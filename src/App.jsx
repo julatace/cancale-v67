@@ -20,7 +20,7 @@ const INIT_SAL = [{"id":"s0001","productId":"Casquette roger","buyPrice":14.5,"s
 // ============ SYNCHRO SUPABASE (Mac <-> iPhone) ============
 // Base de donnees en ligne : les donnees sont partagees entre tous les appareils
 const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
-const SUPABASE_KEY = "sb_publishable_YBY_YaVncDdbv-6naRw8IA_OES0EObU";
+const SUPABASE_KEY = "COLLE_TA_CLE_ANON_ICI";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 
 // Liste des cles synchronisees dans le cloud
@@ -299,7 +299,57 @@ function MonthChart({sales}) {
 }
 
 /* ── Dashboard ───────────────────────────────────────── */
+// Détail des ventes d'un mois (affiché au clic sur une barre du graphique)
+function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
+  // Construit le nom de chaque paire depuis le catalogue (si dispo)
+  const catName={};
+  (catalog||[]).forEach(p=>{ if(p.name) catName[p.id]=p.name; });
+  const ventes=[...(mois.ventes||[])].sort((a,b)=>{
+    // tri par date (la plus récente d'abord) selon le type de graphique
+    const da=(type==='encaisse'?a.receiveDate:a.saleDate)||'';
+    const db=(type==='encaisse'?b.receiveDate:b.saleDate)||'';
+    return db.localeCompare(da);
+  });
+  const totalCA=ventes.reduce((s,v)=>s+(+v.sellPrice||0),0);
+  const totalProfit=ventes.reduce((s,v)=>s+((+v.sellPrice||0)-(+v.buyPrice||0)),0);
+  return (
+    <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <span style={{fontSize:13,fontWeight:800,color:C.text}}>{mois.nomComplet} — {ventes.length} vente{ventes.length>1?'s':''}</span>
+        <span onClick={onClose} style={{cursor:'pointer',color:C.muted,fontSize:18,fontWeight:700,lineHeight:1}}>×</span>
+      </div>
+      <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12}}>
+        <span style={{color:C.text}}>CA : <b>{fmt(totalCA)}</b></span>
+        <span style={{color:C.accent}}>Bénéfice : <b>{fmt(totalProfit)}</b></span>
+      </div>
+      <div style={{maxHeight:260,overflowY:'auto'}}>
+        {ventes.map((v,i)=>{
+          const nom=catName[v.productId]||(v.productId?('Paire '+v.productId):'—');
+          const dateAff=(type==='encaisse'?v.receiveDate:v.saleDate)||'';
+          const benef=(+v.sellPrice||0)-(+v.buyPrice||0);
+          return (
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:C.text,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
+                <div style={{color:C.muted,fontSize:10}}>{dateAff}{v.productId?` · n°${v.productId}`:''}</div>
+              </div>
+              <div style={{textAlign:'right',marginLeft:10}}>
+                <div style={{color:C.text,fontWeight:700}}>{fmt(+v.sellPrice||0)}</div>
+                <div style={{color:benef>=0?C.accent:C.warn,fontSize:10}}>{benef>=0?'+':''}{fmt(benef)}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({catalog,sales,garageGrid,invoices}) {
+  // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
+  const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
+  const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
+
   // Paires réellement présentes dans le garage (mémorisé)
   const garageVals=useMemo(()=>
     Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').map(v=>v.trim()),
@@ -373,31 +423,35 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
   // Historique du CA ENCAISSÉ par mois (12 derniers mois, basé sur receiveDate)
   const caHistory=useMemo(()=>{
     const moisCourts=['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
+    const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
     const map={};
     encaissees.forEach(v=>{
       const p=(v.receiveDate||'').trim().split('/');
       if(p.length===3){
         const key=p[2]+'-'+p[1];
-        if(!map[key]) map[key]={ca:0,label:moisCourts[parseInt(p[1],10)-1]||p[1]};
+        if(!map[key]) map[key]={ca:0,label:moisCourts[parseInt(p[1],10)-1]||p[1],nomComplet:`${moisNoms[parseInt(p[1],10)-1]||p[1]} ${p[2]}`,ventes:[]};
         map[key].ca+=+v.sellPrice;
+        map[key].ventes.push(v);
       }
     });
-    return Object.keys(map).sort().slice(-12).map(k=>({label:map[k].label,ca:map[k].ca}));
+    return Object.keys(map).sort().slice(-12).map(k=>({key:k,label:map[k].label,nomComplet:map[k].nomComplet,ca:map[k].ca,ventes:map[k].ventes}));
   },[encaissees]);
 
   // Historique du CA par DATE DE VENTE (12 derniers mois, basé sur saleDate)
   const caHistoryVente=useMemo(()=>{
     const moisCourts=['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
+    const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
     const map={};
     sales.forEach(v=>{
       const p=(v.saleDate||'').trim().split('/');
       if(p.length===3){
         const key=p[2]+'-'+p[1];
-        if(!map[key]) map[key]={ca:0,label:moisCourts[parseInt(p[1],10)-1]||p[1]};
+        if(!map[key]) map[key]={ca:0,label:moisCourts[parseInt(p[1],10)-1]||p[1],nomComplet:`${moisNoms[parseInt(p[1],10)-1]||p[1]} ${p[2]}`,ventes:[]};
         map[key].ca+=+v.sellPrice;
+        map[key].ventes.push(v);
       }
     });
-    return Object.keys(map).sort().slice(-12).map(k=>({label:map[k].label,ca:map[k].ca}));
+    return Object.keys(map).sort().slice(-12).map(k=>({key:k,label:map[k].label,nomComplet:map[k].nomComplet,ca:map[k].ca,ventes:map[k].ventes}));
   },[sales]);
 
   // Récap comptable par MOIS (CA encaissé, bénéfice, cotisations + impôt 13,5 %)
@@ -561,46 +615,56 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         </div>
       </div>
 
-      {/* Graphique du CA encaissé par mois */}
+      {/* Graphique du CA encaissé par mois (cliquable) */}
       {caHistory.length>0&&(()=>{
         const maxCA=Math.max(...caHistory.map(h=>h.ca),1);
+        const sel=caHistory.find(h=>h.key===selMonthEnc);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:16}}>💰 Évolution du CA encaissé (argent reçu, 12 derniers mois)</div>
+            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>💰 Évolution du CA encaissé (argent reçu, 12 derniers mois)</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche une barre pour voir le détail des ventes du mois.</div>
             <div style={{display:'flex',alignItems:'flex-end',gap:6,height:150,paddingTop:10}}>
               {caHistory.map((h,i)=>{
                 const pct=Math.round(h.ca/maxCA*100);
+                const actif=h.key===selMonthEnc;
                 return (
-                  <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end'}}>
+                  <div key={i} onClick={()=>setSelMonthEnc(actif?null:h.key)}
+                       style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer'}}>
                     <div style={{fontSize:9,color:C.muted,fontWeight:700,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
-                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:`linear-gradient(180deg, ${C.accent} 0%, ${C.accent}aa 100%)`,borderRadius:'6px 6px 0 0',transition:'height .4s'}}/>
-                    <div style={{fontSize:10,color:C.muted,fontWeight:600}}>{h.label}</div>
+                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:`linear-gradient(180deg, ${C.accent} 0%, ${C.accent}aa 100%)`,borderRadius:'6px 6px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.accent}`:'none'}}/>
+                    <div style={{fontSize:10,color:actif?C.accent:C.muted,fontWeight:actif?800:600}}>{h.label}</div>
                   </div>
                 );
               })}
             </div>
+            {sel&&<MonthDetail mois={sel} type="encaisse" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthEnc(null)}/>}
           </Card>
         );
       })()}
 
-      {/* Graphique du CA par date de vente */}
+      {/* Graphique du CA par date de vente (cliquable) */}
       {caHistoryVente.length>0&&(()=>{
         const maxCA=Math.max(...caHistoryVente.map(h=>h.ca),1);
+        const sel=caHistoryVente.find(h=>h.key===selMonthVente);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:16}}>🛒 Évolution du CA par date de vente (12 derniers mois)</div>
+            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>🛒 Évolution du CA par date de vente (12 derniers mois)</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche une barre pour voir le détail des ventes du mois.</div>
             <div style={{display:'flex',alignItems:'flex-end',gap:6,height:150,paddingTop:10}}>
               {caHistoryVente.map((h,i)=>{
                 const pct=Math.round(h.ca/maxCA*100);
+                const actif=h.key===selMonthVente;
                 return (
-                  <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end'}}>
+                  <div key={i} onClick={()=>setSelMonthVente(actif?null:h.key)}
+                       style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer'}}>
                     <div style={{fontSize:9,color:C.muted,fontWeight:700,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
-                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:`linear-gradient(180deg, ${C.blue} 0%, ${C.blue}aa 100%)`,borderRadius:'6px 6px 0 0',transition:'height .4s'}}/>
-                    <div style={{fontSize:10,color:C.muted,fontWeight:600}}>{h.label}</div>
+                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:`linear-gradient(180deg, ${C.blue} 0%, ${C.blue}aa 100%)`,borderRadius:'6px 6px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.blue}`:'none'}}/>
+                    <div style={{fontSize:10,color:actif?C.blue:C.muted,fontWeight:actif?800:600}}>{h.label}</div>
                   </div>
                 );
               })}
             </div>
+            {sel&&<MonthDetail mois={sel} type="vente" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthVente(null)}/>}
           </Card>
         );
       })()}
