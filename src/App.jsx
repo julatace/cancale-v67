@@ -20,7 +20,7 @@ const INIT_SAL = [{"id":"s0001","productId":"Casquette roger","buyPrice":14.5,"s
 // ============ SYNCHRO SUPABASE (Mac <-> iPhone) ============
 // Base de donnees en ligne : les donnees sont partagees entre tous les appareils
 const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
-const SUPABASE_KEY = "COLLE_TA_CLE_ANON_ICI";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 
 // Liste des cles synchronisees dans le cloud
