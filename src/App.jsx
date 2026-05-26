@@ -20,7 +20,7 @@ const INIT_SAL = [{"id":"s0001","productId":"Casquette roger","buyPrice":14.5,"s
 // ============ SYNCHRO SUPABASE (Mac <-> iPhone) ============
 // Base de donnees en ligne : les donnees sont partagees entre tous les appareils
 const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
+const SUPABASE_KEY = "COLLE_TA_CLE_ANON_ICI";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 
 // Liste des cles synchronisees dans le cloud
@@ -394,10 +394,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
   },[encaissees]);
   const days=useMemo(()=>Object.entries(dayStats),[dayStats]);
 
-  // Estimation des cotisations URSSAF (13,5 % du CA encaissé — cotisations + impôt inclus)
-  const TAUX_URSSAF=0.135;
-  const urssafEstime=ca*TAUX_URSSAF;
-  const netApresUrssaf=ca-urssafEstime;
+  // (Estimation des cotisations URSSAF déplacée après moisCourant, voir plus bas)
 
   // CA et bénéfice du MOIS EN COURS (basé sur la date de réception JJ/MM/AAAA)
   const moisCourant=useMemo(()=>{
@@ -415,6 +412,12 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
     const labels=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
     return {ca:caM, profit:profitM, count:countM, nom:labels[now.getMonth()]};
   },[encaissees]);
+
+  // Cotisations + impôt du MOIS EN COURS : 13,5 % du CA encaissé du mois.
+  // C'est la somme à payer à la fin du mois (versement libératoire).
+  const TAUX_URSSAF=0.135;
+  const urssafEstime=moisCourant.ca*TAUX_URSSAF;
+  const netApresUrssaf=moisCourant.ca-urssafEstime;
 
   const bestDayCA=useMemo(()=>[...days].sort((a,b)=>b[1].ca-a[1].ca)[0],[days]);
   const bestDayProfit=useMemo(()=>[...days].sort((a,b)=>b[1].profit-a[1].profit)[0],[days]);
@@ -542,23 +545,23 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         </div>
       </Card>
 
-      {/* Estimation URSSAF */}
+      {/* Estimation cotisations du MOIS EN COURS */}
       <Card style={{padding:18,background:`linear-gradient(135deg, ${C.warn}15 0%, ${C.surface} 100%)`,border:`1px solid ${C.warn}44`}}>
         <div style={{fontSize:11,color:C.warn,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:12}}>
-          🧾 Estimation cotisations (13,5 % du CA encaissé)
+          🧾 À payer pour {moisCourant.nom} (13,5 % du CA encaissé)
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
           <div>
-            <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À provisionner</div>
-            <div style={{fontSize:24,fontWeight:800,color:C.warn,letterSpacing:-0.5}}>{fmt(urssafEstime)}</div>
+            <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Somme à payer ce mois</div>
+            <div style={{fontSize:28,fontWeight:800,color:C.warn,letterSpacing:-0.5}}>{fmt(urssafEstime)}</div>
           </div>
           <div>
-            <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net estimé après cotisations</div>
-            <div style={{fontSize:24,fontWeight:800,color:C.accent,letterSpacing:-0.5}}>{fmt(netApresUrssaf)}</div>
+            <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net estimé après paiement</div>
+            <div style={{fontSize:28,fontWeight:800,color:C.accent,letterSpacing:-0.5}}>{fmt(netApresUrssaf)}</div>
           </div>
         </div>
         <div style={{fontSize:10,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          Estimation indicative sur le CA encaissé total. Vérifie ton taux exact sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
+          Calculé sur le CA encaissé de {moisCourant.nom} ({fmt(moisCourant.ca)}). C'est la somme à verser à la fin du mois (versement libératoire). Vérifie ton taux sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
         </div>
       </Card>
 
@@ -2321,15 +2324,44 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
     setBordereaux(u); save('vinted_bordereaux',u);
   };
 
-  // Imprimer tous les bordereaux d'un coup : ouvre chaque PDF dans un onglet
+  // Imprimer tous les bordereaux d'un coup : ouvre UNE page avec tous les
+  // PDF à la suite (un par page), prête à imprimer (Cmd+P / Partager -> Imprimer).
   const imprimerTout=()=>{
     const avecPdf=bordereaux.filter(b=>b.pdfUrl);
     if(avecPdf.length===0){ alert('Aucun bordereau avec PDF à imprimer.'); return; }
-    if(!window.confirm(`Ouvrir ${avecPdf.length} bordereau(x) pour impression ?\n(Autorise les fenêtres pop-up si demandé.)`))return;
-    avecPdf.forEach((b,i)=>{
-      // Petit décalage pour éviter que le navigateur bloque l'ouverture multiple
-      setTimeout(()=>window.open(b.pdfUrl,'_blank'),i*400);
-    });
+    // Convertit les liens Drive en liens d'aperçu intégrable (/preview)
+    const toEmbed=(url)=>{
+      const m=String(url).match(/[-\w]{25,}/); // id du fichier Drive
+      return m? ('https://drive.google.com/file/d/'+m[0]+'/preview') : url;
+    };
+    const blocs=avecPdf.map(b=>{
+      const titre=(b.numero?('N° '+b.numero):'')+(b.modele?(' — '+b.modele):'');
+      return `<div class="page">
+        <div class="titre">${titre.replace(/</g,'&lt;')}</div>
+        <iframe src="${toEmbed(b.pdfUrl)}" loading="lazy"></iframe>
+      </div>`;
+    }).join('');
+    const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>Bordereaux à imprimer (${avecPdf.length})</title>
+      <style>
+        body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#f0f0f0;}
+        .barre{position:sticky;top:0;background:#007782;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;}
+        .barre button{background:#fff;color:#007782;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;cursor:pointer;}
+        .page{page-break-after:always;padding:10px;background:#fff;margin:10px;border-radius:8px;}
+        .titre{font-weight:700;font-size:16px;margin-bottom:8px;}
+        iframe{width:100%;height:600px;border:1px solid #ccc;}
+        @media print{.barre{display:none;}.page{margin:0;border-radius:0;}iframe{height:95vh;border:none;}}
+      </style></head>
+      <body>
+        <div class="barre">
+          <span>${avecPdf.length} bordereau(x) — vérifie qu'ils sont bien chargés puis imprime</span>
+          <button onclick="window.print()">🖨️ Imprimer tout</button>
+        </div>
+        ${blocs}
+      </body></html>`;
+    const w=window.open('','_blank');
+    if(!w){ alert('Autorise les fenêtres pop-up pour ce site, puis réessaie.'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   };
 
   const liste = bordereaux;
@@ -2423,6 +2455,7 @@ export default function App() {
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);
   const [syncStatus,setSyncStatus]=useState('idle'); // idle | saving | synced | error | loading
+  const [lastSync,setLastSync]=useState(null); // date de la dernière synchro réussie
   // Logo personnalisable : si l'utilisateur en charge un, il remplace le logo par défaut (header + factures)
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
   const logoSrc = customLogo || LOGO_CANCALE;
@@ -2454,7 +2487,7 @@ export default function App() {
   useEffect(() => {
     let stop = false;
     // Écoute les changements de statut de synchro (saving / synced / error)
-    const off = onSyncChange((st)=>{ if(!stop) setSyncStatus(st); });
+    const off = onSyncChange((st)=>{ if(!stop){ setSyncStatus(st); if(st==='synced') setLastSync(new Date()); } });
     setSyncStatus('loading');
     (async () => {
       const cloud = await cloudLoad();
@@ -2478,6 +2511,7 @@ export default function App() {
         apply('vinted_invoice_settings', setInvoiceSettings);
         apply('vinted_custom_logo', setCustomLogo);
         setSyncStatus('synced');
+        setLastSync(new Date());
       } else {
         // Cloud vide : on y envoie les données locales actuelles (1re utilisation)
         cloudPush();
@@ -2488,7 +2522,7 @@ export default function App() {
   }, []);
 
   return (
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:78,transition:'background .3s,color .3s'}}>
+    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'hidden',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:78,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
@@ -2515,8 +2549,13 @@ export default function App() {
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
               syncStatus==='error'?'Hors ligne (sauvegarde locale)':'En attente'
-            } style={{fontSize:13,opacity:0.9}}>
+            } style={{fontSize:13,opacity:0.9,display:'flex',alignItems:'center',gap:4}}>
               {syncStatus==='synced'?'☁️':syncStatus==='saving'||syncStatus==='loading'?'🔄':syncStatus==='error'?'⚠️':'☁️'}
+              {lastSync&&syncStatus==='synced'&&(
+                <span style={{fontSize:9,color:C.muted,fontWeight:600}}>
+                  {String(lastSync.getHours()).padStart(2,'0')}:{String(lastSync.getMinutes()).padStart(2,'0')}
+                </span>
+              )}
             </span>
           </div>
           {/* Boutons Mode sombre / Exporter / Importer */}
@@ -2605,6 +2644,8 @@ export default function App() {
       />}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+        html, body, #root { max-width: 100%; overflow-x: hidden; margin: 0; }
+        * { box-sizing: border-box; }
         @media (max-width: 600px) {
           table { font-size: 11px !important; }
           table td, table th { padding: 6px 4px !important; }
