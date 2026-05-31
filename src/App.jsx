@@ -1298,7 +1298,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const PER_PAGE=50;
   
   // URL de l'API Apps Script (Vinted Auto)
-  const VINTED_API_URL='https://script.google.com/macros/s/AKfycbyWC5Sf85wTRA2wONYyJdomZcUBlQQDTwbZX0xZk5QA7PYPWwT2Y97WhBKkMPpvufaM/exec';
+  const VINTED_API_URL='https://script.google.com/macros/s/AKfycbzO-jwmFwOwJI49W0LjR8EOcIKAWsTzElWsWc6IVg0luX6MhbJNdOXzpe2BhYUCXmHb/exec';
   
   // Récupère les factures depuis Google Sheets via Apps Script
   // silencieux = true : pas d'alertes (utilisé pour le rafraîchissement auto au démarrage)
@@ -2268,9 +2268,8 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
 
   // API Apps Script bordereaux : même endpoint que les ventes, avec ?type=bordereaux
   // ⚠️ Après redéploiement du script combiné, vérifie que l'URL ci-dessous correspond à ton déploiement actuel.
-  const BORD_API_BASE='https://script.google.com/macros/s/AKfycbyWC5Sf85wTRA2wONYyJdomZcUBlQQDTwbZX0xZk5QA7PYPWwT2Y97WhBKkMPpvufaM/exec';
+  const BORD_API_BASE='https://script.google.com/macros/s/AKfycbzO-jwmFwOwJI49W0LjR8EOcIKAWsTzElWsWc6IVg0luX6MhbJNdOXzpe2BhYUCXmHb/exec';
   const BORD_API_URL=BORD_API_BASE+'?type=bordereaux';
-  const [fusionEnCours,setFusionEnCours]=useState(false);
 
   const fetchBordereaux=async(silencieux=false)=>{
     if(!BORD_API_URL){
@@ -2349,28 +2348,17 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
     setSelection(new Set(bordereaux.filter(b=>String(b.dateMail||'').indexOf(dateAuj)>=0).map(b=>b.id)));
   };
 
-  // Fusionne les bordereaux sélectionnés en UN PDF (via Apps Script) puis l'ouvre.
-  // Le PDF unique s'imprime parfaitement (toutes les pages à la suite).
-  const imprimerSelection=async()=>{
+  // Fusionne les bordereaux sélectionnés en UN PDF (via Apps Script) et l'ouvre.
+  // On ouvre directement l'URL de fusion dans un nouvel onglet : le script
+  // fusionne puis redirige vers le PDF complet (toutes les pages à la suite).
+  const imprimerSelection=()=>{
     const choisis=bordereaux.filter(b=>selection.has(b.id)&&b.transaction);
     if(choisis.length===0){ alert('Coche au moins un bordereau à imprimer.'); return; }
-    setFusionEnCours(true);
-    try{
-      const ids=choisis.map(b=>b.transaction).join(',');
-      const url=BORD_API_BASE+'?type=fusion&ids='+encodeURIComponent(ids);
-      const res=await fetch(url);
-      const data=await res.json();
-      if(data&&data.ok&&data.url){
-        // Ouvre le PDF fusionné : il s'imprime proprement (Cmd+P / Partager -> Imprimer)
-        window.open(data.url,'_blank');
-      }else{
-        alert('La fusion n\'a pas abouti : '+((data&&data.error)||'erreur inconnue')+'\nRéessaie dans un instant.');
-      }
-    }catch(err){
-      alert('Erreur pendant la fusion : '+err.message+'\nVérifie ta connexion et réessaie.');
-    }finally{
-      setFusionEnCours(false);
-    }
+    const ids=choisis.map(b=>b.transaction).join(',');
+    const url=BORD_API_BASE+'?type=fusion&ids='+encodeURIComponent(ids);
+    // Ouvre l'onglet tout de suite (évite le blocage pop-up), puis lance la fusion
+    const w=window.open(url,'_blank');
+    if(!w){ alert('Autorise les fenêtres pop-up pour ce site, puis réessaie.'); }
   };
 
   const liste = bordereaux;
@@ -2381,8 +2369,8 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:14}}>
         <h2 style={{margin:0,fontSize:16,fontWeight:800}}>🏷️ Bordereaux d'envoi ({bordereaux.length})</h2>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          <Btn small onClick={imprimerSelection} color={C.accent} disabled={nbSel===0||fusionEnCours}>
-            {fusionEnCours?'⏳ Fusion en cours...':`🖨️ Imprimer la sélection${nbSel>0?` (${nbSel})`:''}`}
+          <Btn small onClick={imprimerSelection} color={C.accent} disabled={nbSel===0}>
+            🖨️ Imprimer la sélection{nbSel>0?` (${nbSel})`:''}
           </Btn>
           <Btn small onClick={()=>fetchBordereaux(false)} color={C.purple} disabled={fetching}>
             {fetching?'⏳ Chargement...':'📥 Récupérer'}
@@ -2402,7 +2390,7 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
       )}
 
       <div style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.5}}>
-        Coche les bordereaux à imprimer, puis « Imprimer la sélection » : ils sont fusionnés en un seul PDF qui s'ouvre automatiquement (patiente ~20 s). Imprime-le d'un coup (Cmd+P sur Mac, ou Partager → Imprimer sur iPhone). Toutes les pages sortent à la suite.
+        Coche les bordereaux à imprimer, puis « Imprimer la sélection » : un onglet s'ouvre, prépare le PDF (~20 s) puis affiche tous tes bordereaux à la suite dans un seul document. Imprime-le d'un coup (Cmd+P sur Mac, Partager → Imprimer sur iPhone).
       </div>
 
       {liste.length===0?(
