@@ -2264,6 +2264,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 /* ── Bordereaux ──────────────────────────────────────── */
 function Bordereaux({bordereaux,setBordereaux,setTab}) {
   const [fetching,setFetching]=useState(false);
+  const [selection,setSelection]=useState(()=>new Set()); // ids des bordereaux cochés
 
   // API Apps Script bordereaux : même endpoint que les ventes, avec ?type=bordereaux
   // ⚠️ Après redéploiement du script combiné, vérifie que l'URL ci-dessous correspond à ton déploiement actuel.
@@ -2324,55 +2325,51 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
     setBordereaux(u); save('vinted_bordereaux',u);
   };
 
-  // Imprimer tous les bordereaux d'un coup : ouvre UNE page avec tous les
-  // PDF à la suite (un par page), prête à imprimer (Cmd+P / Partager -> Imprimer).
-  const imprimerTout=()=>{
-    const avecPdf=bordereaux.filter(b=>b.pdfUrl);
-    if(avecPdf.length===0){ alert('Aucun bordereau avec PDF à imprimer.'); return; }
-    // Convertit les liens Drive en liens d'aperçu intégrable (/preview)
-    const toEmbed=(url)=>{
-      const m=String(url).match(/[-\w]{25,}/); // id du fichier Drive
-      return m? ('https://drive.google.com/file/d/'+m[0]+'/preview') : url;
-    };
-    const blocs=avecPdf.map(b=>{
-      const titre=(b.numero?('N° '+b.numero):'')+(b.modele?(' — '+b.modele):'');
-      return `<div class="page">
-        <div class="titre">${titre.replace(/</g,'&lt;')}</div>
-        <iframe src="${toEmbed(b.pdfUrl)}" loading="lazy"></iframe>
-      </div>`;
-    }).join('');
-    const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
-      <title>Bordereaux à imprimer (${avecPdf.length})</title>
-      <style>
-        body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#f0f0f0;}
-        .barre{position:sticky;top:0;background:#007782;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;}
-        .barre button{background:#fff;color:#007782;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;cursor:pointer;}
-        .page{page-break-after:always;padding:10px;background:#fff;margin:10px;border-radius:8px;}
-        .titre{font-weight:700;font-size:16px;margin-bottom:8px;}
-        iframe{width:100%;height:600px;border:1px solid #ccc;}
-        @media print{.barre{display:none;}.page{margin:0;border-radius:0;}iframe{height:95vh;border:none;}}
-      </style></head>
-      <body>
-        <div class="barre">
-          <span>${avecPdf.length} bordereau(x) — vérifie qu'ils sont bien chargés puis imprime</span>
-          <button onclick="window.print()">🖨️ Imprimer tout</button>
-        </div>
-        ${blocs}
-      </body></html>`;
-    const w=window.open('','_blank');
-    if(!w){ alert('Autorise les fenêtres pop-up pour ce site, puis réessaie.'); return; }
-    w.document.open(); w.document.write(html); w.document.close();
+  // --- Sélection des bordereaux à imprimer ---
+  const toggleSel=(id)=>{
+    setSelection(prev=>{
+      const s=new Set(prev);
+      if(s.has(id)) s.delete(id); else s.add(id);
+      return s;
+    });
+  };
+  const toutSelectionner=()=>setSelection(new Set(bordereaux.map(b=>b.id)));
+  const toutDeselectionner=()=>setSelection(new Set());
+  const selectionnerAImprimer=()=>{
+    setSelection(new Set(bordereaux.filter(b=>(b.statut||'à imprimer')==='à imprimer').map(b=>b.id)));
+  };
+  const selectionnerAujourdhui=()=>{
+    const auj=new Date();
+    const jj=String(auj.getDate()).padStart(2,'0');
+    const mm=String(auj.getMonth()+1).padStart(2,'0');
+    const aaaa=auj.getFullYear();
+    const dateAuj=jj+'/'+mm+'/'+aaaa;
+    setSelection(new Set(bordereaux.filter(b=>String(b.dateMail||'').indexOf(dateAuj)>=0).map(b=>b.id)));
+  };
+
+  // Ouvre les bordereaux sélectionnés pour impression.
+  // Chaque PDF s'ouvre dans un onglet : tu peux l'imprimer (Cmd+P / Partager -> Imprimer).
+  const imprimerSelection=()=>{
+    const choisis=bordereaux.filter(b=>selection.has(b.id)&&b.pdfUrl);
+    if(choisis.length===0){ alert('Coche au moins un bordereau (avec PDF) à imprimer.'); return; }
+    if(choisis.length>8 && !window.confirm(`Ouvrir ${choisis.length} bordereaux dans ${choisis.length} onglets ?\nC'est beaucoup — tu peux aussi en sélectionner moins.`)) return;
+    // Lien d'aperçu Drive (s'ouvre proprement et permet l'impression)
+    const toView=(url)=>{ const m=String(url).match(/[-\w]{25,}/); return m?('https://drive.google.com/file/d/'+m[0]+'/view'):url; };
+    choisis.forEach((b,i)=>{
+      setTimeout(()=>window.open(toView(b.pdfUrl),'_blank'), i*350);
+    });
   };
 
   const liste = bordereaux;
+  const nbSel = selection.size;
 
   return (
     <div style={{padding:16}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:14}}>
         <h2 style={{margin:0,fontSize:16,fontWeight:800}}>🏷️ Bordereaux d'envoi ({bordereaux.length})</h2>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          <Btn small onClick={imprimerTout} color={C.accent} disabled={bordereaux.length===0}>
-            🖨️ Tout imprimer
+          <Btn small onClick={imprimerSelection} color={C.accent} disabled={nbSel===0}>
+            🖨️ Imprimer la sélection{nbSel>0?` (${nbSel})`:''}
           </Btn>
           <Btn small onClick={()=>fetchBordereaux(false)} color={C.purple} disabled={fetching}>
             {fetching?'⏳ Chargement...':'📥 Récupérer'}
@@ -2380,8 +2377,19 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
         </div>
       </div>
 
+      {/* Barre de sélection rapide */}
+      {liste.length>0&&(
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12,alignItems:'center'}}>
+          <span style={{fontSize:11,color:C.muted,fontWeight:700}}>Sélection :</span>
+          <Btn small onClick={toutSelectionner} color={C.blue}>Tout</Btn>
+          <Btn small onClick={selectionnerAImprimer} color={C.warn}>À imprimer</Btn>
+          <Btn small onClick={selectionnerAujourdhui} color={C.blue}>Aujourd'hui</Btn>
+          {nbSel>0&&<Btn small onClick={toutDeselectionner} color={C.muted}>Effacer ({nbSel})</Btn>}
+        </div>
+      )}
+
       <div style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.5}}>
-        Les bordereaux arrivent automatiquement depuis tes mails Vinted. Le n° de paire + le modèle sont écrits au milieu du PDF. Une fois imprimé, clique « Impression faite » : le bordereau quitte la liste (le PDF reste dans ton Drive).
+        Coche les bordereaux à imprimer, puis « Imprimer la sélection » : chaque PDF s'ouvre dans un onglet (Cmd+P sur Mac, ou Partager → Imprimer sur iPhone). Le n° de paire + le modèle sont écrits sur le PDF.
       </div>
 
       {liste.length===0?(
@@ -2390,10 +2398,14 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
         </div>
       ):(
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {liste.map(b=>(
-              <div key={b.id} style={{background:C.card,border:`1px solid ${C.warn}55`,borderRadius:12,padding:14,
-                display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+          {liste.map(b=>{
+              const coche=selection.has(b.id);
+              return (
+              <div key={b.id} onClick={()=>toggleSel(b.id)} style={{background:coche?(C.accent+'18'):C.card,border:`1px solid ${coche?C.accent:C.warn+'55'}`,borderRadius:12,padding:14,
+                display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',cursor:'pointer',transition:'background .15s,border-color .15s'}}>
                 <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+                  <input type="checkbox" checked={coche} onChange={()=>toggleSel(b.id)} onClick={e=>e.stopPropagation()}
+                    style={{width:22,height:22,accentColor:C.accent,cursor:'pointer',flexShrink:0}}/>
                   <div style={{fontSize:24,fontWeight:800,color:C.warn,fontFamily:'monospace',minWidth:70}}>#{b.numero||'?'}</div>
                   <div>
                     <div style={{fontSize:14,fontWeight:700,color:C.text}}>{b.modele||'—'}</div>
@@ -2403,7 +2415,7 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
                     </div>
                   </div>
                 </div>
-                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}} onClick={e=>e.stopPropagation()}>
                   {b.pdfUrl&&<a href={b.pdfUrl} target="_blank" rel="noopener noreferrer"
                     style={{background:C.blue,color:'#001018',borderRadius:6,padding:'7px 12px',fontSize:12,fontWeight:700,textDecoration:'none'}}>
                     🖨️ Bordereau
@@ -2412,7 +2424,8 @@ function Bordereaux({bordereaux,setBordereaux,setTab}) {
                   <Btn small onClick={()=>supprimer(b.id)} color={C.danger}>🗑</Btn>
                 </div>
               </div>
-          ))}
+              );
+          })}
         </div>
       )}
     </div>
