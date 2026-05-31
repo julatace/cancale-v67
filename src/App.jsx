@@ -26,7 +26,7 @@ const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 // Liste des cles synchronisees dans le cloud
 const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
-  'vinted_extracols','vinted_colors','vinted_invoices','vinted_bordereaux',
+  'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark',
 ];
 
@@ -204,7 +204,6 @@ const TABS=[
   {id:'catalog',  icon:'📦',label:'Catalogue'},
   {id:'sales',    icon:'💸',label:'Ventes'},
   {id:'invoices', icon:'📄',label:'Factures'},
-  {id:'bordereaux',icon:'🏷️',label:'Bordereaux'},
   {id:'garage',   icon:'🏠',label:'Garage'},
 ];
 function Nav({tab,setTab,catalog,sales,garageGrid}) {
@@ -2261,178 +2260,6 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
   );
 }
 
-/* ── Bordereaux ──────────────────────────────────────── */
-function Bordereaux({bordereaux,setBordereaux,setTab}) {
-  const [fetching,setFetching]=useState(false);
-  const [selection,setSelection]=useState(()=>new Set()); // ids des bordereaux cochés
-
-  // API Apps Script bordereaux : même endpoint que les ventes, avec ?type=bordereaux
-  // ⚠️ Après redéploiement du script combiné, vérifie que l'URL ci-dessous correspond à ton déploiement actuel.
-  const BORD_API_BASE='https://script.google.com/macros/s/AKfycbzO-jwmFwOwJI49W0LjR8EOcIKAWsTzElWsWc6IVg0luX6MhbJNdOXzpe2BhYUCXmHb/exec';
-  const BORD_API_URL=BORD_API_BASE+'?type=bordereaux';
-
-  const fetchBordereaux=async(silencieux=false)=>{
-    if(!BORD_API_URL){
-      if(!silencieux) alert("L'URL de l'API bordereaux n'est pas encore configurée. Déploie d'abord le script bordereaux et colle son URL ici.");
-      return;
-    }
-    setFetching(true);
-    try{
-      const res=await fetch(BORD_API_URL);
-      const data=await res.json();
-      if(!Array.isArray(data)){ if(!silencieux)alert('Format inattendu'); return; }
-      const existingKeys=new Set(bordereaux.map(b=>String(b.transaction)));
-      const nouveaux=[];
-      data.forEach(row=>{
-        const transaction=String(row['N° transaction']||'').trim();
-        if(!transaction||existingKeys.has(transaction)) return;
-        nouveaux.push({
-          id:'bord_'+transaction,
-          numero:String(row['N° paire']||'').trim(),
-          modele:String(row['Modèle']||'').trim(),
-          suivi:String(row['N° suivi']||'').trim(),
-          transaction:transaction,
-          dateLimite:String(row['Date limite']||'').trim(),
-          statut:String(row['Statut']||'à imprimer').trim(),
-          pdfUrl:String(row['Lien PDF']||'').trim(),
-          dateMail:row['Date mail']||'',
-        });
-      });
-      if(nouveaux.length===0){ if(!silencieux)alert('Aucun nouveau bordereau'); }
-      else { const u=[...nouveaux,...bordereaux]; setBordereaux(u); save('vinted_bordereaux',u);
-        if(!silencieux)alert(`✓ ${nouveaux.length} nouveau(x) bordereau(x) !`); }
-    }catch(err){ if(!silencieux)alert('Erreur : '+err.message); }
-    finally{ setFetching(false); }
-  };
-
-  // Rafraîchissement auto au démarrage + toutes les 5 min
-  const _ref=React.useRef(false);
-  useEffect(()=>{
-    if(_ref.current)return; _ref.current=true;
-    fetchBordereaux(true);
-    const it=setInterval(()=>fetchBordereaux(true),5*60*1000);
-    return ()=>clearInterval(it);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  // "Impression faite" : retire le bordereau de la liste (le PDF reste dans Drive)
-  const impressionFaite=(id)=>{
-    const u=bordereaux.filter(b=>b.id!==id);
-    setBordereaux(u); save('vinted_bordereaux',u);
-  };
-  const supprimer=(id)=>{
-    if(!window.confirm('Supprimer ce bordereau de la liste ?'))return;
-    const u=bordereaux.filter(b=>b.id!==id);
-    setBordereaux(u); save('vinted_bordereaux',u);
-  };
-
-  // --- Sélection des bordereaux à imprimer ---
-  const toggleSel=(id)=>{
-    setSelection(prev=>{
-      const s=new Set(prev);
-      if(s.has(id)) s.delete(id); else s.add(id);
-      return s;
-    });
-  };
-  const toutSelectionner=()=>setSelection(new Set(bordereaux.map(b=>b.id)));
-  const toutDeselectionner=()=>setSelection(new Set());
-  const selectionnerAImprimer=()=>{
-    setSelection(new Set(bordereaux.filter(b=>(b.statut||'à imprimer')==='à imprimer').map(b=>b.id)));
-  };
-  const selectionnerAujourdhui=()=>{
-    const auj=new Date();
-    const jj=String(auj.getDate()).padStart(2,'0');
-    const mm=String(auj.getMonth()+1).padStart(2,'0');
-    const aaaa=auj.getFullYear();
-    const dateAuj=jj+'/'+mm+'/'+aaaa;
-    setSelection(new Set(bordereaux.filter(b=>String(b.dateMail||'').indexOf(dateAuj)>=0).map(b=>b.id)));
-  };
-
-  // Fusionne les bordereaux sélectionnés en UN PDF (via Apps Script) et l'ouvre.
-  // On ouvre directement l'URL de fusion dans un nouvel onglet : le script
-  // fusionne puis redirige vers le PDF complet (toutes les pages à la suite).
-  const imprimerSelection=()=>{
-    const choisis=bordereaux.filter(b=>selection.has(b.id)&&b.transaction);
-    if(choisis.length===0){ alert('Coche au moins un bordereau à imprimer.'); return; }
-    const ids=choisis.map(b=>b.transaction).join(',');
-    const url=BORD_API_BASE+'?type=fusion&ids='+encodeURIComponent(ids);
-    // Ouvre l'onglet tout de suite (évite le blocage pop-up), puis lance la fusion
-    const w=window.open(url,'_blank');
-    if(!w){ alert('Autorise les fenêtres pop-up pour ce site, puis réessaie.'); }
-  };
-
-  const liste = bordereaux;
-  const nbSel = selection.size;
-
-  return (
-    <div style={{padding:16}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10,marginBottom:14}}>
-        <h2 style={{margin:0,fontSize:16,fontWeight:800}}>🏷️ Bordereaux d'envoi ({bordereaux.length})</h2>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          <Btn small onClick={imprimerSelection} color={C.accent} disabled={nbSel===0}>
-            🖨️ Imprimer la sélection{nbSel>0?` (${nbSel})`:''}
-          </Btn>
-          <Btn small onClick={()=>fetchBordereaux(false)} color={C.purple} disabled={fetching}>
-            {fetching?'⏳ Chargement...':'📥 Récupérer'}
-          </Btn>
-        </div>
-      </div>
-
-      {/* Barre de sélection rapide */}
-      {liste.length>0&&(
-        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12,alignItems:'center'}}>
-          <span style={{fontSize:11,color:C.muted,fontWeight:700}}>Sélection :</span>
-          <Btn small onClick={toutSelectionner} color={C.blue}>Tout</Btn>
-          <Btn small onClick={selectionnerAImprimer} color={C.warn}>À imprimer</Btn>
-          <Btn small onClick={selectionnerAujourdhui} color={C.blue}>Aujourd'hui</Btn>
-          {nbSel>0&&<Btn small onClick={toutDeselectionner} color={C.muted}>Effacer ({nbSel})</Btn>}
-        </div>
-      )}
-
-      <div style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.5}}>
-        Coche les bordereaux à imprimer, puis « Imprimer la sélection » : un onglet s'ouvre, prépare le PDF (~20 s) puis affiche tous tes bordereaux à la suite dans un seul document. Imprime-le d'un coup (Cmd+P sur Mac, Partager → Imprimer sur iPhone).
-      </div>
-
-      {liste.length===0?(
-        <div style={{padding:30,textAlign:'center',color:C.muted,fontSize:13,border:`1px dashed ${C.border}`,borderRadius:12}}>
-          Aucun bordereau à imprimer. Ils apparaîtront ici automatiquement après chaque vente expédiée par Vinted.
-        </div>
-      ):(
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {liste.map(b=>{
-              const coche=selection.has(b.id);
-              return (
-              <div key={b.id} onClick={()=>toggleSel(b.id)} style={{background:coche?(C.accent+'18'):C.card,border:`1px solid ${coche?C.accent:C.warn+'55'}`,borderRadius:12,padding:14,
-                display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',cursor:'pointer',transition:'background .15s,border-color .15s'}}>
-                <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-                  <input type="checkbox" checked={coche} onChange={()=>toggleSel(b.id)} onClick={e=>e.stopPropagation()}
-                    style={{width:22,height:22,accentColor:C.accent,cursor:'pointer',flexShrink:0}}/>
-                  <div style={{fontSize:24,fontWeight:800,color:C.warn,fontFamily:'monospace',minWidth:70}}>#{b.numero||'?'}</div>
-                  <div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.text}}>{b.modele||'—'}</div>
-                    <div style={{fontSize:11,color:C.muted,marginTop:3}}>
-                      {b.dateLimite&&<span>⏰ Avant le {b.dateLimite}</span>}
-                      {b.suivi&&<span style={{marginLeft:10}}>📦 Suivi {b.suivi}</span>}
-                    </div>
-                  </div>
-                </div>
-                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}} onClick={e=>e.stopPropagation()}>
-                  {b.pdfUrl&&<a href={b.pdfUrl} target="_blank" rel="noopener noreferrer"
-                    style={{background:C.blue,color:'#001018',borderRadius:6,padding:'7px 12px',fontSize:12,fontWeight:700,textDecoration:'none'}}>
-                    🖨️ Bordereau
-                  </a>}
-                  <Btn small onClick={()=>impressionFaite(b.id)} color={C.accent}>🖨️ Impression faite</Btn>
-                  <Btn small onClick={()=>supprimer(b.id)} color={C.danger}>🗑</Btn>
-                </div>
-              </div>
-              );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function App() {
   const [tab,setTab]=useState('dashboard');
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
@@ -2458,7 +2285,6 @@ export default function App() {
   const [extraCols,setExtraCols]=useState(()=>load('vinted_extracols',{}));
   const [cellColors,setCellColors]=useState(()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useState(()=>load('vinted_invoices',[]));
-  const [bordereaux,setBordereaux]=useState(()=>load('vinted_bordereaux',[]));
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     companyName:'Shop Cancale35',
     companyType:'Entrepreneur individuel',
@@ -2521,7 +2347,6 @@ export default function App() {
         apply('vinted_extracols', setExtraCols);
         apply('vinted_colors', setCellColors);
         apply('vinted_invoices', setInvoices);
-        apply('vinted_bordereaux', setBordereaux);
         apply('vinted_invoice_settings', setInvoiceSettings);
         apply('vinted_custom_logo', setCustomLogo);
         setSyncStatus('synced');
@@ -2641,7 +2466,6 @@ export default function App() {
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog}/>}
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
-        {tab==='bordereaux'&&<Bordereaux bordereaux={bordereaux} setBordereaux={setBordereaux} setTab={setTab}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors}/>}
       </main>
       {showBackup&&<BackupModal
