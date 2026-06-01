@@ -785,7 +785,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
 }
 
 /* ── Catalogue ───────────────────────────────────────── */
-function Catalog({catalog,setCatalog}) {
+function Catalog({catalog,setCatalog,onDeleteId}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
@@ -808,6 +808,7 @@ function Catalog({catalog,setCatalog}) {
     if(!window.confirm(`Supprimer #${id} ?`)) return;
     const u=catalog.filter(p=>p.id!==id);
     setCatalog(u); save('vinted_catalog',u);
+    if(onDeleteId) onDeleteId(id);
   };
   const toggleStatus=(id)=>{
     const u=catalog.map(p=>p.id===id?{...p,status:p.status==='stock'?'vendu':'stock'}:p);
@@ -1035,22 +1036,27 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   const del=(sid,pid)=>{
     if(!window.confirm('Supprimer cette vente ?')) return;
     const ns=sales.filter(s=>s.id!==sid); setSales(ns); save('vinted_sales',ns);
-    const nc=catalog.map(p=>p.id===pid?{...p,status:'stock'}:p); setCatalog(nc); save('vinted_catalog',nc);
+    const pids=String(pid||'').split('+').map(v=>v.trim()).filter(Boolean);
+    const nc=catalog.map(p=>pids.includes(p.id)?{...p,status:'stock'}:p); setCatalog(nc); save('vinted_catalog',nc);
   };
 
   const addRow=()=>{
     setErr('');
-    const pid=newRow.productId.trim();
-    if(!pid||!newRow.saleDate||!newRow.sellPrice){setErr('Article, date et prix vente obligatoires');return;}
-    const p=catalog.find(x=>x.id===pid);
-    if(p&&p.status==='vendu'){setErr(`#${pid} déjà vendue`);return;}
-    const buy=p?+p.buyPrice:(+newRow.buyPrice||0);
+    const rawPid=newRow.productId.trim();
+    if(!rawPid||!newRow.saleDate||!newRow.sellPrice){setErr('Article, date et prix vente obligatoires');return;}
+    const pids=rawPid.split(/[+,;]+/).map(v=>v.trim()).filter(Boolean);
+    const pid=pids.join('+');
+    const foundItems=pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
+    const alreadySold=pids.find(id=>{const cp=catalog.find(x=>x.id===id);return cp&&cp.status==='vendu';});
+    if(alreadySold){setErr(`#${alreadySold} déjà vendue`);return;}
+    const buy=foundItems.length>0?foundItems.reduce((s,cp)=>s+(+cp.buyPrice),0):(+newRow.buyPrice||0);
     const sell=+newRow.sellPrice;
-    const sale={id:uid(),productId:pid,buyPrice:buy,sellPrice:sell,
+    const sale={id:uid(),productId:pid,buyPrice:+buy.toFixed(2),sellPrice:sell,
       profit:+(sell-buy).toFixed(2),multi:buy>0?+(sell/buy).toFixed(2):0,
-      saleDate:newRow.saleDate,receiveDate:newRow.receiveDate,createdAt:new Date().toISOString()};
+      saleDate:newRow.saleDate,receiveDate:newRow.receiveDate,createdAt:new Date().toISOString(),
+      ...(pids.length>1?{isLot:true}:{})};
     const ns=[sale,...sales]; setSales(ns); save('vinted_sales',ns);
-    if(p){const nc=catalog.map(x=>x.id===pid?{...x,status:'vendu'}:x);setCatalog(nc);save('vinted_catalog',nc);}
+    if(foundItems.length>0){const nc=catalog.map(x=>pids.includes(x.id)?{...x,status:'vendu'}:x);setCatalog(nc);save('vinted_catalog',nc);}
     setNewRow({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
   };
 
@@ -1064,8 +1070,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   const totalCA=useMemo(()=>fullFiltered.reduce((s,v)=>s+ +v.sellPrice,0),[fullFiltered]);
   const totalProfit=useMemo(()=>fullFiltered.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0),[fullFiltered]);
 
-  const p=catalog.find(x=>x.id===newRow.productId.trim());
-  const previewBuy=p?+p.buyPrice:(+newRow.buyPrice||null);
+  const _pids=newRow.productId.trim().split(/[+,;]+/).map(v=>v.trim()).filter(Boolean);
+  const p=_pids.length===1?catalog.find(x=>x.id===_pids[0]):null;
+  const _foundItems=_pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
+  const previewBuy=_foundItems.length>0?_foundItems.reduce((s,x)=>s+(+x.buyPrice),0):(+newRow.buyPrice||null);
   const previewSell=newRow.sellPrice?+newRow.sellPrice:null;
 
   // CA + bénéfice du mois en cours (basé sur la date de réception JJ/MM/AAAA = argent encaissé)
@@ -1209,19 +1217,15 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.productId} onChange={e=>{
                     const pid=e.target.value;
-                    // Cherche une facture pour ce productId
-                    const inv=invoices?invoices.find(i=>String(i.productId).trim()===pid.trim()):null;
-                    // Cherche le prix achat dans le catalogue
-                    const p=catalog.find(x=>x.id===pid.trim());
+                    const parts=pid.trim().split(/[+,;]+/).map(v=>v.trim()).filter(Boolean);
+                    const inv=parts.length===1?(invoices?invoices.find(i=>String(i.productId).trim()===parts[0]):null):null;
                     setNewRow(n=>({
                       ...n,
                       productId:pid,
-                      // Auto-remplit la DATE de vente depuis la facture (PAS le prix : à saisir à la main car frais de port)
                       ...(inv?{saleDate:inv.saleDate||n.saleDate}:{}),
-                      ...(p&&!n.buyPrice?{buyPrice:String(p.buyPrice||'')}:{}),
                     }));
                   }}
-                    placeholder="N° / article" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                    placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:700}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
@@ -1241,7 +1245,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  {p?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(p.buyPrice)}</span>:
+                  {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:10,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
                   <input value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
                     type="number" placeholder="Achat €"
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
@@ -1474,7 +1478,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // Set des productIds qui sont déjà dans Ventes (= comptabilisés)
   const accountedSet=useMemo(()=>{
     const s=new Set();
-    sales.forEach(v=>{if(v.productId) s.add(String(v.productId).trim());});
+    sales.forEach(v=>{
+      if(v.productId) String(v.productId).trim().split('+').forEach(id=>{const t=id.trim();if(t) s.add(t);});
+    });
     return s;
   },[sales]);
   
@@ -2640,7 +2646,7 @@ export default function App() {
   useEffect(()=>{
     if(!synced) return;
     const norm=v=>String(v||'').trim();
-    const factureNums=new Set(invoices.map(i=>norm(i.productId)).filter(Boolean));
+    const factureNums=new Set(invoices.flatMap(i=>norm(i.productId).split('+').map(norm)).filter(Boolean));
     let autoRemoved=load('vinted_sv_auto_removed',[]).map(norm);
     let stock=stockVinted.map(norm);
     let changed=false;
@@ -2694,7 +2700,7 @@ export default function App() {
     let seen=[];
     try{ seen=JSON.parse(seenRaw)||[]; }catch(_){ seen=[]; }
     const seenSet=new Set(seen.map(norm));
-    const factureNums=new Set(invoices.map(i=>norm(i.productId)).filter(Boolean));
+    const factureNums=new Set(invoices.flatMap(i=>norm(i.productId).split('+').map(norm)).filter(Boolean));
 
     // Les nouveaux ids (pas encore vus)
     const nouveaux=currentIds.filter(id=>!seenSet.has(id));
@@ -2868,7 +2874,7 @@ export default function App() {
                   if(data.garageGrid) msg+=`🏠 Garage : ${Object.values(data.garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length} paires\n`;
                   msg+='\n⚠ Tes données actuelles seront REMPLACÉES.';
                   if(!window.confirm(msg)) return;
-                  if(data.catalog) {setCatalog(data.catalog); save('vinted_catalog',data.catalog);}
+                  if(data.catalog) {setCatalog(data.catalog); save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
                   if(data.sales) {setSales(data.sales); save('vinted_sales',data.sales);}
                   if(data.garageGrid) {setGarageGrid(data.garageGrid); save('vinted_garage_grid',data.garageGrid);}
                   alert('✓ Import réussi !');
@@ -2898,7 +2904,13 @@ export default function App() {
       <Nav tab={tab} setTab={setTab} open={menuOpen} setOpen={setMenuOpen}/>
       <main style={{maxWidth:1200,margin:'0 auto'}}>
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices}/>}
-        {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog}/>}
+        {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
+          const norm=v=>String(v||'').trim();
+          const n=norm(id);
+          const u=stockVinted.filter(x=>norm(x)!==n);
+          setStockVinted(u); save('vinted_stock_vinted',u);
+          try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
+        }}/>}
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
@@ -2908,7 +2920,7 @@ export default function App() {
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
         onImport={(data)=>{
-          if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);}
+          if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
           if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);}
           if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);}
           if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}
