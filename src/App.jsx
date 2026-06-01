@@ -2,14 +2,14 @@ import React, { useState, useMemo, useEffect } from "react";
 
 const THEMES = {
   light: {
-    bg:"#eef2f2", surface:"#f8fafa", card:"#ffffff", border:"#dde5e5",
-    accent:"#007782", danger:"#c1373c", warn:"#9c6a1f",
-    blue:"#007782", purple:"#6b5b95", text:"#0f1c1e", muted:"#7a8a8b",
+    bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
+    accent:"#1f7a55", onAccent:"#ffffff", danger:"#c34a4a", warn:"#b07d18",
+    blue:"#3f7fae", purple:"#7a6ad0", text:"#162019", muted:"#697971",
   },
   dark: {
-    bg:"#0f1719", surface:"#16201f", card:"#1b2625", border:"#26302f",
-    accent:"#1ba6b4", danger:"#e16b6f", warn:"#d0a24f",
-    blue:"#27c0d0", purple:"#a78bfa", text:"#eef3f3", muted:"#7a8a8b",
+    bg:"#0f1411", surface:"#161f1a", card:"#1c2822", border:"#283831",
+    accent:"#3f9e74", onAccent:"#ffffff", danger:"#e0737a", warn:"#d2a44e",
+    blue:"#5a9fcf", purple:"#a394e6", text:"#e9f1ec", muted:"#88998f",
   },
 };
 let C = THEMES.light;
@@ -27,7 +27,7 @@ const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
-  'vinted_invoice_settings','vinted_custom_logo','vinted_dark',
+  'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -117,11 +117,30 @@ const fmtN = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',');
 const uid  = () => Math.random().toString(36).slice(2,9);
 const tod  = () => new Date().toLocaleDateString('fr-FR');
 
+// ── Notifications ──────────────────────────────────────
+// Demande la permission d'envoyer des notifications (à appeler sur action utilisateur).
+function askNotifPermission(){
+  if(typeof Notification==='undefined') return Promise.resolve('unsupported');
+  if(Notification.permission==='granted') return Promise.resolve('granted');
+  return Notification.requestPermission().catch(()=>'denied');
+}
+// Envoie une notification navigateur si autorisée (app ouverte / en arrière-plan récent).
+function pushNotif(title, body){
+  try{
+    if(typeof Notification!=='undefined' && Notification.permission==='granted'){
+      new Notification(title, { body, icon:'/icon-192.png', badge:'/icon-192.png' });
+      return true;
+    }
+  }catch(_){/* ignore */}
+  return false;
+}
+
+
+// Garage : une seule zone neutre. L'utilisateur ajoute lui-même ses colonnes
+// via le bouton +. La porte est optionnelle (bouton afficher/masquer).
+// On démarre avec 1 colonne ; tout le reste s'ajoute à la main.
 const LAYOUT = [
-  {id:"bureau",name:"Bureau",     elev:5, cols:[25,25,25,25]},
-  {id:"sol",   name:"Sol droite", elev:0, cols:[25,25,25], door:true},
-  {id:"porte", name:"Zone porte", elev:0, cols:[25]},
-  {id:"grande",name:"Grande zone",elev:0, cols:[25,25,25,25,25,25,25,25,25,25]},
+  {id:"zone", name:"", elev:0, cols:[25]},
 ];
 const TOTAL_SLOTS = LAYOUT.reduce((s,z)=>s+z.cols.reduce((ss,b)=>ss+b,0),0);
 
@@ -156,12 +175,12 @@ function Cell({value, onChange, align="left", mono=false}) {
 /* ── UI ──────────────────────────────────────────────── */
 function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
   const bg=outline?'transparent':(danger?C.danger:(color||C.accent));
-  const col=outline?(color||C.accent):'#fff';
+  const col=outline?(color||C.accent):(color?'#fff':C.onAccent);
   return (
     <button type="button" onClick={onClick} disabled={!!disabled} style={{
       background:bg,color:col,
       border:outline?`1.5px solid ${color||C.accent}`:'none',
-      borderRadius:999,padding:small?'6px 14px':'10px 22px',
+      borderRadius:6,padding:small?'6px 14px':'10px 22px',
       fontSize:small?12:14,fontWeight:700,
       cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,
       fontFamily:'inherit',...style,
@@ -172,7 +191,7 @@ function Input({label,...p}) {
   return (
     <label style={{display:'flex',flexDirection:'column',gap:4}}>
       {label&&<span style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
-      <input {...p} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
+      <input {...p} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:5,
         color:C.text,padding:'8px 12px',fontSize:13,outline:'none',fontFamily:'inherit',...(p.style||{})}}
         onFocus={e=>e.target.style.borderColor=C.accent}
         onBlur={e=>e.target.style.borderColor=C.border}
@@ -181,7 +200,7 @@ function Input({label,...p}) {
   );
 }
 function Card({children,style={}}) {
-  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:18,padding:20,...style}}>{children}</div>;
+  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:color+'22',color,fontSize:11,fontWeight:700}}>{children}</span>;
@@ -204,31 +223,41 @@ const TABS=[
   {id:'catalog',  icon:'📦',label:'Catalogue'},
   {id:'sales',    icon:'💸',label:'Ventes'},
   {id:'invoices', icon:'📄',label:'Factures'},
+  {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'garage',   icon:'🏠',label:'Garage'},
 ];
-function Nav({tab,setTab,catalog,sales,garageGrid}) {
+function Nav({tab,setTab,open,setOpen}) {
+  if(!open) return null;
   return (
-    <nav style={{
-      position:'fixed',bottom:0,left:0,right:0,zIndex:60,
-      background:C.surface,borderTop:`1px solid ${C.border}`,
-      boxShadow:'0 -2px 12px rgba(15,28,30,0.06)',
-    }}>
-      <div style={{display:'flex',justifyContent:'space-around',alignItems:'stretch',maxWidth:700,margin:'0 auto',padding:'6px 4px 8px'}}>
+    <>
+      {/* Voile pour fermer en cliquant à côté */}
+      <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,zIndex:59,background:'rgba(0,0,0,0.25)'}}/>
+      {/* Panneau déroulant */}
+      <nav style={{
+        position:'fixed',top:0,left:0,bottom:0,zIndex:60,width:'min(78vw,280px)',
+        background:C.surface,borderRight:`1px solid ${C.border}`,
+        boxShadow:'2px 0 16px rgba(0,0,0,0.12)',display:'flex',flexDirection:'column',
+        padding:'14px 10px',gap:2,
+      }}>
+        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:700,padding:'6px 12px 10px'}}>Menu</div>
         {TABS.map(t=>{
           const on=tab===t.id;
           return (
-            <button key={t.id} type="button" onClick={()=>setTab(t.id)} style={{
-              flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,
-              padding:'6px 2px',cursor:'pointer',background:'none',border:'none',
-              fontFamily:'inherit',color:on?C.accent:C.muted,borderRadius:12,transition:'color .15s',
+            <button key={t.id} type="button" onClick={()=>{setTab(t.id);setOpen(false);}} style={{
+              display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
+              padding:'12px 14px',cursor:'pointer',
+              background:on?C.accent:'transparent',
+              color:on?C.onAccent:C.text,
+              border:'none',borderRadius:6,fontFamily:'inherit',
+              fontSize:14,fontWeight:on?800:600,transition:'background .12s',
             }}>
-              <div style={{fontSize:19,lineHeight:1,transform:on?'translateY(-2px) scale(1.12)':'none',transition:'transform .15s'}}>{t.icon}</div>
-              <div style={{fontSize:9.5,fontWeight:700,letterSpacing:0.2}}>{t.label}</div>
+              <span style={{fontSize:17,lineHeight:1}}>{t.icon}</span>
+              <span>{t.label}</span>
             </button>
           );
         })}
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 }
 
@@ -312,7 +341,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
   const totalCA=ventes.reduce((s,v)=>s+(+v.sellPrice||0),0);
   const totalProfit=ventes.reduce((s,v)=>s+((+v.sellPrice||0)-(+v.buyPrice||0)),0);
   return (
-    <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
+    <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:8,border:`1px solid ${C.border}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
         <span style={{fontSize:13,fontWeight:800,color:C.text}}>{mois.nomComplet} — {ventes.length} vente{ventes.length>1?'s':''}</span>
         <span onClick={onClose} style={{cursor:'pointer',color:C.muted,fontSize:18,fontWeight:700,lineHeight:1}}>×</span>
@@ -456,6 +485,24 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
     return Object.keys(map).sort().slice(-12).map(k=>({key:k,label:map[k].label,nomComplet:map[k].nomComplet,ca:map[k].ca,ventes:map[k].ventes}));
   },[sales]);
 
+  // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
+  // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
+  // pour ne montrer que le rythme réel d'ajout jour après jour.
+  const ajoutsParJour=useMemo(()=>{
+    const map={};
+    catalog.forEach(p=>{
+      const d=(p.addedAt||'').trim();
+      if(!d||d==='01/01/2024') return; // on saute l'historique initial
+      const parts=d.split('/');
+      if(parts.length!==3) return;
+      const key=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0'); // AAAA-MM-JJ pour tri
+      if(!map[key]) map[key]={count:0,label:`${parts[0]}/${parts[1]}`};
+      map[key].count++;
+    });
+    // 30 derniers jours d'activité (ceux qui ont au moins une paire)
+    return Object.keys(map).sort().slice(-30).map(k=>({key:k,count:map[k].count,label:map[k].label}));
+  },[catalog]);
+
   // Récap comptable par MOIS (CA encaissé, bénéfice, cotisations + impôt 13,5 %)
   // Basé sur la date d'encaissement car c'est ce qui compte pour l'URSSAF.
   const moisRecap=useMemo(()=>{
@@ -490,12 +537,12 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
     }catch(err){ alert('Erreur export : '+err.message); }
   };
 
-  // Carte avec icône, gradient et taille
+  // Carte avec icône et taille
   const StatCard=({icon,label,value,color=C.text,sub,gradient})=>(
     <div style={{
       flex:1,minWidth:140,
-      background:gradient||`linear-gradient(135deg, ${C.card} 0%, ${C.surface} 100%)`,
-      border:`1px solid ${C.border}`,borderRadius:16,padding:'16px 18px',
+      background:gradient||C.card,
+      border:`1px solid ${C.border}`,borderRadius:8,padding:'16px 18px',
     }}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
         <span style={{fontSize:18,opacity:0.9}}>{icon}</span>
@@ -524,7 +571,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
       </div>
 
       {/* Mois en cours */}
-      <Card style={{padding:18,background:`linear-gradient(135deg, ${C.blue}18 0%, ${C.surface} 100%)`,border:`1px solid ${C.blue}44`}}>
+      <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
         <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:12}}>
           📅 Mois en cours — {moisCourant.nom}
         </div>
@@ -545,7 +592,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
       </Card>
 
       {/* Estimation cotisations du MOIS EN COURS */}
-      <Card style={{padding:18,background:`linear-gradient(135deg, ${C.warn}15 0%, ${C.surface} 100%)`,border:`1px solid ${C.warn}44`}}>
+      <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
         <div style={{fontSize:11,color:C.warn,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:12}}>
           🧾 À payer pour {moisCourant.nom} (13,5 % du CA encaissé)
         </div>
@@ -574,7 +621,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
           <div style={{
             height:'100%',
             width:`${fillRate}%`,
-            background:`linear-gradient(90deg, ${C.accent} 0%, ${C.warn} 100%)`,
+            background:C.accent,
             borderRadius:999,
             transition:'width 0.4s ease',
           }}/>
@@ -601,14 +648,14 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,marginBottom:10,paddingLeft:4}}>Records</div>
         <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
           {bestDayCA&&(
-            <Card style={{flex:1,minWidth:160,background:`linear-gradient(135deg, ${C.warn}11 0%, ${C.card} 100%)`,borderColor:C.warn+'44'}}>
+            <Card style={{flex:1,minWidth:160,background:C.card,borderColor:C.border}}>
               <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🏆 Meilleur jour encaissé</div>
               <div style={{fontSize:20,fontWeight:800,color:C.warn}}>{fmt(bestDayCA[1].ca)}</div>
               <div style={{fontSize:11,color:C.muted,marginTop:4}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
             </Card>
           )}
           {bestDayProfit&&(
-            <Card style={{flex:1,minWidth:160,background:`linear-gradient(135deg, ${C.accent}11 0%, ${C.card} 100%)`,borderColor:C.accent+'44'}}>
+            <Card style={{flex:1,minWidth:160,background:C.card,borderColor:C.border}}>
               <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🚀 Meilleur jour bénéfice</div>
               <div style={{fontSize:20,fontWeight:800,color:C.accent}}>{fmt(bestDayProfit[1].profit)}</div>
               <div style={{fontSize:11,color:C.muted,marginTop:4}}>{bestDayProfit[0]}</div>
@@ -633,7 +680,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
                   <div key={i} onClick={()=>setSelMonthEnc(actif?null:h.key)}
                        style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer'}}>
                     <div style={{fontSize:9,color:C.muted,fontWeight:700,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
-                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:`linear-gradient(180deg, ${C.accent} 0%, ${C.accent}aa 100%)`,borderRadius:'6px 6px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.accent}`:'none'}}/>
+                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:C.accent,borderRadius:'3px 3px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.accent}`:'none'}}/>
                     <div style={{fontSize:10,color:actif?C.accent:C.muted,fontWeight:actif?800:600}}>{h.label}</div>
                   </div>
                 );
@@ -660,13 +707,40 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
                   <div key={i} onClick={()=>setSelMonthVente(actif?null:h.key)}
                        style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer'}}>
                     <div style={{fontSize:9,color:C.muted,fontWeight:700,whiteSpace:'nowrap'}}>{Math.round(h.ca)}</div>
-                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:`linear-gradient(180deg, ${C.blue} 0%, ${C.blue}aa 100%)`,borderRadius:'6px 6px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.blue}`:'none'}}/>
+                    <div style={{width:'100%',maxWidth:34,height:`${pct}%`,minHeight:4,background:actif?C.text:C.blue,borderRadius:'3px 3px 0 0',transition:'height .4s',outline:actif?`2px solid ${C.blue}`:'none'}}/>
                     <div style={{fontSize:10,color:actif?C.blue:C.muted,fontWeight:actif?800:600}}>{h.label}</div>
                   </div>
                 );
               })}
             </div>
             {sel&&<MonthDetail mois={sel} type="vente" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthVente(null)}/>}
+          </Card>
+        );
+      })()}
+
+      {/* Graphique : paires ajoutées par jour */}
+      {ajoutsParJour.length>0&&(()=>{
+        const maxAjout=Math.max(...ajoutsParJour.map(h=>h.count),1);
+        const totalAjouts=ajoutsParJour.reduce((s,h)=>s+h.count,0);
+        const moyenne=(totalAjouts/ajoutsParJour.length);
+        return (
+          <Card>
+            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>📦 Paires ajoutées par jour</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
+              {totalAjouts} paire{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
+            </div>
+            <div style={{display:'flex',alignItems:'flex-end',gap:4,height:150,paddingTop:10,overflowX:'auto'}}>
+              {ajoutsParJour.map((h,i)=>{
+                const pct=Math.round(h.count/maxAjout*100);
+                return (
+                  <div key={i} style={{flex:'1 0 auto',minWidth:22,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end'}}>
+                    <div style={{fontSize:9,color:C.muted,fontWeight:700}}>{h.count}</div>
+                    <div style={{width:'100%',maxWidth:30,height:`${pct}%`,minHeight:4,background:C.accent,borderRadius:'3px 3px 0 0',transition:'height .4s'}}/>
+                    <div style={{fontSize:9,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{h.label}</div>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         );
       })()}
@@ -1014,8 +1088,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       {/* Bandeau mois en cours */}
-      <div style={{display:'flex',flexWrap:'wrap',gap:14,background:`linear-gradient(135deg, ${C.blue}18 0%, ${C.surface} 100%)`,
-        border:`1px solid ${C.blue}44`,borderRadius:14,padding:'12px 16px'}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:14,background:C.card,
+        border:`1px solid ${C.blue}44`,borderRadius:8,padding:'12px 16px'}}>
         <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:700,width:'100%'}}>
           📅 {moisVentes.nom} — mois en cours
         </div>
@@ -1288,7 +1362,7 @@ function Door({h}) {
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
-  const [zone,setZone]=useState('reception'); // 'reception' | 'attente' | 'comptabilisees'
+  const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
   const [page,setPage]=useState(null);
   const [showAll,setShowAll]=useState(false);
   const [showForm,setShowForm]=useState(false);
@@ -1422,8 +1496,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       return [...list].sort((a,b)=>(b.saleDate||'').localeCompare(a.saleDate||''));
     }
     // Sinon, filtrage normal par zone
-    if(zone==='reception') list=list.filter(i=>i.source==='auto'&&!i.validated);
-    else if(zone==='attente') list=list.filter(i=>(i.source!=='auto'||i.validated)&&!accountedSet.has(String(i.productId).trim()));
+    if(zone==='attente') list=list.filter(i=>!accountedSet.has(String(i.productId).trim()));
     else if(zone==='comptabilisees') list=list.filter(i=>accountedSet.has(String(i.productId).trim()));
     return [...list].sort((a,b)=>(b.saleDate||'').localeCompare(a.saleDate||''));
   },[invoices,zone,search,accountedSet]);
@@ -1434,10 +1507,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   
   // Compteurs par zone
   const counters=useMemo(()=>{
-    const reception=invoices.filter(i=>i.source==='auto'&&!i.validated).length;
-    const attente=invoices.filter(i=>(i.source!=='auto'||i.validated)&&!accountedSet.has(String(i.productId).trim())).length;
+    const attente=invoices.filter(i=>!accountedSet.has(String(i.productId).trim())).length;
     const comptabilisees=invoices.filter(i=>accountedSet.has(String(i.productId).trim())).length;
-    return {reception,attente,comptabilisees};
+    return {attente,comptabilisees};
   },[invoices,accountedSet]);
   
   const deleteInvoice=(id)=>{
@@ -1517,7 +1589,6 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       {/* Sous-onglets zones */}
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
-          {id:'reception',icon:'📥',label:'Boîte de réception',count:counters.reception},
           {id:'attente',icon:'⏳',label:'En attente',count:counters.attente},
           {id:'comptabilisees',icon:'✅',label:'Comptabilisées',count:counters.comptabilisees},
         ].map(z=>(
@@ -1539,7 +1610,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
       </div>
-      {search.trim()&&<div style={{fontSize:11,color:C.warn,marginTop:6}}>🔍 Recherche active dans toutes les zones (réception, attente, comptabilisées).</div>}
+      {search.trim()&&<div style={{fontSize:11,color:C.warn,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
       
       {/* Tableau factures */}
       <Card style={{padding:0,overflowX:'auto'}}>
@@ -1556,7 +1627,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
             </tr>
           </thead>
           <tbody>
-            {list.length===0&&<tr><td colSpan={7} style={{padding:30,textAlign:'center',color:C.muted}}>{search.trim()?`Aucune facture trouvée pour « ${search} »`:`Aucune facture ${zone==='reception'?'en réception':zone==='attente'?'en attente':'comptabilisée'}`}</td></tr>}
+            {list.length===0&&<tr><td colSpan={7} style={{padding:30,textAlign:'center',color:C.muted}}>{search.trim()?`Aucune facture trouvée pour « ${search} »`:`Aucune facture ${zone==='attente'?'en attente':'comptabilisée'}`}</td></tr>}
             {list.map(inv=>{
               const isAccounted=accountedSet.has(String(inv.productId).trim());
               return (
@@ -1564,28 +1635,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',color:C.warn,fontWeight:800,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
                   <td style={{padding:'8px',color:C.accent,fontWeight:700,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
-                  <td style={{padding:'8px',color:C.text}}>{inv.itemName||'—'}</td>
+                  <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:700}}>{fmt(+inv.sellPrice||0)}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    {zone==='reception'&&!inv.validated&&(
-                      <Btn small onClick={()=>{
-                        // Le numéro est déjà attribué à l'arrivée ; on le garde.
-                        // Sécurité : si jamais il manque, on en génère un.
-                        let num=inv.number;
-                        if(!num){
-                          const year=new Date().getFullYear();
-                          const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`));
-                          const maxNum=yearInvoices.reduce((mx,i)=>{
-                            const n=parseInt(i.number.split('-')[1],10);
-                            return isNaN(n)?mx:Math.max(mx,n);
-                          },0);
-                          num=`${year}-${String(maxNum+1).padStart(6,'0')}`;
-                        }
-                        const u=invoices.map(i=>i.id===inv.id?{...i,validated:true,number:num}:i);
-                        setInvoices(u); save('vinted_invoices',u);
-                      }} color={C.accent} style={{marginRight:4}}>✓ Valider</Btn>
-                    )}
                     <Btn small onClick={()=>generatePDF(inv,invoiceSettings)} color={C.blue} style={{marginRight:4}}>📄</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
@@ -1639,7 +1692,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
       onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>Nouvelle facture</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
@@ -1697,7 +1750,7 @@ function InvoiceSettings({settings,setSettings,onClose}) {
   const save=()=>{setSettings(data);onClose();};
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
@@ -1854,7 +1907,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   
   const soldIds=useMemo(()=>new Set(catalog.filter(p=>p.status==='vendu').map(p=>p.id)),[catalog]);
   const BW=46,BH=26,SW=6,TH=5;
-  const CW=BW+SW,CH=BH+TH,GAP=3,DOOR_W=80;
+  const CW=BW+SW,CH=BH+TH,GAP=3;
   
   // LAYOUT effectif avec colonnes ajoutées par l'utilisateur
   const effectiveLayout=useMemo(()=>LAYOUT.map(z=>{
@@ -1863,7 +1916,6 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   }),[extraCols]);
   
   const globalMax=useMemo(()=>Math.max(...effectiveLayout.flatMap(z=>z.cols.map(b=>b+z.elev))),[effectiveLayout]);
-  const doorH=globalMax*(CH+GAP);
   const TOTAL=useMemo(()=>effectiveLayout.reduce((s,z)=>s+z.cols.reduce((ss,b)=>ss+b,0),0),[effectiveLayout]);
 
   const allVals=useMemo(()=>
@@ -1988,14 +2040,6 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       
       {/* Compteurs */}
       <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-        <Card style={{flex:'none',padding:'10px 16px'}}>
-          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Boîtes attribuées</div>
-          <div style={{fontSize:20,fontWeight:800,color:C.accent,marginTop:4}}>{allVals.length} <span style={{fontSize:11,color:C.muted,fontWeight:400}}>/ {TOTAL-Object.keys(blockedCells).length}</span></div>
-        </Card>
-        <Card style={{flex:'none',padding:'10px 16px'}}>
-          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Places libres</div>
-          <div style={{fontSize:20,fontWeight:800,color:C.warn,marginTop:4}}>{TOTAL-Object.keys(blockedCells).length-allVals.length}</div>
-        </Card>
         {duplicates.length>0&&<Card style={{flex:'none',padding:'10px 16px',background:`${C.danger}22`,borderColor:`${C.danger}66`}}>
           <div style={{fontSize:9,color:C.danger,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>⚠ Doublons</div>
           <div style={{fontSize:20,fontWeight:800,color:C.danger,marginTop:4}}>{duplicates.length}</div>
@@ -2062,13 +2106,13 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       </div>}
       {/* Boutons d'ajout de colonnes */}
       <Card style={{padding:10}}>
-        <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6,fontWeight:700}}>Ajouter des colonnes</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6,fontWeight:700}}>Colonnes</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           {LAYOUT.map(z=>(
             <div key={z.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,background:C.bg,padding:'4px 8px',borderRadius:6}}>
-              <span style={{color:C.muted}}>{z.name}:</span>
+              <span style={{color:C.muted}}>Colonnes :</span>
               <button onClick={()=>removeColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.danger,borderRadius:4,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>−</button>
-              <span style={{color:C.accent,fontWeight:700,minWidth:18,textAlign:'center'}}>+{extraCols[z.id]||0}</span>
+              <span style={{color:C.accent,fontWeight:700,minWidth:24,textAlign:'center'}}>{z.cols.length+(extraCols[z.id]||0)}</span>
               <button onClick={()=>addColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:4,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>+</button>
             </div>
           ))}
@@ -2084,7 +2128,6 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                 {ci===0?z.name:''}
               </div>
             ));
-            if(z.door) labels.push(<div key={`ld${zi}`} style={{width:DOOR_W+GAP,flexShrink:0}}/>);
             return labels;
           })}
         </div>
@@ -2156,12 +2199,6 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                 </div>
               );
             });
-            if(z.door) cols.push(
-              <div key={`door${zi}`} style={{alignSelf:'flex-end'}}>
-                <Door h={doorH}/>
-                <div style={{fontSize:7,color:'transparent'}}>0</div>
-              </div>
-            );
             return cols;
           })}
         </div>
@@ -2219,7 +2256,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
       animation:'fadeIn 0.2s',
     }}>
       <div onClick={e=>e.stopPropagation()} style={{
-        background:C.card,border:`1px solid ${C.border}`,borderRadius:16,
+        background:C.card,border:`1px solid ${C.border}`,borderRadius:8,
         padding:24,maxWidth:480,width:'100%',
       }}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
@@ -2232,7 +2269,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
         </div>
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:14}}>
+          <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:14}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📤 Exporter</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               <b>{catalog.length}</b> paires · <b>{sales.length}</b> ventes
@@ -2240,7 +2277,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
             <Btn small onClick={exportData} color={C.accent}>💾 Télécharger sauvegarde</Btn>
           </div>
           
-          <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:14}}>
+          <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:14}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📥 Restaurer</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               ⚠️ Cela remplacera toutes tes données actuelles
@@ -2259,6 +2296,199 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
     </div>
   );
 }
+
+/* ── Stock Vinted ──────────────────────────────────────── */
+// Suivi des annonces en ligne sur Vinted, avec réconciliation garage.
+// - Saisie manuelle des numéros (à l'unité + collage en masse)
+// - Une facture qui arrive => le numéro se retire automatiquement (géré dans App via useEffect)
+// - Une facture supprimée => le numéro revient (géré dans App)
+// - Nouveau numéro au catalogue (à partir de maintenant) => ajout auto (géré dans App)
+// - Incohérences : compare le Stock Vinted avec les numéros présents dans le Garage
+function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
+  const [input,setInput]=useState('');
+  const [bulk,setBulk]=useState('');
+  const [showBulk,setShowBulk]=useState(false);
+  const [search,setSearch]=useState('');
+
+  // Normalise un numéro (string, trim)
+  const norm=(v)=>String(v||'').trim();
+
+  // Ajoute un numéro à l'unité
+  const addOne=()=>{
+    const n=norm(input);
+    if(!n){ return; }
+    if(stockVinted.includes(n)){ alert('Le numéro '+n+' est déjà dans le stock Vinted.'); setInput(''); return; }
+    const u=[...stockVinted,n];
+    setStockVinted(u); save('vinted_stock_vinted',u);
+    setInput('');
+  };
+
+  // Ajoute plusieurs numéros d'un coup (séparés par virgule, espace, point-virgule ou saut de ligne)
+  const addBulk=()=>{
+    const parts=bulk.split(/[\s,;]+/).map(norm).filter(Boolean);
+    if(parts.length===0){ alert('Aucun numéro détecté.'); return; }
+    const set=new Set(stockVinted);
+    let added=0;
+    parts.forEach(p=>{ if(!set.has(p)){ set.add(p); added++; } });
+    const u=Array.from(set);
+    setStockVinted(u); save('vinted_stock_vinted',u);
+    setBulk(''); setShowBulk(false);
+    alert(added+' numéro(s) ajouté(s) au stock Vinted.');
+  };
+
+  // Retire un numéro manuellement
+  const removeOne=(n)=>{
+    const u=stockVinted.filter(x=>x!==n);
+    setStockVinted(u); save('vinted_stock_vinted',u);
+  };
+
+  // Numéros présents dans le garage (toutes les cases non vides)
+  const garageNums=useMemo(()=>{
+    const s=new Set();
+    Object.values(garageGrid||{}).forEach(arr=>{
+      if(Array.isArray(arr)) arr.forEach(v=>{ const t=norm(v); if(t) s.add(t); });
+    });
+    return s;
+  },[garageGrid]);
+
+  // Set du stock Vinted pour comparaisons rapides
+  const stockSet=useMemo(()=>new Set(stockVinted.map(norm)),[stockVinted]);
+
+  // Incohérences :
+  //  - "en ligne mais pas au garage" : numéro dans Stock Vinted mais introuvable dans le garage
+  //    (=> l'annonce est en ligne alors que la paire n'est plus là : à vérifier)
+  //  - "au garage mais pas en ligne" : numéro présent au garage mais pas dans Stock Vinted
+  //    (=> paire stockée mais pas annoncée : peut-être à mettre en ligne)
+  const enLignePasGarage=useMemo(()=>
+    stockVinted.map(norm).filter(n=>n&&!garageNums.has(n)).sort((a,b)=>(+a||0)-(+b||0))
+  ,[stockVinted,garageNums]);
+
+  const garagePasEnLigne=useMemo(()=>
+    Array.from(garageNums).filter(n=>!stockSet.has(n)).sort((a,b)=>(+a||0)-(+b||0))
+  ,[garageNums,stockSet]);
+
+  // Liste filtrée pour l'affichage
+  const liste=useMemo(()=>{
+    const arr=[...stockVinted].map(norm).sort((a,b)=>(+a||0)-(+b||0));
+    const q=norm(search).toLowerCase();
+    if(!q) return arr;
+    return arr.filter(n=>n.toLowerCase().includes(q));
+  },[stockVinted,search]);
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+        <h2 style={{margin:0,fontSize:16,fontWeight:800}}>🟢 Stock Vinted ({stockVinted.length})</h2>
+        <button onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:8,padding:'7px 12px',fontWeight:700,fontSize:12,cursor:'pointer'}}>
+          {showBulk?'Fermer':'Coller en masse'}
+        </button>
+      </div>
+
+      <p style={{fontSize:12.5,color:C.muted,margin:'0 0 14px',lineHeight:1.5}}>
+        Liste de tes annonces actuellement en ligne sur Vinted. Ajoute tes numéros un par un ci-dessous.
+        Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.
+      </p>
+
+      {/* Saisie à l'unité */}
+      <div style={{display:'flex',gap:8,marginBottom:12}}>
+        <input
+          value={input}
+          onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>{ if(e.key==='Enter') addOne(); }}
+          placeholder="N° de l'annonce (ex : 1908)"
+          inputMode="numeric"
+          style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:14}}
+        />
+        <button onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'10px 16px',fontWeight:700,fontSize:14,cursor:'pointer'}}>
+          Ajouter
+        </button>
+      </div>
+
+      {/* Collage en masse (optionnel) */}
+      {showBulk&&(
+        <div style={{marginBottom:14,padding:12,background:C.card2||'rgba(0,0,0,0.04)',borderRadius:8}}>
+          <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Colle plusieurs numéros (séparés par espace, virgule ou retour à la ligne) :</div>
+          <textarea
+            value={bulk}
+            onChange={e=>setBulk(e.target.value)}
+            rows={4}
+            placeholder="1908 1925 898 ..."
+            style={{width:'100%',padding:10,border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:13,boxSizing:'border-box',resize:'vertical'}}
+          />
+          <button onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'9px 16px',fontWeight:700,fontSize:13,cursor:'pointer'}}>
+            Ajouter tout
+          </button>
+        </div>
+      )}
+
+      {/* Incohérences */}
+      {(enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
+        <div style={{marginBottom:16}}>
+          <h3 style={{fontSize:14,fontWeight:800,margin:'0 0 8px',color:C.warn}}>⚠️ Incohérences avec le garage</h3>
+
+          {enLignePasGarage.length>0&&(
+            <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:8}}>
+              <div style={{fontSize:12.5,fontWeight:700,marginBottom:4}}>En ligne mais absent du garage ({enLignePasGarage.length})</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le garage.</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {enLignePasGarage.map(n=>(
+                  <span key={n} style={{background:C.warn,color:'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:700}}>{n}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {garagePasEnLigne.length>0&&(
+            <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:8}}>
+              <div style={{fontSize:12.5,fontWeight:700,marginBottom:4}}>Au garage mais pas en ligne ({garagePasEnLigne.length})</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces paires sont dans le garage mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {garagePasEnLigne.map(n=>(
+                  <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:700}}>{n}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recherche */}
+      {stockVinted.length>0&&(
+        <input
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          placeholder="Rechercher un numéro…"
+          style={{width:'100%',padding:'9px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:13,boxSizing:'border-box',marginBottom:12}}
+        />
+      )}
+
+      {/* Liste des numéros en ligne */}
+      {liste.length===0?(
+        <div style={{textAlign:'center',color:C.muted,fontSize:13,padding:'30px 0'}}>
+          {stockVinted.length===0?'Aucun numéro pour le moment. Ajoute tes annonces en ligne ci-dessus.':'Aucun résultat.'}
+        </div>
+      ):(
+        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+          {liste.map(n=>{
+            const absentGarage=!garageNums.has(n);
+            return (
+              <span key={n} style={{
+                display:'inline-flex',alignItems:'center',gap:6,
+                background:absentGarage?'rgba(156,106,31,0.12)':(C.card2||'rgba(0,0,0,0.05)'),
+                border:absentGarage?`1px solid ${C.warn}`:'1px solid transparent',
+                borderRadius:8,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:700
+              }}>
+                {n}
+                <button onClick={()=>removeOne(n)} title="Retirer" style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:900}}>×</button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 export default function App() {
   const [tab,setTab]=useState('dashboard');
@@ -2285,6 +2515,10 @@ export default function App() {
   const [extraCols,setExtraCols]=useState(()=>load('vinted_extracols',{}));
   const [cellColors,setCellColors]=useState(()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useState(()=>load('vinted_invoices',[]));
+  const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
+  const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
+  const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
+  const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     companyName:'Shop Cancale35',
     companyType:'Entrepreneur individuel',
@@ -2320,10 +2554,40 @@ export default function App() {
       try{ localStorage.removeItem('vinted_custom_logo'); cloudPush(); }catch(_){}
     }
   };
+
+  // Icône externe de l'app (onglet du navigateur + écran d'accueil) = le logo de l'app.
+  // On met à jour dynamiquement les balises <link> d'icônes avec le logo courant
+  // (ta photo si tu en as mis une, sinon le logo Cancale par défaut).
+  useEffect(()=>{
+    if(!logoSrc) return;
+    const setIcon=(rel)=>{
+      let link=document.querySelector(`link[rel="${rel}"]`);
+      if(!link){ link=document.createElement('link'); link.rel=rel; document.head.appendChild(link); }
+      link.href=logoSrc;
+    };
+    setIcon('icon');
+    setIcon('shortcut icon');
+    setIcon('apple-touch-icon');
+  },[logoSrc]);
   
   // Au démarrage : charger depuis le cloud Supabase (synchro Mac <-> iPhone)
   // Si le cloud a des données, elles remplacent les données locales.
   // Le localStorage sert de secours si pas de connexion.
+  // Demande automatiquement l'autorisation de notifications au démarrage.
+  // Si l'utilisateur accepte, les notifications restent activées en permanence.
+  // (Le navigateur impose ce consentement une seule fois ; on ne peut pas l'éviter.)
+  useEffect(()=>{
+    if(typeof Notification==='undefined') return;
+    if(Notification.permission==='granted'){
+      if(!notifEnabled){ setNotifEnabled(true); save('vinted_notif_enabled',true); }
+    } else if(Notification.permission==='default'){
+      askNotifPermission().then(res=>{
+        if(res==='granted'){ setNotifEnabled(true); save('vinted_notif_enabled',true); }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
   useEffect(() => {
     let stop = false;
     // Écoute les changements de statut de synchro (saving / synced / error)
@@ -2347,6 +2611,7 @@ export default function App() {
         apply('vinted_extracols', setExtraCols);
         apply('vinted_colors', setCellColors);
         apply('vinted_invoices', setInvoices);
+        apply('vinted_stock_vinted', setStockVinted);
         apply('vinted_invoice_settings', setInvoiceSettings);
         apply('vinted_custom_logo', setCustomLogo);
         setSyncStatus('synced');
@@ -2360,19 +2625,160 @@ export default function App() {
     return () => { stop = true; off(); };
   }, []);
 
+  // ── Automatismes Stock Vinted ──────────────────────────
+  // On n'active ces effets qu'APRÈS le chargement initial (synced),
+  // pour ne pas travailler sur des données encore vides/non synchronisées.
+
+  // 1) Quand des factures existent, leur numéro de paire (productId) se retire
+  //    automatiquement du Stock Vinted (la paire est vendue, donc plus en ligne).
+  //    Si une facture est supprimée, son numéro n'est plus dans cette liste,
+  //    donc il n'est plus retiré : il « revient » naturellement au prochain
+  //    ajout manuel — et surtout on conserve les numéros sans facture.
+  //    Pour gérer le RETOUR après suppression, on garde la trace des numéros
+  //    retirés automatiquement (vinted_sv_auto_removed) afin de les réinjecter
+  //    si leur facture disparaît.
+  useEffect(()=>{
+    if(!synced) return;
+    const norm=v=>String(v||'').trim();
+    const factureNums=new Set(invoices.map(i=>norm(i.productId)).filter(Boolean));
+    let autoRemoved=load('vinted_sv_auto_removed',[]).map(norm);
+    let stock=stockVinted.map(norm);
+    let changed=false;
+
+    // a) Retirer du stock les numéros qui ont désormais une facture
+    const stillPresent=[];
+    stock.forEach(n=>{
+      if(factureNums.has(n)){
+        if(!autoRemoved.includes(n)){ autoRemoved.push(n); }
+        changed=true; // retiré
+      } else {
+        stillPresent.push(n);
+      }
+    });
+
+    // b) Réinjecter les numéros précédemment retirés auto dont la facture a disparu
+    const stillRemoved=[];
+    autoRemoved.forEach(n=>{
+      if(factureNums.has(n)){
+        stillRemoved.push(n); // facture toujours là -> reste retiré
+      } else {
+        // facture supprimée -> le numéro revient au stock (s'il n'y est pas déjà)
+        if(!stillPresent.includes(n)){ stillPresent.push(n); changed=true; }
+      }
+    });
+
+    if(changed){
+      // Dédoublonnage
+      const finalStock=Array.from(new Set(stillPresent));
+      setStockVinted(finalStock); save('vinted_stock_vinted',finalStock);
+      save('vinted_sv_auto_removed',stillRemoved);
+    }
+  },[invoices,synced]);
+
+  // 2) Nouveaux numéros ajoutés au catalogue À PARTIR DE MAINTENANT
+  //    => ajout automatique au Stock Vinted.
+  //    On initialise une liste de référence (vinted_sv_seen_catalog) avec
+  //    tout le catalogue actuel au premier passage : rien n'est ajouté
+  //    rétroactivement. Ensuite, chaque nouvel id du catalogue est ajouté.
+  useEffect(()=>{
+    if(!synced) return;
+    const norm=v=>String(v||'').trim();
+    const seenRaw=localStorage.getItem('vinted_sv_seen_catalog');
+    const currentIds=catalog.map(p=>norm(p.id)).filter(Boolean);
+
+    if(seenRaw===null){
+      // Première initialisation : on mémorise l'état actuel sans rien ajouter
+      save('vinted_sv_seen_catalog',currentIds);
+      return;
+    }
+    let seen=[];
+    try{ seen=JSON.parse(seenRaw)||[]; }catch(_){ seen=[]; }
+    const seenSet=new Set(seen.map(norm));
+    const factureNums=new Set(invoices.map(i=>norm(i.productId)).filter(Boolean));
+
+    // Les nouveaux ids (pas encore vus)
+    const nouveaux=currentIds.filter(id=>!seenSet.has(id));
+    if(nouveaux.length>0){
+      const stockSet=new Set(stockVinted.map(norm));
+      let added=false;
+      nouveaux.forEach(id=>{
+        // On n'ajoute pas si déjà vendu (facture présente) ni déjà dans le stock
+        if(!stockSet.has(id)&&!factureNums.has(id)){ stockSet.add(id); added=true; }
+      });
+      if(added){
+        const finalStock=Array.from(stockSet);
+        setStockVinted(finalStock); save('vinted_stock_vinted',finalStock);
+      }
+      // Mémoriser tous les ids vus (anciens + nouveaux)
+      save('vinted_sv_seen_catalog',currentIds);
+    } else {
+      // Garder la liste vue à jour (au cas où des ids auraient été retirés)
+      save('vinted_sv_seen_catalog',currentIds);
+    }
+  },[catalog,synced]);
+
+  // ── Notifications : ventes comptabilisées + factures reçues ──
+  // Après chargement, on compare le nombre actuel de ventes (=comptabilisées)
+  // et de factures avec les derniers compteurs mémorisés. S'il y a du nouveau,
+  // on envoie une notification navigateur + on affiche un bandeau dans l'app.
+  useEffect(()=>{
+    if(!synced) return;
+    const prevV=parseInt(localStorage.getItem('vinted_notif_last_sales')||'-1',10);
+    const prevF=parseInt(localStorage.getItem('vinted_notif_last_invoices')||'-1',10);
+    const curV=sales.length;
+    const curF=invoices.length;
+
+    // Première initialisation : on mémorise sans notifier
+    if(prevV<0||prevF<0){
+      save('vinted_notif_last_sales',curV);
+      save('vinted_notif_last_invoices',curF);
+      return;
+    }
+
+    const newV=Math.max(0,curV-prevV);
+    const newF=Math.max(0,curF-prevF);
+
+    if((newV>0||newF>0)){
+      // Bandeau in-app (toujours affiché, même si les notifs système sont off)
+      setNotifBanner({ventes:newV, factures:newF});
+
+      // Notification navigateur si activée
+      if(notifEnabled){
+        if(newV>0&&newF>0){
+          pushNotif('Shop Cancale35', `${newV} vente${newV>1?'s':''} comptabilisée${newV>1?'s':''} et ${newF} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`);
+        } else if(newV>0){
+          pushNotif('Vente comptabilisée', `${newV} nouvelle${newV>1?'s':''} vente${newV>1?'s':''} en comptabilité.`);
+        } else if(newF>0){
+          pushNotif('Nouvelle facture', `${newF} nouvelle${newF>1?'s':''} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`);
+        }
+      }
+    }
+
+    // Mémoriser les nouveaux compteurs
+    save('vinted_notif_last_sales',curV);
+    save('vinted_notif_last_invoices',curF);
+  },[sales,invoices,synced,notifEnabled]);
+
   return (
-    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'hidden',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:78,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
+    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'hidden',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-        <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {/* Bouton menu hamburger */}
+          <button type="button" onClick={()=>setMenuOpen(true)} title="Menu" aria-label="Ouvrir le menu"
+            style={{display:'flex',flexDirection:'column',justifyContent:'center',gap:4,width:38,height:38,background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer',padding:'0 9px',flexShrink:0}}>
+            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
+            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
+            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
+          </button>
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div
             onClick={()=>logoInputRef.current&&logoInputRef.current.click()}
             onContextMenu={(e)=>{e.preventDefault();resetLogo();}}
             title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)"
-            style={{position:'relative',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:8,overflow:'hidden',cursor:'pointer'}}>
-            <img src={logoSrc} alt="Cancale" style={{width:46,height:46,objectFit:'cover'}}/>
-            <div style={{position:'absolute',bottom:0,left:0,right:0,height:14,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:C.accent}}>✎</div>
+            style={{position:'relative',width:42,height:42,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:6,overflow:'hidden',cursor:'pointer'}}>
+            <img src={logoSrc} alt="Cancale" style={{width:42,height:42,objectFit:'cover'}}/>
+            <div style={{position:'absolute',bottom:0,left:0,right:0,height:13,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>✎</div>
           </div>
           <div>
             <div style={{fontWeight:900,fontSize:19,color:C.accent,letterSpacing:-0.3,lineHeight:1}}>Cancale</div>
@@ -2402,6 +2808,24 @@ export default function App() {
             <button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {dark?'☀️':'🌙'}
+            </button>
+            <button type="button" onClick={async()=>{
+              if(!notifEnabled){
+                const res=await askNotifPermission();
+                if(res==='granted'){
+                  setNotifEnabled(true); save('vinted_notif_enabled',true);
+                  pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
+                } else if(res==='denied'){
+                  alert("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
+                } else if(res==='unsupported'){
+                  alert("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
+                }
+              } else {
+                setNotifEnabled(false); save('vinted_notif_enabled',false);
+              }
+            }} title={notifEnabled?'Notifications activées (cliquer pour désactiver)':'Activer les notifications'}
+              style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
+              {notifEnabled?'🔔':'🔕'}
             </button>
             <button type="button" onClick={()=>{
               try {
@@ -2460,12 +2884,24 @@ export default function App() {
           </div>
         </div>
       </header>
-      <Nav tab={tab} setTab={setTab} catalog={catalog} sales={sales} garageGrid={garageGrid}/>
+      {/* Bandeau de notification in-app */}
+      {notifBanner&&(notifBanner.ventes>0||notifBanner.factures>0)&&(
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.accent,color:C.onAccent,fontSize:13,fontWeight:700}}>
+          <span>
+            🔔 {notifBanner.ventes>0&&`${notifBanner.ventes} vente${notifBanner.ventes>1?'s':''} comptabilisée${notifBanner.ventes>1?'s':''}`}
+            {notifBanner.ventes>0&&notifBanner.factures>0&&' · '}
+            {notifBanner.factures>0&&`${notifBanner.factures} facture${notifBanner.factures>1?'s':''} reçue${notifBanner.factures>1?'s':''}`}
+          </span>
+          <button onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:6,color:C.onAccent,cursor:'pointer',fontSize:16,fontWeight:900,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
+        </div>
+      )}
+      <Nav tab={tab} setTab={setTab} open={menuOpen} setOpen={setMenuOpen}/>
       <main style={{maxWidth:1200,margin:'0 auto'}}>
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog}/>}
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
+        {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors}/>}
       </main>
       {showBackup&&<BackupModal
