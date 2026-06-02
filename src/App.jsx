@@ -2187,6 +2187,10 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       
       {/* Compteurs */}
       <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+        <Card style={{flex:'none',padding:'10px 16px'}}>
+          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>Paires</div>
+          <div style={{fontSize:20,fontWeight:800,color:C.accent,marginTop:4}}>{allVals.length}</div>
+        </Card>
         {duplicates.length>0&&<Card style={{flex:'none',padding:'10px 16px',background:`${C.danger}22`,borderColor:`${C.danger}66`}}>
           <div style={{fontSize:9,color:C.danger,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>⚠ Doublons</div>
           <div style={{fontSize:20,fontWeight:800,color:C.danger,marginTop:4}}>{duplicates.length}</div>
