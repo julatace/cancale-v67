@@ -180,6 +180,29 @@ const TOTAL_SLOTS = LAYOUT.reduce((s,z)=>s+z.cols.reduce((ss,b)=>ss+b,0),0);
 // Garage vide par défaut
 const INIT_GARAGE = {};
 
+// Ancienne disposition (4 zones) → nouvelle disposition (zone unique)
+const OLD_ZONES = [{id:'bureau',cols:4},{id:'sol',cols:3},{id:'porte',cols:1},{id:'grande',cols:10}];
+function migrateGarageData(garageGrid, blockedCells, cellColors) {
+  const needsMigration = Object.keys(garageGrid).some(k => OLD_ZONES.some(z => k.startsWith(z.id+'_')));
+  if (!needsMigration) return null;
+  const colMap = {};
+  let n = 0;
+  OLD_ZONES.forEach(z => { for(let ci=0;ci<z.cols;ci++) colMap[`${z.id}_${ci}`]=`zone_${n++}`; });
+  const newGrid = {};
+  Object.entries(garageGrid).forEach(([k,v]) => { newGrid[colMap[k]||k] = v; });
+  const migrateKeyed = (obj) => {
+    const out = {};
+    Object.entries(obj||{}).forEach(([k,v]) => {
+      const m = k.match(/^([^_]+)_(\d+)_(\d+)$/);
+      const mapped = m && colMap[`${m[1]}_${m[2]}`];
+      out[mapped ? `${mapped}_${m[3]}` : k] = v;
+    });
+    return out;
+  };
+  const maxN = Math.max(0,...Object.keys(newGrid).map(k=>{const m=k.match(/^zone_(\d+)$/);return m?+m[1]:0;}));
+  return { garageGrid: newGrid, blockedCells: migrateKeyed(blockedCells), cellColors: migrateKeyed(cellColors), extraCols: {zone: maxN} };
+}
+
 /* ── Editable cell ───────────────────────────────────── */
 function Cell({value, onChange, align="left", mono=false}) {
   const [editing, setEditing] = useState(false);
@@ -2995,17 +3018,20 @@ export default function App() {
                   if(data.catalog) {setCatalog(data.catalog); save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
                   if(data.sales) {setSales(data.sales); save('vinted_sales',data.sales);}
                   if(data.garageGrid) {
-                    setGarageGrid(data.garageGrid); save('vinted_garage_grid',data.garageGrid);
-                    // Si extraCols absent de la sauvegarde, on le recalcule depuis les clés du garage
-                    if(!data.extraCols){
-                      const ec={};
-                      Object.keys(data.garageGrid).forEach(k=>{const m=k.match(/^(.+)_(\d+)$/);if(m){const [,zid,ci]=m;ec[zid]=Math.max(ec[zid]||0,parseInt(ci,10));}});
-                      setExtraCols(ec); save('vinted_extracols',ec);
-                    }
+                    const mig = migrateGarageData(data.garageGrid, data.blockedCells, data.cellColors);
+                    const g = mig ? mig.garageGrid : data.garageGrid;
+                    const b = mig ? mig.blockedCells : (data.blockedCells||{});
+                    const co = mig ? mig.cellColors : (data.cellColors||{});
+                    const ec = data.extraCols || (mig ? mig.extraCols : (() => { const e={}; Object.keys(g).forEach(k=>{const m=k.match(/^(.+)_(\d+)$/);if(m)e[m[1]]=Math.max(e[m[1]]||0,+m[2]);}); return e; })());
+                    setGarageGrid(g); save('vinted_garage_grid',g);
+                    setBlockedCells(b); save('vinted_blocked',b);
+                    setCellColors(co); save('vinted_colors',co);
+                    setExtraCols(ec); save('vinted_extracols',ec);
+                  } else {
+                    if(data.blockedCells) {setBlockedCells(data.blockedCells); save('vinted_blocked',data.blockedCells);}
+                    if(data.extraCols) {setExtraCols(data.extraCols); save('vinted_extracols',data.extraCols);}
+                    if(data.cellColors) {setCellColors(data.cellColors); save('vinted_colors',data.cellColors);}
                   }
-                  if(data.blockedCells) {setBlockedCells(data.blockedCells); save('vinted_blocked',data.blockedCells);}
-                  if(data.extraCols) {setExtraCols(data.extraCols); save('vinted_extracols',data.extraCols);}
-                  if(data.cellColors) {setCellColors(data.cellColors); save('vinted_colors',data.cellColors);}
                   alert('✓ Import réussi !');
                 } catch(err) {
                   alert('Erreur lecture du fichier : '+err.message);
@@ -3052,16 +3078,20 @@ export default function App() {
           if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
           if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);}
           if(data.garageGrid){
-            setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);
-            if(!data.extraCols){
-              const ec={};
-              Object.keys(data.garageGrid).forEach(k=>{const m=k.match(/^(.+)_(\d+)$/);if(m){const [,zid,ci]=m;ec[zid]=Math.max(ec[zid]||0,parseInt(ci,10));}});
-              setExtraCols(ec); save('vinted_extracols',ec);
-            }
+            const mig=migrateGarageData(data.garageGrid,data.blockedCells,data.cellColors);
+            const g=mig?mig.garageGrid:data.garageGrid;
+            const b=mig?mig.blockedCells:(data.blockedCells||{});
+            const co=mig?mig.cellColors:(data.cellColors||{});
+            const ec=data.extraCols||(mig?mig.extraCols:(()=>{const e={};Object.keys(g).forEach(k=>{const m=k.match(/^(.+)_(\d+)$/);if(m)e[m[1]]=Math.max(e[m[1]]||0,+m[2]);});return e;})());
+            setGarageGrid(g);save('vinted_garage_grid',g);
+            setBlockedCells(b);save('vinted_blocked',b);
+            setCellColors(co);save('vinted_colors',co);
+            setExtraCols(ec);save('vinted_extracols',ec);
+          } else {
+            if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}
+            if(data.extraCols){setExtraCols(data.extraCols);save('vinted_extracols',data.extraCols);}
+            if(data.cellColors){setCellColors(data.cellColors);save('vinted_colors',data.cellColors);}
           }
-          if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}
-          if(data.extraCols){setExtraCols(data.extraCols);save('vinted_extracols',data.extraCols);}
-          if(data.cellColors){setCellColors(data.cellColors);save('vinted_colors',data.cellColors);}
           setShowBackup(false);
           alert('✓ Restauration réussie !');
         }}
