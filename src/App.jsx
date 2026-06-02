@@ -1207,7 +1207,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     const pid=pids.join('+');
     const foundItems=pids.map(id=>catalog.find(x=>x.id===id)).filter(Boolean);
     const alreadySold=pids.find(id=>{const cp=catalog.find(x=>x.id===id);return cp&&cp.status==='vendu';});
-    if(alreadySold){setErr(`#${alreadySold} déjà vendue`);return;}
+    if(alreadySold&&!window.confirm(`#${alreadySold} est déjà marquée vendue. Ajouter quand même ?`)) return;
     const buy=foundItems.length>0?foundItems.reduce((s,cp)=>s+(+cp.buyPrice),0):(+newRow.buyPrice||0);
     const sell=+newRow.sellPrice;
     const sale={id:uid(),productId:pid,buyPrice:+buy.toFixed(2),sellPrice:sell,
