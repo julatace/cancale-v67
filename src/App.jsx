@@ -2994,7 +2994,15 @@ export default function App() {
                   if(!window.confirm(msg)) return;
                   if(data.catalog) {setCatalog(data.catalog); save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
                   if(data.sales) {setSales(data.sales); save('vinted_sales',data.sales);}
-                  if(data.garageGrid) {setGarageGrid(data.garageGrid); save('vinted_garage_grid',data.garageGrid);}
+                  if(data.garageGrid) {
+                    setGarageGrid(data.garageGrid); save('vinted_garage_grid',data.garageGrid);
+                    // Si extraCols absent de la sauvegarde, on le recalcule depuis les clés du garage
+                    if(!data.extraCols){
+                      const ec={};
+                      Object.keys(data.garageGrid).forEach(k=>{const m=k.match(/^(.+)_(\d+)$/);if(m){const [,zid,ci]=m;ec[zid]=Math.max(ec[zid]||0,parseInt(ci,10));}});
+                      setExtraCols(ec); save('vinted_extracols',ec);
+                    }
+                  }
                   if(data.blockedCells) {setBlockedCells(data.blockedCells); save('vinted_blocked',data.blockedCells);}
                   if(data.extraCols) {setExtraCols(data.extraCols); save('vinted_extracols',data.extraCols);}
                   if(data.cellColors) {setCellColors(data.cellColors); save('vinted_colors',data.cellColors);}
@@ -3043,7 +3051,14 @@ export default function App() {
         onImport={(data)=>{
           if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
           if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);}
-          if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);}
+          if(data.garageGrid){
+            setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);
+            if(!data.extraCols){
+              const ec={};
+              Object.keys(data.garageGrid).forEach(k=>{const m=k.match(/^(.+)_(\d+)$/);if(m){const [,zid,ci]=m;ec[zid]=Math.max(ec[zid]||0,parseInt(ci,10));}});
+              setExtraCols(ec); save('vinted_extracols',ec);
+            }
+          }
           if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}
           if(data.extraCols){setExtraCols(data.extraCols);save('vinted_extracols',data.extraCols);}
           if(data.cellColors){setCellColors(data.cellColors);save('vinted_colors',data.cellColors);}
