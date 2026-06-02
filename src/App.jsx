@@ -925,30 +925,6 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
 }
 
 /* ── Catalogue ───────────────────────────────────────── */
-function SwipeRow({onDelete,bg,children}){
-  const [ox,setOx]=React.useState(0);
-  const tx=React.useRef(null);
-  const W=80;
-  const start=e=>{tx.current=e.touches[0].clientX;};
-  const move=e=>{
-    if(tx.current===null)return;
-    const dx=e.touches[0].clientX-tx.current;
-    if(dx<0) setOx(Math.max(dx,-W));
-    else if(ox<0) setOx(Math.min(0,ox+dx));
-  };
-  const end=()=>{setOx(ox<-(W/2)?-W:0);tx.current=null;};
-  return(
-    <div style={{position:'relative',overflow:'hidden',background:bg,borderTop:`1px solid ${C.border}`}}>
-      <div style={{position:'absolute',right:0,top:0,bottom:0,width:W,background:C.danger,display:'flex',alignItems:'center',justifyContent:'center'}}>
-        <button onClick={onDelete} style={{background:'none',border:'none',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer',padding:0,textAlign:'center',lineHeight:1.3}}>🗑{'\n'}Suppr.</button>
-      </div>
-      <div onTouchStart={start} onTouchMove={move} onTouchEnd={end}
-        style={{transform:`translateX(${ox}px)`,transition:tx.current===null?'transform .22s ease':'none',background:bg,display:'flex',alignItems:'center',minHeight:36}}>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function Catalog({catalog,setCatalog,onDeleteId}) {
   const [searchInput,setSearchInput]=useState('');
@@ -1069,64 +1045,65 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           ⚠️ {oldStockCount} paire{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
-      <Card style={{padding:0,overflow:'hidden'}}>
-        {/* En-tête colonnes */}
-        <div style={{display:'flex',alignItems:'center',background:C.surface,padding:'8px 10px',gap:4}}>
-          <span style={{width:58,flexShrink:0,fontSize:10,color:C.muted,fontWeight:600,textTransform:'uppercase'}}>N°</span>
-          <span style={{width:68,flexShrink:0,fontSize:10,color:C.muted,fontWeight:600,textTransform:'uppercase',textAlign:'right'}}>Prix achat</span>
-          <span style={{width:74,flexShrink:0,fontSize:10,color:C.muted,fontWeight:600,textTransform:'uppercase',paddingLeft:8}}>Statut</span>
-          <span style={{flex:1,fontSize:10,color:C.muted,fontWeight:600,textTransform:'uppercase'}}>Ajouté</span>
-          <span style={{width:32,flexShrink:0}}/>
-        </div>
-        {/* Lignes avec swipe */}
-        {list.length===0&&<div style={{padding:20,textAlign:'center',color:C.muted,fontSize:12}}>Aucune paire</div>}
-        {list.map(p=>{
-          const rowBg=(()=>{if(p.status==='vendu') return '#ff4d6d08';if(parseInt(p.id,10)>=1900){const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}}return C.card;})();
-          return(
-            <SwipeRow key={p.id} bg={rowBg} onDelete={()=>remove(p.id)}>
-              <div style={{width:58,flexShrink:0,padding:'0 6px',fontWeight:800,color:C.accent,fontSize:13}}>
-                <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
-              </div>
-              <div style={{width:68,flexShrink:0,padding:'0 6px',fontSize:12,textAlign:'right'}}>
-                <Cell value={String(p.buyPrice)} onChange={v=>update(p.id,'buyPrice',v)} align="right"/>
-              </div>
-              <div style={{width:74,flexShrink:0,padding:'0 6px'}}>
-                <span onClick={()=>toggleStatus(p.id)} style={{cursor:'pointer'}}>
-                  <Badge color={p.status==='stock'?C.accent:C.danger}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
-                </span>
-              </div>
-              <div style={{flex:1,padding:'0 6px',color:C.muted,fontSize:11,display:'flex',alignItems:'center',gap:4,minWidth:0}}>
-                <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
-                {p.status==='stock'&&parseInt(p.id,10)>=1900&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3)return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30)return<span style={{fontSize:10,color:days>60?C.danger:C.warn,fontWeight:700,whiteSpace:'nowrap'}}>{days}j</span>;return null;})()}
-              </div>
-              <div style={{width:32,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <button onClick={()=>remove(p.id)} style={{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:14,padding:0,lineHeight:1}}>✕</button>
-              </div>
-            </SwipeRow>
-          );
-        })}
-        {/* Ligne d'ajout */}
-        {(showAll||currentPage===totalPages-1)&&(
-          <div style={{display:'flex',alignItems:'center',gap:6,padding:'8px 10px',borderTop:`2px solid ${C.accent}44`,background:'#00e5a008',flexWrap:'wrap'}}>
-            <div style={{display:'flex',gap:4,alignItems:'center'}}>
-              <input value={newRow.id} onChange={e=>setNewRow(n=>({...n,id:e.target.value}))}
-                placeholder="N°" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
-                style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'5px 8px',fontSize:12,width:60,fontFamily:'monospace',outline:'none'}}
-                onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
-              />
-              <button type="button" onClick={fillNextId}
-                style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accent,padding:'5px 8px',fontSize:13,fontWeight:800,cursor:'pointer',lineHeight:1}}>
-                +1
-              </button>
-            </div>
-            <input ref={priceInputRef} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-              type="number" placeholder="Prix €" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
-              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'5px 8px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
-              onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
-            />
-            <Btn small onClick={addRow} color={C.accent}>+ Ajouter</Btn>
-          </div>
-        )}
+      <Card style={{padding:0,overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:420}}>
+          <thead style={{background:C.surface}}><tr>
+            {['N°','Prix achat','Statut','Ajouté',''].map(h=>(
+              <th key={h} style={{textAlign:'left',padding:'10px 12px',color:C.muted,fontWeight:600,fontSize:10,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
+            {list.map(p=>(
+              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';if(parseInt(p.id,10)>=1900){const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}}return 'transparent';})()}}>
+                <td style={{padding:'2px 12px',fontWeight:800,color:C.accent,fontSize:14,minWidth:60}}>
+                  <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
+                </td>
+                <td style={{padding:'2px 12px',minWidth:80}}>
+                  <Cell value={String(p.buyPrice)} onChange={v=>update(p.id,'buyPrice',v)} align="right"/>
+                </td>
+                <td style={{padding:'2px 12px'}}>
+                  <span onClick={()=>toggleStatus(p.id)} style={{cursor:'pointer'}}>
+                    <Badge color={p.status==='stock'?C.accent:C.danger}>{p.status==='stock'?'Stock':'Vendu'}</Badge>
+                  </span>
+                </td>
+                <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
+                  <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
+                  {p.status==='stock'&&parseInt(p.id,10)>=1900&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:10,color:days>60?C.danger:C.warn,fontWeight:700,marginLeft:3}}>{days}j</span>;return null;})()}
+                </td>
+                <td style={{padding:'2px 12px'}}>
+                  <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
+                </td>
+              </tr>
+            ))}
+            {(showAll||currentPage===totalPages-1)&&<tr style={{borderTop:`2px solid ${C.accent}44`,background:'#00e5a008'}}>
+              <td style={{padding:'6px 8px'}}>
+                <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                  <input value={newRow.id} onChange={e=>setNewRow(n=>({...n,id:e.target.value}))}
+                    placeholder="N°" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:60,fontFamily:'monospace',outline:'none'}}
+                    onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
+                  />
+                  <button type="button" onClick={fillNextId} title="Numéro suivant (dernier ajouté +1)"
+                    style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:14,fontWeight:800,cursor:'pointer',lineHeight:1}}>
+                    +1
+                  </button>
+                </div>
+              </td>
+              <td style={{padding:'6px 8px'}}>
+                <input ref={priceInputRef} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
+                  type="number" placeholder="Prix achat €" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                  style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:100,outline:'none',fontFamily:'inherit'}}
+                  onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
+                />
+              </td>
+              <td colSpan={2} style={{padding:'6px 8px',color:C.muted,fontSize:11}}>← Entrée ou bouton pour ajouter</td>
+              <td style={{padding:'6px 8px'}}>
+                <Btn small onClick={addRow} color={C.accent}>+ Ajouter</Btn>
+              </td>
+            </tr>}
+          </tbody>
+        </table>
       </Card>
       {/* Pagination Catalogue */}
       {!showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
