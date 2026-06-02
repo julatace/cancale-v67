@@ -765,7 +765,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
         <StatCard icon="📦" label="Stock garage" value={stockCount} color={C.accent} sub={`${freeSlots} places libres`}/>
         <StatCard icon="💰" label="Valeur stock" value={fmt(stockValue)} color={C.warn} sub="prix d'achat total"/>
-        <StatCard icon="✅" label="Vendues" value={totalSold} color={C.danger}/>
+        <StatCard icon="✅" label="Vendues" value={sales.length} color={C.danger}/>
         <StatCard icon="💸" label="CA encaissé" value={fmt(ca)} color={C.text} sub={`${encaissees.length} ventes reçues`}/>
         <StatCard icon="📈" label="Bénéfice net" value={fmt(profit)} color={profit>=0?C.accent:C.danger} sub="argent reçu uniquement"/>
         <StatCard icon="🎯" label="Taux marge" value={`${avgMargin}%`} color={C.blue} sub="bénéf / CA"/>
