@@ -1274,7 +1274,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     }).sort((a,b)=>{
       const da=parseD(a.receiveDate)||parseD(a.saleDate);
       const db=parseD(b.receiveDate)||parseD(b.saleDate);
-      return da-db;
+      if(da!==db) return da-db;
+      return (a.createdAt||'') < (b.createdAt||'') ? -1 : 1;
     });
   },[sales,search,selectedMonth]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
