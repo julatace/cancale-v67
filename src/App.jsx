@@ -681,6 +681,46 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         <div style={{fontSize:12,color:C.muted,marginTop:2}}>Vue d'ensemble de ton activité</div>
       </div>
 
+      {/* Camemberts */}
+      {(brandStats.length>0||countryStats.length>0)&&(
+        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+          {brandStats.length>0&&(
+            <Card style={{flex:'1 1 260px'}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:12}}>🏷️ Répartition par marque</div>
+              <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
+                <PieChartSVG data={brandStats} size={140}/>
+                <div style={{flex:1,minWidth:120}}>
+                  {brandStats.map((b,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
+                      <span style={{color:C.text,fontWeight:700,flex:1}}>{b.label}</span>
+                      <span style={{color:C.muted}}>{b.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+          {countryStats.length>0&&(
+            <Card style={{flex:'1 1 260px'}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:12}}>🌍 Répartition par pays</div>
+              <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
+                <PieChartSVG data={countryStats} size={140}/>
+                <div style={{flex:1,minWidth:120}}>
+                  {countryStats.map((b,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
+                      <span style={{color:C.text,fontWeight:700,flex:1}}>{b.label}</span>
+                      <span style={{color:C.muted}}>{b.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Stats principales */}
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
         <StatCard icon="📦" label="Stock garage" value={stockCount} color={C.accent} sub={`${freeSlots} places libres`}/>
@@ -732,26 +772,6 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         </div>
       </Card>
 
-      {/* Barre de progression du garage */}
-      <Card style={{padding:18}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>🏠 Remplissage garage</span>
-          <span style={{fontSize:13,fontWeight:800,color:C.accent}}>{fillRate}%</span>
-        </div>
-        <div style={{height:10,background:C.surface,borderRadius:999,overflow:'hidden',border:`1px solid ${C.border}`}}>
-          <div style={{
-            height:'100%',
-            width:`${fillRate}%`,
-            background:C.accent,
-            borderRadius:999,
-            transition:'width 0.4s ease',
-          }}/>
-        </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:11,color:C.muted}}>
-          <span><b style={{color:C.accent}}>{stockCount}</b> boîtes occupées</span>
-          <span><b style={{color:C.warn}}>{freeSlots}</b> libres / {TOTAL_SLOTS} total</span>
-        </div>
-      </Card>
 
       {/* Stats secondaires */}
       <div>
@@ -920,63 +940,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         </Card>
       )}
 
-      {/* Récap mensuel */}
-      {showMonthly&&monthlyRecapData.count>0&&(
-        <Card style={{borderLeft:`4px solid ${C.purple}`,background:`${C.purple}11`}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-            <div>
-              <div style={{fontSize:13,fontWeight:800,color:C.purple,marginBottom:6}}>📆 Récap {monthlyRecapData.nom}</div>
-              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
-                <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
-                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>encaissé</span></span>
-                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
-              </div>
-            </div>
-            <button type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
-              style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:16,lineHeight:1,padding:'2px 4px'}}>✕</button>
-          </div>
-        </Card>
-      )}
 
-      {/* Camemberts */}
-      {(brandStats.length>0||countryStats.length>0)&&(
-        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
-          {brandStats.length>0&&(
-            <Card style={{flex:'1 1 260px'}}>
-              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:12}}>🏷️ Répartition par marque</div>
-              <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
-                <PieChartSVG data={brandStats} size={140}/>
-                <div style={{flex:1,minWidth:120}}>
-                  {brandStats.map((b,i)=>(
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
-                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
-                      <span style={{color:C.text,fontWeight:700,flex:1}}>{b.label}</span>
-                      <span style={{color:C.muted}}>{b.v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          )}
-          {countryStats.length>0&&(
-            <Card style={{flex:'1 1 260px'}}>
-              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:12}}>🌍 Répartition par pays</div>
-              <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
-                <PieChartSVG data={countryStats} size={140}/>
-                <div style={{flex:1,minWidth:120}}>
-                  {countryStats.map((b,i)=>(
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
-                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
-                      <span style={{color:C.text,fontWeight:700,flex:1}}>{b.label}</span>
-                      <span style={{color:C.muted}}>{b.v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -1053,6 +1017,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
     const now=new Date();
     return catalog.filter(p=>{
       if(p.status!=='stock') return false;
+      if(parseInt(p.id,10)<1900) return false;
       const parts=(p.addedAt||'').split('/');
       if(parts.length!==3) return false;
       const d=new Date(+parts[2],+parts[1]-1,+parts[0]);
@@ -1109,7 +1074,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           <tbody>
             {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
             {list.map(p=>(
-              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
+              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';if(parseInt(p.id,10)>=1900){const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:800,color:C.accent,fontSize:14,minWidth:60}}>
                   <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
                 </td>
@@ -1123,7 +1088,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
                   <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
-                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:10,color:days>60?C.danger:C.warn,fontWeight:700,marginLeft:3}}>{days}j</span>;return null;})()}
+                  {p.status==='stock'&&parseInt(p.id,10)>=1900&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:10,color:days>60?C.danger:C.warn,fontWeight:700,marginLeft:3}}>{days}j</span>;return null;})()}
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
