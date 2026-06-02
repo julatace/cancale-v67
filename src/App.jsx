@@ -1154,8 +1154,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   const [err,setErr]=useState('');
   const [page,setPage]=useState(null); // null = dernière page (init)
   const [showAll,setShowAll]=useState(false);
-  const [dateFrom,setDateFrom]=useState('');
-  const [dateTo,setDateTo]=useState('');
+  const [selectedMonth,setSelectedMonth]=useState('');
   const [selectMode,setSelectMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [isDragging,setIsDragging]=useState(false);
@@ -1243,18 +1242,33 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     setNewRow({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
   };
 
+  const availableMonths=useMemo(()=>{
+    const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    const seen=new Set();
+    sales.forEach(s=>{
+      const p=(s.receiveDate||'').split('/');
+      if(p.length===3&&p[1]&&p[2]) seen.add(p[2]+'-'+p[1].padStart(2,'0'));
+    });
+    return [...seen].sort().reverse().map(k=>{
+      const [y,m]=k.split('-');
+      return {key:k,label:`${MOIS[+m-1]} ${y}`};
+    });
+  },[sales]);
+
   const fullFiltered=useMemo(()=>{
+    let fromTs=0,toTs=Infinity;
+    if(selectedMonth){
+      const [y,m]=selectedMonth.split('-');
+      const start=new Date(+y,+m-1,1); const end=new Date(+y,+m,0,23,59,59,999);
+      fromTs=start.getTime(); toTs=end.getTime();
+    }
     const parseRec=d=>{if(!d)return 0;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]).getTime():0;};
-    const fromTs=dateFrom?new Date(dateFrom).getTime():0;
-    const toTs=dateTo?new Date(dateTo).getTime()+86399999:Infinity;
     return sales.filter(s=>{
       if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
-      const rd=parseRec(s.receiveDate);
-      if(dateFrom&&rd<fromTs) return false;
-      if(dateTo&&rd>toTs) return false;
+      if(selectedMonth){const rd=parseRec(s.receiveDate);if(rd<fromTs||rd>toTs) return false;}
       return true;
     });
-  },[sales,search,dateFrom,dateTo]);
+  },[sales,search,selectedMonth]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const filtered=showAll?fullFiltered:fullFiltered.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
@@ -1332,13 +1346,13 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
       </div>
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-        <span style={{fontSize:11,color:C.muted,fontWeight:600}}>Réception :</span>
-        <input type="date" value={dateFrom} onChange={e=>{setDateFrom(e.target.value);setPage(null);}}
-          style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'5px 8px',fontSize:12,background:C.card,color:C.text}}/>
-        <span style={{fontSize:11,color:C.muted}}>→</span>
-        <input type="date" value={dateTo} onChange={e=>{setDateTo(e.target.value);setPage(null);}}
-          style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'5px 8px',fontSize:12,background:C.card,color:C.text}}/>
-        {(dateFrom||dateTo)&&<Btn small onClick={()=>{setDateFrom('');setDateTo('');setPage(null);}} color={C.border}>✕</Btn>}
+        <span style={{fontSize:11,color:C.muted,fontWeight:600}}>Période :</span>
+        <select value={selectedMonth} onChange={e=>{setSelectedMonth(e.target.value);setPage(null);}}
+          style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'5px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer'}}>
+          <option value="">— Tous les mois —</option>
+          {availableMonths.map(m=><option key={m.key} value={m.key}>{m.label}</option>)}
+        </select>
+        {selectedMonth&&<Btn small onClick={()=>{setSelectedMonth('');setPage(null);}} color={C.border}>✕</Btn>}
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
         <div className={selectMode?'sales-select-mode':''} style={{overflowX:'auto',position:'relative'}}>
