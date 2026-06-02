@@ -2757,10 +2757,32 @@ export default function App() {
         };
         apply('vinted_catalog', setCatalog);
         apply('vinted_sales', setSales);
-        apply('vinted_garage_grid', setGarageGrid);
-        apply('vinted_blocked', setBlockedCells);
-        apply('vinted_extracols', setExtraCols);
-        apply('vinted_colors', setCellColors);
+        // Garage : migration automatique si anciennes clés détectées dans Firebase
+        if (cloud.vinted_garage_grid) {
+          const mig = migrateGarageData(cloud.vinted_garage_grid, cloud.vinted_blocked||{}, cloud.vinted_colors||{});
+          if (mig) {
+            // Anciennes clés détectées : appliquer les données migrées
+            [['vinted_garage_grid',mig.garageGrid,setGarageGrid],['vinted_blocked',mig.blockedCells,setBlockedCells],
+             ['vinted_colors',mig.cellColors,setCellColors],['vinted_extracols',mig.extraCols,setExtraCols]
+            ].forEach(([k,v,s])=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{} s(v); });
+            // Nettoyer Firebase : écraser avec données migrées + nullifier les anciennes clés
+            const nullKeys={};
+            OLD_ZONES.forEach(z=>{for(let ci=0;ci<z.cols;ci++) nullKeys[`${z.id}_${ci}`]=null;});
+            fetch(FIREBASE_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({vinted_garage_grid:{...mig.garageGrid,...nullKeys},
+                vinted_blocked:mig.blockedCells,vinted_extracols:mig.extraCols,vinted_colors:mig.cellColors})
+            }).catch(()=>{});
+          } else {
+            apply('vinted_garage_grid', setGarageGrid);
+            apply('vinted_blocked', setBlockedCells);
+            apply('vinted_extracols', setExtraCols);
+            apply('vinted_colors', setCellColors);
+          }
+        } else {
+          apply('vinted_blocked', setBlockedCells);
+          apply('vinted_extracols', setExtraCols);
+          apply('vinted_colors', setCellColors);
+        }
         apply('vinted_invoices', setInvoices);
         apply('vinted_stock_vinted', setStockVinted);
         apply('vinted_invoice_settings', setInvoiceSettings);
