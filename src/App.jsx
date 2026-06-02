@@ -117,6 +117,44 @@ const fmtN = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',');
 const uid  = () => Math.random().toString(36).slice(2,9);
 const tod  = () => new Date().toLocaleDateString('fr-FR');
 
+const KNOWN_BRANDS=['New Balance','Under Armour','Air Jordan','Le Coq Sportif','Sergio Tacchini',
+  'Nike','Adidas','Asics','Jordan','Puma','Reebok','Vans','Converse','Lacoste','Wilson',
+  'Babolat','Head','Yonex','Salomon','Brooks','Hoka','Mizuno','Fila','Saucony','New Era',
+  'Kappa','Hummel','Umbro','Ellesse','Diadora','Lotto'];
+function extractBrand(text){
+  if(!text) return null;
+  const t=text.toLowerCase();
+  for(const b of KNOWN_BRANDS){if(t.includes(b.toLowerCase())) return b;}
+  return null;
+}
+const COUNTRY_MAP_DATA=[
+  [['france'],'France'],[['allemagne','deutschland','germany'],'Allemagne'],
+  [['belgique','belgium','belgie'],'Belgique'],[['espagne','españa','spain','espana'],'Espagne'],
+  [['italie','italia','italy'],'Italie'],[['pays-bas','nederland','netherlands','holland'],'Pays-Bas'],
+  [['suisse','schweiz','switzerland'],'Suisse'],[['luxembourg'],'Luxembourg'],
+  [['autriche','österreich','austria','osterreich'],'Autriche'],[['portugal'],'Portugal'],
+  [['pologne','poland','polska'],'Pologne'],[['roumanie','romania'],'Roumanie'],
+  [['suede','sweden','sverige'],'Suède'],[['danemark','denmark','danmark'],'Danemark'],
+  [['tchequie','czech','tschechien'],'Tchéquie'],
+];
+function extractCountry(address){
+  if(!address) return 'France';
+  const lines=address.split(/[\n,]+/).map(l=>l.trim().toLowerCase()).filter(Boolean);
+  for(const line of [...lines].reverse()){
+    for(const [keys,name] of COUNTRY_MAP_DATA){
+      if(keys.some(k=>line.includes(k))) return name;
+    }
+  }
+  return 'France';
+}
+function getISOWeekKey(){
+  const d=new Date();const day=d.getDay()||7;
+  d.setDate(d.getDate()+4-day);
+  const y=d.getFullYear();
+  const wk=Math.ceil(((d-new Date(y,0,1))/864e5+1)/7);
+  return `${y}-W${String(wk).padStart(2,'0')}`;
+}
+
 // ── Notifications ──────────────────────────────────────
 // Demande la permission d'envoyer des notifications (à appeler sur action utilisateur).
 function askNotifPermission(){
@@ -212,6 +250,26 @@ function StatBox({label,value,color=C.text,sub=null}) {
       <div style={{fontSize:18,fontWeight:800,color,lineHeight:1.2}}>{value}</div>
       {sub&&<div style={{fontSize:10,color:C.muted,marginTop:3}}>{sub}</div>}
     </Card>
+  );
+}
+function PieChartSVG({data,size=160}){
+  const total=data.reduce((s,d)=>s+d.v,0);
+  if(total===0) return null;
+  const cx=size/2,cy=size/2,r=size/2-8;
+  let angle=-Math.PI/2;
+  const slices=data.map(d=>{
+    const a=(d.v/total)*2*Math.PI;
+    const ea=angle+a;
+    const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(ea),y2=cy+r*Math.sin(ea);
+    const path=`M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${a>Math.PI?1:0},1 ${x2},${y2} Z`;
+    angle=ea;
+    return {...d,path};
+  });
+  return(
+    <svg width={size} height={size} style={{display:'block',flexShrink:0}}>
+      {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth={1.5}/>)}
+    </svg>
   );
 }
 
@@ -406,6 +464,69 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
   const avgMargin=ca>0?((profit/ca)*100).toFixed(1):'0';
   const avgSale=encaissees.length?(ca/encaissees.length):0;
   const avgProfit=encaissees.length?(profit/encaissees.length):0;
+
+  const PIE_COLORS=['#1f7a55','#3f7fae','#b07d18','#7a6ad0','#c34a4a','#2aa198','#6c71c4','#d33682','#268bd2','#cb4b16'];
+
+  const brandStats=useMemo(()=>{
+    const map={};
+    invoices.forEach(inv=>{
+      const b=extractBrand(inv.itemName)||extractBrand(inv.productId);
+      if(b) map[b]=(map[b]||0)+1;
+    });
+    sales.forEach(s=>{
+      const pid=String(s.productId||'');
+      if(!/^\d+(\+\d+)*$/.test(pid.trim())){
+        const b=extractBrand(pid);
+        if(b) map[b]=(map[b]||0)+1;
+      }
+    });
+    const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    const top7=sorted.slice(0,7);
+    const rest=sorted.slice(7).reduce((s,x)=>s+x[1],0);
+    const items=top7.map(([k,v],i)=>({label:k,v,color:PIE_COLORS[i%PIE_COLORS.length]}));
+    if(rest>0) items.push({label:'Autre',v:rest,color:'#aaa'});
+    return items;
+  },[invoices,sales]);
+
+  const countryStats=useMemo(()=>{
+    const map={};
+    invoices.forEach(inv=>{
+      const c=extractCountry(inv.buyerAddress);
+      map[c]=(map[c]||0)+1;
+    });
+    const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    return sorted.map(([k,v],i)=>({label:k,v,color:PIE_COLORS[i%PIE_COLORS.length]}));
+  },[invoices]);
+
+  const weeklyRecapData=useMemo(()=>{
+    const today=new Date();
+    const day=today.getDay()||7;
+    const lastMon=new Date(today);lastMon.setDate(today.getDate()-day-6);lastMon.setHours(0,0,0,0);
+    const lastSun=new Date(today);lastSun.setDate(today.getDate()-day);lastSun.setHours(23,59,59,999);
+    const parseDt=s=>{if(!s)return null;const p=s.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]):null;};
+    const ventes=encaissees.filter(v=>{const d=parseDt(v.receiveDate);return d&&d>=lastMon&&d<=lastSun;});
+    const ca=ventes.reduce((s,v)=>s+ +v.sellPrice,0);
+    const profit=ventes.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0);
+    return{count:ventes.length,ca,profit,from:lastMon.toLocaleDateString('fr-FR'),to:lastSun.toLocaleDateString('fr-FR')};
+  },[encaissees]);
+
+  const monthlyRecapData=useMemo(()=>{
+    const today=new Date();
+    const prevM=today.getMonth()===0?11:today.getMonth()-1;
+    const prevY=today.getMonth()===0?today.getFullYear()-1:today.getFullYear();
+    const prevMM=String(prevM+1).padStart(2,'0');
+    const prevY4=String(prevY);
+    const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    const ventes=encaissees.filter(v=>{const p=(v.receiveDate||'').split('/');return p.length===3&&p[1]===prevMM&&p[2]===prevY4;});
+    const ca=ventes.reduce((s,v)=>s+ +v.sellPrice,0);
+    const profit=ventes.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0);
+    return{count:ventes.length,ca,profit,nom:`${moisNoms[prevM]} ${prevY4}`};
+  },[encaissees]);
+
+  const isoWeek=getISOWeekKey();
+  const monthKey=new Date().toISOString().slice(0,7);
+  const [showWeekly,setShowWeekly]=useState(()=>load('vinted_last_weekly_recap','')!==isoWeek);
+  const [showMonthly,setShowMonthly]=useState(()=>load('vinted_last_monthly_recap','')!==monthKey);
 
   // Stats journalières basées sur la date de réception (CA encaissé) (mémorisé)
   const dayStats=useMemo(()=>{
@@ -779,6 +900,82 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
             Cotisations + impôt estimés à 13,5 % du CA encaissé chaque mois (versement libératoire). Vérifie auprès de l'URSSAF.
           </div>
         </Card>
+      )}
+
+      {/* Récap hebdomadaire */}
+      {showWeekly&&weeklyRecapData.count>0&&(
+        <Card style={{borderLeft:`4px solid ${C.blue}`,background:`${C.blue}11`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:C.blue,marginBottom:6}}>📅 Récap semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
+              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
+                <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
+                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>encaissé</span></span>
+                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
+              </div>
+            </div>
+            <button type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
+              style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:16,lineHeight:1,padding:'2px 4px'}}>✕</button>
+          </div>
+        </Card>
+      )}
+
+      {/* Récap mensuel */}
+      {showMonthly&&monthlyRecapData.count>0&&(
+        <Card style={{borderLeft:`4px solid ${C.purple}`,background:`${C.purple}11`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:C.purple,marginBottom:6}}>📆 Récap {monthlyRecapData.nom}</div>
+              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
+                <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
+                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>encaissé</span></span>
+                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
+              </div>
+            </div>
+            <button type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
+              style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:16,lineHeight:1,padding:'2px 4px'}}>✕</button>
+          </div>
+        </Card>
+      )}
+
+      {/* Camemberts */}
+      {(brandStats.length>0||countryStats.length>0)&&(
+        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+          {brandStats.length>0&&(
+            <Card style={{flex:'1 1 260px'}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:12}}>🏷️ Répartition par marque</div>
+              <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
+                <PieChartSVG data={brandStats} size={140}/>
+                <div style={{flex:1,minWidth:120}}>
+                  {brandStats.map((b,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
+                      <span style={{color:C.text,fontWeight:700,flex:1}}>{b.label}</span>
+                      <span style={{color:C.muted}}>{b.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+          {countryStats.length>0&&(
+            <Card style={{flex:'1 1 260px'}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:12}}>🌍 Répartition par pays</div>
+              <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
+                <PieChartSVG data={countryStats} size={140}/>
+                <div style={{flex:1,minWidth:120}}>
+                  {countryStats.map((b,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
+                      <span style={{color:C.text,fontWeight:700,flex:1}}>{b.label}</span>
+                      <span style={{color:C.muted}}>{b.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );
