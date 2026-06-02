@@ -1240,13 +1240,15 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     const ns=[sale,...sales]; setSales(ns); save('vinted_sales',ns);
     if(foundItems.length>0){const nc=catalog.map(x=>pids.includes(x.id)?{...x,status:'vendu'}:x);setCatalog(nc);save('vinted_catalog',nc);}
     setNewRow({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
+    setPage(0);setSelectedMonth('');
   };
 
   const availableMonths=useMemo(()=>{
     const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
     const seen=new Set();
     sales.forEach(s=>{
-      const p=(s.receiveDate||'').split('/');
+      const d=s.saleDate||s.receiveDate||'';
+      const p=d.split('/');
       if(p.length===3&&p[1]&&p[2]) seen.add(p[2]+'-'+p[1].padStart(2,'0'));
     });
     return [...seen].sort().reverse().map(k=>{
@@ -1256,16 +1258,21 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   },[sales]);
 
   const fullFiltered=useMemo(()=>{
+    const parseD=d=>{if(!d)return 0;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]).getTime():0;};
     let fromTs=0,toTs=Infinity;
     if(selectedMonth){
       const [y,m]=selectedMonth.split('-');
-      const start=new Date(+y,+m-1,1); const end=new Date(+y,+m,0,23,59,59,999);
-      fromTs=start.getTime(); toTs=end.getTime();
+      fromTs=new Date(+y,+m-1,1).getTime();
+      toTs=new Date(+y,+m,0,23,59,59,999).getTime();
     }
-    const parseRec=d=>{if(!d)return 0;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]).getTime():0;};
     return sales.filter(s=>{
       if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
-      if(selectedMonth){const rd=parseRec(s.receiveDate);if(rd<fromTs||rd>toTs) return false;}
+      if(selectedMonth){
+        const sd=parseD(s.saleDate);
+        const rd=parseD(s.receiveDate);
+        const match=(sd>=fromTs&&sd<=toTs)||(rd>0&&rd>=fromTs&&rd<=toTs);
+        if(!match) return false;
+      }
       return true;
     });
   },[sales,search,selectedMonth]);
