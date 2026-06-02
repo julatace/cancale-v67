@@ -251,6 +251,11 @@ function PieChartSVG({data,size=160}){
   const total=data.reduce((s,d)=>s+d.v,0);
   if(total===0) return null;
   const cx=size/2,cy=size/2,r=size/2-8;
+  if(data.length===1) return(
+    <svg width={size} height={size} style={{display:'block',flexShrink:0}}>
+      <circle cx={cx} cy={cy} r={r} fill={data[0].color}/>
+    </svg>
+  );
   let angle=-Math.PI/2;
   const slices=data.map(d=>{
     const a=(d.v/total)*2*Math.PI;
@@ -724,6 +729,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         <StatCard icon="💸" label="CA encaissé" value={fmt(ca)} color={C.text} sub={`${encaissees.length} ventes reçues`}/>
         <StatCard icon="📈" label="Bénéfice net" value={fmt(profit)} color={profit>=0?C.accent:C.danger} sub="argent reçu uniquement"/>
         <StatCard icon="🎯" label="Taux marge" value={`${avgMargin}%`} color={C.blue} sub="bénéf / CA"/>
+        {ajoutsParJour.length>0&&<StatCard icon="📦" label="Ajout moyen/jour" value={`${(ajoutsParJour.reduce((s,h)=>s+h.count,0)/ajoutsParJour.length).toFixed(1)}`} color={C.text} sub={`sur ${ajoutsParJour.length}j d'activité`}/>}
       </div>
 
       {/* Mois en cours */}
@@ -854,68 +860,6 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         );
       })()}
 
-      {/* Graphique : paires ajoutées par jour */}
-      {ajoutsParJour.length>0&&(()=>{
-        const maxAjout=Math.max(...ajoutsParJour.map(h=>h.count),1);
-        const totalAjouts=ajoutsParJour.reduce((s,h)=>s+h.count,0);
-        const moyenne=(totalAjouts/ajoutsParJour.length);
-        return (
-          <Card>
-            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>📦 Paires ajoutées par jour</div>
-            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {totalAjouts} paire{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
-            </div>
-            <div style={{display:'flex',alignItems:'flex-end',gap:4,height:150,paddingTop:10,overflowX:'auto'}}>
-              {ajoutsParJour.map((h,i)=>{
-                const pct=Math.round(h.count/maxAjout*100);
-                return (
-                  <div key={i} style={{flex:'1 0 auto',minWidth:22,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end'}}>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:700}}>{h.count}</div>
-                    <div style={{width:'100%',maxWidth:30,height:`${pct}%`,minHeight:4,background:C.accent,borderRadius:'3px 3px 0 0',transition:'height .4s'}}/>
-                    <div style={{fontSize:9,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{h.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        );
-      })()}
-
-      {/* Récap comptable mensuel */}
-      {moisRecap.length>0&&(
-        <Card>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <span style={{fontSize:13,fontWeight:800,color:C.text}}>📊 Récap comptable mensuel</span>
-            <Btn small onClick={exportCompta}>📥 Exporter (CSV)</Btn>
-          </div>
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-              <thead>
-                <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                  {['Mois','Ventes','CA encaissé','Bénéfice','Cotis.+impôt 13,5 %','Net estimé'].map(h=>(
-                    <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:10,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {moisRecap.map(m=>(
-                  <tr key={m.label} style={{borderBottom:`1px solid ${C.border}`}}>
-                    <td style={{padding:'8px 10px',fontWeight:800,color:C.accent,whiteSpace:'nowrap'}}>{m.label}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',fontWeight:700}}>{fmt(m.ca)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.accent}}>{fmt(m.profit)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.warn}}>{fmt(m.urssaf)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.accent,fontWeight:700}}>{fmt(m.net)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
-            Cotisations + impôt estimés à 13,5 % du CA encaissé chaque mois (versement libératoire). Vérifie auprès de l'URSSAF.
-          </div>
-        </Card>
-      )}
 
       {/* Récap hebdomadaire */}
       {showWeekly&&weeklyRecapData.count>0&&(
