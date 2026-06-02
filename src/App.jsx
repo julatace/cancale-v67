@@ -183,30 +183,41 @@ const INIT_GARAGE = {};
 // Ancienne disposition (4 zones) → nouvelle disposition (zone unique)
 const OLD_ZONES = [{id:'bureau',cols:4},{id:'sol',cols:3},{id:'porte',cols:1},{id:'grande',cols:10}];
 function migrateGarageData(garageGrid, blockedCells, cellColors) {
-  const needsMigration = Object.keys(garageGrid).some(k => OLD_ZONES.some(z => k.startsWith(z.id+'_')));
-  if (!needsMigration) return null;
+  const isOldKey = k => OLD_ZONES.some(z => k.match(new RegExp(`^${z.id}_\\d+$`)));
+  const hasOld = Object.keys(garageGrid).some(isOldKey);
+  if (!hasOld) return null;
+  const hasNew = Object.keys(garageGrid).some(k => k.startsWith('zone_'));
+  const maxZone = k => { const m=k.match(/^zone_(\d+)$/); return m?+m[1]:0; };
+  if (hasNew) {
+    // Migration déjà faite : supprimer les anciennes clés sans toucher aux zone_
+    const newGrid = {};
+    Object.entries(garageGrid).forEach(([k,v]) => { if(!isOldKey(k)) newGrid[k]=v; });
+    const stripOld = obj => { const o={}; Object.entries(obj||{}).forEach(([k,v])=>{ const m=k.match(/^([^_]+)_\d+_\d+$/); if(!m||!OLD_ZONES.some(z=>z.id===m[1])) o[k]=v; }); return o; };
+    const maxN = Math.max(0,...Object.keys(newGrid).map(maxZone));
+    return { garageGrid:newGrid, blockedCells:stripOld(blockedCells), cellColors:stripOld(cellColors), extraCols:{zone:maxN} };
+  }
+  // Première migration : convertir toutes les colonnes (base + extras) en zone_N
   const colMap = {};
   let n = 0;
-  // Découverte dynamique de TOUTES les colonnes par zone (base + extras ajoutées par l'utilisateur)
   OLD_ZONES.forEach(z => {
     Object.keys(garageGrid)
       .filter(k => k.match(new RegExp(`^${z.id}_\\d+$`)))
-      .sort((a,b) => parseInt(a.split('_').pop(),10) - parseInt(b.split('_').pop(),10))
-      .forEach(k => { colMap[k] = `zone_${n++}`; });
+      .sort((a,b) => parseInt(a.split('_').pop(),10)-parseInt(b.split('_').pop(),10))
+      .forEach(k => { colMap[k]=`zone_${n++}`; });
   });
   const newGrid = {};
-  Object.entries(garageGrid).forEach(([k,v]) => { newGrid[colMap[k]||k] = v; });
-  const migrateKeyed = (obj) => {
+  Object.entries(garageGrid).forEach(([k,v]) => { newGrid[colMap[k]||k]=v; });
+  const migrateKeyed = obj => {
     const out = {};
     Object.entries(obj||{}).forEach(([k,v]) => {
-      const m = k.match(/^([^_]+)_(\d+)_(\d+)$/);
-      const mapped = m && colMap[`${m[1]}_${m[2]}`];
-      out[mapped ? `${mapped}_${m[3]}` : k] = v;
+      const m=k.match(/^([^_]+)_(\d+)_(\d+)$/);
+      const mapped=m&&colMap[`${m[1]}_${m[2]}`];
+      out[mapped?`${mapped}_${m[3]}`:k]=v;
     });
     return out;
   };
-  const maxN = Math.max(0,...Object.keys(newGrid).map(k=>{const m=k.match(/^zone_(\d+)$/);return m?+m[1]:0;}));
-  return { garageGrid: newGrid, blockedCells: migrateKeyed(blockedCells), cellColors: migrateKeyed(cellColors), extraCols: {zone: maxN} };
+  const maxN = Math.max(0,...Object.keys(newGrid).map(maxZone));
+  return { garageGrid:newGrid, blockedCells:migrateKeyed(blockedCells), cellColors:migrateKeyed(cellColors), extraCols:{zone:maxN} };
 }
 
 /* ── Editable cell ───────────────────────────────────── */
