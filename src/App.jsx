@@ -1218,10 +1218,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   };
 
   const fullFiltered=useMemo(()=>{
-    const parseDate=d=>{if(!d)return 0;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]).getTime():0;};
     return sales
-      .filter(s=>!search||(s.productId||'').toLowerCase().includes(search.toLowerCase())||(s.saleDate||'').includes(search)||(s.receiveDate||'').includes(search))
-      .sort((a,b)=>parseDate(a.receiveDate)-parseDate(b.receiveDate));
+      .filter(s=>!search||(s.productId||'').toLowerCase().includes(search.toLowerCase())||(s.saleDate||'').includes(search)||(s.receiveDate||'').includes(search));
   },[sales,search]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
