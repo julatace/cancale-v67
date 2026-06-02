@@ -1049,6 +1049,17 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const list=showAll?fullList:fullList.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
 
+  const oldStockCount=useMemo(()=>{
+    const now=new Date();
+    return catalog.filter(p=>{
+      if(p.status!=='stock') return false;
+      const parts=(p.addedAt||'').split('/');
+      if(parts.length!==3) return false;
+      const d=new Date(+parts[2],+parts[1]-1,+parts[0]);
+      return (now-d)/86400000>30;
+    }).length;
+  },[catalog]);
+
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
@@ -1083,6 +1094,11 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           </Btn>
         ))}
       </div>
+      {oldStockCount>0&&(
+        <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:8,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:700}}>
+          ⚠️ {oldStockCount} paire{oldStockCount>1?'s':''} en stock depuis + de 30 jours
+        </div>
+      )}
       <Card style={{padding:0,overflow:'hidden'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
           <thead style={{background:C.surface}}><tr>
@@ -1093,7 +1109,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           <tbody>
             {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
             {list.map(p=>(
-              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:p.status==='vendu'?'#ff4d6d08':'transparent'}}>
+              <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:800,color:C.accent,fontSize:14,minWidth:60}}>
                   <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
                 </td>
@@ -1107,6 +1123,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 </td>
                 <td style={{padding:'2px 12px',color:C.muted,fontSize:11,minWidth:80}}>
                   <Cell value={p.addedAt||'—'} onChange={v=>update(p.id,'addedAt',v)}/>
+                  {p.status==='stock'&&(()=>{const parts=(p.addedAt||'').split('/');if(parts.length!==3) return null;const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>30) return <span style={{fontSize:10,color:days>60?C.danger:C.warn,fontWeight:700,marginLeft:3}}>{days}j</span>;return null;})()}
                 </td>
                 <td style={{padding:'2px 12px'}}>
                   <Btn small danger onClick={()=>remove(p.id)}>✕</Btn>
