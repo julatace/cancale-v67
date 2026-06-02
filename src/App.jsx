@@ -187,7 +187,13 @@ function migrateGarageData(garageGrid, blockedCells, cellColors) {
   if (!needsMigration) return null;
   const colMap = {};
   let n = 0;
-  OLD_ZONES.forEach(z => { for(let ci=0;ci<z.cols;ci++) colMap[`${z.id}_${ci}`]=`zone_${n++}`; });
+  // Découverte dynamique de TOUTES les colonnes par zone (base + extras ajoutées par l'utilisateur)
+  OLD_ZONES.forEach(z => {
+    Object.keys(garageGrid)
+      .filter(k => k.match(new RegExp(`^${z.id}_\\d+$`)))
+      .sort((a,b) => parseInt(a.split('_').pop(),10) - parseInt(b.split('_').pop(),10))
+      .forEach(k => { colMap[k] = `zone_${n++}`; });
+  });
   const newGrid = {};
   Object.entries(garageGrid).forEach(([k,v]) => { newGrid[colMap[k]||k] = v; });
   const migrateKeyed = (obj) => {
