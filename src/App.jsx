@@ -487,6 +487,29 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
     catalog.forEach(p=>{m[p.id]=+p.buyPrice;});
     return m;
   },[catalog]);
+
+  const addedAtMap=useMemo(()=>{
+    const m={};
+    catalog.forEach(p=>{if(p.addedAt&&p.addedAt!=='01/01/2024') m[p.id]=p.addedAt;});
+    return m;
+  },[catalog]);
+
+  const avgDelayDays=useMemo(()=>{
+    const parseD=d=>{if(!d)return null;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]):null;};
+    let total=0,count=0;
+    sales.forEach(s=>{
+      const saleD=parseD(s.saleDate);
+      if(!saleD) return;
+      const pids=String(s.productId||'').split('+').filter(Boolean);
+      pids.forEach(pid=>{
+        const addedD=parseD(addedAtMap[pid]);
+        if(!addedD) return;
+        const days=(saleD-addedD)/(1000*60*60*24);
+        if(days>=0){total+=days;count++;}
+      });
+    });
+    return count>0?Math.round(total/count):null;
+  },[sales,addedAtMap]);
   
   // Stock & valeur (mémorisés)
   const stockCount=garageVals.length;
@@ -770,6 +793,7 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         <StatCard icon="📈" label="Bénéfice net" value={fmt(profit)} color={profit>=0?C.accent:C.danger} sub="argent reçu uniquement"/>
         <StatCard icon="🎯" label="Taux marge" value={`${avgMargin}%`} color={C.blue} sub="bénéf / CA"/>
         {ajoutsParJour.length>0&&<StatCard icon="📦" label="Ajout moyen/jour" value={`${(ajoutsParJour.reduce((s,h)=>s+h.count,0)/ajoutsParJour.length).toFixed(1)}`} color={C.text} sub={`sur ${ajoutsParJour.length}j d'activité`}/>}
+        {avgDelayDays!==null&&<StatCard icon="⏱" label="Délai achat → vente" value={`${avgDelayDays}j`} color={C.blue} sub="de l'ajout à la date de vente"/>}
       </div>
 
       {/* Mois en cours */}
@@ -1130,6 +1154,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   const [err,setErr]=useState('');
   const [page,setPage]=useState(null); // null = dernière page (init)
   const [showAll,setShowAll]=useState(false);
+  const [dateFrom,setDateFrom]=useState('');
+  const [dateTo,setDateTo]=useState('');
   const [selectMode,setSelectMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [isDragging,setIsDragging]=useState(false);
@@ -1218,9 +1244,17 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   };
 
   const fullFiltered=useMemo(()=>{
-    return sales
-      .filter(s=>!search||(s.productId||'').toLowerCase().includes(search.toLowerCase())||(s.saleDate||'').includes(search)||(s.receiveDate||'').includes(search));
-  },[sales,search]);
+    const parseRec=d=>{if(!d)return 0;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]).getTime():0;};
+    const fromTs=dateFrom?new Date(dateFrom).getTime():0;
+    const toTs=dateTo?new Date(dateTo).getTime()+86399999:Infinity;
+    return sales.filter(s=>{
+      if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
+      const rd=parseRec(s.receiveDate);
+      if(dateFrom&&rd<fromTs) return false;
+      if(dateTo&&rd>toTs) return false;
+      return true;
+    });
+  },[sales,search,dateFrom,dateTo]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const filtered=showAll?fullFiltered:fullFiltered.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
@@ -1296,6 +1330,15 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
           style={{maxWidth:280,flex:1,minWidth:160}}/>
         <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
+      </div>
+      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+        <span style={{fontSize:11,color:C.muted,fontWeight:600}}>Réception :</span>
+        <input type="date" value={dateFrom} onChange={e=>{setDateFrom(e.target.value);setPage(null);}}
+          style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'5px 8px',fontSize:12,background:C.card,color:C.text}}/>
+        <span style={{fontSize:11,color:C.muted}}>→</span>
+        <input type="date" value={dateTo} onChange={e=>{setDateTo(e.target.value);setPage(null);}}
+          style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'5px 8px',fontSize:12,background:C.card,color:C.text}}/>
+        {(dateFrom||dateTo)&&<Btn small onClick={()=>{setDateFrom('');setDateTo('');setPage(null);}} color={C.border}>✕</Btn>}
       </div>
       <Card style={{padding:0,overflow:'hidden'}}>
         <div className={selectMode?'sales-select-mode':''} style={{overflowX:'auto',position:'relative'}}>
