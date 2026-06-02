@@ -1247,8 +1247,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
     const seen=new Set();
     sales.forEach(s=>{
-      const d=s.saleDate||s.receiveDate||'';
-      const p=d.split('/');
+      const p=(s.receiveDate||'').split('/');
       if(p.length===3&&p[1]&&p[2]) seen.add(p[2]+'-'+p[1].padStart(2,'0'));
     });
     return [...seen].sort().reverse().map(k=>{
@@ -1268,13 +1267,11 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     return sales.filter(s=>{
       if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
       if(selectedMonth){
-        const sd=parseD(s.saleDate);
         const rd=parseD(s.receiveDate);
-        const match=(sd>=fromTs&&sd<=toTs)||(rd>0&&rd>=fromTs&&rd<=toTs);
-        if(!match) return false;
+        if(rd<fromTs||rd>toTs) return false;
       }
       return true;
-    }).sort((a,b)=>parseD(a.saleDate)-parseD(b.saleDate));
+    });
   },[sales,search,selectedMonth]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
