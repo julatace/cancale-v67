@@ -1240,7 +1240,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     const ns=[sale,...sales]; setSales(ns); save('vinted_sales',ns);
     if(foundItems.length>0){const nc=catalog.map(x=>pids.includes(x.id)?{...x,status:'vendu'}:x);setCatalog(nc);save('vinted_catalog',nc);}
     setNewRow({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
-    setPage(0);setSelectedMonth('');
+    setPage(null);setSelectedMonth('');
   };
 
   const availableMonths=useMemo(()=>{
@@ -1274,7 +1274,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
         if(!match) return false;
       }
       return true;
-    });
+    }).sort((a,b)=>parseD(a.saleDate)-parseD(b.saleDate));
   },[sales,search,selectedMonth]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
