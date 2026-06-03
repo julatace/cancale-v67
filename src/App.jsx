@@ -1168,9 +1168,9 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   const refSell=React.useRef(null);
   const PER_PAGE=50;
   const rowRefs=[refPid,refSaleDate,refReceiveDate,refBuy,refSell];
-  const navArrow=(e,idx)=>{
-    if(e.key==='ArrowRight'){e.preventDefault();const next=rowRefs[idx+1];if(next?.current)next.current.focus();}
-    else if(e.key==='ArrowLeft'){e.preventDefault();const prev=rowRefs[idx-1];if(prev?.current)prev.current.focus();}
+  const navTab=(e,idx)=>{
+    if(e.key==='Tab'&&!e.shiftKey){e.preventDefault();const next=rowRefs[idx+1];if(next?.current)next.current.focus();}
+    else if(e.key==='Tab'&&e.shiftKey){e.preventDefault();const prev=rowRefs[idx-1];if(prev?.current)prev.current.focus();}
   };
   
   // Recherche : sur Entrée ou bouton
@@ -1460,21 +1460,21 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                       ...(inv?{saleDate:inv.saleDate||n.saleDate}:{}),
                     }));
                   }}
-                    placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();refSell.current&&refSell.current.focus();}else navArrow(e,0);}}
+                    title="N° de la paire (ex: 1974). Pour un lot: 1974+1532" placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();refSell.current&&refSell.current.focus();}else navTab(e,0);}}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:700}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input ref={refSaleDate} value={newRow.saleDate} onChange={e=>setNewRow(n=>({...n,saleDate:e.target.value}))}
-                    placeholder="jj/mm/aaaa" onKeyDown={e=>navArrow(e,1)}
+                    title="Date à laquelle la vente a été faite sur Vinted (jj/mm/aaaa)" placeholder="jj/mm/aaaa" onKeyDown={e=>navTab(e,1)}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input ref={refReceiveDate} value={newRow.receiveDate} onChange={e=>setNewRow(n=>({...n,receiveDate:e.target.value}))}
-                    placeholder="jj/mm/aaaa" onKeyDown={e=>navArrow(e,2)}
+                    title="Date à laquelle tu as reçu l'argent sur Vinted (jj/mm/aaaa)" placeholder="jj/mm/aaaa" onKeyDown={e=>navTab(e,2)}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
@@ -1482,14 +1482,14 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                 <td style={{padding:'6px 6px'}}>
                   {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:10,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
                   <input ref={refBuy} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-                    type="number" placeholder="Achat €" onKeyDown={e=>navArrow(e,3)}
+                    type="number" title="Prix auquel tu as acheté la paire (rempli automatiquement si le n° est dans le catalogue)" placeholder="Achat €" onKeyDown={e=>navTab(e,3)}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />}
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input ref={refSell} value={newRow.sellPrice} onChange={e=>setNewRow(n=>({...n,sellPrice:e.target.value}))}
-                    type="number" placeholder="Vente €" onKeyDown={e=>{if(e.key==='Enter')addRow();else navArrow(e,4);}}
+                    type="number" title="Prix auquel tu as vendu la paire sur Vinted. Entrée pour valider." placeholder="Vente €" onKeyDown={e=>{if(e.key==='Enter')addRow();else navTab(e,4);}}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
