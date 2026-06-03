@@ -1161,7 +1161,17 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
   const dragModeRef=React.useRef('add');
   const selectedIdsRef=React.useRef(new Set());
   selectedIdsRef.current=selectedIds;
+  const refPid=React.useRef(null);
+  const refSaleDate=React.useRef(null);
+  const refReceiveDate=React.useRef(null);
+  const refBuy=React.useRef(null);
+  const refSell=React.useRef(null);
   const PER_PAGE=50;
+  const rowRefs=[refPid,refSaleDate,refReceiveDate,refBuy,refSell];
+  const navArrow=(e,idx)=>{
+    if(e.key==='ArrowRight'){e.preventDefault();const next=rowRefs[idx+1];if(next?.current)next.current.focus();}
+    else if(e.key==='ArrowLeft'){e.preventDefault();const prev=rowRefs[idx-1];if(prev?.current)prev.current.focus();}
+  };
   
   // Recherche : sur Entrée ou bouton
   const triggerSearch=()=>{setSearch(searchInput);setPage(null);};
@@ -1241,6 +1251,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     if(foundItems.length>0){const nc=catalog.map(x=>pids.includes(x.id)?{...x,status:'vendu'}:x);setCatalog(nc);save('vinted_catalog',nc);}
     setNewRow({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
     setPage(null);setSelectedMonth('');
+    setTimeout(()=>refPid.current&&refPid.current.focus(),50);
   };
 
   const availableMonths=useMemo(()=>{
@@ -1439,7 +1450,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
               {/* Ligne d'ajout en bas */}
               <tr style={{borderTop:`2px solid ${C.accent}44`,background:'#00e5a008'}}>
                 <td style={{padding:'6px 6px'}}>
-                  <input value={newRow.productId} onChange={e=>{
+                  <input ref={refPid} value={newRow.productId} onChange={e=>{
                     const pid=e.target.value;
                     const parts=pid.trim().split(/[+,;]+/).map(v=>v.trim()).filter(Boolean);
                     const inv=parts.length===1?(invoices?invoices.find(i=>String(i.productId).trim()===parts[0]):null):null;
@@ -1449,36 +1460,36 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                       ...(inv?{saleDate:inv.saleDate||n.saleDate}:{}),
                     }));
                   }}
-                    placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                    placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();refSell.current&&refSell.current.focus();}else navArrow(e,0);}}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:700}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  <input value={newRow.saleDate} onChange={e=>setNewRow(n=>({...n,saleDate:e.target.value}))}
-                    placeholder="jj/mm/aaaa"
+                  <input ref={refSaleDate} value={newRow.saleDate} onChange={e=>setNewRow(n=>({...n,saleDate:e.target.value}))}
+                    placeholder="jj/mm/aaaa" onKeyDown={e=>navArrow(e,1)}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  <input value={newRow.receiveDate} onChange={e=>setNewRow(n=>({...n,receiveDate:e.target.value}))}
-                    placeholder="jj/mm/aaaa"
+                  <input ref={refReceiveDate} value={newRow.receiveDate} onChange={e=>setNewRow(n=>({...n,receiveDate:e.target.value}))}
+                    placeholder="jj/mm/aaaa" onKeyDown={e=>navArrow(e,2)}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:10,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
-                  <input value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-                    type="number" placeholder="Achat €"
+                  <input ref={refBuy} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
+                    type="number" placeholder="Achat €" onKeyDown={e=>navArrow(e,3)}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />}
                 </td>
                 <td style={{padding:'6px 6px'}}>
-                  <input value={newRow.sellPrice} onChange={e=>setNewRow(n=>({...n,sellPrice:e.target.value}))}
-                    type="number" placeholder="Vente €"
+                  <input ref={refSell} value={newRow.sellPrice} onChange={e=>setNewRow(n=>({...n,sellPrice:e.target.value}))}
+                    type="number" placeholder="Vente €" onKeyDown={e=>{if(e.key==='Enter')addRow();else navArrow(e,4);}}
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
@@ -1791,9 +1802,6 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Factures ({invoices.length})</h2>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
-          <Btn small onClick={()=>fetchVintedInvoices(false)} color={C.purple} disabled={fetching}>
-            {fetching?'⏳ Chargement...':'📥 Récupérer Vinted'}
-          </Btn>
           <Btn small onClick={exportExcel} color={C.blue}>📤 Exporter Excel</Btn>
           <Btn small onClick={()=>setShowSettings(true)} color={C.border}>⚙ Réglages</Btn>
         </div>
@@ -3043,8 +3051,6 @@ export default function App() {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:14}}>
           <div style={{fontSize:12,display:'flex',gap:12,alignItems:'center'}}>
-            <span style={{color:C.accent,fontWeight:700}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>
-            <span style={{color:C.muted,fontWeight:700}}>💸 {sales.length}</span>
             <span title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':

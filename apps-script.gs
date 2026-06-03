@@ -107,10 +107,11 @@ function parseVintedEmail(msg) {
 
   // Désignation : capture tout entre "a acheté" et le prix
   const designMatch = cleanBody.match(/a\s+achet[éeè]\s*\n?([\s\S]+?)\s*\n?\s*\d+[,.]\d{2}\s*€/i);
-  if (designMatch) data.designation = designMatch[1].trim().replace(/\s+/g, ' ');
+  const stripBrackets = s => s.replace(/^\[.*?\]\s*/,'').trim();
+  if (designMatch) data.designation = stripBrackets(designMatch[1].trim().replace(/\s+/g, ' '));
   if (!data.designation) {
     const designMatch2 = cleanBody.match(/a\s+achet[éeè]\s+(.+?)\s+\d+[,.]\d{2}\s*€/i);
-    if (designMatch2) data.designation = designMatch2[1].trim().replace(/\s+/g, ' ');
+    if (designMatch2) data.designation = stripBrackets(designMatch2[1].trim().replace(/\s+/g, ' '));
   }
 
   // N° de paire : format n898 / N1925 / nº1925
