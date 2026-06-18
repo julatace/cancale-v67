@@ -25,7 +25,7 @@ const FIREBASE_URL = "https://shop-cancale67-default-rtdb.europe-west1.firebased
 const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
-  'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
+  'vinted_invoice_settings','vinted_dark','vinted_stock_vinted','vinted_accounts',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -180,6 +180,12 @@ const TOTAL_SLOTS = LAYOUT.reduce((s,z)=>s+z.cols.reduce((ss,b)=>ss+b,0),0);
 // Garage vide par défaut
 const INIT_GARAGE = {};
 
+const INIT_ACCOUNTS=[
+  {id:'acc1',name:'Compte 1',color:'#007782'},
+  {id:'acc2',name:'Compte 2',color:'#e67e22'},
+  {id:'acc3',name:'Compte 3',color:'#9b59b6'},
+];
+
 // Ancienne disposition (4 zones) → nouvelle disposition (zone unique)
 const OLD_ZONES = [{id:'bureau',cols:4},{id:'sol',cols:3},{id:'porte',cols:1},{id:'grande',cols:10}];
 function migrateGarageData(garageGrid, blockedCells, cellColors) {
@@ -323,6 +329,7 @@ const TABS=[
   {id:'invoices', icon:'📄',label:'Factures'},
   {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'garage',   icon:'🏠',label:'Garage'},
+  {id:'params',   icon:'⚙️',label:'Comptes'},
 ];
 function Nav({tab,setTab,open,setOpen}) {
   if(!open) return null;
@@ -471,7 +478,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices}) {
+function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -943,18 +950,71 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         </Card>
       )}
 
+      {/* Stats par compte */}
+      {accounts&&accounts.length>0&&(()=>{
+        const encaissees2=sales.filter(v=>v.receiveDate&&v.receiveDate.trim()!=='');
+        return (
+          <Card>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:10,fontWeight:700}}>Stats par compte</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+              {accounts.map(acc=>{
+                const accSales=encaissees2.filter(v=>v.account===acc.id);
+                const accCA=accSales.reduce((s,v)=>s+ +v.sellPrice,0);
+                const accProfit=accSales.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0);
+                return (
+                  <div key={acc.id} style={{flex:'1 1 140px',background:C.bg,borderRadius:8,padding:'10px 14px',border:`1px solid ${acc.color}44`}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+                      <span style={{width:10,height:10,borderRadius:'50%',background:acc.color,display:'inline-block'}}/>
+                      <span style={{fontSize:12,fontWeight:700,color:C.text}}>{acc.name}</span>
+                    </div>
+                    <div style={{fontSize:10,color:C.muted}}>CA encaissé</div>
+                    <div style={{fontSize:16,fontWeight:800,color:C.text}}>{fmt(accCA)}</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:4}}>Bénéfice</div>
+                    <div style={{fontSize:14,fontWeight:700,color:accProfit>=0?C.accent:C.danger}}>{fmt(accProfit)}</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:4}}>Ventes : <b style={{color:C.text}}>{accSales.length}</b></div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        );
+      })()}
 
+    </div>
+  );
+}
+
+/* ── Comptes ─────────────────────────────────────────── */
+function AccountsSettings({accounts,setAccounts}) {
+  const saveAcc=(a)=>{setAccounts(a);save('vinted_accounts',a);};
+  return (
+    <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+      <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Comptes Vinted</h2>
+      <Card style={{padding:14,display:'flex',flexDirection:'column',gap:10}}>
+        {accounts.map((acc,i)=>(
+          <div key={acc.id} style={{display:'flex',gap:10,alignItems:'center'}}>
+            <input type="color" value={acc.color} onChange={e=>{const a=[...accounts];a[i]={...a[i],color:e.target.value};saveAcc(a);}}
+              style={{width:36,height:36,border:'none',borderRadius:6,cursor:'pointer',padding:0,background:'none'}}/>
+            <input value={acc.name} onChange={e=>{const a=[...accounts];a[i]={...a[i],name:e.target.value};saveAcc(a);}}
+              style={{flex:1,background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:14,fontFamily:'inherit',outline:'none'}}
+              onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+            <div style={{width:14,height:14,borderRadius:'50%',background:acc.color,flexShrink:0}}/>
+          </div>
+        ))}
+      </Card>
+      <div style={{fontSize:12,color:C.muted}}>Les comptes sont synchronisés dans le cloud. Les couleurs s'affichent dans le catalogue, les ventes et le garage.</div>
     </div>
   );
 }
 
 /* ── Catalogue ───────────────────────────────────────── */
 
-function Catalog({catalog,setCatalog,onDeleteId}) {
+function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
-  const [newRow,setNewRow]=useState({id:'',buyPrice:''});
+  const [accountFilter,setAccountFilter]=useState('all');
+  const [newRow,setNewRow]=useState({id:'',buyPrice:'',account:''});
   const [lastAddedId,setLastAddedId]=useState(null);
   const priceInputRef=React.useRef(null);
   const [page,setPage]=useState(null);
@@ -984,13 +1044,13 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
     const id=newRow.id.trim();
     if(!id||!newRow.buyPrice) return;
     if(catalog.find(p=>p.id===id)){alert('Numéro déjà existant !');return;}
-    const u=[...catalog,{id,buyPrice:+newRow.buyPrice,status:'stock',addedAt:tod()}];
+    const u=[...catalog,{id,buyPrice:+newRow.buyPrice,status:'stock',addedAt:tod(),...(newRow.account?{account:newRow.account}:{})}];
     setCatalog(u); save('vinted_catalog',u);
     setLastAddedId(id);
     // Pré-remplit automatiquement le numéro suivant (ex: après 50 → 51 prêt pour le prix)
     let nextId='';
     if(/^\d+$/.test(id)) nextId=String(parseInt(id,10)+1);
-    setNewRow({id:nextId,buyPrice:''});
+    setNewRow({id:nextId,buyPrice:'',account:newRow.account});
     setPage(null); // reste sur la dernière page (où se trouve la ligne d'ajout)
     // Place le curseur sur le champ prix pour enchaîner directement
     setTimeout(()=>{ if(priceInputRef.current) priceInputRef.current.focus(); },50);
@@ -1012,8 +1072,8 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
   };
 
   const fullList=useMemo(()=>catalog
-    .filter(p=>p.id.toString().includes(search.trim())&&(filter==='all'||p.status===filter))
-    .sort((a,b)=>+a.id-+b.id),[catalog,search,filter]);
+    .filter(p=>p.id.toString().includes(search.trim())&&(filter==='all'||p.status===filter)&&(accountFilter==='all'||p.account===accountFilter))
+    .sort((a,b)=>+a.id-+b.id),[catalog,search,filter,accountFilter]);
   const totalPages=Math.max(1,Math.ceil(fullList.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const list=showAll?fullList:fullList.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
@@ -1064,6 +1124,19 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           </Btn>
         ))}
       </div>
+      {accounts&&accounts.length>0&&(
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          <Btn key="all" small onClick={()=>setAccountFilter('all')} color={accountFilter==='all'?C.accent:C.border} style={{color:accountFilter==='all'?'#fff':C.muted}}>Tous les comptes</Btn>
+          {accounts.map(acc=>(
+            <Btn key={acc.id} small onClick={()=>setAccountFilter(acc.id)} color={accountFilter===acc.id?acc.color:C.border} style={{color:accountFilter===acc.id?'#fff':C.muted}}>
+              <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:acc.color,display:'inline-block'}}/>
+                {acc.name}
+              </span>
+            </Btn>
+          ))}
+        </div>
+      )}
       {oldStockCount>0&&(
         <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:8,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:700}}>
           ⚠️ {oldStockCount} paire{oldStockCount>1?'s':''} en stock depuis + de 30 jours
@@ -1072,14 +1145,56 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
       <Card style={{padding:0,overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:420}}>
           <thead style={{background:C.surface}}><tr>
-            {['N°','Prix achat','Statut','Ajouté',''].map(h=>(
-              <th key={h} style={{textAlign:'left',padding:'10px 12px',color:C.muted,fontWeight:600,fontSize:10,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+            {['','N°','Prix achat','Statut','Ajouté','',''].map((h,i)=>(
+              <th key={i} style={{textAlign:'left',padding:'10px 12px',color:C.muted,fontWeight:600,fontSize:10,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
+            {list.length===0&&<tr><td colSpan={7} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
             {list.map(p=>(
               <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';if(parseInt(p.id,10)>=1900){const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}}return 'transparent';})()}}>
+                <td style={{padding:'2px 8px',width:60}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    {(()=>{const acc=accounts&&accounts.find(a=>a.id===p.account);return acc?<span style={{width:10,height:10,borderRadius:'50%',background:acc.color,display:'inline-block',flexShrink:0}}/>:null;})()}
+                    {(()=>{
+                      const photo=photos&&photos[p.id];
+                      const photoInputId=`photo-${p.id}`;
+                      return (<>
+                        <input type="file" accept="image/*" id={photoInputId} style={{display:'none'}}
+                          onChange={e=>{
+                            const file=e.target.files&&e.target.files[0];
+                            if(!file) return;
+                            const reader=new FileReader();
+                            reader.onload=ev=>{
+                              const img=new window.Image();
+                              img.onload=()=>{
+                                const MAX=150;
+                                const sc=Math.min(1,MAX/Math.max(img.width,img.height));
+                                const w=Math.round(img.width*sc),h=Math.round(img.height*sc);
+                                const canvas=document.createElement('canvas');
+                                canvas.width=w;canvas.height=h;
+                                canvas.getContext('2d').drawImage(img,0,0,w,h);
+                                const dataUrl=canvas.toDataURL('image/jpeg',0.7);
+                                const np={...(photos||{}),[p.id]:dataUrl};
+                                setPhotos(np);
+                                try{localStorage.setItem('vinted_photos',JSON.stringify(np));}catch(_){}
+                              };
+                              img.src=ev.target.result;
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value='';
+                          }}/>
+                        {photo
+                          ?<img src={photo} alt="" style={{width:40,height:40,objectFit:'cover',borderRadius:4,cursor:'pointer'}}
+                            onClick={()=>{const np={...(photos||{})};delete np[p.id];setPhotos(np);try{localStorage.setItem('vinted_photos',JSON.stringify(np));}catch(_){}}}
+                            title="Cliquer pour supprimer la photo"/>
+                          :<button type="button" onClick={()=>document.getElementById(photoInputId).click()}
+                            style={{background:'transparent',border:`1px dashed ${C.border}`,borderRadius:4,color:C.muted,padding:'2px 4px',cursor:'pointer',fontSize:11,lineHeight:1}}>📷</button>
+                        }
+                      </>);
+                    })()}
+                  </div>
+                </td>
                 <td style={{padding:'2px 12px',fontWeight:800,color:C.accent,fontSize:14,minWidth:60}}>
                   <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
                 </td>
@@ -2774,6 +2889,8 @@ export default function App() {
   const [lastSync,setLastSync]=useState(null); // date de la dernière synchro réussie
   // Logo personnalisable : si l'utilisateur en charge un, il remplace le logo par défaut (header + factures)
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
+  const [accounts,setAccounts]=useState(()=>load('vinted_accounts',INIT_ACCOUNTS));
+  const [photos,setPhotos]=useState(()=>load('vinted_photos',{}));
   const logoSrc = customLogo || LOGO_CANCALE;
   const logoInputRef = React.useRef(null);
   const handleLogoChange = (e) => {
@@ -2878,6 +2995,7 @@ export default function App() {
         apply('vinted_stock_vinted', setStockVinted);
         apply('vinted_invoice_settings', setInvoiceSettings);
         apply('vinted_custom_logo', setCustomLogo);
+        apply('vinted_accounts', setAccounts);
         setSyncStatus('synced');
         setLastSync(new Date());
       } else {
