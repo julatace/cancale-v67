@@ -2920,7 +2920,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const pdfDirectUrl=(url)=>{
     const m=(url||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-    return m?`https://drive.google.com/uc?id=${m[1]}&export=download`:url;
+    return m?`https://drive.google.com/file/d/${m[1]}/view`:url;
   };
 
   // Ouvre le PDF dans Safari — l'option Imprimer est dans le bouton Partager de Safari
