@@ -1262,10 +1262,10 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
 }
 
 /* ── Ventes ──────────────────────────────────────────── */
-function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
+function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accounts}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
-  const [newRow,setNewRow]=useState({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
+  const [newRow,setNewRow]=useState({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:'',account:''});
   const [err,setErr]=useState('');
   const [page,setPage]=useState(null); // null = dernière page (init)
   const [showAll,setShowAll]=useState(false);
@@ -3291,18 +3291,19 @@ export default function App() {
       )}
       <Nav tab={tab} setTab={setTab} open={menuOpen} setOpen={setMenuOpen}/>
       <main style={{maxWidth:1200,margin:'0 auto'}}>
-        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices}/>}
-        {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
+        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} accounts={accounts}/>}
+        {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} accounts={accounts} photos={photos} setPhotos={setPhotos} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
           const n=norm(id);
           const u=stockVinted.filter(x=>norm(x)!==n);
           setStockVinted(u); save('vinted_stock_vinted',u);
           try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
         }}/>}
-        {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
+        {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
-        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors}/>}
+        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
+        {tab==='params'   &&<AccountsSettings accounts={accounts} setAccounts={setAccounts}/>}
       </main>
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells} extraCols={extraCols} cellColors={cellColors}
