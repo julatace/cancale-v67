@@ -1036,6 +1036,7 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
   const [accountFilter,setAccountFilter]=useState('all');
   const [newRow,setNewRow]=useState({id:'',buyPrice:'',account:''});
   const [lastAddedId,setLastAddedId]=useState(null);
+  const [photoPreview,setPhotoPreview]=useState(null);
   const priceInputRef=React.useRef(null);
   const [page,setPage]=useState(null);
   const [showAll,setShowAll]=useState(false);
@@ -1112,6 +1113,13 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
 
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+      {/* Lightbox photo */}
+      {photoPreview&&(
+        <div onClick={()=>setPhotoPreview(null)} style={{position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.88)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'zoom-out'}}>
+          <img src={photoPreview} alt="" style={{maxWidth:'92vw',maxHeight:'88vh',borderRadius:10,boxShadow:'0 8px 40px rgba(0,0,0,0.6)',objectFit:'contain'}}/>
+          <button onClick={()=>setPhotoPreview(null)} style={{position:'absolute',top:16,right:18,background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',color:'#fff',fontSize:26,fontWeight:900,width:40,height:40,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>×</button>
+        </div>
+      )}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
         <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Catalogue ({catalog.length})</h2>
         <Btn small onClick={()=>{
@@ -1173,9 +1181,8 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
             {list.length===0&&<tr><td colSpan={7} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
             {list.map(p=>(
               <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';if(parseInt(p.id,10)>=1900){const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}}return 'transparent';})()}}>
-                <td style={{padding:'2px 8px',width:60}}>
-                  <div style={{display:'flex',alignItems:'center',gap:4}}>
-                    {(()=>{const acc=accounts&&accounts.find(a=>a.id===p.account);return acc?<span style={{width:10,height:10,borderRadius:'50%',background:acc.color,display:'inline-block',flexShrink:0}}/>:null;})()}
+                <td style={{padding:'2px 8px',width:70}}>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
                     {(()=>{
                       const photo=photos&&photos[p.id];
                       const photoInputId=`photo-${p.id}`;
@@ -1188,13 +1195,13 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
                             reader.onload=ev=>{
                               const img=new window.Image();
                               img.onload=()=>{
-                                const MAX=150;
+                                const MAX=600;
                                 const sc=Math.min(1,MAX/Math.max(img.width,img.height));
                                 const w=Math.round(img.width*sc),h=Math.round(img.height*sc);
                                 const canvas=document.createElement('canvas');
                                 canvas.width=w;canvas.height=h;
                                 canvas.getContext('2d').drawImage(img,0,0,w,h);
-                                const dataUrl=canvas.toDataURL('image/jpeg',0.7);
+                                const dataUrl=canvas.toDataURL('image/jpeg',0.82);
                                 const np={...(photos||{}),[p.id]:dataUrl};
                                 setPhotos(np);
                                 try{localStorage.setItem('vinted_photos',JSON.stringify(np));}catch(_){}
@@ -1205,12 +1212,21 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
                             e.target.value='';
                           }}/>
                         {photo
-                          ?<img src={photo} alt="" style={{width:40,height:40,objectFit:'cover',borderRadius:4,cursor:'pointer'}}
-                            onClick={()=>{const np={...(photos||{})};delete np[p.id];setPhotos(np);try{localStorage.setItem('vinted_photos',JSON.stringify(np));}catch(_){}}}
-                            title="Cliquer pour supprimer la photo"/>
+                          ?<div style={{position:'relative',width:44,height:44,flexShrink:0}}>
+                            <img src={photo} alt="" style={{width:44,height:44,objectFit:'cover',borderRadius:5,cursor:'zoom-in',display:'block'}}
+                              onClick={()=>setPhotoPreview(photo)} title="Cliquer pour agrandir"/>
+                            <button type="button" onClick={()=>{const np={...(photos||{})};delete np[p.id];setPhotos(np);try{localStorage.setItem('vinted_photos',JSON.stringify(np));}catch(_){}}}
+                              style={{position:'absolute',top:-5,right:-5,width:16,height:16,borderRadius:'50%',background:C.danger,border:'none',color:'#fff',fontSize:10,fontWeight:900,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,padding:0}}
+                              title="Supprimer la photo">×</button>
+                          </div>
                           :<button type="button" onClick={()=>document.getElementById(photoInputId).click()}
-                            style={{background:'transparent',border:`1px dashed ${C.border}`,borderRadius:4,color:C.muted,padding:'2px 4px',cursor:'pointer',fontSize:11,lineHeight:1}}>📷</button>
+                            style={{background:'transparent',border:`1px dashed ${C.border}`,borderRadius:5,color:C.muted,padding:'4px 6px',cursor:'pointer',fontSize:14,lineHeight:1,width:44,height:44,display:'flex',alignItems:'center',justifyContent:'center'}}>📷</button>
                         }
+                        <select value={p.account||''} onChange={e=>update(p.id,'account',e.target.value)}
+                          style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:5,color:(()=>{const a=accounts&&accounts.find(x=>x.id===p.account);return a?a.color:C.muted;})(),padding:'2px 2px',fontSize:10,width:60,cursor:'pointer',fontWeight:700,outline:'none'}}>
+                          <option value="">—</option>
+                          {(accounts||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
                       </>);
                     })()}
                   </div>
