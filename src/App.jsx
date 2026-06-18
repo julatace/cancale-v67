@@ -2915,27 +2915,42 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,ca
 
 function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [filter,setFilter]=React.useState('à imprimer');
+  const [selected,setSelected]=React.useState(new Set());
+  const [printQueue,setPrintQueue]=React.useState(null); // {items, idx}
 
-  // Construit l'URL de téléchargement direct du PDF Drive (fonctionne sur iOS Safari sans login)
   const pdfDirectUrl=(url)=>{
     const m=(url||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
     return m?`https://drive.google.com/uc?id=${m[1]}&export=download`:url;
   };
 
+  // Ouvre le PDF via le partage natif iOS (feuille Partager → Imprimer)
+  const handlePrint=(pdfUrl,numero,modele,taille)=>{
+    const url=pdfDirectUrl(pdfUrl);
+    if(navigator.share){
+      navigator.share({title:`Bordereau N°${numero||'?'}${taille?' T.'+taille:''} - ${modele||''}`,url})
+        .catch(()=>window.open(url,'_blank'));
+    } else {
+      window.open(url,'_blank');
+    }
+  };
+
   const all=Array.isArray(bordereaux)?bordereaux:[];
   const filtered=all
     .filter(b=>filter==='tous'?true:(b.statut||'à imprimer')===filter)
-    .slice()
-    .sort((a,b)=>{
+    .slice().sort((a,b)=>{
       const da=a.date?a.date.split('/').reverse().join('-'):'';
       const db=b.date?b.date.split('/').reverse().join('-'):'';
       return db.localeCompare(da);
     });
 
+  const toggleSelect=(id)=>{const s=new Set(selected);s.has(id)?s.delete(id):s.add(id);setSelected(s);};
+  const selectAll=()=>setSelected(new Set(filtered.map(b=>b.id)));
+  const clearSel=()=>setSelected(new Set());
+  const selectedItems=filtered.filter(b=>selected.has(b.id));
+
   const markImprime=(id)=>{
-    const updated=all.map(b=>b.id===id?{...b,statut:'imprimé'}:b);
-    setBordereaux(updated);
-    save('vinted_bordereaux',updated);
+    const u=all.map(b=>b.id===id?{...b,statut:'imprimé'}:b);
+    setBordereaux(u); save('vinted_bordereaux',u);
   };
 
   const counts={
@@ -2944,33 +2959,56 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     'tous':       all.length,
   };
 
-  const fusionUrl=appsScriptUrl?(appsScriptUrl+'?type=fusion'):null;
+  // Modal file d'impression : affiche un bordereau à la fois, bouton Imprimer + Suivant
+  if(printQueue){
+    const {items,idx}=printQueue;
+    const b=items[idx];
+    const isLast=idx===items.length-1;
+    return (
+      <div style={{padding:'0 4px'}}>
+        <div style={{background:C.surface,borderRadius:16,padding:24,textAlign:'center',marginTop:20}}>
+          <div style={{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}}>
+            BORDEREAU {idx+1} / {items.length}
+          </div>
+          <div style={{fontWeight:900,fontSize:28,color:C.accent,marginBottom:4}}>N°{b.numero||'?'}</div>
+          {b.taille&&<div style={{fontSize:18,fontWeight:700,color:C.accent,marginBottom:4}}>Taille {b.taille}</div>}
+          <div style={{fontSize:16,color:C.text,fontWeight:500,marginBottom:8}}>{b.modele||''}</div>
+          {b.dateLimite&&<div style={{fontSize:12,color:C.muted,marginBottom:16}}>⏰ À expédier avant le {b.dateLimite}</div>}
+
+          {b.pdfUrl&&(
+            <button onClick={()=>handlePrint(b.pdfUrl,b.numero,b.modele,b.taille)} style={{
+              width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
+              border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
+            }}>🖨️ Imprimer ce bordereau</button>
+          )}
+
+          <div style={{display:'flex',gap:10,marginBottom:8}}>
+            {!isLast&&(
+              <button onClick={()=>setPrintQueue({...printQueue,idx:idx+1})} style={{
+                flex:1,padding:'13px 0',borderRadius:12,background:'transparent',color:C.accent,
+                border:`2px solid ${C.accent}`,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+              }}>Suivant →</button>
+            )}
+            <button onClick={()=>{setPrintQueue(null);clearSel();}} style={{
+              flex:1,padding:'13px 0',borderRadius:12,background:'transparent',color:C.muted,
+              border:`1px solid ${C.border}`,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+            }}>{isLast?'✓ Terminé':'Annuler'}</button>
+          </div>
+
+          <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
+            Sur iPhone : appuie sur <b style={{color:C.text}}>🖨️ Imprimer ce bordereau</b> → la feuille de partage s'ouvre → <b style={{color:C.text}}>Imprimer</b>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{padding:'0 4px'}}>
-
-      {/* Bouton Tout imprimer */}
-      {fusionUrl?(
-        <a href={fusionUrl} target="_blank" rel="noreferrer" style={{
-          display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-          padding:'13px 0',borderRadius:12,marginBottom:10,
-          background:C.accent,color:'#fff',textDecoration:'none',fontWeight:700,fontSize:15,
-        }}>🖨️ Tout imprimer (PDF fusionné)</a>
-      ):(
-        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',marginBottom:10,fontSize:12,color:C.muted}}>
-          💡 Pour imprimer tous les bordereaux d'un coup, colle l'URL Apps Script dans l'onglet <b style={{color:C.text}}>⚙️ Comptes</b>
-        </div>
-      )}
-
-      {/* Instruction iOS */}
-      <div style={{background:'#007782' +'11',border:`1px solid ${'#007782'}33`,borderRadius:10,padding:'8px 12px',marginBottom:12,fontSize:11,color:C.text,lineHeight:1.5}}>
-        Sur iPhone : appuie sur <b>🖨️ Imprimer</b> → le PDF s'ouvre dans Safari → bouton <b>Partager</b> → <b>Imprimer</b>
-      </div>
-
       {/* Filtres */}
-      <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {(['à imprimer','imprimé','tous']).map(k=>(
-          <button key={k} onClick={()=>setFilter(k)} style={{
+          <button key={k} onClick={()=>{setFilter(k);clearSel();}} style={{
             padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
             background:filter===k?C.accent:'transparent',
             color:filter===k?'#fff':C.muted,
@@ -2978,6 +3016,22 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           }}>{k==='à imprimer'?'À imprimer':k==='imprimé'?'Imprimés':'Tous'} ({counts[k]})</button>
         ))}
       </div>
+
+      {/* Barre de sélection */}
+      {filtered.length>0&&(
+        <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
+          <button onClick={selected.size===filtered.length?clearSel:selectAll} style={{
+            padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',
+            background:'transparent',color:C.muted,border:`1px solid ${C.border}`,fontFamily:'inherit',
+          }}>{selected.size===filtered.length?'Tout désélect.':'Tout sélect.'}</button>
+          {selected.size>0&&(
+            <button onClick={()=>setPrintQueue({items:selectedItems,idx:0})} style={{
+              padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
+              background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
+            }}>🖨️ Imprimer la sélection ({selected.size})</button>
+          )}
+        </div>
+      )}
 
       {filtered.length===0&&(
         <div style={{textAlign:'center',color:C.muted,padding:'40px 0',fontSize:13}}>
@@ -2989,10 +3043,22 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
       {filtered.map(b=>{
         const imprime=b.statut==='imprimé';
-        const pdfUrl=pdfDirectUrl(b.pdfUrl);
+        const isSel=selected.has(b.id);
         return (
-          <Card key={b.id} style={{marginBottom:10,padding:'12px 14px',opacity:imprime?0.65:1}}>
-            <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:8}}>
+          <Card key={b.id} onClick={()=>toggleSelect(b.id)} style={{
+            marginBottom:10,padding:'12px 14px',opacity:imprime?0.65:1,cursor:'pointer',
+            border:`2px solid ${isSel?C.accent:C.border}`,transition:'border-color .15s',
+          }}>
+            <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:8}}>
+              {/* Checkbox */}
+              <div style={{
+                width:22,height:22,borderRadius:6,flexShrink:0,marginTop:1,
+                border:`2px solid ${isSel?C.accent:C.border}`,
+                background:isSel?C.accent:'transparent',
+                display:'flex',alignItems:'center',justifyContent:'center',
+              }}>
+                {isSel&&<span style={{color:'#fff',fontSize:13,lineHeight:1,fontWeight:900}}>✓</span>}
+              </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
                   <span style={{fontWeight:800,fontSize:15,color:C.accent}}>N°{b.numero||'?'}</span>
@@ -3007,12 +3073,12 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
                 </div>
               </div>
             </div>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <div onClick={e=>e.stopPropagation()} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               {b.pdfUrl&&(
-                <a href={pdfUrl} target="_blank" rel="noreferrer" style={{
-                  padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,
-                  background:C.accent,color:'#fff',textDecoration:'none',display:'inline-block',
-                }}>🖨️ Imprimer</a>
+                <button onClick={()=>handlePrint(b.pdfUrl,b.numero,b.modele,b.taille)} style={{
+                  padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
+                  background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
+                }}>🖨️ Imprimer</button>
               )}
               {!imprime&&(
                 <button onClick={()=>markImprime(b.id)} style={{
