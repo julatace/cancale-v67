@@ -26,7 +26,7 @@ const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted','vinted_accounts',
-  'vinted_bordereaux',
+  'vinted_bordereaux','vinted_appsscript_url',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -977,7 +977,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
 }
 
 /* ── Comptes ─────────────────────────────────────────── */
-function AccountsSettings({accounts,setAccounts}) {
+function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl}) {
   const saveAcc=(a)=>{setAccounts(a);save('vinted_accounts',a);};
   const addAcc=()=>{
     const COLORS=['#007782','#e67e22','#9b59b6','#e74c3c','#27ae60','#2980b9','#f39c12','#1abc9c'];
@@ -1025,6 +1025,21 @@ function AccountsSettings({accounts,setAccounts}) {
           </div>
         ))}
       </Card>
+      {/* URL Apps Script */}
+      <Card style={{padding:14,display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{fontWeight:700,color:C.text,fontSize:14}}>URL Apps Script</div>
+        <div style={{fontSize:12,color:C.muted}}>Nécessaire pour le bouton "Tout imprimer" dans l'onglet Bordereaux. Colle l'URL de déploiement de ton script.</div>
+        <input
+          value={appsScriptUrl||''}
+          onChange={e=>{setAppsScriptUrl(e.target.value.trim());save('vinted_appsscript_url',e.target.value.trim());}}
+          placeholder="https://script.google.com/macros/s/.../exec"
+          style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:12,fontFamily:'inherit',outline:'none',width:'100%'}}
+          onFocus={e=>e.target.style.borderColor=C.accent}
+          onBlur={e=>e.target.style.borderColor=C.border}
+        />
+        <div style={{fontSize:11,color:C.muted}}>Dans Apps Script → Déployer → Gérer les déploiements → copie l'URL</div>
+      </Card>
+
       <Card style={{padding:12,fontSize:12,color:C.muted,lineHeight:1.6}}>
         <div style={{fontWeight:700,color:C.text,marginBottom:4}}>Comment ça marche</div>
         L'email iCloud permet la détection automatique du compte dans le script Apps Script. Le pseudo et le téléphone sont pour ta gestion interne. Tout est synchronisé dans le cloud.
@@ -2898,8 +2913,19 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,ca
 }
 
 
-function BordereauxView({bordereaux,setBordereaux}) {
+function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [filter,setFilter]=React.useState('à imprimer');
+  const [pdfModal,setPdfModal]=React.useState(null); // {url, numero, modele, taille}
+
+  // Extrait l'ID Drive depuis une URL et construit l'URL de prévisualisation
+  const drivePreviewUrl=(url)=>{
+    const m=(url||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+    return m?`https://drive.google.com/file/d/${m[1]}/preview`:url;
+  };
+  const driveDirectUrl=(url)=>{
+    const m=(url||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+    return m?`https://drive.google.com/file/d/${m[1]}/view`:url;
+  };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
   const filtered=all
@@ -2929,8 +2955,26 @@ function BordereauxView({bordereaux,setBordereaux}) {
     {k:'tous',      label:'Tous'},
   ];
 
+  const fusionUrl=appsScriptUrl?(appsScriptUrl+'?type=fusion'):null;
+
   return (
     <div style={{padding:'0 4px'}}>
+
+      {/* Bouton Tout imprimer */}
+      {fusionUrl&&(
+        <a href={fusionUrl} target="_blank" rel="noreferrer" style={{
+          display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+          padding:'11px 0',borderRadius:12,marginBottom:12,
+          background:C.accent,color:'#fff',textDecoration:'none',fontWeight:700,fontSize:14,
+        }}>🖨️ Tout imprimer (PDF fusionné)</a>
+      )}
+      {!fusionUrl&&(
+        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',marginBottom:12,fontSize:12,color:C.muted}}>
+          💡 Pour le bouton "Tout imprimer", colle l'URL de ton Apps Script dans l'onglet <b style={{color:C.text}}>⚙️ Comptes</b>
+        </div>
+      )}
+
+      {/* Filtres */}
       <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
         {filterBtns.map(f=>(
           <button key={f.k} onClick={()=>setFilter(f.k)} style={{
@@ -2971,10 +3015,10 @@ function BordereauxView({bordereaux,setBordereaux}) {
             </div>
             <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
               {b.pdfUrl&&(
-                <a href={b.pdfUrl} target="_blank" rel="noreferrer" style={{
-                  padding:'6px 14px',borderRadius:8,fontSize:12,fontWeight:700,
-                  background:C.accent,color:'#fff',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:4,
-                }}>🖨️ Voir / Imprimer le PDF</a>
+                <button onClick={()=>setPdfModal({url:b.pdfUrl,numero:b.numero,modele:b.modele,taille:b.taille})} style={{
+                  padding:'6px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',
+                  background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
+                }}>🖨️ Voir le PDF</button>
               )}
               {!imprime&&(
                 <button onClick={()=>markImprime(b.id)} style={{
@@ -2986,6 +3030,39 @@ function BordereauxView({bordereaux,setBordereaux}) {
           </Card>
         );
       })}
+
+      {/* Modal PDF intégré */}
+      {pdfModal&&(
+        <div style={{position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.92)',display:'flex',flexDirection:'column'}}>
+          {/* Header */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:C.surface,flexShrink:0}}>
+            <div style={{overflow:'hidden'}}>
+              <div style={{fontWeight:700,fontSize:13,color:C.accent}}>N°{pdfModal.numero||'?'}{pdfModal.taille?' · T.'+pdfModal.taille:''}</div>
+              <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pdfModal.modele||''}</div>
+            </div>
+            <div style={{display:'flex',gap:8,flexShrink:0}}>
+              <a href={driveDirectUrl(pdfModal.url)} target="_blank" rel="noreferrer" style={{
+                padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:700,
+                background:C.accent,color:'#fff',textDecoration:'none',
+              }}>Ouvrir ↗</a>
+              <button onClick={()=>setPdfModal(null)} style={{
+                background:'transparent',border:'none',color:C.text,fontSize:22,cursor:'pointer',lineHeight:1,padding:'0 4px',
+              }}>×</button>
+            </div>
+          </div>
+          {/* PDF iframe */}
+          <iframe
+            src={drivePreviewUrl(pdfModal.url)}
+            style={{flex:1,border:'none',width:'100%'}}
+            title="Bordereau PDF"
+            allow="autoplay"
+          />
+          {/* Pied de page iOS */}
+          <div style={{padding:'10px 14px',background:C.surface,textAlign:'center',fontSize:11,color:C.muted,flexShrink:0}}>
+            Sur iPhone : appuie sur <b style={{color:C.text}}>Ouvrir ↗</b> puis utilise le bouton Partager pour imprimer
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3035,6 +3112,7 @@ export default function App() {
   const [accounts,setAccounts]=useState(()=>load('vinted_accounts',INIT_ACCOUNTS));
   const [photos,setPhotos]=useState(()=>load('vinted_photos',{}));
   const [bordereaux,setBordereaux]=useState(()=>load('vinted_bordereaux',[]));
+  const [appsScriptUrl,setAppsScriptUrl]=useState(()=>load('vinted_appsscript_url',''));
   const logoSrc = customLogo || LOGO_CANCALE;
   const logoInputRef = React.useRef(null);
   const handleLogoChange = (e) => {
@@ -3141,6 +3219,7 @@ export default function App() {
         apply('vinted_custom_logo', setCustomLogo);
         apply('vinted_accounts', setAccounts);
         apply('vinted_bordereaux', setBordereaux);
+        apply('vinted_appsscript_url', setAppsScriptUrl);
         setSyncStatus('synced');
         setLastSync(new Date());
       } else {
@@ -3440,9 +3519,9 @@ export default function App() {
         {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
         {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
-        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux}/>}
+        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
-        {tab==='params'     &&<AccountsSettings accounts={accounts} setAccounts={setAccounts}/>}
+        {tab==='params'     &&<AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}/>}
       </main>
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells} extraCols={extraCols} cellColors={cellColors}
