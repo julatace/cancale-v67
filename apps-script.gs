@@ -566,12 +566,54 @@ const BORD_SETTINGS = {
   sheetName: 'Bordereaux'
 };
 
+// Pousse un bordereau vers Firebase /vinted_bordereaux (lecture dans l'app)
+function pushBordeauFirebase(data, pdfUrl) {
+  if (!FIREBASE_URL) return false;
+  try {
+    const uid = 'bord_' + Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+    const bord = {
+      id:          uid,
+      date:        Utilities.formatDate(new Date(), 'Europe/Paris', 'dd/MM/yyyy'),
+      numero:      data.numero      || '',
+      modele:      data.modele      || '',
+      taille:      data.taille      || '',
+      suivi:       data.suivi       || '',
+      transaction: data.transaction || '',
+      dateLimite:  data.dateLimite  || '',
+      pdfUrl:      pdfUrl           || '',
+      statut:      'à imprimer'
+    };
+
+    const res = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_bordereaux.json', { muteHttpExceptions: true });
+    let bords = [];
+    if (res.getResponseCode() === 200) {
+      const raw = JSON.parse(res.getContentText());
+      if (Array.isArray(raw)) bords = raw;
+    }
+
+    const alreadyExists = bords.some(b => b.transaction && b.transaction === bord.transaction);
+    if (alreadyExists) { Logger.log('Firebase bordereau: doublon ignoré ' + bord.transaction); return false; }
+
+    bords.push(bord);
+    const putRes = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_bordereaux.json', {
+      method: 'put',
+      contentType: 'application/json',
+      payload: JSON.stringify(bords),
+      muteHttpExceptions: true
+    });
+    return putRes.getResponseCode() === 200;
+  } catch (e) {
+    Logger.log('⚠ Firebase bordereau push : ' + e.message);
+    return false;
+  }
+}
+
 function lireBordereauxVinted() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(BORD_SETTINGS.sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(BORD_SETTINGS.sheetName);
-    sheet.appendRow(['Date mail', 'N° paire', 'Modèle', 'N° suivi', 'N° transaction', 'Date limite', 'Statut', 'Lien PDF']);
+    sheet.appendRow(['Date mail', 'N° paire', 'Modèle', 'Taille', 'N° suivi', 'N° transaction', 'Date limite', 'Statut', 'Lien PDF']);
   }
 
   Logger.log('🔍 Recherche des mails bordereaux...');
@@ -617,14 +659,15 @@ function lireBordereauxVinted() {
 
         let finalPdf;
         try {
-          finalPdf = ecrireSurBordereauSlides(pdfBlob, data.numero, data.modele, data.dateLimite);
+          finalPdf = ecrireSurBordereauSlides(pdfBlob, data.numero, data.modele, data.taille, data.dateLimite);
         } catch (e) {
           Logger.log('⚠ Écriture échouée, PDF original conservé : ' + e.message);
           finalPdf = pdfBlob;
         }
 
         const safeModele = (data.modele || '').replace(/[\\/:*?"<>|]/g, '').slice(0, 60);
-        const fileName = (data.numero || 'sans-numero') + (safeModele ? ' - ' + safeModele : '') + '.pdf';
+        const safeTaille = data.taille ? ' T' + data.taille : '';
+        const fileName = (data.numero || 'sans-numero') + (safeModele ? ' - ' + safeModele : '') + safeTaille + '.pdf';
         finalPdf.setName(fileName);
 
         let folder;
@@ -635,9 +678,13 @@ function lireBordereauxVinted() {
         const pdfUrl = file.getUrl();
 
         sheet.appendRow([
-          msg.getDate(), data.numero, data.modele, data.suivi,
+          msg.getDate(), data.numero, data.modele, data.taille || '', data.suivi,
           data.transaction, data.dateLimite, 'à imprimer', pdfUrl
         ]);
+
+        // Push dans Firebase pour lecture dans l'app Cancale
+        const pushed = pushBordeauFirebase(data, pdfUrl);
+        if (pushed) Logger.log('☁ Bordereau Firebase OK : ' + data.numero);
         existing.add(data.transaction);
         added++;
         Logger.log('✓ Bordereau paire ' + data.numero + ' | ' + data.modele);
@@ -681,7 +728,7 @@ function parseBordereauEmail(msg) {
   const all = (subject + '\n' + body + '\n' + htmlText + '\n' + attachNames)
               .replace(/\t/g, ' ').replace(/[ ]{2,}/g, ' ');
 
-  const data = { article: '', modele: '', numero: '', suivi: '', transaction: '', dateLimite: '' };
+  const data = { article: '', modele: '', numero: '', taille: '', suivi: '', transaction: '', dateLimite: '' };
 
   let art = subject.match(/pour\s+(.+?)\s*$/i);
   if (!art) art = all.match(/Article\s*:?\s*([^\n]+?)\s*(?:Format|N[°ºo]?\s*de|\n)/i);
@@ -692,6 +739,16 @@ function parseBordereauEmail(msg) {
       data.numero = numMatch[1];
       data.modele = data.article.replace(/-?\s*[nN][º°]?\d{2,6}(?!\d)/, '').trim().replace(/\s+/g, ' ');
     } else { data.modele = data.article; }
+  }
+
+  // Taille : "Taille 42", "T.42", "T42", "42 EU", "42 FR"
+  const taillePatterns = [
+    /(?:Taille|T\.?|Size)\s*(\d{2,3}(?:[.,]\d)?)\b/i,
+    /\b(\d{2,3}(?:[.,]\d)?)\s*(?:EU|FR|US|UK)\b/i
+  ];
+  for (const pat of taillePatterns) {
+    const tm = (data.article || '').match(pat);
+    if (tm) { data.taille = tm[1]; break; }
   }
 
   let trans = attachNames.match(/Bordereau[- ]Vinted[- ](\d{6,})/i);
@@ -710,7 +767,7 @@ function parseBordereauEmail(msg) {
   return null;
 }
 
-function ecrireSurBordereauSlides(pdfBlob, numero, modele, dateLimite) {
+function ecrireSurBordereauSlides(pdfBlob, numero, modele, taille, dateLimite) {
   const tmpFolder = getTempFolder_();
   const tmpPdf = tmpFolder.createFile(pdfBlob.setName('tmp_bord_' + Date.now() + '.pdf'));
 
@@ -750,10 +807,11 @@ function ecrireSurBordereauSlides(pdfBlob, numero, modele, dateLimite) {
 
   const aLeNumero = numero && String(numero).trim() !== '' && String(numero).trim() !== '?';
   const mod = String(modele || '').trim();
+  const tail = taille ? '  T.' + String(taille).trim() : '';
   let texte;
-  if (aLeNumero && mod) texte = 'No ' + String(numero).trim() + '  -  ' + mod;
-  else if (aLeNumero)   texte = 'No ' + String(numero).trim();
-  else                  texte = mod || 'sans numero';
+  if (aLeNumero && mod) texte = 'No ' + String(numero).trim() + '  -  ' + mod + tail;
+  else if (aLeNumero)   texte = 'No ' + String(numero).trim() + tail;
+  else                  texte = mod + tail || 'sans numero';
   Logger.log('Bordereau -> texte écrit : "' + texte + '"');
 
   const boxX = 6, boxY = PAGE_H - BANDE_H + 2, boxW = PAGE_W - 12, boxH = BANDE_H - 6;
