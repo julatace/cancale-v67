@@ -331,38 +331,29 @@ const TABS=[
   {id:'garage',   icon:'🏠',label:'Garage'},
   {id:'params',   icon:'⚙️',label:'Comptes'},
 ];
-function Nav({tab,setTab,open,setOpen}) {
-  if(!open) return null;
+function Nav({tab,setTab}) {
   return (
-    <>
-      {/* Voile pour fermer en cliquant à côté */}
-      <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,zIndex:59,background:'rgba(0,0,0,0.25)'}}/>
-      {/* Panneau déroulant */}
-      <nav style={{
-        position:'fixed',top:0,left:0,bottom:0,zIndex:60,width:'min(78vw,280px)',
-        background:C.surface,borderRight:`1px solid ${C.border}`,
-        boxShadow:'2px 0 16px rgba(0,0,0,0.12)',display:'flex',flexDirection:'column',
-        padding:'14px 10px',gap:2,
-      }}>
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:700,padding:'6px 12px 10px'}}>Menu</div>
+    <nav style={{
+      position:'fixed',bottom:0,left:0,right:0,zIndex:60,
+      background:C.surface,borderTop:`1px solid ${C.border}`,
+      boxShadow:'0 -2px 12px rgba(15,28,30,0.06)',
+    }}>
+      <div style={{display:'flex',justifyContent:'space-around',alignItems:'stretch',maxWidth:700,margin:'0 auto',padding:'6px 4px 8px'}}>
         {TABS.map(t=>{
           const on=tab===t.id;
           return (
-            <button key={t.id} type="button" onClick={()=>{setTab(t.id);setOpen(false);}} style={{
-              display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
-              padding:'12px 14px',cursor:'pointer',
-              background:on?C.accent:'transparent',
-              color:on?C.onAccent:C.text,
-              border:'none',borderRadius:6,fontFamily:'inherit',
-              fontSize:14,fontWeight:on?800:600,transition:'background .12s',
+            <button key={t.id} type="button" onClick={()=>setTab(t.id)} style={{
+              flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,
+              padding:'6px 2px',cursor:'pointer',background:'none',border:'none',
+              fontFamily:'inherit',color:on?C.accent:C.muted,borderRadius:12,transition:'color .15s',
             }}>
-              <span style={{fontSize:17,lineHeight:1}}>{t.icon}</span>
-              <span>{t.label}</span>
+              <div style={{fontSize:19,lineHeight:1,transform:on?'translateY(-2px) scale(1.12)':'none',transition:'transform .15s'}}>{t.icon}</div>
+              <div style={{fontSize:9.5,fontWeight:700,letterSpacing:0.2}}>{t.label}</div>
             </button>
           );
         })}
-      </nav>
-    </>
+      </div>
+    </nav>
   );
 }
 
@@ -2661,11 +2652,15 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,extraCols,cellColors
 // - Une facture supprimée => le numéro revient (géré dans App)
 // - Nouveau numéro au catalogue (à partir de maintenant) => ajout auto (géré dans App)
 // - Incohérences : compare le Stock Vinted avec les numéros présents dans le Garage
-function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
+function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,catalog}) {
   const [input,setInput]=useState('');
   const [bulk,setBulk]=useState('');
   const [showBulk,setShowBulk]=useState(false);
   const [search,setSearch]=useState('');
+  const [accountFilter,setAccountFilter]=useState('all');
+
+  const catAccountMap=useMemo(()=>{const m={};(catalog||[]).forEach(p=>{if(p.account)m[p.id]=p.account;});return m;},[catalog]);
+  const accountColorMap=useMemo(()=>{const m={};(accounts||[]).forEach(a=>{m[a.id]=a.color;});return m;},[accounts]);
 
   // Normalise un numéro (string, trim)
   const norm=(v)=>String(v||'').trim();
@@ -2728,9 +2723,12 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   const liste=useMemo(()=>{
     const arr=[...stockVinted].map(norm).sort((a,b)=>(+a||0)-(+b||0));
     const q=norm(search).toLowerCase();
-    if(!q) return arr;
-    return arr.filter(n=>n.toLowerCase().includes(q));
-  },[stockVinted,search]);
+    return arr.filter(n=>{
+      if(q&&!n.toLowerCase().includes(q)) return false;
+      if(accountFilter!=='all'&&catAccountMap[n]!==accountFilter) return false;
+      return true;
+    });
+  },[stockVinted,search,accountFilter,catAccountMap]);
 
   return (
     <div>
@@ -2741,10 +2739,25 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         </button>
       </div>
 
-      <p style={{fontSize:12.5,color:C.muted,margin:'0 0 14px',lineHeight:1.5}}>
+      <p style={{fontSize:12.5,color:C.muted,margin:'0 0 10px',lineHeight:1.5}}>
         Liste de tes annonces actuellement en ligne sur Vinted. Ajoute tes numéros un par un ci-dessous.
         Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.
       </p>
+
+      {/* Filtre par compte */}
+      {accounts&&accounts.length>0&&(
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+          <Btn small onClick={()=>setAccountFilter('all')} color={accountFilter==='all'?C.accent:C.border} style={{color:accountFilter==='all'?'#fff':C.muted}}>Tous</Btn>
+          {accounts.map(acc=>(
+            <Btn key={acc.id} small onClick={()=>setAccountFilter(acc.id)} color={accountFilter===acc.id?acc.color:C.border} style={{color:accountFilter===acc.id?'#fff':C.muted}}>
+              <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:acc.color,display:'inline-block'}}/>
+                {acc.name}
+              </span>
+            </Btn>
+          ))}
+        </div>
+      )}
 
       {/* Saisie à l'unité */}
       <div style={{display:'flex',gap:8,marginBottom:12}}>
@@ -2828,6 +2841,8 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
           {liste.map(n=>{
             const absentGarage=!garageNums.has(n);
+            const accId=catAccountMap[n];
+            const accColor=accId&&accountColorMap[accId];
             return (
               <span key={n} style={{
                 display:'inline-flex',alignItems:'center',gap:6,
@@ -2835,6 +2850,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
                 border:absentGarage?`1px solid ${C.warn}`:'1px solid transparent',
                 borderRadius:8,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:700
               }}>
+                {accColor&&<span style={{width:8,height:8,borderRadius:'50%',background:accColor,display:'inline-block',flexShrink:0}}/>}
                 {n}
                 <button onClick={()=>removeOne(n)} title="Retirer" style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:900}}>×</button>
               </span>
@@ -3142,16 +3158,9 @@ export default function App() {
   },[sales,invoices,synced,notifEnabled]);
 
   return (
-    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'hidden',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
+    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'hidden',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:80,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          {/* Bouton menu hamburger */}
-          <button type="button" onClick={()=>setMenuOpen(true)} title="Menu" aria-label="Ouvrir le menu"
-            style={{display:'flex',flexDirection:'column',justifyContent:'center',gap:4,width:38,height:38,background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer',padding:'0 9px',flexShrink:0}}>
-            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
-            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
-            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
-          </button>
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div
@@ -3289,7 +3298,7 @@ export default function App() {
           <button onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:6,color:C.onAccent,cursor:'pointer',fontSize:16,fontWeight:900,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
-      <Nav tab={tab} setTab={setTab} open={menuOpen} setOpen={setMenuOpen}/>
+      <Nav tab={tab} setTab={setTab}/>
       <main style={{maxWidth:1200,margin:'0 auto'}}>
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} accounts={accounts}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} accounts={accounts} photos={photos} setPhotos={setPhotos} onDeleteId={(id)=>{
@@ -3301,7 +3310,7 @@ export default function App() {
         }}/>}
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
-        {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
+        {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
         {tab==='params'   &&<AccountsSettings accounts={accounts} setAccounts={setAccounts}/>}
       </main>
