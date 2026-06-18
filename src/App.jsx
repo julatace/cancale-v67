@@ -1099,17 +1099,6 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const list=showAll?fullList:fullList.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
 
-  const oldStockCount=useMemo(()=>{
-    const now=new Date();
-    return catalog.filter(p=>{
-      if(p.status!=='stock') return false;
-      if(parseInt(p.id,10)<1900) return false;
-      const parts=(p.addedAt||'').split('/');
-      if(parts.length!==3) return false;
-      const d=new Date(+parts[2],+parts[1]-1,+parts[0]);
-      return (now-d)/86400000>30;
-    }).length;
-  },[catalog]);
 
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
@@ -1163,11 +1152,6 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
               </span>
             </Btn>
           ))}
-        </div>
-      )}
-      {oldStockCount>0&&(
-        <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:8,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:700}}>
-          ⚠️ {oldStockCount} paire{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
       <Card style={{padding:0,overflowX:'auto'}}>
