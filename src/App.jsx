@@ -2918,14 +2918,34 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [selected,setSelected]=React.useState(new Set());
   const [printQueue,setPrintQueue]=React.useState(null); // {items, idx}
 
-  const pdfDirectUrl=(url)=>{
-    const m=(url||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-    return m?`https://drive.google.com/file/d/${m[1]}/view`:url;
-  };
+  const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
+  const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  // Ouvre le PDF dans Safari — l'option Imprimer est dans le bouton Partager de Safari
-  const handlePrint=(pdfUrl)=>{
-    window.open(pdfDirectUrl(pdfUrl),'_blank');
+  // Ouvre le PDF comme un vrai fichier — récupère le base64 depuis Firebase,
+  // crée un blob URL que iOS Safari ouvre dans son lecteur PDF natif (Share → Imprimer fonctionne)
+  const handlePrint=async(b)=>{
+    if(!b||(!b.id&&!b.pdfUrl)) return;
+    setLoadingPdf(b.id);
+    try {
+      const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
+      const base64=await res.json();
+      if(base64&&typeof base64==='string'){
+        const bytes=atob(base64);
+        const arr=new Uint8Array(bytes.length);
+        for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+        const blob=new Blob([arr],{type:'application/pdf'});
+        const url=URL.createObjectURL(blob);
+        window.open(url,'_blank');
+        setTimeout(()=>URL.revokeObjectURL(url),60000);
+        return;
+      }
+    } catch(_){}
+    // Fallback Drive si pas de base64
+    if(b.pdfUrl){
+      const m=(b.pdfUrl||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+      window.open(m?`https://drive.google.com/file/d/${m[1]}/view`:b.pdfUrl,'_blank');
+    }
+    setLoadingPdf(null);
   };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
@@ -2970,10 +2990,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           {b.dateLimite&&<div style={{fontSize:12,color:C.muted,marginBottom:16}}>⏰ À expédier avant le {b.dateLimite}</div>}
 
           {b.pdfUrl&&(
-            <button onClick={()=>handlePrint(b.pdfUrl)} style={{
+            <button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
               width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
               border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
-            }}>🖨️ Imprimer ce bordereau</button>
+              opacity:loadingPdf===b.id?0.6:1,
+            }}>{loadingPdf===b.id?'Chargement...' :'🖨️ Imprimer ce bordereau'}</button>
           )}
 
           <div style={{display:'flex',gap:10,marginBottom:8}}>
@@ -3069,10 +3090,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
             </div>
             <div onClick={e=>e.stopPropagation()} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               {b.pdfUrl&&(
-                <button onClick={()=>handlePrint(b.pdfUrl)} style={{
+                <button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
                   padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
                   background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
-                }}>🖨️ Imprimer</button>
+                  opacity:loadingPdf===b.id?0.6:1,
+                }}>{loadingPdf===b.id?'...' :'🖨️ Imprimer'}</button>
               )}
               {!imprime&&(
                 <button onClick={()=>markImprime(b.id)} style={{

@@ -567,7 +567,7 @@ const BORD_SETTINGS = {
 };
 
 // Pousse un bordereau vers Firebase /vinted_bordereaux (lecture dans l'app)
-function pushBordeauFirebase(data, pdfUrl) {
+function pushBordeauFirebase(data, pdfUrl, pdfBlob) {
   if (!FIREBASE_URL) return false;
   try {
     const uid = 'bord_' + Utilities.getUuid().replace(/-/g, '').slice(0, 12);
@@ -601,7 +601,30 @@ function pushBordeauFirebase(data, pdfUrl) {
       payload: JSON.stringify(bords),
       muteHttpExceptions: true
     });
-    return putRes.getResponseCode() === 200;
+    if (putRes.getResponseCode() !== 200) return false;
+
+    // Stocke le PDF en base64 dans Firebase pour impression directe (sans passer par Drive)
+    if (pdfBlob) {
+      try {
+        const bytes = pdfBlob.getBytes();
+        if (bytes.length < 4000000) { // max 4 Mo
+          const base64 = Utilities.base64Encode(bytes);
+          UrlFetchApp.fetch(FIREBASE_URL + '/vinted_bordereau_pdfs/' + uid + '.json', {
+            method: 'put',
+            contentType: 'application/json',
+            payload: JSON.stringify(base64),
+            muteHttpExceptions: true
+          });
+          Logger.log('☁ PDF base64 stocké (' + Math.round(bytes.length/1024) + ' Ko) pour ' + uid);
+        } else {
+          Logger.log('⚠ PDF trop grand pour base64 Firebase (' + Math.round(bytes.length/1024) + ' Ko), Drive uniquement');
+        }
+      } catch(e2) {
+        Logger.log('⚠ Upload base64 : ' + e2.message);
+      }
+    }
+
+    return true;
   } catch (e) {
     Logger.log('⚠ Firebase bordereau push : ' + e.message);
     return false;
@@ -682,8 +705,8 @@ function lireBordereauxVinted() {
           data.transaction, data.dateLimite, 'à imprimer', pdfUrl
         ]);
 
-        // Push dans Firebase pour lecture dans l'app Cancale
-        const pushed = pushBordeauFirebase(data, pdfUrl);
+        // Push dans Firebase (métadonnées + PDF base64 pour impression directe)
+        const pushed = pushBordeauFirebase(data, pdfUrl, finalPdf);
         if (pushed) Logger.log('☁ Bordereau Firebase OK : ' + data.numero);
         existing.add(data.transaction);
         added++;
