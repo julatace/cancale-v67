@@ -13,6 +13,42 @@ const SETTINGS = {
   testMode: false                       // true = tous les mails vont vers ccEmail (test)
 };
 
+// ⚙️ TES COMPTES VINTED — modifie les emails iCloud de chaque compte
+// Option A (recommandée) : chaque iCloud forward vers une adresse Gmail avec alias
+//   icloud1@icloud.com → shopcancale35+compte1@gmail.com
+//   icloud2@icloud.com → shopcancale35+compte2@gmail.com
+//   icloud3@icloud.com → shopcancale35+compte3@gmail.com
+// Option B : utilise des labels Gmail (ajoute le label dans Gmail Filter, renseigne-le ci-dessous)
+const COMPTES_VINTED = [
+  { nom: 'Compte 1', alias: '+compte1', label: 'Compte1', email: 'icloud1@icloud.com' },
+  { nom: 'Compte 2', alias: '+compte2', label: 'Compte2', email: 'icloud2@icloud.com' },
+  { nom: 'Compte 3', alias: '+compte3', label: 'Compte3', email: 'icloud3@icloud.com' },
+];
+
+// Détecte à quel compte Vinted appartient un mail (via alias Gmail ou label)
+function detecterCompte(msg) {
+  // Méthode 1 : alias Gmail (+compte1, +compte2, +compte3)
+  const to = msg.getTo() || '';
+  for (const c of COMPTES_VINTED) {
+    if (to.toLowerCase().includes(c.alias.toLowerCase())) return c.nom;
+  }
+  // Méthode 2 : label Gmail
+  try {
+    const labels = msg.getThread().getLabels().map(l => l.getName());
+    for (const c of COMPTES_VINTED) {
+      if (labels.includes(c.label)) return c.nom;
+    }
+  } catch(e) {}
+  // Méthode 3 : email original dans les en-têtes (Delivered-To / X-Forwarded-To)
+  try {
+    const raw = msg.getRawContent();
+    for (const c of COMPTES_VINTED) {
+      if (raw.includes(c.email)) return c.nom;
+    }
+  } catch(e) {}
+  return 'Compte inconnu';
+}
+
 
 // ===== Fonction principale =====
 function lireMailsVinted() {
@@ -46,13 +82,15 @@ function lireMailsVinted() {
 
         const invoiceNumber = generateInvoiceNumber(sheet);
         const saleDate = msg.getDate();
+        const compte = detecterCompte(msg);
 
         sheet.appendRow([
           saleDate, data.numero, data.designation, data.prix,
-          data.pseudo, data.nomComplet, data.email, data.adresse, 'nouveau'
+          data.pseudo, data.nomComplet, data.email, data.adresse, 'nouveau', compte
         ]);
         existing.add(key);
         added++;
+        Logger.log('💼 Compte détecté : ' + compte);
 
         if (data.email && data.email.includes('@')) {
           try {
