@@ -823,8 +823,8 @@ function ecrireSurBordereauSlides(pdfBlob, numero, modele, taille, dateLimite) {
 
   const txt = rect.getText();
   txt.setText(texte);
-  const taille = texte.length > 45 ? 9 : (texte.length > 30 ? 11 : 13);
-  txt.getTextStyle().setBold(true).setFontSize(taille);
+  const fontSize = texte.length > 45 ? 9 : (texte.length > 30 ? 11 : 13);
+  txt.getTextStyle().setBold(true).setFontSize(fontSize);
   txt.getParagraphs().forEach(p => p.getRange().getParagraphStyle().setParagraphAlignment(SlidesApp.ParagraphAlignment.CENTER));
 
   pres.saveAndClose();
