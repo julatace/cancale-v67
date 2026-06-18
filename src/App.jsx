@@ -982,14 +982,23 @@ function AccountsSettings({accounts,setAccounts}) {
     const COLORS=['#007782','#e67e22','#9b59b6','#e74c3c','#27ae60','#2980b9','#f39c12','#1abc9c'];
     const usedColors=accounts.map(a=>a.color);
     const color=COLORS.find(c=>!usedColors.includes(c))||COLORS[accounts.length%COLORS.length];
-    const newAcc={id:'acc'+Date.now(),name:`Compte ${accounts.length+1}`,color,email:''};
+    const newAcc={id:'acc'+Date.now(),name:`Compte ${accounts.length+1}`,color,email:'',pseudo:'',phone:''};
     saveAcc([...accounts,newAcc]);
   };
   const removeAcc=(id)=>{
     if(!window.confirm('Supprimer ce compte ?')) return;
     saveAcc(accounts.filter(a=>a.id!==id));
   };
+  const upd=(i,field,val)=>{const a=[...accounts];a[i]={...a[i],[field]:val};saveAcc(a);};
   const inputStyle={background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:13,fontFamily:'inherit',outline:'none',width:'100%'};
+  const row=(label,field,i,acc,placeholder)=>(
+    <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',minWidth:80}}>{label}</span>
+      <input value={acc[field]||''} onChange={e=>upd(i,field,e.target.value)}
+        placeholder={placeholder} style={inputStyle}
+        onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+    </div>
+  );
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1001,27 +1010,23 @@ function AccountsSettings({accounts,setAccounts}) {
         {accounts.map((acc,i)=>(
           <div key={acc.id} style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:C.bg,borderRadius:8,border:`1px solid ${acc.color}44`}}>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <input type="color" value={acc.color} onChange={e=>{const a=[...accounts];a[i]={...a[i],color:e.target.value};saveAcc(a);}}
+              <input type="color" value={acc.color} onChange={e=>upd(i,'color',e.target.value)}
                 style={{width:32,height:32,border:'none',borderRadius:6,cursor:'pointer',padding:0,background:'none',flexShrink:0}}/>
-              <input value={acc.name} onChange={e=>{const a=[...accounts];a[i]={...a[i],name:e.target.value};saveAcc(a);}}
+              <input value={acc.name} onChange={e=>upd(i,'name',e.target.value)}
                 placeholder="Nom du compte"
                 style={{...inputStyle,fontWeight:700,fontSize:14}}
                 onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
               <button onClick={()=>removeAcc(acc.id)} style={{background:'transparent',border:'none',color:C.danger,cursor:'pointer',fontSize:18,fontWeight:900,lineHeight:1,padding:'0 4px',flexShrink:0}}>×</button>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',minWidth:80}}>Email iCloud :</span>
-              <input value={acc.email||''} onChange={e=>{const a=[...accounts];a[i]={...a[i],email:e.target.value.trim()};saveAcc(a);}}
-                placeholder="exemple@icloud.com"
-                style={inputStyle}
-                onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
-            </div>
+            {row('Pseudo Vinted :','pseudo',i,acc,'mon_pseudo_vinted')}
+            {row('Email iCloud :','email',i,acc,'exemple@icloud.com')}
+            {row('Téléphone :','phone',i,acc,'+33 6 00 00 00 00')}
           </div>
         ))}
       </Card>
       <Card style={{padding:12,fontSize:12,color:C.muted,lineHeight:1.6}}>
         <div style={{fontWeight:700,color:C.text,marginBottom:4}}>Comment ça marche</div>
-        L'adresse email iCloud est utilisée pour détecter automatiquement le compte dans le script Google Apps Script (quand les mails sont transférés vers Gmail). Les comptes et couleurs se synchronisent dans le cloud.
+        L'email iCloud permet la détection automatique du compte dans le script Apps Script. Le pseudo et le téléphone sont pour ta gestion interne. Tout est synchronisé dans le cloud.
       </Card>
     </div>
   );
