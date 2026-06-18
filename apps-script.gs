@@ -1,77 +1,103 @@
-// === SCRIPT VINTED → GOOGLE SHEETS + ENVOI AUTO FACTURES ===
-// VERSION FINALE 2 (logo Cancale + PDF aligné sur l'app)
+// ============================================================
+// === SCRIPT VINTED UNIFIÉ — Shop Cancale35 ===
+// Lit les mails Vinted (ventes + finalisations), pousse les données
+// directement dans l'app Firebase, sauvegarde les PDF de factures
+// sur Drive, et gère les bordereaux d'envoi.
+// UN SEUL FICHIER À COPIER-COLLER dans Google Apps Script.
+// ============================================================
 
-// ⚙️ RÉGLAGES À MODIFIER SI BESOIN
+// ⚙️ RÉGLAGES
 const SETTINGS = {
   companyName: 'Shop Cancale35',
   companyType: 'Entrepreneur individuel',
   companyAddress: '80 rue de la vieille rivière 35260',
   siret: '94135104100012',
   footer: 'Merci pour votre achat !',
-  ccEmail: 'shopcancale35@gmail.com',   // Toi en copie de chaque facture
-  driveFolderName: 'Factures Cancale',  // Dossier Drive pour sauvegarde des PDF
-  testMode: false                       // true = tous les mails vont vers ccEmail (test)
+  ccEmail: 'shopcancale35@gmail.com',
+  driveFolderName: 'Factures Cancale',
+  testMode: false
 };
 
-// ⚙️ URL Firebase de l'app Cancale (copie depuis l'app → Paramètres cloud)
-// Si renseignée, les comptes sont lus automatiquement depuis l'app (emails inclus).
-// Laisse vide ('') si tu ne veux pas utiliser Firebase.
+// ⚙️ URL Firebase (depuis l'app → icône nuage en haut à droite)
 const FIREBASE_URL = 'https://shop-cancale67-default-rtdb.europe-west1.firebasedatabase.app/cancale';
 
-// Fallback manuel — utilisé seulement si Firebase est vide ou inaccessible
+// Fallback si Firebase inaccessible
 const COMPTES_VINTED_FALLBACK = [
-  { nom: 'Compte 1', email: '' },
-  { nom: 'Compte 2', email: '' },
-  { nom: 'Compte 3', email: '' },
+  { id: 'acc1', nom: 'Compte 1', email: '', pseudo: '', phone: '' },
+  { id: 'acc2', nom: 'Compte 2', email: '', pseudo: '', phone: '' },
 ];
 
-// Récupère les comptes depuis Firebase (ou fallback si indisponible)
+// ============================================================
+// === COMPTES : lecture depuis Firebase ===
+// ============================================================
+
 function getComptes() {
   if (!FIREBASE_URL) return COMPTES_VINTED_FALLBACK;
   try {
-    const res = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_accounts.json', {muteHttpExceptions: true});
+    const res = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_accounts.json', { muteHttpExceptions: true });
     if (res.getResponseCode() !== 200) return COMPTES_VINTED_FALLBACK;
     const data = JSON.parse(res.getContentText());
     if (!Array.isArray(data) || data.length === 0) return COMPTES_VINTED_FALLBACK;
-    return data.map(a => ({ nom: a.name || a.nom || '', email: a.email || '' }));
-  } catch(e) {
+    return data.map(a => ({
+      id:     a.id     || '',
+      nom:    a.name   || a.nom   || '',
+      email:  a.email  || '',
+      pseudo: a.pseudo || '',
+      phone:  a.phone  || ''
+    }));
+  } catch (e) {
+    Logger.log('⚠ getComptes Firebase : ' + e.message);
     return COMPTES_VINTED_FALLBACK;
   }
 }
 
-// Détecte à quel compte Vinted appartient un mail (via email iCloud dans les en-têtes)
+// Détecte le compte Vinted d'un mail — retourne {id, nom, email, ...} ou {id:'', nom:''}
 function detecterCompte(msg) {
   const comptes = getComptes();
-  // Méthode 1 : email iCloud dans les en-têtes bruts (Delivered-To / X-Forwarded-To / To)
+
+  // Méthode 1 : email iCloud dans les en-têtes bruts (transfert iCloud → Gmail)
   try {
     const raw = msg.getRawContent();
     for (const c of comptes) {
-      if (c.email && raw.toLowerCase().includes(c.email.toLowerCase())) return c.nom;
+      if (c.email && raw.toLowerCase().includes(c.email.toLowerCase())) return c;
     }
-  } catch(e) {}
-  // Méthode 2 : champ To (alias Gmail +compte1 etc.)
+  } catch (e) {}
+
+  // Méthode 2 : alias Gmail (+slug dans le champ To)
   const to = (msg.getTo() || '').toLowerCase();
   for (const c of comptes) {
     const slug = (c.nom || '').toLowerCase().replace(/\s+/g, '');
-    if (slug && to.includes('+' + slug)) return c.nom;
+    if (slug && to.includes('+' + slug)) return c;
   }
-  // Méthode 3 : label Gmail
+
+  // Méthode 3 : label Gmail correspondant au nom du compte
   try {
     const labels = msg.getThread().getLabels().map(l => l.getName().toLowerCase());
     for (const c of comptes) {
       const slug = (c.nom || '').toLowerCase().replace(/\s+/g, '');
-      if (slug && labels.includes(slug)) return c.nom;
+      if (slug && labels.includes(slug)) return c;
     }
-  } catch(e) {}
-  return '';
+  } catch (e) {}
+
+  return { id: '', nom: '' };
 }
 
+// ============================================================
+// === VENTES : lecture et push vers Firebase ===
+// ============================================================
 
-// ===== Fonction principale =====
+// Fonction principale — à lancer manuellement ou via déclencheur
+function synchroniserVinted() {
+  Logger.log('🔄 Synchronisation Vinted...');
+  lireMailsVinted();
+  lireFinalisationsVinted();
+  Logger.log('✅ Synchronisation terminée');
+}
+
 function lireMailsVinted() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Factures');
 
-  Logger.log('🔍 Recherche des mails Vinted...');
+  Logger.log('🔍 Recherche des mails de vente Vinted...');
 
   const existingData = sheet.getDataRange().getValues();
   const existing = new Set();
@@ -80,12 +106,12 @@ function lireMailsVinted() {
     const key = (row[4] || '') + '|' + (row[3] || '');
     if (key !== '|') existing.add(key);
   }
-  Logger.log('📊 ' + existing.size + ' factures déjà dans Sheets');
+  Logger.log('📊 ' + existing.size + ' ventes déjà enregistrées');
 
   const threads = GmailApp.search('from:no-reply@vinted.fr subject:"Ton article s\'est vendu" after:2026/05/01', 0, 100);
-  Logger.log('📧 ' + threads.length + ' mails Vinted trouvés');
+  Logger.log('📧 ' + threads.length + ' mails de vente trouvés');
 
-  let added = 0, skipped = 0, sent = 0, failed = 0;
+  let added = 0, skipped = 0, failed = 0;
 
   threads.forEach(thread => {
     const messages = thread.getMessages();
@@ -101,26 +127,24 @@ function lireMailsVinted() {
         const saleDate = msg.getDate();
         const compte = detecterCompte(msg);
 
+        // Enregistrement dans Sheets (suivi local)
         sheet.appendRow([
           saleDate, data.numero, data.designation, data.prix,
-          data.pseudo, data.nomComplet, data.email, data.adresse, 'nouveau', compte
+          data.pseudo, data.nomComplet, data.email, data.adresse, 'nouveau', compte.nom
         ]);
         existing.add(key);
         added++;
-        Logger.log('💼 Compte détecté : ' + compte);
+        Logger.log('💼 Compte détecté : ' + (compte.nom || '(inconnu)') + ' [' + compte.id + ']');
 
-        if (data.email && data.email.includes('@')) {
-          try {
-            const ok = envoyerFacture(data, invoiceNumber, saleDate);
-            if (ok) {
-              sheet.getRange(sheet.getLastRow(), 9).setValue('envoyé');
-              sent++;
-              Logger.log('📧 Facture envoyée à ' + data.email);
-            }
-          } catch (err) {
-            Logger.log('⚠ Erreur envoi : ' + err.message);
-          }
+        // Push vers Firebase (app Cancale)
+        const pushed = pushVenteFirebase(data, compte, saleDate);
+        if (pushed) {
+          sheet.getRange(sheet.getLastRow(), 9).setValue('sync Firebase');
+          Logger.log('☁ Firebase OK pour ' + data.pseudo);
         }
+
+        // Sauvegarde PDF sur Drive uniquement (pas d'envoi à l'acheteur)
+        sauvegarderFactureDrive(data, invoiceNumber, saleDate);
 
         Logger.log('✓ ' + data.pseudo + ' | ' + data.designation + ' | ' + data.prix + '€');
       } catch (e) {
@@ -130,10 +154,146 @@ function lireMailsVinted() {
     });
   });
 
-  Logger.log('✅ Terminé : ' + added + ' ajoutées, ' + sent + ' factures envoyées, ' + skipped + ' doublons, ' + failed + ' échecs');
+  Logger.log('✅ Ventes : ' + added + ' ajoutées, ' + skipped + ' doublons, ' + failed + ' échecs');
 }
 
-// ===== Parser du mail Vinted =====
+// Pousse une vente vers Firebase /vinted_sales
+function pushVenteFirebase(data, compte, saleDate) {
+  if (!FIREBASE_URL) return false;
+  try {
+    const dateStr = Utilities.formatDate(saleDate, 'Europe/Paris', 'dd/MM/yyyy');
+    const uid = 'gs_' + Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+
+    const vente = {
+      id:          uid,
+      productId:   data.numero    || '',
+      buyPrice:    0,
+      sellPrice:   parseFloat(data.prix) || 0,
+      saleDate:    dateStr,
+      receiveDate: '',
+      createdAt:   new Date().toISOString(),
+      account:     compte.id      || '',
+      designation: data.designation || '',
+      buyerPseudo: data.pseudo    || ''
+    };
+
+    // Lecture de l'état actuel
+    const res = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_sales.json', { muteHttpExceptions: true });
+    let sales = [];
+    if (res.getResponseCode() === 200) {
+      const raw = JSON.parse(res.getContentText());
+      if (Array.isArray(raw)) sales = raw;
+    }
+
+    // Dédoublonnage : même acheteur + même prix + même date
+    const alreadyExists = sales.some(s =>
+      s.buyerPseudo === vente.buyerPseudo &&
+      String(s.sellPrice) === String(vente.sellPrice) &&
+      s.saleDate === vente.saleDate
+    );
+    if (alreadyExists) {
+      Logger.log('Firebase: doublon ignoré pour ' + data.pseudo);
+      return false;
+    }
+
+    sales.push(vente);
+
+    const putRes = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_sales.json', {
+      method: 'put',
+      contentType: 'application/json',
+      payload: JSON.stringify(sales),
+      muteHttpExceptions: true
+    });
+
+    return putRes.getResponseCode() === 200;
+  } catch (e) {
+    Logger.log('⚠ Firebase push : ' + e.message);
+    return false;
+  }
+}
+
+// ============================================================
+// === FINALISATIONS : mise à jour de receiveDate ===
+// ============================================================
+
+// Lit les mails "transaction finalisée" et met à jour receiveDate dans Firebase
+function lireFinalisationsVinted() {
+  if (!FIREBASE_URL) return;
+
+  Logger.log('🔍 Recherche des mails de finalisation Vinted...');
+  const threads = GmailApp.search('from:no-reply@vinted.fr subject:"transaction finalisée" after:2026/05/01', 0, 100);
+  Logger.log('📧 ' + threads.length + ' mails de finalisation trouvés');
+
+  if (threads.length === 0) return;
+
+  // Charge toutes les ventes une seule fois
+  const res = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_sales.json', { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) { Logger.log('⚠ Firebase inaccessible'); return; }
+
+  let sales = JSON.parse(res.getContentText());
+  if (!Array.isArray(sales)) sales = [];
+
+  let updated = 0;
+
+  threads.forEach(thread => {
+    thread.getMessages().forEach(msg => {
+      try {
+        const body = (msg.getPlainBody() || '') + ' ' + (msg.getSubject() || '');
+        const cleanBody = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+        // Pseudo de l'acheteur
+        let pseudo = '';
+        const pMatch = cleanBody.match(/(\S+)\s+a\s+(?:finalis|confirm)/i)
+                    || cleanBody.match(/Acheteur\s*:?\s*(\S+)/i)
+                    || cleanBody.match(/de\s+(\S+)\s+a\s+été\s+finalis/i);
+        if (pMatch) pseudo = pMatch[1].trim();
+
+        // Prix
+        const prixMatch = cleanBody.match(/(\d+[,.]\d{2})\s*€/);
+        if (!prixMatch || !pseudo) return;
+
+        const prix = parseFloat(prixMatch[1].replace(',', '.'));
+        const receiveDate = Utilities.formatDate(msg.getDate(), 'Europe/Paris', 'dd/MM/yyyy');
+
+        let changed = false;
+        sales = sales.map(s => {
+          if (
+            s.buyerPseudo === pseudo &&
+            Math.abs(s.sellPrice - prix) < 0.01 &&
+            !s.receiveDate
+          ) {
+            changed = true;
+            updated++;
+            Logger.log('✓ receiveDate = ' + receiveDate + ' pour ' + pseudo);
+            return { ...s, receiveDate };
+          }
+          return s;
+        });
+
+        if (!changed) Logger.log('ℹ Pas de vente à matcher pour finalisation ' + pseudo + ' ' + prix + '€');
+      } catch (e) {
+        Logger.log('⚠ Erreur finalisation : ' + e.message);
+      }
+    });
+  });
+
+  if (updated > 0) {
+    UrlFetchApp.fetch(FIREBASE_URL + '/vinted_sales.json', {
+      method: 'put',
+      contentType: 'application/json',
+      payload: JSON.stringify(sales),
+      muteHttpExceptions: true
+    });
+    Logger.log('☁ ' + updated + ' receiveDate mis à jour dans Firebase');
+  } else {
+    Logger.log('ℹ Aucune mise à jour nécessaire');
+  }
+}
+
+// ============================================================
+// === PARSER DU MAIL DE VENTE ===
+// ============================================================
+
 function parseVintedEmail(msg) {
   let body = msg.getPlainBody() || '';
 
@@ -160,16 +320,14 @@ function parseVintedEmail(msg) {
   const prixMatch = cleanBody.match(/(\d+[,.]\d{2})\s*€/);
   if (prixMatch) data.prix = prixMatch[1].replace(',', '.');
 
-  // Désignation : capture tout entre "a acheté" et le prix
   const designMatch = cleanBody.match(/a\s+achet[éeè]\s*\n?([\s\S]+?)\s*\n?\s*\d+[,.]\d{2}\s*€/i);
-  const stripBrackets = s => s.replace(/^\[.*?\]\s*/,'').trim();
+  const stripBrackets = s => s.replace(/^\[.*?\]\s*/, '').trim();
   if (designMatch) data.designation = stripBrackets(designMatch[1].trim().replace(/\s+/g, ' '));
   if (!data.designation) {
     const designMatch2 = cleanBody.match(/a\s+achet[éeè]\s+(.+?)\s+\d+[,.]\d{2}\s*€/i);
     if (designMatch2) data.designation = stripBrackets(designMatch2[1].trim().replace(/\s+/g, ' '));
   }
 
-  // N° de paire : format n898 / N1925 / nº1925
   let numMatch = data.designation.match(/[nN][º°]?(\d{2,6})(?!\d)/);
   if (!numMatch) {
     try {
@@ -182,14 +340,11 @@ function parseVintedEmail(msg) {
     data.designation = data.designation.replace(/-?\s*[nN][º°]?\d{2,6}(?!\d)/, '').trim().replace(/\s+/g, ' ');
   }
 
-  // === LOT : si la désignation est "X articles", cherche les n° dans le formulaire de retour ===
-  // Vinted indique "2 articles" (ou 3, 4...) au lieu du nom de l'article pour les lots.
-  // Les numéros de paires sont listés dans la section "Commande" en bas du mail.
   if (!data.numero && /^\d+\s+articles?$/i.test(data.designation)) {
     const numerosLot = extraireNumerosLot_(cleanBody);
     if (numerosLot.length > 0) {
       data.numero = numerosLot.join('+');
-      Logger.log('LOT détecté : numéros trouvés = ' + data.numero);
+      Logger.log('LOT détecté : ' + data.numero);
     }
   }
 
@@ -212,14 +367,10 @@ function parseVintedEmail(msg) {
   return null;
 }
 
-// ===== Extraction des n° de paires pour les ventes en lot =====
-// Cherche dans la section "Commande" du formulaire de retour (tout en bas du mail)
-// les numéros de paires des articles vendus ensemble (format nXXXX).
+// Extrait les n° de paires pour les ventes en lot
 function extraireNumerosLot_(body) {
   const numeros = [];
 
-  // Stratégie 1 : cherche la section "Commande" du formulaire de retour
-  // (Vinted liste les articles individuels juste en dessous de ce mot-clé)
   const sectionMatch = body.match(
     /Commande\s*[\n:]\s*([\s\S]+?)(?=\nAdresse|\ne-mail|www\.|http|Conditions|TVA|$)/i
   );
@@ -233,9 +384,6 @@ function extraireNumerosLot_(body) {
     }
   }
 
-  // Stratégie 2 : si rien trouvé dans la section "Commande",
-  // cherche dans tout le bas du mail (derniers 2000 caractères)
-  // pour éviter les faux positifs sur des numéros de téléphone ou codes postaux
   if (numeros.length === 0) {
     const bas = body.length > 2000 ? body.slice(-2000) : body;
     const re2 = /[nN][º°]?(\d{2,6})(?!\d)/g;
@@ -248,7 +396,10 @@ function extraireNumerosLot_(body) {
   return numeros;
 }
 
-// ===== Génère le numéro de facture auto =====
+// ============================================================
+// === FACTURES : numéro + PDF Drive (pas d'envoi acheteur) ===
+// ============================================================
+
 function generateInvoiceNumber(sheet) {
   const year = new Date().getFullYear();
   const data = sheet.getDataRange().getValues();
@@ -260,65 +411,32 @@ function generateInvoiceNumber(sheet) {
   return year + '-' + String(count + 1).padStart(6, '0');
 }
 
-// ===== Envoi de la facture =====
-function envoyerFacture(data, invoiceNumber, saleDate) {
-  const dateStr = Utilities.formatDate(saleDate, 'Europe/Paris', 'dd/MM/yyyy');
-  const prix = parseFloat(data.prix).toFixed(2).replace('.', ',');
-
-  const htmlContent = generateInvoiceHTML(data, invoiceNumber, dateStr, prix);
-  const blob = Utilities.newBlob(htmlContent, 'text/html', 'temp.html');
-  // Pour les lots, le nom du fichier utilise "-" au lieu de "+" (caractère interdit dans les noms de fichiers)
-  const safeNumero = (data.numero || 'X').replace(/\+/g, '-');
-  const pdf = blob.getAs('application/pdf').setName('Facture-' + invoiceNumber + '-paire-' + safeNumero + '.pdf');
-
-  const subject = '🎉 Votre achat Vinted - Shop Cancale35';
-  const bodyText =
-`Bonjour,
-
-Merci d'avoir effectué votre achat sur notre dressing Vinted Shop Cancale35.
-
-Votre commande est en cours de traitement et sera expédiée très prochainement.
-
-Vous trouverez ci-joint la facture correspondant à cet achat.
-
-Vous pourrez suivre votre colis grâce au lien de suivi colis dans notre conversation Vinted.
-
-Merci pour votre confiance.
-
----
-Article : ${data.designation}
-N° de paire : ${data.numero || 'À préciser'}
-N° de facture : ${invoiceNumber}
----
-
-Shop Cancale35
-Entrepreneur individuel
-SIRET : ${SETTINGS.siret}`;
-
-  const destinataire = SETTINGS.testMode ? SETTINGS.ccEmail : data.email;
-  const options = { attachments: [pdf], name: 'Shop Cancale35' };
-  if (!SETTINGS.testMode) options.cc = SETTINGS.ccEmail;
-
-  GmailApp.sendEmail(destinataire, subject, bodyText, options);
-
+// Sauvegarde la facture PDF sur Drive uniquement — aucun mail envoyé à l'acheteur
+function sauvegarderFactureDrive(data, invoiceNumber, saleDate) {
   try {
-    let folder;
+    const dateStr = Utilities.formatDate(saleDate, 'Europe/Paris', 'dd/MM/yyyy');
+    const prix = parseFloat(data.prix).toFixed(2).replace('.', ',');
+
+    const htmlContent = generateInvoiceHTML(data, invoiceNumber, dateStr, prix);
+    const blob = Utilities.newBlob(htmlContent, 'text/html', 'temp.html');
+    const safeNumero = (data.numero || 'X').replace(/\+/g, '-');
+    const pdf = blob.getAs('application/pdf').setName('Facture-' + invoiceNumber + '-paire-' + safeNumero + '.pdf');
+
     const folders = DriveApp.getFoldersByName(SETTINGS.driveFolderName);
-    folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(SETTINGS.driveFolderName);
+    const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(SETTINGS.driveFolderName);
     folder.createFile(pdf);
+    Logger.log('📂 Facture sauvegardée sur Drive : ' + pdf.getName());
+    return true;
   } catch (e) {
     Logger.log('⚠ Erreur sauvegarde Drive : ' + e.message);
+    return false;
   }
-
-  return true;
 }
 
-// ===== Génération HTML de la facture (deviendra PDF) =====
 function generateInvoiceHTML(data, invoiceNumber, dateStr, prixStr) {
   const acheteurNom = data.nomComplet || '';
   const acheteurAdr = data.adresse || '';
 
-  // Gestion des lots : data.numero peut être "1908+1456"
   const numeros = (data.numero || '').split('+').filter(Boolean);
   const numLabel = numeros.length > 1
     ? 'paires n° ' + numeros.join(' et n° ')
@@ -367,7 +485,7 @@ td.right{text-align:right;}
   </div>
   <div class="party" style="text-align:right">
     <div class="party-label">À :</div>
-    <div class="party-info"><b>${data.email}</b>${acheteurNom?'<br>'+acheteurNom:''}${acheteurAdr?'<br>'+acheteurAdr:''}</div>
+    <div class="party-info"><b>${data.email}</b>${acheteurNom ? '<br>' + acheteurNom : ''}${acheteurAdr ? '<br>' + acheteurAdr : ''}</div>
   </div>
 </div>
 <table>
@@ -389,7 +507,10 @@ td.right{text-align:right;}
 </body></html>`;
 }
 
-// ===== API pour l'app Cancale =====
+// ============================================================
+// === API WEB (doGet) ===
+// ============================================================
+
 function doGet(e) {
   const type = (e && e.parameter && e.parameter.type) ? e.parameter.type : 'factures';
 
@@ -436,9 +557,8 @@ function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
 }
 
-
 // ============================================================
-// === PARTIE BORDEREAUX ===
+// === BORDEREAUX ===
 // ============================================================
 
 const BORD_SETTINGS = {
@@ -451,7 +571,7 @@ function lireBordereauxVinted() {
   let sheet = ss.getSheetByName(BORD_SETTINGS.sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(BORD_SETTINGS.sheetName);
-    sheet.appendRow(['Date mail','N° paire','Modèle','N° suivi','N° transaction','Date limite','Statut','Lien PDF']);
+    sheet.appendRow(['Date mail', 'N° paire', 'Modèle', 'N° suivi', 'N° transaction', 'Date limite', 'Statut', 'Lien PDF']);
   }
 
   Logger.log('🔍 Recherche des mails bordereaux...');
@@ -511,7 +631,7 @@ function lireBordereauxVinted() {
         const folders = DriveApp.getFoldersByName(BORD_SETTINGS.driveFolderName);
         folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(BORD_SETTINGS.driveFolderName);
         const file = folder.createFile(finalPdf);
-        try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+        try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
         const pdfUrl = file.getUrl();
 
         sheet.appendRow([
@@ -561,7 +681,7 @@ function parseBordereauEmail(msg) {
   const all = (subject + '\n' + body + '\n' + htmlText + '\n' + attachNames)
               .replace(/\t/g, ' ').replace(/[ ]{2,}/g, ' ');
 
-  const data = { article:'', modele:'', numero:'', suivi:'', transaction:'', dateLimite:'' };
+  const data = { article: '', modele: '', numero: '', suivi: '', transaction: '', dateLimite: '' };
 
   let art = subject.match(/pour\s+(.+?)\s*$/i);
   if (!art) art = all.match(/Article\s*:?\s*([^\n]+?)\s*(?:Format|N[°ºo]?\s*de|\n)/i);
@@ -605,8 +725,8 @@ function ecrireSurBordereauSlides(pdfBlob, numero, modele, dateLimite) {
   let imgW = 1600, imgH = 1131;
   try {
     const bytes = imgBlob.getBytes();
-    const w = ((bytes[16]&0xff)<<24)|((bytes[17]&0xff)<<16)|((bytes[18]&0xff)<<8)|(bytes[19]&0xff);
-    const h = ((bytes[20]&0xff)<<24)|((bytes[21]&0xff)<<16)|((bytes[22]&0xff)<<8)|(bytes[23]&0xff);
+    const w = ((bytes[16] & 0xff) << 24) | ((bytes[17] & 0xff) << 16) | ((bytes[18] & 0xff) << 8) | (bytes[19] & 0xff);
+    const h = ((bytes[20] & 0xff) << 24) | ((bytes[21] & 0xff) << 16) | ((bytes[22] & 0xff) << 8) | (bytes[23] & 0xff);
     if (w > 0 && h > 0) { imgW = w; imgH = h; }
   } catch (e) {}
 
@@ -634,7 +754,7 @@ function ecrireSurBordereauSlides(pdfBlob, numero, modele, dateLimite) {
   if (aLeNumero && mod) texte = 'No ' + String(numero).trim() + '  -  ' + mod;
   else if (aLeNumero)   texte = 'No ' + String(numero).trim();
   else                  texte = mod || 'sans numero';
-  Logger.log('Bordereau -> texte écrit : "' + texte + '" (numero=' + numero + ', modele=' + modele + ')');
+  Logger.log('Bordereau -> texte écrit : "' + texte + '"');
 
   const boxX = 6, boxY = PAGE_H - BANDE_H + 2, boxW = PAGE_W - 12, boxH = BANDE_H - 6;
 
@@ -656,8 +776,8 @@ function ecrireSurBordereauSlides(pdfBlob, numero, modele, dateLimite) {
   const pdfResp = UrlFetchApp.fetch(exportUrl, { headers: { Authorization: 'Bearer ' + token } });
   const finalPdf = pdfResp.getBlob().setName('bordereau.pdf');
 
-  try { tmpPdf.setTrashed(true); } catch(e){}
-  try { presFile.setTrashed(true); } catch(e){}
+  try { tmpPdf.setTrashed(true); } catch (e) {}
+  try { presFile.setTrashed(true); } catch (e) {}
 
   return finalPdf;
 }
@@ -680,10 +800,6 @@ function renderPdfFirstPageToImage_(fileId) {
   const imgResp = UrlFetchApp.fetch(bigUrl, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
   if (imgResp.getResponseCode() !== 200) throw new Error('Téléchargement image échoué (' + imgResp.getResponseCode() + ')');
   return imgResp.getBlob().setName('bordereau.png');
-}
-
-function setSlideSize_(presId, widthPt, heightPt) {
-  // Volontairement vide : le redimensionnement de page n'est pas supporté de façon fiable après création.
 }
 
 function getTempFolder_() {
@@ -709,23 +825,23 @@ function _fusionnerBordereaux_(transactions) {
 
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
-  const idxLien = headers.indexOf('Lien PDF');
+  const idxLien   = headers.indexOf('Lien PDF');
   const idxStatut = headers.indexOf('Statut');
-  const idxTrans = headers.indexOf('N° transaction');
-  const idxNum = headers.indexOf('N° paire');
-  const idxMod = headers.indexOf('Modèle');
-  const idxDate = headers.indexOf('Date mail');
+  const idxTrans  = headers.indexOf('N° transaction');
+  const idxNum    = headers.indexOf('N° paire');
+  const idxMod    = headers.indexOf('Modèle');
+  const idxDate   = headers.indexOf('Date mail');
   if (idxLien < 0) { Logger.log('❌ Colonne "Lien PDF" introuvable'); return null; }
 
   const dateDepart = new Date(FUSION_DATE_DEPART + 'T00:00:00');
-
   const filtreTrans = (transactions && transactions.length) ? new Set(transactions.map(String)) : null;
+
   const aFusionner = [];
   for (let i = 1; i < data.length; i++) {
-    const lien = String(data[i][idxLien] || '').trim();
+    const lien   = String(data[i][idxLien]   || '').trim();
     if (!lien) continue;
     const statut = String(data[i][idxStatut] || '').trim();
-    const trans = String(data[i][idxTrans] || '').trim();
+    const trans  = String(data[i][idxTrans]  || '').trim();
 
     let dateBord = null;
     if (idxDate >= 0) {
@@ -741,11 +857,11 @@ function _fusionnerBordereaux_(transactions) {
       if (dateBord && dateBord < dateDepart) continue;
     }
     aFusionner.push({
-      lien: lien,
-      num: String(data[i][idxNum] || '').trim(),
-      mod: idxMod >= 0 ? String(data[i][idxMod] || '').trim() : '',
+      lien:  lien,
+      num:   String(data[i][idxNum] || '').trim(),
+      mod:   idxMod >= 0 ? String(data[i][idxMod] || '').trim() : '',
       trans: trans,
-      date: dateBord
+      date:  dateBord
     });
   }
 
@@ -792,7 +908,7 @@ function _fusionnerBordereaux_(transactions) {
   pres.saveAndClose();
 
   if (ok === 0) {
-    Logger.log('❌ Aucun bordereau n a pu être ajouté');
+    Logger.log('❌ Aucun bordereau n\'a pu être ajouté');
     try { DriveApp.getFileById(presId).setTrashed(true); } catch (e) {}
     return null;
   }
