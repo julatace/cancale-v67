@@ -2923,15 +2923,9 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     return m?`https://drive.google.com/uc?id=${m[1]}&export=download`:url;
   };
 
-  // Ouvre le PDF via le partage natif iOS (feuille Partager → Imprimer)
-  const handlePrint=(pdfUrl,numero,modele,taille)=>{
-    const url=pdfDirectUrl(pdfUrl);
-    if(navigator.share){
-      navigator.share({title:`Bordereau N°${numero||'?'}${taille?' T.'+taille:''} - ${modele||''}`,url})
-        .catch(()=>window.open(url,'_blank'));
-    } else {
-      window.open(url,'_blank');
-    }
+  // Ouvre le PDF dans Safari — l'option Imprimer est dans le bouton Partager de Safari
+  const handlePrint=(pdfUrl)=>{
+    window.open(pdfDirectUrl(pdfUrl),'_blank');
   };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
@@ -2976,7 +2970,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           {b.dateLimite&&<div style={{fontSize:12,color:C.muted,marginBottom:16}}>⏰ À expédier avant le {b.dateLimite}</div>}
 
           {b.pdfUrl&&(
-            <button onClick={()=>handlePrint(b.pdfUrl,b.numero,b.modele,b.taille)} style={{
+            <button onClick={()=>handlePrint(b.pdfUrl)} style={{
               width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
               border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
             }}>🖨️ Imprimer ce bordereau</button>
@@ -2996,7 +2990,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Sur iPhone : appuie sur <b style={{color:C.text}}>🖨️ Imprimer ce bordereau</b> → la feuille de partage s'ouvre → <b style={{color:C.text}}>Imprimer</b>
+            Le PDF s'ouvre dans Safari → bouton <b style={{color:C.text}}>Partager</b> (carré avec flèche) → <b style={{color:C.text}}>Imprimer</b>
           </div>
         </div>
       </div>
@@ -3075,7 +3069,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
             </div>
             <div onClick={e=>e.stopPropagation()} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               {b.pdfUrl&&(
-                <button onClick={()=>handlePrint(b.pdfUrl,b.numero,b.modele,b.taille)} style={{
+                <button onClick={()=>handlePrint(b.pdfUrl)} style={{
                   padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
                   background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
                 }}>🖨️ Imprimer</button>
