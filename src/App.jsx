@@ -978,22 +978,51 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
 /* ── Comptes ─────────────────────────────────────────── */
 function AccountsSettings({accounts,setAccounts}) {
   const saveAcc=(a)=>{setAccounts(a);save('vinted_accounts',a);};
+  const addAcc=()=>{
+    const COLORS=['#007782','#e67e22','#9b59b6','#e74c3c','#27ae60','#2980b9','#f39c12','#1abc9c'];
+    const usedColors=accounts.map(a=>a.color);
+    const color=COLORS.find(c=>!usedColors.includes(c))||COLORS[accounts.length%COLORS.length];
+    const newAcc={id:'acc'+Date.now(),name:`Compte ${accounts.length+1}`,color,email:''};
+    saveAcc([...accounts,newAcc]);
+  };
+  const removeAcc=(id)=>{
+    if(!window.confirm('Supprimer ce compte ?')) return;
+    saveAcc(accounts.filter(a=>a.id!==id));
+  };
+  const inputStyle={background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:13,fontFamily:'inherit',outline:'none',width:'100%'};
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Comptes Vinted</h2>
-      <Card style={{padding:14,display:'flex',flexDirection:'column',gap:10}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Comptes Vinted</h2>
+        <Btn small onClick={addAcc} color={C.accent}>+ Ajouter</Btn>
+      </div>
+      <Card style={{padding:14,display:'flex',flexDirection:'column',gap:12}}>
+        {accounts.length===0&&<div style={{color:C.muted,fontSize:13,textAlign:'center',padding:'10px 0'}}>Aucun compte. Clique sur "+ Ajouter".</div>}
         {accounts.map((acc,i)=>(
-          <div key={acc.id} style={{display:'flex',gap:10,alignItems:'center'}}>
-            <input type="color" value={acc.color} onChange={e=>{const a=[...accounts];a[i]={...a[i],color:e.target.value};saveAcc(a);}}
-              style={{width:36,height:36,border:'none',borderRadius:6,cursor:'pointer',padding:0,background:'none'}}/>
-            <input value={acc.name} onChange={e=>{const a=[...accounts];a[i]={...a[i],name:e.target.value};saveAcc(a);}}
-              style={{flex:1,background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:14,fontFamily:'inherit',outline:'none'}}
-              onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
-            <div style={{width:14,height:14,borderRadius:'50%',background:acc.color,flexShrink:0}}/>
+          <div key={acc.id} style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:C.bg,borderRadius:8,border:`1px solid ${acc.color}44`}}>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <input type="color" value={acc.color} onChange={e=>{const a=[...accounts];a[i]={...a[i],color:e.target.value};saveAcc(a);}}
+                style={{width:32,height:32,border:'none',borderRadius:6,cursor:'pointer',padding:0,background:'none',flexShrink:0}}/>
+              <input value={acc.name} onChange={e=>{const a=[...accounts];a[i]={...a[i],name:e.target.value};saveAcc(a);}}
+                placeholder="Nom du compte"
+                style={{...inputStyle,fontWeight:700,fontSize:14}}
+                onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+              <button onClick={()=>removeAcc(acc.id)} style={{background:'transparent',border:'none',color:C.danger,cursor:'pointer',fontSize:18,fontWeight:900,lineHeight:1,padding:'0 4px',flexShrink:0}}>×</button>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',minWidth:80}}>Email iCloud :</span>
+              <input value={acc.email||''} onChange={e=>{const a=[...accounts];a[i]={...a[i],email:e.target.value.trim()};saveAcc(a);}}
+                placeholder="exemple@icloud.com"
+                style={inputStyle}
+                onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+            </div>
           </div>
         ))}
       </Card>
-      <div style={{fontSize:12,color:C.muted}}>Les comptes sont synchronisés dans le cloud. Les couleurs s'affichent dans le catalogue, les ventes et le garage.</div>
+      <Card style={{padding:12,fontSize:12,color:C.muted,lineHeight:1.6}}>
+        <div style={{fontWeight:700,color:C.text,marginBottom:4}}>Comment ça marche</div>
+        L'adresse email iCloud est utilisée pour détecter automatiquement le compte dans le script Google Apps Script (quand les mails sont transférés vers Gmail). Les comptes et couleurs se synchronisent dans le cloud.
+      </Card>
     </div>
   );
 }

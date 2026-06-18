@@ -13,40 +13,57 @@ const SETTINGS = {
   testMode: false                       // true = tous les mails vont vers ccEmail (test)
 };
 
-// ⚙️ TES COMPTES VINTED — modifie les emails iCloud de chaque compte
-// Option A (recommandée) : chaque iCloud forward vers une adresse Gmail avec alias
-//   icloud1@icloud.com → shopcancale35+compte1@gmail.com
-//   icloud2@icloud.com → shopcancale35+compte2@gmail.com
-//   icloud3@icloud.com → shopcancale35+compte3@gmail.com
-// Option B : utilise des labels Gmail (ajoute le label dans Gmail Filter, renseigne-le ci-dessous)
-const COMPTES_VINTED = [
-  { nom: 'Compte 1', alias: '+compte1', label: 'Compte1', email: 'icloud1@icloud.com' },
-  { nom: 'Compte 2', alias: '+compte2', label: 'Compte2', email: 'icloud2@icloud.com' },
-  { nom: 'Compte 3', alias: '+compte3', label: 'Compte3', email: 'icloud3@icloud.com' },
+// ⚙️ URL Firebase de l'app Cancale (copie depuis l'app → Paramètres cloud)
+// Si renseignée, les comptes sont lus automatiquement depuis l'app (emails inclus).
+// Laisse vide ('') si tu ne veux pas utiliser Firebase.
+const FIREBASE_URL = 'https://shop-cancale67-default-rtdb.europe-west1.firebasedatabase.app/cancale';
+
+// Fallback manuel — utilisé seulement si Firebase est vide ou inaccessible
+const COMPTES_VINTED_FALLBACK = [
+  { nom: 'Compte 1', email: '' },
+  { nom: 'Compte 2', email: '' },
+  { nom: 'Compte 3', email: '' },
 ];
 
-// Détecte à quel compte Vinted appartient un mail (via alias Gmail ou label)
-function detecterCompte(msg) {
-  // Méthode 1 : alias Gmail (+compte1, +compte2, +compte3)
-  const to = msg.getTo() || '';
-  for (const c of COMPTES_VINTED) {
-    if (to.toLowerCase().includes(c.alias.toLowerCase())) return c.nom;
-  }
-  // Méthode 2 : label Gmail
+// Récupère les comptes depuis Firebase (ou fallback si indisponible)
+function getComptes() {
+  if (!FIREBASE_URL) return COMPTES_VINTED_FALLBACK;
   try {
-    const labels = msg.getThread().getLabels().map(l => l.getName());
-    for (const c of COMPTES_VINTED) {
-      if (labels.includes(c.label)) return c.nom;
-    }
-  } catch(e) {}
-  // Méthode 3 : email original dans les en-têtes (Delivered-To / X-Forwarded-To)
+    const res = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_accounts.json', {muteHttpExceptions: true});
+    if (res.getResponseCode() !== 200) return COMPTES_VINTED_FALLBACK;
+    const data = JSON.parse(res.getContentText());
+    if (!Array.isArray(data) || data.length === 0) return COMPTES_VINTED_FALLBACK;
+    return data.map(a => ({ nom: a.name || a.nom || '', email: a.email || '' }));
+  } catch(e) {
+    return COMPTES_VINTED_FALLBACK;
+  }
+}
+
+// Détecte à quel compte Vinted appartient un mail (via email iCloud dans les en-têtes)
+function detecterCompte(msg) {
+  const comptes = getComptes();
+  // Méthode 1 : email iCloud dans les en-têtes bruts (Delivered-To / X-Forwarded-To / To)
   try {
     const raw = msg.getRawContent();
-    for (const c of COMPTES_VINTED) {
-      if (raw.includes(c.email)) return c.nom;
+    for (const c of comptes) {
+      if (c.email && raw.toLowerCase().includes(c.email.toLowerCase())) return c.nom;
     }
   } catch(e) {}
-  return 'Compte inconnu';
+  // Méthode 2 : champ To (alias Gmail +compte1 etc.)
+  const to = (msg.getTo() || '').toLowerCase();
+  for (const c of comptes) {
+    const slug = (c.nom || '').toLowerCase().replace(/\s+/g, '');
+    if (slug && to.includes('+' + slug)) return c.nom;
+  }
+  // Méthode 3 : label Gmail
+  try {
+    const labels = msg.getThread().getLabels().map(l => l.getName().toLowerCase());
+    for (const c of comptes) {
+      const slug = (c.nom || '').toLowerCase().replace(/\s+/g, '');
+      if (slug && labels.includes(slug)) return c.nom;
+    }
+  } catch(e) {}
+  return '';
 }
 
 
