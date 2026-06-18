@@ -2915,16 +2915,11 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,ca
 
 function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [filter,setFilter]=React.useState('à imprimer');
-  const [pdfModal,setPdfModal]=React.useState(null); // {url, numero, modele, taille}
 
-  // Extrait l'ID Drive depuis une URL et construit l'URL de prévisualisation
-  const drivePreviewUrl=(url)=>{
+  // Construit l'URL de téléchargement direct du PDF Drive (fonctionne sur iOS Safari sans login)
+  const pdfDirectUrl=(url)=>{
     const m=(url||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-    return m?`https://drive.google.com/file/d/${m[1]}/preview`:url;
-  };
-  const driveDirectUrl=(url)=>{
-    const m=(url||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-    return m?`https://drive.google.com/file/d/${m[1]}/view`:url;
+    return m?`https://drive.google.com/uc?id=${m[1]}&export=download`:url;
   };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
@@ -2949,80 +2944,79 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     'tous':       all.length,
   };
 
-  const filterBtns=[
-    {k:'à imprimer',label:'À imprimer'},
-    {k:'imprimé',   label:'Imprimés'},
-    {k:'tous',      label:'Tous'},
-  ];
-
   const fusionUrl=appsScriptUrl?(appsScriptUrl+'?type=fusion'):null;
 
   return (
     <div style={{padding:'0 4px'}}>
 
       {/* Bouton Tout imprimer */}
-      {fusionUrl&&(
+      {fusionUrl?(
         <a href={fusionUrl} target="_blank" rel="noreferrer" style={{
           display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-          padding:'11px 0',borderRadius:12,marginBottom:12,
-          background:C.accent,color:'#fff',textDecoration:'none',fontWeight:700,fontSize:14,
+          padding:'13px 0',borderRadius:12,marginBottom:10,
+          background:C.accent,color:'#fff',textDecoration:'none',fontWeight:700,fontSize:15,
         }}>🖨️ Tout imprimer (PDF fusionné)</a>
-      )}
-      {!fusionUrl&&(
-        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',marginBottom:12,fontSize:12,color:C.muted}}>
-          💡 Pour le bouton "Tout imprimer", colle l'URL de ton Apps Script dans l'onglet <b style={{color:C.text}}>⚙️ Comptes</b>
+      ):(
+        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',marginBottom:10,fontSize:12,color:C.muted}}>
+          💡 Pour imprimer tous les bordereaux d'un coup, colle l'URL Apps Script dans l'onglet <b style={{color:C.text}}>⚙️ Comptes</b>
         </div>
       )}
 
+      {/* Instruction iOS */}
+      <div style={{background:'#007782' +'11',border:`1px solid ${'#007782'}33`,borderRadius:10,padding:'8px 12px',marginBottom:12,fontSize:11,color:C.text,lineHeight:1.5}}>
+        Sur iPhone : appuie sur <b>🖨️ Imprimer</b> → le PDF s'ouvre dans Safari → bouton <b>Partager</b> → <b>Imprimer</b>
+      </div>
+
       {/* Filtres */}
       <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-        {filterBtns.map(f=>(
-          <button key={f.k} onClick={()=>setFilter(f.k)} style={{
+        {(['à imprimer','imprimé','tous']).map(k=>(
+          <button key={k} onClick={()=>setFilter(k)} style={{
             padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
-            background:filter===f.k?C.accent:'transparent',
-            color:filter===f.k?'#fff':C.muted,
-            border:`1.5px solid ${filter===f.k?C.accent:C.border}`,fontFamily:'inherit',
-          }}>{f.label} ({counts[f.k]})</button>
+            background:filter===k?C.accent:'transparent',
+            color:filter===k?'#fff':C.muted,
+            border:`1.5px solid ${filter===k?C.accent:C.border}`,fontFamily:'inherit',
+          }}>{k==='à imprimer'?'À imprimer':k==='imprimé'?'Imprimés':'Tous'} ({counts[k]})</button>
         ))}
       </div>
 
       {filtered.length===0&&(
         <div style={{textAlign:'center',color:C.muted,padding:'40px 0',fontSize:13}}>
           {all.length===0
-            ? 'Aucun bordereau reçu. Lance le script Apps Script pour synchroniser.'
+            ? 'Aucun bordereau reçu. Lance synchroniserVinted dans Apps Script.'
             : 'Aucun bordereau dans cette catégorie.'}
         </div>
       )}
 
       {filtered.map(b=>{
         const imprime=b.statut==='imprimé';
+        const pdfUrl=pdfDirectUrl(b.pdfUrl);
         return (
           <Card key={b.id} style={{marginBottom:10,padding:'12px 14px',opacity:imprime?0.65:1}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+            <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:8}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                  <span style={{fontWeight:700,fontSize:14,color:C.accent}}>N°{b.numero||'?'}</span>
-                  {b.taille&&<span style={{background:C.accent+'22',color:C.accent,borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:700}}>T.{b.taille}</span>}
-                  {imprime&&<span style={{background:'#27ae6022',color:'#27ae60',borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:700}}>✓ Imprimé</span>}
+                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
+                  <span style={{fontWeight:800,fontSize:15,color:C.accent}}>N°{b.numero||'?'}</span>
+                  {b.taille&&<span style={{background:C.accent+'22',color:C.accent,borderRadius:8,padding:'2px 8px',fontSize:12,fontWeight:700}}>T.{b.taille}</span>}
+                  {imprime&&<span style={{background:'#27ae6022',color:'#27ae60',borderRadius:8,padding:'2px 8px',fontSize:11,fontWeight:700}}>✓ Imprimé</span>}
                 </div>
-                <div style={{fontSize:13,color:C.text,marginTop:3,fontWeight:500}}>{b.modele||'(modèle inconnu)'}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',gap:10,flexWrap:'wrap'}}>
-                  {b.dateLimite&&<span>⏰ Limite : {b.dateLimite}</span>}
+                <div style={{fontSize:13,color:C.text,fontWeight:500,marginBottom:4}}>{b.modele||'(modèle inconnu)'}</div>
+                <div style={{fontSize:11,color:C.muted,display:'flex',gap:12,flexWrap:'wrap'}}>
+                  {b.dateLimite&&<span>⏰ {b.dateLimite}</span>}
                   {b.suivi&&<span>📦 {b.suivi}</span>}
                   {b.date&&<span>{b.date}</span>}
                 </div>
               </div>
             </div>
-            <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               {b.pdfUrl&&(
-                <button onClick={()=>setPdfModal({url:b.pdfUrl,numero:b.numero,modele:b.modele,taille:b.taille})} style={{
-                  padding:'6px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',
-                  background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
-                }}>🖨️ Voir le PDF</button>
+                <a href={pdfUrl} target="_blank" rel="noreferrer" style={{
+                  padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,
+                  background:C.accent,color:'#fff',textDecoration:'none',display:'inline-block',
+                }}>🖨️ Imprimer</a>
               )}
               {!imprime&&(
                 <button onClick={()=>markImprime(b.id)} style={{
-                  padding:'6px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',
+                  padding:'8px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
                   background:'transparent',color:'#27ae60',border:'1.5px solid #27ae60',fontFamily:'inherit',
                 }}>✓ Marquer imprimé</button>
               )}
@@ -3030,39 +3024,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </Card>
         );
       })}
-
-      {/* Modal PDF intégré */}
-      {pdfModal&&(
-        <div style={{position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.92)',display:'flex',flexDirection:'column'}}>
-          {/* Header */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:C.surface,flexShrink:0}}>
-            <div style={{overflow:'hidden'}}>
-              <div style={{fontWeight:700,fontSize:13,color:C.accent}}>N°{pdfModal.numero||'?'}{pdfModal.taille?' · T.'+pdfModal.taille:''}</div>
-              <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pdfModal.modele||''}</div>
-            </div>
-            <div style={{display:'flex',gap:8,flexShrink:0}}>
-              <a href={driveDirectUrl(pdfModal.url)} target="_blank" rel="noreferrer" style={{
-                padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:700,
-                background:C.accent,color:'#fff',textDecoration:'none',
-              }}>Ouvrir ↗</a>
-              <button onClick={()=>setPdfModal(null)} style={{
-                background:'transparent',border:'none',color:C.text,fontSize:22,cursor:'pointer',lineHeight:1,padding:'0 4px',
-              }}>×</button>
-            </div>
-          </div>
-          {/* PDF iframe */}
-          <iframe
-            src={drivePreviewUrl(pdfModal.url)}
-            style={{flex:1,border:'none',width:'100%'}}
-            title="Bordereau PDF"
-            allow="autoplay"
-          />
-          {/* Pied de page iOS */}
-          <div style={{padding:'10px 14px',background:C.surface,textAlign:'center',fontSize:11,color:C.muted,flexShrink:0}}>
-            Sur iPhone : appuie sur <b style={{color:C.text}}>Ouvrir ↗</b> puis utilise le bouton Partager pour imprimer
-          </div>
-        </div>
-      )}
     </div>
   );
 }
