@@ -2989,21 +2989,25 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const c=document.createElement('canvas');
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-        // Texte N°/modèle/taille dessiné directement sur le canvas (visible dans l'appli ET à l'impression)
-        const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('   ');
-        if(infoText){
-          const ctx=c.getContext('2d');
-          const fs=Math.round(c.width*0.04);
-          ctx.font=`900 ${fs}px sans-serif`;
-          ctx.fillStyle='#111111';
-          const ty=isPortrait?c.height-fs*0.4:fs*1.3;
-          ctx.fillText(infoText,30,ty);
+        let printBlob=null;
+        if(isPortrait){
+          // Mondial Relay : texte petit en bas du canvas, PDF A4 portrait rempli
+          const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('  ');
+          if(infoText){
+            const ctx=c.getContext('2d');
+            const fs=Math.round(c.width*0.016);
+            ctx.font=`bold ${fs}px sans-serif`;
+            ctx.fillStyle='#111';
+            ctx.fillText(infoText,10,c.height-fs*0.3);
+          }
+          const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
+          const pb=new Uint8Array(await pj.arrayBuffer());
+          printBlob=jpegToPdfFillA4(pb,c.width,c.height,595,842);
         }
+        // Chronopost : pas de dessin sur canvas (canvas potentiellement rotationné par /Rotate 90)
+        // → utilise le PDF vectoriel original via pdfBlob
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
-        const jpegBytes=new Uint8Array(await jpegBlob.arrayBuffer());
-        const pageW=isPortrait?595:842,pageH=isPortrait?842:595;
-        const printBlob=jpegToPdfFillA4(jpegBytes,c.width,c.height,pageW,pageH);
         setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
