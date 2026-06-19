@@ -3237,50 +3237,72 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
         const flagStr=paysFlag(b.pays);
         return (
           <div key={b.id} onClick={()=>toggleSelect(b.id)} style={{
-            marginBottom:10,padding:'12px 14px',cursor:'pointer',
-            background:C.card,border:`2px solid ${isSel?C.accent:C.border}`,
-            borderRadius:8,transition:'border-color .15s',opacity:imprime?0.65:1,
+            marginBottom:8,cursor:'pointer',
+            background:isSel?C.accent+'12':C.card,
+            border:`1.5px solid ${isSel?C.accent:C.border}`,
+            borderRadius:12,overflow:'hidden',
+            transition:'border-color .15s,background .15s',
+            opacity:imprime?0.72:1,
           }}>
-            <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:8}}>
-              {/* Checkbox */}
+            <div style={{display:'flex',alignItems:'stretch'}}>
+              {/* Photo ou placeholder grisé */}
               <div style={{
-                width:22,height:22,borderRadius:6,flexShrink:0,marginTop:1,
-                border:`2px solid ${isSel?C.accent:C.border}`,
-                background:isSel?C.accent:'transparent',
+                width:82,flexShrink:0,position:'relative',
+                background:photo?'#000':C.accent+'18',
                 display:'flex',alignItems:'center',justifyContent:'center',
+                minHeight:82,
               }}>
-                {isSel&&<span style={{color:'#fff',fontSize:13,lineHeight:1,fontWeight:900}}>✓</span>}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
-                  <span style={{fontWeight:800,fontSize:15,color:C.accent}}>N°{b.numero||'?'}</span>
-                  {b.taille&&<span style={{background:C.accent+'22',color:C.accent,borderRadius:8,padding:'2px 8px',fontSize:12,fontWeight:700}}>T.{b.taille}</span>}
-                  {flagStr&&<span style={{fontSize:13,fontWeight:700}}>{flagStr}</span>}
-                  {imprime&&<span style={{background:'#27ae6022',color:'#27ae60',borderRadius:8,padding:'2px 8px',fontSize:11,fontWeight:700}}>✓ Imprimé</span>}
+                {photo
+                  ? <img src={photo} alt="" style={{width:82,height:'100%',objectFit:'cover',display:'block'}} onClick={e=>e.stopPropagation()}/>
+                  : <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+                      <div style={{fontSize:22,opacity:0.25}}>👟</div>
+                      <div style={{fontSize:9,color:C.muted,opacity:0.6,fontWeight:600}}>PHOTO</div>
+                    </div>
+                }
+                {/* Badge sélection */}
+                <div style={{
+                  position:'absolute',top:5,left:5,
+                  width:20,height:20,borderRadius:5,
+                  background:isSel?C.accent:'rgba(0,0,0,0.25)',
+                  border:`1.5px solid ${isSel?'#fff':C.border}`,
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                }}>
+                  {isSel&&<span style={{color:'#fff',fontSize:11,fontWeight:900,lineHeight:1}}>✓</span>}
                 </div>
-                <div style={{fontSize:13,color:C.text,fontWeight:500,marginBottom:4}}>{b.modele||'(modèle inconnu)'}</div>
-                <div style={{fontSize:11,color:C.muted,display:'flex',gap:12,flexWrap:'wrap'}}>
+              </div>
+
+              {/* Infos */}
+              <div style={{flex:1,padding:'10px 12px',minWidth:0,display:'flex',flexDirection:'column',gap:3}}>
+                <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                  <span style={{fontWeight:800,fontSize:14,color:C.accent}}>N°{b.numero||'?'}</span>
+                  {b.taille&&<span style={{background:C.accent,color:'#fff',borderRadius:5,padding:'1px 7px',fontSize:11,fontWeight:700}}>T.{b.taille}</span>}
+                  {imprime&&<span style={{background:'#27ae6022',color:'#27ae60',borderRadius:5,padding:'1px 7px',fontSize:10,fontWeight:700}}>✓ Expédié</span>}
+                </div>
+                <div style={{fontSize:13,color:C.text,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.modele||<span style={{color:C.muted,fontStyle:'italic',fontWeight:400}}>Modèle inconnu</span>}</div>
+                {flagStr&&<div style={{fontSize:12,color:C.muted,fontWeight:500}}>{flagStr}</div>}
+                <div style={{fontSize:11,color:C.muted,display:'flex',gap:10,flexWrap:'wrap',marginTop:1}}>
                   {b.dateLimite&&<span>⏰ {b.dateLimite}</span>}
-                  {b.suivi&&<span>📦 {b.suivi}</span>}
-                  {b.date&&<span>{b.date}</span>}
+                  {b.suivi&&<span style={{overflow:'hidden',textOverflow:'ellipsis',maxWidth:160}}>📦 {b.suivi}</span>}
                 </div>
               </div>
-              {photo&&<img src={photo} alt="" onClick={e=>e.stopPropagation()} style={{width:52,height:52,objectFit:'cover',borderRadius:8,flexShrink:0,border:`1px solid ${C.border}`}}/>}
             </div>
-            <div onClick={e=>e.stopPropagation()} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              {b.id&&(
-                <button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
-                  padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
-                  background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
-                  opacity:loadingPdf===b.id?0.6:1,
-                }}>{loadingPdf===b.id?'...' :'🖨️ Imprimer'}</button>
-              )}
-              {!imprime&&(
-                <button onClick={()=>markImprime(b.id)} style={{
-                  padding:'8px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
-                  background:'transparent',color:'#27ae60',border:'1.5px solid #27ae60',fontFamily:'inherit',
-                }}>✓ Marquer imprimé</button>
-              )}
+
+            {/* Boutons */}
+            <div onClick={e=>e.stopPropagation()} style={{
+              display:'flex',gap:6,padding:'8px 10px',
+              borderTop:`1px solid ${C.border}`,
+              background:C.surface+'80',
+            }}>
+              {b.id&&<button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
+                flex:1,padding:'7px 0',borderRadius:8,background:C.accent,color:'#fff',
+                border:'none',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                opacity:loadingPdf===b.id?0.55:1,
+              }}>{loadingPdf===b.id?'⏳' :'🖨️ Imprimer'}</button>}
+              {!imprime&&<button onClick={()=>markImprime(b.id)} style={{
+                flex:1,padding:'7px 0',borderRadius:8,background:'transparent',
+                color:'#27ae60',border:'1.5px solid #27ae60',
+                fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+              }}>✓ Marquer expédié</button>}
             </div>
           </div>
         );
