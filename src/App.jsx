@@ -2933,21 +2933,46 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
       const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
       const base64=await res.json();
       if(base64&&typeof base64==='string'){
-        const bytes=atob(base64);
-        const arr=new Uint8Array(bytes.length);
-        for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-        const pdfBlob=new Blob([arr],{type:'application/pdf'});
-        const pdfUrl=URL.createObjectURL(pdfBlob);
-        // Enveloppe le PDF dans une page HTML avec CSS pour remplir la feuille à l'impression
-        const wrapper=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        const wrapper=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;background:#fff}
-embed{display:block;width:100%;height:100vh}
-@page{margin:0}
-@media print{html,body{width:100%;height:100%}embed{width:100%;height:100vh;position:fixed;top:0;left:0}}
-</style></head><body><embed src="${pdfUrl}" type="application/pdf"></body></html>`;
+html,body{background:#fff}
+.page{display:block;width:100%;height:auto;page-break-after:always}
+@page{size:A4 portrait;margin:0}
+@media print{.page{display:block;width:210mm;height:auto;page-break-after:always}}
+</style></head><body>
+<div id="ct"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+(async function(){
+  const bin=atob('${base64}');
+  const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+  const A4W=595.28,A4H=841.89;
+  const ct=document.getElementById('ct');
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const vp0=page.getViewport({scale:1});
+    const rot=vp0.width>vp0.height?90:0;
+    const vp1=page.getViewport({scale:1,rotation:rot});
+    const sc=Math.min(A4W/vp1.width,A4H/vp1.height)*2;
+    const vp=page.getViewport({scale:sc,rotation:rot});
+    const c=document.createElement('canvas');
+    c.width=Math.round(vp.width);
+    c.height=Math.round(vp.height);
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    const img=document.createElement('img');
+    img.className='page';
+    img.src=c.toDataURL('image/jpeg',0.95);
+    ct.appendChild(img);
+  }
+})();
+</script>
+</body></html>`;
         const wrapBlob=new Blob([wrapper],{type:'text/html'});
-        setPdfViewer({url:URL.createObjectURL(wrapBlob),isPdf:true,pdfUrl});
+        setPdfViewer({url:URL.createObjectURL(wrapBlob),isPdf:true,pdfUrl:null});
         setLoadingPdf(null);
         return;
       }
