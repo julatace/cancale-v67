@@ -2921,8 +2921,8 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  // Ouvre le PDF comme un vrai fichier — récupère le base64 depuis Firebase,
-  // crée un blob URL que iOS Safari ouvre dans son lecteur PDF natif (Share → Imprimer fonctionne)
+  // Approche Web Share API : ouvre le share sheet natif iOS avec le fichier PDF
+  // → l'utilisateur voit "Imprimer" directement dans le share sheet
   const handlePrint=async(b)=>{
     if(!b||(!b.id&&!b.pdfUrl)) return;
     setLoadingPdf(b.id);
@@ -2934,17 +2934,28 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
         const blob=new Blob([arr],{type:'application/pdf'});
+        const fname=`bordereau-${b.numero||b.id}.pdf`;
+        const file=new File([blob],fname,{type:'application/pdf'});
+        // iOS/Android : share sheet natif avec option Imprimer
+        if(navigator.canShare&&navigator.canShare({files:[file]})){
+          await navigator.share({files:[file],title:`Bordereau ${b.numero||''}`.trim()});
+          setLoadingPdf(null);
+          return;
+        }
+        // Desktop fallback : téléchargement direct
         const url=URL.createObjectURL(blob);
-        window.open(url,'_blank');
-        setTimeout(()=>URL.revokeObjectURL(url),60000);
+        const a=document.createElement('a');
+        a.href=url; a.download=fname;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(url),10000);
+        setLoadingPdf(null);
         return;
       }
     } catch(_){}
-    // Fallback Drive si pas de base64
-    if(b.pdfUrl){
-      const m=(b.pdfUrl||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-      window.open(m?`https://drive.google.com/file/d/${m[1]}/view`:b.pdfUrl,'_blank');
-    }
+    // Fallback Drive
+    const m=(b.pdfUrl||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+    const fallback=m?`https://drive.google.com/file/d/${m[1]}/view`:(b.pdfUrl||'');
+    if(fallback) window.open(fallback,'_blank');
     setLoadingPdf(null);
   };
 
@@ -3011,7 +3022,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le PDF s'ouvre dans Safari → bouton <b style={{color:C.text}}>Partager</b> (carré avec flèche) → <b style={{color:C.text}}>Imprimer</b>
+            Le menu de partage s'ouvre → choisis <b style={{color:C.text}}>Imprimer</b>
           </div>
         </div>
       </div>
