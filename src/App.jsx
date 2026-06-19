@@ -2936,70 +2936,66 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const bin=atob(base64);
         const arr=new Uint8Array(bin.length);
         for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-        const blob=new Blob([arr],{type:'application/pdf'});
-        setPdfViewer({url:URL.createObjectURL(blob),blob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
+        const pdfBlob=new Blob([arr],{type:'application/pdf'});
+        // Charger PDF.js une seule fois
+        if(!window.pdfjsLib){
+          await new Promise((res,rej)=>{
+            const s=document.createElement('script');
+            s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            s.onload=res;s.onerror=rej;document.head.appendChild(s);
+          });
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
+        const page=await pdf.getPage(1);
+        const vp0=page.getViewport({scale:1});
+        const rot=vp0.height>vp0.width?90:0;
+        const vp=page.getViewport({scale:2,rotation:rot});
+        const c=document.createElement('canvas');
+        c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+        await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+        // Détecter et supprimer les marges blanches
+        const {data:d,width:w,height:h}=c.getContext('2d').getImageData(0,0,c.width,c.height);
+        let x0=w,y0=h,x1=0,y1=0;
+        for(let i=0;i<d.length;i+=4){
+          if(d[i]<240||d[i+1]<240||d[i+2]<240){
+            const p=i>>2,px=p%w,py=p/w|0;
+            if(px<x0)x0=px;if(px>x1)x1=px;
+            if(py<y0)y0=py;if(py>y1)y1=py;
+          }
+        }
+        const pad=30;
+        x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
+        x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
+        const bigMargin=x0>w*0.08||y0>h*0.08||x1<w*0.92||y1<h*0.92;
+        let out=c;
+        if(bigMargin&&x1>x0&&y1>y0){
+          out=document.createElement('canvas');
+          out.width=x1-x0;out.height=y1-y0;
+          out.getContext('2d').drawImage(c,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
+        }
+        const printBlob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.95));
+        const previewSrc=URL.createObjectURL(printBlob);
+        setPdfViewer({previewSrc,printBlob,pdfBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
       }
     } catch(_){}
-    setPdfViewer({url:null,blob:null,isPdf:false,numero:b.numero,modele:b.modele,taille:b.taille});
+    setPdfViewer({previewSrc:null,printBlob:null,pdfBlob:null,isPdf:false,numero:b.numero,modele:b.modele,taille:b.taille});
     setLoadingPdf(null);
   };
 
   const doPrint=async()=>{
-    if(!pdfViewer?.blob) return;
-    try{
-      if(!window.pdfjsLib){
-        await new Promise((res,rej)=>{
-          const s=document.createElement('script');
-          s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-          s.onload=res;s.onerror=rej;document.head.appendChild(s);
-        });
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      }
-      const arr=new Uint8Array(await pdfViewer.blob.arrayBuffer());
-      const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
-      const page=await pdf.getPage(1);
-      const vp0=page.getViewport({scale:1});
-      // Pages portrait → pivoter 90° (Mondial Relay : contenu en paysage dans page portrait)
-      const rot=vp0.height>vp0.width?90:0;
-      const vp=page.getViewport({scale:2,rotation:rot});
-      const c=document.createElement('canvas');
-      c.width=Math.round(vp.width);c.height=Math.round(vp.height);
-      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-      // Détecter les marges blanches et recadrer automatiquement
-      const {data:d,width:w,height:h}=c.getContext('2d').getImageData(0,0,c.width,c.height);
-      let x0=w,y0=h,x1=0,y1=0;
-      for(let i=0;i<d.length;i+=4){
-        if(d[i]<240||d[i+1]<240||d[i+2]<240){
-          const p=i>>2,px=p%w,py=p/w|0;
-          if(px<x0)x0=px;if(px>x1)x1=px;
-          if(py<y0)y0=py;if(py>y1)y1=py;
-        }
-      }
-      const pad=30;
-      x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
-      x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
-      // Recadrage seulement si les marges représentent >8% d'un côté
-      const bigMargin=x0>w*0.08||y0>h*0.08||x1<w*0.92||y1<h*0.92;
-      let out=c;
-      if(bigMargin&&x1>x0&&y1>y0){
-        out=document.createElement('canvas');
-        out.width=x1-x0;out.height=y1-y0;
-        out.getContext('2d').drawImage(c,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
-      }
-      const jpegBlob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.95));
-      const file=new File([jpegBlob],'bordereau.jpg',{type:'image/jpeg'});
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        try{await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
-        return;
-      }
-    }catch(_){}
-    const pdfFile=new File([pdfViewer.blob],'bordereau.pdf',{type:'application/pdf'});
-    if(navigator.canShare&&navigator.canShare({files:[pdfFile]})){
-      try{await navigator.share({files:[pdfFile],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
-    }else{
-      window.open(pdfViewer.url,'_blank');
+    if(!pdfViewer) return;
+    const blob=pdfViewer.printBlob||pdfViewer.pdfBlob;
+    if(!blob) return;
+    const ext=pdfViewer.printBlob?'jpg':'pdf';
+    const mime=pdfViewer.printBlob?'image/jpeg':'application/pdf';
+    const file=new File([blob],`bordereau.${ext}`,{type:mime});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
+    }else if(pdfViewer.previewSrc){
+      window.open(pdfViewer.previewSrc,'_blank');
     }
   };
 
@@ -3037,15 +3033,10 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           {pdfViewer.taille&&<span style={{background:'#444',color:'#fff',borderRadius:5,padding:'2px 8px',fontSize:13,fontWeight:700}}>T.{pdfViewer.taille}</span>}
         </div>
       )}
-      <div ref={el=>{embedContainerRef.current=el;if(el&&!cSize){const r=el.getBoundingClientRect();if(r.width)setCSize({w:r.width,h:r.height});setTimeout(()=>{const r2=el.getBoundingClientRect();setCSize({w:r2.width,h:r2.height});},100);}}} style={{flex:1,background:'#fff',overflow:'hidden',position:'relative'}}>
-        {pdfViewer.url
-          ? <embed src={pdfViewer.url} type="application/pdf" style={rotated&&cSize?{
-                position:'absolute',top:'50%',left:'50%',
-                width:cSize.h+'px',height:cSize.w+'px',
-                transform:'translate(-50%,-50%) rotate(90deg)',
-                display:'block',
-              }:{width:'100%',height:'100%',display:'block'}}/>
-          : <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:10,padding:24}}>
+      <div style={{flex:1,background:'#fff',overflow:'auto',WebkitOverflowScrolling:'touch'}}>
+        {pdfViewer.previewSrc
+          ? <img src={pdfViewer.previewSrc} style={{width:'100%',height:'auto',display:'block'}}/>
+          : <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100%',gap:10,padding:24}}>
               <div style={{fontSize:42,fontWeight:900}}>N°{pdfViewer.numero||'?'}</div>
               {pdfViewer.modele&&<div style={{fontSize:15,fontWeight:700}}>{pdfViewer.modele}</div>}
               {pdfViewer.taille&&<div style={{background:'#000',color:'#fff',padding:'4px 16px',borderRadius:5,fontSize:22,fontWeight:900}}>T.{pdfViewer.taille}</div>}
@@ -3054,9 +3045,8 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         }
       </div>
       <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
-        {pdfViewer.blob&&<button onClick={doPrint} style={{flex:2,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
-        <button onClick={()=>setRotated(r=>!r)} style={{padding:'14px 16px',borderRadius:12,background:'#2c2c2e',color:'#fff',border:'none',fontSize:22,cursor:'pointer'}}>⟲</button>
-        <button onClick={()=>{if(pdfViewer.url)URL.revokeObjectURL(pdfViewer.url);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
+        {(pdfViewer.printBlob||pdfViewer.pdfBlob)&&<button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
+        <button onClick={()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
       </div>
     </div>
   );
