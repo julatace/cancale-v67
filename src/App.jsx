@@ -2921,10 +2921,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  const [downloaded,setDownloaded]=React.useState(null); // {name}
+  const [pdfViewer,setPdfViewer]=React.useState(null); // {url}
+  const iframeRef=React.useRef(null);
 
-  // Télécharge le PDF via <a download> → iOS enregistre dans Fichiers/Téléchargements
-  // L'utilisateur ouvre ensuite le PDF depuis l'indicateur ⬇️ de Safari → Partager → Imprimer
+  // Affiche le PDF dans l'app via iframe plein écran
+  // iframe.contentWindow.print() imprime le contenu de l'iframe (le PDF), pas la page web
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
@@ -2936,22 +2937,22 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
         const blob=new Blob([arr],{type:'application/pdf'});
-        const url=URL.createObjectURL(blob);
-        const fname=`bordereau-${b.numero||b.id}.pdf`;
-        const a=document.createElement('a');
-        a.href=url; a.download=fname;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(()=>URL.revokeObjectURL(url),30000);
-        setDownloaded({name:fname});
+        setPdfViewer({url:URL.createObjectURL(blob)});
         setLoadingPdf(null);
         return;
       }
     } catch(_){}
-    // Fallback Drive
     const m=(b.pdfUrl||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
     const fallback=m?`https://drive.google.com/file/d/${m[1]}/view`:(b.pdfUrl||'');
     if(fallback) window.open(fallback,'_blank');
     setLoadingPdf(null);
+  };
+
+  const doPrint=()=>{
+    // Tente d'imprimer uniquement le contenu de l'iframe (le PDF)
+    try { iframeRef.current?.contentWindow?.print(); return; } catch(_){}
+    // Fallback : window.print() imprime ce qui est visible (l'iframe plein écran)
+    window.print();
   };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
@@ -2979,16 +2980,23 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     'tous':       all.length,
   };
 
-  // Bannière verte après téléchargement avec instructions pour imprimer
-  const downloadedBanner=downloaded&&(
-    <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#1a7f1a',padding:'16px 16px 14px',color:'#fff',textAlign:'center',boxShadow:'0 2px 12px rgba(0,0,0,0.35)'}}>
-      <div style={{fontWeight:700,fontSize:15,marginBottom:6}}>✓ PDF téléchargé !</div>
-      <div style={{fontSize:12,lineHeight:1.7,opacity:0.96}}>
-        Appuie sur <b>⬇️</b> en haut à droite de Safari<br/>
-        → ouvre <b>{downloaded.name}</b><br/>
-        → bouton <b>Partager ⬆️</b> → <b>Imprimer</b>
+  // Visionneur PDF plein écran dans l'app (iframe) + bouton Imprimer
+  const pdfViewerEl=pdfViewer&&(
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#000',display:'flex',flexDirection:'column'}}>
+      <iframe
+        ref={iframeRef}
+        src={pdfViewer.url}
+        title="Bordereau PDF"
+        style={{flex:1,width:'100%',border:'none',background:'#fff'}}
+      />
+      <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
+        <button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+          🖨️ Imprimer
+        </button>
+        <button onClick={()=>{URL.revokeObjectURL(pdfViewer.url);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+          ✕ Fermer
+        </button>
       </div>
-      <button onClick={()=>setDownloaded(null)} style={{marginTop:10,padding:'6px 20px',borderRadius:8,background:'transparent',border:'1.5px solid rgba(255,255,255,0.7)',color:'#fff',fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer'}}>OK</button>
     </div>
   );
 
@@ -2999,7 +3007,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     const isLast=idx===items.length-1;
     return (
       <div style={{padding:'0 4px'}}>
-        {downloadedBanner}
+        {pdfViewerEl}
         <div style={{background:C.surface,borderRadius:16,padding:24,textAlign:'center',marginTop:20}}>
           <div style={{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}}>
             BORDEREAU {idx+1} / {items.length}
@@ -3014,7 +3022,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
               width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
               border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
               opacity:loadingPdf===b.id?0.6:1,
-            }}>{loadingPdf===b.id?'Chargement...' :'📥 Télécharger ce bordereau'}</button>
+            }}>{loadingPdf===b.id?'Chargement...' :'🖨️ Voir et imprimer'}</button>
           )}
 
           <div style={{display:'flex',gap:10,marginBottom:8}}>
@@ -3031,7 +3039,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le PDF se télécharge → appuie sur <b style={{color:C.text}}>⬇️</b> en haut de Safari → ouvre le fichier → <b style={{color:C.text}}>Partager → Imprimer</b>
+            Le PDF s'affiche dans l'app → appuie sur <b style={{color:C.text}}>🖨️ Imprimer</b>
           </div>
         </div>
       </div>
@@ -3040,7 +3048,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   return (
     <div style={{padding:'0 4px'}}>
-      {downloadedBanner}
+      {pdfViewerEl}
       {/* Filtres */}
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {(['à imprimer','imprimé','tous']).map(k=>(
@@ -3115,7 +3123,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
                   padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
                   background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
                   opacity:loadingPdf===b.id?0.6:1,
-                }}>{loadingPdf===b.id?'...' :'📥 Télécharger'}</button>
+                }}>{loadingPdf===b.id?'...' :'🖨️ Imprimer'}</button>
               )}
               {!imprime&&(
                 <button onClick={()=>markImprime(b.id)} style={{
