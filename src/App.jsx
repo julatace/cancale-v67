@@ -2948,10 +2948,40 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const doPrint=async()=>{
     if(!pdfViewer?.blob) return;
-    const file=new File([pdfViewer.blob],'bordereau.pdf',{type:'application/pdf'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{ await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`}); }catch(_){}
-    } else {
+    try{
+      if(!window.pdfjsLib){
+        await new Promise((res,rej)=>{
+          const s=document.createElement('script');
+          s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          s.onload=res;s.onerror=rej;document.head.appendChild(s);
+        });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      const arr=new Uint8Array(await pdfViewer.blob.arrayBuffer());
+      const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
+      const page=await pdf.getPage(1);
+      const vp0=page.getViewport({scale:1});
+      // PDFs portrait → on pivote 90° pour que l'étiquette soit à l'endroit sur papier paysage
+      const rot=vp0.height>vp0.width?90:0;
+      const vp1=page.getViewport({scale:1,rotation:rot});
+      // On cible 1754px de large (A4 paysage 150dpi)
+      const sc=1754/vp1.width;
+      const vp=page.getViewport({scale:sc,rotation:rot});
+      const c=document.createElement('canvas');
+      c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+      const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.95));
+      const file=new File([jpegBlob],'bordereau.jpg',{type:'image/jpeg'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
+        return;
+      }
+    }catch(_){}
+    // Fallback : partage du PDF brut
+    const pdfFile=new File([pdfViewer.blob],'bordereau.pdf',{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[pdfFile]})){
+      try{await navigator.share({files:[pdfFile],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
+    }else{
       window.open(pdfViewer.url,'_blank');
     }
   };
