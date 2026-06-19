@@ -331,7 +331,6 @@ const TABS=[
   {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'bordereaux', icon:'🖨️',label:'Bordereaux'},
   {id:'garage',     icon:'🏠',label:'Garage'},
-  {id:'params',     icon:'👤',label:'Comptes'},
 ];
 function Nav({tab,setTab}) {
   return (
@@ -3763,6 +3762,7 @@ export default function App() {
     footer:'Merci pour votre achat !',
   }));
   const [showBackup,setShowBackup]=useState(false);
+  const [showSettings,setShowSettings]=useState(false);
   const [synced,setSynced]=useState(false);
   const [syncStatus,setSyncStatus]=useState('idle'); // idle | saving | synced | error | loading
   const [lastSync,setLastSync]=useState(null); // date de la dernière synchro réussie
@@ -4060,8 +4060,8 @@ export default function App() {
             </span>
           </div>
           {/* Bouton Paramètres */}
-          <button type="button" onClick={()=>setTab('params')} title="Paramètres"
-            style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',color:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
+          <button type="button" onClick={()=>setShowSettings(s=>!s)} title="Paramètres"
+            style={{background:showSettings?C.accent:'transparent',border:`1px solid ${showSettings?C.accent:C.border}`,borderRadius:999,padding:'6px 12px',color:showSettings?'#fff':C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
             ⚙️
           </button>
         </div>
@@ -4092,53 +4092,67 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
         {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
-        {tab==='params'     &&<AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}
-          dark={dark} toggleDark={toggleDark} notifEnabled={notifEnabled}
-          onToggleNotif={async()=>{
-            if(!notifEnabled){
-              const res=await askNotifPermission();
-              if(res==='granted'){setNotifEnabled(true);save('vinted_notif_enabled',true);pushNotif('Notifications activées','Tu seras prévenu des ventes et des factures.');}
-              else if(res==='denied') alert("Notifications bloquées par le navigateur. Active-les dans les réglages du site.");
-              else if(res==='unsupported') alert("Ton navigateur ne supporte pas les notifications.");
-            } else {setNotifEnabled(false);save('vinted_notif_enabled',false);}
-          }}
-          onExport={()=>{
-            try{
-              const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()};
-              const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-              const url=URL.createObjectURL(blob);
-              const a=document.createElement('a');
-              a.href=url;a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`;
-              document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-            }catch(err){alert('Erreur export : '+err.message);}
-          }}
-          onImport={()=>{
-            const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
-            inp.onchange=async(e)=>{
-              const file=e.target.files[0];if(!file) return;
-              try{
-                const data=JSON.parse(await file.text());
-                if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;}
-                let msg='Importer ce fichier ?\n\n';
-                if(data.catalog) msg+=`📦 Catalogue : ${data.catalog.length} paires\n`;
-                if(data.sales) msg+=`💸 Ventes : ${data.sales.length} ventes\n`;
-                msg+='\n⚠ Tes données actuelles seront REMPLACÉES.';
-                if(!window.confirm(msg)) return;
-                if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);}
-                if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);}
-                if(data.garageGrid){
-                  const mig=migrateGarageData(data.garageGrid,data.blockedCells,data.cellColors);
-                  const g=mig?mig.garageGrid:data.garageGrid;
-                  setGarageGrid(g);save('vinted_garage_grid',g);
-                  if(mig){setBlockedCells(mig.blockedCells);save('vinted_blocked',mig.blockedCells);setCellColors(mig.cellColors);save('vinted_colors',mig.cellColors);}
-                  else{if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}if(data.cellColors){setCellColors(data.cellColors);save('vinted_colors',data.cellColors);}}
-                }
-                alert('✓ Import réussi !');
-              }catch(err){alert('Erreur : '+err.message);}
-            };inp.click();
-          }}
-        />}
       </main>
+
+      {/* Panneau Paramètres (overlay glissant) */}
+      {showSettings&&(
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9000,display:'flex',flexDirection:'column'}}
+          onClick={e=>{if(e.target===e.currentTarget)setShowSettings(false);}}>
+          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.4)'}} onClick={()=>setShowSettings(false)}/>
+          <div style={{position:'absolute',top:0,right:0,bottom:0,width:'min(420px,100vw)',background:C.bg,overflowY:'auto',boxShadow:'-4px 0 24px rgba(0,0,0,0.25)',display:'flex',flexDirection:'column'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 16px 0'}}>
+              <span style={{fontWeight:800,fontSize:18,color:C.accent}}>⚙️ Paramètres</span>
+              <button onClick={()=>setShowSettings(false)} style={{background:'transparent',border:'none',color:C.muted,fontSize:22,cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>×</button>
+            </div>
+            <AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}
+              dark={dark} toggleDark={toggleDark} notifEnabled={notifEnabled}
+              onToggleNotif={async()=>{
+                if(!notifEnabled){
+                  const res=await askNotifPermission();
+                  if(res==='granted'){setNotifEnabled(true);save('vinted_notif_enabled',true);pushNotif('Notifications activées','Tu seras prévenu des ventes et des factures.');}
+                  else if(res==='denied') alert("Notifications bloquées par le navigateur. Active-les dans les réglages du site.");
+                  else if(res==='unsupported') alert("Ton navigateur ne supporte pas les notifications.");
+                } else {setNotifEnabled(false);save('vinted_notif_enabled',false);}
+              }}
+              onExport={()=>{
+                try{
+                  const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()};
+                  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+                  const url=URL.createObjectURL(blob);
+                  const a=document.createElement('a');
+                  a.href=url;a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`;
+                  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+                }catch(err){alert('Erreur export : '+err.message);}
+              }}
+              onImport={()=>{
+                const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
+                inp.onchange=async(e)=>{
+                  const file=e.target.files[0];if(!file) return;
+                  try{
+                    const data=JSON.parse(await file.text());
+                    if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;}
+                    let msg='Importer ce fichier ?\n\n';
+                    if(data.catalog) msg+=`📦 Catalogue : ${data.catalog.length} paires\n`;
+                    if(data.sales) msg+=`💸 Ventes : ${data.sales.length} ventes\n`;
+                    msg+='\n⚠ Tes données actuelles seront REMPLACÉES.';
+                    if(!window.confirm(msg)) return;
+                    if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);}
+                    if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);}
+                    if(data.garageGrid){
+                      const mig=migrateGarageData(data.garageGrid,data.blockedCells,data.cellColors);
+                      const g=mig?mig.garageGrid:data.garageGrid;
+                      setGarageGrid(g);save('vinted_garage_grid',g);
+                      if(mig){setBlockedCells(mig.blockedCells);save('vinted_blocked',mig.blockedCells);setCellColors(mig.cellColors);save('vinted_colors',mig.cellColors);}
+                      else{if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}if(data.cellColors){setCellColors(data.cellColors);save('vinted_colors',data.cellColors);}}
+                    }
+                    alert('✓ Import réussi !');
+                  }catch(err){alert('Erreur : '+err.message);}
+                };inp.click();
+              }}
+            />
+          </div>
+        </div>
+      )}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells} extraCols={extraCols} cellColors={cellColors}
         onClose={()=>setShowBackup(false)}
