@@ -2964,6 +2964,13 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     }
   },[]);
 
+  // Auto-charge le PDF dès que la file d'impression change d'index
+  React.useEffect(()=>{
+    if(!printQueue) return;
+    const b=printQueue.items[printQueue.idx];
+    if(b) handlePrint(b); // eslint-disable-line react-hooks/exhaustive-deps
+  },[printQueue]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
@@ -3082,16 +3089,23 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
       </div>
       <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
         {pdfViewer.pdfBlob&&<button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
-        <button onClick={()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
+        {printQueue ? (() => {
+          const closePdf=()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);};
+          const isLast=printQueue.idx>=printQueue.items.length-1;
+          return isLast
+            ? <button onClick={()=>{closePdf();setPrintQueue(null);clearSel();}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#4cd964',border:'1px solid #4cd964',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✓ Terminé</button>
+            : <button onClick={()=>{closePdf();setPrintQueue({...printQueue,idx:printQueue.idx+1});}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:16,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>▶ Suivant ({printQueue.idx+2}/{printQueue.items.length})</button>;
+        })()
+        : <button onClick={()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
+        }
       </div>
     </div>
   );
 
-  // Modal file d'impression : affiche un bordereau à la fois, bouton Imprimer + Suivant
+  // File d'impression : le PDF charge automatiquement, cet écran s'affiche le temps du chargement
   if(printQueue){
     const {items,idx}=printQueue;
     const b=items[idx];
-    const isLast=idx===items.length-1;
     return (
       <div style={{padding:'0 4px'}}>
         {pdfViewerEl}
@@ -3101,31 +3115,14 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
           </div>
           <div style={{fontWeight:900,fontSize:28,color:C.accent,marginBottom:4}}>N°{b.numero||'?'}</div>
           {b.taille&&<div style={{fontSize:18,fontWeight:700,color:C.accent,marginBottom:4}}>Taille {b.taille}</div>}
-          <div style={{fontSize:16,color:C.text,fontWeight:500,marginBottom:8}}>{b.modele||''}</div>
-          {b.dateLimite&&<div style={{fontSize:12,color:C.muted,marginBottom:16}}>⏰ À expédier avant le {b.dateLimite}</div>}
-
-          <button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
-            width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
-            border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
-            opacity:loadingPdf===b.id?0.6:1,
-          }}>{loadingPdf===b.id?'Chargement...' :'🖨️ Voir et imprimer'}</button>
-
-          <div style={{display:'flex',gap:10,marginBottom:8}}>
-            {!isLast&&(
-              <button onClick={()=>setPrintQueue({...printQueue,idx:idx+1})} style={{
-                flex:1,padding:'13px 0',borderRadius:12,background:'transparent',color:C.accent,
-                border:`2px solid ${C.accent}`,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
-              }}>Suivant →</button>
-            )}
-            <button onClick={()=>{setPrintQueue(null);clearSel();}} style={{
-              flex:1,padding:'13px 0',borderRadius:12,background:'transparent',color:C.muted,
-              border:`1px solid ${C.border}`,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
-            }}>{isLast?'✓ Terminé':'Annuler'}</button>
+          <div style={{fontSize:16,color:C.text,fontWeight:500,marginBottom:12}}>{b.modele||''}</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>
+            {loadingPdf===b.id ? '⏳ Chargement du bordereau...' : 'Bordereau prêt — ouverture...'}
           </div>
-
-          <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le bordereau s'affiche → appuie sur <b style={{color:C.text}}>🖨️ Imprimer</b> → AirPrint
-          </div>
+          <button onClick={()=>{setPrintQueue(null);clearSel();}} style={{
+            padding:'13px 24px',borderRadius:12,background:'transparent',color:C.muted,
+            border:`1px solid ${C.border}`,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+          }}>✕ Annuler</button>
         </div>
       </div>
     );
