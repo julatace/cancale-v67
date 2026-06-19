@@ -2921,8 +2921,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  const [pdfViewer,setPdfViewer]=React.useState(null); // {url}
-  const iframeRef=React.useRef(null);
+  const [pdfViewer,setPdfViewer]=React.useState(null); // {imgs, isPdf, numero, modele, taille}
 
   // Essaie d'afficher le vrai PDF annoté depuis Firebase, sinon génère un slip minimal
   const handlePrint=async(b)=>{
@@ -2933,41 +2932,37 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
       const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
       const base64=await res.json();
       if(base64&&typeof base64==='string'){
+        if(!window.pdfjsLib){
+          await new Promise((res,rej)=>{
+            const s=document.createElement('script');
+            s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            s.onload=res;s.onerror=rej;document.head.appendChild(s);
+          });
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
         const bin=atob(base64);
         const arr=new Uint8Array(bin.length);
         for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-        const pdfBlob=new Blob([arr],{type:'application/pdf'});
-        const pdfUrl=URL.createObjectURL(pdfBlob);
-        const infoHtml=`${b.numero?`<span class="num">N°${b.numero}</span>`:''}${b.modele?`<span class="mod">${b.modele}</span>`:''}${b.taille?`<span class="tai">T.${b.taille}</span>`:''}`;
-        const wrapper=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100vh;background:#fff;font-family:-apple-system,Arial,sans-serif;display:flex;flex-direction:column}
-.info{padding:8px 12px;background:#f0f0f0;border-bottom:1px solid #ccc;display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex-shrink:0}
-.num{font-weight:700;font-size:15px}
-.mod{color:#555;font-size:13px;flex:1}
-.tai{background:#333;color:#fff;border-radius:5px;padding:2px 8px;font-size:13px;font-weight:700}
-embed{flex:1;width:100%;display:block}
-@page{margin:0}
-</style></head><body>
-<div class="info">${infoHtml}</div>
-<embed src="${pdfUrl}" type="application/pdf">
-</body></html>`;
-        const wrapBlob=new Blob([wrapper],{type:'text/html'});
-        setPdfViewer({url:URL.createObjectURL(wrapBlob),isPdf:true,pdfUrl,numero:b.numero,modele:b.modele,taille:b.taille});
+        const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
+        const imgs=[];
+        for(let p=1;p<=pdf.numPages;p++){
+          const page=await pdf.getPage(p);
+          const vp=page.getViewport({scale:2});
+          const c=document.createElement('canvas');
+          c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+          await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+          imgs.push(c.toDataURL('image/jpeg',0.95));
+        }
+        setPdfViewer({imgs,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
       }
     } catch(_){}
-    // 2. Fallback : slip minimal (PDF non disponible)
-    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}.slip{border:2.5px dashed #000;border-radius:6px;padding:20px 24px;text-align:center;width:260px}.n{font-size:13px;color:#555;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}.num{font-size:44px;font-weight:900;line-height:1;margin-bottom:10px}.mod{font-size:15px;font-weight:700;margin-bottom:8px}.tai{display:inline-block;background:#000;color:#fff;font-size:22px;font-weight:900;padding:4px 16px;border-radius:5px}@media print{body{min-height:unset;padding:0}.slip{width:100%;border:2px dashed #000}}</style></head><body><div class="slip"><div class="n">Vinted — à expédier</div><div class="num">N°${b.numero||'?'}</div>${b.modele?`<div class="mod">${b.modele}</div>`:''}${b.taille?`<div class="tai">T.${b.taille}</div>`:''}</div></body></html>`;
-    const blob=new Blob([html],{type:'text/html'});
-    setPdfViewer({url:URL.createObjectURL(blob),isPdf:false,numero:b.numero,modele:b.modele,taille:b.taille});
+    setPdfViewer({imgs:null,isPdf:false,numero:b.numero,modele:b.modele,taille:b.taille});
     setLoadingPdf(null);
   };
 
-  const doPrint=()=>{
-    try{ iframeRef.current?.contentWindow?.print(); }catch(_){ window.print(); }
-  };
+  const doPrint=()=>{ window.print(); };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
   const filtered=all
@@ -2996,25 +2991,35 @@ embed{flex:1;width:100%;display:block}
 
   // Visionneur plein écran dans l'app + bouton Imprimer
   const pdfViewerEl=pdfViewer&&(
-    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#000',display:'flex',flexDirection:'column'}}>
-      <iframe
-        ref={iframeRef}
-        src={pdfViewer.url}
-        title="Bordereau"
-        style={{flex:1,width:'100%',border:'none',background:'#fff'}}
-      />
-      <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
-        <button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-          🖨️ Imprimer
-        </button>
-        <button onClick={()=>{URL.revokeObjectURL(pdfViewer.url);if(pdfViewer.pdfUrl)URL.revokeObjectURL(pdfViewer.pdfUrl);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-          ✕ Fermer
-        </button>
+    <>
+      <style>{`@media print{#root{visibility:hidden!important}.pdf-ov,.pdf-ov *{visibility:visible!important}.pdf-ov{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;background:#fff!important;display:flex!important;flex-direction:column!important}.no-print{display:none!important}@page{size:auto;margin:0}}`}</style>
+      <div className="pdf-ov" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#111',display:'flex',flexDirection:'column'}}>
+        <div style={{flex:1,overflowY:'auto',background:'#fff',WebkitOverflowScrolling:'touch'}}>
+          {pdfViewer.imgs
+            ? <>
+                {pdfViewer.imgs.map((src,i)=><img key={i} src={src} style={{width:'100%',height:'auto',display:'block'}}/>)}
+                {(pdfViewer.numero||pdfViewer.modele||pdfViewer.taille)&&(
+                  <div style={{margin:'10px auto 14px',width:'fit-content',border:'1.5px solid #bbb',borderRadius:7,padding:'5px 12px',display:'flex',gap:8,alignItems:'center',background:'#fafafa',flexWrap:'wrap'}}>
+                    {pdfViewer.numero&&<span style={{fontWeight:700,fontSize:13}}>N°{pdfViewer.numero}</span>}
+                    {pdfViewer.modele&&<span style={{color:'#555',fontSize:12}}>{pdfViewer.modele}</span>}
+                    {pdfViewer.taille&&<span style={{background:'#222',color:'#fff',borderRadius:4,padding:'1px 7px',fontSize:12,fontWeight:700}}>T.{pdfViewer.taille}</span>}
+                  </div>
+                )}
+              </>
+            : <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'60vh',gap:10,padding:24}}>
+                <div style={{fontSize:42,fontWeight:900}}>N°{pdfViewer.numero||'?'}</div>
+                {pdfViewer.modele&&<div style={{fontSize:15,fontWeight:700}}>{pdfViewer.modele}</div>}
+                {pdfViewer.taille&&<div style={{background:'#000',color:'#fff',padding:'4px 16px',borderRadius:5,fontSize:22,fontWeight:900}}>T.{pdfViewer.taille}</div>}
+                <div style={{marginTop:8,fontSize:12,color:'#999'}}>PDF non disponible</div>
+              </div>
+          }
+        </div>
+        <div className="no-print" style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
+          <button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>
+          <button onClick={()=>setPdfViewer(null)} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
+        </div>
       </div>
-      {!pdfViewer.isPdf&&<div style={{background:'#2c2c2e',padding:'8px 16px',textAlign:'center',fontSize:11,color:'#999',flexShrink:0}}>
-        PDF non disponible — ce bordereau a été créé avant la mise à jour. Slip d'identification uniquement.
-      </div>}
-    </div>
+    </>
   );
 
   // Modal file d'impression : affiche un bordereau à la fois, bouton Imprimer + Suivant
