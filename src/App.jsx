@@ -2436,7 +2436,7 @@ td.right{text-align:right;}
 }
 
 /* ── Garage ──────────────────────────────────────────── */
-function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,stockVinted}) {
+function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,accounts}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
   const [blockMode,setBlockMode]=useState(false);
@@ -2472,15 +2472,16 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   };
   
   const soldIds=useMemo(()=>new Set(catalog.filter(p=>p.status==='vendu').map(p=>p.id)),[catalog]);
-  const stockNumColors=useMemo(()=>{
+  const numColors=useMemo(()=>{
+    const accMap={};
+    (accounts||[]).forEach(a=>{if(a.color) accMap[a.id]=a.color;});
     const m={};
-    (stockVinted||[]).forEach(x=>{
-      const num=typeof x==='string'?x.trim():(x.num||'').trim();
-      const cat=typeof x==='string'?'Vinted':(x.cat||'Vinted');
-      if(num) m[num]=getStockCatColor(cat);
+    (catalog||[]).forEach(item=>{
+      if(item.account&&accMap[item.account]&&item.id)
+        m[String(item.id).trim()]=accMap[item.account];
     });
     return m;
-  },[stockVinted]);
+  },[catalog,accounts]);
   const BW=46,BH=26,SW=6,TH=5;
   const CW=BW+SW,CH=BH+TH,GAP=3;
   
@@ -2726,7 +2727,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                     const highlight=searchTrim!==''&&t.toLowerCase()===searchTrim;
                     const blocked=isBlocked(z.id,ci,si);
                     const cellColor=getColor(z.id,ci,si);
-                    const stockColor=!cellColor&&t?stockNumColors[t]:null;
+                    const stockColor=!cellColor&&t?numColors[t]:null;
                     const displayColor=cellColor||stockColor||null;
 
                     // Masquer les cases vides (non bloquées, sans couleur) sauf en mode ajout/blocage/couleur
@@ -4011,7 +4012,7 @@ export default function App() {
         {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} setSales={setSales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
         {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales}/>}
-        {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts} stockVinted={stockVinted}/>}
+        {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
       </main>
 
       {/* Panneau Paramètres (overlay glissant) */}
