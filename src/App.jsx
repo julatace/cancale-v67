@@ -2942,9 +2942,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         return;
       }
     } catch(_){}
-    const m=(b.pdfUrl||'').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-    const fallback=m?`https://drive.google.com/file/d/${m[1]}/view`:(b.pdfUrl||'');
-    if(fallback) window.open(fallback,'_blank');
     setLoadingPdf(null);
   };
 
