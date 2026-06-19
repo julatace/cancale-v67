@@ -2961,23 +2961,40 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
       const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
       const page=await pdf.getPage(1);
       const vp0=page.getViewport({scale:1});
-      // PDFs portrait → on pivote 90° pour que l'étiquette soit à l'endroit sur papier paysage
+      // Pages portrait → pivoter 90° (Mondial Relay : contenu en paysage dans page portrait)
       const rot=vp0.height>vp0.width?90:0;
-      const vp1=page.getViewport({scale:1,rotation:rot});
-      // On cible 1754px de large (A4 paysage 150dpi)
-      const sc=1754/vp1.width;
-      const vp=page.getViewport({scale:sc,rotation:rot});
+      const vp=page.getViewport({scale:2,rotation:rot});
       const c=document.createElement('canvas');
       c.width=Math.round(vp.width);c.height=Math.round(vp.height);
       await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-      const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.95));
+      // Détecter les marges blanches et recadrer automatiquement
+      const {data:d,width:w,height:h}=c.getContext('2d').getImageData(0,0,c.width,c.height);
+      let x0=w,y0=h,x1=0,y1=0;
+      for(let i=0;i<d.length;i+=4){
+        if(d[i]<240||d[i+1]<240||d[i+2]<240){
+          const p=i>>2,px=p%w,py=p/w|0;
+          if(px<x0)x0=px;if(px>x1)x1=px;
+          if(py<y0)y0=py;if(py>y1)y1=py;
+        }
+      }
+      const pad=30;
+      x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
+      x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
+      // Recadrage seulement si les marges représentent >8% d'un côté
+      const bigMargin=x0>w*0.08||y0>h*0.08||x1<w*0.92||y1<h*0.92;
+      let out=c;
+      if(bigMargin&&x1>x0&&y1>y0){
+        out=document.createElement('canvas');
+        out.width=x1-x0;out.height=y1-y0;
+        out.getContext('2d').drawImage(c,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
+      }
+      const jpegBlob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.95));
       const file=new File([jpegBlob],'bordereau.jpg',{type:'image/jpeg'});
       if(navigator.canShare&&navigator.canShare({files:[file]})){
         try{await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
         return;
       }
     }catch(_){}
-    // Fallback : partage du PDF brut
     const pdfFile=new File([pdfViewer.blob],'bordereau.pdf',{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[pdfFile]})){
       try{await navigator.share({files:[pdfFile],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
