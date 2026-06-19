@@ -327,6 +327,7 @@ const TABS=[
   {id:'dashboard',  icon:'📊',label:'Stats'},
   {id:'catalog',    icon:'📦',label:'Catalogue'},
   {id:'sales',      icon:'💸',label:'Ventes'},
+  {id:'invoices',   icon:'🧾',label:'Factures'},
   {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'bordereaux', icon:'🖨️',label:'Bordereaux'},
   {id:'garage',     icon:'🏠',label:'Garage'},
