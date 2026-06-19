@@ -1312,6 +1312,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
   const [page,setPage]=useState(null); // null = dernière page (init)
   const [showAll,setShowAll]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState('');
+  const [salesFilter,setSalesFilter]=useState('finalisée'); // 'finalisée' | 'en attente'
   const [selectMode,setSelectMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [isDragging,setIsDragging]=useState(false);
@@ -1424,6 +1425,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
     });
   },[sales]);
 
+  const pendingCount=useMemo(()=>sales.filter(s=>s.statut==='en attente').length,[sales]);
+
   const fullFiltered=useMemo(()=>{
     const parseD=d=>{if(!d)return 0;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]).getTime():0;};
     let fromTs=0,toTs=Infinity;
@@ -1433,6 +1436,17 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
       toTs=new Date(+y,+m,0,23,59,59,999).getTime();
     }
     return sales.filter(s=>{
+      // Filtre par statut : "en attente" OU "finalisée" (entrées manuelles sans statut = finalisées)
+      if(salesFilter==='en attente') return s.statut==='en attente';
+      if(salesFilter==='finalisée') return s.statut!=='en attente';
+      if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
+      if(selectedMonth){
+        const rd=parseD(s.receiveDate);
+        if(rd<fromTs||rd>toTs) return false;
+      }
+      return true;
+    }).filter(s=>{
+      if(salesFilter==='en attente') return true;
       if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
       if(selectedMonth){
         const rd=parseD(s.receiveDate);
@@ -1442,10 +1456,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
     }).sort((a,b)=>{
       const da=parseD(a.receiveDate)||parseD(a.saleDate);
       const db=parseD(b.receiveDate)||parseD(b.saleDate);
-      if(da!==db) return da-db;
-      return (a.createdAt||'') < (b.createdAt||'') ? -1 : 1;
+      if(da!==db) return db-da;
+      return (a.createdAt||'') < (b.createdAt||'') ? 1 : -1;
     });
-  },[sales,search,selectedMonth]);
+  },[sales,search,selectedMonth,salesFilter]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const filtered=showAll?fullFiltered:fullFiltered.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
@@ -1487,6 +1501,18 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
         <div><span style={{fontSize:10,color:C.muted}}>CA encaissé</span><div style={{fontSize:20,fontWeight:800,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
         <div><span style={{fontSize:10,color:C.muted}}>Bénéfice</span><div style={{fontSize:20,fontWeight:800,color:moisVentes.profit>=0?C.accent:C.danger}}>{fmt(moisVentes.profit)}</div></div>
         <div><span style={{fontSize:10,color:C.muted}}>Ventes</span><div style={{fontSize:20,fontWeight:800,color:C.muted}}>{moisVentes.count}</div></div>
+      </div>
+
+      {/* Filtre En attente / Finalisées */}
+      <div style={{display:'flex',gap:6}}>
+        {[['finalisée','✅ Finalisées'],['en attente','⏳ En attente']].map(([k,label])=>(
+          <button key={k} onClick={()=>{setSalesFilter(k);setPage(null);}} style={{
+            padding:'6px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
+            background:salesFilter===k?C.accent:'transparent',
+            color:salesFilter===k?'#fff':C.muted,
+            border:`1.5px solid ${salesFilter===k?C.accent:C.border}`,fontFamily:'inherit',
+          }}>{label}{k==='en attente'&&pendingCount>0?` (${pendingCount})`:''}</button>
+        ))}
       </div>
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
@@ -2975,7 +3001,7 @@ function jpegsToPdfA4(pages,pageW=595,pageH=842){
 const PAYS_FLAGS={France:'🇫🇷',Italie:'🇮🇹',Espagne:'🇪🇸',Allemagne:'🇩🇪',Belgique:'🇧🇪','Pays-Bas':'🇳🇱',Suisse:'🇨🇭',Luxembourg:'🇱🇺',Autriche:'🇦🇹',Portugal:'🇵🇹',Pologne:'🇵🇱',Suède:'🇸🇪',Danemark:'🇩🇰',Finlande:'🇫🇮',Norvège:'🇳🇴',Tchéquie:'🇨🇿',Hongrie:'🇭🇺',Roumanie:'🇷🇴',Grèce:'🇬🇷','Royaume-Uni':'🇬🇧'};
 const paysFlag=p=>{if(!p)return null;for(const[k,v]of Object.entries(PAYS_FLAGS))if(p.toLowerCase().includes(k.toLowerCase()))return v+' '+p;return'🌍 '+p;};
 
-function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
+function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,sales,setSales}) {
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
   const [batchLoading,setBatchLoading]=React.useState(false);
@@ -3182,44 +3208,122 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     setSyncingGmail(true);
     setSyncMsg(null);
     try{
-      // Étape 1 : déclencher le script Apps Script pour qu'il lise Gmail → Firebase
       if(appsScriptUrl){
         try{ await fetch(appsScriptUrl,{mode:'no-cors'}); }catch(_){}
-        // Laisser 2s au script pour écrire dans Firebase
         await new Promise(r=>setTimeout(r,2000));
       }
-      // Étape 2 : lire vinted_incoming_sales dans Firebase
+
+      // --- Nouvelles ventes : crée bordereaux + entrée Ventes "en attente" ---
       const res=await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`);
       const incoming=await res.json();
-      if(!incoming||!Array.isArray(incoming)||incoming.length===0){
-        setSyncMsg(appsScriptUrl?'Gmail scanné — aucune nouvelle vente.':'Aucune nouvelle vente à importer.');
-        setSyncingGmail(false);
-        return;
-      }
       const existingNums=new Set(all.map(b=>String(b.numero||'')).filter(Boolean));
-      const toAdd=incoming.filter(v=>!existingNums.has(String(v.numero||'')));
-      if(toAdd.length===0){
+      const currentSales=Array.isArray(sales)?[...sales]:[];
+      const existingSaleNums=new Set(currentSales.map(s=>String(s.numero||'')).filter(Boolean));
+
+      let addedCount=0;
+      if(incoming&&Array.isArray(incoming)&&incoming.length>0){
+        const toAdd=incoming.filter(v=>!existingNums.has(String(v.numero||'')));
+        if(toAdd.length>0){
+          // Bordereaux
+          const newBordereaux=toAdd.map(v=>({
+            id: v.id||('gmail_'+Math.random().toString(36).slice(2,10)),
+            emailId: v.emailId||null,
+            numero: v.numero,
+            modele: v.modele||'',
+            sellPrice: v.sellPrice??null,
+            date: v.date||new Date().toLocaleDateString('fr-FR'),
+            compte: v.compte||'',
+            statut: 'à imprimer',
+            paiement: 'en attente',
+            source: 'email',
+          }));
+          const updatedB=[...newBordereaux,...all];
+          setBordereaux(updatedB);
+          save('vinted_bordereaux',updatedB);
+
+          // Entrées Ventes "en attente" (sans prix pour l'instant)
+          const pendingSales=toAdd
+            .filter(v=>!existingSaleNums.has(String(v.numero||'')))
+            .map(v=>({
+              id: 'sale_'+Math.random().toString(36).slice(2,10),
+              numero: v.numero,
+              productId: v.modele||'',
+              buyPrice: null,
+              sellPrice: null,
+              profit: null,
+              multi: null,
+              saleDate: v.date||'',
+              receiveDate: '',
+              compte: v.compte||'',
+              statut: 'en attente',
+              source: 'email',
+              createdAt: new Date().toISOString(),
+            }));
+          if(pendingSales.length>0){
+            const updatedS=[...pendingSales,...currentSales];
+            setSales(updatedS);
+            save('vinted_sales',updatedS);
+            pendingSales.forEach(s=>existingSaleNums.add(String(s.numero)));
+          }
+          addedCount=toAdd.length;
+        }
         await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
-        setSyncMsg('Aucune nouvelle vente (déjà synchronisées).');
-        setSyncingGmail(false);
-        return;
       }
-      const newEntries=toAdd.map(v=>({
-        id: v.id||('gmail_'+Math.random().toString(36).slice(2,10)),
-        emailId: v.emailId||null,
-        numero: v.numero,
-        modele: v.modele||'',
-        date: v.date||new Date().toLocaleDateString('fr-FR'),
-        compte: v.compte||'',
-        statut: 'à imprimer',
-        paiement: 'en attente',
-        source: 'email',
-      }));
-      const updated=[...newEntries,...all];
-      setBordereaux(updated);
-      save('vinted_bordereaux',updated);
-      await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
-      setSyncMsg(`${newEntries.length} vente${newEntries.length>1?'s':''} importée${newEntries.length>1?'s':''} !`);
+
+      // --- Paiements reçus : finalise la vente en attente ---
+      const resP=await fetch(`${FIREBASE_BASE}/vinted_incoming_payments.json`);
+      const payments=await resP.json();
+      if(payments&&Array.isArray(payments)&&payments.length>0){
+        const cat=Array.isArray(catalog)?catalog:[];
+        const currentBordereaux=Array.isArray(bordereaux)?bordereaux:[];
+        // Relit les ventes depuis l'état le plus à jour
+        const latestSales=Array.isArray(sales)?[...sales]:[];
+        let payUpdated=false;
+
+        payments.forEach(p=>{
+          if(!p.numero||!p.receiveDate) return;
+          const idx=latestSales.findIndex(s=>String(s.numero)===String(p.numero));
+          const bord=currentBordereaux.find(b=>String(b.numero)===String(p.numero));
+          const catItem=cat.find(c=>String(c.id)===String(p.numero));
+          const buyPrice=catItem?.buyPrice??null;
+          const sellPrice=p.amount??bord?.sellPrice??null;
+          const profit=(sellPrice!=null&&buyPrice!=null)?Math.round((sellPrice-buyPrice)*100)/100:null;
+
+          if(idx>=0){
+            // Met à jour l'entrée en attente existante
+            latestSales[idx]={
+              ...latestSales[idx],
+              buyPrice, sellPrice, profit,
+              multi:(sellPrice&&buyPrice&&buyPrice>0)?Math.round(sellPrice/buyPrice*100)/100:null,
+              receiveDate: p.receiveDate,
+              statut: 'finalisée',
+            };
+          } else {
+            // Crée directement la vente finalisée si pas de "en attente"
+            latestSales.unshift({
+              id: 'sale_'+Math.random().toString(36).slice(2,10),
+              numero: p.numero,
+              productId: bord?.modele||'',
+              buyPrice, sellPrice, profit,
+              multi:(sellPrice&&buyPrice&&buyPrice>0)?Math.round(sellPrice/buyPrice*100)/100:null,
+              saleDate: bord?.date||'',
+              receiveDate: p.receiveDate,
+              compte: bord?.compte||'',
+              statut: 'finalisée',
+              source: 'email',
+              createdAt: new Date().toISOString(),
+            });
+          }
+          payUpdated=true;
+        });
+
+        if(payUpdated){ setSales(latestSales); save('vinted_sales',latestSales); }
+        await fetch(`${FIREBASE_BASE}/vinted_incoming_payments.json`,{method:'DELETE'});
+      }
+
+      setSyncMsg(addedCount>0
+        ?`${addedCount} vente${addedCount>1?'s':''} importée${addedCount>1?'s':''} !`
+        :'Aucune nouvelle vente.');
     }catch(e){
       setSyncMsg('Erreur sync : '+e.message);
     }
@@ -3867,7 +3971,7 @@ export default function App() {
         {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
         {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
-        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos}/>}
+        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
         {tab==='params'     &&<AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}/>}
       </main>
