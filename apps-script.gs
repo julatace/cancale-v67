@@ -897,6 +897,53 @@ function fusionnerBordereauxAImprimer() {
   return _fusionnerBordereaux_(null);
 }
 
+// ============================================================
+// === BACKFILL : stocke dans Firebase les PDFs des anciens bordereaux
+// Lance cette fonction UNE SEULE FOIS depuis Apps Script pour
+// rendre tous les bordereaux disponibles dans l'application.
+// ============================================================
+function remplirPdfsManquants() {
+  try {
+    const res = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_bordereaux.json', { muteHttpExceptions: true });
+    const bordereaux = JSON.parse(res.getContentText());
+    if (!Array.isArray(bordereaux)) { Logger.log('Aucun bordereau trouvé'); return; }
+
+    let ok = 0, skip = 0, err = 0;
+    for (const bord of bordereaux) {
+      if (!bord || !bord.id) continue;
+
+      // Déjà dans Firebase ?
+      const chk = UrlFetchApp.fetch(FIREBASE_URL + '/vinted_bordereau_pdfs/' + bord.id + '.json', { muteHttpExceptions: true });
+      if (chk.getContentText() && chk.getContentText() !== 'null') { skip++; continue; }
+
+      // Récupérer le PDF depuis Drive via pdfUrl
+      const m = (bord.pdfUrl || '').match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+      if (!m) { err++; Logger.log('Pas de pdfUrl pour ' + bord.id + ' - ' + bord.numero); continue; }
+
+      try {
+        const file = DriveApp.getFileById(m[1]);
+        const pdfBlob = file.getBlob();
+        const bytes = pdfBlob.getBytes();
+        if (bytes.length > 4000000) { err++; Logger.log('PDF trop grand : ' + bord.id); continue; }
+
+        const base64 = Utilities.base64Encode(bytes);
+        UrlFetchApp.fetch(FIREBASE_URL + '/vinted_bordereau_pdfs/' + bord.id + '.json', {
+          method: 'put', contentType: 'application/json',
+          payload: JSON.stringify(base64), muteHttpExceptions: true
+        });
+        ok++;
+        Logger.log('✓ ' + bord.id + ' N°' + bord.numero + ' (' + Math.round(bytes.length / 1024) + ' Ko)');
+      } catch (e) {
+        err++;
+        Logger.log('✗ Erreur ' + bord.id + ' : ' + e.message);
+      }
+    }
+    Logger.log('Terminé : ' + ok + ' stockés, ' + skip + ' déjà présents, ' + err + ' erreurs');
+  } catch (e) {
+    Logger.log('Erreur générale : ' + e.message);
+  }
+}
+
 const FUSION_DATE_DEPART = '2026-05-26';
 
 function _fusionnerBordereaux_(transactions) {
