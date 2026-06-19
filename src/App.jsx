@@ -3047,12 +3047,12 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
         // preview JPEG
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
-        setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
+        setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,id:b.id,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
       }
     } catch(_){}
-    setPdfViewer({previewSrc:null,printBlob:null,pdfBlob:null,isPdf:false,numero:b.numero,modele:b.modele,taille:b.taille});
+    setPdfViewer({previewSrc:null,printBlob:null,pdfBlob:null,isPdf:false,id:b.id,numero:b.numero,modele:b.modele,taille:b.taille});
     setLoadingPdf(null);
   };
 
@@ -3062,7 +3062,10 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     if(!blob) return;
     const file=new File([blob],'bordereau.pdf',{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
+      try{
+        await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`});
+        if(pdfViewer.id) markImprime(pdfViewer.id);
+      }catch(_){}
     }else if(pdfViewer.previewSrc){
       window.open(pdfViewer.previewSrc,'_blank');
     }
@@ -3114,7 +3117,14 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
       const combined=jpegsToPdfA4(pages);
       const file=new File([combined],`bordereaux-${pages.length}.pdf`,{type:'application/pdf'});
       if(navigator.canShare&&navigator.canShare({files:[file]})){
-        try{await navigator.share({files:[file],title:`${pages.length} bordereaux`});}catch(_){}
+        try{
+          await navigator.share({files:[file],title:`${pages.length} bordereaux`});
+          // Déplace tous les bordereaux imprimés en corbeille
+          const ids=new Set(items.map(b=>b.id));
+          const u=(Array.isArray(bordereaux)?bordereaux:[]).map(b=>ids.has(b.id)?{...b,statut:'imprimé'}:b);
+          setBordereaux(u);save('vinted_bordereaux',u);
+          clearSel();
+        }catch(_){}
       }else{
         const url=URL.createObjectURL(combined);
         window.open(url,'_blank');
@@ -3125,7 +3135,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
   const filtered=all
-    .filter(b=>filter==='tous'?true:(b.statut||'à imprimer')===filter)
+    .filter(b=>(b.statut||'à imprimer')===filter)
     .slice().sort((a,b)=>{
       const da=a.dateVente||a.date||'';
       const db=b.dateVente||b.date||'';
@@ -3150,10 +3160,18 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     clearSel();
   };
 
+  const viderCorbeille=()=>{
+    const n=all.filter(b=>b.statut==='imprimé').length;
+    if(!n) return;
+    if(!window.confirm(`Vider la corbeille (${n} bordereau${n>1?'x':''}) définitivement ?`)) return;
+    const u=all.filter(b=>b.statut!=='imprimé');
+    setBordereaux(u); save('vinted_bordereaux',u);
+    clearSel();
+  };
+
   const counts={
     'à imprimer': all.filter(b=>(b.statut||'à imprimer')==='à imprimer').length,
     'imprimé':    all.filter(b=>b.statut==='imprimé').length,
-    'tous':       all.length,
   };
 
   const pdfViewerEl=pdfViewer&&(
@@ -3192,15 +3210,21 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     <div style={{padding:'0 4px'}}>
       {pdfViewerEl}
       {/* Filtres */}
-      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
-        {(['à imprimer','imprimé','tous']).map(k=>(
+      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
+        {(['à imprimer','imprimé']).map(k=>(
           <button key={k} onClick={()=>{setFilter(k);clearSel();}} style={{
-            padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
+            padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
             background:filter===k?C.accent:'transparent',
             color:filter===k?'#fff':C.muted,
             border:`1.5px solid ${filter===k?C.accent:C.border}`,fontFamily:'inherit',
-          }}>{k==='à imprimer'?'À imprimer':k==='imprimé'?'Imprimés':'Tous'} ({counts[k]})</button>
+          }}>{k==='à imprimer'?'À imprimer':'🗑️ Corbeille'} ({counts[k]})</button>
         ))}
+        {filter==='imprimé'&&counts['imprimé']>0&&(
+          <button onClick={viderCorbeille} style={{
+            marginLeft:'auto',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
+            background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}`,fontFamily:'inherit',
+          }}>Vider la corbeille</button>
+        )}
       </div>
 
       {/* Barre de sélection */}
@@ -3211,10 +3235,10 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
             background:'transparent',color:C.muted,border:`1px solid ${C.border}`,fontFamily:'inherit',
           }}>{selected.size===filtered.length?'Tout désélect.':'Tout sélect.'}</button>
           {selected.size>0&&(<>
-            <button onClick={()=>handlePrintAll(selectedItems)} style={{
+            {filter==='à imprimer'&&<button onClick={()=>handlePrintAll(selectedItems)} style={{
               padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
               background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
-            }}>🖨️ Imprimer ({selected.size})</button>
+            }}>🖨️ Imprimer ({selected.size})</button>}
             <button onClick={deleteSelected} style={{
               padding:'8px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
               background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}`,fontFamily:'inherit',
@@ -3277,7 +3301,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
                 <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                   <span style={{fontWeight:800,fontSize:14,color:C.accent}}>N°{b.numero||'?'}</span>
                   {b.taille&&<span style={{background:C.accent,color:'#fff',borderRadius:5,padding:'1px 7px',fontSize:11,fontWeight:700}}>T.{b.taille}</span>}
-                  {imprime&&<span style={{background:'#27ae6022',color:'#27ae60',borderRadius:5,padding:'1px 7px',fontSize:10,fontWeight:700}}>✓ Expédié</span>}
+                  {imprime&&<span style={{background:'#8882',color:C.muted,borderRadius:5,padding:'1px 7px',fontSize:10,fontWeight:700}}>🗑️ Corbeille</span>}
                 </div>
                 <div style={{fontSize:13,color:C.text,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.modele||<span style={{color:C.muted,fontStyle:'italic',fontWeight:400}}>Modèle inconnu</span>}</div>
                 {flagStr&&<div style={{fontSize:12,color:C.muted,fontWeight:500}}>{flagStr}</div>}
@@ -3294,16 +3318,24 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
               borderTop:`1px solid ${C.border}`,
               background:C.surface+'80',
             }}>
-              {b.id&&<button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
+              {!imprime&&b.id&&<button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
                 flex:1,padding:'7px 0',borderRadius:8,background:C.accent,color:'#fff',
                 border:'none',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
                 opacity:loadingPdf===b.id?0.55:1,
               }}>{loadingPdf===b.id?'⏳' :'🖨️ Imprimer'}</button>}
-              {!imprime&&<button onClick={()=>markImprime(b.id)} style={{
-                flex:1,padding:'7px 0',borderRadius:8,background:'transparent',
-                color:'#27ae60',border:'1.5px solid #27ae60',
-                fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
-              }}>✓ Marquer expédié</button>}
+              <button onClick={()=>{
+                if(imprime){
+                  // En corbeille : suppression définitive
+                  const u=all.filter(x=>x.id!==b.id);
+                  setBordereaux(u);save('vinted_bordereaux',u);
+                }else{
+                  markImprime(b.id);
+                }
+              }} style={{
+                width:36,padding:'7px 0',borderRadius:8,background:'transparent',
+                color:C.danger,border:`1.5px solid ${C.danger}`,
+                fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0,
+              }}>🗑️</button>
             </div>
           </div>
         );
