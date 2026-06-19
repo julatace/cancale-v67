@@ -2989,15 +2989,31 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
-        // page.view = [x0,y0,w,h] brut sans /Rotate — détecte Mondial Relay (portrait) vs Chronopost (paysage)
+        // page.view = [x0,y0,w,h] brut sans /Rotate
         const [,,rawW,rawH]=page.view;
         const isPortrait=rawH>rawW;
-        let printBlob=null;
-        if(isPortrait){
-          // PDF portrait (Mondial Relay) : créer un PDF A4 portrait qui remplit toute la feuille
-          const jpegBytes=new Uint8Array(await jpegBlob.arrayBuffer());
-          printBlob=jpegToPdfFillA4(jpegBytes,c.width,c.height,595,842);
+        // Canvas d'impression : copie + texte N°/modèle/taille dessiné directement
+        const pc=document.createElement('canvas');
+        pc.width=c.width;pc.height=c.height;
+        const pctx=pc.getContext('2d');
+        pctx.drawImage(c,0,0);
+        const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('   ');
+        if(infoText){
+          const fs=Math.round(c.width*0.022);
+          pctx.font=`bold ${fs}px Arial, sans-serif`;
+          pctx.fillStyle='#111';
+          if(isPortrait){
+            // Mondial Relay : en bas de la page (espace vide sous le label)
+            pctx.fillText(infoText,30,c.height-30);
+          } else {
+            // Chronopost : en haut à gauche (côté fiche destinataire)
+            pctx.fillText(infoText,30,fs+20);
+          }
         }
+        const printJpeg=await new Promise(r=>pc.toBlob(r,'image/jpeg',0.92));
+        const printBytes=new Uint8Array(await printJpeg.arrayBuffer());
+        const pageW=isPortrait?595:842,pageH=isPortrait?842:595;
+        const printBlob=jpegToPdfFillA4(printBytes,pc.width,pc.height,pageW,pageH);
         setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
@@ -3046,13 +3062,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const pdfViewerEl=pdfViewer&&(
     <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#111',display:'flex',flexDirection:'column'}}>
-      {(pdfViewer.numero||pdfViewer.modele||pdfViewer.taille)&&(
-        <div style={{padding:'6px 14px',background:'#111',flexShrink:0,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',paddingTop:'max(6px,env(safe-area-inset-top))'}}>
-          {pdfViewer.numero&&<span style={{color:'#fff',fontWeight:700,fontSize:14}}>N°{pdfViewer.numero}</span>}
-          {pdfViewer.modele&&<span style={{color:'#aaa',fontSize:13,flex:1}}>{pdfViewer.modele}</span>}
-          {pdfViewer.taille&&<span style={{color:'#ccc',fontSize:13}}>T.{pdfViewer.taille}</span>}
-        </div>
-      )}
       <div style={{flex:1,background:'#fff',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
         {pdfViewer.previewSrc
           ? <img src={pdfViewer.previewSrc} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',display:'block'}}/>
