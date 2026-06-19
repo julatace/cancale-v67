@@ -2924,44 +2924,52 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [pdfViewer,setPdfViewer]=React.useState(null); // {url}
   const iframeRef=React.useRef(null);
 
-  // Génère un label HTML imprimable à partir des données Firebase (pas besoin du PDF)
-  const handlePrint=(b)=>{
+  // Essaie d'afficher le vrai PDF annoté depuis Firebase, sinon génère un slip minimal
+  const handlePrint=async(b)=>{
     if(!b||!b.id) return;
-    const dark=document.documentElement.classList.contains('dark');
+    setLoadingPdf(b.id);
+    // 1. Essai : PDF annoté dans Firebase (nouveaux bordereaux)
+    try {
+      const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
+      const base64=await res.json();
+      if(base64&&typeof base64==='string'){
+        const bytes=atob(base64);
+        const arr=new Uint8Array(bytes.length);
+        for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+        const blob=new Blob([arr],{type:'application/pdf'});
+        setPdfViewer({url:URL.createObjectURL(blob),isPdf:true});
+        setLoadingPdf(null);
+        return;
+      }
+    } catch(_){}
+    // 2. Fallback : slip minimal avec seulement N°, modèle, taille (anciens bordereaux)
     const html=`<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Bordereau N°${b.numero||''}</title>
+<title>N°${b.numero||''}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;padding:24px;display:flex;align-items:center;justify-content:center;min-height:100vh}
-.label{border:3px solid #000;border-radius:8px;padding:24px;width:340px}
-.badge{font-size:11px;font-weight:700;letter-spacing:2px;color:#555;text-transform:uppercase;margin-bottom:6px}
-.numero{font-size:40px;font-weight:900;line-height:1;margin-bottom:16px;letter-spacing:-1px}
-.modele{font-size:17px;font-weight:700;margin-bottom:4px}
-.taille{display:inline-block;background:#000;color:#fff;font-size:20px;font-weight:900;padding:4px 14px;border-radius:6px;margin-bottom:16px}
-hr{border:none;border-top:1.5px solid #ccc;margin:14px 0}
-.row{font-size:13px;margin-bottom:6px;display:flex;gap:8px}
-.row b{font-weight:700}
-.mono{font-family:monospace;font-size:13px;font-weight:700;letter-spacing:1px}
-@media print{body{padding:0;min-height:unset}.label{border:2px solid #000;width:100%}}
+body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+.slip{border:2.5px dashed #000;border-radius:6px;padding:20px 24px;text-align:center;width:260px}
+.n{font-size:13px;color:#555;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.num{font-size:44px;font-weight:900;line-height:1;margin-bottom:10px}
+.mod{font-size:15px;font-weight:700;margin-bottom:8px}
+.tai{display:inline-block;background:#000;color:#fff;font-size:22px;font-weight:900;
+  padding:4px 16px;border-radius:5px}
+@media print{body{min-height:unset;padding:0}.slip{width:100%;border:2px dashed #000}}
 </style>
 </head><body>
-<div class="label">
-  <div class="badge">Vinted · Bordereau</div>
-  <div class="numero">N°${b.numero||'?'}</div>
-  ${b.modele?`<div class="modele">${b.modele}</div>`:''}
-  ${b.taille?`<div class="taille">T.${b.taille}</div>`:''}
-  <hr>
-  ${b.dateLimite?`<div class="row">⏰ À expédier avant le <b>${b.dateLimite}</b></div>`:''}
-  ${b.suivi?`<div class="row">📦 Suivi : <span class="mono">${b.suivi}</span></div>`:''}
-  ${b.transaction?`<div class="row">🔖 Transaction : <span class="mono">${b.transaction}</span></div>`:''}
-  ${b.date?`<div class="row">📅 Vente du ${b.date}</div>`:''}
+<div class="slip">
+  <div class="n">Vinted — à expédier</div>
+  <div class="num">N°${b.numero||'?'}</div>
+  ${b.modele?`<div class="mod">${b.modele}</div>`:''}
+  ${b.taille?`<div class="tai">T.${b.taille}</div>`:''}
 </div>
 </body></html>`;
     const blob=new Blob([html],{type:'text/html'});
-    setPdfViewer({url:URL.createObjectURL(blob)});
+    setPdfViewer({url:URL.createObjectURL(blob),isPdf:false});
+    setLoadingPdf(null);
   };
 
   const doPrint=()=>{
@@ -2993,13 +3001,13 @@ hr{border:none;border-top:1.5px solid #ccc;margin:14px 0}
     'tous':       all.length,
   };
 
-  // Visionneur PDF plein écran dans l'app (iframe) + bouton Imprimer
+  // Visionneur plein écran dans l'app + bouton Imprimer
   const pdfViewerEl=pdfViewer&&(
     <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#000',display:'flex',flexDirection:'column'}}>
       <iframe
         ref={iframeRef}
         src={pdfViewer.url}
-        title="Bordereau PDF"
+        title="Bordereau"
         style={{flex:1,width:'100%',border:'none',background:'#fff'}}
       />
       <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
@@ -3010,6 +3018,9 @@ hr{border:none;border-top:1.5px solid #ccc;margin:14px 0}
           ✕ Fermer
         </button>
       </div>
+      {!pdfViewer.isPdf&&<div style={{background:'#2c2c2e',padding:'8px 16px',textAlign:'center',fontSize:11,color:'#999',flexShrink:0}}>
+        PDF non disponible — ce bordereau a été créé avant la mise à jour. Slip d'identification uniquement.
+      </div>}
     </div>
   );
 
