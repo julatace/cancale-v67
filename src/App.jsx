@@ -2990,22 +2990,22 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
         let printBlob=null;
-        if(isPortrait){
-          // Mondial Relay : texte petit en bas du canvas, PDF A4 portrait rempli
+        {
+          // PDF.js applique /Rotate → canvas toujours dans le bon sens de lecture
           const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('  ');
           if(infoText){
             const ctx=c.getContext('2d');
-            const fs=Math.round(c.width*0.016);
+            const fs=Math.round(Math.min(c.width,c.height)*0.016);
             ctx.font=`bold ${fs}px sans-serif`;
             ctx.fillStyle='#111';
-            ctx.fillText(infoText,10,c.height-fs*0.3);
+            ctx.fillText(infoText,10,c.height-fs*0.4);
           }
           const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
           const pb=new Uint8Array(await pj.arrayBuffer());
+          // PDF.js oriente déjà le canvas → A4 portrait dans tous les cas
           printBlob=jpegToPdfFillA4(pb,c.width,c.height,595,842);
         }
-        // Chronopost : pas de dessin sur canvas (canvas potentiellement rotationné par /Rotate 90)
-        // → utilise le PDF vectoriel original via pdfBlob
+        // preview JPEG
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
         setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
