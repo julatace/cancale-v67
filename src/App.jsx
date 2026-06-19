@@ -2921,8 +2921,8 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  // Approche Web Share API : ouvre le share sheet natif iOS avec le fichier PDF
-  // → l'utilisateur voit "Imprimer" directement dans le share sheet
+  // Navigue l'onglet courant vers le PDF (blob URL)
+  // iOS Safari détecte le PDF → visionneur natif → bouton Partager de Safari → Imprimer
   const handlePrint=async(b)=>{
     if(!b||(!b.id&&!b.pdfUrl)) return;
     setLoadingPdf(b.id);
@@ -2934,20 +2934,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
         const blob=new Blob([arr],{type:'application/pdf'});
-        const fname=`bordereau-${b.numero||b.id}.pdf`;
-        const file=new File([blob],fname,{type:'application/pdf'});
-        // iOS/Android : share sheet natif avec option Imprimer
-        if(navigator.canShare&&navigator.canShare({files:[file]})){
-          await navigator.share({files:[file],title:`Bordereau ${b.numero||''}`.trim()});
-          setLoadingPdf(null);
-          return;
-        }
-        // Desktop fallback : téléchargement direct
         const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url; a.download=fname;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(()=>URL.revokeObjectURL(url),10000);
+        // Navigation dans l'onglet courant → pas de popup bloqué
+        // iOS affiche le PDF dans son visionneur natif
+        // Bouton retour (←) ramène dans l'app
+        window.location.href=url;
         setLoadingPdf(null);
         return;
       }
@@ -3022,7 +3013,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le menu de partage s'ouvre → choisis <b style={{color:C.text}}>Imprimer</b>
+            Le PDF s'ouvre → bouton <b style={{color:C.text}}>Partager</b> (⬆️) en bas de Safari → <b style={{color:C.text}}>Imprimer</b><br/>Puis bouton <b style={{color:C.text}}>← Retour</b> pour revenir
           </div>
         </div>
       </div>
