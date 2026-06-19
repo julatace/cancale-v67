@@ -2983,44 +2983,13 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         }
         const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
         const page=await pdf.getPage(1);
-        const vp0=page.getViewport({scale:1});
-        const rot=vp0.height>vp0.width?90:0;
-        const vp=page.getViewport({scale:2,rotation:rot});
+        const vp=page.getViewport({scale:2});
         const c=document.createElement('canvas');
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-        // Détection par blocs 40×40 px — ignore les cadres fins (1 px) qui faussent le recadrage
-        const {data:d,width:w,height:h}=c.getContext('2d').getImageData(0,0,c.width,c.height);
-        const BS=40,bW=Math.ceil(w/BS),bH=Math.ceil(h/BS);
-        const blk=new Float32Array(bW*bH);
-        for(let i=0;i<d.length;i+=4){
-          if(d[i]<220||d[i+1]<220||d[i+2]<220){
-            const p=i>>2;blk[((p/w|0)/BS|0)*bW+((p%w)/BS|0)]++;
-          }
-        }
-        let x0=w,y0=h,x1=0,y1=0;
-        for(let by=0;by<bH;by++) for(let bx=0;bx<bW;bx++){
-          const bwA=Math.min(BS,w-bx*BS),bhA=Math.min(BS,h-by*BS);
-          if(blk[by*bW+bx]/(bwA*bhA)>=0.06){
-            const px0=bx*BS,py0=by*BS,px1=Math.min(w,(bx+1)*BS),py1=Math.min(h,(by+1)*BS);
-            if(px0<x0)x0=px0;if(px1>x1)x1=px1;if(py0<y0)y0=py0;if(py1>y1)y1=py1;
-          }
-        }
-        const pad=40;
-        x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
-        x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
-        const bigMargin=x0>w*0.05||y0>h*0.05||x1<w*0.95||y1<h*0.95;
-        let out=c;
-        if(bigMargin&&x1>x0&&y1>y0){
-          out=document.createElement('canvas');
-          out.width=x1-x0;out.height=y1-y0;
-          out.getContext('2d').drawImage(c,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
-        }
-        const jpegBlob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.9));
-        const jpegBytes=new Uint8Array(await jpegBlob.arrayBuffer());
-        const printBlob=jpegToPdf(jpegBytes,out.width,out.height);
+        const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
-        setPdfViewer({previewSrc,printBlob,pdfBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
+        setPdfViewer({previewSrc,pdfBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
       }
@@ -3068,16 +3037,18 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const pdfViewerEl=pdfViewer&&(
     <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#111',display:'flex',flexDirection:'column'}}>
-      {(pdfViewer.numero||pdfViewer.modele||pdfViewer.taille)&&(
-        <div style={{padding:'8px 14px',background:'#1c1c1e',display:'flex',gap:10,alignItems:'center',flexShrink:0,flexWrap:'wrap'}}>
-          {pdfViewer.numero&&<span style={{color:'#fff',fontWeight:700,fontSize:14}}>N°{pdfViewer.numero}</span>}
-          {pdfViewer.modele&&<span style={{color:'#aaa',fontSize:13,flex:1}}>{pdfViewer.modele}</span>}
-          {pdfViewer.taille&&<span style={{background:'#444',color:'#fff',borderRadius:5,padding:'2px 8px',fontSize:13,fontWeight:700}}>T.{pdfViewer.taille}</span>}
-        </div>
-      )}
-      <div style={{flex:1,background:'#fff',overflow:'auto',WebkitOverflowScrolling:'touch'}}>
+      <div style={{flex:1,background:'#fff',overflow:'auto',WebkitOverflowScrolling:'touch',position:'relative'}}>
         {pdfViewer.previewSrc
-          ? <img src={pdfViewer.previewSrc} style={{width:'100%',height:'auto',display:'block'}}/>
+          ? <>
+              <img src={pdfViewer.previewSrc} style={{width:'100%',height:'auto',display:'block'}}/>
+              {(pdfViewer.numero||pdfViewer.modele||pdfViewer.taille)&&(
+                <div style={{position:'absolute',bottom:10,left:10,background:'rgba(0,0,0,0.72)',backdropFilter:'blur(6px)',borderRadius:10,padding:'6px 10px',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',maxWidth:'90%'}}>
+                  {pdfViewer.numero&&<span style={{color:'#fff',fontWeight:700,fontSize:13}}>N°{pdfViewer.numero}</span>}
+                  {pdfViewer.modele&&<span style={{color:'#ddd',fontSize:12}}>{pdfViewer.modele}</span>}
+                  {pdfViewer.taille&&<span style={{background:'#444',color:'#fff',borderRadius:5,padding:'2px 7px',fontSize:12,fontWeight:700}}>T.{pdfViewer.taille}</span>}
+                </div>
+              )}
+            </>
           : <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100%',gap:10,padding:24}}>
               <div style={{fontSize:42,fontWeight:900}}>N°{pdfViewer.numero||'?'}</div>
               {pdfViewer.modele&&<div style={{fontSize:15,fontWeight:700}}>{pdfViewer.modele}</div>}
@@ -3087,7 +3058,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         }
       </div>
       <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
-        {(pdfViewer.printBlob||pdfViewer.pdfBlob)&&<button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
+        {pdfViewer.pdfBlob&&<button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
         <button onClick={()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
       </div>
     </div>
