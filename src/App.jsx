@@ -2922,6 +2922,9 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
   const [pdfViewer,setPdfViewer]=React.useState(null); // {url, blob, isPdf, numero, modele, taille}
+  const [rotated,setRotated]=React.useState(false);
+  const embedContainerRef=React.useRef(null);
+  const [cSize,setCSize]=React.useState(null);
 
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
@@ -2987,9 +2990,14 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           {pdfViewer.taille&&<span style={{background:'#444',color:'#fff',borderRadius:5,padding:'2px 8px',fontSize:13,fontWeight:700}}>T.{pdfViewer.taille}</span>}
         </div>
       )}
-      <div style={{flex:1,background:'#fff',overflow:'hidden'}}>
+      <div ref={el=>{embedContainerRef.current=el;if(el&&!cSize){const r=el.getBoundingClientRect();if(r.width)setCSize({w:r.width,h:r.height});setTimeout(()=>{const r2=el.getBoundingClientRect();setCSize({w:r2.width,h:r2.height});},100);}}} style={{flex:1,background:'#fff',overflow:'hidden',position:'relative'}}>
         {pdfViewer.url
-          ? <embed src={pdfViewer.url} type="application/pdf" style={{width:'100%',height:'100%',display:'block'}}/>
+          ? <embed src={pdfViewer.url} type="application/pdf" style={rotated&&cSize?{
+                position:'absolute',top:'50%',left:'50%',
+                width:cSize.h+'px',height:cSize.w+'px',
+                transform:'translate(-50%,-50%) rotate(90deg)',
+                display:'block',
+              }:{width:'100%',height:'100%',display:'block'}}/>
           : <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:10,padding:24}}>
               <div style={{fontSize:42,fontWeight:900}}>N°{pdfViewer.numero||'?'}</div>
               {pdfViewer.modele&&<div style={{fontSize:15,fontWeight:700}}>{pdfViewer.modele}</div>}
@@ -2999,8 +3007,9 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         }
       </div>
       <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
-        {pdfViewer.blob&&<button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
-        <button onClick={()=>{if(pdfViewer.url)URL.revokeObjectURL(pdfViewer.url);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
+        {pdfViewer.blob&&<button onClick={doPrint} style={{flex:2,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
+        <button onClick={()=>setRotated(r=>!r)} style={{padding:'14px 16px',borderRadius:12,background:'#2c2c2e',color:'#fff',border:'none',fontSize:22,cursor:'pointer'}}>⟲</button>
+        <button onClick={()=>{if(pdfViewer.url)URL.revokeObjectURL(pdfViewer.url);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
       </div>
     </div>
   );
