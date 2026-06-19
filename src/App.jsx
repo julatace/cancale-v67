@@ -2921,24 +2921,45 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  // Navigue l'onglet courant vers le PDF (blob URL)
-  // iOS Safari détecte le PDF → visionneur natif → bouton Partager de Safari → Imprimer
+  // Enregistre le service worker au montage du composant
+  React.useEffect(()=>{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    }
+  },[]);
+
+  // Service worker approach : stocke le PDF dans le SW, navigue vers /print-pdf/{id}
+  // → vraie URL HTTPS que AirPrint peut fetcher et imprimer nativement
   const handlePrint=async(b)=>{
-    if(!b||(!b.id&&!b.pdfUrl)) return;
+    if(!b||!b.id) return;
     setLoadingPdf(b.id);
     try {
       const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
       const base64=await res.json();
       if(base64&&typeof base64==='string'){
+        // Essai via service worker (vraie URL HTTPS → AirPrint fonctionne)
+        if('serviceWorker' in navigator){
+          try {
+            const reg=await navigator.serviceWorker.ready;
+            if(reg.active){
+              await new Promise(resolve=>{
+                const ch=new MessageChannel();
+                ch.port1.onmessage=resolve;
+                reg.active.postMessage({type:'STORE_PDF',id:b.id,base64},[ch.port2]);
+                setTimeout(resolve,1500); // fallback si pas de réponse SW
+              });
+              setLoadingPdf(null);
+              window.location.href='/print-pdf/'+b.id;
+              return;
+            }
+          } catch(_){}
+        }
+        // Fallback : blob URL direct (marche sur desktop, pas sur iOS AirPrint)
         const bytes=atob(base64);
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
         const blob=new Blob([arr],{type:'application/pdf'});
-        const url=URL.createObjectURL(blob);
-        // Navigation dans l'onglet courant → pas de popup bloqué
-        // iOS affiche le PDF dans son visionneur natif
-        // Bouton retour (←) ramène dans l'app
-        window.location.href=url;
+        window.location.href=URL.createObjectURL(blob);
         setLoadingPdf(null);
         return;
       }
@@ -3013,7 +3034,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le PDF s'ouvre → bouton <b style={{color:C.text}}>Partager</b> (⬆️) en bas de Safari → <b style={{color:C.text}}>Imprimer</b><br/>Puis bouton <b style={{color:C.text}}>← Retour</b> pour revenir
+            Le PDF s'ouvre dans Safari → bouton <b style={{color:C.text}}>Partager ⬆️</b> → <b style={{color:C.text}}>Imprimer</b><br/>Bouton <b style={{color:C.text}}>← Retour</b> pour revenir dans l'app
           </div>
         </div>
       </div>
