@@ -2913,6 +2913,32 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,ca
 }
 
 
+// Crée un PDF minimal contenant une image JPEG — plus rapide à imprimer qu'un JPEG brut
+function jpegToPdf(jpegBytes,imgW,imgH){
+  const DPI=144; // scale:2 @ 72pt/inch
+  const pW=Math.round(imgW/DPI*72), pH=Math.round(imgH/DPI*72);
+  const enc=new TextEncoder();
+  const parts=[], off={};
+  const push=s=>parts.push(typeof s==='string'?enc.encode(s):s);
+  const len=()=>parts.reduce((a,p)=>a+p.length,0);
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  off[1]=len(); push(`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`);
+  off[2]=len(); push(`2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n`);
+  off[3]=len(); push(`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${pW} ${pH}]/Contents 4 0 R/Resources<</XObject<</I 5 0 R>>>>>>\nendobj\n`);
+  const s4=`q ${pW} 0 0 ${pH} 0 0 cm /I Do Q`;
+  off[4]=len(); push(`4 0 obj\n<</Length ${s4.length}>>\nstream\n${s4}\nendstream\nendobj\n`);
+  off[5]=len(); push(`5 0 obj\n<</Type/XObject/Subtype/Image/Width ${imgW}/Height ${imgH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpegBytes.length}>>\nstream\n`);
+  push(jpegBytes);
+  push('\nendstream\nendobj\n');
+  const xp=len();
+  push(`xref\n0 6\n0000000000 65535 f \n`);
+  for(let i=1;i<=5;i++) push(`${String(off[i]).padStart(10,'0')} 00000 n \n`);
+  push(`trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xp}\n%%EOF`);
+  const buf=new Uint8Array(parts.reduce((a,p)=>a+p.length,0));
+  let o=0; for(const p of parts){buf.set(p,o);o+=p.length;}
+  return new Blob([buf],{type:'application/pdf'});
+}
+
 function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
@@ -2981,8 +3007,10 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           out.width=x1-x0;out.height=y1-y0;
           out.getContext('2d').drawImage(c,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
         }
-        const printBlob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.95));
-        const previewSrc=URL.createObjectURL(printBlob);
+        const jpegBlob=await new Promise(r=>out.toBlob(r,'image/jpeg',0.9));
+        const jpegBytes=new Uint8Array(await jpegBlob.arrayBuffer());
+        const printBlob=jpegToPdf(jpegBytes,out.width,out.height);
+        const previewSrc=URL.createObjectURL(jpegBlob);
         setPdfViewer({previewSrc,printBlob,pdfBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
