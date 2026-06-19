@@ -2921,15 +2921,19 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  // Enregistre le service worker au montage du composant
-  React.useEffect(()=>{
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('/sw.js').catch(()=>{});
-    }
-  },[]);
+  const [pdfOverlay,setPdfOverlay]=React.useState(null); // {url}
 
-  // Service worker approach : stocke le PDF dans le SW, navigue vers /print-pdf/{id}
-  // → vraie URL HTTPS que AirPrint peut fetcher et imprimer nativement
+  // Injecte/retire le CSS d'impression : cache tout sauf l'embed PDF
+  React.useEffect(()=>{
+    if(!pdfOverlay) return;
+    const s=document.createElement('style');
+    s.id='pdf-print-css';
+    s.textContent='@media print{body *{display:none!important}#pdf-print-overlay,#pdf-print-overlay *{display:block!important}#pdf-print-overlay embed{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;border:none!important}}';
+    document.head.appendChild(s);
+    return ()=>{document.getElementById('pdf-print-css')?.remove();};
+  },[pdfOverlay]);
+
+  // Affiche le PDF dans un overlay intégré, window.print() déclenche AirPrint sur le PDF
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
@@ -2937,29 +2941,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
       const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
       const base64=await res.json();
       if(base64&&typeof base64==='string'){
-        // Essai via service worker (vraie URL HTTPS → AirPrint fonctionne)
-        if('serviceWorker' in navigator){
-          try {
-            const reg=await navigator.serviceWorker.ready;
-            if(reg.active){
-              await new Promise(resolve=>{
-                const ch=new MessageChannel();
-                ch.port1.onmessage=resolve;
-                reg.active.postMessage({type:'STORE_PDF',id:b.id,base64},[ch.port2]);
-                setTimeout(resolve,1500); // fallback si pas de réponse SW
-              });
-              setLoadingPdf(null);
-              window.location.href='/print-pdf/'+b.id;
-              return;
-            }
-          } catch(_){}
-        }
-        // Fallback : blob URL direct (marche sur desktop, pas sur iOS AirPrint)
         const bytes=atob(base64);
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
         const blob=new Blob([arr],{type:'application/pdf'});
-        window.location.href=URL.createObjectURL(blob);
+        setPdfOverlay({url:URL.createObjectURL(blob)});
         setLoadingPdf(null);
         return;
       }
@@ -2996,6 +2982,17 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     'tous':       all.length,
   };
 
+  // Overlay plein écran : affiche le PDF + bouton Imprimer (window.print) + Fermer
+  const pdfOverlayEl=pdfOverlay&&(
+    <div id="pdf-print-overlay" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#111',display:'flex',flexDirection:'column'}}>
+      <embed src={pdfOverlay.url} type="application/pdf" style={{flex:1,width:'100%',border:'none',display:'block'}}/>
+      <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
+        <button onClick={()=>window.print()} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>
+        <button onClick={()=>{URL.revokeObjectURL(pdfOverlay.url);setPdfOverlay(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
+      </div>
+    </div>
+  );
+
   // Modal file d'impression : affiche un bordereau à la fois, bouton Imprimer + Suivant
   if(printQueue){
     const {items,idx}=printQueue;
@@ -3003,6 +3000,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     const isLast=idx===items.length-1;
     return (
       <div style={{padding:'0 4px'}}>
+        {pdfOverlayEl}
         <div style={{background:C.surface,borderRadius:16,padding:24,textAlign:'center',marginTop:20}}>
           <div style={{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}}>
             BORDEREAU {idx+1} / {items.length}
@@ -3034,7 +3032,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le PDF s'ouvre dans Safari → bouton <b style={{color:C.text}}>Partager ⬆️</b> → <b style={{color:C.text}}>Imprimer</b><br/>Bouton <b style={{color:C.text}}>← Retour</b> pour revenir dans l'app
+            Le PDF s'affiche → appuie sur <b style={{color:C.text}}>🖨️ Imprimer</b> pour lancer AirPrint
           </div>
         </div>
       </div>
@@ -3043,6 +3041,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   return (
     <div style={{padding:'0 4px'}}>
+      {pdfOverlayEl}
       {/* Filtres */}
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {(['à imprimer','imprimé','tous']).map(k=>(
