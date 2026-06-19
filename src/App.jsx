@@ -3175,6 +3175,52 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     clearSel();
   };
 
+  const [syncingGmail,setSyncingGmail]=React.useState(false);
+  const [syncMsg,setSyncMsg]=React.useState(null);
+
+  const syncGmailSales=async()=>{
+    setSyncingGmail(true);
+    setSyncMsg(null);
+    try{
+      const res=await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`);
+      const incoming=await res.json();
+      if(!incoming||!Array.isArray(incoming)||incoming.length===0){
+        setSyncMsg('Aucune nouvelle vente à importer.');
+        setSyncingGmail(false);
+        return;
+      }
+      const existingNums=new Set(all.map(b=>String(b.numero||'')).filter(Boolean));
+      const toAdd=incoming.filter(v=>!existingNums.has(String(v.numero||'')));
+      if(toAdd.length===0){
+        // Rien de nouveau — vider quand même la queue
+        await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
+        setSyncMsg('Aucune nouvelle vente (déjà synchronisées).');
+        setSyncingGmail(false);
+        return;
+      }
+      const newEntries=toAdd.map(v=>({
+        id: v.id||('gmail_'+Math.random().toString(36).slice(2,10)),
+        emailId: v.emailId||null,
+        numero: v.numero,
+        modele: v.modele||'',
+        date: v.date||new Date().toLocaleDateString('fr-FR'),
+        compte: v.compte||'',
+        statut: 'à imprimer',
+        paiement: 'en attente',
+        source: 'email',
+      }));
+      const updated=[...newEntries,...all];
+      setBordereaux(updated);
+      save('vinted_bordereaux',updated);
+      // Vider la queue Firebase
+      await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
+      setSyncMsg(`${newEntries.length} vente${newEntries.length>1?'s':''} importée${newEntries.length>1?'s':''} !`);
+    }catch(e){
+      setSyncMsg('Erreur sync : '+e.message);
+    }
+    setSyncingGmail(false);
+  };
+
   const counts={
     'à imprimer': all.filter(b=>(b.statut||'à imprimer')==='à imprimer').length,
     'imprimé':    all.filter(b=>b.statut==='imprimé').length,
@@ -3215,6 +3261,16 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
   return (
     <div style={{padding:'0 4px'}}>
       {pdfViewerEl}
+      {/* Sync Gmail */}
+      <div style={{display:'flex',gap:8,marginBottom:10,alignItems:'center'}}>
+        <button onClick={syncGmailSales} disabled={syncingGmail} style={{
+          padding:'7px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:syncingGmail?'default':'pointer',
+          background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
+          opacity:syncingGmail?0.6:1,flexShrink:0,
+        }}>{syncingGmail?'⏳ Sync...':'📧 Sync Gmail'}</button>
+        {syncMsg&&<span style={{fontSize:11,color:C.muted,fontWeight:600}}>{syncMsg}</span>}
+      </div>
+
       {/* Filtres */}
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
         {(['à imprimer','imprimé']).map(k=>(
