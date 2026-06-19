@@ -2936,8 +2936,18 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const bytes=atob(base64);
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-        const blob=new Blob([arr],{type:'application/pdf'});
-        setPdfViewer({url:URL.createObjectURL(blob),isPdf:true});
+        const pdfBlob=new Blob([arr],{type:'application/pdf'});
+        const pdfUrl=URL.createObjectURL(pdfBlob);
+        // Enveloppe le PDF dans une page HTML avec CSS pour remplir la feuille à l'impression
+        const wrapper=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#fff}
+embed{display:block;width:100%;height:100vh}
+@page{margin:0}
+@media print{html,body{width:100%;height:100%}embed{width:100%;height:100vh;position:fixed;top:0;left:0}}
+</style></head><body><embed src="${pdfUrl}" type="application/pdf"></body></html>`;
+        const wrapBlob=new Blob([wrapper],{type:'text/html'});
+        setPdfViewer({url:URL.createObjectURL(wrapBlob),isPdf:true,pdfUrl});
         setLoadingPdf(null);
         return;
       }
@@ -3014,7 +3024,7 @@ body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;
         <button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
           🖨️ Imprimer
         </button>
-        <button onClick={()=>{URL.revokeObjectURL(pdfViewer.url);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+        <button onClick={()=>{URL.revokeObjectURL(pdfViewer.url);if(pdfViewer.pdfUrl)URL.revokeObjectURL(pdfViewer.pdfUrl);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
           ✕ Fermer
         </button>
       </div>
