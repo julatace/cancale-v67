@@ -3124,12 +3124,18 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
   };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
+  const toISO=s=>s?s.split('/').reverse().join('-'):'';
   const filtered=all
     .filter(b=>filter==='tous'?true:(b.statut||'à imprimer')===filter)
     .slice().sort((a,b)=>{
-      const da=a.date?a.date.split('/').reverse().join('-'):'';
-      const db=b.date?b.date.split('/').reverse().join('-'):'';
-      return db.localeCompare(da);
+      // 1) date de vente (DD/MM/YYYY → YYYY-MM-DD)
+      const da=toISO(a.date),db=toISO(b.date);
+      if(da!==db) return db.localeCompare(da);
+      // 2) date limite d'expédition en fallback
+      const la=toISO(a.dateLimite),lb=toISO(b.dateLimite);
+      if(la!==lb) return lb.localeCompare(la);
+      // 3) id Firebase (push key chronologique) en dernier recours
+      return (b.id||'').localeCompare(a.id||'');
     });
 
   const toggleSelect=(id)=>{const s=new Set(selected);s.has(id)?s.delete(id):s.add(id);setSelected(s);};
