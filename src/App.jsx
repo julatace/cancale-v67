@@ -2913,9 +2913,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,ca
 }
 
 
-function jpegToPdfFillA4(jpegBytes,imgW,imgH){
-  // Place le JPEG centré dans une page A4 portrait en remplissant au maximum
-  const pageW=595,pageH=842; // A4 portrait en points (72pt/inch)
+function jpegToPdfFillA4(jpegBytes,imgW,imgH,pageW,pageH){
   const scale=Math.min(pageW/imgW,pageH/imgH);
   const dW=Math.round(imgW*scale),dH=Math.round(imgH*scale);
   const ox=Math.round((pageW-dW)/2),oy=Math.round((pageH-dH)/2);
@@ -2991,7 +2989,16 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
-        setPdfViewer({previewSrc,pdfBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
+        // page.view = [x0,y0,w,h] brut sans /Rotate — détecte Mondial Relay (portrait) vs Chronopost (paysage)
+        const [,,rawW,rawH]=page.view;
+        const isPortrait=rawH>rawW;
+        let printBlob=null;
+        if(isPortrait){
+          // PDF portrait (Mondial Relay) : créer un PDF A4 portrait qui remplit toute la feuille
+          const jpegBytes=new Uint8Array(await jpegBlob.arrayBuffer());
+          printBlob=jpegToPdfFillA4(jpegBytes,c.width,c.height,595,842);
+        }
+        setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
       }
@@ -3002,7 +3009,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const doPrint=async()=>{
     if(!pdfViewer) return;
-    const blob=pdfViewer.pdfBlob;
+    const blob=pdfViewer.printBlob||pdfViewer.pdfBlob;
     if(!blob) return;
     const file=new File([blob],'bordereau.pdf',{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
