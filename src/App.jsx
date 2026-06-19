@@ -2914,8 +2914,8 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,ca
 
 
 function jpegToPdfFillA4(jpegBytes,imgW,imgH){
-  // Place le JPEG centré dans une page A4 paysage en remplissant au maximum
-  const pageW=842,pageH=595; // A4 landscape en points (72pt/inch)
+  // Place le JPEG centré dans une page A4 portrait en remplissant au maximum
+  const pageW=595,pageH=842; // A4 portrait en points (72pt/inch)
   const scale=Math.min(pageW/imgW,pageH/imgH);
   const dW=Math.round(imgW*scale),dH=Math.round(imgH*scale);
   const ox=Math.round((pageW-dW)/2),oy=Math.round((pageH-dH)/2);
@@ -2994,25 +2994,24 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
-        // Impression Mondial Relay (portrait) : pivoter 90°, recadrer, remplir A4 paysage
+        // Impression Mondial Relay (portrait) : supprimer les marges blanches, remplir A4 portrait
         let printBlob=null;
         if(isPortrait){
-          const vpR=page.getViewport({scale:2,rotation:90});
-          const cr=document.createElement('canvas');
-          cr.width=Math.round(vpR.width);cr.height=Math.round(vpR.height);
-          await page.render({canvasContext:cr.getContext('2d'),viewport:vpR}).promise;
-          const {data:d,width:w,height:h}=cr.getContext('2d').getImageData(0,0,cr.width,cr.height);
+          // Réutilise le canvas déjà rendu — pas de second rendu nécessaire
+          const {data:d,width:w,height:h}=c.getContext('2d').getImageData(0,0,c.width,c.height);
           const BS=40,bW=Math.ceil(w/BS),bH=Math.ceil(h/BS);
           const blk=new Float32Array(bW*bH);
           for(let i=0;i<d.length;i+=4){
-            if(d[i]<220||d[i+1]<220||d[i+2]<220){
+            // Seuil permissif : tout pixel non-blanc (<230 sur les 3 canaux)
+            if(d[i]<230||d[i+1]<230||d[i+2]<230){
               const p=i>>2;blk[((p/w|0)/BS|0)*bW+((p%w)/BS|0)]++;
             }
           }
           let x0=w,y0=h,x1=0,y1=0;
           for(let by=0;by<bH;by++) for(let bx=0;bx<bW;bx++){
             const bwA=Math.min(BS,w-bx*BS),bhA=Math.min(BS,h-by*BS);
-            if(blk[by*bW+bx]/(bwA*bhA)>=0.06){
+            // Seuil 2% au lieu de 6% — détecte même les zones légères
+            if(blk[by*bW+bx]/(bwA*bhA)>=0.02){
               const px0=bx*BS,py0=by*BS,px1=Math.min(w,(bx+1)*BS),py1=Math.min(h,(by+1)*BS);
               if(px0<x0)x0=px0;if(px1>x1)x1=px1;if(py0<y0)y0=py0;if(py1>y1)y1=py1;
             }
@@ -3020,10 +3019,12 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           const pad=20;
           x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
           x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
-          if(x1>x0&&y1>y0){
+          // Appliquer seulement si le recadrage supprime au moins 5% de marge
+          const bigMargin=x0>w*0.05||y0>h*0.05||x1<w*0.95||y1<h*0.95;
+          if(bigMargin&&x1>x0&&y1>y0){
             const cut=document.createElement('canvas');
             cut.width=x1-x0;cut.height=y1-y0;
-            cut.getContext('2d').drawImage(cr,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
+            cut.getContext('2d').drawImage(c,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
             const pj=await new Promise(r=>cut.toBlob(r,'image/jpeg',0.92));
             const pb=new Uint8Array(await pj.arrayBuffer());
             printBlob=jpegToPdfFillA4(pb,cut.width,cut.height);
