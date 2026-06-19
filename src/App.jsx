@@ -3132,6 +3132,17 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
     }
   },[]);
 
+  // Sync automatique au démarrage + toutes les 5 minutes (silencieuse)
+  const _autoSyncedRef=React.useRef(false);
+  React.useEffect(()=>{
+    if(_autoSyncedRef.current) return;
+    _autoSyncedRef.current=true;
+    syncGmailSalesSilent();
+    const interval=setInterval(syncGmailSalesSilent, 5*60*1000);
+    return ()=>clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
@@ -3312,6 +3323,75 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
 
   const [syncingGmail,setSyncingGmail]=React.useState(false);
   const [syncMsg,setSyncMsg]=React.useState(null);
+
+  // Sync silencieuse : lit Firebase sans appeler Apps Script (utilisée en arrière-plan)
+  const syncGmailSalesSilent=async()=>{
+    try{
+      const FBASE=FIREBASE_URL.replace('.json','');
+      const res=await fetch(`${FBASE}/vinted_incoming_sales.json`);
+      const incoming=await res.json();
+      const currentAll=Array.isArray(bordereaux)?bordereaux:[];
+      const existingNums=new Set(currentAll.map(b=>String(b.numero||'')).filter(Boolean));
+      const currentSales=Array.isArray(sales)?[...sales]:[];
+      const existingSaleNums=new Set(currentSales.map(s=>String(s.numero||'')).filter(Boolean));
+      if(incoming&&Array.isArray(incoming)&&incoming.length>0){
+        const toAdd=incoming.filter(v=>!existingNums.has(String(v.numero||'')));
+        if(toAdd.length>0){
+          const newBordereaux=toAdd.map(v=>({
+            id:v.id||('gmail_'+Math.random().toString(36).slice(2,10)),
+            emailId:v.emailId||null,numero:v.numero,modele:v.modele||'',
+            sellPrice:v.sellPrice??null,date:v.date||new Date().toLocaleDateString('fr-FR'),
+            compte:v.compte||'',statut:'à imprimer',paiement:'en attente',source:'email',
+          }));
+          const updatedB=[...newBordereaux,...currentAll];
+          setBordereaux(updatedB); save('vinted_bordereaux',updatedB);
+          const pendingSales=toAdd.filter(v=>!existingSaleNums.has(String(v.numero||''))).map(v=>({
+            id:'sale_'+Math.random().toString(36).slice(2,10),numero:v.numero,
+            productId:v.modele||'',buyPrice:null,sellPrice:null,profit:null,multi:null,
+            saleDate:v.date||'',receiveDate:'',compte:v.compte||'',
+            statut:'en attente',source:'email',createdAt:new Date().toISOString(),
+          }));
+          if(pendingSales.length>0){
+            const updatedS=[...pendingSales,...currentSales];
+            setSales(updatedS); save('vinted_sales',updatedS);
+          }
+        }
+        await fetch(`${FBASE}/vinted_incoming_sales.json`,{method:'DELETE'});
+      }
+      // Paiements reçus
+      const resP=await fetch(`${FBASE}/vinted_incoming_payments.json`);
+      const payments=await resP.json();
+      if(payments&&Array.isArray(payments)&&payments.length>0){
+        const cat=Array.isArray(catalog)?catalog:[];
+        const latestSales=Array.isArray(sales)?[...sales]:[];
+        const currentBordereaux=Array.isArray(bordereaux)?bordereaux:[];
+        let updated=false;
+        payments.forEach(p=>{
+          if(!p.numero||!p.receiveDate) return;
+          const idx=latestSales.findIndex(s=>String(s.numero)===String(p.numero));
+          const bord=currentBordereaux.find(b=>String(b.numero)===String(p.numero));
+          const catItem=cat.find(c=>String(c.id)===String(p.numero));
+          const buyPrice=catItem?.buyPrice??null;
+          const sellPrice=p.amount??bord?.sellPrice??null;
+          const profit=(sellPrice!=null&&buyPrice!=null)?Math.round((sellPrice-buyPrice)*100)/100:null;
+          if(idx>=0){
+            latestSales[idx]={...latestSales[idx],buyPrice,sellPrice,profit,
+              multi:(sellPrice&&buyPrice&&buyPrice>0)?Math.round(sellPrice/buyPrice*100)/100:null,
+              receiveDate:p.receiveDate,statut:'finalisée'};
+          } else {
+            latestSales.unshift({id:'sale_'+Math.random().toString(36).slice(2,10),
+              numero:p.numero,productId:bord?.modele||'',buyPrice,sellPrice,profit,
+              multi:(sellPrice&&buyPrice&&buyPrice>0)?Math.round(sellPrice/buyPrice*100)/100:null,
+              saleDate:bord?.date||'',receiveDate:p.receiveDate,compte:bord?.compte||'',
+              statut:'finalisée',source:'email',createdAt:new Date().toISOString()});
+          }
+          updated=true;
+        });
+        if(updated){setSales(latestSales);save('vinted_sales',latestSales);}
+        await fetch(`${FBASE}/vinted_incoming_payments.json`,{method:'DELETE'});
+      }
+    }catch(_){}
+  };
 
   const syncGmailSales=async()=>{
     setSyncingGmail(true);
