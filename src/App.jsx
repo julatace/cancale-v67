@@ -1312,7 +1312,6 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
   const [page,setPage]=useState(null); // null = dernière page (init)
   const [showAll,setShowAll]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState('');
-  const [salesFilter,setSalesFilter]=useState('finalisée'); // 'finalisée' | 'en attente'
   const [selectMode,setSelectMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [isDragging,setIsDragging]=useState(false);
@@ -1425,8 +1424,6 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
     });
   },[sales]);
 
-  const pendingCount=useMemo(()=>sales.filter(s=>s.statut==='en attente').length,[sales]);
-
   const fullFiltered=useMemo(()=>{
     const parseD=d=>{if(!d)return 0;const p=d.split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0]).getTime():0;};
     let fromTs=0,toTs=Infinity;
@@ -1436,17 +1433,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
       toTs=new Date(+y,+m,0,23,59,59,999).getTime();
     }
     return sales.filter(s=>{
-      // Filtre par statut : "en attente" OU "finalisée" (entrées manuelles sans statut = finalisées)
-      if(salesFilter==='en attente') return s.statut==='en attente';
-      if(salesFilter==='finalisée') return s.statut!=='en attente';
-      if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
-      if(selectedMonth){
-        const rd=parseD(s.receiveDate);
-        if(rd<fromTs||rd>toTs) return false;
-      }
-      return true;
-    }).filter(s=>{
-      if(salesFilter==='en attente') return true;
+      if(s.statut==='en attente') return false; // ventes en attente → onglet Factures
       if(search&&!(s.productId||'').toLowerCase().includes(search.toLowerCase())&&!(s.saleDate||'').includes(search)&&!(s.receiveDate||'').includes(search)) return false;
       if(selectedMonth){
         const rd=parseD(s.receiveDate);
@@ -1459,7 +1446,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
       if(da!==db) return db-da;
       return (a.createdAt||'') < (b.createdAt||'') ? 1 : -1;
     });
-  },[sales,search,selectedMonth,salesFilter]);
+  },[sales,search,selectedMonth]);
   const totalPages=Math.max(1,Math.ceil(fullFiltered.length/PER_PAGE));
   const currentPage=page===null?totalPages-1:Math.min(page,totalPages-1);
   const filtered=showAll?fullFiltered:fullFiltered.slice(currentPage*PER_PAGE,(currentPage+1)*PER_PAGE);
@@ -1501,18 +1488,6 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
         <div><span style={{fontSize:10,color:C.muted}}>CA encaissé</span><div style={{fontSize:20,fontWeight:800,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
         <div><span style={{fontSize:10,color:C.muted}}>Bénéfice</span><div style={{fontSize:20,fontWeight:800,color:moisVentes.profit>=0?C.accent:C.danger}}>{fmt(moisVentes.profit)}</div></div>
         <div><span style={{fontSize:10,color:C.muted}}>Ventes</span><div style={{fontSize:20,fontWeight:800,color:C.muted}}>{moisVentes.count}</div></div>
-      </div>
-
-      {/* Filtre En attente / Finalisées */}
-      <div style={{display:'flex',gap:6}}>
-        {[['finalisée','✅ Finalisées'],['en attente','⏳ En attente']].map(([k,label])=>(
-          <button key={k} onClick={()=>{setSalesFilter(k);setPage(null);}} style={{
-            padding:'6px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
-            background:salesFilter===k?C.accent:'transparent',
-            color:salesFilter===k?'#fff':C.muted,
-            border:`1.5px solid ${salesFilter===k?C.accent:C.border}`,fontFamily:'inherit',
-          }}>{label}{k==='en attente'&&pendingCount>0?` (${pendingCount})`:''}</button>
-        ))}
       </div>
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
@@ -1781,10 +1756,10 @@ function Door({h}) {
 }
 
 /* ── Factures ───────────────────────────────────────── */
-function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings}) {
+function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,setInvoiceSettings}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
-  const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
+  const [zone,setZone]=useState('ventes_attente'); // 'ventes_attente' | 'ventes_finalisees' | 'attente' | 'comptabilisees'
   const [page,setPage]=useState(null);
   const [showAll,setShowAll]=useState(false);
   const [showForm,setShowForm]=useState(false);
@@ -1933,8 +1908,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const counters=useMemo(()=>{
     const attente=invoices.filter(i=>!accountedSet.has(String(i.productId).trim())).length;
     const comptabilisees=invoices.filter(i=>accountedSet.has(String(i.productId).trim())).length;
-    return {attente,comptabilisees};
-  },[invoices,accountedSet]);
+    const ventes_attente=(Array.isArray(sales)?sales:[]).filter(s=>s.statut==='en attente').length;
+    const ventes_finalisees=(Array.isArray(sales)?sales:[]).filter(s=>s.statut==='finalisée').length;
+    return {attente,comptabilisees,ventes_attente,ventes_finalisees};
+  },[invoices,accountedSet,sales]);
   
   const deleteInvoice=(id)=>{
     const inv=invoices.find(i=>i.id===id);
@@ -2010,7 +1987,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       {/* Sous-onglets zones */}
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
-          {id:'attente',icon:'⏳',label:'En attente',count:counters.attente},
+          {id:'ventes_attente',icon:'⏳',label:'En attente',count:counters.ventes_attente},
+          {id:'ventes_finalisees',icon:'💰',label:'Finalisées',count:counters.ventes_finalisees},
+          {id:'attente',icon:'🧾',label:'Factures',count:counters.attente},
           {id:'comptabilisees',icon:'✅',label:'Comptabilisées',count:counters.comptabilisees},
         ].map(z=>(
           <button key={z.id} type="button" onClick={()=>{setZone(z.id);setPage(null);}}
@@ -2020,6 +1999,59 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           </button>
         ))}
       </div>
+
+      {/* Ventes Gmail : En attente / Finalisées */}
+      {(zone==='ventes_attente'||zone==='ventes_finalisees')&&(()=>{
+        const gmailSales=(Array.isArray(sales)?sales:[]).filter(s=>
+          zone==='ventes_attente'?s.statut==='en attente':s.statut==='finalisée'
+        ).sort((a,b)=>{
+          const ta=a.saleDate?a.saleDate.split('/').reverse().join('-'):'';
+          const tb=b.saleDate?b.saleDate.split('/').reverse().join('-'):'';
+          return tb.localeCompare(ta);
+        });
+        const fmt2=v=>v!=null&&v!==''?`${(+v).toFixed(2)} €`:'—';
+        return (
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {gmailSales.length===0&&(
+              <div style={{textAlign:'center',color:C.muted,padding:'32px 0',fontSize:13}}>
+                {zone==='ventes_attente'
+                  ? 'Aucune vente en attente. Les ventes Vinted apparaissent ici dès la sync.'
+                  : 'Aucune vente finalisée via Gmail pour l\'instant.'}
+              </div>
+            )}
+            {gmailSales.map(s=>{
+              const canDelete=zone==='ventes_attente';
+              return (
+                <div key={s.id} style={{
+                  background:C.card,border:`1px solid ${C.border}`,borderRadius:10,
+                  padding:'12px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',
+                }}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:3}}>
+                      <span style={{fontWeight:800,fontSize:13,color:C.accent}}>N°{s.numero||s.productId||'?'}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:200}}>{s.productId||<span style={{color:C.muted,fontStyle:'italic'}}>Modèle inconnu</span>}</span>
+                    </div>
+                    <div style={{fontSize:11,color:C.muted,display:'flex',gap:12,flexWrap:'wrap'}}>
+                      {s.saleDate&&<span>📅 Vente : {s.saleDate}</span>}
+                      {s.receiveDate&&<span>💳 Reçu : {s.receiveDate}</span>}
+                      {zone==='ventes_finalisees'&&<>
+                        <span>🛒 Achat : {fmt2(s.buyPrice)}</span>
+                        <span>💶 Vente : {fmt2(s.sellPrice)}</span>
+                        <span style={{color:s.profit>=0?C.accent:C.danger,fontWeight:700}}>📈 Bénéf. : {fmt2(s.profit)}</span>
+                      </>}
+                    </div>
+                  </div>
+                  {canDelete&&<button onClick={()=>{
+                    if(!window.confirm('Supprimer cette vente en attente ?')) return;
+                    const u=(Array.isArray(sales)?sales:[]).filter(x=>x.id!==s.id);
+                    setSales(u); save('vinted_sales',u);
+                  }} style={{padding:'6px 10px',borderRadius:8,background:'transparent',color:C.danger,border:`1px solid ${C.danger}`,fontSize:12,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>🗑️</button>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       
       {/* Recherche */}
       <div style={{display:'flex',gap:6,alignItems:'center'}}>
@@ -3969,7 +4001,7 @@ export default function App() {
           try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
         }}/>}
         {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
-        {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
+        {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} setSales={setSales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
         {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
