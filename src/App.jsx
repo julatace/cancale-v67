@@ -2987,22 +2987,18 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const page=await pdf.getPage(1);
         const vp0=page.getViewport({scale:1});
         const isPortrait=vp0.height>vp0.width;
-        // Aperçu : rendu original sans modification
         const vp=page.getViewport({scale:2});
         const c=document.createElement('canvas');
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-        const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
-        const previewSrc=URL.createObjectURL(jpegBlob);
-        // Impression Mondial Relay (portrait) : supprimer les marges blanches, remplir A4 portrait
+        let displayCanvas=c;
         let printBlob=null;
         if(isPortrait){
-          // Réutilise le canvas déjà rendu — pas de second rendu nécessaire
+          // Mondial Relay : détecter le contenu et zoomer (affichage + impression)
           const {data:d,width:w,height:h}=c.getContext('2d').getImageData(0,0,c.width,c.height);
           const BS=40,bW=Math.ceil(w/BS),bH=Math.ceil(h/BS);
           const blk=new Float32Array(bW*bH);
           for(let i=0;i<d.length;i+=4){
-            // Seuil permissif : tout pixel non-blanc (<230 sur les 3 canaux)
             if(d[i]<230||d[i+1]<230||d[i+2]<230){
               const p=i>>2;blk[((p/w|0)/BS|0)*bW+((p%w)/BS|0)]++;
             }
@@ -3010,7 +3006,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           let x0=w,y0=h,x1=0,y1=0;
           for(let by=0;by<bH;by++) for(let bx=0;bx<bW;bx++){
             const bwA=Math.min(BS,w-bx*BS),bhA=Math.min(BS,h-by*BS);
-            // Seuil 2% au lieu de 6% — détecte même les zones légères
             if(blk[by*bW+bx]/(bwA*bhA)>=0.02){
               const px0=bx*BS,py0=by*BS,px1=Math.min(w,(bx+1)*BS),py1=Math.min(h,(by+1)*BS);
               if(px0<x0)x0=px0;if(px1>x1)x1=px1;if(py0<y0)y0=py0;if(py1>y1)y1=py1;
@@ -3019,17 +3014,19 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           const pad=20;
           x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
           x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
-          // Appliquer seulement si le recadrage supprime au moins 5% de marge
           const bigMargin=x0>w*0.05||y0>h*0.05||x1<w*0.95||y1<h*0.95;
           if(bigMargin&&x1>x0&&y1>y0){
             const cut=document.createElement('canvas');
             cut.width=x1-x0;cut.height=y1-y0;
             cut.getContext('2d').drawImage(c,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
+            displayCanvas=cut; // zoom aussi dans l'affichage
             const pj=await new Promise(r=>cut.toBlob(r,'image/jpeg',0.92));
             const pb=new Uint8Array(await pj.arrayBuffer());
             printBlob=jpegToPdfFillA4(pb,cut.width,cut.height);
           }
         }
+        const jpegBlob=await new Promise(r=>displayCanvas.toBlob(r,'image/jpeg',0.92));
+        const previewSrc=URL.createObjectURL(jpegBlob);
         setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
