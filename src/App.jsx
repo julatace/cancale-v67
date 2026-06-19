@@ -3182,17 +3182,23 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     setSyncingGmail(true);
     setSyncMsg(null);
     try{
+      // Étape 1 : déclencher le script Apps Script pour qu'il lise Gmail → Firebase
+      if(appsScriptUrl){
+        try{ await fetch(appsScriptUrl,{mode:'no-cors'}); }catch(_){}
+        // Laisser 2s au script pour écrire dans Firebase
+        await new Promise(r=>setTimeout(r,2000));
+      }
+      // Étape 2 : lire vinted_incoming_sales dans Firebase
       const res=await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`);
       const incoming=await res.json();
       if(!incoming||!Array.isArray(incoming)||incoming.length===0){
-        setSyncMsg('Aucune nouvelle vente à importer.');
+        setSyncMsg(appsScriptUrl?'Gmail scanné — aucune nouvelle vente.':'Aucune nouvelle vente à importer.');
         setSyncingGmail(false);
         return;
       }
       const existingNums=new Set(all.map(b=>String(b.numero||'')).filter(Boolean));
       const toAdd=incoming.filter(v=>!existingNums.has(String(v.numero||'')));
       if(toAdd.length===0){
-        // Rien de nouveau — vider quand même la queue
         await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
         setSyncMsg('Aucune nouvelle vente (déjà synchronisées).');
         setSyncingGmail(false);
@@ -3212,7 +3218,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
       const updated=[...newEntries,...all];
       setBordereaux(updated);
       save('vinted_bordereaux',updated);
-      // Vider la queue Firebase
       await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
       setSyncMsg(`${newEntries.length} vente${newEntries.length>1?'s':''} importée${newEntries.length>1?'s':''} !`);
     }catch(e){
