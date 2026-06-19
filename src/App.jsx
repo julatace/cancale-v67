@@ -2939,13 +2939,45 @@ function jpegToPdfFillA4(jpegBytes,imgW,imgH,pageW,pageH){
   return new Blob([buf],{type:'application/pdf'});
 }
 
+// PDF multi-pages : pages = [{jpegBytes, imgW, imgH}]
+function jpegsToPdfA4(pages,pageW=595,pageH=842){
+  const enc=new TextEncoder();
+  const parts=[],off={};
+  const push=s=>parts.push(typeof s==='string'?enc.encode(s):s);
+  const len=()=>parts.reduce((a,p)=>a+p.length,0);
+  const n=pages.length;
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  off[1]=len();push(`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`);
+  const kids=Array.from({length:n},(_,i)=>`${3+i*3} 0 R`).join(' ');
+  off[2]=len();push(`2 0 obj\n<</Type/Pages/Kids[${kids}]/Count ${n}>>\nendobj\n`);
+  for(let i=0;i<n;i++){
+    const {jpegBytes,imgW,imgH}=pages[i];
+    const scale=Math.min(pageW/imgW,pageH/imgH);
+    const dW=Math.round(imgW*scale),dH=Math.round(imgH*scale);
+    const ox=Math.round((pageW-dW)/2),oy=Math.round((pageH-dH)/2);
+    const pg=3+i*3,ct=4+i*3,im=5+i*3,nm=`I${i+1}`;
+    off[pg]=len();push(`${pg} 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${pageW} ${pageH}]/Contents ${ct} 0 R/Resources<</XObject<</${nm} ${im} 0 R>>>>>>\nendobj\n`);
+    const s=`q ${dW} 0 0 ${dH} ${ox} ${oy} cm /${nm} Do Q`;
+    off[ct]=len();push(`${ct} 0 obj\n<</Length ${s.length}>>\nstream\n${s}\nendstream\nendobj\n`);
+    off[im]=len();push(`${im} 0 obj\n<</Type/XObject/Subtype/Image/Width ${imgW}/Height ${imgH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpegBytes.length}>>\nstream\n`);
+    push(jpegBytes);push('\nendstream\nendobj\n');
+  }
+  const tot=2+n*3,xp=len();
+  push(`xref\n0 ${tot+1}\n0000000000 65535 f \n`);
+  for(let i=1;i<=tot;i++)push(`${String(off[i]).padStart(10,'0')} 00000 n \n`);
+  push(`trailer\n<</Size ${tot+1}/Root 1 0 R>>\nstartxref\n${xp}\n%%EOF`);
+  const buf=new Uint8Array(parts.reduce((a,p)=>a+p.length,0));
+  let o=0;for(const p of parts){buf.set(p,o);o+=p.length;}
+  return new Blob([buf],{type:'application/pdf'});
+}
+
 const PAYS_FLAGS={France:'🇫🇷',Italie:'🇮🇹',Espagne:'🇪🇸',Allemagne:'🇩🇪',Belgique:'🇧🇪','Pays-Bas':'🇳🇱',Suisse:'🇨🇭',Luxembourg:'🇱🇺',Autriche:'🇦🇹',Portugal:'🇵🇹',Pologne:'🇵🇱',Suède:'🇸🇪',Danemark:'🇩🇰',Finlande:'🇫🇮',Norvège:'🇳🇴',Tchéquie:'🇨🇿',Hongrie:'🇭🇺',Roumanie:'🇷🇴',Grèce:'🇬🇷','Royaume-Uni':'🇬🇧'};
 const paysFlag=p=>{if(!p)return null;for(const[k,v]of Object.entries(PAYS_FLAGS))if(p.toLowerCase().includes(k.toLowerCase()))return v+' '+p;return'🌍 '+p;};
 
 function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
-  const [printQueue,setPrintQueue]=React.useState(null); // {items, idx}
+  const [batchLoading,setBatchLoading]=React.useState(false);
 
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
@@ -2963,13 +2995,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
       document.head.appendChild(s);
     }
   },[]);
-
-  // Auto-charge le PDF dès que la file d'impression change d'index
-  React.useEffect(()=>{
-    if(!printQueue) return;
-    const b=printQueue.items[printQueue.idx];
-    if(b) handlePrint(b); // eslint-disable-line react-hooks/exhaustive-deps
-  },[printQueue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
@@ -3042,6 +3067,60 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
     }
   };
 
+  // Impression groupée : assemble un PDF multi-pages et l'envoie une seule fois à AirPrint
+  const handlePrintAll=async(items)=>{
+    if(!items||!items.length) return;
+    setBatchLoading(true);
+    try{
+      if(!window.pdfjsLib){
+        await new Promise((res,rej)=>{
+          const s=document.createElement('script');
+          s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          s.onload=res;s.onerror=rej;document.head.appendChild(s);
+        });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      const pages=[];
+      for(const b of items){
+        try{
+          const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
+          const base64=await res.json();
+          if(!base64||typeof base64!=='string') continue;
+          const bin=atob(base64);
+          const arr=new Uint8Array(bin.length);
+          for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+          const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
+          const page=await pdf.getPage(1);
+          const [,,rawW,rawH]=page.view;
+          const isPortrait=rawH>rawW;
+          const vp=page.getViewport({scale:2});
+          const c=document.createElement('canvas');
+          c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+          await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+          const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('  ');
+          if(infoText){
+            const ctx=c.getContext('2d');
+            const fs=Math.round(Math.min(c.width,c.height)*0.016);
+            ctx.font=`bold ${fs}px sans-serif`;ctx.fillStyle='#111';
+            ctx.fillText(infoText,10,isPortrait?fs*1.4:c.height-fs*0.4);
+          }
+          const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
+          pages.push({jpegBytes:new Uint8Array(await pj.arrayBuffer()),imgW:c.width,imgH:c.height});
+        }catch(_){}
+      }
+      if(!pages.length){setBatchLoading(false);return;}
+      const combined=jpegsToPdfA4(pages);
+      const file=new File([combined],`bordereaux-${pages.length}.pdf`,{type:'application/pdf'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:`${pages.length} bordereaux`});}catch(_){}
+      }else{
+        const url=URL.createObjectURL(combined);
+        window.open(url,'_blank');
+      }
+    }catch(_){}
+    setBatchLoading(false);
+  };
+
   const all=Array.isArray(bordereaux)?bordereaux:[];
   const filtered=all
     .filter(b=>filter==='tous'?true:(b.statut||'à imprimer')===filter)
@@ -3089,40 +3168,18 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
       </div>
       <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
         {pdfViewer.pdfBlob&&<button onClick={doPrint} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>}
-        {printQueue ? (() => {
-          const closePdf=()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);};
-          const isLast=printQueue.idx>=printQueue.items.length-1;
-          return isLast
-            ? <button onClick={()=>{closePdf();setPrintQueue(null);clearSel();}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#4cd964',border:'1px solid #4cd964',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✓ Terminé</button>
-            : <button onClick={()=>{closePdf();setPrintQueue({...printQueue,idx:printQueue.idx+1});}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:16,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>▶ Suivant ({printQueue.idx+2}/{printQueue.items.length})</button>;
-        })()
-        : <button onClick={()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
-        }
+        <button onClick={()=>{if(pdfViewer.previewSrc)URL.revokeObjectURL(pdfViewer.previewSrc);setRotated(false);setCSize(null);setPdfViewer(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
       </div>
     </div>
   );
 
-  // File d'impression : le PDF charge automatiquement, cet écran s'affiche le temps du chargement
-  if(printQueue){
-    const {items,idx}=printQueue;
-    const b=items[idx];
+  // Overlay d'assemblage en cours
+  if(batchLoading){
     return (
       <div style={{padding:'0 4px'}}>
-        {pdfViewerEl}
-        <div style={{background:C.surface,borderRadius:16,padding:24,textAlign:'center',marginTop:20}}>
-          <div style={{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}}>
-            BORDEREAU {idx+1} / {items.length}
-          </div>
-          <div style={{fontWeight:900,fontSize:28,color:C.accent,marginBottom:4}}>N°{b.numero||'?'}</div>
-          {b.taille&&<div style={{fontSize:18,fontWeight:700,color:C.accent,marginBottom:4}}>Taille {b.taille}</div>}
-          <div style={{fontSize:16,color:C.text,fontWeight:500,marginBottom:12}}>{b.modele||''}</div>
-          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>
-            {loadingPdf===b.id ? '⏳ Chargement du bordereau...' : 'Bordereau prêt — ouverture...'}
-          </div>
-          <button onClick={()=>{setPrintQueue(null);clearSel();}} style={{
-            padding:'13px 24px',borderRadius:12,background:'transparent',color:C.muted,
-            border:`1px solid ${C.border}`,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
-          }}>✕ Annuler</button>
+        <div style={{background:C.surface,borderRadius:16,padding:32,textAlign:'center',marginTop:20}}>
+          <div style={{fontSize:13,color:C.muted,marginBottom:8}}>⏳ Assemblage des bordereaux...</div>
+          <div style={{fontSize:11,color:C.muted}}>Le PDF multi-pages se prépare, patiente quelques secondes.</div>
         </div>
       </div>
     );
@@ -3151,7 +3208,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
             background:'transparent',color:C.muted,border:`1px solid ${C.border}`,fontFamily:'inherit',
           }}>{selected.size===filtered.length?'Tout désélect.':'Tout sélect.'}</button>
           {selected.size>0&&(<>
-            <button onClick={()=>setPrintQueue({items:selectedItems,idx:0})} style={{
+            <button onClick={()=>handlePrintAll(selectedItems)} style={{
               padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
               background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
             }}>🖨️ Imprimer ({selected.size})</button>
