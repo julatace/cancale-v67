@@ -785,7 +785,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
 
       {/* Stats principales */}
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-        <StatCard icon="📦" label="Stock garage" value={stockCount} color={C.accent} sub={`${freeSlots} places libres`}/>
+        <StatCard icon="📦" label="Stock garage" value={stockCount} color={C.accent}/>
         <StatCard icon="💰" label="Valeur stock" value={fmt(stockValue)} color={C.warn} sub="prix d'achat total"/>
         <StatCard icon="✅" label="Vendues" value={sales.length} color={C.danger}/>
         <StatCard icon="💸" label="CA encaissé" value={fmt(ca)} color={C.text} sub={`${encaissees.length} ventes reçues`}/>
@@ -2866,210 +2866,110 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,extraCols,cellColors
 // - Nouveau numéro au catalogue (à partir de maintenant) => ajout auto (géré dans App)
 // - Incohérences : compare le Stock Vinted avec les numéros présents dans le Garage
 function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,catalog}) {
-  const [input,setInput]=useState('');
-  const [bulk,setBulk]=useState('');
-  const [showBulk,setShowBulk]=useState(false);
-  const [search,setSearch]=useState('');
-  const [accountFilter,setAccountFilter]=useState('all');
-
-  const catAccountMap=useMemo(()=>{const m={};(catalog||[]).forEach(p=>{if(p.account)m[p.id]=p.account;});return m;},[catalog]);
-  const accountColorMap=useMemo(()=>{const m={};(accounts||[]).forEach(a=>{m[a.id]=a.color;});return m;},[accounts]);
-
-  // Normalise un numéro (string, trim)
   const norm=(v)=>String(v||'').trim();
 
-  // Ajoute un numéro à l'unité
+  // Migration : ancien format string[] → nouveau format {num,cat}[]
+  const items=useMemo(()=>(stockVinted||[]).map(x=>
+    typeof x==='string'?{num:x,cat:'Vinted'}:{num:norm(x.num),cat:x.cat||'Vinted'}
+  ),[stockVinted]);
+
+  const save_=(u)=>{setStockVinted(u);save('vinted_stock_vinted',u);};
+
+  const [inputNum,setInputNum]=useState('');
+  const [inputCat,setInputCat]=useState('Vinted');
+  const [search,setSearch]=useState('');
+  const [filterCat,setFilterCat]=useState('');
+
+  const DEFAULT_CATS=['Vinted','Garage','Compta'];
+  const allCats=useMemo(()=>{
+    const s=new Set(DEFAULT_CATS);
+    items.forEach(x=>{if(x.cat)s.add(x.cat);});
+    return [...s];
+  },[items]);
+
   const addOne=()=>{
-    const n=norm(input);
-    if(!n){ return; }
-    if(stockVinted.includes(n)){ alert('Le numéro '+n+' est déjà dans le stock Vinted.'); setInput(''); return; }
-    const u=[...stockVinted,n];
-    setStockVinted(u); save('vinted_stock_vinted',u);
-    setInput('');
+    const n=norm(inputNum);if(!n) return;
+    const cat=norm(inputCat)||'Vinted';
+    if(items.some(x=>x.num===n&&x.cat===cat)){alert(`N°${n} déjà dans ${cat}.`);setInputNum('');return;}
+    save_([...stockVinted,{num:n,cat}]);
+    setInputNum('');
   };
 
-  // Ajoute plusieurs numéros d'un coup (séparés par virgule, espace, point-virgule ou saut de ligne)
-  const addBulk=()=>{
-    const parts=bulk.split(/[\s,;]+/).map(norm).filter(Boolean);
-    if(parts.length===0){ alert('Aucun numéro détecté.'); return; }
-    const set=new Set(stockVinted);
-    let added=0;
-    parts.forEach(p=>{ if(!set.has(p)){ set.add(p); added++; } });
-    const u=Array.from(set);
-    setStockVinted(u); save('vinted_stock_vinted',u);
-    setBulk(''); setShowBulk(false);
-    alert(added+' numéro(s) ajouté(s) au stock Vinted.');
+  const removeOne=(num,cat)=>{
+    save_(items.filter(x=>!(x.num===num&&x.cat===cat)));
   };
 
-  // Retire un numéro manuellement
-  const removeOne=(n)=>{
-    const u=stockVinted.filter(x=>x!==n);
-    setStockVinted(u); save('vinted_stock_vinted',u);
-  };
-
-  // Numéros présents dans le garage (toutes les cases non vides)
-  const garageNums=useMemo(()=>{
-    const s=new Set();
-    Object.values(garageGrid||{}).forEach(arr=>{
-      if(Array.isArray(arr)) arr.forEach(v=>{ const t=norm(v); if(t) s.add(t); });
-    });
-    return s;
-  },[garageGrid]);
-
-  // Set du stock Vinted pour comparaisons rapides
-  const stockSet=useMemo(()=>new Set(stockVinted.map(norm)),[stockVinted]);
-
-  // Incohérences :
-  //  - "en ligne mais pas au garage" : numéro dans Stock Vinted mais introuvable dans le garage
-  //    (=> l'annonce est en ligne alors que la paire n'est plus là : à vérifier)
-  //  - "au garage mais pas en ligne" : numéro présent au garage mais pas dans Stock Vinted
-  //    (=> paire stockée mais pas annoncée : peut-être à mettre en ligne)
-  const enLignePasGarage=useMemo(()=>
-    stockVinted.map(norm).filter(n=>n&&!garageNums.has(n)).sort((a,b)=>(+a||0)-(+b||0))
-  ,[stockVinted,garageNums]);
-
-  const garagePasEnLigne=useMemo(()=>
-    Array.from(garageNums).filter(n=>!stockSet.has(n)).sort((a,b)=>(+a||0)-(+b||0))
-  ,[garageNums,stockSet]);
-
-  // Liste filtrée pour l'affichage
   const liste=useMemo(()=>{
-    const arr=[...stockVinted].map(norm).sort((a,b)=>(+a||0)-(+b||0));
     const q=norm(search).toLowerCase();
-    return arr.filter(n=>{
-      if(q&&!n.toLowerCase().includes(q)) return false;
-      if(accountFilter!=='all'&&catAccountMap[n]!==accountFilter) return false;
+    return items.filter(x=>{
+      if(q&&!x.num.toLowerCase().includes(q)) return false;
+      if(filterCat&&x.cat!==filterCat) return false;
       return true;
-    });
-  },[stockVinted,search,accountFilter,catAccountMap]);
+    }).sort((a,b)=>(+a.num||0)-(+b.num||0));
+  },[items,search,filterCat]);
+
+  // Grouper par catégorie
+  const grouped=useMemo(()=>{
+    const g={};
+    liste.forEach(x=>{if(!g[x.cat])g[x.cat]=[];g[x.cat].push(x);});
+    return g;
+  },[liste]);
 
   return (
-    <div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
-        <h2 style={{margin:0,fontSize:16,fontWeight:800}}>🟢 Stock Vinted ({stockVinted.length})</h2>
-        <button onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:8,padding:'7px 12px',fontWeight:700,fontSize:12,cursor:'pointer'}}>
-          {showBulk?'Fermer':'Coller en masse'}
+    <div style={{padding:'0 4px',display:'flex',flexDirection:'column',gap:14}}>
+      <h2 style={{margin:0,fontSize:16,fontWeight:800,color:C.accent}}>Stock ({items.length})</h2>
+
+      {/* Ajout */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+        <input value={inputNum} onChange={e=>setInputNum(e.target.value)}
+          onKeyDown={e=>{if(e.key==='Enter')addOne();}}
+          placeholder="Numéro" inputMode="numeric"
+          style={{flex:2,minWidth:80,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.surface,color:C.text,fontFamily:'inherit'}}/>
+        <input value={inputCat} onChange={e=>setInputCat(e.target.value)}
+          list="stock-cats" placeholder="Catégorie"
+          style={{flex:2,minWidth:100,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.surface,color:C.text,fontFamily:'inherit'}}/>
+        <datalist id="stock-cats">{allCats.map(c=><option key={c} value={c}/>)}</datalist>
+        <button onClick={addOne} style={{padding:'10px 18px',borderRadius:8,background:C.accent,color:'#fff',border:'none',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>
+          + Ajouter
         </button>
       </div>
 
-      <p style={{fontSize:12.5,color:C.muted,margin:'0 0 10px',lineHeight:1.5}}>
-        Liste de tes annonces actuellement en ligne sur Vinted. Ajoute tes numéros un par un ci-dessous.
-        Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.
-      </p>
-
-      {/* Filtre par compte */}
-      {accounts&&accounts.length>0&&(
-        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
-          <Btn small onClick={()=>setAccountFilter('all')} color={accountFilter==='all'?C.accent:C.border} style={{color:accountFilter==='all'?'#fff':C.muted}}>Tous</Btn>
-          {accounts.map(acc=>(
-            <Btn key={acc.id} small onClick={()=>setAccountFilter(acc.id)} color={accountFilter===acc.id?acc.color:C.border} style={{color:accountFilter===acc.id?'#fff':C.muted}}>
-              <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
-                <span style={{width:8,height:8,borderRadius:'50%',background:acc.color,display:'inline-block'}}/>
-                {acc.name}
-              </span>
-            </Btn>
+      {/* Filtres catégories */}
+      {allCats.length>1&&(
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          <button onClick={()=>setFilterCat('')} style={{padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',background:!filterCat?C.accent:'transparent',color:!filterCat?'#fff':C.muted,border:`1.5px solid ${!filterCat?C.accent:C.border}`}}>Tout</button>
+          {allCats.map(c=>(
+            <button key={c} onClick={()=>setFilterCat(filterCat===c?'':c)} style={{padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',background:filterCat===c?C.accent:'transparent',color:filterCat===c?'#fff':C.muted,border:`1.5px solid ${filterCat===c?C.accent:C.border}`}}>{c} ({items.filter(x=>x.cat===c).length})</button>
           ))}
         </div>
       )}
 
-      {/* Saisie à l'unité */}
-      <div style={{display:'flex',gap:8,marginBottom:12}}>
-        <input
-          value={input}
-          onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>{ if(e.key==='Enter') addOne(); }}
-          placeholder="N° de l'annonce (ex : 1908)"
-          inputMode="numeric"
-          style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:14}}
-        />
-        <button onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'10px 16px',fontWeight:700,fontSize:14,cursor:'pointer'}}>
-          Ajouter
-        </button>
-      </div>
-
-      {/* Collage en masse (optionnel) */}
-      {showBulk&&(
-        <div style={{marginBottom:14,padding:12,background:C.card2||'rgba(0,0,0,0.04)',borderRadius:8}}>
-          <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Colle plusieurs numéros (séparés par espace, virgule ou retour à la ligne) :</div>
-          <textarea
-            value={bulk}
-            onChange={e=>setBulk(e.target.value)}
-            rows={4}
-            placeholder="1908 1925 898 ..."
-            style={{width:'100%',padding:10,border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:13,boxSizing:'border-box',resize:'vertical'}}
-          />
-          <button onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'9px 16px',fontWeight:700,fontSize:13,cursor:'pointer'}}>
-            Ajouter tout
-          </button>
-        </div>
-      )}
-
-      {/* Incohérences */}
-      {(enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
-        <div style={{marginBottom:16}}>
-          <h3 style={{fontSize:14,fontWeight:800,margin:'0 0 8px',color:C.warn}}>⚠️ Incohérences avec le garage</h3>
-
-          {enLignePasGarage.length>0&&(
-            <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:8}}>
-              <div style={{fontSize:12.5,fontWeight:700,marginBottom:4}}>En ligne mais absent du garage ({enLignePasGarage.length})</div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le garage.</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                {enLignePasGarage.map(n=>(
-                  <span key={n} style={{background:C.warn,color:'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:700}}>{n}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {garagePasEnLigne.length>0&&(
-            <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:8}}>
-              <div style={{fontSize:12.5,fontWeight:700,marginBottom:4}}>Au garage mais pas en ligne ({garagePasEnLigne.length})</div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces paires sont dans le garage mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                {garagePasEnLigne.map(n=>(
-                  <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:700}}>{n}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Recherche */}
-      {stockVinted.length>0&&(
-        <input
-          value={search}
-          onChange={e=>setSearch(e.target.value)}
+      {items.length>0&&(
+        <input value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Rechercher un numéro…"
-          style={{width:'100%',padding:'9px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:8,fontSize:13,boxSizing:'border-box',marginBottom:12}}
-        />
+          style={{width:'100%',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,boxSizing:'border-box',background:C.surface,color:C.text,fontFamily:'inherit'}}/>
       )}
 
-      {/* Liste des numéros en ligne */}
+      {/* Groupes */}
       {liste.length===0?(
         <div style={{textAlign:'center',color:C.muted,fontSize:13,padding:'30px 0'}}>
-          {stockVinted.length===0?'Aucun numéro pour le moment. Ajoute tes annonces en ligne ci-dessus.':'Aucun résultat.'}
+          {items.length===0?'Aucun numéro. Ajoute-en un ci-dessus.':'Aucun résultat.'}
         </div>
       ):(
-        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-          {liste.map(n=>{
-            const absentGarage=!garageNums.has(n);
-            const accId=catAccountMap[n];
-            const accColor=accId&&accountColorMap[accId];
-            return (
-              <span key={n} style={{
-                display:'inline-flex',alignItems:'center',gap:6,
-                background:absentGarage?'rgba(156,106,31,0.12)':(C.card2||'rgba(0,0,0,0.05)'),
-                border:absentGarage?`1px solid ${C.warn}`:'1px solid transparent',
-                borderRadius:8,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:700
-              }}>
-                {accColor&&<span style={{width:8,height:8,borderRadius:'50%',background:accColor,display:'inline-block',flexShrink:0}}/>}
-                {n}
-                <button onClick={()=>removeOne(n)} title="Retirer" style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:900}}>×</button>
-              </span>
-            );
-          })}
-        </div>
+        Object.entries(grouped).map(([cat,entries])=>(
+          <div key={cat}>
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>{cat} ({entries.length})</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
+              {entries.map(x=>(
+                <span key={x.num+x.cat} style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px 5px 11px',fontSize:13,fontWeight:700,color:C.text}}>
+                  {x.num}
+                  <button onClick={()=>removeOne(x.num,x.cat)} style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:900}}>×</button>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
