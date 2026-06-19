@@ -3148,6 +3148,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
   const clearSel=()=>setSelected(new Set());
   const selectedItems=filtered.filter(b=>selected.has(b.id));
 
+  const restaurer=(id)=>{
+    const u=all.map(b=>b.id===id?{...b,statut:'à imprimer'}:b);
+    setBordereaux(u); save('vinted_bordereaux',u);
+  };
+
   const markImprime=(id)=>{
     const u=all.map(b=>b.id===id?{...b,statut:'imprimé'}:b);
     setBordereaux(u); save('vinted_bordereaux',u);
@@ -3318,14 +3323,18 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
               borderTop:`1px solid ${C.border}`,
               background:C.surface+'80',
             }}>
-              {!imprime&&b.id&&<button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
+              {b.id&&<button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
                 flex:1,padding:'7px 0',borderRadius:8,background:C.accent,color:'#fff',
                 border:'none',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
                 opacity:loadingPdf===b.id?0.55:1,
-              }}>{loadingPdf===b.id?'⏳' :'🖨️ Imprimer'}</button>}
+              }}>{loadingPdf===b.id?'⏳':imprime?'🖨️ Réimprimer':'🖨️ Imprimer'}</button>}
+              {imprime&&<button onClick={()=>restaurer(b.id)} style={{
+                flex:1,padding:'7px 0',borderRadius:8,background:'transparent',
+                color:C.accent,border:`1.5px solid ${C.accent}`,
+                fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+              }}>↩️ Restaurer</button>}
               <button onClick={()=>{
                 if(imprime){
-                  // En corbeille : suppression définitive
                   const u=all.filter(x=>x.id!==b.id);
                   setBordereaux(u);save('vinted_bordereaux',u);
                 }else{
