@@ -2983,37 +2983,27 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         }
         const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
         const page=await pdf.getPage(1);
+        const [,,rawW,rawH]=page.view;
+        const isPortrait=rawH>rawW;
         const vp=page.getViewport({scale:2});
         const c=document.createElement('canvas');
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-        const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
-        const previewSrc=URL.createObjectURL(jpegBlob);
-        // page.view = [x0,y0,w,h] brut sans /Rotate
-        const [,,rawW,rawH]=page.view;
-        const isPortrait=rawH>rawW;
-        // Canvas d'impression : copie + texte N°/modèle/taille dessiné directement
-        const pc=document.createElement('canvas');
-        pc.width=c.width;pc.height=c.height;
-        const pctx=pc.getContext('2d');
-        pctx.drawImage(c,0,0);
+        // Texte N°/modèle/taille dessiné directement sur le canvas (visible dans l'appli ET à l'impression)
         const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('   ');
         if(infoText){
-          const fs=Math.round(c.width*0.022);
-          pctx.font=`bold ${fs}px Arial, sans-serif`;
-          pctx.fillStyle='#111';
-          if(isPortrait){
-            // Mondial Relay : en bas de la page (espace vide sous le label)
-            pctx.fillText(infoText,30,c.height-30);
-          } else {
-            // Chronopost : en haut à gauche (côté fiche destinataire)
-            pctx.fillText(infoText,30,fs+20);
-          }
+          const ctx=c.getContext('2d');
+          const fs=Math.round(c.width*0.04);
+          ctx.font=`900 ${fs}px sans-serif`;
+          ctx.fillStyle='#111111';
+          const ty=isPortrait?c.height-fs*0.4:fs*1.3;
+          ctx.fillText(infoText,30,ty);
         }
-        const printJpeg=await new Promise(r=>pc.toBlob(r,'image/jpeg',0.92));
-        const printBytes=new Uint8Array(await printJpeg.arrayBuffer());
+        const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
+        const previewSrc=URL.createObjectURL(jpegBlob);
+        const jpegBytes=new Uint8Array(await jpegBlob.arrayBuffer());
         const pageW=isPortrait?595:842,pageH=isPortrait?842:595;
-        const printBlob=jpegToPdfFillA4(printBytes,pc.width,pc.height,pageW,pageH);
+        const printBlob=jpegToPdfFillA4(jpegBytes,c.width,c.height,pageW,pageH);
         setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
