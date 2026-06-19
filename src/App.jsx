@@ -2954,20 +2954,27 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const c=document.createElement('canvas');
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-        // Détecter et supprimer les marges blanches
+        // Détection par blocs 40×40 px — ignore les cadres fins (1 px) qui faussent le recadrage
         const {data:d,width:w,height:h}=c.getContext('2d').getImageData(0,0,c.width,c.height);
-        let x0=w,y0=h,x1=0,y1=0;
+        const BS=40,bW=Math.ceil(w/BS),bH=Math.ceil(h/BS);
+        const blk=new Float32Array(bW*bH);
         for(let i=0;i<d.length;i+=4){
-          if(d[i]<240||d[i+1]<240||d[i+2]<240){
-            const p=i>>2,px=p%w,py=p/w|0;
-            if(px<x0)x0=px;if(px>x1)x1=px;
-            if(py<y0)y0=py;if(py>y1)y1=py;
+          if(d[i]<220||d[i+1]<220||d[i+2]<220){
+            const p=i>>2;blk[((p/w|0)/BS|0)*bW+((p%w)/BS|0)]++;
           }
         }
-        const pad=30;
+        let x0=w,y0=h,x1=0,y1=0;
+        for(let by=0;by<bH;by++) for(let bx=0;bx<bW;bx++){
+          const bwA=Math.min(BS,w-bx*BS),bhA=Math.min(BS,h-by*BS);
+          if(blk[by*bW+bx]/(bwA*bhA)>=0.06){
+            const px0=bx*BS,py0=by*BS,px1=Math.min(w,(bx+1)*BS),py1=Math.min(h,(by+1)*BS);
+            if(px0<x0)x0=px0;if(px1>x1)x1=px1;if(py0<y0)y0=py0;if(py1>y1)y1=py1;
+          }
+        }
+        const pad=40;
         x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
         x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
-        const bigMargin=x0>w*0.08||y0>h*0.08||x1<w*0.92||y1<h*0.92;
+        const bigMargin=x0>w*0.05||y0>h*0.05||x1<w*0.95||y1<h*0.95;
         let out=c;
         if(bigMargin&&x1>x0&&y1>y0){
           out=document.createElement('canvas');
