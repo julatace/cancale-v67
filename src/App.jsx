@@ -3046,18 +3046,16 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const pdfViewerEl=pdfViewer&&(
     <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#111',display:'flex',flexDirection:'column'}}>
-      <div style={{flex:1,background:'#fff',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+      {(pdfViewer.numero||pdfViewer.modele||pdfViewer.taille)&&(
+        <div style={{padding:'6px 14px',background:'#111',flexShrink:0,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',paddingTop:'max(6px,env(safe-area-inset-top))'}}>
+          {pdfViewer.numero&&<span style={{color:'#fff',fontWeight:700,fontSize:14}}>N°{pdfViewer.numero}</span>}
+          {pdfViewer.modele&&<span style={{color:'#aaa',fontSize:13,flex:1}}>{pdfViewer.modele}</span>}
+          {pdfViewer.taille&&<span style={{color:'#ccc',fontSize:13}}>T.{pdfViewer.taille}</span>}
+        </div>
+      )}
+      <div style={{flex:1,background:'#fff',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
         {pdfViewer.previewSrc
-          ? <>
-              <img src={pdfViewer.previewSrc} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',display:'block'}}/>
-              {(pdfViewer.numero||pdfViewer.modele||pdfViewer.taille)&&(
-                <div style={{position:'absolute',bottom:10,left:10,background:'rgba(0,0,0,0.72)',backdropFilter:'blur(6px)',borderRadius:10,padding:'6px 10px',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',maxWidth:'90%'}}>
-                  {pdfViewer.numero&&<span style={{color:'#fff',fontWeight:700,fontSize:13}}>N°{pdfViewer.numero}</span>}
-                  {pdfViewer.modele&&<span style={{color:'#ddd',fontSize:12}}>{pdfViewer.modele}</span>}
-                  {pdfViewer.taille&&<span style={{background:'#444',color:'#fff',borderRadius:5,padding:'2px 7px',fontSize:12,fontWeight:700}}>T.{pdfViewer.taille}</span>}
-                </div>
-              )}
-            </>
+          ? <img src={pdfViewer.previewSrc} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',display:'block'}}/>
           : <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100%',gap:10,padding:24}}>
               <div style={{fontSize:42,fontWeight:900}}>N°{pdfViewer.numero||'?'}</div>
               {pdfViewer.modele&&<div style={{fontSize:15,fontWeight:700}}>{pdfViewer.modele}</div>}
