@@ -2757,7 +2757,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                       }}
                         style={{position:'relative',width:CW,height:CH,
                           cursor:(blockMode&&!t)||colorMode?'pointer':'auto'}}>
-                        {displayColor&&<div style={{position:'absolute',inset:0,top:TH,background:displayColor,opacity:0.35,borderRadius:2,zIndex:1,pointerEvents:'none'}}/>}
+                        {displayColor&&<div style={{position:'absolute',inset:0,top:TH,background:displayColor,opacity:0.6,borderRadius:2,zIndex:1,pointerEvents:'none'}}/>}
                         <Box val={val} isSold={isSold} highlight={highlight}/>
                         {!blockMode&&!colorMode&&<input value={val}
                           data-cell={`${z.id}_${ci}_${si}`}
