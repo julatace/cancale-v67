@@ -2939,7 +2939,10 @@ function jpegToPdfFillA4(jpegBytes,imgW,imgH,pageW,pageH){
   return new Blob([buf],{type:'application/pdf'});
 }
 
-function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
+const PAYS_FLAGS={France:'🇫🇷',Italie:'🇮🇹',Espagne:'🇪🇸',Allemagne:'🇩🇪',Belgique:'🇧🇪','Pays-Bas':'🇳🇱',Suisse:'🇨🇭',Luxembourg:'🇱🇺',Autriche:'🇦🇹',Portugal:'🇵🇹',Pologne:'🇵🇱',Suède:'🇸🇪',Danemark:'🇩🇰',Finlande:'🇫🇮',Norvège:'🇳🇴',Tchéquie:'🇨🇿',Hongrie:'🇭🇺',Roumanie:'🇷🇴',Grèce:'🇬🇷','Royaume-Uni':'🇬🇧'};
+const paysFlag=p=>{if(!p)return null;for(const[k,v]of Object.entries(PAYS_FLAGS))if(p.toLowerCase().includes(k.toLowerCase()))return v+' '+p;return'🌍 '+p;};
+
+function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
   const [printQueue,setPrintQueue]=React.useState(null); // {items, idx}
@@ -3051,6 +3054,13 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     setBordereaux(u); save('vinted_bordereaux',u);
   };
 
+  const deleteSelected=()=>{
+    if(!window.confirm(`Supprimer ${selected.size} bordereau(x) définitivement ?`)) return;
+    const u=all.filter(b=>!selected.has(b.id));
+    setBordereaux(u); save('vinted_bordereaux',u);
+    clearSel();
+  };
+
   const counts={
     'à imprimer': all.filter(b=>(b.statut||'à imprimer')==='à imprimer').length,
     'imprimé':    all.filter(b=>b.statut==='imprimé').length,
@@ -3143,12 +3153,16 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
             padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',
             background:'transparent',color:C.muted,border:`1px solid ${C.border}`,fontFamily:'inherit',
           }}>{selected.size===filtered.length?'Tout désélect.':'Tout sélect.'}</button>
-          {selected.size>0&&(
+          {selected.size>0&&(<>
             <button onClick={()=>setPrintQueue({items:selectedItems,idx:0})} style={{
               padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
               background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
-            }}>🖨️ Imprimer la sélection ({selected.size})</button>
-          )}
+            }}>🖨️ Imprimer ({selected.size})</button>
+            <button onClick={deleteSelected} style={{
+              padding:'8px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
+              background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}`,fontFamily:'inherit',
+            }}>🗑️ Supprimer ({selected.size})</button>
+          </>)}
         </div>
       )}
 
@@ -3163,10 +3177,13 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
       {filtered.map(b=>{
         const imprime=b.statut==='imprimé';
         const isSel=selected.has(b.id);
+        const photo=photos&&photos[b.numero];
+        const flagStr=paysFlag(b.pays);
         return (
-          <Card key={b.id} onClick={()=>toggleSelect(b.id)} style={{
-            marginBottom:10,padding:'12px 14px',opacity:imprime?0.65:1,cursor:'pointer',
-            border:`2px solid ${isSel?C.accent:C.border}`,transition:'border-color .15s',
+          <div key={b.id} onClick={()=>toggleSelect(b.id)} style={{
+            marginBottom:10,padding:'12px 14px',cursor:'pointer',
+            background:C.card,border:`2px solid ${isSel?C.accent:C.border}`,
+            borderRadius:8,transition:'border-color .15s',opacity:imprime?0.65:1,
           }}>
             <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:8}}>
               {/* Checkbox */}
@@ -3182,6 +3199,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
                 <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
                   <span style={{fontWeight:800,fontSize:15,color:C.accent}}>N°{b.numero||'?'}</span>
                   {b.taille&&<span style={{background:C.accent+'22',color:C.accent,borderRadius:8,padding:'2px 8px',fontSize:12,fontWeight:700}}>T.{b.taille}</span>}
+                  {flagStr&&<span style={{fontSize:13,fontWeight:700}}>{flagStr}</span>}
                   {imprime&&<span style={{background:'#27ae6022',color:'#27ae60',borderRadius:8,padding:'2px 8px',fontSize:11,fontWeight:700}}>✓ Imprimé</span>}
                 </div>
                 <div style={{fontSize:13,color:C.text,fontWeight:500,marginBottom:4}}>{b.modele||'(modèle inconnu)'}</div>
@@ -3191,6 +3209,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
                   {b.date&&<span>{b.date}</span>}
                 </div>
               </div>
+              {photo&&<img src={photo} alt="" onClick={e=>e.stopPropagation()} style={{width:52,height:52,objectFit:'cover',borderRadius:8,flexShrink:0,border:`1px solid ${C.border}`}}/>}
             </div>
             <div onClick={e=>e.stopPropagation()} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               {b.id&&(
@@ -3207,7 +3226,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
                 }}>✓ Marquer imprimé</button>
               )}
             </div>
-          </Card>
+          </div>
         );
       })}
     </div>
@@ -3666,7 +3685,7 @@ export default function App() {
         {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
         {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
-        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl}/>}
+        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
         {tab==='params'     &&<AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}/>}
       </main>
