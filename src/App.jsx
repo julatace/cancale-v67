@@ -2921,19 +2921,10 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const FIREBASE_BASE=FIREBASE_URL.replace('.json','');
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
-  const [pdfOverlay,setPdfOverlay]=React.useState(null); // {url}
+  const [downloaded,setDownloaded]=React.useState(null); // {name}
 
-  // Injecte/retire le CSS d'impression : cache tout sauf l'embed PDF
-  React.useEffect(()=>{
-    if(!pdfOverlay) return;
-    const s=document.createElement('style');
-    s.id='pdf-print-css';
-    s.textContent='@media print{body *{display:none!important}#pdf-print-overlay,#pdf-print-overlay *{display:block!important}#pdf-print-overlay embed{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;border:none!important}}';
-    document.head.appendChild(s);
-    return ()=>{document.getElementById('pdf-print-css')?.remove();};
-  },[pdfOverlay]);
-
-  // Affiche le PDF dans un overlay intégré, window.print() déclenche AirPrint sur le PDF
+  // Télécharge le PDF via <a download> → iOS enregistre dans Fichiers/Téléchargements
+  // L'utilisateur ouvre ensuite le PDF depuis l'indicateur ⬇️ de Safari → Partager → Imprimer
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
@@ -2945,7 +2936,13 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         const arr=new Uint8Array(bytes.length);
         for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
         const blob=new Blob([arr],{type:'application/pdf'});
-        setPdfOverlay({url:URL.createObjectURL(blob)});
+        const url=URL.createObjectURL(blob);
+        const fname=`bordereau-${b.numero||b.id}.pdf`;
+        const a=document.createElement('a');
+        a.href=url; a.download=fname;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(url),30000);
+        setDownloaded({name:fname});
         setLoadingPdf(null);
         return;
       }
@@ -2982,14 +2979,16 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     'tous':       all.length,
   };
 
-  // Overlay plein écran : affiche le PDF + bouton Imprimer (window.print) + Fermer
-  const pdfOverlayEl=pdfOverlay&&(
-    <div id="pdf-print-overlay" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#111',display:'flex',flexDirection:'column'}}>
-      <embed src={pdfOverlay.url} type="application/pdf" style={{flex:1,width:'100%',border:'none',display:'block'}}/>
-      <div style={{display:'flex',gap:8,padding:'12px 16px',background:'#1c1c1e',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))'}}>
-        <button onClick={()=>window.print()} style={{flex:1,padding:'14px 0',borderRadius:12,background:'#007AFF',color:'#fff',border:'none',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>🖨️ Imprimer</button>
-        <button onClick={()=>{URL.revokeObjectURL(pdfOverlay.url);setPdfOverlay(null);}} style={{flex:1,padding:'14px 0',borderRadius:12,background:'transparent',color:'#fff',border:'1px solid #555',fontSize:17,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>✕ Fermer</button>
+  // Bannière verte après téléchargement avec instructions pour imprimer
+  const downloadedBanner=downloaded&&(
+    <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#1a7f1a',padding:'16px 16px 14px',color:'#fff',textAlign:'center',boxShadow:'0 2px 12px rgba(0,0,0,0.35)'}}>
+      <div style={{fontWeight:700,fontSize:15,marginBottom:6}}>✓ PDF téléchargé !</div>
+      <div style={{fontSize:12,lineHeight:1.7,opacity:0.96}}>
+        Appuie sur <b>⬇️</b> en haut à droite de Safari<br/>
+        → ouvre <b>{downloaded.name}</b><br/>
+        → bouton <b>Partager ⬆️</b> → <b>Imprimer</b>
       </div>
+      <button onClick={()=>setDownloaded(null)} style={{marginTop:10,padding:'6px 20px',borderRadius:8,background:'transparent',border:'1.5px solid rgba(255,255,255,0.7)',color:'#fff',fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer'}}>OK</button>
     </div>
   );
 
@@ -3000,7 +2999,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
     const isLast=idx===items.length-1;
     return (
       <div style={{padding:'0 4px'}}>
-        {pdfOverlayEl}
+        {downloadedBanner}
         <div style={{background:C.surface,borderRadius:16,padding:24,textAlign:'center',marginTop:20}}>
           <div style={{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600}}>
             BORDEREAU {idx+1} / {items.length}
@@ -3015,7 +3014,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
               width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
               border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
               opacity:loadingPdf===b.id?0.6:1,
-            }}>{loadingPdf===b.id?'Chargement...' :'🖨️ Imprimer ce bordereau'}</button>
+            }}>{loadingPdf===b.id?'Chargement...' :'📥 Télécharger ce bordereau'}</button>
           )}
 
           <div style={{display:'flex',gap:10,marginBottom:8}}>
@@ -3032,7 +3031,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le PDF s'affiche → appuie sur <b style={{color:C.text}}>🖨️ Imprimer</b> pour lancer AirPrint
+            Le PDF se télécharge → appuie sur <b style={{color:C.text}}>⬇️</b> en haut de Safari → ouvre le fichier → <b style={{color:C.text}}>Partager → Imprimer</b>
           </div>
         </div>
       </div>
@@ -3041,7 +3040,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   return (
     <div style={{padding:'0 4px'}}>
-      {pdfOverlayEl}
+      {downloadedBanner}
       {/* Filtres */}
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {(['à imprimer','imprimé','tous']).map(k=>(
@@ -3116,7 +3115,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
                   padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
                   background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
                   opacity:loadingPdf===b.id?0.6:1,
-                }}>{loadingPdf===b.id?'...' :'🖨️ Imprimer'}</button>
+                }}>{loadingPdf===b.id?'...' :'📥 Télécharger'}</button>
               )}
               {!imprime&&(
                 <button onClick={()=>markImprime(b.id)} style={{
