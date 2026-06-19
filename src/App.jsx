@@ -1312,6 +1312,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
   const [page,setPage]=useState(null); // null = dernière page (init)
   const [showAll,setShowAll]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState('');
+  const [groupByAccount,setGroupByAccount]=useState(false);
   const [selectMode,setSelectMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [isDragging,setIsDragging]=useState(false);
@@ -1491,8 +1492,14 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
       </div>
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
-        <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Ventes ({sales.length})</h2>
+        <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Ventes ({sales.filter(s=>s.statut!=='en attente').length})</h2>
         <div style={{display:'flex',gap:12,fontSize:13,flexWrap:'wrap',alignItems:'center'}}>
+          <button onClick={()=>setGroupByAccount(g=>!g)} style={{
+            padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+            background:groupByAccount?C.accent:'transparent',
+            color:groupByAccount?'#fff':C.muted,
+            border:`1.5px solid ${groupByAccount?C.accent:C.border}`,
+          }}>👤 Par compte</button>
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
           <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
           <Btn small onClick={()=>{
@@ -1532,7 +1539,86 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
         </select>
         {selectedMonth&&<Btn small onClick={()=>{setSelectedMonth('');setPage(null);}} color={C.border}>✕</Btn>}
       </div>
-      <Card style={{padding:0,overflow:'hidden'}}>
+      {/* Vue par compte */}
+      {groupByAccount&&(()=>{
+        const accs=Array.isArray(accounts)?accounts:[];
+        // Associe chaque vente à un compte en cherchant dans pseudo, email prefix, ou name
+        const matchAcc=(s)=>{
+          const c=String(s.compte||'').toLowerCase().trim();
+          if(!c) return null;
+          return accs.find(a=>
+            (a.pseudo&&a.pseudo.toLowerCase()===c)||
+            (a.email&&a.email.split('@')[0].toLowerCase()===c)||
+            (a.name&&a.name.toLowerCase()===c)
+          )||null;
+        };
+        // Grouper fullFiltered par compte
+        const groups={};
+        accs.forEach(a=>{ groups[a.id]={acc:a,items:[]}; });
+        groups['__autre']={acc:{id:'__autre',name:'Sans compte',color:C.muted},items:[]};
+        fullFiltered.forEach(s=>{
+          const a=matchAcc(s);
+          const key=a?a.id:'__autre';
+          if(!groups[key]) groups[key]={acc:a||{id:key,name:key,color:C.muted},items:[]};
+          groups[key].items.push(s);
+        });
+        const grandCA=fullFiltered.reduce((s,v)=>s+(+v.sellPrice||0),0);
+        const grandProfit=fullFiltered.reduce((s,v)=>s+(+v.sellPrice||0)-(+v.buyPrice||0),0);
+        return (
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            {[...accs.map(a=>groups[a.id]),groups['__autre']].filter(g=>g&&g.items.length>0).map(({acc,items})=>{
+              const ca=items.reduce((s,v)=>s+(+v.sellPrice||0),0);
+              const profit=items.reduce((s,v)=>s+(+v.sellPrice||0)-(+v.buyPrice||0),0);
+              return (
+                <div key={acc.id} style={{borderRadius:12,overflow:'hidden',border:`1.5px solid ${acc.color}44`}}>
+                  {/* Header compte */}
+                  <div style={{background:acc.color+'22',padding:'10px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:acc.color,flexShrink:0}}/>
+                    <span style={{fontWeight:800,fontSize:14,color:acc.color}}>{acc.name}</span>
+                    <span style={{fontSize:12,color:C.muted,marginLeft:'auto'}}>{items.length} vente{items.length>1?'s':''}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:C.text}}>CA : {fmt(ca)}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:profit>=0?C.accent:C.danger}}>Bénéf. : {fmt(profit)}</span>
+                  </div>
+                  {/* Mini-tableau des ventes du compte */}
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                      <thead><tr style={{background:C.surface}}>
+                        {['Article','Date vente','Réception €','Achat','Vente','Bénéfice'].map(h=>(
+                          <th key={h} style={{padding:'6px 10px',textAlign:'left',color:C.muted,fontWeight:600,fontSize:10,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {items.map(v=>{
+                          const b=(+v.sellPrice||0)-(+v.buyPrice||0);
+                          return (
+                            <tr key={v.id} style={{borderTop:`1px solid ${C.border}`}}>
+                              <td style={{padding:'5px 10px',fontWeight:700,color:C.accent}}>{v.productId||'—'}</td>
+                              <td style={{padding:'5px 10px',color:C.muted}}>{v.saleDate||'—'}</td>
+                              <td style={{padding:'5px 10px',color:C.muted}}>{v.receiveDate||'—'}</td>
+                              <td style={{padding:'5px 10px',color:C.text,textAlign:'right'}}>{v.buyPrice!=null?fmt(+v.buyPrice):'—'}</td>
+                              <td style={{padding:'5px 10px',color:C.text,textAlign:'right'}}>{v.sellPrice!=null?fmt(+v.sellPrice):'—'}</td>
+                              <td style={{padding:'5px 10px',fontWeight:700,color:b>=0?C.accent:C.danger,textAlign:'right'}}>{fmt(b)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+            {/* Total général */}
+            <div style={{background:C.accent+'18',borderRadius:12,padding:'12px 16px',display:'flex',gap:16,flexWrap:'wrap',alignItems:'center',border:`1.5px solid ${C.accent}44`}}>
+              <span style={{fontWeight:800,fontSize:14,color:C.accent}}>Total tous comptes</span>
+              <span style={{fontSize:13,color:C.muted}}>{fullFiltered.length} vente{fullFiltered.length>1?'s':''}</span>
+              <span style={{fontSize:13,fontWeight:700,color:C.text,marginLeft:'auto'}}>CA : {fmt(grandCA)}</span>
+              <span style={{fontSize:13,fontWeight:800,color:grandProfit>=0?C.accent:C.danger}}>Bénéfice : {fmt(grandProfit)}</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {!groupByAccount&&<Card style={{padding:0,overflow:'hidden'}}>
         <div className={selectMode?'sales-select-mode':''} style={{overflowX:'auto',position:'relative'}}>
           <style>{`
             .sales-select-mode tbody td > * { pointer-events: none !important; }
@@ -1666,9 +1752,9 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
             </tbody>
           </table>
         </div>
-      </Card>
+      </Card>}
       {/* Pagination */}
-      {!showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
+      {!groupByAccount&&!showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
         <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?totalPages-1:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>← Précédent</Btn>
         <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
           Page <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>({fullFiltered.length} résultats)</span>
@@ -1676,7 +1762,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
         <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>Suivant →</Btn>
         <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
       </div>}
-      {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
+      {!groupByAccount&&showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
         <span style={{color:C.warn}}>📋 Affichage complet — {fullFiltered.length} ventes</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
