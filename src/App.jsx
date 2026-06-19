@@ -331,7 +331,7 @@ const TABS=[
   {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'bordereaux', icon:'🖨️',label:'Bordereaux'},
   {id:'garage',     icon:'🏠',label:'Garage'},
-  {id:'params',     icon:'⚙️',label:'Comptes'},
+  {id:'params',     icon:'👤',label:'Comptes'},
 ];
 function Nav({tab,setTab}) {
   return (
@@ -978,7 +978,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
 }
 
 /* ── Comptes ─────────────────────────────────────────── */
-function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl}) {
+function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,dark,toggleDark,notifEnabled,onToggleNotif,onExport,onImport}) {
   const saveAcc=(a)=>{setAccounts(a);save('vinted_accounts',a);};
   const addAcc=()=>{
     const COLORS=['#007782','#e67e22','#9b59b6','#e74c3c','#27ae60','#2980b9','#f39c12','#1abc9c'];
@@ -1003,6 +1003,34 @@ function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl})
   );
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+
+      {/* Paramètres généraux */}
+      <Card style={{padding:14,display:'flex',flexDirection:'column',gap:10}}>
+        <div style={{fontWeight:700,color:C.text,fontSize:14,marginBottom:2}}>Paramètres</div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          <button onClick={toggleDark} style={{
+            flex:1,minWidth:120,padding:'10px 0',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:700,cursor:'pointer',
+            background:'transparent',border:`1px solid ${C.border}`,color:C.text,
+          }}>{dark?'☀️  Mode clair':'🌙  Mode sombre'}</button>
+          <button onClick={onToggleNotif} style={{
+            flex:1,minWidth:120,padding:'10px 0',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:700,cursor:'pointer',
+            background:notifEnabled?C.accent:'transparent',
+            border:`1px solid ${notifEnabled?C.accent:C.border}`,
+            color:notifEnabled?'#fff':C.text,
+          }}>{notifEnabled?'🔔  Notifications ON':'🔕  Notifications OFF'}</button>
+        </div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          <button onClick={onExport} style={{
+            flex:1,minWidth:120,padding:'10px 0',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:700,cursor:'pointer',
+            background:'transparent',border:`1px solid ${C.accent}66`,color:C.accent,
+          }}>📤  Exporter sauvegarde</button>
+          <button onClick={onImport} style={{
+            flex:1,minWidth:120,padding:'10px 0',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:700,cursor:'pointer',
+            background:'transparent',border:`1px solid ${C.blue}66`,color:C.blue,
+          }}>📥  Importer sauvegarde</button>
+        </div>
+      </Card>
+
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Comptes Vinted</h2>
         <Btn small onClick={addAcc} color={C.accent}>+ Ajouter</Btn>
@@ -3559,16 +3587,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
   return (
     <div style={{padding:'0 4px'}}>
       {pdfViewerEl}
-      {/* Sync Gmail */}
-      <div style={{display:'flex',gap:8,marginBottom:10,alignItems:'center'}}>
-        <button onClick={syncGmailSales} disabled={syncingGmail} style={{
-          padding:'7px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:syncingGmail?'default':'pointer',
-          background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
-          opacity:syncingGmail?0.6:1,flexShrink:0,
-        }}>{syncingGmail?'⏳ Sync...':'📧 Sync Gmail'}</button>
-        {syncMsg&&<span style={{fontSize:11,color:C.muted,fontWeight:600}}>{syncMsg}</span>}
-      </div>
-
       {/* Filtres */}
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
         {(['à imprimer','imprimé']).map(k=>(
@@ -4041,99 +4059,11 @@ export default function App() {
               )}
             </span>
           </div>
-          {/* Boutons Mode sombre / Exporter / Importer */}
-          <div style={{display:'flex',gap:6}}>
-            <button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
-              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
-              {dark?'☀️':'🌙'}
-            </button>
-            <button type="button" onClick={async()=>{
-              if(!notifEnabled){
-                const res=await askNotifPermission();
-                if(res==='granted'){
-                  setNotifEnabled(true); save('vinted_notif_enabled',true);
-                  pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
-                } else if(res==='denied'){
-                  alert("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
-                } else if(res==='unsupported'){
-                  alert("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
-                }
-              } else {
-                setNotifEnabled(false); save('vinted_notif_enabled',false);
-              }
-            }} title={notifEnabled?'Notifications activées (cliquer pour désactiver)':'Activer les notifications'}
-              style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
-              {notifEnabled?'🔔':'🔕'}
-            </button>
-            <button type="button" onClick={()=>{
-              try {
-                const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()};
-                const json=JSON.stringify(data,null,2);
-                const blob=new Blob([json],{type:'application/json'});
-                const url=URL.createObjectURL(blob);
-                const a=document.createElement('a');
-                const date=new Date().toISOString().slice(0,10);
-                a.href=url;
-                a.download=`cancale-backup-${date}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-              } catch(err) {
-                alert('Erreur export : '+err.message);
-              }
-            }} title="Télécharger une sauvegarde"
-              style={{background:'transparent',border:`1px solid ${C.accent}66`,borderRadius:999,padding:'6px 12px',color:C.accent,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>
-              📤 Exporter
-            </button>
-            <button type="button" onClick={()=>{
-              const inp=document.createElement('input');
-              inp.type='file';
-              inp.accept='.json,application/json';
-              inp.onchange=async(e)=>{
-                const file=e.target.files[0];
-                if(!file) return;
-                try {
-                  const text=await file.text();
-                  const data=JSON.parse(text);
-                  if(!data.catalog&&!data.sales&&!data.garageGrid){
-                    alert('⚠ Fichier invalide : aucun catalogue/ventes/garage trouvé.');
-                    return;
-                  }
-                  let msg='Importer ce fichier ?\n\n';
-                  if(data.catalog) msg+=`📦 Catalogue : ${data.catalog.length} paires\n`;
-                  if(data.sales) msg+=`💸 Ventes : ${data.sales.length} ventes\n`;
-                  if(data.garageGrid) msg+=`🏠 Garage : ${Object.values(data.garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length} paires\n`;
-                  msg+='\n⚠ Tes données actuelles seront REMPLACÉES.';
-                  if(!window.confirm(msg)) return;
-                  if(data.catalog) {setCatalog(data.catalog); save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
-                  if(data.sales) {setSales(data.sales); save('vinted_sales',data.sales);}
-                  if(data.garageGrid) {
-                    const mig = migrateGarageData(data.garageGrid, data.blockedCells, data.cellColors);
-                    const g = mig ? mig.garageGrid : data.garageGrid;
-                    const b = mig ? mig.blockedCells : (data.blockedCells||{});
-                    const co = mig ? mig.cellColors : (data.cellColors||{});
-                    const ec = data.extraCols || (mig ? mig.extraCols : (() => { const e={}; Object.keys(g).forEach(k=>{const m=k.match(/^(.+)_(\d+)$/);if(m)e[m[1]]=Math.max(e[m[1]]||0,+m[2]);}); return e; })());
-                    setGarageGrid(g); save('vinted_garage_grid',g);
-                    setBlockedCells(b); save('vinted_blocked',b);
-                    setCellColors(co); save('vinted_colors',co);
-                    setExtraCols(ec); save('vinted_extracols',ec);
-                  } else {
-                    if(data.blockedCells) {setBlockedCells(data.blockedCells); save('vinted_blocked',data.blockedCells);}
-                    if(data.extraCols) {setExtraCols(data.extraCols); save('vinted_extracols',data.extraCols);}
-                    if(data.cellColors) {setCellColors(data.cellColors); save('vinted_colors',data.cellColors);}
-                  }
-                  alert('✓ Import réussi !');
-                } catch(err) {
-                  alert('Erreur lecture du fichier : '+err.message);
-                }
-              };
-              inp.click();
-            }} title="Importer une sauvegarde"
-              style={{background:'transparent',border:`1px solid ${C.blue}66`,borderRadius:999,padding:'6px 12px',color:C.blue,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>
-              📥 Importer
-            </button>
-          </div>
+          {/* Bouton Paramètres */}
+          <button type="button" onClick={()=>setTab('params')} title="Paramètres"
+            style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',color:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
+            ⚙️
+          </button>
         </div>
       </header>
       {/* Bandeau de notification in-app */}
@@ -4162,7 +4092,52 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
         {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
-        {tab==='params'     &&<AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}/>}
+        {tab==='params'     &&<AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}
+          dark={dark} toggleDark={toggleDark} notifEnabled={notifEnabled}
+          onToggleNotif={async()=>{
+            if(!notifEnabled){
+              const res=await askNotifPermission();
+              if(res==='granted'){setNotifEnabled(true);save('vinted_notif_enabled',true);pushNotif('Notifications activées','Tu seras prévenu des ventes et des factures.');}
+              else if(res==='denied') alert("Notifications bloquées par le navigateur. Active-les dans les réglages du site.");
+              else if(res==='unsupported') alert("Ton navigateur ne supporte pas les notifications.");
+            } else {setNotifEnabled(false);save('vinted_notif_enabled',false);}
+          }}
+          onExport={()=>{
+            try{
+              const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()};
+              const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+              const url=URL.createObjectURL(blob);
+              const a=document.createElement('a');
+              a.href=url;a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`;
+              document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+            }catch(err){alert('Erreur export : '+err.message);}
+          }}
+          onImport={()=>{
+            const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
+            inp.onchange=async(e)=>{
+              const file=e.target.files[0];if(!file) return;
+              try{
+                const data=JSON.parse(await file.text());
+                if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;}
+                let msg='Importer ce fichier ?\n\n';
+                if(data.catalog) msg+=`📦 Catalogue : ${data.catalog.length} paires\n`;
+                if(data.sales) msg+=`💸 Ventes : ${data.sales.length} ventes\n`;
+                msg+='\n⚠ Tes données actuelles seront REMPLACÉES.';
+                if(!window.confirm(msg)) return;
+                if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);}
+                if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);}
+                if(data.garageGrid){
+                  const mig=migrateGarageData(data.garageGrid,data.blockedCells,data.cellColors);
+                  const g=mig?mig.garageGrid:data.garageGrid;
+                  setGarageGrid(g);save('vinted_garage_grid',g);
+                  if(mig){setBlockedCells(mig.blockedCells);save('vinted_blocked',mig.blockedCells);setCellColors(mig.cellColors);save('vinted_colors',mig.cellColors);}
+                  else{if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}if(data.cellColors){setCellColors(data.cellColors);save('vinted_colors',data.cellColors);}}
+                }
+                alert('✓ Import réussi !');
+              }catch(err){alert('Erreur : '+err.message);}
+            };inp.click();
+          }}
+        />}
       </main>
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells} extraCols={extraCols} cellColors={cellColors}
