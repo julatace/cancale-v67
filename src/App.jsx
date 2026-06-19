@@ -2922,38 +2922,50 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
   const [pdfViewer,setPdfViewer]=React.useState(null); // {url}
-  const [pdfError,setPdfError]=React.useState(null);
   const iframeRef=React.useRef(null);
 
-  const handlePrint=async(b)=>{
+  // Génère un label HTML imprimable à partir des données Firebase (pas besoin du PDF)
+  const handlePrint=(b)=>{
     if(!b||!b.id) return;
-    setLoadingPdf(b.id);
-    setPdfError(null);
-    try {
-      const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
-      const base64=await res.json();
-      if(base64&&typeof base64==='string'){
-        const bytes=atob(base64);
-        const arr=new Uint8Array(bytes.length);
-        for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-        const blob=new Blob([arr],{type:'application/pdf'});
-        setPdfViewer({url:URL.createObjectURL(blob)});
-        setLoadingPdf(null);
-        return;
-      }
-      // PDF pas encore dans Firebase (bordereau avant la mise à jour Apps Script)
-      setPdfError(b.id);
-    } catch(_){
-      setPdfError(b.id);
-    }
-    setLoadingPdf(null);
+    const dark=document.documentElement.classList.contains('dark');
+    const html=`<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bordereau N°${b.numero||''}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;padding:24px;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.label{border:3px solid #000;border-radius:8px;padding:24px;width:340px}
+.badge{font-size:11px;font-weight:700;letter-spacing:2px;color:#555;text-transform:uppercase;margin-bottom:6px}
+.numero{font-size:40px;font-weight:900;line-height:1;margin-bottom:16px;letter-spacing:-1px}
+.modele{font-size:17px;font-weight:700;margin-bottom:4px}
+.taille{display:inline-block;background:#000;color:#fff;font-size:20px;font-weight:900;padding:4px 14px;border-radius:6px;margin-bottom:16px}
+hr{border:none;border-top:1.5px solid #ccc;margin:14px 0}
+.row{font-size:13px;margin-bottom:6px;display:flex;gap:8px}
+.row b{font-weight:700}
+.mono{font-family:monospace;font-size:13px;font-weight:700;letter-spacing:1px}
+@media print{body{padding:0;min-height:unset}.label{border:2px solid #000;width:100%}}
+</style>
+</head><body>
+<div class="label">
+  <div class="badge">Vinted · Bordereau</div>
+  <div class="numero">N°${b.numero||'?'}</div>
+  ${b.modele?`<div class="modele">${b.modele}</div>`:''}
+  ${b.taille?`<div class="taille">T.${b.taille}</div>`:''}
+  <hr>
+  ${b.dateLimite?`<div class="row">⏰ À expédier avant le <b>${b.dateLimite}</b></div>`:''}
+  ${b.suivi?`<div class="row">📦 Suivi : <span class="mono">${b.suivi}</span></div>`:''}
+  ${b.transaction?`<div class="row">🔖 Transaction : <span class="mono">${b.transaction}</span></div>`:''}
+  ${b.date?`<div class="row">📅 Vente du ${b.date}</div>`:''}
+</div>
+</body></html>`;
+    const blob=new Blob([html],{type:'text/html'});
+    setPdfViewer({url:URL.createObjectURL(blob)});
   };
 
   const doPrint=()=>{
-    // Tente d'imprimer uniquement le contenu de l'iframe (le PDF)
-    try { iframeRef.current?.contentWindow?.print(); return; } catch(_){}
-    // Fallback : window.print() imprime ce qui est visible (l'iframe plein écran)
-    window.print();
+    try{ iframeRef.current?.contentWindow?.print(); }catch(_){ window.print(); }
   };
 
   const all=Array.isArray(bordereaux)?bordereaux:[];
@@ -3024,8 +3036,6 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
             opacity:loadingPdf===b.id?0.6:1,
           }}>{loadingPdf===b.id?'Chargement...' :'🖨️ Voir et imprimer'}</button>
 
-          {pdfError===b.id&&<div style={{fontSize:12,color:'#e74c3c',marginBottom:8,padding:'8px',background:'#e74c3c11',borderRadius:8}}>PDF non disponible — ce bordereau a été créé avant la mise à jour de l'Apps Script.</div>}
-
           <div style={{display:'flex',gap:10,marginBottom:8}}>
             {!isLast&&(
               <button onClick={()=>setPrintQueue({...printQueue,idx:idx+1})} style={{
@@ -3040,7 +3050,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           </div>
 
           <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.5}}>
-            Le PDF s'affiche dans l'app → appuie sur <b style={{color:C.text}}>🖨️ Imprimer</b>
+            Le bordereau s'affiche → appuie sur <b style={{color:C.text}}>🖨️ Imprimer</b> → AirPrint
           </div>
         </div>
       </div>
