@@ -1988,7 +1988,6 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
           {id:'ventes_attente',icon:'⏳',label:'En attente',count:counters.ventes_attente},
-          {id:'ventes_finalisees',icon:'💰',label:'Finalisées',count:counters.ventes_finalisees},
           {id:'attente',icon:'🧾',label:'Factures',count:counters.attente},
           {id:'comptabilisees',icon:'✅',label:'Comptabilisées',count:counters.comptabilisees},
         ].map(z=>(
@@ -2001,9 +2000,8 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
       </div>
 
       {/* Ventes Gmail : En attente / Finalisées */}
-      {(zone==='ventes_attente'||zone==='ventes_finalisees')&&(()=>{
-        const gmailSales=(Array.isArray(sales)?sales:[]).filter(s=>
-          zone==='ventes_attente'?s.statut==='en attente':s.statut==='finalisée'
+      {zone==='ventes_attente'&&(()=>{
+        const gmailSales=(Array.isArray(sales)?sales:[]).filter(s=>s.statut==='en attente'
         ).sort((a,b)=>{
           const ta=a.saleDate?a.saleDate.split('/').reverse().join('-'):'';
           const tb=b.saleDate?b.saleDate.split('/').reverse().join('-'):'';
@@ -2014,9 +2012,7 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {gmailSales.length===0&&(
               <div style={{textAlign:'center',color:C.muted,padding:'32px 0',fontSize:13}}>
-                {zone==='ventes_attente'
-                  ? 'Aucune vente en attente. Les ventes Vinted apparaissent ici dès la sync.'
-                  : 'Aucune vente finalisée via Gmail pour l\'instant.'}
+                Aucune vente en attente. Les ventes Vinted apparaissent ici dès la sync.
               </div>
             )}
             {gmailSales.map(s=>{
@@ -2034,12 +2030,7 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
                     <div style={{fontSize:11,color:C.muted,display:'flex',gap:12,flexWrap:'wrap'}}>
                       {s.saleDate&&<span>📅 Vente : {s.saleDate}</span>}
                       {s.receiveDate&&<span>💳 Reçu : {s.receiveDate}</span>}
-                      {zone==='ventes_finalisees'&&<>
-                        <span>🛒 Achat : {fmt2(s.buyPrice)}</span>
-                        <span>💶 Vente : {fmt2(s.sellPrice)}</span>
-                        <span style={{color:s.profit>=0?C.accent:C.danger,fontWeight:700}}>📈 Bénéf. : {fmt2(s.profit)}</span>
-                      </>}
-                    </div>
+                        </div>
                   </div>
                   {canDelete&&<button onClick={()=>{
                     if(!window.confirm('Supprimer cette vente en attente ?')) return;
