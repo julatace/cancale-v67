@@ -2951,12 +2951,12 @@ function jpegsToPdfA4(pages,pageW=595,pageH=842){
   const kids=Array.from({length:n},(_,i)=>`${3+i*3} 0 R`).join(' ');
   off[2]=len();push(`2 0 obj\n<</Type/Pages/Kids[${kids}]/Count ${n}>>\nendobj\n`);
   for(let i=0;i<n;i++){
-    const {jpegBytes,imgW,imgH}=pages[i];
-    const scale=Math.min(pageW/imgW,pageH/imgH);
+    const {jpegBytes,imgW,imgH,pageW:pw=pageW,pageH:ph=pageH}=pages[i];
+    const scale=Math.min(pw/imgW,ph/imgH);
     const dW=Math.round(imgW*scale),dH=Math.round(imgH*scale);
-    const ox=Math.round((pageW-dW)/2),oy=Math.round((pageH-dH)/2);
+    const ox=Math.round((pw-dW)/2),oy=Math.round((ph-dH)/2);
     const pg=3+i*3,ct=4+i*3,im=5+i*3,nm=`I${i+1}`;
-    off[pg]=len();push(`${pg} 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${pageW} ${pageH}]/Contents ${ct} 0 R/Resources<</XObject<</${nm} ${im} 0 R>>>>>>\nendobj\n`);
+    off[pg]=len();push(`${pg} 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${pw} ${ph}]/Contents ${ct} 0 R/Resources<</XObject<</${nm} ${im} 0 R>>>>>>\nendobj\n`);
     const s=`q ${dW} 0 0 ${dH} ${ox} ${oy} cm /${nm} Do Q`;
     off[ct]=len();push(`${ct} 0 obj\n<</Length ${s.length}>>\nstream\n${s}\nendstream\nendobj\n`);
     off[im]=len();push(`${im} 0 obj\n<</Type/XObject/Subtype/Image/Width ${imgW}/Height ${imgH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpegBytes.length}>>\nstream\n`);
@@ -3040,8 +3040,9 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
           }
           const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
           const pb=new Uint8Array(await pj.arrayBuffer());
-          // PDF.js oriente déjà le canvas → A4 portrait dans tous les cas
-          printBlob=jpegToPdfFillA4(pb,c.width,c.height,595,842);
+          // Choisit portrait ou paysage A4 selon l'orientation du canvas rendu
+          const pw=c.width>c.height?842:595,ph=c.width>c.height?595:842;
+          printBlob=jpegToPdfFillA4(pb,c.width,c.height,pw,ph);
         }
         // preview JPEG
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
@@ -3105,7 +3106,8 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos}) {
             ctx.fillText(infoText,10,isPortrait?fs*1.4:c.height-fs*0.4);
           }
           const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
-          pages.push({jpegBytes:new Uint8Array(await pj.arrayBuffer()),imgW:c.width,imgH:c.height});
+          const pw=c.width>c.height?842:595,ph=c.width>c.height?595:842;
+          pages.push({jpegBytes:new Uint8Array(await pj.arrayBuffer()),imgW:c.width,imgH:c.height,pageW:pw,pageH:ph});
         }catch(_){}
       }
       if(!pages.length){setBatchLoading(false);return;}
