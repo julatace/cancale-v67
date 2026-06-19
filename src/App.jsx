@@ -2933,77 +2933,22 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
       const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
       const base64=await res.json();
       if(base64&&typeof base64==='string'){
-        const wrapper=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{background:#fff}
-.page{display:block;width:100%;height:auto;page-break-after:always}
-@page{size:A4 portrait;margin:0}
-@media print{.page{display:block;width:210mm;height:auto;page-break-after:always}}
-</style></head><body>
-<div id="ct"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>
-pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-(async function(){
-  const bin=atob('${base64}');
-  const bytes=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-  const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
-  const A4W=595.28,A4H=841.89;
-  const ct=document.getElementById('ct');
-  for(let p=1;p<=pdf.numPages;p++){
-    const page=await pdf.getPage(p);
-    const vp0=page.getViewport({scale:1});
-    const rot=vp0.width>vp0.height?90:0;
-    const vp1=page.getViewport({scale:1,rotation:rot});
-    const sc=Math.min(A4W/vp1.width,A4H/vp1.height)*2;
-    const vp=page.getViewport({scale:sc,rotation:rot});
-    const c=document.createElement('canvas');
-    c.width=Math.round(vp.width);
-    c.height=Math.round(vp.height);
-    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-    const img=document.createElement('img');
-    img.className='page';
-    img.src=c.toDataURL('image/jpeg',0.95);
-    ct.appendChild(img);
-  }
-})();
-</script>
-</body></html>`;
+        const bin=atob(base64);
+        const arr=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+        const pdfBlob=new Blob([arr],{type:'application/pdf'});
+        const pdfUrl=URL.createObjectURL(pdfBlob);
+        const wrapper=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#fff}embed{display:block;width:100%;height:100vh}@page{margin:0}</style></head><body><embed src="${pdfUrl}" type="application/pdf"></body></html>`;
         const wrapBlob=new Blob([wrapper],{type:'text/html'});
-        setPdfViewer({url:URL.createObjectURL(wrapBlob),isPdf:true,pdfUrl:null});
+        setPdfViewer({url:URL.createObjectURL(wrapBlob),isPdf:true,pdfUrl,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
       }
     } catch(_){}
-    // 2. Fallback : slip minimal avec seulement N°, modèle, taille (anciens bordereaux)
-    const html=`<!DOCTYPE html>
-<html><head>
-<meta charset="UTF-8">
-<title>N°${b.numero||''}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;
-  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
-.slip{border:2.5px dashed #000;border-radius:6px;padding:20px 24px;text-align:center;width:260px}
-.n{font-size:13px;color:#555;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-.num{font-size:44px;font-weight:900;line-height:1;margin-bottom:10px}
-.mod{font-size:15px;font-weight:700;margin-bottom:8px}
-.tai{display:inline-block;background:#000;color:#fff;font-size:22px;font-weight:900;
-  padding:4px 16px;border-radius:5px}
-@media print{body{min-height:unset;padding:0}.slip{width:100%;border:2px dashed #000}}
-</style>
-</head><body>
-<div class="slip">
-  <div class="n">Vinted — à expédier</div>
-  <div class="num">N°${b.numero||'?'}</div>
-  ${b.modele?`<div class="mod">${b.modele}</div>`:''}
-  ${b.taille?`<div class="tai">T.${b.taille}</div>`:''}
-</div>
-</body></html>`;
+    // 2. Fallback : slip minimal (PDF non disponible)
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}.slip{border:2.5px dashed #000;border-radius:6px;padding:20px 24px;text-align:center;width:260px}.n{font-size:13px;color:#555;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}.num{font-size:44px;font-weight:900;line-height:1;margin-bottom:10px}.mod{font-size:15px;font-weight:700;margin-bottom:8px}.tai{display:inline-block;background:#000;color:#fff;font-size:22px;font-weight:900;padding:4px 16px;border-radius:5px}@media print{body{min-height:unset;padding:0}.slip{width:100%;border:2px dashed #000}}</style></head><body><div class="slip"><div class="n">Vinted — à expédier</div><div class="num">N°${b.numero||'?'}</div>${b.modele?`<div class="mod">${b.modele}</div>`:''}${b.taille?`<div class="tai">T.${b.taille}</div>`:''}</div></body></html>`;
     const blob=new Blob([html],{type:'text/html'});
-    setPdfViewer({url:URL.createObjectURL(blob),isPdf:false});
+    setPdfViewer({url:URL.createObjectURL(blob),isPdf:false,numero:b.numero,modele:b.modele,taille:b.taille});
     setLoadingPdf(null);
   };
 
@@ -3039,6 +2984,13 @@ body{font-family:-apple-system,Arial,sans-serif;background:#fff;color:#000;
   // Visionneur plein écran dans l'app + bouton Imprimer
   const pdfViewerEl=pdfViewer&&(
     <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,background:'#000',display:'flex',flexDirection:'column'}}>
+      {(pdfViewer.numero||pdfViewer.modele||pdfViewer.taille)&&(
+        <div style={{background:'#2c2c2e',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0,flexWrap:'wrap'}}>
+          {pdfViewer.numero&&<span style={{color:'#fff',fontWeight:700,fontSize:15}}>N°{pdfViewer.numero}</span>}
+          {pdfViewer.modele&&<span style={{color:'#aaa',fontSize:13,flex:1}}>{pdfViewer.modele}</span>}
+          {pdfViewer.taille&&<span style={{background:'#555',color:'#fff',borderRadius:6,padding:'2px 9px',fontSize:13,fontWeight:700}}>T.{pdfViewer.taille}</span>}
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         src={pdfViewer.url}
