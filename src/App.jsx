@@ -2913,29 +2913,31 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices,accounts,ca
 }
 
 
-// Crée un PDF minimal contenant une image JPEG — plus rapide à imprimer qu'un JPEG brut
-function jpegToPdf(jpegBytes,imgW,imgH){
-  const DPI=144; // scale:2 @ 72pt/inch
-  const pW=Math.round(imgW/DPI*72), pH=Math.round(imgH/DPI*72);
+function jpegToPdfFillA4(jpegBytes,imgW,imgH){
+  // Place le JPEG centré dans une page A4 paysage en remplissant au maximum
+  const pageW=842,pageH=595; // A4 landscape en points (72pt/inch)
+  const scale=Math.min(pageW/imgW,pageH/imgH);
+  const dW=Math.round(imgW*scale),dH=Math.round(imgH*scale);
+  const ox=Math.round((pageW-dW)/2),oy=Math.round((pageH-dH)/2);
   const enc=new TextEncoder();
-  const parts=[], off={};
+  const parts=[],off={};
   const push=s=>parts.push(typeof s==='string'?enc.encode(s):s);
   const len=()=>parts.reduce((a,p)=>a+p.length,0);
   push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
-  off[1]=len(); push(`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`);
-  off[2]=len(); push(`2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n`);
-  off[3]=len(); push(`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${pW} ${pH}]/Contents 4 0 R/Resources<</XObject<</I 5 0 R>>>>>>\nendobj\n`);
-  const s4=`q ${pW} 0 0 ${pH} 0 0 cm /I Do Q`;
-  off[4]=len(); push(`4 0 obj\n<</Length ${s4.length}>>\nstream\n${s4}\nendstream\nendobj\n`);
-  off[5]=len(); push(`5 0 obj\n<</Type/XObject/Subtype/Image/Width ${imgW}/Height ${imgH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpegBytes.length}>>\nstream\n`);
+  off[1]=len();push(`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`);
+  off[2]=len();push(`2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n`);
+  off[3]=len();push(`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${pageW} ${pageH}]/Contents 4 0 R/Resources<</XObject<</I 5 0 R>>>>>>\nendobj\n`);
+  const s4=`q ${dW} 0 0 ${dH} ${ox} ${oy} cm /I Do Q`;
+  off[4]=len();push(`4 0 obj\n<</Length ${s4.length}>>\nstream\n${s4}\nendstream\nendobj\n`);
+  off[5]=len();push(`5 0 obj\n<</Type/XObject/Subtype/Image/Width ${imgW}/Height ${imgH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpegBytes.length}>>\nstream\n`);
   push(jpegBytes);
   push('\nendstream\nendobj\n');
   const xp=len();
   push(`xref\n0 6\n0000000000 65535 f \n`);
-  for(let i=1;i<=5;i++) push(`${String(off[i]).padStart(10,'0')} 00000 n \n`);
+  for(let i=1;i<=5;i++)push(`${String(off[i]).padStart(10,'0')} 00000 n \n`);
   push(`trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xp}\n%%EOF`);
   const buf=new Uint8Array(parts.reduce((a,p)=>a+p.length,0));
-  let o=0; for(const p of parts){buf.set(p,o);o+=p.length;}
+  let o=0;for(const p of parts){buf.set(p,o);o+=p.length;}
   return new Blob([buf],{type:'application/pdf'});
 }
 
@@ -2983,13 +2985,51 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         }
         const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
         const page=await pdf.getPage(1);
+        const vp0=page.getViewport({scale:1});
+        const isPortrait=vp0.height>vp0.width;
+        // Aperçu : rendu original sans modification
         const vp=page.getViewport({scale:2});
         const c=document.createElement('canvas');
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
         const jpegBlob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
         const previewSrc=URL.createObjectURL(jpegBlob);
-        setPdfViewer({previewSrc,pdfBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
+        // Impression Mondial Relay (portrait) : pivoter 90°, recadrer, remplir A4 paysage
+        let printBlob=null;
+        if(isPortrait){
+          const vpR=page.getViewport({scale:2,rotation:90});
+          const cr=document.createElement('canvas');
+          cr.width=Math.round(vpR.width);cr.height=Math.round(vpR.height);
+          await page.render({canvasContext:cr.getContext('2d'),viewport:vpR}).promise;
+          const {data:d,width:w,height:h}=cr.getContext('2d').getImageData(0,0,cr.width,cr.height);
+          const BS=40,bW=Math.ceil(w/BS),bH=Math.ceil(h/BS);
+          const blk=new Float32Array(bW*bH);
+          for(let i=0;i<d.length;i+=4){
+            if(d[i]<220||d[i+1]<220||d[i+2]<220){
+              const p=i>>2;blk[((p/w|0)/BS|0)*bW+((p%w)/BS|0)]++;
+            }
+          }
+          let x0=w,y0=h,x1=0,y1=0;
+          for(let by=0;by<bH;by++) for(let bx=0;bx<bW;bx++){
+            const bwA=Math.min(BS,w-bx*BS),bhA=Math.min(BS,h-by*BS);
+            if(blk[by*bW+bx]/(bwA*bhA)>=0.06){
+              const px0=bx*BS,py0=by*BS,px1=Math.min(w,(bx+1)*BS),py1=Math.min(h,(by+1)*BS);
+              if(px0<x0)x0=px0;if(px1>x1)x1=px1;if(py0<y0)y0=py0;if(py1>y1)y1=py1;
+            }
+          }
+          const pad=20;
+          x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);
+          x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
+          if(x1>x0&&y1>y0){
+            const cut=document.createElement('canvas');
+            cut.width=x1-x0;cut.height=y1-y0;
+            cut.getContext('2d').drawImage(cr,x0,y0,x1-x0,y1-y0,0,0,x1-x0,y1-y0);
+            const pj=await new Promise(r=>cut.toBlob(r,'image/jpeg',0.92));
+            const pb=new Uint8Array(await pj.arrayBuffer());
+            printBlob=jpegToPdfFillA4(pb,cut.width,cut.height);
+          }
+        }
+        setPdfViewer({previewSrc,pdfBlob,printBlob,isPdf:true,numero:b.numero,modele:b.modele,taille:b.taille});
         setLoadingPdf(null);
         return;
       }
@@ -3000,7 +3040,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const doPrint=async()=>{
     if(!pdfViewer) return;
-    const blob=pdfViewer.pdfBlob;
+    const blob=pdfViewer.printBlob||pdfViewer.pdfBlob;
     if(!blob) return;
     const file=new File([blob],'bordereau.pdf',{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
