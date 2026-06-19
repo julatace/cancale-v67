@@ -2952,6 +2952,15 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const embedContainerRef=React.useRef(null);
   const [cSize,setCSize]=React.useState(null);
 
+  React.useEffect(()=>{
+    if(!window.pdfjsLib){
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';};
+      document.head.appendChild(s);
+    }
+  },[]);
+
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
@@ -3022,11 +3031,9 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
 
   const doPrint=async()=>{
     if(!pdfViewer) return;
-    const blob=pdfViewer.printBlob||pdfViewer.pdfBlob;
+    const blob=pdfViewer.pdfBlob;
     if(!blob) return;
-    const ext=pdfViewer.printBlob?'jpg':'pdf';
-    const mime=pdfViewer.printBlob?'image/jpeg':'application/pdf';
-    const file=new File([blob],`bordereau.${ext}`,{type:mime});
+    const file=new File([blob],'bordereau.pdf',{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       try{await navigator.share({files:[file],title:`Bordereau N°${pdfViewer.numero||''}`});}catch(_){}
     }else if(pdfViewer.previewSrc){
