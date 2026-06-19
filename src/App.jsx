@@ -2922,13 +2922,13 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
   const [loadingPdf,setLoadingPdf]=React.useState(null);
 
   const [pdfViewer,setPdfViewer]=React.useState(null); // {url}
+  const [pdfError,setPdfError]=React.useState(null);
   const iframeRef=React.useRef(null);
 
-  // Affiche le PDF dans l'app via iframe plein écran
-  // iframe.contentWindow.print() imprime le contenu de l'iframe (le PDF), pas la page web
   const handlePrint=async(b)=>{
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
+    setPdfError(null);
     try {
       const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
       const base64=await res.json();
@@ -2941,7 +2941,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
         setLoadingPdf(null);
         return;
       }
-    } catch(_){}
+      // PDF pas encore dans Firebase (bordereau avant la mise à jour Apps Script)
+      setPdfError(b.id);
+    } catch(_){
+      setPdfError(b.id);
+    }
     setLoadingPdf(null);
   };
 
@@ -3014,13 +3018,13 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
           <div style={{fontSize:16,color:C.text,fontWeight:500,marginBottom:8}}>{b.modele||''}</div>
           {b.dateLimite&&<div style={{fontSize:12,color:C.muted,marginBottom:16}}>⏰ À expédier avant le {b.dateLimite}</div>}
 
-          {b.pdfUrl&&(
-            <button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
-              width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
-              border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
-              opacity:loadingPdf===b.id?0.6:1,
-            }}>{loadingPdf===b.id?'Chargement...' :'🖨️ Voir et imprimer'}</button>
-          )}
+          <button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
+            width:'100%',padding:'16px 0',borderRadius:12,background:C.accent,color:'#fff',
+            border:'none',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:12,
+            opacity:loadingPdf===b.id?0.6:1,
+          }}>{loadingPdf===b.id?'Chargement...' :'🖨️ Voir et imprimer'}</button>
+
+          {pdfError===b.id&&<div style={{fontSize:12,color:'#e74c3c',marginBottom:8,padding:'8px',background:'#e74c3c11',borderRadius:8}}>PDF non disponible — ce bordereau a été créé avant la mise à jour de l'Apps Script.</div>}
 
           <div style={{display:'flex',gap:10,marginBottom:8}}>
             {!isLast&&(
@@ -3115,7 +3119,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl}) {
               </div>
             </div>
             <div onClick={e=>e.stopPropagation()} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              {b.pdfUrl&&(
+              {b.id&&(
                 <button onClick={()=>handlePrint(b)} disabled={loadingPdf===b.id} style={{
                   padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
                   background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
