@@ -3557,16 +3557,12 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             border:`1.5px solid ${filter===k?C.accent:C.border}`,fontFamily:'inherit',
           }}>{k==='à imprimer'?'À imprimer':'🗑️ Corbeille'} ({counts[k]})</button>
         ))}
-        {filter==='imprimé'&&counts['imprimé']>0&&(<>
-          <button onClick={()=>handlePrintAll(filtered)} disabled={batchLoading} style={{
-            padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
-            background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',opacity:batchLoading?0.5:1,
-          }}>🖨️ Réimprimer tout</button>
+        {filter==='imprimé'&&counts['imprimé']>0&&(
           <button onClick={viderCorbeille} style={{
             marginLeft:'auto',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
             background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}`,fontFamily:'inherit',
           }}>Vider la corbeille</button>
-        </>)}
+        )}
       </div>
 
       {/* Barre de sélection */}
@@ -3581,6 +3577,10 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
               padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
               background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',
             }}>🖨️ Imprimer ({selected.size})</button>}
+            {filter==='imprimé'&&<button onClick={()=>handlePrintAll(selectedItems)} disabled={batchLoading} style={{
+              padding:'8px 16px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
+              background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',opacity:batchLoading?0.5:1,
+            }}>🖨️ Réimprimer ({selected.size})</button>}
             <button onClick={deleteSelected} style={{
               padding:'8px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',
               background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}`,fontFamily:'inherit',
