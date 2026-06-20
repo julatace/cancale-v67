@@ -3100,7 +3100,7 @@ function jpegsToPdfA4(pages,pageW=595,pageH=842){
 const PAYS_FLAGS={France:'🇫🇷',Italie:'🇮🇹',Espagne:'🇪🇸',Allemagne:'🇩🇪',Belgique:'🇧🇪','Pays-Bas':'🇳🇱',Suisse:'🇨🇭',Luxembourg:'🇱🇺',Autriche:'🇦🇹',Portugal:'🇵🇹',Pologne:'🇵🇱',Suède:'🇸🇪',Danemark:'🇩🇰',Finlande:'🇫🇮',Norvège:'🇳🇴',Tchéquie:'🇨🇿',Hongrie:'🇭🇺',Roumanie:'🇷🇴',Grèce:'🇬🇷','Royaume-Uni':'🇬🇧'};
 const paysFlag=p=>{if(!p)return null;for(const[k,v]of Object.entries(PAYS_FLAGS))if(p.toLowerCase().includes(k.toLowerCase()))return v+' '+p;return'🌍 '+p;};
 
-function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,sales,setSales}) {
+function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,sales,setSales,setStockVinted}) {
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
   const [batchLoading,setBatchLoading]=React.useState(false);
@@ -3343,6 +3343,17 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             const updatedS=[...pendingSales,...currentSales];
             setSales(updatedS); save('vinted_sales',updatedS);
           }
+          // Retire du Stock les paires vendues (cherche le numéro dans le modèle)
+          try{
+            let sv=JSON.parse(localStorage.getItem('vinted_stock_vinted')||'[]');
+            let changed=false;
+            toAdd.forEach(v=>{
+              const txt=String(v.modele||'');
+              const match=sv.find(x=>{const n=typeof x==='string'?x:(x.num||'');return n&&new RegExp('\\b'+n+'\\b').test(txt);});
+              if(match){const n=typeof match==='string'?match:match.num;sv=sv.filter(x=>(typeof x==='string'?x:(x.num||''))!==n);changed=true;}
+            });
+            if(changed){localStorage.setItem('vinted_stock_vinted',JSON.stringify(sv));setStockVinted(sv);}
+          }catch(_){}
         }
         await fetch(`${FBASE}/vinted_incoming_sales.json`,{method:'DELETE'});
       }
@@ -3442,6 +3453,17 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             save('vinted_sales',updatedS);
             pendingSales.forEach(s=>existingSaleNums.add(String(s.numero)));
           }
+          // Retire du Stock les paires vendues (cherche le numéro dans le modèle)
+          try{
+            let sv=JSON.parse(localStorage.getItem('vinted_stock_vinted')||'[]');
+            let changed=false;
+            toAdd.forEach(v=>{
+              const txt=String(v.modele||'');
+              const match=sv.find(x=>{const n=typeof x==='string'?x:(x.num||'');return n&&new RegExp('\\b'+n+'\\b').test(txt);});
+              if(match){const n=typeof match==='string'?match:match.num;sv=sv.filter(x=>(typeof x==='string'?x:(x.num||''))!==n);changed=true;}
+            });
+            if(changed){localStorage.setItem('vinted_stock_vinted',JSON.stringify(sv));setStockVinted(sv);}
+          }catch(_){}
           addedCount=toAdd.length;
         }
         await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
@@ -4055,7 +4077,7 @@ export default function App() {
         {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
         {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} setSales={setSales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
-        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales}/>}
+        {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales} setStockVinted={setStockVinted}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
       </main>
 
