@@ -1092,9 +1092,11 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
   const [accountFilter,setAccountFilter]=useState('all');
-  const [newRow,setNewRow]=useState({id:'',buyPrice:'',account:''});
+  const [newRow,setNewRow]=useState(()=>{try{const s=localStorage.getItem('vinted_next_cat_id');return {id:s||'',buyPrice:'',account:''};}catch(_){return {id:'',buyPrice:'',account:''};}});
   const [lastAddedId,setLastAddedId]=useState(null);
   const [photoPreview,setPhotoPreview]=useState(null);
+  const [photoPromptId,setPhotoPromptId]=useState(null);
+  const photoPromptRef=React.useRef(null);
   const priceInputRef=React.useRef(null);
   const [page,setPage]=useState(null);
   const [showAll,setShowAll]=useState(false);
@@ -1126,13 +1128,14 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
     const u=[...catalog,{id,buyPrice:+newRow.buyPrice,status:'stock',addedAt:tod(),...(newRow.account?{account:newRow.account}:{})}];
     setCatalog(u); save('vinted_catalog',u);
     setLastAddedId(id);
-    // Pré-remplit automatiquement le numéro suivant (ex: après 50 → 51 prêt pour le prix)
     let nextId='';
     if(/^\d+$/.test(id)) nextId=String(parseInt(id,10)+1);
     setNewRow({id:nextId,buyPrice:'',account:newRow.account});
-    setPage(null); // reste sur la dernière page (où se trouve la ligne d'ajout)
-    // Place le curseur sur le champ prix pour enchaîner directement
-    setTimeout(()=>{ if(priceInputRef.current) priceInputRef.current.focus(); },50);
+    // Persiste le prochain numéro pour qu'il soit là au redémarrage
+    try{if(nextId)localStorage.setItem('vinted_next_cat_id',nextId);}catch(_){}
+    setPage(null);
+    // Propose la photo pour la paire qu'on vient d'ajouter
+    setPhotoPromptId(id);
   };
 
   // Bouton +1 : pré-remplit le champ N° avec (dernier n° ajouté + 1).
@@ -1165,6 +1168,40 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
         <div onClick={()=>setPhotoPreview(null)} style={{position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.88)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'zoom-out'}}>
           <img src={photoPreview} alt="" style={{maxWidth:'92vw',maxHeight:'88vh',borderRadius:10,boxShadow:'0 8px 40px rgba(0,0,0,0.6)',objectFit:'contain'}}/>
           <button onClick={()=>setPhotoPreview(null)} style={{position:'absolute',top:16,right:18,background:'rgba(255,255,255,0.15)',border:'none',borderRadius:'50%',color:'#fff',fontSize:26,fontWeight:900,width:40,height:40,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>×</button>
+        </div>
+      )}
+      {/* Bannière photo après ajout */}
+      {photoPromptId&&(
+        <div style={{background:C.accent,borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <span style={{color:'#fff',fontSize:13,fontWeight:700,flex:1}}>📷 Ajouter une photo pour #{photoPromptId} ?</span>
+          <input type="file" accept="image/*" capture="environment" ref={photoPromptRef} style={{display:'none'}}
+            onChange={e=>{
+              const file=e.target.files&&e.target.files[0];
+              if(!file){setPhotoPromptId(null);if(priceInputRef.current)priceInputRef.current.focus();return;}
+              const reader=new FileReader();
+              reader.onload=ev=>{
+                const img=new window.Image();
+                img.onload=()=>{
+                  const MAX=600,sc=Math.min(1,MAX/Math.max(img.width,img.height));
+                  const w=Math.round(img.width*sc),h=Math.round(img.height*sc);
+                  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+                  cv.getContext('2d').drawImage(img,0,0,w,h);
+                  const dataUrl=cv.toDataURL('image/jpeg',0.82);
+                  const np={...(photos||{}),[photoPromptId]:dataUrl};
+                  setPhotos(np);try{localStorage.setItem('vinted_photos',JSON.stringify(np));}catch(_){}
+                };img.src=ev.target.result;
+              };reader.readAsDataURL(file);e.target.value='';
+              setPhotoPromptId(null);
+              setTimeout(()=>{if(priceInputRef.current)priceInputRef.current.focus();},100);
+            }}/>
+          <button onClick={()=>{photoPromptRef.current&&photoPromptRef.current.click();}}
+            style={{background:'#fff',color:C.accent,border:'none',borderRadius:6,padding:'7px 14px',fontWeight:700,cursor:'pointer',fontSize:12,fontFamily:'inherit'}}>
+            📸 Photo
+          </button>
+          <button onClick={()=>{setPhotoPromptId(null);setTimeout(()=>{if(priceInputRef.current)priceInputRef.current.focus();},50);}}
+            style={{background:'transparent',color:'#fff',border:'1px solid rgba(255,255,255,0.5)',borderRadius:6,padding:'7px 12px',fontWeight:600,cursor:'pointer',fontSize:12,fontFamily:'inherit'}}>
+            Plus tard
+          </button>
         </div>
       )}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
@@ -3515,12 +3552,16 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             border:`1.5px solid ${filter===k?C.accent:C.border}`,fontFamily:'inherit',
           }}>{k==='à imprimer'?'À imprimer':'🗑️ Corbeille'} ({counts[k]})</button>
         ))}
-        {filter==='imprimé'&&counts['imprimé']>0&&(
+        {filter==='imprimé'&&counts['imprimé']>0&&(<>
+          <button onClick={()=>handlePrintAll(filtered)} disabled={batchLoading} style={{
+            padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
+            background:C.accent,color:'#fff',border:'none',fontFamily:'inherit',opacity:batchLoading?0.5:1,
+          }}>🖨️ Réimprimer tout</button>
           <button onClick={viderCorbeille} style={{
             marginLeft:'auto',padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',
             background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}`,fontFamily:'inherit',
           }}>Vider la corbeille</button>
-        )}
+        </>)}
       </div>
 
       {/* Barre de sélection */}
