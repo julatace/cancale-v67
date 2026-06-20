@@ -3130,7 +3130,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             ctx.fillStyle='#111';
             // Mondial Relay (portrait) : texte en HAUT — hors de la zone du bordereau collé
             // Chronopost (paysage rendu portrait) : texte en bas
-            const textY=isPortrait ? fs*1.4 : c.height-fs*0.4;
+            const textY=isPortrait ? fs*1.4 : c.height-fs*2.5;
             ctx.fillText(infoText,10,textY);
           }
           const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
@@ -3201,7 +3201,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             const ctx=c.getContext('2d');
             const fs=Math.round(Math.min(c.width,c.height)*0.016);
             ctx.font=`bold ${fs}px sans-serif`;ctx.fillStyle='#111';
-            ctx.fillText(infoText,10,isPortrait?fs*1.4:c.height-fs*0.4);
+            ctx.fillText(infoText,10,isPortrait?fs*1.4:c.height-fs*2.5);
           }
           const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
           const pw=c.width>c.height?842:595,ph=c.width>c.height?595:842;
