@@ -3113,24 +3113,23 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
         }
         const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
         const page=await pdf.getPage(1);
-        const [,,rawW,rawH]=page.view;
-        const isPortrait=rawH>rawW;
         const vp=page.getViewport({scale:2});
         const c=document.createElement('canvas');
         c.width=Math.round(vp.width);c.height=Math.round(vp.height);
         await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
         let printBlob=null;
         {
-          // PDF.js applique /Rotate → canvas toujours dans le bon sens de lecture
+          // Orientation basée sur le canvas rendu (PDF.js applique /Rotate automatiquement)
+          const isPortrait=c.height>c.width;
           const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('  ');
           if(infoText){
             const ctx=c.getContext('2d');
             const fs=Math.round(Math.min(c.width,c.height)*0.016);
             ctx.font=`bold ${fs}px sans-serif`;
             ctx.fillStyle='#111';
-            // Mondial Relay (portrait) : texte en HAUT — hors de la zone du bordereau collé
-            // Chronopost (paysage rendu portrait) : texte en bas
-            const textY=isPortrait ? fs*1.4 : c.height-fs*2.5;
+            // Portrait : texte en haut dans la zone de marge imprimante (~10mm)
+            // Paysage : texte en bas avec marge suffisante
+            const textY=isPortrait ? fs*3.5 : c.height-fs*2.5;
             ctx.fillText(infoText,10,textY);
           }
           const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
@@ -3190,18 +3189,17 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
           for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
           const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
           const page=await pdf.getPage(1);
-          const [,,rawW,rawH]=page.view;
-          const isPortrait=rawH>rawW;
           const vp=page.getViewport({scale:2});
           const c=document.createElement('canvas');
           c.width=Math.round(vp.width);c.height=Math.round(vp.height);
           await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+          const isPortrait=c.height>c.width;
           const infoText=[b.numero&&`N°${b.numero}`,b.modele,b.taille&&`T.${b.taille}`].filter(Boolean).join('  ');
           if(infoText){
             const ctx=c.getContext('2d');
             const fs=Math.round(Math.min(c.width,c.height)*0.016);
             ctx.font=`bold ${fs}px sans-serif`;ctx.fillStyle='#111';
-            ctx.fillText(infoText,10,isPortrait?fs*1.4:c.height-fs*2.5);
+            ctx.fillText(infoText,10,isPortrait?fs*3.5:c.height-fs*2.5);
           }
           const pj=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
           const pw=c.width>c.height?842:595,ph=c.width>c.height?595:842;
