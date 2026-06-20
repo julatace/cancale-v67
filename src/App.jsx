@@ -1092,7 +1092,12 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
   const [accountFilter,setAccountFilter]=useState('all');
-  const [newRow,setNewRow]=useState(()=>{try{const s=localStorage.getItem('vinted_next_cat_id');return {id:s||'',buyPrice:'',account:''};}catch(_){return {id:'',buyPrice:'',account:''};}});
+  const [newRow,setNewRow]=useState(()=>{
+    try{const s=localStorage.getItem('vinted_next_cat_id');if(s)return {id:s,buyPrice:'',account:''};} catch(_){}
+    const nums=(catalog||[]).map(p=>parseInt(p.id,10)).filter(n=>!isNaN(n));
+    const nextId=nums.length?String(Math.max(...nums)+1):'';
+    return {id:nextId,buyPrice:'',account:''};
+  });
   const [lastAddedId,setLastAddedId]=useState(null);
   const [photoPreview,setPhotoPreview]=useState(null);
   const [photoPromptId,setPhotoPromptId]=useState(null);
