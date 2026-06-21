@@ -1696,6 +1696,40 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
           }} color={C.blue}>📤 Exporter Excel</Btn>
         </div>
       </div>
+      {showBulkAssign&&(
+        <div style={{background:C.card,border:`1px solid ${C.warn}66`,borderRadius:10,padding:'12px 14px',display:'flex',flexDirection:'column',gap:8}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.text}}>↩ Attribuer des ventes à un compte</div>
+          <div style={{fontSize:12,color:C.muted}}>Choisir un compte, puis attribuer les ventes sans compte ou toutes les ventes.</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            <select value={bulkAssignAcc} onChange={e=>setBulkAssignAcc(e.target.value)}
+              style={{flex:1,minWidth:160,padding:'7px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.surface,color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}>
+              <option value="">— Choisir un compte —</option>
+              {(accounts||[]).map(a=><option key={a.id} value={a.id}>{a.name}{a.pseudo?` (${a.pseudo})`:''}</option>)}
+            </select>
+            <button disabled={!bulkAssignAcc} onClick={()=>{
+              const acc=(accounts||[]).find(a=>a.id===bulkAssignAcc);if(!acc)return;
+              const label=acc.pseudo||acc.name;
+              const noC=sales.filter(s=>!s.compte||s.compte.trim()==='');
+              if(noC.length===0){alert('Toutes les ventes ont déjà un compte.');return;}
+              if(!window.confirm(`Attribuer ${noC.length} vente(s) sans compte à "${acc.name}" ?`))return;
+              const upd=sales.map(s=>(!s.compte||s.compte.trim()==='')?{...s,compte:label}:s);
+              setSales(upd);save('vinted_sales',upd);setShowBulkAssign(false);setBulkAssignAcc('');
+            }} style={{padding:'7px 14px',borderRadius:8,background:bulkAssignAcc?C.warn:'#555',color:'#fff',border:'none',fontWeight:700,fontSize:12,cursor:bulkAssignAcc?'pointer':'default',fontFamily:'inherit',opacity:bulkAssignAcc?1:0.5}}>
+              Sans compte ({sales.filter(s=>!s.compte||s.compte.trim()==='').length})
+            </button>
+            <button disabled={!bulkAssignAcc} onClick={()=>{
+              const acc=(accounts||[]).find(a=>a.id===bulkAssignAcc);if(!acc)return;
+              const label=acc.pseudo||acc.name;
+              if(!window.confirm(`Réattribuer TOUTES les ${sales.length} ventes à "${acc.name}" ?`))return;
+              const upd=sales.map(s=>({...s,compte:label}));
+              setSales(upd);save('vinted_sales',upd);setShowBulkAssign(false);setBulkAssignAcc('');
+            }} style={{padding:'7px 14px',borderRadius:8,background:bulkAssignAcc?C.danger:'#555',color:'#fff',border:'none',fontWeight:700,fontSize:12,cursor:bulkAssignAcc?'pointer':'default',fontFamily:'inherit',opacity:bulkAssignAcc?1:0.5}}>
+              Toutes ({sales.length})
+            </button>
+            <button onClick={()=>{setShowBulkAssign(false);setBulkAssignAcc('');}} style={{padding:'7px 12px',borderRadius:8,background:'transparent',color:C.muted,border:`1px solid ${C.border}`,fontWeight:600,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+          </div>
+        </div>
+      )}
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
         <Input value={searchInput}
           onChange={e=>setSearchInput(e.target.value)}
