@@ -3309,6 +3309,39 @@ const PAYS_FLAGS={France:'🇫🇷',Italie:'🇮🇹',Espagne:'🇪🇸',Allemag
 const paysFlag=p=>{if(!p)return null;for(const[k,v]of Object.entries(PAYS_FLAGS))if(p.toLowerCase().includes(k.toLowerCase()))return v+' '+p;return'🌍 '+p;};
 
 function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,sales,setSales,setStockVinted,accounts}) {
+  // Cherche le compte d'une vente : 1) v.compte de l'email, 2) listings du catalogue, 3) account du catalogue
+  const resolveCompte=(modele,emailCompte)=>{
+    const detected=String(emailCompte||'').trim();
+    // Si l'Apps Script a détecté un compte qui correspond à un compte connu → on l'utilise
+    if(detected){
+      const c=detected.toLowerCase();
+      const match=(accounts||[]).find(a=>
+        (a.pseudo&&a.pseudo.toLowerCase()===c)||
+        (a.email&&a.email.split('@')[0].toLowerCase()===c)||
+        (a.name&&a.name.toLowerCase()===c)
+      );
+      if(match) return detected; // compte reconnu
+    }
+    // Sinon chercher l'article dans le catalogue
+    const txt=String(modele||'');
+    const catItem=(catalog||[]).find(item=>{
+      const n=String(item.id||'').trim();
+      return n&&new RegExp('\\b'+n+'\\b').test(txt);
+    });
+    if(catItem){
+      // Priorité aux listings
+      if(catItem.listings&&catItem.listings.length>0){
+        const acc=(accounts||[]).find(a=>catItem.listings.includes(a.id));
+        if(acc) return acc.pseudo||acc.name;
+      }
+      // Sinon account principal
+      if(catItem.account){
+        const acc=(accounts||[]).find(a=>a.id===catItem.account);
+        if(acc) return acc.pseudo||acc.name;
+      }
+    }
+    return detected; // garde ce que l'Apps Script a envoyé même si non reconnu
+  };
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
   const [batchLoading,setBatchLoading]=React.useState(false);
@@ -3537,14 +3570,14 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             id:v.id||('gmail_'+Math.random().toString(36).slice(2,10)),
             emailId:v.emailId||null,numero:v.numero,modele:v.modele||'',
             sellPrice:v.sellPrice??null,date:v.date||new Date().toLocaleDateString('fr-FR'),
-            compte:v.compte||'',statut:'à imprimer',paiement:'en attente',source:'email',
+            compte:resolveCompte(v.modele,v.compte),statut:'à imprimer',paiement:'en attente',source:'email',
           }));
           const updatedB=[...newBordereaux,...currentAll];
           setBordereaux(updatedB); save('vinted_bordereaux',updatedB);
           const pendingSales=toAdd.filter(v=>!existingSaleNums.has(String(v.numero||''))).map(v=>({
             id:'sale_'+Math.random().toString(36).slice(2,10),numero:v.numero,
             productId:v.modele||'',buyPrice:null,sellPrice:null,profit:null,multi:null,
-            saleDate:v.date||'',receiveDate:'',compte:v.compte||'',
+            saleDate:v.date||'',receiveDate:'',compte:resolveCompte(v.modele,v.compte),
             statut:'en attente',source:'email',createdAt:new Date().toISOString(),
           }));
           if(pendingSales.length>0){
@@ -3628,7 +3661,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             modele: v.modele||'',
             sellPrice: v.sellPrice??null,
             date: v.date||new Date().toLocaleDateString('fr-FR'),
-            compte: v.compte||'',
+            compte: resolveCompte(v.modele,v.compte),
             statut: 'à imprimer',
             paiement: 'en attente',
             source: 'email',
@@ -3650,7 +3683,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
               multi: null,
               saleDate: v.date||'',
               receiveDate: '',
-              compte: v.compte||'',
+              compte: resolveCompte(v.modele,v.compte),
               statut: 'en attente',
               source: 'email',
               createdAt: new Date().toISOString(),
