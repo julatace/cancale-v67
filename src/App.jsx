@@ -1400,22 +1400,34 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
                 />
               </td>
               <td colSpan={2} style={{padding:'6px 8px'}}>
-                <div style={{display:'flex',gap:3,flexWrap:'wrap',alignItems:'center',marginBottom:2}}>
+                <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center',marginBottom:3}}>
                   <span style={{fontSize:10,color:C.muted,whiteSpace:'nowrap'}}>Mis en vente :</span>
-                  {(accounts||[]).map(acc=>{
+                  {/* Badges des comptes déjà sélectionnés */}
+                  {(newRow.listings||[]).map(lid=>{
+                    const acc=(accounts||[]).find(a=>a.id===lid);
+                    if(!acc) return null;
                     const pb=platBadge(acc);
-                    const isSel=(newRow.listings||[]).includes(acc.id);
                     return (
-                      <button key={acc.id} type="button" onClick={()=>{
-                        const cur=newRow.listings||[];
-                        setNewRow(n=>({...n,listings:isSel?cur.filter(x=>x!==acc.id):[...cur,acc.id]}));
-                      }} style={{
-                        padding:'2px 7px',borderRadius:12,fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
-                        background:isSel?pb.color:'transparent',color:isSel?'#fff':C.muted,
-                        border:`1.5px solid ${isSel?pb.color:C.border}`,
-                      }}>{pb.short} {acc.name}</button>
+                      <span key={lid} style={{display:'inline-flex',alignItems:'center',gap:3,background:pb.color,color:'#fff',borderRadius:10,padding:'2px 7px 2px 8px',fontSize:10,fontWeight:700}}>
+                        {pb.short} {acc.name}
+                        <button type="button" onClick={()=>setNewRow(n=>({...n,listings:(n.listings||[]).filter(x=>x!==lid)}))}
+                          style={{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:900,lineHeight:1,padding:0,opacity:0.8}}>×</button>
+                      </span>
                     );
                   })}
+                  {/* Selecteur pour ajouter un compte */}
+                  {(accounts||[]).filter(a=>!(newRow.listings||[]).includes(a.id)).length>0&&(
+                    <select value="" onChange={e=>{
+                      if(!e.target.value) return;
+                      setNewRow(n=>({...n,listings:[...(n.listings||[]),e.target.value]}));
+                    }} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,color:C.muted,padding:'2px 4px',fontSize:10,cursor:'pointer',outline:'none'}}>
+                      <option value="">+ Ajouter compte…</option>
+                      {(accounts||[]).filter(a=>!(newRow.listings||[]).includes(a.id)).map(acc=>{
+                        const pb=platBadge(acc);
+                        return <option key={acc.id} value={acc.id}>{pb.platform} — {acc.name}</option>;
+                      })}
+                    </select>
+                  )}
                 </div>
                 <span style={{color:C.muted,fontSize:10}}>← Entrée ou bouton pour ajouter</span>
               </td>
