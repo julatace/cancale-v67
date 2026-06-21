@@ -3279,7 +3279,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
   // Cherche le compte d'une vente : 1) v.compte de l'email, 2) listings du catalogue, 3) account du catalogue
   const resolveCompte=(modele,emailCompte)=>{
     const detected=String(emailCompte||'').trim();
-    // Si l'Apps Script a détecté un compte qui correspond à un compte connu → on l'utilise
+    // Si l'Apps Script a détecté un compte → chercher le compte correspondant et retourner son nom
     if(detected){
       const c=detected.toLowerCase();
       const match=(accounts||[]).find(a=>
@@ -3287,7 +3287,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
         (a.email&&a.email.split('@')[0].toLowerCase()===c)||
         (a.name&&a.name.toLowerCase()===c)
       );
-      if(match) return detected; // compte reconnu
+      if(match) return match.name;
     }
     // Sinon chercher l'article dans le catalogue
     const txt=String(modele||'');
@@ -3299,15 +3299,15 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
       // Priorité aux listings
       if(catItem.listings&&catItem.listings.length>0){
         const acc=(accounts||[]).find(a=>catItem.listings.includes(a.id));
-        if(acc) return acc.pseudo||acc.name;
+        if(acc) return acc.name;
       }
       // Sinon account principal
       if(catItem.account){
         const acc=(accounts||[]).find(a=>a.id===catItem.account);
-        if(acc) return acc.pseudo||acc.name;
+        if(acc) return acc.name;
       }
     }
-    return detected; // garde ce que l'Apps Script a envoyé même si non reconnu
+    return detected;
   };
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
