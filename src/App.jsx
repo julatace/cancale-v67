@@ -1466,6 +1466,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
   const [showAll,setShowAll]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState('');
   const [groupByAccount,setGroupByAccount]=useState(false);
+  const [showBulkAssign,setShowBulkAssign]=useState(false);
+  const [bulkAssignAcc,setBulkAssignAcc]=useState('');
   const [selectMode,setSelectMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [isDragging,setIsDragging]=useState(false);
@@ -1675,6 +1677,12 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
             color:groupByAccount?'#fff':C.muted,
             border:`1.5px solid ${groupByAccount?C.accent:C.border}`,
           }}>👤 Par compte</button>
+          <button onClick={()=>setShowBulkAssign(v=>!v)} style={{
+            padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+            background:showBulkAssign?C.warn:'transparent',
+            color:showBulkAssign?'#fff':C.muted,
+            border:`1.5px solid ${showBulkAssign?C.warn:C.border}`,
+          }}>↩ Réattribuer</button>
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
           <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
           <Btn small onClick={()=>{
