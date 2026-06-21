@@ -2572,6 +2572,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   const [addMode,setAddMode]=useState(false); // masquer les cases vides par défaut
   const [activeColor,setActiveColor]=useState('#ffb830');
   const [focusedCell,setFocusedCell]=useState(null); // {zid, ci, si}
+  const [selectedAccount,setSelectedAccount]=useState(null); // null = tous
   const highlightRef=React.useRef(null);
 
   // Quand une recherche trouve une case, on défile automatiquement jusqu'à elle (centré)
@@ -2615,6 +2616,13 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
     (catalog||[]).forEach(item=>{
       if(item.id&&item.listings&&item.listings.length)
         m[String(item.id).trim()]=item.listings;
+    });
+    return m;
+  },[catalog]);
+  const numAccounts=useMemo(()=>{
+    const m={};
+    (catalog||[]).forEach(item=>{
+      if(item.id&&item.account) m[String(item.id).trim()]=item.account;
     });
     return m;
   },[catalog]);
@@ -2775,6 +2783,34 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         </div>
       </Card>}
       
+      {/* Filtres par compte */}
+      {accounts&&accounts.length>0&&(
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          <button onClick={()=>setSelectedAccount(null)} style={{
+            padding:'6px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+            background:selectedAccount===null?C.accent:'transparent',
+            color:selectedAccount===null?'#fff':C.muted,
+            border:`1.5px solid ${selectedAccount===null?C.accent:C.border}`,
+          }}>Tous les comptes</button>
+          {accounts.map(acc=>{
+            const isActive=selectedAccount===acc.id;
+            const count=Object.values(numAccounts).filter(v=>v===acc.id).length;
+            return (
+              <button key={acc.id} onClick={()=>setSelectedAccount(isActive?null:acc.id)} style={{
+                padding:'6px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                background:isActive?acc.color:'transparent',
+                color:isActive?'#fff':C.muted,
+                border:`1.5px solid ${isActive?acc.color:C.border}`,
+                display:'flex',alignItems:'center',gap:5,
+              }}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:acc.color,display:'inline-block',flexShrink:0}}/>
+                {acc.name}
+                {count>0&&<span style={{fontSize:10,opacity:0.75}}>({count})</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {/* Recherche avec bouton + Entrée */}
       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
         <div style={{flex:1,minWidth:200,display:'flex',gap:6}}>
@@ -2885,13 +2921,19 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                       </div>
                     );
                     
+                    const accDimmed=selectedAccount!==null&&t&&numAccounts[t]!==selectedAccount;
+                    const accGlow=selectedAccount!==null&&t&&numAccounts[t]===selectedAccount;
                     return (
                       <div key={si} ref={highlight?highlightRef:null} onClick={()=>{
                         if(blockMode&&!t) toggleBlock(z.id,ci,si);
                         else if(colorMode) setColor(z.id,ci,si,activeColor);
                       }}
                         style={{position:'relative',width:CW,height:CH,
-                          cursor:(blockMode&&!t)||colorMode?'pointer':'auto'}}>
+                          cursor:(blockMode&&!t)||colorMode?'pointer':'auto',
+                          opacity:accDimmed?0.18:1,
+                          filter:accGlow?'brightness(1.3) drop-shadow(0 0 5px currentColor)':'none',
+                          transition:'opacity 0.2s, filter 0.2s',
+                        }}>
                         {cellColor&&<div style={{position:'absolute',inset:0,top:TH,background:cellColor,opacity:0.6,borderRadius:2,zIndex:1,pointerEvents:'none'}}/>}
                         <Box val={val} isSold={isSold} highlight={highlight} accountColor={accountColor}/>
                         {/* Platform badges overlay */}
