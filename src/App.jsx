@@ -2806,7 +2806,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           }}>Tous les comptes</button>
           {accounts.map(acc=>{
             const isActive=selectedAccount===acc.id;
-            const count=Object.values(numAccounts).filter(v=>v===acc.id).length;
+            const count=(()=>{
+              const owned=new Set(Object.entries(numAccounts).filter(([,v])=>v===acc.id).map(([k])=>k));
+              Object.entries(numListings).forEach(([k,lst])=>{if(lst.includes(acc.id))owned.add(k);});
+              return owned.size;
+            })();
             return (
               <button key={acc.id} onClick={()=>setSelectedAccount(isActive?null:acc.id)} style={{
                 padding:'6px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
@@ -2933,8 +2937,10 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                       </div>
                     );
                     
-                    const accDimmed=selectedAccount!==null&&t&&numAccounts[t]!==selectedAccount;
-                    const accGlow=selectedAccount!==null&&t&&numAccounts[t]===selectedAccount;
+                    const itemListingsSet=new Set(numListings[t]||[]);
+                    const matchesAccount=selectedAccount!==null&&t&&(numAccounts[t]===selectedAccount||itemListingsSet.has(selectedAccount));
+                    const accDimmed=selectedAccount!==null&&t&&!matchesAccount;
+                    const accGlow=selectedAccount!==null&&t&&matchesAccount;
                     return (
                       <div key={si} ref={highlight?highlightRef:null} onClick={()=>{
                         if(blockMode&&!t) toggleBlock(z.id,ci,si);
