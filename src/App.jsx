@@ -3309,8 +3309,6 @@ const PAYS_FLAGS={France:'🇫🇷',Italie:'🇮🇹',Espagne:'🇪🇸',Allemag
 const paysFlag=p=>{if(!p)return null;for(const[k,v]of Object.entries(PAYS_FLAGS))if(p.toLowerCase().includes(k.toLowerCase()))return v+' '+p;return'🌍 '+p;};
 
 function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,sales,setSales,setStockVinted,accounts}) {
-  // Compte par défaut : premier compte avec pseudo, sinon premier compte, sinon ''
-  const defaultCompte=()=>{const a=(accounts||[]).find(x=>x.pseudo)||accounts?.[0];return a?(a.pseudo||a.name):'';};
   const [filter,setFilter]=React.useState('à imprimer');
   const [selected,setSelected]=React.useState(new Set());
   const [batchLoading,setBatchLoading]=React.useState(false);
@@ -3539,14 +3537,14 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             id:v.id||('gmail_'+Math.random().toString(36).slice(2,10)),
             emailId:v.emailId||null,numero:v.numero,modele:v.modele||'',
             sellPrice:v.sellPrice??null,date:v.date||new Date().toLocaleDateString('fr-FR'),
-            compte:v.compte||defaultCompte(),statut:'à imprimer',paiement:'en attente',source:'email',
+            compte:v.compte||'',statut:'à imprimer',paiement:'en attente',source:'email',
           }));
           const updatedB=[...newBordereaux,...currentAll];
           setBordereaux(updatedB); save('vinted_bordereaux',updatedB);
           const pendingSales=toAdd.filter(v=>!existingSaleNums.has(String(v.numero||''))).map(v=>({
             id:'sale_'+Math.random().toString(36).slice(2,10),numero:v.numero,
             productId:v.modele||'',buyPrice:null,sellPrice:null,profit:null,multi:null,
-            saleDate:v.date||'',receiveDate:'',compte:v.compte||defaultCompte(),
+            saleDate:v.date||'',receiveDate:'',compte:v.compte||'',
             statut:'en attente',source:'email',createdAt:new Date().toISOString(),
           }));
           if(pendingSales.length>0){
@@ -3630,7 +3628,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             modele: v.modele||'',
             sellPrice: v.sellPrice??null,
             date: v.date||new Date().toLocaleDateString('fr-FR'),
-            compte: v.compte||defaultCompte(),
+            compte: v.compte||'',
             statut: 'à imprimer',
             paiement: 'en attente',
             source: 'email',
@@ -3652,7 +3650,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
               multi: null,
               saleDate: v.date||'',
               receiveDate: '',
-              compte: v.compte||defaultCompte(),
+              compte: v.compte||'',
               statut: 'en attente',
               source: 'email',
               createdAt: new Date().toISOString(),
