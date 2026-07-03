@@ -137,14 +137,26 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
   }
 };
 
+// Classe le texte de statut renvoye par Vinted en 3 categories utilisables
+// partout dans l'app : 'cancelled' (annulee, remboursee, refusee...),
+// 'completed' (transaction finalisee), 'pending' (tout le reste, en cours).
+// Avant ce correctif, "En attente" ne filtrait que sur "finalisee", donc les
+// achats annules par l'acheteur/le vendeur restaient affiches comme en
+// attente au lieu d'etre a part - d'ou la confusion remontee par l'utilisateur.
+const classifyOrderStatus = (status) => {
+  const s = status || '';
+  if (/annul|cancel|refus|rembours/i.test(s)) return 'cancelled';
+  if (/finalis/i.test(s)) return 'completed';
+  return 'pending';
+};
+
 // Recupere une page d'achats ou de ventes pour un compte (endpoint reel
 // trouve via "Copy as fetch" : www.vinted.fr/api/v2/my_orders).
-// type: 'purchased' | 'sold' ; statusFilter: 'completed' | 'pending' | 'all'
+// type: 'purchased' | 'sold' ; statusFilter: 'completed' | 'pending' | 'cancelled' | 'all'
 const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'completed') => {
   // Vinted n'expose pas de valeur "status=pending" confirmee - on recupere
   // donc tout (pas de filtre status cote serveur) et on trie nous-memes selon
-  // le texte du champ "status" renvoye par Vinted (contient "finalisee" une
-  // fois la transaction terminee, autre chose sinon).
+  // le texte du champ "status" renvoye par Vinted.
   const endpoint = statusFilter === 'completed'
     ? `/api/v2/my_orders?type=${type}&status=completed&per_page=20&page=${page}`
     : `/api/v2/my_orders?type=${type}&per_page=20&page=${page}`;
@@ -152,7 +164,9 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
   let items = res.data?.my_orders || [];
   if (statusFilter === 'pending') {
-    items = items.filter(it => !/finalis/i.test(it.status || ''));
+    items = items.filter(it => classifyOrderStatus(it.status) === 'pending');
+  } else if (statusFilter === 'cancelled') {
+    items = items.filter(it => classifyOrderStatus(it.status) === 'cancelled');
   }
   return {
     ok: true,
@@ -2822,6 +2836,7 @@ const STATUS_TABS = [
   { id:'all',       label:'Toutes' },
   { id:'pending',   label:'En attente' },
   { id:'completed', label:'Finalisées' },
+  { id:'cancelled', label:'Annulées' },
 ];
 
 function VintedAccounts({ accounts, setAccounts }) {
@@ -2998,15 +3013,17 @@ function VintedAccounts({ accounts, setAccounts }) {
                     {view.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun élément.</div>}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:14}}>
                       {view.items.map(item => {
-                        const isDone = /finalis/i.test(item.status||'');
+                        const orderStatus = classifyOrderStatus(item.status);
+                        const badgeColor = orderStatus==='completed' ? C.accent : orderStatus==='cancelled' ? C.danger : C.warn;
+                        const badgeLabel = orderStatus==='completed' ? 'Finalisée' : orderStatus==='cancelled' ? 'Annulée' : 'En attente';
                         return (
-                          <div key={item.transaction_id} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`}}>
+                          <div key={item.transaction_id} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,opacity:orderStatus==='cancelled'?0.65:1}}>
                             <div style={{width:'100%',aspectRatio:'1/1',background:C.border,position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
                               {item.photo_url
                                 ? <img src={item.photo_url} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                                 : <span style={{fontSize:30}}>👟</span>}
-                              <div style={{position:'absolute',top:6,left:6,background:isDone?C.accent:C.warn,color:'#fff',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:999}}>
-                                {isDone ? 'Finalisée' : 'En attente'}
+                              <div style={{position:'absolute',top:6,left:6,background:badgeColor,color:'#fff',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:999}}>
+                                {badgeLabel}
                               </div>
                             </div>
                             <div style={{padding:'8px 10px'}}>
