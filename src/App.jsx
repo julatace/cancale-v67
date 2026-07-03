@@ -29,6 +29,8 @@ const SYNC_KEYS = [
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels',
+  'vinted_listing_registry','vinted_catalog_archive','vinted_sales_archive',
+  'vinted_legacy_archived',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -189,6 +191,23 @@ const fetchVintedConversations = async (account, page = 1) => {
     items,
     pagination: res.data?.pagination || null,
     raw: res,
+  };
+};
+
+// Recupere les annonces actuellement en ligne d'un compte (dressing/wardrobe).
+// Endpoint reel trouve via "Copy as fetch" sur la page profil Vinted (onglet
+// "Annonces") : www.vinted.fr/api/v2/wardrobe/{vinted_user_id}/items. Meme
+// mecanisme d'auth que my_orders (cookies + x-anon-id + x-csrf-token).
+const fetchVintedWardrobeItems = async (account, page = 1) => {
+  const userId = account.vinted_user_id;
+  if (!userId) return { ok: false, error: 'vinted_user_id manquant', items: [], pagination: null };
+  const endpoint = `/api/v2/wardrobe/${userId}/items?page=${page}&per_page=20&order=relevance`;
+  const res = await vintedApiCall(account, endpoint);
+  if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
+  return {
+    ok: true,
+    items: res.data?.items || [],
+    pagination: res.data?.pagination || null,
   };
 };
 
@@ -388,12 +407,13 @@ const LOGO_CANCALE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 
 const TABS=[
   {id:'dashboard',icon:'📊',label:'Stats'},
-  {id:'catalog',  icon:'📦',label:'Catalogue'},
+  {id:'onlinelistings',icon:'🌐',label:'Annonces en ligne'},
   {id:'sales',    icon:'💸',label:'Ventes'},
   {id:'invoices', icon:'📄',label:'Factures'},
   {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'garage',   icon:'🏠',label:'Garage'},
   {id:'vintedaccounts',icon:'🔗',label:'Comptes Vinted'},
+  {id:'legacyarchive',icon:'🗄️',label:'Ancienne appli'},
 ];
 function Nav({tab,setTab,open,setOpen}) {
   if(!open) return null;
@@ -1504,7 +1524,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                     data-vid={v.id}
                     style={{borderTop:`1px solid ${C.border}`,background:isSelected?`${C.accent}33`:'transparent',cursor:selectMode?'pointer':'auto',userSelect:selectMode?'none':'auto',position:'relative'}}>
                     <td style={{padding:'2px 10px',minWidth:100,fontWeight:700,color:C.accent}}>
-                      <Cell value={v.productId||''} onChange={val=>updateSale(v.id,'productId',val)}/>
+                      <div style={{display:'flex',alignItems:'center',gap:5}}>
+                        <Cell value={v.productId||''} onChange={val=>updateSale(v.id,'productId',val)}/>
+                        {v.source==='vinted-auto'&&<span title="Importée automatiquement depuis Vinted" style={{fontSize:9,fontWeight:800,color:'#fff',background:C.blue,borderRadius:999,padding:'2px 6px',flexShrink:0}}>AUTO</span>}
+                      </div>
                     </td>
                     <td style={{padding:'2px 10px',minWidth:90}}>
                       <Cell value={v.saleDate||''} onChange={val=>updateSale(v.id,'saleDate',val)}/>
@@ -3103,6 +3126,262 @@ function VintedAccounts({ accounts, setAccounts }) {
   );
 }
 
+/* ── Annonces en ligne (nouveau systeme numero + prix d'achat) ──────────
+   Remplace le suivi manuel : recupere reellement les annonces en ligne via
+   l'API Vinted (wardrobe/items) pour chaque compte connecte. Chaque annonce
+   recoit ici un numero + un prix d'achat, stockes dans listingRegistry, cle
+   = `${vinted_user_id}_${item.id}`. Ce registre sert ensuite a remplir
+   automatiquement l'onglet Ventes des qu'une annonce se vend (voir
+   l'auto-import des ventes dans App()). */
+function OnlineListings({ accounts, registry, setRegistry }) {
+  const [selectedId, setSelectedId] = useState(null);
+  const [labels] = useState(()=>load('vinted_account_labels',{}));
+  const [view, setView] = useState({ loading:false, items:[], pagination:null, page:1, error:null });
+  const [drafts, setDrafts] = useState({}); // edition en cours { [regKey]: {numero,buyPrice} }
+
+  const accountName = (acc) => labels[acc.vinted_user_id] || acc.login || `Compte #${acc.vinted_user_id}`;
+
+  useEffect(() => { if (!selectedId && accounts.length > 0) setSelectedId(accounts[0].vinted_user_id); }, [accounts]);
+  const selectedAccount = accounts.find(a => a.vinted_user_id === selectedId) || null;
+
+  const loadView = async (page = 1) => {
+    if (!selectedAccount) return;
+    setView(v => ({ ...v, loading:true, error:null }));
+    const res = await fetchVintedWardrobeItems(selectedAccount, page);
+    setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw: res.ok?res.items:null });
+  };
+  useEffect(() => { if (selectedAccount) loadView(1); /* eslint-disable-next-line */ }, [selectedId]);
+
+  const regKey = (item) => `${selectedId}_${item.id}`;
+
+  const startEdit = (item) => {
+    const k = regKey(item);
+    const existing = registry[k];
+    setDrafts(d => ({ ...d, [k]: { numero: existing?.numero || '', buyPrice: existing?.buyPrice || '' } }));
+  };
+  const cancelEdit = (k) => setDrafts(d => { const n={...d}; delete n[k]; return n; });
+  const commitEdit = (item) => {
+    const k = regKey(item);
+    const draft = drafts[k];
+    if (!draft) return;
+    const numero = String(draft.numero||'').trim();
+    if (!numero) { alert('Numéro obligatoire.'); return; }
+    const u = { ...registry, [k]: {
+      numero, buyPrice: +draft.buyPrice || 0, title: item.title || '',
+      accountId: selectedId, itemId: item.id, photoUrl: item.photo?.url || item.photos?.[0]?.url || item.photo_url || null,
+      addedAt: registry[k]?.addedAt || new Date().toISOString(),
+    }};
+    setRegistry(u); save('vinted_listing_registry', u);
+    cancelEdit(k);
+  };
+  const removeEntry = (k) => {
+    if (!window.confirm('Retirer le numéro attribué à cette annonce ?')) return;
+    const u = { ...registry }; delete u[k];
+    setRegistry(u); save('vinted_listing_registry', u);
+  };
+
+  return (
+    <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+      <h2 style={{margin:0,fontSize:16,fontWeight:800}}>🌐 Annonces en ligne</h2>
+      <p style={{fontSize:12.5,color:C.muted,margin:0,lineHeight:1.5}}>
+        Liste réelle de tes annonces actuellement en ligne sur Vinted (par compte connecté). Attribue un numéro + un prix d'achat à chaque annonce : dès qu'elle se vend, la vente et le bordereau reprendront automatiquement ce numéro.
+      </p>
+
+      {accounts.length===0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted connecté (voir l'onglet "Comptes Vinted").</div>}
+
+      {accounts.length>0 && (
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          {accounts.map(acc => (
+            <button key={acc.vinted_user_id} onClick={()=>setSelectedId(acc.vinted_user_id)}
+              style={{padding:'6px 14px',borderRadius:999,cursor:'pointer',fontSize:12,fontWeight:700,
+                background: selectedId===acc.vinted_user_id ? C.text : C.card,
+                color: selectedId===acc.vinted_user_id ? C.surface : C.text,
+                border:`1px solid ${selectedId===acc.vinted_user_id?C.text:C.border}`}}>
+              {accountName(acc)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {view.loading && <div style={{fontSize:13,color:C.muted,padding:'20px 0',textAlign:'center'}}>Chargement…</div>}
+      {!view.loading && view.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(view.error)}</div>}
+
+      {!view.loading && !view.error && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(190px, 1fr))',gap:14}}>
+          {view.items.length===0 && <div style={{fontSize:13,color:C.muted}}>Aucune annonce en ligne actuellement.</div>}
+          {view.items.map(item => {
+            const k = regKey(item);
+            const reg = registry[k];
+            const draft = drafts[k];
+            const photo = item.photo?.url || item.photos?.[0]?.url || item.photo_url;
+            return (
+              <div key={item.id} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`}}>
+                <div style={{width:'100%',aspectRatio:'1/1',background:C.border,position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {photo ? <img src={photo} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:30}}>👟</span>}
+                  {reg && <div style={{position:'absolute',top:6,left:6,background:C.accent,color:'#fff',fontSize:11,fontWeight:900,padding:'2px 8px',borderRadius:999}}>N° {reg.numero}</div>}
+                </div>
+                <div style={{padding:'8px 10px',display:'flex',flexDirection:'column',gap:6}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
+                  <div style={{fontSize:14,fontWeight:900,color:C.text}}>{item.price?.amount} {item.price?.currency_code==='EUR'?'€':item.price?.currency_code}</div>
+
+                  {draft ? (
+                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                      <input value={draft.numero} onChange={e=>setDrafts(d=>({...d,[k]:{...d[k],numero:e.target.value}}))}
+                        placeholder="Numéro" style={{padding:'5px 8px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:12,fontFamily:'monospace'}}/>
+                      <input value={draft.buyPrice} onChange={e=>setDrafts(d=>({...d,[k]:{...d[k],buyPrice:e.target.value}}))}
+                        type="number" placeholder="Prix achat €" style={{padding:'5px 8px',border:`1px solid ${C.border}`,borderRadius:6,fontSize:12}}/>
+                      <div style={{display:'flex',gap:6}}>
+                        <Btn small onClick={()=>commitEdit(item)} color={C.accent}>OK</Btn>
+                        <Btn small onClick={()=>cancelEdit(k)} color={C.border}>Annuler</Btn>
+                      </div>
+                    </div>
+                  ) : reg ? (
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:11,color:C.muted}}>
+                      <span>Achat : {fmt(reg.buyPrice)}</span>
+                      <div style={{display:'flex',gap:4}}>
+                        <Btn small onClick={()=>startEdit(item)} color={C.blue}>✎</Btn>
+                        <Btn small danger onClick={()=>removeEntry(k)}>✕</Btn>
+                      </div>
+                    </div>
+                  ) : (
+                    <Btn small onClick={()=>startEdit(item)} color={C.accent}>+ Numéro / prix</Btn>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!view.loading && !view.error && view.pagination && view.pagination.total_pages>1 && (
+        <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:10,marginTop:6}}>
+          <button disabled={view.page<=1} onClick={()=>loadView(view.page-1)}
+            style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:view.page<=1?'default':'pointer',opacity:view.page<=1?0.4:1,fontSize:12}}>← Précédent</button>
+          <span style={{fontSize:12,color:C.muted}}>Page {view.pagination.current_page} / {view.pagination.total_pages}</span>
+          <button disabled={view.page>=view.pagination.total_pages} onClick={()=>loadView(view.page+1)}
+            style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:view.page>=view.pagination.total_pages?'default':'pointer',opacity:view.page>=view.pagination.total_pages?0.4:1,fontSize:12}}>Suivant →</button>
+        </div>
+      )}
+
+      {/* Debug : si les photos/titres/prix ne s'affichent pas correctement,
+          ouvrir ceci pour voir la vraie forme JSON renvoyée par Vinted et
+          ajuster les champs lus plus haut (item.photo?.url, item.price...). */}
+      {!view.loading && !view.error && view.raw && view.raw.length>0 && (
+        <details style={{marginTop:4}}>
+          <summary style={{cursor:'pointer',color:C.blue,fontWeight:700,fontSize:12}}>🔧 Debug : voir la réponse brute (1ère annonce)</summary>
+          <pre style={{fontSize:10,whiteSpace:'pre-wrap',wordBreak:'break-all',background:C.surface,padding:8,borderRadius:8,marginTop:6,maxHeight:300,overflow:'auto'}}>
+            {JSON.stringify(view.raw[0], null, 2)}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/* ── Ancienne appli (archive du catalogue + ventes d'avant le nouveau
+   systeme de numerotation par annonce). Rien n'est jamais supprime : le
+   bouton copie l'existant dans des cles a part et vide les cles vivantes,
+   pour repartir de zero sans perdre l'historique. */
+function LegacyArchive({ catalog, sales, catalogArchive, setCatalogArchive, salesArchive, setSalesArchive, setCatalog, setSales }) {
+  const alreadyArchived = !!(catalogArchive || salesArchive);
+  const hasLiveData = catalog.length > 0 || sales.length > 0;
+
+  const doArchive = () => {
+    if (!window.confirm(
+      "Ça va déplacer tout l'ancien catalogue et toutes les ventes actuelles dans cette archive, "+
+      "et repartir de zéro dans l'onglet Ventes. Rien n'est supprimé. Continuer ?"
+    )) return;
+    setCatalogArchive(catalog); save('vinted_catalog_archive', catalog);
+    setSalesArchive(sales); save('vinted_sales_archive', sales);
+    setCatalog([]); save('vinted_catalog', []);
+    setSales([]); save('vinted_sales', []);
+    save('vinted_legacy_archived', true);
+  };
+
+  const archCatalog = catalogArchive || [];
+  const archSales = salesArchive || [];
+  const totalBuy = archCatalog.reduce((s,p)=>s+(+p.buyPrice||0),0);
+  const totalSell = archSales.reduce((s,v)=>s+(+v.sellPrice||0),0);
+  const totalProfit = archSales.reduce((s,v)=>s+((+v.sellPrice||0)-(+v.buyPrice||0)),0);
+
+  return (
+    <div style={{padding:16,display:'flex',flexDirection:'column',gap:16}}>
+      <h2 style={{margin:0,fontSize:16,fontWeight:800}}>🗄️ Ancienne appli</h2>
+      <p style={{fontSize:12.5,color:C.muted,margin:0,lineHeight:1.5}}>
+        Catalogue et ventes d'avant le nouveau système de numérotation par annonce. Conservés ici pour l'historique, en lecture seule.
+      </p>
+
+      {!alreadyArchived && (
+        <div style={{padding:14,border:`1px solid ${C.warn}66`,background:`${C.warn}18`,borderRadius:10,display:'flex',flexDirection:'column',gap:8}}>
+          <div style={{fontSize:13,fontWeight:700}}>Rien n'a encore été archivé.</div>
+          <div style={{fontSize:12,color:C.muted}}>{catalog.length} paire(s) au catalogue, {sales.length} vente(s) actuellement.</div>
+          <Btn small onClick={doArchive} color={C.warn} disabled={!hasLiveData} style={{alignSelf:'flex-start'}}>
+            Archiver maintenant et repartir de zéro
+          </Btn>
+        </div>
+      )}
+
+      {alreadyArchived && (
+        <>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+            <StatBox label="📦 Paires archivées" value={archCatalog.length} color={C.accent}/>
+            <StatBox label="💸 Ventes archivées" value={archSales.length} color={C.blue}/>
+            <StatBox label="💰 CA archivé" value={fmt(totalSell)} color={C.warn}/>
+            <StatBox label="📈 Bénéfice archivé" value={fmt(totalProfit)} color={totalProfit>=0?C.accent:C.danger}/>
+          </div>
+
+          <Card style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 12px',fontWeight:800,fontSize:13,borderBottom:`1px solid ${C.border}`}}>Catalogue archivé ({archCatalog.length})</div>
+            <div style={{maxHeight:300,overflow:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead style={{background:C.surface}}><tr>
+                  {['N°','Prix achat','Statut','Ajouté'].map(h=>(
+                    <th key={h} style={{textAlign:'left',padding:'8px 12px',color:C.muted,fontWeight:600,fontSize:10,textTransform:'uppercase'}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {archCatalog.map(p=>(
+                    <tr key={p.id} style={{borderTop:`1px solid ${C.border}`}}>
+                      <td style={{padding:'6px 12px',fontWeight:800,color:C.accent}}>{p.id}</td>
+                      <td style={{padding:'6px 12px'}}>{fmt(p.buyPrice)}</td>
+                      <td style={{padding:'6px 12px'}}><Badge color={p.status==='stock'?C.accent:C.danger}>{p.status==='stock'?'Stock':'Vendu'}</Badge></td>
+                      <td style={{padding:'6px 12px',color:C.muted,fontSize:11}}>{p.addedAt||'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Card style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 12px',fontWeight:800,fontSize:13,borderBottom:`1px solid ${C.border}`}}>Ventes archivées ({archSales.length})</div>
+            <div style={{maxHeight:300,overflow:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead style={{background:C.surface}}><tr>
+                  {['N° Paire','Date vente','Prix achat','Prix vente','Bénéfice'].map(h=>(
+                    <th key={h} style={{textAlign:'left',padding:'8px 12px',color:C.muted,fontWeight:600,fontSize:10,textTransform:'uppercase'}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {archSales.map(s=>(
+                    <tr key={s.id} style={{borderTop:`1px solid ${C.border}`}}>
+                      <td style={{padding:'6px 12px',fontWeight:800,color:C.accent}}>{s.productId}</td>
+                      <td style={{padding:'6px 12px',color:C.muted,fontSize:11}}>{s.saleDate||'—'}</td>
+                      <td style={{padding:'6px 12px'}}>{fmt(s.buyPrice)}</td>
+                      <td style={{padding:'6px 12px'}}>{fmt(s.sellPrice)}</td>
+                      <td style={{padding:'6px 12px',color:(+s.profit>=0)?C.accent:C.danger}}>{fmt(s.profit)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [tab,setTab]=useState('dashboard');
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
@@ -3111,11 +3390,15 @@ export default function App() {
   const toggleDark=()=>{ const d=!dark; setDark(d); save('vinted_dark',d); };
   const [catalog,setCatalog]=useState(()=>{
     const s=load('vinted_catalog',null);
+    // Si l'ancien catalogue a ete archive (repartir de zero), un tableau vide
+    // est une valeur voulue - ne pas le reseeder avec l'ancien INIT_CAT.
+    if(load('vinted_legacy_archived',false)) return s||[];
     if(!s||s.length===0){return INIT_CAT;}
     return s;
   });
   const [sales,setSales]=useState(()=>{
     const s=load('vinted_sales',null);
+    if(load('vinted_legacy_archived',false)) return s||[];
     if(!s||s.length===0){save('vinted_sales',INIT_SAL);return INIT_SAL;}
     return s;
   });
@@ -3130,6 +3413,11 @@ export default function App() {
   const [invoices,setInvoices]=useState(()=>load('vinted_invoices',[]));
   const [vintedAccounts,setVintedAccounts]=useState(()=>load('vinted_accounts',[]));
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
+  // Registre du nouveau systeme "Annonces en ligne" : { [accountId_itemId]: {numero, buyPrice, title, accountId, itemId, addedAt} }
+  const [listingRegistry,setListingRegistry]=useState(()=>load('vinted_listing_registry',{}));
+  // Archive de l'ancien catalogue/ventes (mise de cote a la demande de l'utilisateur, jamais supprimee)
+  const [catalogArchive,setCatalogArchive]=useState(()=>load('vinted_catalog_archive',null));
+  const [salesArchive,setSalesArchive]=useState(()=>load('vinted_sales_archive',null));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [menuOpen,setMenuOpen]=useState(false);
@@ -3226,6 +3514,12 @@ export default function App() {
         apply('vinted_colors', setCellColors);
         apply('vinted_invoices', setInvoices);
         apply('vinted_stock_vinted', setStockVinted);
+        apply('vinted_listing_registry', setListingRegistry);
+        apply('vinted_catalog_archive', setCatalogArchive);
+        apply('vinted_sales_archive', setSalesArchive);
+        if (cloud['vinted_legacy_archived'] !== undefined) {
+          try { localStorage.setItem('vinted_legacy_archived', JSON.stringify(cloud['vinted_legacy_archived'])); } catch(_){}
+        }
         apply('vinted_invoice_settings', setInvoiceSettings);
         apply('vinted_custom_logo', setCustomLogo);
         setSyncStatus('synced');
@@ -3330,6 +3624,69 @@ export default function App() {
       save('vinted_sv_seen_catalog',currentIds);
     }
   },[catalog,synced]);
+
+  // 3) Auto-import des ventes finalisees detectees via l'API Vinted directe
+  //    (nouveau systeme "Annonces en ligne"). Correspondance stricte
+  //    compte + titre identique entre l'annonce active enregistree dans
+  //    listingRegistry et la commande "vendue" renvoyee par Vinted une fois
+  //    finalisee - le titre d'une annonce ne change pas entre les deux etats,
+  //    donc pas besoin de convention de numero cachee dans le titre.
+  useEffect(() => {
+    if (!synced) return;
+    if (vintedAccounts.length===0) return;
+    if (Object.keys(listingRegistry).length===0) return;
+    let stop=false;
+    const run = async () => {
+      const importedTxIds = new Set(load('vinted_auto_sale_txids', []));
+      const removedKeys = [];
+      const newSales = [];
+      for (const acc of vintedAccounts) {
+        if (stop) return;
+        const res = await fetchVintedOrders(acc, 'sold', 1, 'completed');
+        if (!res.ok) continue;
+        for (const item of res.items) {
+          const txid = String(item.transaction_id);
+          if (importedTxIds.has(txid)) continue;
+          const matchKey = Object.keys(listingRegistry).find(k =>
+            listingRegistry[k].accountId===acc.vinted_user_id &&
+            listingRegistry[k].title===item.title &&
+            !removedKeys.includes(k)
+          );
+          if (!matchKey) continue;
+          const entry = listingRegistry[matchKey];
+          const sell = +(item.price?.amount || 0);
+          const buy = +(entry.buyPrice || 0);
+          newSales.push({
+            id: uid(), productId: entry.numero, buyPrice: buy, sellPrice: sell,
+            profit: +(sell-buy).toFixed(2), multi: buy>0?+(sell/buy).toFixed(2):0,
+            saleDate: item.date ? new Date(item.date).toLocaleDateString('fr-FR') : tod(),
+            receiveDate:'', createdAt:new Date().toISOString(),
+            source:'vinted-auto', vintedTransactionId:item.transaction_id, vintedAccountId:acc.vinted_user_id,
+          });
+          importedTxIds.add(txid);
+          removedKeys.push(matchKey);
+        }
+      }
+      if (stop) return;
+      save('vinted_auto_sale_txids', Array.from(importedTxIds));
+      if (newSales.length>0) {
+        setSales(prev => { const ns=[...newSales, ...prev]; save('vinted_sales', ns); return ns; });
+        pushNotif('Vente(s) détectée(s)', `${newSales.length} vente${newSales.length>1?'s':''} importée${newSales.length>1?'s':''} automatiquement (n° ${newSales.map(s=>s.productId).join(', ')}).`);
+      }
+      if (removedKeys.length>0) {
+        setListingRegistry(prev => {
+          const next = {...prev};
+          removedKeys.forEach(k=>delete next[k]);
+          save('vinted_listing_registry', next);
+          return next;
+        });
+      }
+    };
+    run();
+    const interval = setInterval(run, 5*60*1000);
+    return () => { stop=true; clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[synced, vintedAccounts, listingRegistry]);
 
   // ── Notifications : ventes comptabilisées + factures reçues ──
   // Après chargement, on compare le nombre actuel de ventes (=comptabilisées)
@@ -3524,6 +3881,8 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors}/>}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
+        {tab==='onlinelistings'&&<OnlineListings accounts={vintedAccounts} registry={listingRegistry} setRegistry={setListingRegistry}/>}
+        {tab==='legacyarchive'&&<LegacyArchive catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} catalogArchive={catalogArchive} setCatalogArchive={setCatalogArchive} salesArchive={salesArchive} setSalesArchive={setSalesArchive}/>}
       </main>
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
