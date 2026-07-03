@@ -99,13 +99,9 @@ const fetchVintedAccounts = async () => {
   } catch (_) { return []; }
 };
 
-// Vinted utilise DEUX hosts differents selon l'endpoint (constate via
-// plusieurs vraies requetes "Copy as fetch") :
-// - www.vinted.fr/api/v2/...      -> commandes, ventes, achats
-// - api.vinted.fr/{service}/v1/...  -> notifications et autres services annexes
-// Le domaine "site" (compte.domain, ex. www.vinted.fr) sert de defaut ; les
-// appels qui ont besoin de l'autre host le precisent via opts.host.
-const VINTED_NOTIF_API_HOST = {
+// L'extension capture le domaine "site" (www.vinted.fr) mais l'API reelle vit
+// sur un sous-domaine dedie (api.vinted.fr) - trouve via une vraie requete du site.
+const VINTED_API_HOST_MAP = {
   'www.vinted.fr': 'api.vinted.fr', 'www.vinted.com': 'api.vinted.com',
   'www.vinted.it': 'api.vinted.it', 'www.vinted.de': 'api.vinted.de',
 };
@@ -115,7 +111,7 @@ const VINTED_NOTIF_API_HOST = {
 const vintedApiCall = async (account, endpoint, opts = {}) => {
   try {
     const siteDomain = account.domain || 'www.vinted.fr';
-    const host = opts.host || siteDomain;
+    const apiHost = VINTED_API_HOST_MAP[siteDomain] || 'api.vinted.fr';
     const res = await fetch('/api/vinted-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -124,7 +120,7 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
         refreshToken: account.refresh_token,
         anonId: account.anon_id,
         csrfToken: account.csrf_token,
-        host,
+        host: apiHost,
         endpoint,
         method: opts.method || 'GET',
         body: opts.body,
@@ -135,20 +131,6 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
   } catch (err) {
     return { ok: false, error: String(err) };
   }
-};
-
-// Recupere une page d'achats ou de ventes pour un compte (endpoint reel
-// trouve via "Copy as fetch" : www.vinted.fr/api/v2/my_orders).
-// type: 'purchased' | 'sold'
-const fetchVintedOrders = async (account, type, page = 1) => {
-  const endpoint = `/api/v2/my_orders?type=${type}&status=completed&per_page=20&page=${page}`;
-  const res = await vintedApiCall(account, endpoint);
-  if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
-  return {
-    ok: true,
-    items: res.data?.my_orders || [],
-    pagination: res.data?.pagination || null,
-  };
 };
 
 // Synchro avec Google Sheets
@@ -2784,8 +2766,6 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 function VintedAccounts({ accounts, setAccounts }) {
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, raw} }
-  // Etat des listes achats/ventes par compte : { [vinted_user_id]: { type, page, items, pagination, loading, error } }
-  const [orders, setOrders] = useState({});
 
   const refreshAccounts = async () => {
     setLoading(true);
@@ -2796,37 +2776,11 @@ function VintedAccounts({ accounts, setAccounts }) {
 
   useEffect(() => { refreshAccounts(); }, []);
 
-  const loadOrders = async (acc, type, page = 1) => {
-    const key = acc.vinted_user_id;
-    setOrders(o => ({ ...o, [key]: { ...(o[key]||{}), type, page, loading: true, error: null } }));
-    const res = await fetchVintedOrders(acc, type, page);
-    setOrders(o => ({
-      ...o,
-      [key]: {
-        type, page, loading: false,
-        items: res.ok ? res.items : [],
-        pagination: res.ok ? res.pagination : null,
-        error: res.ok ? null : res.error,
-      },
-    }));
-  };
-
-  const toggleOrders = (acc, type) => {
-    const current = orders[acc.vinted_user_id];
-    if (current && current.type === type) {
-      // Referme si on reclique sur le meme bouton
-      setOrders(o => ({ ...o, [acc.vinted_user_id]: { ...current, type: null } }));
-    } else {
-      loadOrders(acc, type, 1);
-    }
-  };
-
   const testAccount = async (acc) => {
     setTestResult(r => ({ ...r, [acc.vinted_user_id]: { loading: true } }));
     // Endpoint confirme fonctionnel (repere via "Copy as fetch" dans DevTools) -
     // sert juste a verifier que le token + les headers anti-robot sont acceptes.
-    const notifHost = VINTED_NOTIF_API_HOST[acc.domain] || 'api.vinted.fr';
-    const res = await vintedApiCall(acc, '/inbox-notifications/v1/notifications/unread_count', { host: notifHost });
+    const res = await vintedApiCall(acc, '/inbox-notifications/v1/notifications/unread_count');
     setTestResult(r => ({
       ...r,
       [acc.vinted_user_id]: {
@@ -2871,71 +2825,12 @@ function VintedAccounts({ accounts, setAccounts }) {
                   <div style={{fontWeight:800,color:C.text,fontSize:14}}>{acc.login || `Compte #${acc.vinted_user_id}`}</div>
                   <div style={{fontSize:11,color:C.muted}}>{acc.domain} · maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}</div>
                 </div>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                  <button onClick={()=>toggleOrders(acc,'purchased')} style={{background:orders[acc.vinted_user_id]?.type==='purchased'?C.accent:'transparent',color:orders[acc.vinted_user_id]?.type==='purchased'?C.onAccent:C.text,border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
-                    🛍️ Achats
-                  </button>
-                  <button onClick={()=>toggleOrders(acc,'sold')} style={{background:orders[acc.vinted_user_id]?.type==='sold'?C.accent:'transparent',color:orders[acc.vinted_user_id]?.type==='sold'?C.onAccent:C.text,border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
-                    💸 Ventes
-                  </button>
-                  <button onClick={()=>testAccount(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
-                    {tr?.loading ? 'Test…' : 'Tester'}
-                  </button>
-                </div>
+                <button onClick={()=>testAccount(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
+                  {tr?.loading ? 'Test…' : 'Tester la connexion'}
+                </button>
               </div>
               {tr && !tr.loading && (
                 <div style={{marginTop:8,fontSize:12,fontWeight:700,color:tr.ok?C.accent:C.danger}}>{tr.label}</div>
-              )}
-
-              {orders[acc.vinted_user_id]?.type && (
-                <div style={{marginTop:14,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
-                  {orders[acc.vinted_user_id].loading && (
-                    <div style={{fontSize:13,color:C.muted}}>Chargement…</div>
-                  )}
-                  {!orders[acc.vinted_user_id].loading && orders[acc.vinted_user_id].error && (
-                    <div style={{fontSize:13,color:C.danger}}>Erreur : {String(orders[acc.vinted_user_id].error)}</div>
-                  )}
-                  {!orders[acc.vinted_user_id].loading && !orders[acc.vinted_user_id].error && (
-                    <>
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))',gap:10}}>
-                        {orders[acc.vinted_user_id].items.map(item => (
-                          <div key={item.transaction_id} style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',background:C.surface}}>
-                            <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              {item.photo_url
-                                ? <img src={item.photo_url} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                                : <span style={{fontSize:24}}>📦</span>}
-                            </div>
-                            <div style={{padding:'8px 10px'}}>
-                              <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={item.title}>{item.title}</div>
-                              <div style={{fontSize:13,fontWeight:800,color:C.accent,marginTop:2}}>{item.price?.amount} {item.price?.currency_code==='EUR'?'€':item.price?.currency_code}</div>
-                              <div style={{fontSize:10,color:C.muted,marginTop:2}}>{item.date ? new Date(item.date).toLocaleDateString('fr-FR') : ''}</div>
-                              <div style={{fontSize:10,color:C.muted,marginTop:2,lineHeight:1.3}}>{item.status}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      {orders[acc.vinted_user_id].pagination && (
-                        <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:10,marginTop:12}}>
-                          <button
-                            disabled={orders[acc.vinted_user_id].page<=1}
-                            onClick={()=>loadOrders(acc, orders[acc.vinted_user_id].type, orders[acc.vinted_user_id].page-1)}
-                            style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:orders[acc.vinted_user_id].page<=1?'default':'pointer',opacity:orders[acc.vinted_user_id].page<=1?0.4:1,fontSize:12}}>
-                            ← Précédent
-                          </button>
-                          <span style={{fontSize:12,color:C.muted}}>
-                            Page {orders[acc.vinted_user_id].pagination.current_page} / {orders[acc.vinted_user_id].pagination.total_pages} ({orders[acc.vinted_user_id].pagination.total_entries} au total)
-                          </span>
-                          <button
-                            disabled={orders[acc.vinted_user_id].page>=orders[acc.vinted_user_id].pagination.total_pages}
-                            onClick={()=>loadOrders(acc, orders[acc.vinted_user_id].type, orders[acc.vinted_user_id].page+1)}
-                            style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:orders[acc.vinted_user_id].page>=orders[acc.vinted_user_id].pagination.total_pages?'default':'pointer',opacity:orders[acc.vinted_user_id].page>=orders[acc.vinted_user_id].pagination.total_pages?0.4:1,fontSize:12}}>
-                            Suivant →
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
               )}
             </div>
           );
