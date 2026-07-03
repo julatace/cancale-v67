@@ -2808,16 +2808,32 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 
 
 /* ── Comptes Vinted liés (API directe) ─────────────────── */
+// Interface a deux niveaux d'onglets, comme la vraie page "Mes commandes" de
+// Vinted : Achats / Ventes / Messages en haut, puis Toutes / En attente /
+// Finalisées juste en dessous pour Achats et Ventes. Un seul compte affiche
+// son contenu a la fois (selectionne via les pastilles en haut) plutot que
+// tout empiler - plus lisible des qu'il y a plusieurs comptes.
+const CATEGORY_TABS = [
+  { id:'purchased', label:'Achats',   icon:'🛍️' },
+  { id:'sold',      label:'Ventes',   icon:'💸' },
+  { id:'messages',  label:'Messages', icon:'💬' },
+];
+const STATUS_TABS = [
+  { id:'all',       label:'Toutes' },
+  { id:'pending',   label:'En attente' },
+  { id:'completed', label:'Finalisées' },
+];
+
 function VintedAccounts({ accounts, setAccounts }) {
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, raw} }
-  // Etat des listes achats/ventes par compte : { [vinted_user_id]: { type, page, items, pagination, loading, error } }
-  const [orders, setOrders] = useState({});
-  // Petits noms perso donnes a chaque compte (ex: "Shop Cancale", "Compte Julien") -
-  // purement cosmetique, stocke comme le reste des donnees de l'app (synchro cloud incluse).
   const [labels, setLabels] = useState(()=>load('vinted_account_labels',{}));
-  const [editingLabel, setEditingLabel] = useState(null); // vinted_user_id en cours d'edition
+  const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
+  const [category, setCategory] = useState('purchased'); // purchased | sold | messages
+  const [statusFilter, setStatusFilter] = useState('all'); // all | pending | completed
+  const [view, setView] = useState({ loading:false, items:[], pagination:null, page:1, error:null, raw:null });
 
   const startEditLabel = (acc) => { setEditingLabel(acc.vinted_user_id); setLabelDraft(labels[acc.vinted_user_id] || acc.login || ''); };
   const commitLabel = (acc) => {
@@ -2832,58 +2848,30 @@ function VintedAccounts({ accounts, setAccounts }) {
     setLoading(true);
     const list = await fetchVintedAccounts();
     setAccounts(list);
+    if (!selectedId && list.length > 0) setSelectedId(list[0].vinted_user_id);
     setLoading(false);
   };
 
   useEffect(() => { refreshAccounts(); }, []);
 
-  const loadOrders = async (acc, type, page = 1, statusFilter = 'completed') => {
-    const key = acc.vinted_user_id;
-    setOrders(o => ({ ...o, [key]: { ...(o[key]||{}), type, page, statusFilter, loading: true, error: null } }));
-    const res = await fetchVintedOrders(acc, type, page, statusFilter);
-    setOrders(o => ({
-      ...o,
-      [key]: {
-        type, page, statusFilter, loading: false,
-        items: res.ok ? res.items : [],
-        pagination: res.ok ? res.pagination : null,
-        error: res.ok ? null : res.error,
-      },
-    }));
-  };
+  const selectedAccount = accounts.find(a => a.vinted_user_id === selectedId) || null;
 
-  const loadMessages = async (acc, page = 1) => {
-    const key = acc.vinted_user_id;
-    setOrders(o => ({ ...o, [key]: { ...(o[key]||{}), type: 'messages', page, loading: true, error: null } }));
-    const res = await fetchVintedConversations(acc, page);
-    setOrders(o => ({
-      ...o,
-      [key]: {
-        type: 'messages', page, loading: false,
-        items: res.ok ? res.items : [],
-        pagination: res.ok ? res.pagination : null,
-        error: res.ok ? null : res.error,
-        raw: res.raw,
-      },
-    }));
-  };
-
-  const toggleOrders = (acc, type) => {
-    const current = orders[acc.vinted_user_id];
-    if (current && current.type === type) {
-      // Referme si on reclique sur le meme bouton
-      setOrders(o => ({ ...o, [acc.vinted_user_id]: { ...current, type: null } }));
-    } else if (type === 'messages') {
-      loadMessages(acc, 1);
+  const loadView = async (page = 1) => {
+    if (!selectedAccount) return;
+    setView(v => ({ ...v, loading:true, error:null }));
+    if (category === 'messages') {
+      const res = await fetchVintedConversations(selectedAccount, page);
+      setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw: res.raw });
     } else {
-      loadOrders(acc, type, 1, 'completed');
+      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter);
+      setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
     }
   };
 
+  useEffect(() => { if (selectedAccount) loadView(1); /* eslint-disable-next-line */ }, [selectedId, category, statusFilter]);
+
   const testAccount = async (acc) => {
     setTestResult(r => ({ ...r, [acc.vinted_user_id]: { loading: true } }));
-    // Endpoint confirme fonctionnel (repere via "Copy as fetch" dans DevTools) -
-    // sert juste a verifier que le token + les headers anti-robot sont acceptes.
     const notifHost = VINTED_NOTIF_API_HOST[acc.domain] || 'api.vinted.fr';
     const res = await vintedApiCall(acc, '/inbox-notifications/v1/notifications/unread_count', { host: notifHost });
     setTestResult(r => ({
@@ -2891,192 +2879,209 @@ function VintedAccounts({ accounts, setAccounts }) {
       [acc.vinted_user_id]: {
         ok: !!res.ok,
         label: res.ok
-          ? `✓ Connexion acceptée pour ${acc.login || `#${acc.vinted_user_id}`}`
-          : `✗ Échec (${res.status || res.error || 'erreur inconnue'})${res.status===403?' — anti-robot Vinted (csrf/anon_id manquant ou expiré)':''}`,
-        raw: res,
+          ? `✓ Connexion acceptée`
+          : `✗ Échec (${res.status || res.error || 'erreur inconnue'})${res.status===403?' — anti-robot Vinted':''}`,
       },
     }));
   };
 
+  const tr = selectedAccount ? testResult[selectedAccount.vinted_user_id] : null;
+
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
         <button onClick={refreshAccounts} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
           {loading ? '…' : '↻ Actualiser'}
         </button>
       </div>
 
-      <div style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.5}}>
-        Les comptes apparaissent ici automatiquement dès que l'extension Chrome
-        « Shop Cancale35 – Vinted Sync » a capturé une session (aucune action
-        manuelle nécessaire une fois installée). Utilise « Tester » pour vérifier
-        qu'un compte répond bien avant de l'utiliser pour la synchro des ventes.
-      </div>
-
       {accounts.length === 0 && (
         <div style={{padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted}}>
-          Aucun compte détecté pour l'instant. Installe l'extension, connecte-toi sur vinted.fr, puis clique sur « Actualiser » ci-dessus.
+          Aucun compte détecté pour l'instant. Installe l'extension « Shop Cancale35 – Vinted Sync », connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
         </div>
       )}
 
-      <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        {accounts.map(acc => {
-          const tr = testResult[acc.vinted_user_id];
-          return (
-            <div key={acc.vinted_user_id} style={{padding:14,borderRadius:12,background:C.card,border:`1px solid ${C.border}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+      {accounts.length > 0 && (
+        <>
+          {/* Sélecteur de compte, sous forme de pastilles - un seul actif a la fois */}
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+            {accounts.map(acc => (
+              <button key={acc.vinted_user_id} onClick={()=>setSelectedId(acc.vinted_user_id)}
+                style={{
+                  display:'flex',alignItems:'center',gap:6,padding:'6px 12px 6px 6px',borderRadius:999,cursor:'pointer',fontSize:12,fontWeight:700,
+                  background: selectedId===acc.vinted_user_id ? C.text : C.card,
+                  color: selectedId===acc.vinted_user_id ? C.surface : C.text,
+                  border:`1px solid ${selectedId===acc.vinted_user_id?C.text:C.border}`,
+                }}>
+                <span style={{width:20,height:20,borderRadius:999,background:selectedId===acc.vinted_user_id?C.surface:C.border,color:selectedId===acc.vinted_user_id?C.text:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900}}>
+                  {accountName(acc).slice(0,1).toUpperCase()}
+                </span>
+                {accountName(acc)}
+              </button>
+            ))}
+          </div>
+
+          {selectedAccount && (
+            <div style={{borderRadius:16,border:`1px solid ${C.border}`,background:C.card,overflow:'hidden'}}>
+              {/* En-tête compte : nom éditable + statut + bouton Tester */}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`}}>
                 <div>
-                  {editingLabel===acc.vinted_user_id ? (
+                  {editingLabel===selectedAccount.vinted_user_id ? (
                     <div style={{display:'flex',gap:6,alignItems:'center'}}>
                       <input autoFocus value={labelDraft} onChange={e=>setLabelDraft(e.target.value)}
-                        onKeyDown={e=>{ if(e.key==='Enter') commitLabel(acc); if(e.key==='Escape') setEditingLabel(null); }}
-                        placeholder={acc.login || `Compte #${acc.vinted_user_id}`}
-                        style={{fontSize:14,fontWeight:800,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:180}}/>
-                      <button onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:700}}>OK</button>
+                        onKeyDown={e=>{ if(e.key==='Enter') commitLabel(selectedAccount); if(e.key==='Escape') setEditingLabel(null); }}
+                        placeholder={selectedAccount.login || `Compte #${selectedAccount.vinted_user_id}`}
+                        style={{fontSize:15,fontWeight:800,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:180}}/>
+                      <button onClick={()=>commitLabel(selectedAccount)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:700}}>OK</button>
                     </div>
                   ) : (
-                    <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
-                      <div style={{fontWeight:800,color:C.text,fontSize:14}}>{accountName(acc)}</div>
+                    <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(selectedAccount)} title="Cliquer pour renommer">
+                      <div style={{fontWeight:800,color:C.text,fontSize:15}}>{accountName(selectedAccount)}</div>
                       <span style={{fontSize:11,color:C.muted}}>✎</span>
                     </div>
                   )}
-                  <div style={{fontSize:11,color:C.muted}}>{acc.login && acc.login!==accountName(acc) ? `@${acc.login} · ` : ''}{acc.domain} · maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
+                    {selectedAccount.login && selectedAccount.login!==accountName(selectedAccount) ? `@${selectedAccount.login} · ` : ''}
+                    maj {selectedAccount.updated_at ? new Date(selectedAccount.updated_at).toLocaleString('fr-FR') : '—'}
+                  </div>
                 </div>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                  <button onClick={()=>toggleOrders(acc,'purchased')} style={{background:orders[acc.vinted_user_id]?.type==='purchased'?C.accent:'transparent',color:orders[acc.vinted_user_id]?.type==='purchased'?C.onAccent:C.text,border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
-                    🛍️ Achats
-                  </button>
-                  <button onClick={()=>toggleOrders(acc,'sold')} style={{background:orders[acc.vinted_user_id]?.type==='sold'?C.accent:'transparent',color:orders[acc.vinted_user_id]?.type==='sold'?C.onAccent:C.text,border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
-                    💸 Ventes
-                  </button>
-                  <button onClick={()=>toggleOrders(acc,'messages')} style={{background:orders[acc.vinted_user_id]?.type==='messages'?C.accent:'transparent',color:orders[acc.vinted_user_id]?.type==='messages'?C.onAccent:C.text,border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
-                    💬 Messages
-                  </button>
-                  <button onClick={()=>testAccount(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:999,padding:'6px 14px',cursor:'pointer',fontSize:12,fontWeight:700}}>
-                    {tr?.loading ? 'Test…' : 'Tester'}
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  {tr && !tr.loading && <span style={{fontSize:11,fontWeight:700,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
+                  <button onClick={()=>testAccount(selectedAccount)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
+                    {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
                 </div>
               </div>
-              {tr && !tr.loading && (
-                <div style={{marginTop:8,fontSize:12,fontWeight:700,color:tr.ok?C.accent:C.danger}}>{tr.label}</div>
+
+              {/* Onglets de catégorie */}
+              <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,padding:'0 16px'}}>
+                {CATEGORY_TABS.map(t => (
+                  <button key={t.id} onClick={()=>{ setCategory(t.id); setStatusFilter('all'); }}
+                    style={{
+                      background:'none',border:'none',cursor:'pointer',padding:'12px 16px',fontSize:13,fontWeight:700,
+                      color: category===t.id ? C.text : C.muted,
+                      borderBottom: category===t.id ? `2px solid ${C.text}` : '2px solid transparent',
+                      marginBottom:-1,
+                    }}>
+                    {t.icon} {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sous-onglets Toutes / En attente / Finalisées (achats & ventes uniquement) */}
+              {category!=='messages' && (
+                <div style={{display:'flex',gap:8,padding:'12px 16px 0'}}>
+                  {STATUS_TABS.map(t => (
+                    <button key={t.id} onClick={()=>setStatusFilter(t.id)}
+                      style={{
+                        background: statusFilter===t.id ? C.text : 'transparent',
+                        color: statusFilter===t.id ? C.surface : C.muted,
+                        border:`1px solid ${statusFilter===t.id?C.text:C.border}`,
+                        borderRadius:999,padding:'4px 12px',cursor:'pointer',fontSize:11,fontWeight:700,
+                      }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               )}
 
-              {orders[acc.vinted_user_id]?.type && (
-                <div style={{marginTop:14,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
-                  {(orders[acc.vinted_user_id].type==='purchased'||orders[acc.vinted_user_id].type==='sold') && (
-                    <div style={{display:'flex',gap:6,marginBottom:12}}>
-                      <button onClick={()=>loadOrders(acc, orders[acc.vinted_user_id].type, 1, 'completed')} style={{background:orders[acc.vinted_user_id].statusFilter==='completed'?C.text:'transparent',color:orders[acc.vinted_user_id].statusFilter==='completed'?C.surface:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:700}}>
-                        Finalisées
-                      </button>
-                      <button onClick={()=>loadOrders(acc, orders[acc.vinted_user_id].type, 1, 'pending')} style={{background:orders[acc.vinted_user_id].statusFilter==='pending'?C.text:'transparent',color:orders[acc.vinted_user_id].statusFilter==='pending'?C.surface:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:700}}>
-                        En attente
-                      </button>
-                    </div>
-                  )}
-                  {orders[acc.vinted_user_id].loading && (
-                    <div style={{fontSize:13,color:C.muted}}>Chargement…</div>
-                  )}
-                  {!orders[acc.vinted_user_id].loading && orders[acc.vinted_user_id].error && (
-                    <div style={{fontSize:13,color:C.danger}}>Erreur : {String(orders[acc.vinted_user_id].error)}</div>
-                  )}
-                  {!orders[acc.vinted_user_id].loading && !orders[acc.vinted_user_id].error && orders[acc.vinted_user_id].type!=='messages' && (
-                    <>
-                      {orders[acc.vinted_user_id].items.length===0 && (
-                        <div style={{fontSize:13,color:C.muted}}>Aucun élément.</div>
-                      )}
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(190px, 1fr))',gap:16}}>
-                        {orders[acc.vinted_user_id].items.map(item => {
-                          const isDone = /finalis/i.test(item.status||'');
-                          return (
-                          <div key={item.transaction_id} style={{borderRadius:14,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`}}>
-                            <div style={{width:'100%',aspectRatio:'3/4',background:C.border,position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {/* Contenu */}
+              <div style={{padding:16}}>
+                {view.loading && <div style={{fontSize:13,color:C.muted,padding:'20px 0',textAlign:'center'}}>Chargement…</div>}
+                {!view.loading && view.error && (
+                  <div style={{fontSize:13,color:C.danger}}>Erreur : {String(view.error)}</div>
+                )}
+
+                {!view.loading && !view.error && category!=='messages' && (
+                  <>
+                    {view.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun élément.</div>}
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:14}}>
+                      {view.items.map(item => {
+                        const isDone = /finalis/i.test(item.status||'');
+                        return (
+                          <div key={item.transaction_id} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`}}>
+                            <div style={{width:'100%',aspectRatio:'1/1',background:C.border,position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
                               {item.photo_url
                                 ? <img src={item.photo_url} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                                : <span style={{fontSize:36}}>👟</span>}
-                              <div style={{position:'absolute',top:8,left:8,background:isDone?C.accent:C.warn,color:'#fff',fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:999}}>
+                                : <span style={{fontSize:30}}>👟</span>}
+                              <div style={{position:'absolute',top:6,left:6,background:isDone?C.accent:C.warn,color:'#fff',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:999}}>
                                 {isDone ? 'Finalisée' : 'En attente'}
                               </div>
                             </div>
-                            <div style={{padding:'10px 12px'}}>
-                              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:34}} title={item.title}>{item.title}</div>
-                              <div style={{fontSize:17,fontWeight:900,color:C.text,marginTop:6}}>{item.price?.amount} {item.price?.currency_code==='EUR'?'€':item.price?.currency_code}</div>
-                              <div style={{fontSize:11,color:C.muted,marginTop:4}}>{item.date ? new Date(item.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
+                            <div style={{padding:'8px 10px'}}>
+                              <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
+                              <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price?.amount} {item.price?.currency_code==='EUR'?'€':item.price?.currency_code}</div>
+                              <div style={{fontSize:10,color:C.muted,marginTop:2}}>{item.date ? new Date(item.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
                             </div>
                           </div>
-                        );})}
-                      </div>
-                    </>
-                  )}
-                  {!orders[acc.vinted_user_id].loading && !orders[acc.vinted_user_id].error && orders[acc.vinted_user_id].type==='messages' && (
-                    <>
-                      {orders[acc.vinted_user_id].items.length===0 && (
-                        <div style={{fontSize:13,color:C.muted}}>
-                          Aucune conversation trouvée (ou le format de réponse diffère de ce qui était attendu).
-                          {orders[acc.vinted_user_id].raw && (
-                            <details style={{marginTop:8}}>
-                              <summary style={{cursor:'pointer',color:C.blue,fontWeight:700}}>Voir la réponse brute (debug)</summary>
-                              <pre style={{fontSize:10,whiteSpace:'pre-wrap',wordBreak:'break-all',background:C.surface,padding:8,borderRadius:8,marginTop:6,maxHeight:300,overflow:'auto'}}>
-                                {JSON.stringify(orders[acc.vinted_user_id].raw, null, 2).slice(0,4000)}
-                              </pre>
-                            </details>
-                          )}
-                        </div>
-                      )}
-                      <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                        {orders[acc.vinted_user_id].items.map((conv, i) => (
-                          <div key={conv.id || i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.surface}}>
-                            {(conv.photo?.url || conv.opposite_user?.photo?.url) ? (
-                              <img src={conv.photo?.url || conv.opposite_user?.photo?.url} alt="" style={{width:36,height:36,borderRadius:999,objectFit:'cover',flexShrink:0}}/>
-                            ) : (
-                              <div style={{width:36,height:36,borderRadius:999,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>
-                            )}
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                                {conv.title || conv.subject || conv.opposite_user?.login || conv.item?.title || conv.user?.login || `Conversation`}
-                              </div>
-                              <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                                {conv.last_message?.body || conv.snippet || conv.body || conv.message || conv.text || ''}
-                              </div>
-                            </div>
-                            <div style={{fontSize:10,color:C.muted,flexShrink:0}}>
-                              {(conv.updated_at || conv.last_message_at || conv.created_at) ? new Date(conv.updated_at || conv.last_message_at || conv.created_at).toLocaleDateString('fr-FR') : ''}
-                            </div>
-                            {conv.unread && <div style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {!orders[acc.vinted_user_id].loading && !orders[acc.vinted_user_id].error && orders[acc.vinted_user_id].pagination && (
-                    <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:10,marginTop:12}}>
-                      <button
-                        disabled={orders[acc.vinted_user_id].page<=1}
-                        onClick={()=> orders[acc.vinted_user_id].type==='messages'
-                          ? loadMessages(acc, orders[acc.vinted_user_id].page-1)
-                          : loadOrders(acc, orders[acc.vinted_user_id].type, orders[acc.vinted_user_id].page-1, orders[acc.vinted_user_id].statusFilter)}
-                        style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:orders[acc.vinted_user_id].page<=1?'default':'pointer',opacity:orders[acc.vinted_user_id].page<=1?0.4:1,fontSize:12}}>
-                        ← Précédent
-                      </button>
-                      <span style={{fontSize:12,color:C.muted}}>
-                        Page {orders[acc.vinted_user_id].pagination.current_page} / {orders[acc.vinted_user_id].pagination.total_pages} ({orders[acc.vinted_user_id].pagination.total_entries} au total)
-                      </span>
-                      <button
-                        disabled={orders[acc.vinted_user_id].page>=orders[acc.vinted_user_id].pagination.total_pages}
-                        onClick={()=> orders[acc.vinted_user_id].type==='messages'
-                          ? loadMessages(acc, orders[acc.vinted_user_id].page+1)
-                          : loadOrders(acc, orders[acc.vinted_user_id].type, orders[acc.vinted_user_id].page+1, orders[acc.vinted_user_id].statusFilter)}
-                        style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:orders[acc.vinted_user_id].page>=orders[acc.vinted_user_id].pagination.total_pages?'default':'pointer',opacity:orders[acc.vinted_user_id].page>=orders[acc.vinted_user_id].pagination.total_pages?0.4:1,fontSize:12}}>
-                        Suivant →
-                      </button>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              )}
+                  </>
+                )}
+
+                {!view.loading && !view.error && category==='messages' && (
+                  <>
+                    {view.items.length===0 && (
+                      <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'10px 0'}}>
+                        Aucune conversation trouvée (ou le format de réponse diffère de ce qui était attendu).
+                        {view.raw && (
+                          <details style={{marginTop:8,textAlign:'left'}}>
+                            <summary style={{cursor:'pointer',color:C.blue,fontWeight:700}}>Voir la réponse brute (debug)</summary>
+                            <pre style={{fontSize:10,whiteSpace:'pre-wrap',wordBreak:'break-all',background:C.surface,padding:8,borderRadius:8,marginTop:6,maxHeight:300,overflow:'auto'}}>
+                              {JSON.stringify(view.raw, null, 2).slice(0,4000)}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                      {view.items.map((conv, i) => (
+                        <div key={conv.id || i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.surface}}>
+                          {(conv.photo?.url || conv.opposite_user?.photo?.url) ? (
+                            <img src={conv.photo?.url || conv.opposite_user?.photo?.url} alt="" style={{width:36,height:36,borderRadius:999,objectFit:'cover',flexShrink:0}}/>
+                          ) : (
+                            <div style={{width:36,height:36,borderRadius:999,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>
+                          )}
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {conv.title || conv.subject || conv.opposite_user?.login || conv.item?.title || conv.user?.login || `Conversation`}
+                            </div>
+                            <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {conv.last_message?.body || conv.snippet || conv.body || conv.message || conv.text || ''}
+                            </div>
+                          </div>
+                          <div style={{fontSize:10,color:C.muted,flexShrink:0}}>
+                            {(conv.updated_at || conv.last_message_at || conv.created_at) ? new Date(conv.updated_at || conv.last_message_at || conv.created_at).toLocaleDateString('fr-FR') : ''}
+                          </div>
+                          {conv.unread && <div style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {!view.loading && !view.error && view.pagination && (
+                  <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:10,marginTop:16}}>
+                    <button disabled={view.page<=1} onClick={()=>loadView(view.page-1)}
+                      style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:view.page<=1?'default':'pointer',opacity:view.page<=1?0.4:1,fontSize:12}}>
+                      ← Précédent
+                    </button>
+                    <span style={{fontSize:12,color:C.muted}}>
+                      Page {view.pagination.current_page} / {view.pagination.total_pages} ({view.pagination.total_entries} au total)
+                    </span>
+                    <button disabled={view.page>=view.pagination.total_pages} onClick={()=>loadView(view.page+1)}
+                      style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:view.page>=view.pagination.total_pages?'default':'pointer',opacity:view.page>=view.pagination.total_pages?0.4:1,fontSize:12}}>
+                      Suivant →
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          );
-        })}
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
