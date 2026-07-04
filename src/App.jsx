@@ -3338,10 +3338,14 @@ function VintedAccounts({ accounts, setAccounts }) {
    - marquer En ligne / Vendu / Stock.
    Stocke dans la cle localStorage synchronisee "vinted_inventory". */
 const INV_STATUS = {
-  online: { label: 'En ligne', color: '#22a06b', icon: '🟢' },
-  sold:   { label: 'Vendu',    color: '#c0392b', icon: '💸' },
-  stock:  { label: 'Stock',    color: '#f39c12', icon: '📦' },
+  online:       { label: 'En ligne',      color: '#22a06b', icon: '🟢' },
+  pending_sale: { label: 'Vente en cours', color: '#2f80ed', icon: '⏳' },
+  sold:         { label: 'Vendu',         color: '#c0392b', icon: '💸' },
+  stock:        { label: 'Stock',         color: '#f39c12', icon: '📦' },
 };
+// Normalise un titre pour comparer une annonce et une commande vendue (Vinted
+// renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
+const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLocate }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all'); // all | online | sold | stock
@@ -3437,8 +3441,11 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
     if (!numero) { alert('Indique le numéro à associer à cette annonce.'); return; }
     const existing = inventory.find(p => String(p.numero).trim().toLowerCase() === numero.toLowerCase());
     if (existing) {
+      // On sauvegarde le titre EXACT de l'annonce : c'est ce même titre qui
+      // reviendra dans la commande vendue, et qui permettra de retrouver le
+      // numéro au moment de la vente (les commandes n'ont pas d'id d'article).
       persist(inventory.map(p => p.id === existing.id
-        ? { ...p, title: p.title || listing.title, status:'online', vintedItemId: listing.id,
+        ? { ...p, title: listing.title, status:'online', vintedItemId: listing.id,
             vintedAccountId: acc.vinted_user_id, price: listing.price, photo: listing.photo }
         : p));
     } else {
@@ -3457,13 +3464,16 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const syncSalesFromVinted = async () => {
-    if (accounts.length === 0) { setSyncResult({ matched:0, msg:'Aucun compte Vinted lié.' }); return; }
+    if (accounts.length === 0) { setSyncResult({ msg:'Aucun compte Vinted lié.' }); return; }
     setSyncing(true); setSyncResult(null);
-    // Index numero -> paire pour un matching rapide.
-    const byNum = new Map();
-    inventory.forEach(p => byNum.set(String(p.numero).trim().toLowerCase(), p));
+    // Matching par TITRE : les annonces Vinted n'exposent pas d'id d'article
+    // dans les commandes, seulement le titre exact. On a sauvegardé ce titre
+    // sur chaque paire au moment de l'association -> on relie ainsi la vente au
+    // numéro sans dépendre d'un "nXX" dans le titre.
+    const byTitle = new Map();
+    inventory.forEach(p => { const k = normTitle(p.title); if (k) byTitle.set(k, p); });
     const updates = new Map(); // id -> patch
-    let scanned = 0;
+    let sold = 0, pending = 0, scanned = 0;
     for (const acc of accounts) {
       for (let page = 1; page <= 3; page++) {
         const res = await fetchVintedOrders(acc, 'sold', page, 'all');
@@ -3471,19 +3481,26 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
         const orders = res.items || [];
         scanned += orders.length;
         for (const o of orders) {
-          if (classifyOrderStatus(o.status) === 'cancelled') continue;
-          const num = extractPairNumber(o.title);
-          if (!num) continue;
-          const pair = byNum.get(String(num).trim().toLowerCase());
-          if (!pair || pair.status === 'sold') continue;
-          updates.set(pair.id, {
-            status: 'sold',
-            soldAt: o.date ? new Date(o.date).toLocaleDateString('fr-FR') : tod(),
+          const cls = classifyOrderStatus(o.status);
+          const pair = byTitle.get(normTitle(o.title));
+          if (!pair) continue;
+          const base = {
             transactionId: o.transaction_id || pair.transactionId || null,
-            price: pair.price ?? o.price?.amount ?? null,
             photo: pair.photo || o.photo_url || null,
+            price: pair.price ?? (o.price?.amount != null ? Number(o.price.amount) : null),
             vintedAccountId: pair.vintedAccountId || acc.vinted_user_id,
-          });
+          };
+          if (cls === 'completed') {
+            // Vente FINALISÉE = argent reçu -> on la comptabilise.
+            if (pair.status !== 'sold') { updates.set(pair.id, { ...base, status:'sold', soldAt: o.date ? new Date(o.date).toLocaleDateString('fr-FR') : tod() }); sold++; }
+          } else if (cls === 'cancelled') {
+            // Annulée/remboursée : si on l'avait mise "en cours", on la remet en ligne.
+            if (pair.status === 'pending_sale') updates.set(pair.id, { status:'online' });
+          } else {
+            // Vente en cours (expédiée, en acheminement...) : on l'affiche mais on
+            // NE la compte PAS tant que l'acheteur n'a pas validé (argent reçu).
+            if (pair.status === 'online' || pair.status === 'stock') { updates.set(pair.id, { ...base, status:'pending_sale' }); pending++; }
+          }
         }
         if (!res.pagination || page >= (res.pagination.total_pages || 1)) break;
       }
@@ -3492,7 +3509,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
       persist(inventory.map(p => updates.has(p.id) ? { ...p, ...updates.get(p.id) } : p));
     }
     setSyncing(false);
-    setSyncResult({ matched: updates.size, scanned });
+    setSyncResult({ sold, pending, scanned });
   };
 
   const filtered = useMemo(() => {
@@ -3510,6 +3527,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const counts = useMemo(() => ({
     all: inventory.length,
     online: inventory.filter(p=>p.status==='online').length,
+    pending_sale: inventory.filter(p=>p.status==='pending_sale').length,
     sold: inventory.filter(p=>p.status==='sold').length,
     stock: inventory.filter(p=>p.status==='stock').length,
   }), [inventory]);
@@ -3523,7 +3541,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
       <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:14}}>
         <StatBox label="Paires" value={counts.all}/>
         <StatBox label="En ligne" value={counts.online} color={INV_STATUS.online.color}/>
-        <StatBox label="Vendues" value={counts.sold} color={INV_STATUS.sold.color}/>
+        <StatBox label="Vente en cours" value={counts.pending_sale} color={INV_STATUS.pending_sale.color}/>
+        <StatBox label="Vendues" value={counts.sold} color={INV_STATUS.sold.color} sub="argent reçu"/>
         <StatBox label="En stock" value={counts.stock} color={INV_STATUS.stock.color}/>
       </div>
 
@@ -3541,14 +3560,14 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
         <div style={{fontSize:12,marginBottom:12,padding:'8px 12px',borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text}}>
           {syncResult.msg
             ? syncResult.msg
-            : (syncResult.matched > 0
-                ? `✅ ${syncResult.matched} paire(s) marquée(s) comme vendue(s) (sur ${syncResult.scanned} commandes analysées).`
-                : `Aucune nouvelle vente à reporter (${syncResult.scanned} commandes analysées). Vérifie que le numéro « nXX » figure bien dans le titre de l'annonce Vinted.`)}
+            : ((syncResult.sold + syncResult.pending) > 0
+                ? `✅ ${syncResult.sold} vente(s) finalisée(s) comptée(s)${syncResult.pending?`, ${syncResult.pending} en cours (non comptée(s), en attente de validation)`:''} — sur ${syncResult.scanned} commandes analysées.`
+                : `Aucune vente à reporter (${syncResult.scanned} commandes analysées). Chaque paire doit avoir le même titre que son annonce Vinted (via « Importer mes annonces »).`)}
         </div>
       )}
 
       <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
-        {[['all','Toutes'],['online','En ligne'],['sold','Vendues'],['stock','Stock']].map(([id,label]) => (
+        {[['all','Toutes'],['online','En ligne'],['pending_sale','En cours'],['sold','Vendues'],['stock','Stock']].map(([id,label]) => (
           <button key={id} type="button" onClick={()=>setFilter(id)}
             style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${filter===id?C.accent:C.border}`,
               background:filter===id?C.accent:'transparent',color:filter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>
@@ -3679,6 +3698,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             <select value={editDraft.status} onChange={e=>setEditDraft(d=>({...d,status:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:16}}>
               <option value="stock">📦 Stock</option>
               <option value="online">🟢 En ligne</option>
+              <option value="pending_sale">⏳ Vente en cours</option>
               <option value="sold">💸 Vendu</option>
             </select>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
@@ -3792,6 +3812,12 @@ export default function App() {
     });
     return ()=> setVintedTokensRefreshedHandler(null);
   },[]);
+
+  // Au demarrage : rafraichit cote serveur les tokens Vinted de tous les comptes
+  // (centralise, ne rafraichit que ceux qui expirent). Permet de consulter les
+  // comptes depuis n'importe quel appareil sans se reconnecter ni relancer
+  // l'extension. Un cron Vercel (vercel.json) fait de meme quand l'app est fermee.
+  useEffect(()=>{ fetch('/api/vinted-refresh').catch(()=>{}); },[]);
 
   // Au démarrage : charger depuis le cloud Supabase (synchro Mac <-> iPhone)
   // Si le cloud a des données, elles remplacent les données locales.
