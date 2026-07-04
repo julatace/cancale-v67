@@ -110,6 +110,40 @@ const VINTED_NOTIF_API_HOST = {
   'www.vinted.it': 'api.vinted.it', 'www.vinted.de': 'api.vinted.de',
 };
 
+// Persistance des tokens rafraichis automatiquement par le proxy (voir
+// api/vinted-proxy.js : quand un appel renvoie 401, le proxy refait un refresh
+// et nous renvoie de nouveaux tokens dans json.refreshed). Il FAUT les persister
+// car Vinted invalide l'ancien refresh_token a chaque refresh - sinon le refresh
+// suivant echouerait. Le composant App enregistre un handler pour repercuter les
+// nouveaux tokens dans son state ; en parallele on met a jour la ligne Supabase
+// pour que l'extension et les autres appareils repartent du bon refresh_token.
+let onVintedTokensRefreshed = null;
+const setVintedTokensRefreshedHandler = (fn) => { onVintedTokensRefreshed = fn; };
+
+const persistRefreshedTokens = async (account, refreshed) => {
+  if (!refreshed || !refreshed.access_token) return;
+  // Mutation en memoire : les appels suivants de la meme sequence utilisent
+  // deja le token frais sans attendre le re-render React.
+  account.access_token = refreshed.access_token;
+  account.refresh_token = refreshed.refresh_token;
+  try {
+    if (account.vinted_user_id) {
+      await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          access_token: refreshed.access_token,
+          refresh_token: refreshed.refresh_token,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+    }
+  } catch (_) { /* best effort : la mutation memoire suffit pour la session */ }
+  if (onVintedTokensRefreshed) {
+    try { onVintedTokensRefreshed(account.vinted_user_id, refreshed); } catch (_) { /* ignore */ }
+  }
+};
+
 // Appelle un endpoint de l'API Vinted pour le compte donne, via le proxy
 // (evite le blocage CORS puisque le navigateur ne parle qu'a notre propre domaine).
 const vintedApiCall = async (account, endpoint, opts = {}) => {
@@ -131,7 +165,9 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
       }),
     });
     const json = await res.json();
-    return json; // { status, ok, data }
+    // Le proxy a du rafraichir le token expire : on persiste les nouveaux tokens.
+    if (json && json.refreshed) await persistRefreshedTokens(account, json.refreshed);
+    return json; // { status, ok, data, refreshed? }
   } catch (err) {
     return { ok: false, error: String(err) };
   }
@@ -3183,7 +3219,24 @@ export default function App() {
     setIcon('shortcut icon');
     setIcon('apple-touch-icon');
   },[logoSrc]);
-  
+
+  // Repercute dans le state React les tokens rafraichis automatiquement par le
+  // proxy (via persistRefreshedTokens). Sans ca, seuls l'objet compte en memoire
+  // et Supabase seraient a jour, mais pas le state -> le prochain rendu
+  // repartirait de l'ancien token expire.
+  useEffect(()=>{
+    setVintedTokensRefreshedHandler((vintedUserId, refreshed)=>{
+      setVintedAccounts(prev=>{
+        const next=prev.map(a=> String(a.vinted_user_id)===String(vintedUserId)
+          ? {...a, access_token:refreshed.access_token, refresh_token:refreshed.refresh_token}
+          : a);
+        try{ localStorage.setItem('vinted_accounts', JSON.stringify(next)); }catch(_){}
+        return next;
+      });
+    });
+    return ()=> setVintedTokensRefreshedHandler(null);
+  },[]);
+
   // Au démarrage : charger depuis le cloud Supabase (synchro Mac <-> iPhone)
   // Si le cloud a des données, elles remplacent les données locales.
   // Le localStorage sert de secours si pas de connexion.
