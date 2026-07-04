@@ -60,7 +60,7 @@ Donc : si on améliore/débogue les "achats en attente", c'est le pipeline API V
   vinted_catalog, vinted_sales, vinted_garage_grid, vinted_blocked,
   vinted_extracols, vinted_colors, vinted_invoices,
   vinted_invoice_settings, vinted_custom_logo, vinted_dark, vinted_stock_vinted,
-  vinted_accounts, vinted_account_labels
+  vinted_accounts, vinted_account_labels, vinted_inventory
   ```
   D'autres clés localStorage existent mais **ne sont volontairement pas synchronisées** (comportement propre à chaque appareil) : `vinted_notif_enabled`, `vinted_last_weekly_recap`, `vinted_last_monthly_recap`, `vinted_sv_auto_removed`, `vinted_sv_seen_catalog`, `vinted_notif_last_sales`, `vinted_notif_last_invoices`.
 - **Identifiants Supabase** (déjà en clair dans le code, RLS désactivé volontairement) :
@@ -82,7 +82,10 @@ Vinted n'a pas d'API publique documentée. Tout ce qui suit a été découvert p
   - `x-anon-id`
   - `x-csrf-token` — **introuvable** via cookie, meta tag ou JSON embarqué dans la page ; seule méthode fiable trouvée : intercepter les vraies requêtes fetch/XHR de la page elle-même en injectant un script dans le "MAIN world" (voir `inject.js` de l'extension).
   - `x-next-app: marketplace-web` et `platform: web` — uniquement nécessaires sur les appels à `api.vinted.fr` (pas sur `www.vinted.fr`).
-- **Endpoint conversations/messages : jamais trouvé.** Tentatives faites et échouées : `/api/v2/conversations` (404), `/api/v2/transaction_messages?folder=message` (404, endpoint sourcé d'un wrapper communautaire non fiable). `/api/v2/conversations/stats` fonctionne mais ne renvoie qu'un compteur, pas la liste. **Fonctionnalité mise en pause**, pas abandonnée : l'UI et la fonction `fetchVintedConversations` existent déjà dans `App.jsx` avec un fallback propre (état vide + visualiseur JSON brut de debug). Pour la reprendre : ouvrir une conversation précise sur vinted.fr avec l'onglet Réseau des DevTools ouvert, chercher la requête XHR/fetch réelle.
+- **Endpoint conversations/messages : TROUVÉ (juillet 2026).** La liste vient de `GET /api/v2/inbox` → `{ conversations: [...] }` (chaque conv : `id`, `description` = titre de l'article, `unread`, `updated_at`, `opposite_user{id,login,photo}`, `item_photos`). Le détail d'un fil vient de `GET /api/v2/conversations/{id}` → `{ conversation }` avec `conversation.messages` = liste d'entités `{ entity_type, entity }`. `entity_type==='message'` = vrai message (`entity.body`, `entity.user_id`) ; autres types = événements système (`offer_request_message`, `status_message`, `action_message`). Pour distinguer « moi » de l'acheteur : comparer `entity.user_id` à `conversation.opposite_user.id`. Les anciens chemins `/api/v2/conversations` et `/api/v2/transaction_messages` renvoyaient 404. Implémenté dans `fetchVintedConversations`, `fetchVintedConversationDetail`, `normalizeConversationMessages` + modale de lecture. **Fonctionnalité réactivée** (lecture seule ; répondre se fait via lien « Répondre sur Vinted »).
+- **Auto-refresh des tokens (juillet 2026).** Les `access_token` Vinted expirent en ~2h. Le proxy `api/vinted-proxy.js` détecte un 401, appelle `POST /web/api/auth/refresh` (host `www.vinted.fr`, avec le `refresh_token_web`), récupère un nouveau access_token **et un nouveau refresh_token** (Vinted fait tourner le refresh_token — l'ancien est invalidé après usage), rejoue la requête, et renvoie les nouveaux tokens dans `json.refreshed`. `App.jsx` (`persistRefreshedTokens`) les répercute en mémoire + Supabase (`vinted_accounts`) + state. **Important** : ne jamais consommer un refresh_token sans persister le nouveau, sinon les appels suivants échouent en 401.
+- **Annonces en ligne (wardrobe)** : `GET /api/v2/wardrobe/{user_id}/items` → `{ items: [...], pagination }`. Utilisé par `fetchVintedListings` pour l'import dans l'inventaire.
+- **Bordereau (label PDF) : endpoint réel PAS ENCORE capturé.** Vinted ne génère le bordereau que pour une commande *en attente d'expédition* ; il n'y en avait aucune au moment du sondage. La transaction (`GET /api/v2/transactions/{id}`) expose `shipment.id` mais pas l'URL du PDF. Solution actuelle (v1, fonctionnelle) : bouton 📄 par paire dans l'inventaire → l'utilisateur fournit le bordereau PDF téléchargé depuis Vinted → `annotateAndDownloadBordereau` (pdf-lib) y imprime le numéro + le titre. **Pour rendre automatique** : capturer la vraie requête du label (DevTools → Réseau lors d'un vrai téléchargement de bordereau, ou étendre `inject.js` de l'extension), puis fetch via le proxy avant annotation.
 - **Statuts de commande** : Vinted ne renvoie pas un enum documenté, juste un champ `status` texte libre. La fonction `classifyOrderStatus(status)` dans `App.jsx` classe ce texte par regex :
   - `/annul|cancel|refus|rembours/i` → `'cancelled'`
   - `/finalis/i` → `'completed'`
@@ -128,8 +131,17 @@ Sans accès terminal/git direct (session Cowork), chaque modification suivait ce
 - Stock Vinted (liste des annonces en ligne, réconciliation automatique avec factures et catalogue)
 - Comptes Vinted liés : achats/ventes multi-comptes avec photos, prix, dates, filtres Toutes/En attente/Finalisées/**Annulées** (ce dernier ajouté récemment pour corriger un bug de classification)
 
+**Nouveautés (juillet 2026, session Claude Code)** :
+- **Onglet Inventaire** (`Inventory` dans `App.jsx`) : cœur de la nouvelle app. Chaque paire porte un **numéro attribué à la main**. Import des annonces en ligne (wardrobe) + association manuelle numéro↔annonce (suggestion `nXX` pré-remplie depuis le titre, modifiable). Statuts En ligne / Vendu / Stock. Indicateur « Au garage » (les cases du garage contiennent ces mêmes numéros → recherche inversée) + saut direct vers la case dans l'onglet Garage. Stocké dans `vinted_inventory` (synchronisé).
+- **Ventes automatiques** : bouton « Mettre à jour les ventes » dans l'inventaire → parcourt `my_orders?type=sold` de chaque compte et bascule en « Vendu » les paires dont le numéro `nXX` apparaît dans le titre (ignore annulées/remboursées et paires déjà vendues).
+- **Bordereau annoté** : bouton 📄 par paire (voir section 5, dépend de `pdf-lib`).
+- **Messages Vinted réactivés** (voir section 5).
+- **Navigation réorganisée** : le flux principal montre Stats / Inventaire / Factures / Stock / Garage / Comptes. L'ancien **Catalogue** et les **anciennes Ventes** sont déplacés dans une section « Ancienne application » en bas du menu (toujours lus par les statistiques du tableau de bord). `TABS` vs `ARCHIVE_TABS` dans `App.jsx`.
+- **Dépendance ajoutée** : `pdf-lib` (annotation des bordereaux), chargée en import dynamique.
+
 **Ne fonctionne pas / en pause** :
-- Messages/conversations Vinted (endpoint API introuvable, voir section 5)
+- Répondre aux messages depuis l'app (lecture OK ; la réponse renvoie vers Vinted).
+- Bordereau 100% automatique (endpoint label à capturer, voir section 5).
 
 **Signalé par l'utilisateur, pas encore détaillé** : Julien a mentionné qu'il reste des choses "pas très bien" dans l'app sans préciser lesquelles. **À creuser avec lui en priorité** — probablement des détails d'affichage/UX sur un ou plusieurs écrans existants plutôt qu'un bug fonctionnel majeur.
 
