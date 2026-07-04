@@ -211,21 +211,53 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   };
 };
 
-// Recupere les conversations (messages). /api/v2/conversations renvoyait un
-// 404 (mauvais chemin), donc on utilise plutot /api/v2/transaction_messages,
-// un endpoint documente par un wrapper Vinted communautaire independant -
-// plus fiable qu'une nouvelle supposition. On essaie ensuite plusieurs noms
-// de champs possibles dans la reponse pour rester tolerant si la forme differe.
+// Recupere la liste des conversations (boite de reception).
+// Endpoint reel confirme : GET /api/v2/inbox -> { conversations: [...] }.
+// Chaque conversation contient : id, description (titre de l'article),
+// unread, updated_at, opposite_user {id, login, photo}, item_photos.
+// (Les anciennes tentatives /api/v2/conversations et /transaction_messages
+// renvoyaient 404 ; /api/v2/inbox est le bon chemin.)
 const fetchVintedConversations = async (account, page = 1) => {
-  const res = await vintedApiCall(account, `/api/v2/transaction_messages?folder=message&page=${page}&per_page=20`);
+  const res = await vintedApiCall(account, `/api/v2/inbox?page=${page}&per_page=20`);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null, raw: res };
-  const items = res.data?.conversations || res.data?.transaction_messages || res.data?.messages || res.data?.data || [];
+  const items = res.data?.conversations || [];
   return {
     ok: true,
     items,
     pagination: res.data?.pagination || null,
     raw: res,
   };
+};
+
+// Recupere le detail d'une conversation (fil de messages).
+// Endpoint reel confirme : GET /api/v2/conversations/{id} -> { conversation }.
+// conversation.messages est une liste d'entites { entity_type, entity }.
+// entity_type = 'message' pour un vrai message (entity.body + entity.user_id) ;
+// d'autres types existent (offer_request_message, status_message,
+// action_message) qu'on affiche comme evenements. Pour distinguer "moi" de
+// "l'acheteur" on compare entity.user_id a opposite_user.id (fiable meme si
+// l'id vendeur differe du vinted_user_id du compte).
+const fetchVintedConversationDetail = async (account, conversationId) => {
+  const res = await vintedApiCall(account, `/api/v2/conversations/${conversationId}`);
+  if (!res.ok) return { ok: false, error: res.status || res.error, conversation: null };
+  return { ok: true, conversation: res.data?.conversation || null };
+};
+
+// Aplati les entites d'une conversation en messages affichables et tries.
+const normalizeConversationMessages = (conversation) => {
+  if (!conversation || !Array.isArray(conversation.messages)) return [];
+  const oppId = conversation.opposite_user?.id;
+  return conversation.messages.map((m) => {
+    const e = m.entity || {};
+    const ts = m.created_at_ts || e.created_at_ts || null;
+    if (m.entity_type === 'message') {
+      return { kind: 'message', mine: oppId != null && e.user_id !== oppId, body: e.body || '', photos: e.photos || [], ts };
+    }
+    // Evenements systeme (offre, statut, action) : on montre un libelle.
+    const label = e.title || e.body || e.subtitle || m.entity_type;
+    const extra = (e.title && e.body && e.body !== e.title) ? e.body : '';
+    return { kind: 'event', body: [label, extra].filter(Boolean).join(' — '), ts };
+  });
 };
 
 // Synchro avec Google Sheets
@@ -2885,6 +2917,17 @@ function VintedAccounts({ accounts, setAccounts }) {
   const [category, setCategory] = useState('purchased'); // purchased | sold | messages
   const [statusFilter, setStatusFilter] = useState('all'); // all | pending | completed
   const [view, setView] = useState({ loading:false, items:[], pagination:null, page:1, error:null, raw:null });
+  const [openConv, setOpenConv] = useState(null); // { loading, error, conversation, messages, header }
+
+  const openConversation = async (conv) => {
+    setOpenConv({ loading:true, error:null, conversation:null, messages:[], header:{
+      login: conv.opposite_user?.login, title: conv.description,
+      photo: conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url || null,
+    }});
+    const res = await fetchVintedConversationDetail(selectedAccount, conv.id);
+    if (!res.ok) { setOpenConv(o => ({ ...o, loading:false, error:res.error })); return; }
+    setOpenConv(o => ({ ...o, loading:false, conversation:res.conversation, messages:normalizeConversationMessages(res.conversation) }));
+  };
 
   const startEditLabel = (acc) => { setEditingLabel(acc.vinted_user_id); setLabelDraft(labels[acc.vinted_user_id] || acc.login || ''); };
   const commitLabel = (acc) => {
@@ -3078,39 +3121,37 @@ function VintedAccounts({ accounts, setAccounts }) {
                   <>
                     {view.items.length===0 && (
                       <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'10px 0'}}>
-                        Aucune conversation trouvée (ou le format de réponse diffère de ce qui était attendu).
-                        {view.raw && (
-                          <details style={{marginTop:8,textAlign:'left'}}>
-                            <summary style={{cursor:'pointer',color:C.blue,fontWeight:700}}>Voir la réponse brute (debug)</summary>
-                            <pre style={{fontSize:10,whiteSpace:'pre-wrap',wordBreak:'break-all',background:C.surface,padding:8,borderRadius:8,marginTop:6,maxHeight:300,overflow:'auto'}}>
-                              {JSON.stringify(view.raw, null, 2).slice(0,4000)}
-                            </pre>
-                          </details>
-                        )}
+                        Aucune conversation.
                       </div>
                     )}
                     <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                      {view.items.map((conv, i) => (
-                        <div key={conv.id || i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.surface}}>
-                          {(conv.photo?.url || conv.opposite_user?.photo?.url) ? (
-                            <img src={conv.photo?.url || conv.opposite_user?.photo?.url} alt="" style={{width:36,height:36,borderRadius:999,objectFit:'cover',flexShrink:0}}/>
+                      {view.items.map((conv, i) => {
+                        const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
+                        return (
+                        <button key={conv.id || i} type="button" onClick={()=>openConversation(conv)}
+                          style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left',width:'100%'}}>
+                          {photo ? (
+                            <img src={photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/>
                           ) : (
-                            <div style={{width:36,height:36,borderRadius:999,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>
+                            <div style={{width:40,height:40,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>
                           )}
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {conv.title || conv.subject || conv.opposite_user?.login || conv.item?.title || conv.user?.login || `Conversation`}
+                            <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {conv.opposite_user?.login || 'Conversation'}
                             </div>
                             <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {conv.last_message?.body || conv.snippet || conv.body || conv.message || conv.text || ''}
+                              {conv.description || ''}
                             </div>
                           </div>
-                          <div style={{fontSize:10,color:C.muted,flexShrink:0}}>
-                            {(conv.updated_at || conv.last_message_at || conv.created_at) ? new Date(conv.updated_at || conv.last_message_at || conv.created_at).toLocaleDateString('fr-FR') : ''}
+                          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+                            <div style={{fontSize:10,color:C.muted}}>
+                              {conv.updated_at ? new Date(conv.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : ''}
+                            </div>
+                            {conv.unread && <div style={{width:9,height:9,borderRadius:999,background:C.accent}}/>}
                           </div>
-                          {conv.unread && <div style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
-                        </div>
-                      ))}
+                        </button>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -3134,6 +3175,60 @@ function VintedAccounts({ accounts, setAccounts }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Modale : fil d'une conversation ouverte */}
+      {openConv && (
+        <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              {openConv.header?.photo
+                ? <img src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>
+                : <div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>💬</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:800,color:C.text}}>{openConv.header?.login || 'Conversation'}</div>
+                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title || ''}</div>
+              </div>
+              <button type="button" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
+              {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
+              {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
+              {!openConv.loading && !openConv.error && openConv.messages.map((m, i) => (
+                m.kind==='event' ? (
+                  <div key={i} style={{alignSelf:'center',fontSize:10,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}</div>
+                ) : (
+                  <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
+                    <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:14,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+                      {m.body || (m.photos?.length ? '📷 photo' : '')}
+                      {m.photos?.map((p,pi)=>(<img key={pi} src={p.url||p.thumbnails?.[0]?.url} alt="" style={{display:'block',marginTop:6,maxWidth:'100%',borderRadius:8}}/>))}
+                    </div>
+                    <div style={{fontSize:9,color:C.muted,marginTop:2,textAlign:m.mine?'right':'left'}}>
+                      {m.ts ? new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}
+                    </div>
+                  </div>
+                )
+              ))}
+              {!openConv.loading && !openConv.error && openConv.messages.length===0 && (
+                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>
+              )}
+            </div>
+            {(() => {
+              const raw = openConv.conversation?.conversation_url;
+              if (!raw) return null;
+              const dom = (selectedAccount?.domain) || 'www.vinted.fr';
+              const href = /^https?:\/\//.test(raw) ? raw : `https://${dom}${raw.startsWith('/') ? '' : '/'}${raw}`;
+              return (
+                <div style={{padding:'10px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
+                  <a href={href} target="_blank" rel="noreferrer"
+                    style={{display:'block',textAlign:'center',fontSize:12,fontWeight:700,color:C.blue,textDecoration:'none'}}>
+                    Répondre sur Vinted ↗
+                  </a>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       )}
     </div>
   );
