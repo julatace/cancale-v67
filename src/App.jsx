@@ -29,6 +29,7 @@ const SYNC_KEYS = [
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels',
+  'vinted_inventory',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -260,6 +261,32 @@ const normalizeConversationMessages = (conversation) => {
   });
 };
 
+// Recupere les annonces actuellement EN LIGNE d'un compte (sa "penderie").
+// Endpoint reel confirme : GET /api/v2/wardrobe/{user_id}/items.
+const fetchVintedListings = async (account, page = 1) => {
+  const uid = account.vinted_user_id;
+  const res = await vintedApiCall(account, `/api/v2/wardrobe/${uid}/items?page=${page}&per_page=40&order=relevance`);
+  if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
+  const items = (res.data?.items || []).map((it) => ({
+    id: String(it.id),
+    title: it.title || '',
+    price: it.price?.amount ?? (typeof it.price === 'number' ? it.price : null),
+    currency: it.price?.currency_code || 'EUR',
+    photo: it.photo?.url || it.photo?.thumbnails?.[0]?.url || null,
+    url: it.url || null,
+  }));
+  return { ok: true, items, pagination: res.data?.pagination || null };
+};
+
+// Detecte un numero de paire ecrit dans un titre Vinted, au format "nXX",
+// "n XX" ou "n°XX" (ex: "Adidas spezial n20" -> "20"). Sert UNIQUEMENT de
+// suggestion lors de l'import : l'attribution du numero reste manuelle.
+const extractPairNumber = (text) => {
+  if (!text) return null;
+  const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(text);
+  return m ? m[1] : null;
+};
+
 // Synchro avec Google Sheets
 async function syncFromSheets() {
   try {
@@ -456,6 +483,7 @@ const LOGO_CANCALE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 
 const TABS=[
   {id:'dashboard',icon:'📊',label:'Stats'},
+  {id:'inventory',icon:'🔢',label:'Inventaire'},
   {id:'catalog',  icon:'📦',label:'Catalogue'},
   {id:'sales',    icon:'💸',label:'Ventes'},
   {id:'invoices', icon:'📄',label:'Factures'},
@@ -2269,9 +2297,19 @@ td.right{text-align:right;}
 }
 
 /* ── Garage ──────────────────────────────────────────── */
-function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors}) {
+function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
+
+  // Localisation demandee depuis l'inventaire : amorce la recherche sur le numero.
+  useEffect(()=>{
+    if(locate){
+      setSearchInput(String(locate));
+      setGarageSearch(String(locate));
+      onLocateConsumed && onLocateConsumed();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[locate]);
   const [blockMode,setBlockMode]=useState(false);
   const [colorMode,setColorMode]=useState(false);
   const [addMode,setAddMode]=useState(false); // masquer les cases vides par défaut
@@ -3234,6 +3272,290 @@ function VintedAccounts({ accounts, setAccounts }) {
   );
 }
 
+/* ── Inventaire numéroté ─────────────────────────────────
+   Nouveau coeur de l'app : chaque paire porte un NUMERO attribue a la main par
+   Julien. On peut :
+   - ajouter une paire manuellement (numero + titre + statut) ;
+   - importer les annonces EN LIGNE d'un compte Vinted (wardrobe) et associer
+     manuellement un numero a chacune ("je montre a quoi correspond quoi") ;
+   - voir si la paire est rangee au garage (les cases du garage contiennent ces
+     memes numeros) ;
+   - marquer En ligne / Vendu / Stock.
+   Stocke dans la cle localStorage synchronisee "vinted_inventory". */
+const INV_STATUS = {
+  online: { label: 'En ligne', color: '#22a06b', icon: '🟢' },
+  sold:   { label: 'Vendu',    color: '#c0392b', icon: '💸' },
+  stock:  { label: 'Stock',    color: '#f39c12', icon: '📦' },
+};
+function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLocate }) {
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState('all'); // all | online | sold | stock
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ numero:'', title:'', status:'stock' });
+  const [showImport, setShowImport] = useState(false);
+  const [importState, setImportState] = useState({}); // { [accId]: {loading, items, error} }
+  const [importNums, setImportNums] = useState({});   // { [itemId]: numero }
+  const [editing, setEditing] = useState(null);       // pair id
+  const [editDraft, setEditDraft] = useState(null);
+
+  const persist = (next) => { setInventory(next); save('vinted_inventory', next); };
+
+  // Index inverse garage : numero (normalise) -> present dans une case ?
+  const garageNums = useMemo(() => {
+    const s = new Set();
+    Object.values(garageGrid || {}).forEach(arr => {
+      if (Array.isArray(arr)) arr.forEach(v => { const t = (v||'').trim().toLowerCase(); if (t) s.add(t); });
+    });
+    return s;
+  }, [garageGrid]);
+  const inGarage = (numero) => !!numero && garageNums.has(String(numero).trim().toLowerCase());
+
+  const accName = (accId) => (labels && labels[accId]) || accounts.find(a=>a.vinted_user_id===accId)?.login || `Compte #${accId}`;
+
+  const numeroExists = (numero, exceptId=null) =>
+    inventory.some(p => String(p.numero).trim().toLowerCase() === String(numero).trim().toLowerCase() && p.id !== exceptId);
+
+  const addPair = () => {
+    const numero = addForm.numero.trim();
+    if (!numero) { alert('Indique un numéro.'); return; }
+    if (numeroExists(numero)) { alert(`Le numéro ${numero} est déjà utilisé.`); return; }
+    const pair = { id: uid(), numero, title: addForm.title.trim(), status: addForm.status,
+      vintedItemId:null, vintedAccountId:null, price:null, photo:null, soldAt:null, transactionId:null, createdAt: tod() };
+    persist([pair, ...inventory]);
+    setAddForm({ numero:'', title:'', status:'stock' });
+    setShowAdd(false);
+  };
+
+  const deletePair = (id) => {
+    if (!window.confirm('Supprimer cette paire de l\'inventaire ?')) return;
+    persist(inventory.filter(p => p.id !== id));
+  };
+
+  const startEdit = (p) => { setEditing(p.id); setEditDraft({ ...p }); };
+  const commitEdit = () => {
+    const numero = String(editDraft.numero).trim();
+    if (!numero) { alert('Le numéro ne peut pas être vide.'); return; }
+    if (numeroExists(numero, editDraft.id)) { alert(`Le numéro ${numero} est déjà utilisé.`); return; }
+    persist(inventory.map(p => p.id === editDraft.id ? { ...editDraft, numero } : p));
+    setEditing(null); setEditDraft(null);
+  };
+
+  // Import : charge les annonces en ligne d'un compte.
+  const loadListings = async (acc) => {
+    setImportState(s => ({ ...s, [acc.vinted_user_id]: { loading:true } }));
+    const res = await fetchVintedListings(acc);
+    setImportState(s => ({ ...s, [acc.vinted_user_id]: { loading:false, items: res.ok?res.items:[], error: res.ok?null:res.error } }));
+    // Pre-remplit une suggestion de numero depuis le titre (nXX) - modifiable.
+    if (res.ok) {
+      setImportNums(prev => {
+        const u = { ...prev };
+        res.items.forEach(it => { if (u[it.id] === undefined) u[it.id] = extractPairNumber(it.title) || ''; });
+        return u;
+      });
+    }
+  };
+
+  // Associe une annonce en ligne a un numero (cree ou met a jour la paire).
+  const associate = (acc, listing) => {
+    const numero = String(importNums[listing.id] || '').trim();
+    if (!numero) { alert('Indique le numéro à associer à cette annonce.'); return; }
+    const existing = inventory.find(p => String(p.numero).trim().toLowerCase() === numero.toLowerCase());
+    if (existing) {
+      persist(inventory.map(p => p.id === existing.id
+        ? { ...p, title: p.title || listing.title, status:'online', vintedItemId: listing.id,
+            vintedAccountId: acc.vinted_user_id, price: listing.price, photo: listing.photo }
+        : p));
+    } else {
+      const pair = { id: uid(), numero, title: listing.title, status:'online', vintedItemId: listing.id,
+        vintedAccountId: acc.vinted_user_id, price: listing.price, photo: listing.photo, soldAt:null, transactionId:null, createdAt: tod() };
+      persist([pair, ...inventory]);
+    }
+  };
+
+  const isListingLinked = (itemId) => inventory.some(p => p.vintedItemId === String(itemId));
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return inventory
+      .filter(p => filter === 'all' ? true : p.status === filter)
+      .filter(p => !term || String(p.numero).toLowerCase().includes(term) || (p.title||'').toLowerCase().includes(term))
+      .sort((a,b) => {
+        const na = parseInt(a.numero,10), nb = parseInt(b.numero,10);
+        if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+        return String(a.numero).localeCompare(String(b.numero));
+      });
+  }, [inventory, q, filter]);
+
+  const counts = useMemo(() => ({
+    all: inventory.length,
+    online: inventory.filter(p=>p.status==='online').length,
+    sold: inventory.filter(p=>p.status==='sold').length,
+    stock: inventory.filter(p=>p.status==='stock').length,
+  }), [inventory]);
+
+  const inputStyle = { padding:'8px 10px', borderRadius:8, border:`1px solid ${C.border}`, background:C.bg, color:C.text, fontSize:13 };
+  const btn = (bg, fg='#fff') => ({ padding:'8px 12px', borderRadius:8, border:'none', background:bg, color:fg, fontWeight:700, fontSize:13, cursor:'pointer' });
+
+  return (
+    <div style={{padding:'0 4px'}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:14}}>
+        <StatBox label="Paires" value={counts.all}/>
+        <StatBox label="En ligne" value={counts.online} color={INV_STATUS.online.color}/>
+        <StatBox label="Vendues" value={counts.sold} color={INV_STATUS.sold.color}/>
+        <StatBox label="En stock" value={counts.stock} color={INV_STATUS.stock.color}/>
+      </div>
+
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:12}}>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Rechercher un numéro ou un titre…"
+          style={{...inputStyle, flex:1, minWidth:180}}/>
+        <button type="button" onClick={()=>{setShowAdd(v=>!v);setShowImport(false);}} style={btn(C.accent)}>➕ Ajouter</button>
+        <button type="button" onClick={()=>{setShowImport(v=>!v);setShowAdd(false);}} style={btn(C.blue||C.accent)}>🔄 Importer mes annonces</button>
+      </div>
+
+      <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
+        {[['all','Toutes'],['online','En ligne'],['sold','Vendues'],['stock','Stock']].map(([id,label]) => (
+          <button key={id} type="button" onClick={()=>setFilter(id)}
+            style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${filter===id?C.accent:C.border}`,
+              background:filter===id?C.accent:'transparent',color:filter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+            {label} <span style={{opacity:0.7}}>({counts[id]})</span>
+          </button>
+        ))}
+      </div>
+
+      {showAdd && (
+        <Card style={{marginBottom:14}}>
+          <div style={{fontWeight:800,marginBottom:10,color:C.text}}>Nouvelle paire</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}>
+            <input value={addForm.numero} onChange={e=>setAddForm(f=>({...f,numero:e.target.value}))} placeholder="Numéro (ex : 2057)" style={{...inputStyle,width:150}}/>
+            <input value={addForm.title} onChange={e=>setAddForm(f=>({...f,title:e.target.value}))} placeholder="Titre (ex : Adidas Spezial 38)" style={{...inputStyle,flex:1,minWidth:180}}/>
+            <select value={addForm.status} onChange={e=>setAddForm(f=>({...f,status:e.target.value}))} style={inputStyle}>
+              <option value="stock">📦 Stock</option>
+              <option value="online">🟢 En ligne</option>
+              <option value="sold">💸 Vendu</option>
+            </select>
+            <button type="button" onClick={addPair} style={btn(C.accent)}>Enregistrer</button>
+          </div>
+        </Card>
+      )}
+
+      {showImport && (
+        <Card style={{marginBottom:14}}>
+          <div style={{fontWeight:800,marginBottom:4,color:C.text}}>Importer mes annonces en ligne</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:12}}>
+            Charge tes annonces Vinted actuellement en ligne, puis attribue à chacune son numéro et clique « Associer ».
+            {' '}Si le titre contient déjà « nXX », le numéro est pré-rempli (tu peux le corriger).
+          </div>
+          {accounts.length === 0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
+          {accounts.map(acc => {
+            const st = importState[acc.vinted_user_id] || {};
+            return (
+              <div key={acc.vinted_user_id} style={{marginBottom:14,paddingBottom:14,borderBottom:`1px solid ${C.border}`}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                  <div style={{fontWeight:700,color:C.text,fontSize:13}}>{accName(acc.vinted_user_id)}</div>
+                  <button type="button" onClick={()=>loadListings(acc)} style={{...btn(C.blue||C.accent),padding:'5px 10px',fontSize:12}}>
+                    {st.loading ? 'Chargement…' : (st.items ? 'Recharger' : 'Charger les annonces')}
+                  </button>
+                </div>
+                {st.error && <div style={{fontSize:12,color:C.danger}}>Erreur : {String(st.error)}</div>}
+                {st.items && st.items.length === 0 && <div style={{fontSize:12,color:C.muted}}>Aucune annonce en ligne sur ce compte.</div>}
+                {st.items && st.items.length > 0 && (
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:12}}>
+                    {st.items.map(listing => {
+                      const linked = isListingLinked(listing.id);
+                      return (
+                        <div key={listing.id} style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',background:C.bg,opacity:linked?0.6:1}}>
+                          <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            {listing.photo ? <img src={listing.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}>👟</span>}
+                          </div>
+                          <div style={{padding:8}}>
+                            <div title={listing.title} style={{fontSize:11,fontWeight:600,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:28}}>{listing.title}</div>
+                            {linked ? (
+                              <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:700,marginTop:6}}>✓ Associée</div>
+                            ) : (
+                              <div style={{display:'flex',gap:4,marginTop:6}}>
+                                <input value={importNums[listing.id] ?? ''} onChange={e=>setImportNums(n=>({...n,[listing.id]:e.target.value}))}
+                                  placeholder="N°" style={{...inputStyle,width:52,padding:'5px 6px'}}/>
+                                <button type="button" onClick={()=>associate(acc, listing)} style={{...btn(C.accent),padding:'5px 8px',fontSize:11,flex:1}}>Associer</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
+      {filtered.length === 0 && (
+        <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'30px 0'}}>
+          {inventory.length === 0 ? 'Ton inventaire est vide. Ajoute une paire ou importe tes annonces en ligne.' : 'Aucune paire pour ce filtre.'}
+        </div>
+      )}
+
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {filtered.map(p => {
+          const stt = INV_STATUS[p.status] || INV_STATUS.stock;
+          const garage = inGarage(p.numero);
+          return (
+            <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:10,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
+              <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                {p.photo ? <img src={p.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}>👟</span>}
+              </div>
+              <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
+                <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>N°</div>
+                <div style={{fontSize:20,fontWeight:900,color:C.text,lineHeight:1}}>{p.numero}</div>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || <span style={{color:C.muted,fontStyle:'italic'}}>Sans titre</span>}</div>
+                <div style={{display:'flex',gap:6,alignItems:'center',marginTop:5,flexWrap:'wrap'}}>
+                  <Badge color={stt.color}>{stt.icon} {stt.label}</Badge>
+                  <button type="button" onClick={()=>garage && onLocate && onLocate(p.numero)}
+                    title={garage?'Voir dans le garage':'Ce numéro n\'apparaît dans aucune case du garage'}
+                    style={{border:'none',background:'transparent',cursor:garage?'pointer':'default',padding:0,fontSize:11,fontWeight:700,color:garage?C.blue||C.accent:C.muted}}>
+                    {garage ? '🏠 Au garage' : '🏠 Absent du garage'}
+                  </button>
+                  {p.price != null && <span style={{fontSize:11,color:C.muted}}>{p.price} €</span>}
+                  {p.vintedItemId && <span style={{fontSize:11,color:C.muted}}>🔗 annonce liée</span>}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:6,flexShrink:0}}>
+                <button type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
+                <button type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {editing && editDraft && (
+        <div onClick={()=>{setEditing(null);setEditDraft(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:14,padding:20,width:'100%',maxWidth:420}}>
+            <div style={{fontWeight:800,fontSize:15,color:C.text,marginBottom:14}}>Modifier la paire</div>
+            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Numéro</label>
+            <input value={editDraft.numero} onChange={e=>setEditDraft(d=>({...d,numero:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:12}}/>
+            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Titre</label>
+            <input value={editDraft.title||''} onChange={e=>setEditDraft(d=>({...d,title:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:12}}/>
+            <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Statut</label>
+            <select value={editDraft.status} onChange={e=>setEditDraft(d=>({...d,status:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:16}}>
+              <option value="stock">📦 Stock</option>
+              <option value="online">🟢 En ligne</option>
+              <option value="sold">💸 Vendu</option>
+            </select>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+              <button type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>Annuler</button>
+              <button type="button" onClick={commitEdit} style={btn(C.accent)}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [tab,setTab]=useState('dashboard');
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
@@ -3260,6 +3582,9 @@ export default function App() {
   const [cellColors,setCellColors]=useState(()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useState(()=>load('vinted_invoices',[]));
   const [vintedAccounts,setVintedAccounts]=useState(()=>load('vinted_accounts',[]));
+  const [accountLabels]=useState(()=>load('vinted_account_labels',{}));
+  const [inventory,setInventory]=useState(()=>load('vinted_inventory',[]));
+  const [garageLocate,setGarageLocate]=useState(null); // numéro à localiser dans le garage
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
@@ -3660,6 +3985,7 @@ export default function App() {
       <Nav tab={tab} setTab={setTab} open={menuOpen} setOpen={setMenuOpen}/>
       <main style={{maxWidth:1200,margin:'0 auto'}}>
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices}/>}
+        {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
           const n=norm(id);
@@ -3670,7 +3996,7 @@ export default function App() {
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
-        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors}/>}
+        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)}/>}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
       </main>
       {showBackup&&<BackupModal
