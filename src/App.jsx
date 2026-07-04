@@ -3374,6 +3374,51 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
   const isListingLinked = (itemId) => inventory.some(p => p.vintedItemId === String(itemId));
 
+  // Synchronise les VENTES depuis Vinted : recupere les commandes vendues de
+  // chaque compte et bascule en "Vendu" les paires de l'inventaire dont le
+  // numero (nXX) apparait dans le titre de la commande. Ne touche jamais une
+  // paire deja marquee vendue, ni une commande annulee/remboursee.
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const syncSalesFromVinted = async () => {
+    if (accounts.length === 0) { setSyncResult({ matched:0, msg:'Aucun compte Vinted lié.' }); return; }
+    setSyncing(true); setSyncResult(null);
+    // Index numero -> paire pour un matching rapide.
+    const byNum = new Map();
+    inventory.forEach(p => byNum.set(String(p.numero).trim().toLowerCase(), p));
+    const updates = new Map(); // id -> patch
+    let scanned = 0;
+    for (const acc of accounts) {
+      for (let page = 1; page <= 3; page++) {
+        const res = await fetchVintedOrders(acc, 'sold', page, 'all');
+        if (!res.ok) break;
+        const orders = res.items || [];
+        scanned += orders.length;
+        for (const o of orders) {
+          if (classifyOrderStatus(o.status) === 'cancelled') continue;
+          const num = extractPairNumber(o.title);
+          if (!num) continue;
+          const pair = byNum.get(String(num).trim().toLowerCase());
+          if (!pair || pair.status === 'sold') continue;
+          updates.set(pair.id, {
+            status: 'sold',
+            soldAt: o.date ? new Date(o.date).toLocaleDateString('fr-FR') : tod(),
+            transactionId: o.transaction_id || pair.transactionId || null,
+            price: pair.price ?? o.price?.amount ?? null,
+            photo: pair.photo || o.photo_url || null,
+            vintedAccountId: pair.vintedAccountId || acc.vinted_user_id,
+          });
+        }
+        if (!res.pagination || page >= (res.pagination.total_pages || 1)) break;
+      }
+    }
+    if (updates.size > 0) {
+      persist(inventory.map(p => updates.has(p.id) ? { ...p, ...updates.get(p.id) } : p));
+    }
+    setSyncing(false);
+    setSyncResult({ matched: updates.size, scanned });
+  };
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return inventory
@@ -3410,7 +3455,20 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           style={{...inputStyle, flex:1, minWidth:180}}/>
         <button type="button" onClick={()=>{setShowAdd(v=>!v);setShowImport(false);}} style={btn(C.accent)}>➕ Ajouter</button>
         <button type="button" onClick={()=>{setShowImport(v=>!v);setShowAdd(false);}} style={btn(C.blue||C.accent)}>🔄 Importer mes annonces</button>
+        <button type="button" onClick={syncSalesFromVinted} disabled={syncing} style={{...btn(INV_STATUS.sold.color),opacity:syncing?0.6:1,cursor:syncing?'default':'pointer'}}>
+          {syncing ? 'Synchronisation…' : '💸 Mettre à jour les ventes'}
+        </button>
       </div>
+
+      {syncResult && (
+        <div style={{fontSize:12,marginBottom:12,padding:'8px 12px',borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text}}>
+          {syncResult.msg
+            ? syncResult.msg
+            : (syncResult.matched > 0
+                ? `✅ ${syncResult.matched} paire(s) marquée(s) comme vendue(s) (sur ${syncResult.scanned} commandes analysées).`
+                : `Aucune nouvelle vente à reporter (${syncResult.scanned} commandes analysées). Vérifie que le numéro « nXX » figure bien dans le titre de l'annonce Vinted.`)}
+        </div>
+      )}
 
       <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
         {[['all','Toutes'],['online','En ligne'],['sold','Vendues'],['stock','Stock']].map(([id,label]) => (
