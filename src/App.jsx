@@ -287,6 +287,38 @@ const extractPairNumber = (text) => {
   return m ? m[1] : null;
 };
 
+// Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
+// TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
+// telechargement. But : ne pas se tromper de paire quand on prepare un envoi.
+// pdf-lib est charge dynamiquement (import()) pour ne pas alourdir le bundle
+// initial - il n'est telecharge que la 1re fois qu'on genere un bordereau.
+const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer) => {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+  const pdf = await PDFDocument.load(pdfArrayBuffer);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const first = pdf.getPages()[0];
+  const { width } = first.getSize();
+  const bandH = 74;
+  // Bandeau blanc + trait noir de separation.
+  first.drawRectangle({ x:0, y:0, width, height:bandH, color: rgb(1,1,1) });
+  first.drawRectangle({ x:0, y:bandH, width, height:2, color: rgb(0,0,0) });
+  first.drawText(`N° ${numero}`, { x:18, y:bandH-38, size:32, font:bold, color:rgb(0,0,0) });
+  // Titre tronque pour tenir sur une ligne.
+  const maxChars = Math.max(20, Math.floor((width - 36) / 6.2));
+  const t = (title || '').slice(0, maxChars);
+  if (t) first.drawText(t, { x:18, y:12, size:12, font:reg, color:rgb(0.12,0.12,0.12) });
+  const bytes = await pdf.save();
+  const blob = new Blob([bytes], { type:'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
+  a.href = url;
+  a.download = `bordereau-N${numero}${safeTitle?'-'+safeTitle:''}.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+};
+
 // Synchro avec Google Sheets
 async function syncFromSheets() {
   try {
@@ -3320,8 +3352,29 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const [importNums, setImportNums] = useState({});   // { [itemId]: numero }
   const [editing, setEditing] = useState(null);       // pair id
   const [editDraft, setEditDraft] = useState(null);
+  const bordereauInputRef = React.useRef(null);
+  const bordereauPairRef = React.useRef(null);        // paire ciblee par l'annotation
 
   const persist = (next) => { setInventory(next); save('vinted_inventory', next); };
+
+  // Bordereau : on demande a l'utilisateur le PDF telecharge depuis Vinted, puis
+  // on y imprime le numero + le titre de la paire avant de le retelecharger.
+  const startBordereau = (pair) => { bordereauPairRef.current = pair; bordereauInputRef.current?.click(); };
+  const onBordereauFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    const pair = bordereauPairRef.current;
+    if (!file || !pair) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Merci de choisir le bordereau au format PDF téléchargé depuis Vinted.'); return;
+    }
+    try {
+      const buf = await file.arrayBuffer();
+      await annotateAndDownloadBordereau(pair.numero, pair.title, buf);
+    } catch (err) {
+      alert('Impossible d\'annoter ce PDF : ' + String(err));
+    }
+  };
 
   // Index inverse garage : numero (normalise) -> present dans une case ?
   const garageNums = useMemo(() => {
@@ -3466,6 +3519,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
   return (
     <div style={{padding:'0 4px'}}>
+      <input ref={bordereauInputRef} type="file" accept="application/pdf,.pdf" onChange={onBordereauFile} style={{display:'none'}}/>
       <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:14}}>
         <StatBox label="Paires" value={counts.all}/>
         <StatBox label="En ligne" value={counts.online} color={INV_STATUS.online.color}/>
@@ -3604,6 +3658,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                 </div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
+                <button type="button" title="Générer le bordereau annoté (numéro + titre)" onClick={()=>startBordereau(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>📄</button>
                 <button type="button" onClick={()=>startEdit(p)} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`,padding:'6px 10px'}}>✏️</button>
                 <button type="button" onClick={()=>deletePair(p.id)} style={{...btn('transparent',C.danger),border:`1px solid ${C.border}`,padding:'6px 10px'}}>🗑️</button>
               </div>
