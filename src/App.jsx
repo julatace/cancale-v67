@@ -484,12 +484,17 @@ const LOGO_CANCALE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 const TABS=[
   {id:'dashboard',icon:'📊',label:'Stats'},
   {id:'inventory',icon:'🔢',label:'Inventaire'},
-  {id:'catalog',  icon:'📦',label:'Catalogue'},
-  {id:'sales',    icon:'💸',label:'Ventes'},
   {id:'invoices', icon:'📄',label:'Factures'},
   {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'garage',   icon:'🏠',label:'Garage'},
   {id:'vintedaccounts',icon:'🔗',label:'Comptes Vinted'},
+];
+// Ancienne application : le catalogue et les ventes historiques restent
+// accessibles (les stats du tableau de bord les lisent toujours) mais sont
+// ranges a part, hors du flux principal, comme demande.
+const ARCHIVE_TABS=[
+  {id:'catalog',  icon:'📦',label:'Ancien catalogue'},
+  {id:'sales',    icon:'💸',label:'Anciennes ventes'},
 ];
 function Nav({tab,setTab,open,setOpen}) {
   if(!open) return null;
@@ -517,6 +522,24 @@ function Nav({tab,setTab,open,setOpen}) {
               fontSize:14,fontWeight:on?800:600,transition:'background .12s',
             }}>
               <span style={{fontSize:17,lineHeight:1}}>{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
+
+        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:700,padding:'18px 12px 8px',marginTop:'auto',borderTop:`1px solid ${C.border}`}}>Ancienne application</div>
+        {ARCHIVE_TABS.map(t=>{
+          const on=tab===t.id;
+          return (
+            <button key={t.id} type="button" onClick={()=>{setTab(t.id);setOpen(false);}} style={{
+              display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
+              padding:'10px 14px',cursor:'pointer',
+              background:on?C.accent:'transparent',
+              color:on?C.onAccent:C.muted,
+              border:'none',borderRadius:6,fontFamily:'inherit',
+              fontSize:13,fontWeight:on?800:600,
+            }}>
+              <span style={{fontSize:15,lineHeight:1}}>{t.icon}</span>
               <span>{t.label}</span>
             </button>
           );
