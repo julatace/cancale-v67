@@ -2500,7 +2500,7 @@ td.right{text-align:right;}
 }
 
 /* ── Garage ──────────────────────────────────────────── */
-function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed}) {
+function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
 
@@ -2677,7 +2677,14 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Garage 🏠</h2>
-      
+
+      {placeNum && (
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 14px',borderRadius:10,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:800}}>
+          <span>📦 Range la paire <b>N°{placeNum}</b> : clique une case vide pour l'y placer.</span>
+          <button onClick={()=>onPlaced&&onPlaced()} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:700,padding:'3px 10px'}}>Annuler</button>
+        </div>
+      )}
+
       {/* Compteurs */}
       <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
         {duplicates.length>0&&<Card style={{flex:'none',padding:'10px 16px',background:`${C.danger}22`,borderColor:`${C.danger}66`}}>
@@ -2788,8 +2795,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                     const blocked=isBlocked(z.id,ci,si);
                     const cellColor=getColor(z.id,ci,si);
                     
-                    // Masquer les cases vides (non bloquées, sans couleur) sauf en mode ajout/blocage/couleur
-                    const showAllCells=addMode||blockMode||colorMode;
+                    // Masquer les cases vides (non bloquées, sans couleur) sauf en mode ajout/blocage/couleur/rangement
+                    const showAllCells=addMode||blockMode||colorMode||!!placeNum;
                     if(!showAllCells&&!blocked&&t===''&&!cellColor){
                       // Case invisible : on rend juste un placeholder vide pour garder l'alignement
                       return <div key={si} style={{width:CW,height:CH}}/>;
@@ -2820,6 +2827,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                         {!blockMode&&!colorMode&&<input value={val}
                           data-cell={`${z.id}_${ci}_${si}`}
                           onChange={e=>onChange(z.id,ci,si,e.target.value,maxBoxes)}
+                          onClick={()=>{ if(placeNum&&!t){ onChange(z.id,ci,si,String(placeNum),maxBoxes); onBlur(z.id,ci,maxBoxes); onPlaced&&onPlaced(); } }}
                           onBlur={()=>onBlur(z.id,ci,maxBoxes)}
                           onKeyDown={e=>{
                             if(e.key==='ArrowUp'){e.preventDefault();navigateFromCell(z.id,ci,si,'up');}
@@ -3149,7 +3157,7 @@ const STATUS_TABS = [
   { id:'cancelled', label:'Annulées' },
 ];
 
-function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
+function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }) {
   const [loading, setLoading] = useState(false);
   // Ensemble des numéros présents dans le garage (pour l'indicateur "au garage").
   const garageNums = useMemo(() => {
@@ -3221,6 +3229,13 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
     return null;
   };
   const numeroByTitle = (title) => entryByTitle(title)?.numero || null;
+  // Clé (id d'annonce) d'une entrée retrouvée par titre — pour rouvrir le
+  // sélecteur d'achat depuis une vente.
+  const entryKeyByTitle = (title) => {
+    const t = normTitle(title);
+    for (const k in numeros) { if (normTitle(numeros[k].title) === t) return k; }
+    return null;
+  };
 
   // Totaux comptables sur les ventes FINALISÉES affichées (argent reçu).
   const comptaTotals = useMemo(() => {
@@ -3473,6 +3488,14 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
                       </div>
                     )}
                     <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes annonces en ligne. Mets un <b>numéro</b> (pour le garage et le bordereau) et le <b>prix d'achat</b> (pour la compta) sur chaque paire.</div>
+                    {(() => {
+                      const sansNum = view.items.filter(it => !(numeros[it.id]?.numero)).length;
+                      return sansNum>0 ? (
+                        <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
+                          ⚠️ {sansNum} annonce{sansNum>1?'s':''} sans numéro — à compléter.
+                        </div>
+                      ) : null;
+                    })()}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
                       {view.items.map(item => {
                         const entry = numeros[item.id] || {};
@@ -3499,10 +3522,17 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
                               {[item.size, item.condition].filter(Boolean).join(' · ') || (item.brand ? item.title : '')}
                             </div>
                             {num && (
-                              <button type="button" onClick={()=>atGarage && onLocate && onLocate(num)} title={atGarage?'Voir la case dans le garage':"Ce numéro n'est dans aucune case du garage"}
-                                style={{marginTop:6,border:'none',background:'transparent',padding:0,cursor:atGarage?'pointer':'default',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.muted}}>
-                                {atGarage?'🏠 Au garage':'🏠 Pas au garage'}
-                              </button>
+                              atGarage ? (
+                                <button type="button" onClick={()=>onLocate && onLocate(num)} title="Voir la case dans le garage"
+                                  style={{marginTop:6,border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:C.blue||C.accent}}>
+                                  🏠 Au garage
+                                </button>
+                              ) : (
+                                <button type="button" onClick={()=>onStore && onStore(num)} title="Ranger cette paire dans une case du garage"
+                                  style={{marginTop:6,border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:C.warn}}>
+                                  🏠 Ranger au garage
+                                </button>
+                              )
                             )}
                           </div>
                           <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
@@ -3553,6 +3583,11 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
                         </div>
                       </div>
                     )}
+                    {category==='sold' && comptaTotals && (comptaTotals.nb-comptaTotals.nbCout)>0 && (
+                      <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
+                        ⚠️ {comptaTotals.nb-comptaTotals.nbCout} vente{(comptaTotals.nb-comptaTotals.nbCout)>1?'s':''} finalisée{(comptaTotals.nb-comptaTotals.nbCout)>1?'s':''} sans prix d'achat — bénéfice incomplet. Relie l'achat sur la vente ci-dessous.
+                      </div>
+                    )}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:14}}>
                       {view.items.map(item => {
                         const orderStatus = classifyOrderStatus(item.status);
@@ -3578,6 +3613,8 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
                                 const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
                                 const sell = item.price?.amount!=null ? Number(item.price.amount) : null;
                                 const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy : null;
+                                const key = e ? entryKeyByTitle(item.title) : null;
+                                const isFinal = classifyOrderStatus(item.status)==='completed';
                                 return (<>
                                   {(num || buy!=null) && (
                                     <div style={{display:'flex',gap:8,marginTop:6,fontSize:11,flexWrap:'wrap'}}>
@@ -3585,6 +3622,12 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
                                       {buy!=null && <span style={{color:C.muted}}>achat {buy.toFixed(2).replace('.',',')}€</span>}
                                       {benef!=null && <span style={{fontWeight:800,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</span>}
                                     </div>
+                                  )}
+                                  {isFinal && e && buy==null && key && (
+                                    <button type="button" onClick={()=>openPurchasePicker({ id:key, title:e.title, photo:e.photo, price:e.price })}
+                                      style={{marginTop:6,width:'100%',padding:'5px 8px',borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,fontWeight:700,fontSize:11,cursor:'pointer'}}>
+                                      🔗 Relier un achat (prix)
+                                    </button>
                                   )}
                                   {num ? (
                                     <button type="button" onClick={()=>startBordereau(num, item.title)}
@@ -4180,6 +4223,7 @@ export default function App() {
   const [accountLabels]=useState(()=>load('vinted_account_labels',{}));
   const [inventory,setInventory]=useState(()=>load('vinted_inventory',[]));
   const [garageLocate,setGarageLocate]=useState(null); // numéro à localiser dans le garage
+  const [garagePlace,setGaragePlace]=useState(null); // numéro à ranger dans une case du garage
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
@@ -4647,8 +4691,8 @@ export default function App() {
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
-        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)}/>}
-        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} garageGrid={garageGrid} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
+        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
+        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} garageGrid={garageGrid} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }} onStore={(numero)=>{ setGaragePlace(String(numero)); setTab('garage'); }}/>}
       </main>
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
