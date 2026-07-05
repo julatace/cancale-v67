@@ -269,7 +269,8 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   };
   // 1) Données moissonnées par l'extension (aucun appel Vinted). On sépare
   //    achats/ventes par le type d'URL capté ; repli sur l'ancienne clé générique.
-  if (page === 1) {
+  //    opts.force = on saute la moisson (bouton "Synchroniser") pour le dernier état.
+  if (page === 1 && !opts.force) {
     const h = (await fetchHarvestOrders(account.vinted_user_id, type)) || (await fetchHarvest(account.vinted_user_id, 'orders'));
     if (h && Array.isArray(h.my_orders)) {
       return { ok: true, items: applyStatus(h.my_orders), pagination: h.pagination || null, source: 'harvest' };
@@ -300,7 +301,8 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
 // renvoyaient 404 ; /api/v2/inbox est le bon chemin.)
 const fetchVintedConversations = async (account, page = 1, opts = {}) => {
   // 1) Priorité aux données moissonnées par l'extension (aucun appel Vinted).
-  if (page === 1) {
+  //    opts.force = on saute la moisson (bouton "Synchroniser") pour le dernier état.
+  if (page === 1 && !opts.force) {
     const h = await fetchHarvest(account.vinted_user_id, 'inbox');
     if (h && Array.isArray(h.conversations)) {
       return { ok: true, items: h.conversations, pagination: h.pagination || null, raw: null, source: 'harvest' };
@@ -379,7 +381,9 @@ const isOnlineListing = (it) => it && !it.is_closed && !it.is_hidden && !it.is_d
 const fetchVintedListings = async (account, page = 1, opts = {}) => {
   // 1) Données moissonnées par l'extension (aucun appel Vinted). Tu dois avoir
   //    ouvert ta boutique/ton dressing sur vinted.fr pour qu'elles existent.
-  if (page === 1) {
+  //    opts.force = on saute la moisson pour aller chercher le dernier état
+  //    directement sur Vinted (bouton "Synchroniser").
+  if (page === 1 && !opts.force) {
     const h = await fetchHarvest(account.vinted_user_id, 'listings');
     if (h && Array.isArray(h.items)) {
       return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem), pagination: h.pagination || null, source: 'harvest' };
@@ -3216,21 +3220,22 @@ function VintedAccounts({ accounts, setAccounts }) {
 
   const selectedAccount = accounts.find(a => a.vinted_user_id === selectedId) || null;
 
-  const loadView = async (page = 1) => {
+  const loadView = async (page = 1, opts = {}) => {
     if (!selectedAccount) return;
     setView(v => ({ ...v, loading:true, error:null }));
     // On affiche EN PRIORITÉ les données déjà récupérées par l'extension
     // (0 requête). Si l'extension n'a pas encore capté cette page, on va la
     // chercher une seule fois (repli), pour ne jamais rester vide. Une fois
     // moissonnée, les ouvertures suivantes ne font plus aucune requête.
+    const fo = { force: !!opts.force }; // "Synchroniser" force un vrai fetch Vinted
     if (category === 'listings') {
-      const res = await fetchVintedListings(selectedAccount, page);
+      const res = await fetchVintedListings(selectedAccount, page, fo);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
     } else if (category === 'messages') {
-      const res = await fetchVintedConversations(selectedAccount, page);
+      const res = await fetchVintedConversations(selectedAccount, page, fo);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw: res.raw });
     } else {
-      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter);
+      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter, fo);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
     }
   };
@@ -3259,7 +3264,7 @@ function VintedAccounts({ accounts, setAccounts }) {
       <input ref={bordereauInputRef} type="file" accept="application/pdf,.pdf" onChange={onBordereauFile} style={{display:'none'}}/>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
-        <button onClick={()=>{ refreshAccounts(); if (selectedAccount) loadView(1); }} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
+        <button onClick={()=>{ refreshAccounts(); if (selectedAccount) loadView(1, { force:true }); }} title="Va chercher le dernier état sur Vinted maintenant" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
           {loading ? '…' : '↻ Synchroniser'}
         </button>
       </div>
