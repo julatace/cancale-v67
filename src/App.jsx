@@ -3219,18 +3219,18 @@ function VintedAccounts({ accounts, setAccounts }) {
   const loadView = async (page = 1) => {
     if (!selectedAccount) return;
     setView(v => ({ ...v, loading:true, error:null }));
-    // "moisson seulement" : ouvrir un onglet ne déclenche AUCUNE requête vers
-    // Vinted — on n'affiche que ce que l'extension a déjà récupéré pendant ta
-    // navigation. (Réduit fortement l'empreinte et le risque de blocage.)
-    const HO = { harvestOnly: true };
+    // On affiche EN PRIORITÉ les données déjà récupérées par l'extension
+    // (0 requête). Si l'extension n'a pas encore capté cette page, on va la
+    // chercher une seule fois (repli), pour ne jamais rester vide. Une fois
+    // moissonnée, les ouvertures suivantes ne font plus aucune requête.
     if (category === 'listings') {
-      const res = await fetchVintedListings(selectedAccount, page, HO);
+      const res = await fetchVintedListings(selectedAccount, page);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
     } else if (category === 'messages') {
-      const res = await fetchVintedConversations(selectedAccount, page, HO);
+      const res = await fetchVintedConversations(selectedAccount, page);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw: res.raw });
     } else {
-      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter, HO);
+      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
     }
   };
