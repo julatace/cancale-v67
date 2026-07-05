@@ -3184,8 +3184,18 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
   }, [numeros]);
   const openPurchasePicker = async (item) => {
     setPickerFor(item); setPurchases({ loading:true, items:[] });
-    const res = await fetchVintedOrders(selectedAccount, 'purchased', 1, 'all');
-    setPurchases({ loading:false, items: res.ok ? res.items : [] });
+    // Agrège les achats de TOUS les comptes liés (tu peux acheter sur un compte
+    // et revendre depuis un autre), en dédoublonnant par transaction.
+    const seen = new Set(); const all = [];
+    for (const acc of accounts) {
+      const res = await fetchVintedOrders(acc, 'purchased', 1, 'all');
+      if (res.ok) for (const p of res.items) {
+        const id = String(p.transaction_id);
+        if (!seen.has(id)) { seen.add(id); all.push({ ...p, _accountLogin: labels[acc.vinted_user_id] || acc.login || acc.vinted_user_id }); }
+      }
+    }
+    all.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    setPurchases({ loading:false, items: all });
   };
   const choosePurchase = (pur) => {
     const price = pur.price?.amount != null ? Number(pur.price.amount) : null;
@@ -3677,7 +3687,7 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title}</div>
-                      <div style={{fontSize:10,color:C.muted}}>{p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
+                      <div style={{fontSize:10,color:C.muted}}>{p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}{p._accountLogin?` · ${p._accountLogin}`:''}</div>
                     </div>
                     <div style={{fontSize:15,fontWeight:900,color:C.text,flexShrink:0}}>{p.price?.amount} {p.price?.currency_code==='EUR'?'€':p.price?.currency_code}</div>
                   </button>
