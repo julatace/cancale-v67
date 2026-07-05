@@ -118,6 +118,36 @@ const fetchVintedLogin = async (account) => {
   return login;
 };
 
+// Lit une donnee moissonnee PASSIVEMENT par l'extension (voir dossier
+// vinted-sync-extension) dans Supabase, table app_data, ligne
+// harvest_{account_id}_{type}. Renvoie la reponse Vinted brute (payload) ou
+// null si l'extension n'a pas encore capté cette donnee (= tu n'as pas encore
+// ouvert la page correspondante sur vinted.fr). Aucun appel a Vinted ici :
+// c'est le mode le plus discret, tout vient de ta navigation.
+const fetchHarvest = async (uid, type) => {
+  if (!uid) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows[0]?.data?.payload || null;
+  } catch (_) { return null; }
+};
+// Detail d'une conversation moissonnee (ligne harvest_{uid}_conv_{convId}).
+const fetchHarvestConversation = async (uid, convId) => {
+  if (!uid || !convId) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_conv_${convId}&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows[0]?.data?.payload || null;
+  } catch (_) { return null; }
+};
+
 // Vinted utilise DEUX hosts differents selon l'endpoint (constate via
 // plusieurs vraies requetes "Copy as fetch") :
 // - www.vinted.fr/api/v2/...      -> commandes, ventes, achats
@@ -237,6 +267,14 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
 // (Les anciennes tentatives /api/v2/conversations et /transaction_messages
 // renvoyaient 404 ; /api/v2/inbox est le bon chemin.)
 const fetchVintedConversations = async (account, page = 1) => {
+  // 1) Priorité aux données moissonnées par l'extension (aucun appel Vinted).
+  if (page === 1) {
+    const h = await fetchHarvest(account.vinted_user_id, 'inbox');
+    if (h && Array.isArray(h.conversations)) {
+      return { ok: true, items: h.conversations, pagination: h.pagination || null, raw: null, source: 'harvest' };
+    }
+  }
+  // 2) Repli : proxy (si l'inbox n'a pas encore été ouverte dans le navigateur).
   const res = await vintedApiCall(account, `/api/v2/inbox?page=${page}&per_page=20`);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null, raw: res };
   const items = res.data?.conversations || [];
@@ -257,6 +295,10 @@ const fetchVintedConversations = async (account, page = 1) => {
 // "l'acheteur" on compare entity.user_id a opposite_user.id (fiable meme si
 // l'id vendeur differe du vinted_user_id du compte).
 const fetchVintedConversationDetail = async (account, conversationId) => {
+  // 1) Données moissonnées (si tu as déjà ouvert ce fil sur vinted.fr).
+  const h = await fetchHarvestConversation(account.vinted_user_id, conversationId);
+  if (h && h.conversation) return { ok: true, conversation: h.conversation, source: 'harvest' };
+  // 2) Repli : proxy.
   const res = await vintedApiCall(account, `/api/v2/conversations/${conversationId}`);
   if (!res.ok) return { ok: false, error: res.status || res.error, conversation: null };
   return { ok: true, conversation: res.data?.conversation || null };
@@ -286,7 +328,25 @@ const normalizeConversationMessages = (conversation) => {
 // un nombre different). Avec le mauvais id, Vinted renvoie 0 annonce alors que
 // le compte en a. On resout donc d'abord le vrai id via users/current, puis on
 // le garde en cache memoire sur l'objet compte (1 seul appel supplementaire).
+const mapWardrobeItem = (it) => ({
+  id: String(it.id),
+  title: it.title || '',
+  price: it.price?.amount ?? (typeof it.price === 'number' ? it.price : null),
+  currency: it.price?.currency_code || 'EUR',
+  photo: it.photo?.url || it.photo?.thumbnails?.[0]?.url || null,
+  url: it.url || null,
+});
 const fetchVintedListings = async (account, page = 1) => {
+  // 1) Données moissonnées par l'extension (aucun appel Vinted). Tu dois avoir
+  //    ouvert ta boutique/ton dressing sur vinted.fr pour qu'elles existent.
+  if (page === 1) {
+    const h = await fetchHarvest(account.vinted_user_id, 'listings');
+    if (h && Array.isArray(h.items)) {
+      return { ok: true, items: h.items.map(mapWardrobeItem), pagination: h.pagination || null, source: 'harvest' };
+    }
+  }
+  // 2) Repli : proxy. La penderie utilise l'ID DE PROFIL (celui du /member/…),
+  //    différent du vinted_user_id (account_id du token) — sinon 0 annonce.
   let profileId = account._vintedProfileId;
   if (!profileId) {
     const who = await vintedApiCall(account, '/api/v2/users/current');
@@ -3521,10 +3581,22 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
     const updates = new Map(); // id -> patch
     let sold = 0, pending = 0, scanned = 0;
     for (const acc of accounts) {
-      for (let page = 1; page <= 3; page++) {
-        const res = await fetchVintedOrders(acc, 'sold', page, 'all');
-        if (!res.ok) break;
-        const orders = res.items || [];
+      // Priorité aux ventes moissonnées par l'extension (aucun appel Vinted).
+      // Sinon repli sur le proxy (jusqu'à 3 pages).
+      const harvested = await fetchHarvest(acc.vinted_user_id, 'orders');
+      let pages;
+      if (harvested && Array.isArray(harvested.my_orders)) {
+        pages = [harvested.my_orders];
+      } else {
+        pages = [];
+        for (let page = 1; page <= 3; page++) {
+          const res = await fetchVintedOrders(acc, 'sold', page, 'all');
+          if (!res.ok) break;
+          pages.push(res.items || []);
+          if (!res.pagination || page >= (res.pagination.total_pages || 1)) break;
+        }
+      }
+      for (const orders of pages) {
         scanned += orders.length;
         for (const o of orders) {
           const cls = classifyOrderStatus(o.status);
@@ -3548,7 +3620,6 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             if (pair.status === 'online' || pair.status === 'stock') { updates.set(pair.id, { ...base, status:'pending_sale' }); pending++; }
           }
         }
-        if (!res.pagination || page >= (res.pagination.total_pages || 1)) break;
       }
     }
     if (updates.size > 0) {
