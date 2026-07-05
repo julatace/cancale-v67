@@ -391,6 +391,10 @@ const mapWardrobeItem = (it) => ({
   photo: it.photo?.url || it.photo?.thumbnails?.[0]?.url
        || it.photos?.[0]?.url || it.photos?.[0]?.thumbnails?.[0]?.url || null,
   url: it.url || null,
+  // Champs "à la Vinted" pour un affichage proche du site.
+  brand: it.brand_title || it.brand?.title || null,
+  size: it.size_title || it.size?.title || null,
+  condition: it.status || null,
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
@@ -3145,8 +3149,15 @@ const STATUS_TABS = [
   { id:'cancelled', label:'Annulées' },
 ];
 
-function VintedAccounts({ accounts, setAccounts }) {
+function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
   const [loading, setLoading] = useState(false);
+  // Ensemble des numéros présents dans le garage (pour l'indicateur "au garage").
+  const garageNums = useMemo(() => {
+    const s = new Set();
+    Object.values(garageGrid || {}).forEach(arr => { if (Array.isArray(arr)) arr.forEach(v => { const t = (v||'').trim().toLowerCase(); if (t) s.add(t); }); });
+    return s;
+  }, [garageGrid]);
+  const inGarage = (num) => !!num && garageNums.has(String(num).trim().toLowerCase());
   const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, raw} }
   const [labels, setLabels] = useState(()=>load('vinted_account_labels',{}));
   const [editingLabel, setEditingLabel] = useState(null);
@@ -3161,19 +3172,40 @@ function VintedAccounts({ accounts, setAccounts }) {
   // Vinted ; on garde aussi le titre (pour retrouver le numéro à la vente, les
   // commandes n'exposant pas l'id d'article). Synchronisé (vinted_annonce_numeros).
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
-  const setNumero = (item, val) => {
+  // Met à jour l'entrée d'une annonce (numéro et/ou prix d'achat). L'entrée est
+  // supprimée si numéro ET prix d'achat sont vides.
+  const updatePair = (item, patch) => {
     const u = { ...numeros };
-    const v = String(val).trim();
-    if (v) u[item.id] = { numero: v, title: item.title, accountId: selectedId, photo: item.photo || null, price: item.price ?? null };
-    else delete u[item.id];
+    const cur = u[item.id] || {};
+    const next = { ...cur, ...patch, title: item.title, accountId: selectedId, photo: item.photo || null, price: item.price ?? null };
+    const emptyNum = !String(next.numero || '').trim();
+    const emptyBuy = next.buyPrice == null || String(next.buyPrice).trim() === '';
+    if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
     setNumeros(u); save('vinted_annonce_numeros', u);
   };
-  // Retrouve le numéro d'une vente par le titre exact de l'annonce.
-  const numeroByTitle = (title) => {
+  // Retrouve l'entrée (numéro + prix d'achat) d'une vente par le titre exact.
+  const entryByTitle = (title) => {
     const t = normTitle(title);
-    for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k].numero; }
+    for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; }
     return null;
   };
+  const numeroByTitle = (title) => entryByTitle(title)?.numero || null;
+
+  // Totaux comptables sur les ventes FINALISÉES affichées (argent reçu).
+  const comptaTotals = useMemo(() => {
+    if (category !== 'sold') return null;
+    let ca = 0, cout = 0, nb = 0, nbCout = 0;
+    for (const o of view.items) {
+      if (classifyOrderStatus(o.status) !== 'completed') continue;
+      const sell = o.price?.amount != null ? Number(o.price.amount) : 0;
+      ca += sell; nb += 1;
+      const e = entryByTitle(o.title);
+      const buy = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? parseFloat(String(e.buyPrice).replace(',', '.')) : null;
+      if (buy != null && !isNaN(buy)) { cout += buy; nbCout += 1; }
+    }
+    return { ca, cout, benef: ca - cout, nb, nbCout };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, view.items, numeros]);
 
   // Bordereau annoté : on demande le PDF téléchargé depuis Vinted, l'app y
   // imprime le numéro (déjà connu grâce à l'annonce) + le titre.
@@ -3409,28 +3441,50 @@ function VintedAccounts({ accounts, setAccounts }) {
                         <span style={{fontSize:11}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici automatiquement.</span>
                       </div>
                     )}
-                    <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Mets un numéro sur chaque paire : l'app le retient, et quand elle se vend tu pourras imprimer le bordereau avec ce numéro.</div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:14}}>
+                    <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes annonces en ligne. Mets un <b>numéro</b> (pour le garage et le bordereau) et le <b>prix d'achat</b> (pour la compta) sur chaque paire.</div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
                       {view.items.map(item => {
-                        const num = numeros[item.id]?.numero || '';
+                        const entry = numeros[item.id] || {};
+                        const num = entry.numero || '';
+                        const buy = entry.buyPrice ?? '';
+                        const cur = item.currency==='EUR'?'€':(item.currency||'');
+                        const atGarage = inGarage(num);
                         return (
-                        <div key={item.id} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${num?C.accent:C.border}`,display:'block'}}>
-                          <a href={item.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block'}}>
-                            <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+                        <div key={item.id} style={{borderRadius:14,overflow:'hidden',background:C.surface,border:`1px solid ${num?C.accent:C.border}`,display:'flex',flexDirection:'column'}}>
+                          <a href={item.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
+                            <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
                               {item.photo
                                 ? <img src={item.photo} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                                : <span style={{fontSize:30}}>👟</span>}
-                              {num && <div style={{position:'absolute',top:6,left:6,background:C.accent,color:'#fff',fontSize:12,fontWeight:900,padding:'2px 8px',borderRadius:999}}>N°{num}</div>}
+                                : <span style={{fontSize:34}}>👟</span>}
                             </div>
-                            <div style={{padding:'8px 10px 4px'}}>
-                              <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
-                              <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price!=null?`${item.price} ${item.currency==='EUR'?'€':(item.currency||'')}`:''}</div>
-                            </div>
+                            {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'3px 9px',borderRadius:999,boxShadow:'0 1px 4px rgba(0,0,0,.3)'}}>N°{num}</div>}
                           </a>
-                          <div style={{display:'flex',alignItems:'center',gap:6,padding:'0 10px 10px'}}>
-                            <span style={{fontSize:11,color:C.muted,fontWeight:700}}>N°</span>
-                            <input value={num} onChange={e=>setNumero(item, e.target.value)} placeholder="numéro"
-                              style={{flex:1,minWidth:0,padding:'6px 8px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:13,fontWeight:700}}/>
+                          <div style={{padding:'8px 10px 6px'}}>
+                            <div style={{fontSize:16,fontWeight:900,color:C.text}}>{item.price!=null?`${item.price} ${cur}`:''}</div>
+                            <div style={{fontSize:12,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={item.title}>
+                              {item.brand ? <b>{item.brand}</b> : item.title}
+                            </div>
+                            <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {[item.size, item.condition].filter(Boolean).join(' · ') || (item.brand ? item.title : '')}
+                            </div>
+                            {num && (
+                              <button type="button" onClick={()=>atGarage && onLocate && onLocate(num)} title={atGarage?'Voir la case dans le garage':"Ce numéro n'est dans aucune case du garage"}
+                                style={{marginTop:6,border:'none',background:'transparent',padding:0,cursor:atGarage?'pointer':'default',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.muted}}>
+                                {atGarage?'🏠 Au garage':'🏠 Pas au garage'}
+                              </button>
+                            )}
+                          </div>
+                          <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
+                            <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                              <span style={{fontSize:10,color:C.muted,fontWeight:700}}>N°</span>
+                              <input value={num} onChange={e=>updatePair(item,{numero:e.target.value})} placeholder="—"
+                                style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                            </div>
+                            <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                              <input value={buy} onChange={e=>updatePair(item,{buyPrice:e.target.value})} placeholder="achat" inputMode="decimal"
+                                style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                              <span style={{fontSize:10,color:C.muted}}>€</span>
+                            </div>
                           </div>
                         </div>
                         );
@@ -3445,6 +3499,25 @@ function VintedAccounts({ accounts, setAccounts }) {
                       <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.5}}>
                         Rien pour l'instant.<br/>
                         <span style={{fontSize:11}}>Ouvre « Mes commandes » sur vinted.fr une fois : les données remontent ici toutes seules (aucune requête depuis l'app).</span>
+                      </div>
+                    )}
+                    {category==='sold' && comptaTotals && comptaTotals.nb>0 && (
+                      <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                        <div style={{flex:1,minWidth:100,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
+                          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>CA (finalisé)</div>
+                          <div style={{fontSize:18,fontWeight:900,color:C.text}}>{comptaTotals.ca.toFixed(2).replace('.',',')} €</div>
+                          <div style={{fontSize:9,color:C.muted}}>{comptaTotals.nb} vente{comptaTotals.nb>1?'s':''}</div>
+                        </div>
+                        <div style={{flex:1,minWidth:100,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
+                          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Coût d'achat</div>
+                          <div style={{fontSize:18,fontWeight:900,color:C.text}}>{comptaTotals.cout.toFixed(2).replace('.',',')} €</div>
+                          <div style={{fontSize:9,color:C.muted}}>{comptaTotals.nbCout}/{comptaTotals.nb} renseigné{comptaTotals.nbCout>1?'s':''}</div>
+                        </div>
+                        <div style={{flex:1,minWidth:100,background:C.surface,border:`1px solid ${comptaTotals.benef>=0?INV_STATUS.online.color:C.danger}`,borderRadius:12,padding:'10px 12px'}}>
+                          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice</div>
+                          <div style={{fontSize:18,fontWeight:900,color:comptaTotals.benef>=0?INV_STATUS.online.color:C.danger}}>{comptaTotals.benef.toFixed(2).replace('.',',')} €</div>
+                          <div style={{fontSize:9,color:C.muted}}>CA − coût</div>
+                        </div>
                       </div>
                     )}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:14}}>
@@ -3467,15 +3540,28 @@ function VintedAccounts({ accounts, setAccounts }) {
                               <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price?.amount} {item.price?.currency_code==='EUR'?'€':item.price?.currency_code}</div>
                               <div style={{fontSize:10,color:C.muted,marginTop:2}}>{item.date ? new Date(item.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
                               {category==='sold' && (() => {
-                                const num = numeroByTitle(item.title);
-                                return num ? (
-                                  <button type="button" onClick={()=>startBordereau(num, item.title)}
-                                    style={{marginTop:8,width:'100%',padding:'6px 8px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontWeight:800,fontSize:11.5,cursor:'pointer'}}>
-                                    📄 Bordereau N°{num}
-                                  </button>
-                                ) : (
-                                  <div style={{marginTop:8,fontSize:10,color:C.muted,fontStyle:'italic'}}>Pas de numéro (mets-le sur l'annonce)</div>
-                                );
+                                const e = entryByTitle(item.title);
+                                const num = e?.numero;
+                                const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+                                const sell = item.price?.amount!=null ? Number(item.price.amount) : null;
+                                const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy : null;
+                                return (<>
+                                  {(num || buy!=null) && (
+                                    <div style={{display:'flex',gap:8,marginTop:6,fontSize:11,flexWrap:'wrap'}}>
+                                      {num && <span style={{fontWeight:800,color:C.text}}>N°{num}</span>}
+                                      {buy!=null && <span style={{color:C.muted}}>achat {buy.toFixed(2).replace('.',',')}€</span>}
+                                      {benef!=null && <span style={{fontWeight:800,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</span>}
+                                    </div>
+                                  )}
+                                  {num ? (
+                                    <button type="button" onClick={()=>startBordereau(num, item.title)}
+                                      style={{marginTop:8,width:'100%',padding:'6px 8px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontWeight:800,fontSize:11.5,cursor:'pointer'}}>
+                                      📄 Bordereau N°{num}
+                                    </button>
+                                  ) : (
+                                    <div style={{marginTop:8,fontSize:10,color:C.muted,fontStyle:'italic'}}>Pas de numéro (mets-le sur l'annonce)</div>
+                                  )}
+                                </>);
                               })()}
                             </div>
                           </div>
@@ -4495,7 +4581,7 @@ export default function App() {
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)}/>}
-        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
+        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} garageGrid={garageGrid} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
       </main>
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
