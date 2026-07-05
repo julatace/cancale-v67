@@ -3996,6 +3996,7 @@ export default function App() {
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
+  const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
   const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     companyName:'Shop Cancale35',
@@ -4261,6 +4262,42 @@ export default function App() {
     save('vinted_notif_last_invoices',curF);
   },[sales,invoices,synced,notifEnabled]);
 
+  // ── Notif à l'ouverture : nouveautés Vinted (messages non lus + ventes) ──
+  // Calculé À PARTIR DES DONNÉES DÉJÀ MOISSONNÉES par l'extension (lignes
+  // harvest_* de Supabase) : aucune requête vers Vinted. Les messages non lus
+  // sont affichés en absolu (tu en as X) ; les ventes en nouveauté depuis la
+  // dernière ouverture. Se lance une fois quand les comptes sont chargés.
+  const vintedNotifChecked = React.useRef(false);
+  useEffect(()=>{
+    if(!vintedAccounts || vintedAccounts.length===0 || vintedNotifChecked.current) return;
+    vintedNotifChecked.current = true;
+    let cancelled=false;
+    (async()=>{
+      let unread=0, salesCount=0;
+      for(const a of vintedAccounts){
+        const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
+        if(inbox && Array.isArray(inbox.conversations)) unread += inbox.conversations.filter(c=>c.unread).length;
+        const sold=await fetchHarvestOrders(a.vinted_user_id,'sold');
+        if(sold && Array.isArray(sold.my_orders)) salesCount += sold.my_orders.filter(o=>classifyOrderStatus(o.status)!=='cancelled').length;
+      }
+      if(cancelled) return;
+      const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);
+      const newSales = prevS<0 ? 0 : Math.max(0, salesCount-prevS);
+      save('vinted_notif_last_vsales',salesCount);
+      if(unread>0 || newSales>0){
+        setVintedNotif({messages:unread, ventes:newSales});
+        if(notifEnabled){
+          const parts=[];
+          if(newSales>0) parts.push(`${newSales} nouvelle${newSales>1?'s':''} vente${newSales>1?'s':''}`);
+          if(unread>0) parts.push(`${unread} message${unread>1?'s':''} non lu${unread>1?'s':''}`);
+          if(parts.length) pushNotif('Vinted', parts.join(' · '));
+        }
+      }
+    })();
+    return ()=>{cancelled=true;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[vintedAccounts]);
+
   return (
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'hidden',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
@@ -4395,6 +4432,18 @@ export default function App() {
             {notifBanner.factures>0&&`${notifBanner.factures} facture${notifBanner.factures>1?'s':''} reçue${notifBanner.factures>1?'s':''}`}
           </span>
           <button onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:6,color:C.onAccent,cursor:'pointer',fontSize:16,fontWeight:900,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
+        </div>
+      )}
+      {/* Bandeau nouveautés Vinted (à l'ouverture) — clic = va aux comptes */}
+      {vintedNotif&&(vintedNotif.messages>0||vintedNotif.ventes>0)&&(
+        <div onClick={()=>{setTab('vintedaccounts');setVintedNotif(null);}} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.blue||C.accent,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+          <span>
+            🔔 {vintedNotif.ventes>0&&`${vintedNotif.ventes} nouvelle${vintedNotif.ventes>1?'s':''} vente${vintedNotif.ventes>1?'s':''}`}
+            {vintedNotif.ventes>0&&vintedNotif.messages>0&&' · '}
+            {vintedNotif.messages>0&&`${vintedNotif.messages} message${vintedNotif.messages>1?'s':''} non lu${vintedNotif.messages>1?'s':''}`}
+            {' '}sur Vinted
+          </span>
+          <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:6,color:'#fff',cursor:'pointer',fontSize:16,fontWeight:900,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
       <Nav tab={tab} setTab={setTab} open={menuOpen} setOpen={setMenuOpen}/>
