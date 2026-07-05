@@ -3172,6 +3172,27 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
   // Vinted ; on garde aussi le titre (pour retrouver le numéro à la vente, les
   // commandes n'exposant pas l'id d'article). Synchronisé (vinted_annonce_numeros).
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
+  // Sélecteur d'achat : relier une annonce à un de tes achats Vinted pour
+  // récupérer le prix payé automatiquement. Ne propose que les achats pas encore
+  // attribués à une autre annonce.
+  const [pickerFor, setPickerFor] = useState(null); // item annonce en cours de liaison
+  const [purchases, setPurchases] = useState({ loading:false, items:[] });
+  const linkedBuyIds = useMemo(() => {
+    const s = new Set();
+    Object.values(numeros).forEach(e => { if (e && e.buyFromId) s.add(String(e.buyFromId)); });
+    return s;
+  }, [numeros]);
+  const openPurchasePicker = async (item) => {
+    setPickerFor(item); setPurchases({ loading:true, items:[] });
+    const res = await fetchVintedOrders(selectedAccount, 'purchased', 1, 'all');
+    setPurchases({ loading:false, items: res.ok ? res.items : [] });
+  };
+  const choosePurchase = (pur) => {
+    const price = pur.price?.amount != null ? Number(pur.price.amount) : null;
+    updatePair(pickerFor, { buyPrice: price != null ? String(price) : '', buyFromId: pur.transaction_id ? String(pur.transaction_id) : null, buyTitle: pur.title || null });
+    setPickerFor(null);
+  };
+
   // Met à jour l'entrée d'une annonce (numéro et/ou prix d'achat). L'entrée est
   // supprimée si numéro ET prix d'achat sont vides.
   const updatePair = (item, patch) => {
@@ -3480,11 +3501,13 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
                               <input value={num} onChange={e=>updatePair(item,{numero:e.target.value})} placeholder="—"
                                 style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
                             </div>
-                            <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
-                              <input value={buy} onChange={e=>updatePair(item,{buyPrice:e.target.value})} placeholder="achat" inputMode="decimal"
+                            <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${entry.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                              <input value={buy} onChange={e=>updatePair(item,{buyPrice:e.target.value,buyFromId:null})} placeholder="achat" inputMode="decimal"
                                 style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
                               <span style={{fontSize:10,color:C.muted}}>€</span>
                             </div>
+                            <button type="button" onClick={()=>openPurchasePicker(item)} title="Relier à un de mes achats Vinted (récupère le prix payé)"
+                              style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:entry.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
                           </div>
                         </div>
                         );
@@ -3629,6 +3652,40 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Modale : choisir l'achat correspondant à une annonce (récupère le prix payé) */}
+      {pickerFor && (
+        <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{fontSize:14,fontWeight:800,color:C.text}}>Quel achat correspond à cette paire ?</div>
+              <button type="button" onClick={()=>setPickerFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>On récupère le prix que tu as payé. Les achats déjà reliés à une autre paire ne sont pas proposés.</div>
+            <div style={{flex:1,overflow:'auto',padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
+              {purchases.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement de tes achats…</div>}
+              {!purchases.loading && (() => {
+                const curId = numeros[pickerFor.id]?.buyFromId;
+                const avail = purchases.items.filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId));
+                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.5}}>Aucun achat disponible.<br/><span style={{fontSize:11}}>Ouvre « Mes achats » sur Vinted pour qu'ils remontent, ou ils sont déjà tous reliés.</span></div>;
+                return avail.map(p => (
+                  <button key={p.transaction_id} type="button" onClick={()=>choosePurchase(p)}
+                    style={{display:'flex',gap:10,alignItems:'center',padding:'8px',borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
+                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      {p.photo_url ? <img src={p.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:18}}>👟</span>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title}</div>
+                      <div style={{fontSize:10,color:C.muted}}>{p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
+                    </div>
+                    <div style={{fontSize:15,fontWeight:900,color:C.text,flexShrink:0}}>{p.price?.amount} {p.price?.currency_code==='EUR'?'€':p.price?.currency_code}</div>
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modale : fil d'une conversation ouverte */}
