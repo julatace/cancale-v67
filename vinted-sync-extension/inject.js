@@ -63,6 +63,31 @@
     if (text && text.length < 800000) post({ kind: 'harvest', type: h.type, id: h.id, url, body: text });
   };
 
+  // Convertit un ArrayBuffer en base64 (par morceaux pour eviter le débordement
+  // de pile sur les gros PDF).
+  const abToB64 = (buf) => {
+    let binary = '';
+    const bytes = new Uint8Array(buf);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  };
+  // Capture un BORDEREAU (PDF) que Vinted renvoie quand tu le telecharges. On
+  // repere par le content-type application/pdf (l'URL du label n'est pas connue
+  // d'avance). Sert a tamponner automatiquement le bordereau cote app.
+  const maybeCaptureLabel = (contentType, url, getArrayBuffer) => {
+    try {
+      if (!/application\/pdf/i.test(contentType || '')) return;
+      getArrayBuffer().then((buf) => {
+        if (buf && buf.byteLength && buf.byteLength < 4000000) {
+          post({ kind: 'label', url, b64: abToB64(buf) });
+        }
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
   // --- Patch de fetch ---
   const origFetch = window.fetch;
   if (origFetch) {
@@ -72,11 +97,16 @@
         if (init && init.headers) sendCsrf(init.headers);
         else if (input && input.headers) sendCsrf(input.headers);
         const p = origFetch.apply(this, arguments);
-        if (url && matchHarvest(url)) {
-          p.then((res) => {
-            try { res.clone().text().then((t) => sendHarvest(url, t)).catch(() => {}); } catch (_) {}
-          }).catch(() => {});
-        }
+        p.then((res) => {
+          try {
+            const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
+            if (/application\/pdf/i.test(ct)) {
+              maybeCaptureLabel(ct, url, () => res.clone().arrayBuffer());
+            } else if (url && matchHarvest(url)) {
+              res.clone().text().then((t) => sendHarvest(url, t)).catch(() => {});
+            }
+          } catch (_) {}
+        }).catch(() => {});
         return p;
       } catch (_) {
         return origFetch.apply(this, arguments);
@@ -101,11 +131,17 @@
     XHR.prototype.send = function () {
       try {
         const url = this.__cancaleUrl || '';
-        if (url && matchHarvest(url)) {
-          this.addEventListener('load', function () {
-            try { if (typeof this.responseText === 'string') sendHarvest(url, this.responseText); } catch (_) {}
-          });
-        }
+        this.addEventListener('load', function () {
+          try {
+            const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
+            // Bordereau PDF via XHR (si Vinted le charge en binaire).
+            if (/application\/pdf/i.test(ct) && this.response && this.response.byteLength) {
+              maybeCaptureLabel(ct, url, () => Promise.resolve(this.response));
+            } else if (url && matchHarvest(url) && typeof this.responseText === 'string') {
+              sendHarvest(url, this.responseText);
+            }
+          } catch (_) {}
+        });
       } catch (_) {}
       return origSend.apply(this, arguments);
     };

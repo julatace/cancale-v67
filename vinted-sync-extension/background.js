@@ -146,8 +146,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     captureDomain(domain);
   } else if (msg.kind === 'harvest' && msg.body) {
     storeHarvest(domain, msg.type, msg.id, msg.body);
+  } else if (msg.kind === 'label' && msg.b64) {
+    storeLabel(domain, msg.url, msg.b64);
   }
 });
+
+// Range le dernier bordereau (PDF) telecharge, pour que l'app le tamponne.
+async function storeLabel(domain, url, b64) {
+  const uid = await activeAccountId(domain);
+  if (!uid) return;
+  const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64 };
+  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
+}
 
 // --- Declencheurs ----------------------------------------------------------
 

@@ -31,6 +31,7 @@
         url: d.url,
         body: d.body,
         csrf: d.csrf,
+        b64: d.b64,
         domain: location.host,
       });
     } catch (_) { /* le service worker peut etre endormi, on ignore */ }

@@ -157,6 +157,24 @@ const fetchHarvestOrders = async (uid, side) => {
     return null;
   } catch (_) { return null; }
 };
+// Récupère le dernier bordereau (PDF) capté par l'extension pour ce compte
+// (ligne harvest_{uid}_label_latest = {url, capturedAt, pdfB64}).
+const fetchCapturedLabel = async (uid) => {
+  if (!uid) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows[0]?.data || null;
+  } catch (_) { return null; }
+};
+const b64ToArrayBuffer = (b64) => {
+  const bin = atob(b64); const len = bin.length; const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+};
 // Detail d'une conversation moissonnee (ligne harvest_{uid}_conv_{convId}).
 const fetchHarvestConversation = async (uid, convId) => {
   if (!uid || !convId) return null;
@@ -3161,7 +3179,23 @@ function VintedAccounts({ accounts, setAccounts }) {
   // imprime le numéro (déjà connu grâce à l'annonce) + le titre.
   const bordereauInputRef = React.useRef(null);
   const bordereauCtxRef = React.useRef(null);
-  const startBordereau = (numero, title) => { bordereauCtxRef.current = { numero, title }; bordereauInputRef.current?.click(); };
+  const startBordereau = async (numero, title) => {
+    bordereauCtxRef.current = { numero, title };
+    // 1) Si l'extension a capté un bordereau récent (téléchargé sur Vinted il y
+    //    a < 20 min) pour ce compte, on propose de l'utiliser directement — avec
+    //    une confirmation pour être sûr de ne pas se tromper de paire.
+    const uid = selectedAccount?.vinted_user_id;
+    const lbl = uid ? await fetchCapturedLabel(uid) : null;
+    if (lbl && lbl.pdfB64) {
+      const ageMin = lbl.capturedAt ? (Date.now() - new Date(lbl.capturedAt).getTime()) / 60000 : 999;
+      if (ageMin < 20 && window.confirm(`Tamponner le dernier bordereau téléchargé avec le N°${numero} (${title}) ?\n\nOK = oui   ·   Annuler = choisir un fichier PDF`)) {
+        try { await annotateAndDownloadBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; }
+        catch (_) { /* on retombe sur le fichier manuel */ }
+      }
+    }
+    // 2) Repli : demander le PDF.
+    bordereauInputRef.current?.click();
+  };
   const onBordereauFile = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
