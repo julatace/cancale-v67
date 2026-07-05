@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; width: 280px; margin: 0; padding: 14px; background: #0f1720; color: #e8eef5; }
+    h1 { font-size: 14px; margin: 0 0 4px; }
+    .sub { font-size: 11px; color: #8aa0b4; margin-bottom: 12px; }
+    .row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 6px 0; border-top: 1px solid #223; }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: #2ec26b; flex-shrink: 0; }
+    .dot.off { background: #d9534f; }
+    button { width: 100%; margin-top: 12px; padding: 9px; border: none; border-radius: 8px; background: #2ec26b; color: #04210f; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .muted { font-size: 10px; color: #6a7f92; margin-top: 10px; line-height: 1.4; }
+    #status { font-size: 11px; color: #8aa0b4; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Shop Cancale35 — Vinted Sync</h1>
+  <div class="sub">Capture locale, depuis ton navigateur.</div>
+  <div id="accounts"></div>
+  <button id="syncBtn">Synchroniser maintenant</button>
+  <div id="status"></div>
+  <div class="muted">Capture passive : l'extension range les donnees que Vinted envoie deja a ton navigateur quand tu navigues. Aucune requete supplementaire.</div>
+  <script src="popup.js"></script>
+</body>
+</html>

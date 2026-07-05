@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Shop Cancale35 - Vinted Sync",
+  "version": "2.0.0",
+  "description": "Synchronise, depuis TON navigateur, tes comptes et tes donnees Vinted (annonces, ventes, messages) vers l'app Cancale Shoes Store. Capture passive : aucune requete supplementaire vers Vinted.",
+  "permissions": ["cookies", "storage", "alarms"],
+  "host_permissions": [
+    "https://*.vinted.fr/*",
+    "https://*.vinted.com/*",
+    "https://*.vinted.it/*",
+    "https://*.vinted.de/*",
+    "https://lgonxzrzjcqthjtbdpzo.supabase.co/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.vinted.fr/*",
+        "https://*.vinted.com/*",
+        "https://*.vinted.it/*",
+        "https://*.vinted.de/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": [
+        "https://*.vinted.fr/*",
+        "https://*.vinted.com/*",
+        "https://*.vinted.it/*",
+        "https://*.vinted.de/*"
+      ]
+    }
+  ],
+  "action": { "default_popup": "popup.html", "default_title": "Shop Cancale35 - Vinted Sync" }
+}
