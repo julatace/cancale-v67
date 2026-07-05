@@ -29,7 +29,7 @@ const SYNC_KEYS = [
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels',
-  'vinted_inventory',
+  'vinted_inventory','vinted_annonce_numeros',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -333,7 +333,9 @@ const mapWardrobeItem = (it) => ({
   title: it.title || '',
   price: it.price?.amount ?? (typeof it.price === 'number' ? it.price : null),
   currency: it.price?.currency_code || 'EUR',
-  photo: it.photo?.url || it.photo?.thumbnails?.[0]?.url || null,
+  // Certaines annonces ont photo=null mais une liste photos[] : on prend la 1re.
+  photo: it.photo?.url || it.photo?.thumbnails?.[0]?.url
+       || it.photos?.[0]?.url || it.photos?.[0]?.thumbnails?.[0]?.url || null,
   url: it.url || null,
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
@@ -601,9 +603,7 @@ const LOGO_CANCALE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 
 const TABS=[
   {id:'dashboard',icon:'📊',label:'Stats'},
-  {id:'inventory',icon:'🔢',label:'Inventaire'},
   {id:'invoices', icon:'📄',label:'Factures'},
-  {id:'stockvinted',icon:'🟢',label:'Stock'},
   {id:'garage',   icon:'🏠',label:'Garage'},
   {id:'vintedaccounts',icon:'🔗',label:'Comptes Vinted'},
 ];
@@ -3099,6 +3099,39 @@ function VintedAccounts({ accounts, setAccounts }) {
   const [view, setView] = useState({ loading:false, items:[], pagination:null, page:1, error:null, raw:null });
   const [openConv, setOpenConv] = useState(null); // { loading, error, conversation, messages, header }
 
+  // Numéro attribué à la main sur chaque annonce en ligne. Clé = id de l'annonce
+  // Vinted ; on garde aussi le titre (pour retrouver le numéro à la vente, les
+  // commandes n'exposant pas l'id d'article). Synchronisé (vinted_annonce_numeros).
+  const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
+  const setNumero = (item, val) => {
+    const u = { ...numeros };
+    const v = String(val).trim();
+    if (v) u[item.id] = { numero: v, title: item.title, accountId: selectedId, photo: item.photo || null, price: item.price ?? null };
+    else delete u[item.id];
+    setNumeros(u); save('vinted_annonce_numeros', u);
+  };
+  // Retrouve le numéro d'une vente par le titre exact de l'annonce.
+  const numeroByTitle = (title) => {
+    const t = normTitle(title);
+    for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k].numero; }
+    return null;
+  };
+
+  // Bordereau annoté : on demande le PDF téléchargé depuis Vinted, l'app y
+  // imprime le numéro (déjà connu grâce à l'annonce) + le titre.
+  const bordereauInputRef = React.useRef(null);
+  const bordereauCtxRef = React.useRef(null);
+  const startBordereau = (numero, title) => { bordereauCtxRef.current = { numero, title }; bordereauInputRef.current?.click(); };
+  const onBordereauFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    const ctx = bordereauCtxRef.current;
+    if (!file || !ctx) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { alert('Choisis le bordereau au format PDF téléchargé depuis Vinted.'); return; }
+    try { const buf = await file.arrayBuffer(); await annotateAndDownloadBordereau(ctx.numero, ctx.title, buf); }
+    catch (err) { alert('Impossible d\'annoter ce PDF : ' + String(err)); }
+  };
+
   const openConversation = async (conv) => {
     setOpenConv({ loading:true, error:null, conversation:null, messages:[], header:{
       login: conv.opposite_user?.login, title: conv.description,
@@ -3183,6 +3216,7 @@ function VintedAccounts({ accounts, setAccounts }) {
 
   return (
     <div style={{padding:'16px 14px 40px'}}>
+      <input ref={bordereauInputRef} type="file" accept="application/pdf,.pdf" onChange={onBordereauFile} style={{display:'none'}}/>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
         <button onClick={refreshAccounts} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
@@ -3296,21 +3330,32 @@ function VintedAccounts({ accounts, setAccounts }) {
                         <span style={{fontSize:11}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici automatiquement.</span>
                       </div>
                     )}
+                    <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Mets un numéro sur chaque paire : l'app le retient, et quand elle se vend tu pourras imprimer le bordereau avec ce numéro.</div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:14}}>
-                      {view.items.map(item => (
-                        <a key={item.id} href={item.url||undefined} target="_blank" rel="noreferrer"
-                          style={{textDecoration:'none',borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,display:'block'}}>
-                          <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {item.photo
-                              ? <img src={item.photo} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                              : <span style={{fontSize:30}}>👟</span>}
+                      {view.items.map(item => {
+                        const num = numeros[item.id]?.numero || '';
+                        return (
+                        <div key={item.id} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${num?C.accent:C.border}`,display:'block'}}>
+                          <a href={item.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block'}}>
+                            <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+                              {item.photo
+                                ? <img src={item.photo} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                                : <span style={{fontSize:30}}>👟</span>}
+                              {num && <div style={{position:'absolute',top:6,left:6,background:C.accent,color:'#fff',fontSize:12,fontWeight:900,padding:'2px 8px',borderRadius:999}}>N°{num}</div>}
+                            </div>
+                            <div style={{padding:'8px 10px 4px'}}>
+                              <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
+                              <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price!=null?`${item.price} ${item.currency==='EUR'?'€':(item.currency||'')}`:''}</div>
+                            </div>
+                          </a>
+                          <div style={{display:'flex',alignItems:'center',gap:6,padding:'0 10px 10px'}}>
+                            <span style={{fontSize:11,color:C.muted,fontWeight:700}}>N°</span>
+                            <input value={num} onChange={e=>setNumero(item, e.target.value)} placeholder="numéro"
+                              style={{flex:1,minWidth:0,padding:'6px 8px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:13,fontWeight:700}}/>
                           </div>
-                          <div style={{padding:'8px 10px'}}>
-                            <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
-                            <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price!=null?`${item.price} ${item.currency==='EUR'?'€':(item.currency||'')}`:''}</div>
-                          </div>
-                        </a>
-                      ))}
+                        </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -3337,6 +3382,17 @@ function VintedAccounts({ accounts, setAccounts }) {
                               <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
                               <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price?.amount} {item.price?.currency_code==='EUR'?'€':item.price?.currency_code}</div>
                               <div style={{fontSize:10,color:C.muted,marginTop:2}}>{item.date ? new Date(item.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
+                              {category==='sold' && (() => {
+                                const num = numeroByTitle(item.title);
+                                return num ? (
+                                  <button type="button" onClick={()=>startBordereau(num, item.title)}
+                                    style={{marginTop:8,width:'100%',padding:'6px 8px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontWeight:800,fontSize:11.5,cursor:'pointer'}}>
+                                    📄 Bordereau N°{num}
+                                  </button>
+                                ) : (
+                                  <div style={{marginTop:8,fontSize:10,color:C.muted,fontStyle:'italic'}}>Pas de numéro (mets-le sur l'annonce)</div>
+                                );
+                              })()}
                             </div>
                           </div>
                         );
