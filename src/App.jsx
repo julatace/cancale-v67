@@ -100,6 +100,24 @@ const fetchVintedAccounts = async () => {
   } catch (_) { return []; }
 };
 
+// L'extension ne capture pas toujours le pseudo Vinted (colonne login vide) ->
+// on va le chercher via /api/v2/users/current et on le met en cache dans
+// Supabase pour ne pas refaire l'appel a chaque fois. Renvoie le login ou null.
+const fetchVintedLogin = async (account) => {
+  const res = await vintedApiCall(account, '/api/v2/users/current');
+  const login = res?.data?.user?.login || null;
+  if (login && account.vinted_user_id) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ login }),
+      });
+    } catch (_) { /* cache best-effort */ }
+  }
+  return login;
+};
+
 // Vinted utilise DEUX hosts differents selon l'endpoint (constate via
 // plusieurs vraies requetes "Copy as fetch") :
 // - www.vinted.fr/api/v2/...      -> commandes, ventes, achats
@@ -3037,6 +3055,16 @@ function VintedAccounts({ accounts, setAccounts }) {
     setAccounts(list);
     if (!selectedId && list.length > 0) setSelectedId(list[0].vinted_user_id);
     setLoading(false);
+    // Complete les pseudos manquants (l'extension ne capture pas toujours le
+    // login) en tache de fond, sans bloquer l'affichage.
+    const missing = list.filter(a => !a.login);
+    if (missing.length > 0) {
+      const enriched = await Promise.all(missing.map(async a => ({ id:a.vinted_user_id, login: await fetchVintedLogin(a) })));
+      const map = {}; enriched.forEach(e => { if (e.login) map[e.id] = e.login; });
+      if (Object.keys(map).length > 0) {
+        setAccounts(prev => prev.map(a => map[a.vinted_user_id] ? { ...a, login: map[a.vinted_user_id] } : a));
+      }
+    }
   };
 
   useEffect(() => { refreshAccounts(); }, []);
