@@ -280,10 +280,21 @@ const normalizeConversationMessages = (conversation) => {
 };
 
 // Recupere les annonces actuellement EN LIGNE d'un compte (sa "penderie").
-// Endpoint reel confirme : GET /api/v2/wardrobe/{user_id}/items.
+// Endpoint reel confirme : GET /api/v2/wardrobe/{profil_id}/items.
+// ATTENTION : la penderie utilise l'ID DE PROFIL Vinted (celui du /member/...),
+// PAS le vinted_user_id stocke par l'extension (qui est l'account_id du token,
+// un nombre different). Avec le mauvais id, Vinted renvoie 0 annonce alors que
+// le compte en a. On resout donc d'abord le vrai id via users/current, puis on
+// le garde en cache memoire sur l'objet compte (1 seul appel supplementaire).
 const fetchVintedListings = async (account, page = 1) => {
-  const uid = account.vinted_user_id;
-  const res = await vintedApiCall(account, `/api/v2/wardrobe/${uid}/items?page=${page}&per_page=40&order=relevance`);
+  let profileId = account._vintedProfileId;
+  if (!profileId) {
+    const who = await vintedApiCall(account, '/api/v2/users/current');
+    profileId = who?.data?.user?.id;
+    if (profileId) account._vintedProfileId = profileId;
+  }
+  if (!profileId) return { ok: false, error: 'Profil Vinted introuvable', items: [], pagination: null };
+  const res = await vintedApiCall(account, `/api/v2/wardrobe/${profileId}/items?page=${page}&per_page=40&order=relevance`);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
   const items = (res.data?.items || []).map((it) => ({
     id: String(it.id),
