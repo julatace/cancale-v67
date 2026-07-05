@@ -336,13 +336,17 @@ const mapWardrobeItem = (it) => ({
   photo: it.photo?.url || it.photo?.thumbnails?.[0]?.url || null,
   url: it.url || null,
 });
+// Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
+// ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
+// vendus/fermes (is_closed=true) : on ne veut garder que les actives.
+const isOnlineListing = (it) => it && !it.is_closed && !it.is_hidden && !it.is_draft;
 const fetchVintedListings = async (account, page = 1) => {
   // 1) Données moissonnées par l'extension (aucun appel Vinted). Tu dois avoir
   //    ouvert ta boutique/ton dressing sur vinted.fr pour qu'elles existent.
   if (page === 1) {
     const h = await fetchHarvest(account.vinted_user_id, 'listings');
     if (h && Array.isArray(h.items)) {
-      return { ok: true, items: h.items.map(mapWardrobeItem), pagination: h.pagination || null, source: 'harvest' };
+      return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem), pagination: h.pagination || null, source: 'harvest' };
     }
   }
   // 2) Repli : proxy. La penderie utilise l'ID DE PROFIL (celui du /member/…),
@@ -356,14 +360,7 @@ const fetchVintedListings = async (account, page = 1) => {
   if (!profileId) return { ok: false, error: 'Profil Vinted introuvable', items: [], pagination: null };
   const res = await vintedApiCall(account, `/api/v2/wardrobe/${profileId}/items?page=${page}&per_page=40&order=relevance`);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
-  const items = (res.data?.items || []).map((it) => ({
-    id: String(it.id),
-    title: it.title || '',
-    price: it.price?.amount ?? (typeof it.price === 'number' ? it.price : null),
-    currency: it.price?.currency_code || 'EUR',
-    photo: it.photo?.url || it.photo?.thumbnails?.[0]?.url || null,
-    url: it.url || null,
-  }));
+  const items = (res.data?.items || []).filter(isOnlineListing).map(mapWardrobeItem);
   return { ok: true, items, pagination: res.data?.pagination || null };
 };
 
