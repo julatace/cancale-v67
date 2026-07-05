@@ -3078,6 +3078,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 // son contenu a la fois (selectionne via les pastilles en haut) plutot que
 // tout empiler - plus lisible des qu'il y a plusieurs comptes.
 const CATEGORY_TABS = [
+  { id:'listings',  label:'Annonces', icon:'🟢' },
   { id:'purchased', label:'Achats',   icon:'🛍️' },
   { id:'sold',      label:'Ventes',   icon:'💸' },
   { id:'messages',  label:'Messages', icon:'💬' },
@@ -3096,7 +3097,7 @@ function VintedAccounts({ accounts, setAccounts }) {
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
   const [selectedId, setSelectedId] = useState(null);
-  const [category, setCategory] = useState('purchased'); // purchased | sold | messages
+  const [category, setCategory] = useState('listings'); // listings | purchased | sold | messages
   const [statusFilter, setStatusFilter] = useState('all'); // all | pending | completed
   const [view, setView] = useState({ loading:false, items:[], pagination:null, page:1, error:null, raw:null });
   const [openConv, setOpenConv] = useState(null); // { loading, error, conversation, messages, header }
@@ -3152,7 +3153,10 @@ function VintedAccounts({ accounts, setAccounts }) {
   const loadView = async (page = 1) => {
     if (!selectedAccount) return;
     setView(v => ({ ...v, loading:true, error:null }));
-    if (category === 'messages') {
+    if (category === 'listings') {
+      const res = await fetchVintedListings(selectedAccount, page);
+      setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
+    } else if (category === 'messages') {
       const res = await fetchVintedConversations(selectedAccount, page);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw: res.raw });
     } else {
@@ -3263,7 +3267,7 @@ function VintedAccounts({ accounts, setAccounts }) {
               </div>
 
               {/* Sous-onglets Toutes / En attente / Finalisées (achats & ventes uniquement) */}
-              {category!=='messages' && (
+              {(category==='purchased'||category==='sold') && (
                 <div style={{display:'flex',gap:8,padding:'12px 16px 0'}}>
                   {STATUS_TABS.map(t => (
                     <button key={t.id} onClick={()=>setStatusFilter(t.id)}
@@ -3286,7 +3290,35 @@ function VintedAccounts({ accounts, setAccounts }) {
                   <div style={{fontSize:13,color:C.danger}}>Erreur : {String(view.error)}</div>
                 )}
 
-                {!view.loading && !view.error && category!=='messages' && (
+                {/* Annonces en ligne : grille chargée automatiquement (moisson extension, sinon proxy) */}
+                {!view.loading && !view.error && category==='listings' && (
+                  <>
+                    {view.items.length===0 && (
+                      <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.5}}>
+                        Aucune annonce trouvée pour l'instant.<br/>
+                        <span style={{fontSize:11}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici automatiquement.</span>
+                      </div>
+                    )}
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:14}}>
+                      {view.items.map(item => (
+                        <a key={item.id} href={item.url||undefined} target="_blank" rel="noreferrer"
+                          style={{textDecoration:'none',borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,display:'block'}}>
+                          <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            {item.photo
+                              ? <img src={item.photo} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                              : <span style={{fontSize:30}}>👟</span>}
+                          </div>
+                          <div style={{padding:'8px 10px'}}>
+                            <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
+                            <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price!=null?`${item.price} ${item.currency==='EUR'?'€':(item.currency||'')}`:''}</div>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {!view.loading && !view.error && (category==='purchased'||category==='sold') && (
                   <>
                     {view.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun élément.</div>}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:14}}>
