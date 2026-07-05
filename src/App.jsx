@@ -3055,17 +3055,24 @@ function VintedAccounts({ accounts, setAccounts }) {
     setAccounts(list);
     if (!selectedId && list.length > 0) setSelectedId(list[0].vinted_user_id);
     setLoading(false);
-    // Complete les pseudos manquants (l'extension ne capture pas toujours le
-    // login) en tache de fond, sans bloquer l'affichage.
-    const missing = list.filter(a => !a.login);
-    if (missing.length > 0) {
-      const enriched = await Promise.all(missing.map(async a => ({ id:a.vinted_user_id, login: await fetchVintedLogin(a) })));
-      const map = {}; enriched.forEach(e => { if (e.login) map[e.id] = e.login; });
-      if (Object.keys(map).length > 0) {
-        setAccounts(prev => prev.map(a => map[a.vinted_user_id] ? { ...a, login: map[a.vinted_user_id] } : a));
-      }
-    }
+    // Les pseudos manquants sont complétés paresseusement, UN compte à la fois
+    // (celui qu'on regarde) — voir l'effet ci-dessous. On évite volontairement
+    // d'interroger tous les comptes d'un coup pour ne pas ressembler à un robot.
   };
+
+  // Complète le pseudo du seul compte sélectionné, s'il manque. Un appel léger,
+  // sur le compte que l'utilisateur consulte vraiment, et le résultat est mis
+  // en cache dans Supabase (donc une seule fois par compte).
+  useEffect(() => {
+    const acc = accounts.find(a => a.vinted_user_id === selectedId);
+    if (!acc || acc.login) return;
+    let cancelled = false;
+    fetchVintedLogin(acc).then(login => {
+      if (!cancelled && login) setAccounts(prev => prev.map(a => a.vinted_user_id === acc.vinted_user_id ? { ...a, login } : a));
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, accounts.length]);
 
   useEffect(() => { refreshAccounts(); }, []);
 
@@ -3841,11 +3848,12 @@ export default function App() {
     return ()=> setVintedTokensRefreshedHandler(null);
   },[]);
 
-  // Au demarrage : rafraichit cote serveur les tokens Vinted de tous les comptes
-  // (centralise, ne rafraichit que ceux qui expirent). Permet de consulter les
-  // comptes depuis n'importe quel appareil sans se reconnecter ni relancer
-  // l'extension. Un cron Vercel (vercel.json) fait de meme quand l'app est fermee.
-  useEffect(()=>{ fetch('/api/vinted-refresh').catch(()=>{}); },[]);
+  // NOTE (profil discret vis-a-vis de Vinted) : on NE rafraichit PLUS tous les
+  // comptes en arriere-plan au demarrage. Rafraichir plusieurs comptes en meme
+  // temps depuis l'IP serveur de Vercel ressemble a du multi-comptes piloté par
+  // un robot, ce que Vinted surveille. Desormais le token n'est rafraichi que
+  // pour le compte reellement consulté, et seulement s'il a expiré (via le
+  // proxy, sur 401). C'est le comportement le plus proche d'un vrai utilisateur.
 
   // Au démarrage : charger depuis le cloud Supabase (synchro Mac <-> iPhone)
   // Si le cloud a des données, elles remplacent les données locales.
