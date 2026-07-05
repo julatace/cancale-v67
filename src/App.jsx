@@ -135,6 +135,28 @@ const fetchHarvest = async (uid, type) => {
     return rows[0]?.data?.payload || null;
   } catch (_) { return null; }
 };
+// Récupère les commandes moissonnées d'un côté donné (ventes ou achats). Les
+// lignes sont nommées harvest_{uid}_orders_{type} où {type} est le param d'URL
+// capté par l'extension (sold/sell pour les ventes, bought/buy/purchased pour
+// les achats). On classe par le nom de la clé pour être robuste au libellé exact.
+const fetchHarvestOrders = async (uid, side) => {
+  if (!uid) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const wantSold = side === 'sold';
+    for (const r of rows) {
+      const key = String(r.id).replace(`harvest_${uid}_orders_`, '');
+      const isSold = /sold|sell/i.test(key);
+      const isBought = /bought|buy|purchas/i.test(key);
+      if ((wantSold && isSold) || (!wantSold && isBought)) return r.data?.payload || null;
+    }
+    return null;
+  } catch (_) { return null; }
+};
 // Detail d'une conversation moissonnee (ligne harvest_{uid}_conv_{convId}).
 const fetchHarvestConversation = async (uid, convId) => {
   if (!uid || !convId) return null;
@@ -238,21 +260,31 @@ const classifyOrderStatus = (status) => {
 // Recupere une page d'achats ou de ventes pour un compte (endpoint reel
 // trouve via "Copy as fetch" : www.vinted.fr/api/v2/my_orders).
 // type: 'purchased' | 'sold' ; statusFilter: 'completed' | 'pending' | 'cancelled' | 'all'
-const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'completed') => {
-  // Vinted n'expose pas de valeur "status=pending" confirmee - on recupere
-  // donc tout (pas de filtre status cote serveur) et on trie nous-memes selon
-  // le texte du champ "status" renvoye par Vinted.
+const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'completed', opts = {}) => {
+  const applyStatus = (items) => {
+    if (statusFilter === 'pending') return items.filter(it => classifyOrderStatus(it.status) === 'pending');
+    if (statusFilter === 'cancelled') return items.filter(it => classifyOrderStatus(it.status) === 'cancelled');
+    if (statusFilter === 'completed') return items.filter(it => classifyOrderStatus(it.status) === 'completed');
+    return items;
+  };
+  // 1) Données moissonnées par l'extension (aucun appel Vinted). On sépare
+  //    achats/ventes par le type d'URL capté ; repli sur l'ancienne clé générique.
+  if (page === 1) {
+    const h = (await fetchHarvestOrders(account.vinted_user_id, type)) || (await fetchHarvest(account.vinted_user_id, 'orders'));
+    if (h && Array.isArray(h.my_orders)) {
+      return { ok: true, items: applyStatus(h.my_orders), pagination: h.pagination || null, source: 'harvest' };
+    }
+  }
+  // Mode "moisson seulement" : on n'interroge PAS Vinted, on renvoie du vide si
+  // la page n'a pas encore été ouverte dans le navigateur.
+  if (opts.harvestOnly) return { ok: true, items: [], pagination: null, source: 'harvest' };
+  // 2) Repli : proxy.
   const endpoint = statusFilter === 'completed'
     ? `/api/v2/my_orders?type=${type}&status=completed&per_page=20&page=${page}`
     : `/api/v2/my_orders?type=${type}&per_page=20&page=${page}`;
   const res = await vintedApiCall(account, endpoint);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
-  let items = res.data?.my_orders || [];
-  if (statusFilter === 'pending') {
-    items = items.filter(it => classifyOrderStatus(it.status) === 'pending');
-  } else if (statusFilter === 'cancelled') {
-    items = items.filter(it => classifyOrderStatus(it.status) === 'cancelled');
-  }
+  const items = applyStatus(res.data?.my_orders || []);
   return {
     ok: true,
     items,
@@ -266,7 +298,7 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
 // unread, updated_at, opposite_user {id, login, photo}, item_photos.
 // (Les anciennes tentatives /api/v2/conversations et /transaction_messages
 // renvoyaient 404 ; /api/v2/inbox est le bon chemin.)
-const fetchVintedConversations = async (account, page = 1) => {
+const fetchVintedConversations = async (account, page = 1, opts = {}) => {
   // 1) Priorité aux données moissonnées par l'extension (aucun appel Vinted).
   if (page === 1) {
     const h = await fetchHarvest(account.vinted_user_id, 'inbox');
@@ -274,6 +306,8 @@ const fetchVintedConversations = async (account, page = 1) => {
       return { ok: true, items: h.conversations, pagination: h.pagination || null, raw: null, source: 'harvest' };
     }
   }
+  // Mode "moisson seulement" : aucun appel Vinted.
+  if (opts.harvestOnly) return { ok: true, items: [], pagination: null, raw: null, source: 'harvest' };
   // 2) Repli : proxy (si l'inbox n'a pas encore été ouverte dans le navigateur).
   const res = await vintedApiCall(account, `/api/v2/inbox?page=${page}&per_page=20`);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null, raw: res };
@@ -342,7 +376,7 @@ const mapWardrobeItem = (it) => ({
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
 // vendus/fermes (is_closed=true) : on ne veut garder que les actives.
 const isOnlineListing = (it) => it && !it.is_closed && !it.is_hidden && !it.is_draft;
-const fetchVintedListings = async (account, page = 1) => {
+const fetchVintedListings = async (account, page = 1, opts = {}) => {
   // 1) Données moissonnées par l'extension (aucun appel Vinted). Tu dois avoir
   //    ouvert ta boutique/ton dressing sur vinted.fr pour qu'elles existent.
   if (page === 1) {
@@ -351,6 +385,8 @@ const fetchVintedListings = async (account, page = 1) => {
       return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem), pagination: h.pagination || null, source: 'harvest' };
     }
   }
+  // Mode "moisson seulement" : aucun appel Vinted.
+  if (opts.harvestOnly) return { ok: true, items: [], pagination: null, source: 'harvest' };
   // 2) Repli : proxy. La penderie utilise l'ID DE PROFIL (celui du /member/…),
   //    différent du vinted_user_id (account_id du token) — sinon 0 annonce.
   let profileId = account._vintedProfileId;
@@ -3075,10 +3111,10 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 // son contenu a la fois (selectionne via les pastilles en haut) plutot que
 // tout empiler - plus lisible des qu'il y a plusieurs comptes.
 const CATEGORY_TABS = [
-  { id:'listings',  label:'Annonces', icon:'🟢' },
-  { id:'purchased', label:'Achats',   icon:'🛍️' },
-  { id:'sold',      label:'Ventes',   icon:'💸' },
-  { id:'messages',  label:'Messages', icon:'💬' },
+  { id:'listings',  label:'Annonces',     icon:'🟢' },
+  { id:'purchased', label:'Achats',       icon:'🛍️' },
+  { id:'sold',      label:'Comptabilité', icon:'💸' },
+  { id:'messages',  label:'Messages',     icon:'💬' },
 ];
 const STATUS_TABS = [
   { id:'all',       label:'Toutes' },
@@ -3183,14 +3219,18 @@ function VintedAccounts({ accounts, setAccounts }) {
   const loadView = async (page = 1) => {
     if (!selectedAccount) return;
     setView(v => ({ ...v, loading:true, error:null }));
+    // "moisson seulement" : ouvrir un onglet ne déclenche AUCUNE requête vers
+    // Vinted — on n'affiche que ce que l'extension a déjà récupéré pendant ta
+    // navigation. (Réduit fortement l'empreinte et le risque de blocage.)
+    const HO = { harvestOnly: true };
     if (category === 'listings') {
-      const res = await fetchVintedListings(selectedAccount, page);
+      const res = await fetchVintedListings(selectedAccount, page, HO);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
     } else if (category === 'messages') {
-      const res = await fetchVintedConversations(selectedAccount, page);
+      const res = await fetchVintedConversations(selectedAccount, page, HO);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw: res.raw });
     } else {
-      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter);
+      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter, HO);
       setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
     }
   };
@@ -3219,8 +3259,8 @@ function VintedAccounts({ accounts, setAccounts }) {
       <input ref={bordereauInputRef} type="file" accept="application/pdf,.pdf" onChange={onBordereauFile} style={{display:'none'}}/>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
-        <button onClick={refreshAccounts} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
-          {loading ? '…' : '↻ Actualiser'}
+        <button onClick={()=>{ refreshAccounts(); if (selectedAccount) loadView(1); }} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
+          {loading ? '…' : '↻ Synchroniser'}
         </button>
       </div>
 
@@ -3362,7 +3402,12 @@ function VintedAccounts({ accounts, setAccounts }) {
 
                 {!view.loading && !view.error && (category==='purchased'||category==='sold') && (
                   <>
-                    {view.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun élément.</div>}
+                    {view.items.length===0 && (
+                      <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.5}}>
+                        Rien pour l'instant.<br/>
+                        <span style={{fontSize:11}}>Ouvre « Mes commandes » sur vinted.fr une fois : les données remontent ici toutes seules (aucune requête depuis l'app).</span>
+                      </div>
+                    )}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:14}}>
                       {view.items.map(item => {
                         const orderStatus = classifyOrderStatus(item.status);

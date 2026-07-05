@@ -26,7 +26,18 @@
     { re: /\/api\/v2\/users\/current/,          type: 'profile'  },
   ];
   const matchHarvest = (url) => {
-    for (const h of HARVEST) { const m = h.re.exec(url); if (m) return { type: h.type, id: m[1] || null }; }
+    for (const h of HARVEST) {
+      const m = h.re.exec(url);
+      if (!m) continue;
+      let type = h.type;
+      // Pour les commandes, on distingue achats et ventes via le param ?type=
+      // (ex: my_orders?type=sold -> "orders_sold"), sinon elles s'ecraseraient.
+      if (type === 'orders') {
+        const t = /[?&]type=([^&]+)/.exec(url);
+        type = 'orders_' + (t ? decodeURIComponent(t[1]) : 'all');
+      }
+      return { type, id: m[1] || null };
+    }
     return null;
   };
 
