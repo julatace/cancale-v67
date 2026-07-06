@@ -4352,6 +4352,28 @@ function Comptabilite({ accounts }) {
   const fmtE = (n)=> (n==null?'—':Number(n).toFixed(2).replace('.',',')+' €');
   const cur = (c)=> c==='EUR'?'€':(c||'');
 
+  // Export CSV des ventes (pour compta / déclarations).
+  const exportCsv = () => {
+    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Bénéfice','Statut']];
+    (sales.items||[]).forEach(o=>{
+      const st = classifyOrderStatus(o.status);
+      const e = entryByTitle(o.title); const num = e?.numero || '';
+      const sell = o.price?.amount!=null ? Number(o.price.amount) : '';
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : '';
+      const benef = (buy!=='' && sell!=='' && !isNaN(buy)) ? (sell-buy).toFixed(2) : '';
+      rows.push([
+        o.date?new Date(o.date).toLocaleDateString('fr-FR'):'', accName(o._acc), num, o.title||'',
+        sell===''?'':String(sell).replace('.',','), buy===''?'':String(buy).replace('.',','),
+        benef===''?'':String(benef).replace('.',','), st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours',
+      ]);
+    });
+    const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+    const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = 'comptabilite-ventes.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  };
+
   return (
     <div style={{padding:'16px 14px 40px'}}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
@@ -4377,10 +4399,13 @@ function Comptabilite({ accounts }) {
             ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Comptes Vinted → Annonces » (bouton 🔗).
           </div>
         )}
-        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes']].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
           ))}
+          {sales.items && sales.items.length>0 && (
+            <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
+          )}
         </div>
         {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des ventes…</div>}
         {sales.items && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune vente.</div>}

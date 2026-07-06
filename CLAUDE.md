@@ -135,19 +135,27 @@ Sans accès terminal/git direct (session Cowork), chaque modification suivait ce
 - Stock Vinted (liste des annonces en ligne, réconciliation automatique avec factures et catalogue)
 - Comptes Vinted liés : achats/ventes multi-comptes avec photos, prix, dates, filtres Toutes/En attente/Finalisées/**Annulées** (ce dernier ajouté récemment pour corriger un bug de classification)
 
-**Nouveautés (juillet 2026, session Claude Code)** :
-- **Onglet Inventaire** (`Inventory` dans `App.jsx`) : cœur de la nouvelle app. Chaque paire porte un **numéro attribué à la main**. Import des annonces en ligne (wardrobe) + association manuelle numéro↔annonce (suggestion `nXX` pré-remplie depuis le titre, modifiable). Statuts En ligne / Vendu / Stock. Indicateur « Au garage » (les cases du garage contiennent ces mêmes numéros → recherche inversée) + saut direct vers la case dans l'onglet Garage. Stocké dans `vinted_inventory` (synchronisé).
-- **Ventes automatiques par TITRE** : bouton « Mettre à jour les ventes » → parcourt `my_orders?type=sold` de chaque compte et relie chaque commande à une paire **par le titre exact** (les commandes Vinted n'exposent pas d'id d'article, seulement `title` — voir `normTitle`). Le titre de l'annonce est sauvegardé sur la paire au moment de l'association. **Comptage prudent** : une paire n'est marquée « Vendu » (comptée = argent reçu) que si la commande est **finalisée** (`classifyOrderStatus==='completed'`, acheteur a validé). Tant que ce n'est pas validé, elle passe en statut **`pending_sale` (« Vente en cours »)**, affichée mais NON comptée. Une commande annulée/remboursée fait revenir une paire `pending_sale` en `online`. Statuts inventaire : `online` / `pending_sale` / `sold` / `stock`.
-- **Bordereau annoté** : bouton 📄 par paire (voir section 5, dépend de `pdf-lib`).
-- **Messages Vinted réactivés** (voir section 5).
-- **Navigation réorganisée** : le flux principal montre Stats / Inventaire / Factures / Stock / Garage / Comptes. L'ancien **Catalogue** et les **anciennes Ventes** sont déplacés dans une section « Ancienne application » en bas du menu (toujours lus par les statistiques du tableau de bord). `TABS` vs `ARCHIVE_TABS` dans `App.jsx`.
-- **Dépendance ajoutée** : `pdf-lib` (annotation des bordereaux), chargée en import dynamique.
+**ARCHITECTURE ACTUELLE (juillet 2026, après une longue session Claude Code — REMPLACE les anciennes descriptions ci-dessus)** :
+
+⚠️ **L'onglet « Inventaire » et l'onglet « Stock » ont été RETIRÉS** (leurs données restent en base, non supprimées). Le nouveau modèle : le numéro se met **directement sur chaque annonce en ligne**.
+
+- **Navigation principale** (`TABS`) : Stats / **Comptabilité** / Factures / Garage / **Comptes Vinted**. En bas du menu, section « Ancienne application » (`ARCHIVE_TABS`) : Ancien catalogue + Anciennes ventes (toujours lus par le tableau de bord).
+- **Onglet « Comptes Vinted »** (`VintedAccounts`) : par compte sélectionné, sous-onglets **Annonces / Achats / Comptabilité / Messages**.
+  - **Annonces** = annonces réellement en ligne (`fetchVintedListings` → `wardrobe/{PROFIL_id}/items`, filtrées `isOnlineListing` = `!is_closed && !is_hidden && !is_draft`). ⚠️ **Le wardrobe utilise l'ID DE PROFIL** (`users/current.user.id`, ≠ `vinted_user_id`=account_id) — sinon 0 annonce. Affichage façon Vinted (photo, prix, marque·taille·état). Sur chaque annonce : champ **N°** (badge), **prix d'achat**, bouton **🔗** (relier à un achat Vinted de N'IMPORTE quel compte → récupère le prix payé, exclut les achats déjà reliés), indicateur **🏠 Au garage / Ranger**.
+  - **Numérotation** : stockée dans **`vinted_annonce_numeros`** (clé = id d'annonce wardrobe) = `{numero, title, buyPrice, buyFromId, photo, price, numberedAt}`. **`vinted_used_numeros`** (append-only) = tous les numéros déjà utilisés : **un numéro n'est JAMAIS réattribué** (compta non ambiguë), suggestion = max+1.
+- **Onglet « Comptabilité »** (`Comptabilite`, top-level, **tous comptes agrégés**) : sous-onglets Ventes / Achats avec filtres (En cours/Finalisées/Annulées ; En attente/Reçus), tri par date, totaux **CA finalisé / Coût / Bénéfice + marge moyenne + temps de vente moyen**, bouton **bordereau 📄** par vente, **export CSV**. Le bénéfice se calcule via le prix d'achat relié dans Annonces (matching par **titre exact**, `normTitle`).
+- **Garage** : depuis une annonce, bouton **🏠 Ranger** → mode rangement (`placeNum`) : clic sur une case vide y place le N°. Panneaux de cohérence : « numérotées mais pas au garage » / « au garage mais numéro inconnu ».
+- **Notif à l'ouverture** (`vintedNotif`) : bandeau messages non lus + nouvelles ventes, calculé depuis la moisson (0 requête).
+- **Dépendance ajoutée** : `pdf-lib` (bordereaux, import dynamique).
+
+**PIPELINE DE DONNÉES (crucial)** : voir aussi extension section 5. L'app lit **d'abord** les données moissonnées passivement par l'extension (lignes `harvest_*` de Supabase, 0 requête Vinted), et **retombe sur le proxy `vinted-proxy` uniquement si rien n'a encore été capté** pour cette page (filet anti-écran-vide). Le bouton **« Synchroniser »** force un vrai fetch (`opts.force`). Chaque `fetchVinted*` accepte `{harvestOnly}` / `{force}`.
 
 **Ne fonctionne pas / en pause** :
-- Répondre aux messages depuis l'app (lecture OK ; la réponse renvoie vers Vinted).
-- Bordereau 100% automatique (endpoint label à capturer, voir section 5).
+- Répondre aux messages depuis l'app (lecture OK ; réponse via lien Vinted).
+- Bordereau 100% automatique : l'extension v2.2 **capte le PDF quand tu le télécharges sur Vinted** (`harvest_{uid}_label_latest`) et l'app propose de l'utiliser (< 20 min, avec confirmation) sinon glisser-fichier — **jamais validé sur un vrai envoi** (aucune commande à expédier pendant le dev). À confirmer au prochain envoi réel.
+- Dates fines (argent reçu vs vente vs réception colis) : `my_orders` ne donne qu'**une date** par commande. Séparer demanderait de capter le détail transaction par transaction.
 
-**Signalé par l'utilisateur, pas encore détaillé** : Julien a mentionné qu'il reste des choses "pas très bien" dans l'app sans préciser lesquelles. **À creuser avec lui en priorité** — probablement des détails d'affichage/UX sur un ou plusieurs écrans existants plutôt qu'un bug fonctionnel majeur.
+**⚠️ Risque de blocage** : Julien a **4 comptes Vinted** dans le même navigateur (multi-comptes interdit par Vinted, détecté par empreinte/adresse/paiement, pas que l'IP). C'est la principale cause de risque, indépendante du code. C'est pour ça qu'on est passé à la **capture passive par l'extension** (navigateur/IP de Julien) et qu'on a **retiré le refresh en masse + le cron** (voir section 5).
 
 ---
 
