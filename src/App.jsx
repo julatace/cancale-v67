@@ -3205,204 +3205,20 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 }
 
 
-/* ── Comptes Vinted liés (API directe) ─────────────────── */
-// Interface a deux niveaux d'onglets, comme la vraie page "Mes commandes" de
-// Vinted : Achats / Ventes / Messages en haut, puis Toutes / En attente /
-// Finalisées juste en dessous pour Achats et Ventes. Un seul compte affiche
-// son contenu a la fois (selectionne via les pastilles en haut) plutot que
-// tout empiler - plus lisible des qu'il y a plusieurs comptes.
-const CATEGORY_TABS = [
-  { id:'listings',  label:'Annonces',     icon:'🟢' },
-  { id:'purchased', label:'Achats',       icon:'🛍️' },
-  { id:'sold',      label:'Comptabilité', icon:'💸' },
-  { id:'messages',  label:'Messages',     icon:'💬' },
-];
-const STATUS_TABS = [
-  { id:'all',       label:'Toutes' },
-  { id:'pending',   label:'En attente' },
-  { id:'completed', label:'Finalisées' },
-  { id:'cancelled', label:'Annulées' },
-];
-
-function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }) {
+/* ── Comptes Vinted liés (gestion des comptes uniquement) ───────────────
+   Cet écran ne sert plus qu'à GÉRER les comptes liés (les capturés par
+   l'extension) : les lister, les renommer, tester la connexion, resynchroniser.
+   Les données (annonces, ventes, achats, messages, bordereaux) vivent désormais
+   dans les onglets DÉDIÉS du menu (Annonces / Ventes / Achats / Bordereaux /
+   Messages), tous rendus par <Comptabilite/>. On a donc retiré d'ici tout ce
+   qui était en doublon (numérotation, sélecteur d'achat, vues, conversations,
+   bordereaux) — un seul endroit par chose. */
+function VintedAccounts({ accounts, setAccounts }) {
   const [loading, setLoading] = useState(false);
-  // Ensemble des numéros présents dans le garage (pour l'indicateur "au garage").
-  const garageNums = useMemo(() => {
-    const s = new Set();
-    Object.values(garageGrid || {}).forEach(arr => { if (Array.isArray(arr)) arr.forEach(v => { const t = (v||'').trim().toLowerCase(); if (t) s.add(t); }); });
-    return s;
-  }, [garageGrid]);
-  const inGarage = (num) => !!num && garageNums.has(String(num).trim().toLowerCase());
-  const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, raw} }
-  const [labels, setLabels] = useState(()=>load('vinted_account_labels',{}));
+  const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, loading} }
+  const [labels, setLabels] = useState(() => load('vinted_account_labels', {}));
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
-  const [selectedId, setSelectedId] = useState(null);
-  const [category, setCategory] = useState('listings'); // listings | purchased | sold | messages
-  const [statusFilter, setStatusFilter] = useState('all'); // all | pending | completed
-  const [view, setView] = useState({ loading:false, items:[], pagination:null, page:1, error:null, raw:null });
-  const [openConv, setOpenConv] = useState(null); // { loading, error, conversation, messages, header }
-
-  // Numéro attribué à la main sur chaque annonce en ligne. Clé = id de l'annonce
-  // Vinted ; on garde aussi le titre (pour retrouver le numéro à la vente, les
-  // commandes n'exposant pas l'id d'article). Synchronisé (vinted_annonce_numeros).
-  const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
-  // Historique de TOUS les numéros déjà attribués (append-only) : un numéro
-  // utilisé n'est jamais réattribué, pour ne pas fausser la comptabilité.
-  const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
-  const recordUsedNumero = (num) => {
-    const n = parseInt(String(num), 10);
-    if (isNaN(n) || n <= 0) return;
-    setUsedNumeros(prev => { if (prev.includes(n)) return prev; const u = [...prev, n]; save('vinted_used_numeros', u); return u; });
-  };
-  // Prochain numéro suggéré = plus grand jamais utilisé + 1.
-  const nextNumero = useMemo(() => {
-    let m = 0;
-    usedNumeros.forEach(x => { const n = parseInt(String(x), 10); if (!isNaN(n) && n > m) m = n; });
-    Object.values(numeros).forEach(e => { const n = parseInt(String(e.numero), 10); if (!isNaN(n) && n > m) m = n; });
-    return m + 1;
-  }, [usedNumeros, numeros]);
-  // Un numéro est "déjà pris" s'il est utilisé par une autre annonce OU s'il a
-  // déjà servi par le passé (historique), sauf s'il est déjà celui de CETTE annonce.
-  const numeroTaken = (num, itemId) => {
-    const n = String(num).trim(); if (!n) return false;
-    const nl = n.toLowerCase();
-    if (String(numeros[itemId]?.numero || '').trim().toLowerCase() === nl) return false;
-    for (const k in numeros) { if (k !== itemId && String(numeros[k].numero || '').trim().toLowerCase() === nl) return true; }
-    const ni = parseInt(n, 10);
-    if (!isNaN(ni) && usedNumeros.includes(ni)) return true;
-    return false;
-  };
-  // Sélecteur d'achat : relier une annonce à un de tes achats Vinted pour
-  // récupérer le prix payé automatiquement. Ne propose que les achats pas encore
-  // attribués à une autre annonce.
-  const [pickerFor, setPickerFor] = useState(null); // item annonce en cours de liaison
-  const [purchases, setPurchases] = useState({ loading:false, items:[] });
-  const linkedBuyIds = useMemo(() => {
-    const s = new Set();
-    Object.values(numeros).forEach(e => { if (e && e.buyFromId) s.add(String(e.buyFromId)); });
-    return s;
-  }, [numeros]);
-  const openPurchasePicker = async (item) => {
-    setPickerFor(item); setPurchases({ loading:true, items:[] });
-    // Agrège les achats de TOUS les comptes liés (tu peux acheter sur un compte
-    // et revendre depuis un autre), en dédoublonnant par transaction.
-    const seen = new Set(); const all = [];
-    for (const acc of accounts) {
-      const res = await fetchVintedOrders(acc, 'purchased', 1, 'all');
-      if (res.ok) for (const p of res.items) {
-        const id = String(p.transaction_id);
-        if (!seen.has(id)) { seen.add(id); all.push({ ...p, _accountLogin: labels[acc.vinted_user_id] || acc.login || acc.vinted_user_id }); }
-      }
-    }
-    all.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
-    setPurchases({ loading:false, items: all });
-  };
-  const choosePurchase = (pur) => {
-    const price = pur.price?.amount != null ? Number(pur.price.amount) : null;
-    updatePair(pickerFor, { buyPrice: price != null ? String(price) : '', buyFromId: pur.transaction_id ? String(pur.transaction_id) : null, buyTitle: pur.title || null });
-    setPickerFor(null);
-  };
-
-  // Met à jour l'entrée d'une annonce (numéro et/ou prix d'achat). L'entrée est
-  // supprimée si numéro ET prix d'achat sont vides.
-  const updatePair = (item, patch) => {
-    const u = { ...numeros };
-    const cur = u[item.id] || {};
-    const next = { ...cur, ...patch, title: item.title, accountId: selectedId, photo: item.photo || null, price: item.price ?? null };
-    // Date de première numérotation (sert au "temps de vente").
-    if (patch.numero && String(patch.numero).trim() && !cur.numberedAt) next.numberedAt = new Date().toISOString();
-    const emptyNum = !String(next.numero || '').trim();
-    const emptyBuy = next.buyPrice == null || String(next.buyPrice).trim() === '';
-    if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
-    setNumeros(u); save('vinted_annonce_numeros', u);
-  };
-  // Retrouve l'entrée (numéro + prix d'achat) d'une vente par le titre exact.
-  const entryByTitle = (title) => {
-    const t = normTitle(title);
-    for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; }
-    return null;
-  };
-  const numeroByTitle = (title) => entryByTitle(title)?.numero || null;
-  // Clé (id d'annonce) d'une entrée retrouvée par titre — pour rouvrir le
-  // sélecteur d'achat depuis une vente.
-  const entryKeyByTitle = (title) => {
-    const t = normTitle(title);
-    for (const k in numeros) { if (normTitle(numeros[k].title) === t) return k; }
-    return null;
-  };
-
-  // Totaux comptables sur les ventes FINALISÉES affichées (argent reçu).
-  const comptaTotals = useMemo(() => {
-    if (category !== 'sold') return null;
-    let ca = 0, cout = 0, nb = 0, nbCout = 0;
-    let best = null, worst = null, margeSum = 0, margeNb = 0;
-    let daysSum = 0, daysNb = 0;
-    for (const o of view.items) {
-      if (classifyOrderStatus(o.status) !== 'completed') continue;
-      const sell = o.price?.amount != null ? Number(o.price.amount) : 0;
-      ca += sell; nb += 1;
-      const e = entryByTitle(o.title);
-      const buy = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? parseFloat(String(e.buyPrice).replace(',', '.')) : null;
-      if (buy != null && !isNaN(buy)) {
-        cout += buy; nbCout += 1;
-        const marge = sell - buy;
-        if (best == null || marge > best.marge) best = { marge, title: o.title };
-        if (worst == null || marge < worst.marge) worst = { marge, title: o.title };
-        if (sell > 0) { margeSum += (marge / sell) * 100; margeNb += 1; }
-      }
-      // Temps de vente (si la paire a été numérotée avant la vente).
-      if (e && e.numberedAt && o.date) {
-        const d = (new Date(o.date).getTime() - new Date(e.numberedAt).getTime()) / 86400000;
-        if (d >= 0 && d < 3650) { daysSum += d; daysNb += 1; }
-      }
-    }
-    return { ca, cout, benef: ca - cout, nb, nbCout, best, worst,
-      margeMoy: margeNb ? margeSum / margeNb : null,
-      joursMoy: daysNb ? daysSum / daysNb : null };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, view.items, numeros]);
-
-  // Bordereau annoté : on demande le PDF téléchargé depuis Vinted, l'app y
-  // imprime le numéro (déjà connu grâce à l'annonce) + le titre.
-  const bordereauInputRef = React.useRef(null);
-  const bordereauCtxRef = React.useRef(null);
-  const startBordereau = async (numero, title) => {
-    bordereauCtxRef.current = { numero, title };
-    // 1) Si l'extension a capté un bordereau récent (téléchargé sur Vinted il y
-    //    a < 20 min) pour ce compte, on propose de l'utiliser directement — avec
-    //    une confirmation pour être sûr de ne pas se tromper de paire.
-    const uid = selectedAccount?.vinted_user_id;
-    const lbl = uid ? await fetchCapturedLabel(uid) : null;
-    if (lbl && lbl.pdfB64) {
-      const ageMin = lbl.capturedAt ? (Date.now() - new Date(lbl.capturedAt).getTime()) / 60000 : 999;
-      if (ageMin < 20 && window.confirm(`Tamponner le dernier bordereau téléchargé avec le N°${numero} (${title}) ?\n\nOK = oui   ·   Annuler = choisir un fichier PDF`)) {
-        try { await annotateAndDownloadBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; }
-        catch (_) { /* on retombe sur le fichier manuel */ }
-      }
-    }
-    // 2) Repli : demander le PDF.
-    bordereauInputRef.current?.click();
-  };
-  const onBordereauFile = async (e) => {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = '';
-    const ctx = bordereauCtxRef.current;
-    if (!file || !ctx) return;
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { alert('Choisis le bordereau au format PDF téléchargé depuis Vinted.'); return; }
-    try { const buf = await file.arrayBuffer(); await annotateAndDownloadBordereau(ctx.numero, ctx.title, buf); }
-    catch (err) { alert('Impossible d\'annoter ce PDF : ' + String(err)); }
-  };
-
-  const openConversation = async (conv) => {
-    setOpenConv({ loading:true, error:null, conversation:null, messages:[], header:{
-      login: conv.opposite_user?.login, title: conv.description,
-      photo: conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url || null,
-    }});
-    const res = await fetchVintedConversationDetail(selectedAccount, conv.id);
-    if (!res.ok) { setOpenConv(o => ({ ...o, loading:false, error:res.error })); return; }
-    setOpenConv(o => ({ ...o, loading:false, conversation:res.conversation, messages:normalizeConversationMessages(res.conversation) }));
-  };
 
   const startEditLabel = (acc) => { setEditingLabel(acc.vinted_user_id); setLabelDraft(labels[acc.vinted_user_id] || acc.login || ''); };
   const commitLabel = (acc) => {
@@ -3417,53 +3233,13 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }
     setLoading(true);
     const list = await fetchVintedAccounts();
     setAccounts(list);
-    if (!selectedId && list.length > 0) setSelectedId(list[0].vinted_user_id);
     setLoading(false);
-    // Les pseudos manquants sont complétés paresseusement, UN compte à la fois
-    // (celui qu'on regarde) — voir l'effet ci-dessous. On évite volontairement
-    // d'interroger tous les comptes d'un coup pour ne pas ressembler à un robot.
   };
+  useEffect(() => { refreshAccounts(); /* eslint-disable-next-line */ }, []);
 
-  // Complète le pseudo du seul compte sélectionné, s'il manque. Un appel léger,
-  // sur le compte que l'utilisateur consulte vraiment, et le résultat est mis
-  // en cache dans Supabase (donc une seule fois par compte).
-  useEffect(() => {
-    const acc = accounts.find(a => a.vinted_user_id === selectedId);
-    if (!acc || acc.login) return;
-    let cancelled = false;
-    fetchVintedLogin(acc).then(login => {
-      if (!cancelled && login) setAccounts(prev => prev.map(a => a.vinted_user_id === acc.vinted_user_id ? { ...a, login } : a));
-    });
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, accounts.length]);
-
-  useEffect(() => { refreshAccounts(); }, []);
-
-  const selectedAccount = accounts.find(a => a.vinted_user_id === selectedId) || null;
-
-  const loadView = async (page = 1, opts = {}) => {
-    if (!selectedAccount) return;
-    setView(v => ({ ...v, loading:true, error:null }));
-    // On affiche EN PRIORITÉ les données déjà récupérées par l'extension
-    // (0 requête). Si l'extension n'a pas encore capté cette page, on va la
-    // chercher une seule fois (repli), pour ne jamais rester vide. Une fois
-    // moissonnée, les ouvertures suivantes ne font plus aucune requête.
-    const fo = { force: !!opts.force }; // "Synchroniser" force un vrai fetch Vinted
-    if (category === 'listings') {
-      const res = await fetchVintedListings(selectedAccount, page, fo);
-      setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
-    } else if (category === 'messages') {
-      const res = await fetchVintedConversations(selectedAccount, page, fo);
-      setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw: res.raw });
-    } else {
-      const res = await fetchVintedOrders(selectedAccount, category, page, statusFilter, fo);
-      setView({ loading:false, page, items: res.ok?res.items:[], pagination: res.ok?res.pagination:null, error: res.ok?null:res.error, raw:null });
-    }
-  };
-
-  useEffect(() => { if (selectedAccount) loadView(1); /* eslint-disable-next-line */ }, [selectedId, category, statusFilter]);
-
+  // Test de connexion : un appel léger (compteur de notifications non lues) sur
+  // LE compte testé uniquement — jamais tous d'un coup, pour ne pas ressembler à
+  // un robot multi-comptes (voir CLAUDE.md §5, profil discret).
   const testAccount = async (acc) => {
     setTestResult(r => ({ ...r, [acc.vinted_user_id]: { loading: true } }));
     const notifHost = VINTED_NOTIF_API_HOST[acc.domain] || 'api.vinted.fr';
@@ -3474,449 +3250,72 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }
         ok: !!res.ok,
         label: res.ok
           ? `✓ Connexion acceptée`
-          : `✗ Échec (${res.status || res.error || 'erreur inconnue'})${res.status===403?' — anti-robot Vinted':''}`,
+          : `✗ Échec (${res.status || res.error || 'erreur inconnue'})${res.status === 403 ? ' — anti-robot Vinted' : ''}`,
       },
     }));
   };
 
-  const tr = selectedAccount ? testResult[selectedAccount.vinted_user_id] : null;
-
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      <input ref={bordereauInputRef} type="file" accept="application/pdf,.pdf" onChange={onBordereauFile} style={{display:'none'}}/>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
-        <button onClick={()=>{ refreshAccounts(); if (selectedAccount) loadView(1, { force:true }); }} title="Va chercher le dernier état sur Vinted maintenant" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
-          {loading ? '…' : '↻ Synchroniser'}
+        <button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
+          {loading ? '…' : '↻ Actualiser'}
         </button>
       </div>
 
+      <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>
+        Les comptes ci-dessous sont ceux captés par l'extension Chrome quand tu navigues sur Vinted.
+        Les annonces, ventes, achats et messages se consultent dans les onglets dédiés du menu.
+      </div>
+
       {accounts.length === 0 && (
-        <div style={{padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted}}>
-          Aucun compte détecté pour l'instant. Installe l'extension « Shop Cancale35 – Vinted Sync », connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
+        <div style={{padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
+          Aucun compte détecté pour l'instant. Installe l'extension « Shop Cancale35 – Vinted Sync »,
+          connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
         </div>
       )}
 
       {accounts.length > 0 && (
-        <>
-          {/* Sélecteur de compte, sous forme de pastilles - un seul actif a la fois */}
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
-            {accounts.map(acc => (
-              <button key={acc.vinted_user_id} onClick={()=>setSelectedId(acc.vinted_user_id)}
-                style={{
-                  display:'flex',alignItems:'center',gap:6,padding:'6px 12px 6px 6px',borderRadius:999,cursor:'pointer',fontSize:12,fontWeight:700,
-                  background: selectedId===acc.vinted_user_id ? C.text : C.card,
-                  color: selectedId===acc.vinted_user_id ? C.surface : C.text,
-                  border:`1px solid ${selectedId===acc.vinted_user_id?C.text:C.border}`,
-                }}>
-                <span style={{width:20,height:20,borderRadius:999,background:selectedId===acc.vinted_user_id?C.surface:C.border,color:selectedId===acc.vinted_user_id?C.text:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:900}}>
-                  {accountName(acc).slice(0,1).toUpperCase()}
-                </span>
-                {accountName(acc)}
-              </button>
-            ))}
-          </div>
-
-          {selectedAccount && (
-            <div style={{borderRadius:16,border:`1px solid ${C.border}`,background:C.card,overflow:'hidden'}}>
-              {/* En-tête compte : nom éditable + statut + bouton Tester */}
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`}}>
-                <div>
-                  {editingLabel===selectedAccount.vinted_user_id ? (
-                    <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                      <input autoFocus value={labelDraft} onChange={e=>setLabelDraft(e.target.value)}
-                        onKeyDown={e=>{ if(e.key==='Enter') commitLabel(selectedAccount); if(e.key==='Escape') setEditingLabel(null); }}
-                        placeholder={selectedAccount.login || `Compte #${selectedAccount.vinted_user_id}`}
-                        style={{fontSize:15,fontWeight:800,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:180}}/>
-                      <button onClick={()=>commitLabel(selectedAccount)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:700}}>OK</button>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {accounts.map(acc => {
+            const tr = testResult[acc.vinted_user_id];
+            return (
+              <div key={acc.vinted_user_id} style={{borderRadius:14,border:`1px solid ${C.border}`,background:C.card,padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
+                  <span style={{width:36,height:36,flexShrink:0,borderRadius:999,background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900}}>
+                    {accountName(acc).slice(0,1).toUpperCase()}
+                  </span>
+                  <div style={{minWidth:0}}>
+                    {editingLabel === acc.vinted_user_id ? (
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        <input autoFocus value={labelDraft} onChange={e=>setLabelDraft(e.target.value)}
+                          onKeyDown={e=>{ if(e.key==='Enter') commitLabel(acc); if(e.key==='Escape') setEditingLabel(null); }}
+                          placeholder={acc.login || `Compte #${acc.vinted_user_id}`}
+                          style={{fontSize:15,fontWeight:800,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:170}}/>
+                        <button onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:700}}>OK</button>
+                      </div>
+                    ) : (
+                      <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
+                        <div style={{fontWeight:800,color:C.text,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{accountName(acc)}</div>
+                        <span style={{fontSize:11,color:C.muted}}>✎</span>
+                      </div>
+                    )}
+                    <div style={{fontSize:11,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                      {acc.login && acc.login !== accountName(acc) ? `@${acc.login} · ` : ''}
+                      maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}
                     </div>
-                  ) : (
-                    <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(selectedAccount)} title="Cliquer pour renommer">
-                      <div style={{fontWeight:800,color:C.text,fontSize:15}}>{accountName(selectedAccount)}</div>
-                      <span style={{fontSize:11,color:C.muted}}>✎</span>
-                    </div>
-                  )}
-                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {selectedAccount.login && selectedAccount.login!==accountName(selectedAccount) ? `@${selectedAccount.login} · ` : ''}
-                    maj {selectedAccount.updated_at ? new Date(selectedAccount.updated_at).toLocaleString('fr-FR') : '—'}
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                   {tr && !tr.loading && <span style={{fontSize:11,fontWeight:700,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
-                  <button onClick={()=>testAccount(selectedAccount)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
+                  <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
                 </div>
               </div>
-
-              {/* Onglets de catégorie */}
-              <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,padding:'0 16px'}}>
-                {CATEGORY_TABS.map(t => (
-                  <button key={t.id} onClick={()=>{ setCategory(t.id); setStatusFilter('all'); }}
-                    style={{
-                      background:'none',border:'none',cursor:'pointer',padding:'12px 16px',fontSize:13,fontWeight:700,
-                      color: category===t.id ? C.text : C.muted,
-                      borderBottom: category===t.id ? `2px solid ${C.text}` : '2px solid transparent',
-                      marginBottom:-1,
-                    }}>
-                    {t.icon} {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Sous-onglets Toutes / En attente / Finalisées (achats & ventes uniquement) */}
-              {(category==='purchased'||category==='sold') && (
-                <div style={{display:'flex',gap:8,padding:'12px 16px 0'}}>
-                  {STATUS_TABS.map(t => (
-                    <button key={t.id} onClick={()=>setStatusFilter(t.id)}
-                      style={{
-                        background: statusFilter===t.id ? C.text : 'transparent',
-                        color: statusFilter===t.id ? C.surface : C.muted,
-                        border:`1px solid ${statusFilter===t.id?C.text:C.border}`,
-                        borderRadius:999,padding:'4px 12px',cursor:'pointer',fontSize:11,fontWeight:700,
-                      }}>
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Contenu */}
-              <div style={{padding:16}}>
-                {view.loading && <div style={{fontSize:13,color:C.muted,padding:'20px 0',textAlign:'center'}}>Chargement…</div>}
-                {!view.loading && view.error && (
-                  <div style={{fontSize:13,color:C.danger}}>Erreur : {String(view.error)}</div>
-                )}
-
-                {/* Annonces en ligne : grille chargée automatiquement (moisson extension, sinon proxy) */}
-                {!view.loading && !view.error && category==='listings' && (
-                  <>
-                    {view.items.length===0 && (
-                      <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.5}}>
-                        Aucune annonce trouvée pour l'instant.<br/>
-                        <span style={{fontSize:11}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici automatiquement.</span>
-                      </div>
-                    )}
-                    <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes annonces en ligne. Mets un <b>numéro</b> (pour le garage et le bordereau) et le <b>prix d'achat</b> (pour la compta) sur chaque paire.</div>
-                    {(() => {
-                      const sansNum = view.items.filter(it => !(numeros[it.id]?.numero)).length;
-                      return sansNum>0 ? (
-                        <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
-                          ⚠️ {sansNum} annonce{sansNum>1?'s':''} sans numéro — à compléter.
-                        </div>
-                      ) : null;
-                    })()}
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
-                      {view.items.map(item => {
-                        const entry = numeros[item.id] || {};
-                        const num = entry.numero || '';
-                        const buy = entry.buyPrice ?? '';
-                        const cur = item.currency==='EUR'?'€':(item.currency||'');
-                        const atGarage = inGarage(num);
-                        return (
-                        <div key={item.id} style={{borderRadius:14,overflow:'hidden',background:C.surface,border:`1px solid ${num?C.accent:C.border}`,display:'flex',flexDirection:'column'}}>
-                          <a href={item.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
-                            <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              {item.photo
-                                ? <img src={item.photo} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                                : <span style={{fontSize:34}}>👟</span>}
-                            </div>
-                            {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'3px 9px',borderRadius:999,boxShadow:'0 1px 4px rgba(0,0,0,.3)'}}>N°{num}</div>}
-                          </a>
-                          <div style={{padding:'8px 10px 6px'}}>
-                            <div style={{fontSize:16,fontWeight:900,color:C.text}}>{item.price!=null?`${item.price} ${cur}`:''}</div>
-                            <div style={{fontSize:12,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={item.title}>
-                              {item.brand ? <b>{item.brand}</b> : item.title}
-                            </div>
-                            <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {[item.size, item.condition].filter(Boolean).join(' · ') || (item.brand ? item.title : '')}
-                            </div>
-                            {num && (
-                              atGarage ? (
-                                <button type="button" onClick={()=>onLocate && onLocate(num)} title="Voir la case dans le garage"
-                                  style={{marginTop:6,border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:C.blue||C.accent}}>
-                                  🏠 Au garage
-                                </button>
-                              ) : (
-                                <button type="button" onClick={()=>onStore && onStore(num)} title="Ranger cette paire dans une case du garage"
-                                  style={{marginTop:6,border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:C.warn}}>
-                                  🏠 Ranger au garage
-                                </button>
-                              )
-                            )}
-                          </div>
-                          {num && numeroTaken(num,item.id) && (
-                            <div style={{fontSize:10,color:C.danger,fontWeight:700,padding:'0 10px 4px'}}>⚠️ Numéro déjà utilisé — choisis-en un autre.</div>
-                          )}
-                          <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
-                            <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${num&&numeroTaken(num,item.id)?C.danger:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
-                              <span style={{fontSize:10,color:C.muted,fontWeight:700}}>N°</span>
-                              <input value={num} onChange={e=>updatePair(item,{numero:e.target.value})} onBlur={()=>{ if(num&&!numeroTaken(num,item.id)) recordUsedNumero(num); }} placeholder="—"
-                                style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
-                              {!num && (
-                                <button type="button" onClick={()=>{ updatePair(item,{numero:String(nextNumero)}); recordUsedNumero(nextNumero); }} title="Attribuer le prochain numéro libre"
-                                  style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:6,fontSize:10,fontWeight:800,padding:'2px 6px',cursor:'pointer'}}>+{nextNumero}</button>
-                              )}
-                            </div>
-                            <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${entry.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
-                              <input value={buy} onChange={e=>updatePair(item,{buyPrice:e.target.value,buyFromId:null})} placeholder="achat" inputMode="decimal"
-                                style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
-                              <span style={{fontSize:10,color:C.muted}}>€</span>
-                            </div>
-                            <button type="button" onClick={()=>openPurchasePicker(item)} title="Relier à un de mes achats Vinted (récupère le prix payé)"
-                              style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:entry.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
-                          </div>
-                        </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {!view.loading && !view.error && (category==='purchased'||category==='sold') && (
-                  <>
-                    {view.items.length===0 && (
-                      <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.5}}>
-                        Rien pour l'instant.<br/>
-                        <span style={{fontSize:11}}>Ouvre « Mes commandes » sur vinted.fr une fois : les données remontent ici toutes seules (aucune requête depuis l'app).</span>
-                      </div>
-                    )}
-                    {category==='sold' && comptaTotals && comptaTotals.nb>0 && (
-                      <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                        <div style={{flex:1,minWidth:100,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
-                          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>CA (finalisé)</div>
-                          <div style={{fontSize:18,fontWeight:900,color:C.text}}>{comptaTotals.ca.toFixed(2).replace('.',',')} €</div>
-                          <div style={{fontSize:9,color:C.muted}}>{comptaTotals.nb} vente{comptaTotals.nb>1?'s':''}</div>
-                        </div>
-                        <div style={{flex:1,minWidth:100,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
-                          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Coût d'achat</div>
-                          <div style={{fontSize:18,fontWeight:900,color:C.text}}>{comptaTotals.cout.toFixed(2).replace('.',',')} €</div>
-                          <div style={{fontSize:9,color:C.muted}}>{comptaTotals.nbCout}/{comptaTotals.nb} renseigné{comptaTotals.nbCout>1?'s':''}</div>
-                        </div>
-                        <div style={{flex:1,minWidth:100,background:C.surface,border:`1px solid ${comptaTotals.benef>=0?INV_STATUS.online.color:C.danger}`,borderRadius:12,padding:'10px 12px'}}>
-                          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice</div>
-                          <div style={{fontSize:18,fontWeight:900,color:comptaTotals.benef>=0?INV_STATUS.online.color:C.danger}}>{comptaTotals.benef.toFixed(2).replace('.',',')} €</div>
-                          <div style={{fontSize:9,color:C.muted}}>CA − coût</div>
-                        </div>
-                      </div>
-                    )}
-                    {category==='sold' && comptaTotals && comptaTotals.nbCout>0 && (
-                      <div style={{display:'flex',flexWrap:'wrap',gap:14,fontSize:12,color:C.muted,marginBottom:12,padding:'2px 2px'}}>
-                        {comptaTotals.margeMoy!=null && <span>Marge moyenne : <b style={{color:C.text}}>{comptaTotals.margeMoy.toFixed(0)} %</b></span>}
-                        {comptaTotals.best && <span>Meilleure : <b style={{color:INV_STATUS.online.color}}>+{comptaTotals.best.marge.toFixed(2).replace('.',',')}€</b></span>}
-                        {comptaTotals.worst && <span>Pire : <b style={{color:comptaTotals.worst.marge>=0?C.text:C.danger}}>{comptaTotals.worst.marge>=0?'+':''}{comptaTotals.worst.marge.toFixed(2).replace('.',',')}€</b></span>}
-                        {comptaTotals.joursMoy!=null && <span>Temps de vente moyen : <b style={{color:C.text}}>{Math.round(comptaTotals.joursMoy)} j</b></span>}
-                      </div>
-                    )}
-                    {category==='sold' && comptaTotals && (comptaTotals.nb-comptaTotals.nbCout)>0 && (
-                      <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
-                        ⚠️ {comptaTotals.nb-comptaTotals.nbCout} vente{(comptaTotals.nb-comptaTotals.nbCout)>1?'s':''} finalisée{(comptaTotals.nb-comptaTotals.nbCout)>1?'s':''} sans prix d'achat — bénéfice incomplet. Relie l'achat sur la vente ci-dessous.
-                      </div>
-                    )}
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:14}}>
-                      {view.items.map(item => {
-                        const orderStatus = classifyOrderStatus(item.status);
-                        const badgeColor = orderStatus==='completed' ? C.accent : orderStatus==='cancelled' ? C.danger : C.warn;
-                        const badgeLabel = orderStatus==='completed' ? 'Finalisée' : orderStatus==='cancelled' ? 'Annulée' : 'En attente';
-                        return (
-                          <div key={item.transaction_id} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,opacity:orderStatus==='cancelled'?0.65:1}}>
-                            <div style={{width:'100%',aspectRatio:'1/1',background:C.border,position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              {item.photo_url
-                                ? <img src={item.photo_url} alt={item.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                                : <span style={{fontSize:30}}>👟</span>}
-                              <div style={{position:'absolute',top:6,left:6,background:badgeColor,color:'#fff',fontSize:9,fontWeight:800,padding:'2px 7px',borderRadius:999}}>
-                                {badgeLabel}
-                              </div>
-                            </div>
-                            <div style={{padding:'8px 10px'}}>
-                              <div style={{fontSize:12,fontWeight:700,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3,minHeight:31}} title={item.title}>{item.title}</div>
-                              <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:4}}>{item.price?.amount} {item.price?.currency_code==='EUR'?'€':item.price?.currency_code}</div>
-                              <div style={{fontSize:10,color:C.muted,marginTop:2}}>{item.date ? new Date(item.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
-                              {category==='sold' && (() => {
-                                const e = entryByTitle(item.title);
-                                const num = e?.numero;
-                                const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-                                const sell = item.price?.amount!=null ? Number(item.price.amount) : null;
-                                const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy : null;
-                                const key = e ? entryKeyByTitle(item.title) : null;
-                                const isFinal = classifyOrderStatus(item.status)==='completed';
-                                return (<>
-                                  {(num || buy!=null) && (
-                                    <div style={{display:'flex',gap:8,marginTop:6,fontSize:11,flexWrap:'wrap'}}>
-                                      {num && <span style={{fontWeight:800,color:C.text}}>N°{num}</span>}
-                                      {buy!=null && <span style={{color:C.muted}}>achat {buy.toFixed(2).replace('.',',')}€</span>}
-                                      {benef!=null && <span style={{fontWeight:800,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</span>}
-                                    </div>
-                                  )}
-                                  {isFinal && e && buy==null && key && (
-                                    <button type="button" onClick={()=>openPurchasePicker({ id:key, title:e.title, photo:e.photo, price:e.price })}
-                                      style={{marginTop:6,width:'100%',padding:'5px 8px',borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,fontWeight:700,fontSize:11,cursor:'pointer'}}>
-                                      🔗 Relier un achat (prix)
-                                    </button>
-                                  )}
-                                  {num ? (
-                                    <button type="button" onClick={()=>startBordereau(num, item.title)}
-                                      style={{marginTop:8,width:'100%',padding:'6px 8px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontWeight:800,fontSize:11.5,cursor:'pointer'}}>
-                                      📄 Bordereau N°{num}
-                                    </button>
-                                  ) : (
-                                    <div style={{marginTop:8,fontSize:10,color:C.muted,fontStyle:'italic'}}>Pas de numéro (mets-le sur l'annonce)</div>
-                                  )}
-                                </>);
-                              })()}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {!view.loading && !view.error && category==='messages' && (
-                  <>
-                    {view.items.length===0 && (
-                      <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'10px 0'}}>
-                        Aucune conversation.
-                      </div>
-                    )}
-                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                      {view.items.map((conv, i) => {
-                        const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
-                        return (
-                        <button key={conv.id || i} type="button" onClick={()=>openConversation(conv)}
-                          style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left',width:'100%'}}>
-                          {photo ? (
-                            <img src={photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/>
-                          ) : (
-                            <div style={{width:40,height:40,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>
-                          )}
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {conv.opposite_user?.login || 'Conversation'}
-                            </div>
-                            <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {conv.description || ''}
-                            </div>
-                          </div>
-                          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
-                            <div style={{fontSize:10,color:C.muted}}>
-                              {conv.updated_at ? new Date(conv.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : ''}
-                            </div>
-                            {conv.unread && <div style={{width:9,height:9,borderRadius:999,background:C.accent}}/>}
-                          </div>
-                        </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {!view.loading && !view.error && view.pagination && (
-                  <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:10,marginTop:16}}>
-                    <button disabled={view.page<=1} onClick={()=>loadView(view.page-1)}
-                      style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:view.page<=1?'default':'pointer',opacity:view.page<=1?0.4:1,fontSize:12}}>
-                      ← Précédent
-                    </button>
-                    <span style={{fontSize:12,color:C.muted}}>
-                      Page {view.pagination.current_page} / {view.pagination.total_pages} ({view.pagination.total_entries} au total)
-                    </span>
-                    <button disabled={view.page>=view.pagination.total_pages} onClick={()=>loadView(view.page+1)}
-                      style={{padding:'4px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,cursor:view.page>=view.pagination.total_pages?'default':'pointer',opacity:view.page>=view.pagination.total_pages?0.4:1,fontSize:12}}>
-                      Suivant →
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Modale : choisir l'achat correspondant à une annonce (récupère le prix payé) */}
-      {pickerFor && (
-        <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <div style={{fontSize:14,fontWeight:800,color:C.text}}>Quel achat correspond à cette paire ?</div>
-              <button type="button" onClick={()=>setPickerFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
-            </div>
-            <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>On récupère le prix que tu as payé. Les achats déjà reliés à une autre paire ne sont pas proposés.</div>
-            <div style={{flex:1,overflow:'auto',padding:'0 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
-              {purchases.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement de tes achats…</div>}
-              {!purchases.loading && (() => {
-                const curId = numeros[pickerFor.id]?.buyFromId;
-                const avail = purchases.items.filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId));
-                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.5}}>Aucun achat disponible.<br/><span style={{fontSize:11}}>Ouvre « Mes achats » sur Vinted pour qu'ils remontent, ou ils sont déjà tous reliés.</span></div>;
-                return avail.map(p => (
-                  <button key={p.transaction_id} type="button" onClick={()=>choosePurchase(p)}
-                    style={{display:'flex',gap:10,alignItems:'center',padding:'8px',borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      {p.photo_url ? <img src={p.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:18}}>👟</span>}
-                    </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title}</div>
-                      <div style={{fontSize:10,color:C.muted}}>{p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}{p._accountLogin?` · ${p._accountLogin}`:''}</div>
-                    </div>
-                    <div style={{fontSize:15,fontWeight:900,color:C.text,flexShrink:0}}>{p.price?.amount} {p.price?.currency_code==='EUR'?'€':p.price?.currency_code}</div>
-                  </button>
-                ));
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modale : fil d'une conversation ouverte */}
-      {openConv && (
-        <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo
-                ? <img src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>
-                : <div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>💬</div>}
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:800,color:C.text}}>{openConv.header?.login || 'Conversation'}</div>
-                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title || ''}</div>
-              </div>
-              <button type="button" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
-              {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
-              {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
-              {!openConv.loading && !openConv.error && openConv.messages.map((m, i) => (
-                m.kind==='event' ? (
-                  <div key={i} style={{alignSelf:'center',fontSize:10,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}</div>
-                ) : (
-                  <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
-                    <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:14,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
-                      {m.body || (m.photos?.length ? '📷 photo' : '')}
-                      {m.photos?.map((p,pi)=>(<img key={pi} src={p.url||p.thumbnails?.[0]?.url} alt="" style={{display:'block',marginTop:6,maxWidth:'100%',borderRadius:8}}/>))}
-                    </div>
-                    <div style={{fontSize:9,color:C.muted,marginTop:2,textAlign:m.mine?'right':'left'}}>
-                      {m.ts ? new Date(m.ts).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}
-                    </div>
-                  </div>
-                )
-              ))}
-              {!openConv.loading && !openConv.error && openConv.messages.length===0 && (
-                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>
-              )}
-            </div>
-            {(() => {
-              const raw = openConv.conversation?.conversation_url;
-              if (!raw) return null;
-              const dom = (selectedAccount?.domain) || 'www.vinted.fr';
-              const href = /^https?:\/\//.test(raw) ? raw : `https://${dom}${raw.startsWith('/') ? '' : '/'}${raw}`;
-              return (
-                <div style={{padding:'10px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-                  <a href={href} target="_blank" rel="noreferrer"
-                    style={{display:'block',textAlign:'center',fontSize:12,fontWeight:700,color:C.blue,textDecoration:'none'}}>
-                    Répondre sur Vinted ↗
-                  </a>
-                </div>
-              );
-            })()}
-          </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -5257,7 +4656,7 @@ export default function App() {
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/> : null; })()}
-        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} garageGrid={garageGrid} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }} onStore={(numero)=>{ setGaragePlace(String(numero)); setTab('garage'); }}/>}
+        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
       </main>
       <BottomBar tab={tab} setTab={setTab}/>
       {showBackup&&<BackupModal
