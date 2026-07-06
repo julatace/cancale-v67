@@ -100,6 +100,21 @@ const fetchVintedAccounts = async () => {
   } catch (_) { return []; }
 };
 
+// Retire un compte de l'app : supprime sa ligne dans Supabase "vinted_accounts".
+// Sert quand un compte est bloqué/fermé définitivement et qu'on ne veut plus le
+// voir. NB : si la session Chrome du compte est encore valide, l'extension peut
+// le re-capturer au prochain passage sur vinted.fr — mais pour un compte bloqué
+// (cookie mort), il ne réapparaît pas. Renvoie true si la suppression a réussi.
+const deleteVintedAccount = async (vintedUserId) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${vintedUserId}`, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Prefer: 'return=minimal' },
+    });
+    return res.ok;
+  } catch (_) { return false; }
+};
+
 // L'extension ne capture pas toujours le pseudo Vinted (colonne login vide) ->
 // on va le chercher via /api/v2/users/current et on le met en cache dans
 // Supabase pour ne pas refaire l'appel a chaque fois. Renvoie le login ou null.
@@ -3229,6 +3244,18 @@ function VintedAccounts({ accounts, setAccounts }) {
   };
   const accountName = (acc) => labels[acc.vinted_user_id] || acc.login || `Compte #${acc.vinted_user_id}`;
 
+  // Déconnecter un compte : le retire de l'app (Supabase + state). Utile quand un
+  // compte est bloqué/fermé définitivement. On garde son étiquette au cas où.
+  const [removing, setRemoving] = useState(null);
+  const disconnectAccount = async (acc) => {
+    if (!window.confirm(`Déconnecter « ${accountName(acc)} » de l'application ?\n\nSes tokens seront supprimés. Un compte encore actif dans Chrome pourra revenir au prochain passage sur Vinted ; un compte bloqué ne reviendra pas.`)) return;
+    setRemoving(acc.vinted_user_id);
+    const ok = await deleteVintedAccount(acc.vinted_user_id);
+    setRemoving(null);
+    if (!ok) { alert('Échec de la déconnexion. Réessaie.'); return; }
+    setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
+  };
+
   const refreshAccounts = async () => {
     setLoading(true);
     const list = await fetchVintedAccounts();
@@ -3307,10 +3334,14 @@ function VintedAccounts({ accounts, setAccounts }) {
                     </div>
                   </div>
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                   {tr && !tr.loading && <span style={{fontSize:11,fontWeight:700,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
                   <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
+                  </button>
+                  <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Retirer ce compte de l'application"
+                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.danger,opacity:removing===acc.vinted_user_id?0.5:1}}>
+                    {removing===acc.vinted_user_id ? '…' : 'Déconnecter'}
                   </button>
                 </div>
               </div>
@@ -4510,23 +4541,42 @@ export default function App() {
     vintedNotifChecked.current = true;
     let cancelled=false;
     (async()=>{
-      let unread=0, salesCount=0;
+      // Messages : on ne signale QUE le NOUVEAU depuis la dernière ouverture.
+      // Une conversation non lue que Julien laisse traîner volontairement ne doit
+      // plus re-sonner à chaque lancement. On mémorise, par conversation, le
+      // updated_at déjà vu (clé locale vinted_notif_seen_convs, non synchronisée).
+      // Une conv compte comme "nouvelle" si elle est non lue ET (jamais vue OU son
+      // updated_at a changé = nouveau message reçu). Au tout premier lancement de
+      // cette logique, on initialise en silence (on ne re-nag pas sur l'existant).
+      const seenConvs = load('vinted_notif_seen_convs', {});
+      const firstMsgRun = localStorage.getItem('vinted_notif_seen_convs')===null;
+      const nextSeen = {}; // reconstruit à chaque passage -> se purge tout seul
+      let newMsgs=0, salesCount=0;
       for(const a of vintedAccounts){
         const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
-        if(inbox && Array.isArray(inbox.conversations)) unread += inbox.conversations.filter(c=>c.unread).length;
+        if(inbox && Array.isArray(inbox.conversations)){
+          for(const c of inbox.conversations){
+            if(!c.unread) continue;
+            const cid=String(c.id);
+            const stamp=String(c.updated_at||'1');
+            if(!firstMsgRun && seenConvs[cid]!==stamp) newMsgs+=1;
+            nextSeen[cid]=stamp; // désormais "vu" : ne re-sonnera plus tant qu'inchangé
+          }
+        }
         const sold=await fetchHarvestOrders(a.vinted_user_id,'sold');
         if(sold && Array.isArray(sold.my_orders)) salesCount += sold.my_orders.filter(o=>classifyOrderStatus(o.status)!=='cancelled').length;
       }
       if(cancelled) return;
+      save('vinted_notif_seen_convs',nextSeen);
       const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);
       const newSales = prevS<0 ? 0 : Math.max(0, salesCount-prevS);
       save('vinted_notif_last_vsales',salesCount);
-      if(unread>0 || newSales>0){
-        setVintedNotif({messages:unread, ventes:newSales});
+      if(newMsgs>0 || newSales>0){
+        setVintedNotif({messages:newMsgs, ventes:newSales});
         if(notifEnabled){
           const parts=[];
           if(newSales>0) parts.push(`${newSales} nouvelle${newSales>1?'s':''} vente${newSales>1?'s':''}`);
-          if(unread>0) parts.push(`${unread} message${unread>1?'s':''} non lu${unread>1?'s':''}`);
+          if(newMsgs>0) parts.push(`${newMsgs} nouveau${newMsgs>1?'x':''} message${newMsgs>1?'s':''}`);
           if(parts.length) pushNotif('Vinted', parts.join(' · '));
         }
       }
@@ -4620,7 +4670,7 @@ export default function App() {
           <span>
             🔔 {vintedNotif.ventes>0&&`${vintedNotif.ventes} nouvelle${vintedNotif.ventes>1?'s':''} vente${vintedNotif.ventes>1?'s':''}`}
             {vintedNotif.ventes>0&&vintedNotif.messages>0&&' · '}
-            {vintedNotif.messages>0&&`${vintedNotif.messages} message${vintedNotif.messages>1?'s':''} non lu${vintedNotif.messages>1?'s':''}`}
+            {vintedNotif.messages>0&&`${vintedNotif.messages} nouveau${vintedNotif.messages>1?'x':''} message${vintedNotif.messages>1?'s':''}`}
             {' '}sur Vinted
           </span>
           <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:6,color:'#fff',cursor:'pointer',fontSize:16,fontWeight:900,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
