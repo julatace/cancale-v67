@@ -665,6 +665,7 @@ const LOGO_CANCALE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 
 const TABS=[
   {id:'dashboard',icon:'📊',label:'Stats'},
+  {id:'comptabilite',icon:'💸',label:'Comptabilité'},
   {id:'invoices', icon:'📄',label:'Factures'},
   {id:'garage',   icon:'🏠',label:'Garage'},
   {id:'vintedaccounts',icon:'🔗',label:'Comptes Vinted'},
@@ -4289,6 +4290,145 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   );
 }
 
+/* ── Comptabilité (onglet dédié, tous comptes agrégés) ──────────────────── */
+function Comptabilite({ accounts }) {
+  const [numeros] = useState(() => load('vinted_annonce_numeros', {}));
+  const [sub, setSub] = useState('ventes'); // ventes | achats
+  const [sales, setSales] = useState({ loading:false, items:null });
+  const [buys, setBuys] = useState({ loading:false, items:null });
+  const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
+
+  const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
+
+  const loadOrders = async (type, setter) => {
+    setter({ loading:true, items:null });
+    const seen = new Set(); const out = [];
+    for (const acc of accounts) {
+      const res = await fetchVintedOrders(acc, type, 1, 'all');
+      if (res.ok) for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } }
+    }
+    out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    setter({ loading:false, items: out });
+  };
+  useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
+  useEffect(() => { if (sub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+
+  const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
+
+  const totals = useMemo(() => {
+    const items = sales.items || [];
+    let ca=0, cout=0, nb=0, nbCout=0, margeSum=0, margeNb=0;
+    for (const o of items) {
+      if (classifyOrderStatus(o.status) !== 'completed') continue;
+      const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; ca+=sell; nb+=1;
+      const e = entryByTitle(o.title);
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy)/sell)*100; margeNb+=1; } }
+    }
+    return { ca, cout, benef:ca-cout, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros]);
+
+  const startBordereau = async (numero, title, acc) => {
+    bordCtx.current = { numero, title };
+    const lbl = acc ? await fetchCapturedLabel(acc.vinted_user_id) : null;
+    if (lbl && lbl.pdfB64) {
+      const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
+      if (age<20 && window.confirm(`Tamponner le dernier bordereau téléchargé avec le N°${numero} (${title}) ?\n\nOK = oui · Annuler = choisir un fichier`)) {
+        try { await annotateAndDownloadBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; } catch(_){}
+      }
+    }
+    bordRef.current?.click();
+  };
+  const onBordFile = async (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value='';
+    const ctx = bordCtx.current; if (!f || !ctx) return;
+    if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { alert('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
+    try { await annotateAndDownloadBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ alert('Erreur : '+String(err)); }
+  };
+
+  const fmtE = (n)=> (n==null?'—':Number(n).toFixed(2).replace('.',',')+' €');
+  const cur = (c)=> c==='EUR'?'€':(c||'');
+
+  return (
+    <div style={{padding:'16px 14px 40px'}}>
+      <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
+      <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 14px'}}>💸 Comptabilité</h2>
+      {accounts.length===0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
+
+      <div style={{display:'flex',gap:8,marginBottom:16}}>
+        {[['ventes','Ventes'],['achats','Achats']].map(([id,label])=>(
+          <button key={id} onClick={()=>setSub(id)} style={{padding:'6px 16px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:700,fontSize:13,cursor:'pointer'}}>{label}</button>
+        ))}
+      </div>
+
+      {sub==='ventes' && (<>
+        {totals.nb>0 && (
+          <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
+            <StatBox label="CA finalisé" value={fmtE(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            <StatBox label="Coût d'achat" value={fmtE(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
+            <StatBox label="Bénéfice" value={fmtE(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − coût'}/>
+          </div>
+        )}
+        {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
+          <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
+            ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Comptes Vinted → Annonces » (bouton 🔗).
+          </div>
+        )}
+        {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des ventes…</div>}
+        {sales.items && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune vente.</div>}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {(sales.items||[]).map(o=>{
+            const st = classifyOrderStatus(o.status);
+            const e = entryByTitle(o.title); const num = e?.numero;
+            const sell = o.price?.amount!=null?Number(o.price.amount):null;
+            const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+            const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy : null;
+            return (
+              <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:st==='cancelled'?0.6:1}}>
+                <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
+                  <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)} · <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span></div>
+                </div>
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <div style={{fontSize:14,fontWeight:900,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
+                  {benef!=null && <div style={{fontSize:11,fontWeight:800,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
+                  {benef==null && buy==null && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
+                </div>
+                {num && st!=='cancelled' && (
+                  <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} title="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </>)}
+
+      {sub==='achats' && (<>
+        {buys.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des achats…</div>}
+        {buys.items && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat.</div>}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {(buys.items||[]).map(o=>(
+            <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:classifyOrderStatus(o.status)==='cancelled'?0.6:1}}>
+              <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
+                <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)}</div>
+              </div>
+              <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
+            </div>
+          ))}
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 export default function App() {
   const [tab,setTab]=useState('dashboard');
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
@@ -4787,6 +4927,7 @@ export default function App() {
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
+        {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts}/>}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} garageGrid={garageGrid} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }} onStore={(numero)=>{ setGaragePlace(String(numero)); setTab('garage'); }}/>}
       </main>
       {showBackup&&<BackupModal
