@@ -717,11 +717,11 @@ function BottomBar({tab,setTab}) {
       background:C.surface,borderTop:`1px solid ${C.border}`,boxShadow:'0 -2px 10px rgba(0,0,0,0.08)',
       paddingBottom:'env(safe-area-inset-bottom)',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
       {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
-        <button key={t.id} type="button" onClick={()=>setTab(t.id)} style={{
+        <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 0 auto',minWidth:64,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 6px 7px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
           color:on?C.accent:C.muted}}>
-          <span style={{fontSize:20,lineHeight:1,opacity:on?1:0.65}}>{t.icon}</span>
+          <span aria-hidden="true" style={{fontSize:20,lineHeight:1,opacity:on?1:0.65}}>{t.icon}</span>
           <span style={{fontSize:10,fontWeight:on?800:600,whiteSpace:'nowrap'}}>{t.label}</span>
         </button>
       );})}
@@ -4255,7 +4255,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
                 {num && st!=='cancelled' && (
-                  <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} title="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
+                  <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} title="Bordereau annoté" aria-label={`Bordereau annoté N°${num}`} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
                 )}
               </div>
             );
@@ -4378,7 +4378,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
                     <span style={{fontSize:10,color:C.muted}}>€</span>
                   </div>
-                  <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
+                  <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
                 </div>
                 {num && (
                   <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
@@ -4984,7 +4984,7 @@ export default function App() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>
-            <button type="button" onClick={()=>setTab('settings')} title="Paramètres"
+            <button type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
               style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               ⚙️
             </button>

@@ -14,7 +14,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <title>Cancale Shoes Store</title>
-  <style>body{margin:0;padding:0;background:#eef2f2;font-family:'Nunito',system-ui,sans-serif;}*{-webkit-tap-highlight-color:transparent;}@keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}</style>
+  <style>
+    body{margin:0;padding:0;background:#eef2f2;font-family:'Nunito',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+    *{-webkit-tap-highlight-color:transparent;}
+    @keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}
+    /* Accessibilité : anneau de focus visible seulement au clavier (pas au clic). */
+    :focus-visible{outline:3px solid #007782;outline-offset:2px;border-radius:6px;}
+    button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible){outline:none;}
+    /* Respect du réglage système « réduire les animations ». */
+    @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}}
+  </style>
 </head>
 <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
 </html>
