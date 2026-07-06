@@ -29,7 +29,7 @@ const SYNC_KEYS = [
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels',
-  'vinted_inventory','vinted_annonce_numeros',
+  'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -2568,7 +2568,20 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
     allVals.forEach(v=>s.add(v.trim().toLowerCase()));
     return s;
   },[allVals]);
-  
+
+  // Cohérence garage ↔ paires numérotées (annonces). Chargé depuis la même
+  // source que l'onglet Comptes (clé vinted_annonce_numeros).
+  const pairNumeros=useMemo(()=>load('vinted_annonce_numeros',{}),[]);
+  const numberedSet=useMemo(()=>{
+    const s=new Set();
+    Object.values(pairNumeros).forEach(e=>{ const t=String((e&&e.numero)||'').trim().toLowerCase(); if(t) s.add(t); });
+    return s;
+  },[pairNumeros]);
+  // Numérotées (paires connues) mais absentes du garage → à ranger.
+  const numberedNotStored=useMemo(()=>Array.from(numberedSet).filter(n=>!allValsSet.has(n)).sort((a,b)=>(+a||0)-(+b||0)),[numberedSet,allValsSet]);
+  // Au garage mais numéro inconnu (aucune paire numérotée) → doute/typo/ancien.
+  const storedUnknown=useMemo(()=>Array.from(allValsSet).filter(n=>numberedSet.size>0&&!numberedSet.has(n)).sort((a,b)=>(+a||0)-(+b||0)),[allValsSet,numberedSet]);
+
   // Détection des doublons
   const duplicates=useMemo(()=>{
     const counts={};
@@ -2706,6 +2719,30 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         </div>
       </Card>}
       
+      {/* Cohérence : paires numérotées vs garage */}
+      {(numberedNotStored.length>0||storedUnknown.length>0)&&(
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {numberedNotStored.length>0&&(
+            <Card style={{padding:12,background:`${C.warn}11`,borderColor:`${C.warn}44`}}>
+              <div style={{fontSize:11,color:C.warn,fontWeight:700,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>📦 Numérotées mais pas au garage ({numberedNotStored.length})</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Ces paires ont un numéro mais ne sont dans aucune case — à ranger.</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
+                {numberedNotStored.map(n=>(<span key={n} style={{background:C.bg,padding:'4px 10px',borderRadius:6,color:C.text,border:`1px solid ${C.warn}66`,fontWeight:700}}>N°{n}</span>))}
+              </div>
+            </Card>
+          )}
+          {storedUnknown.length>0&&(
+            <Card style={{padding:12,background:`${C.blue||C.accent}11`,borderColor:`${C.blue||C.accent}44`}}>
+              <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:700,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au garage mais numéro inconnu ({storedUnknown.length})</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au garage sans paire numérotée correspondante (ancien numéro, faute de frappe, ou vendue).</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
+                {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:6,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:700}}>#{n}</span>))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Recherche avec bouton + Entrée */}
       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
         <div style={{flex:1,minWidth:200,display:'flex',gap:6}}>
@@ -3180,6 +3217,32 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }
   // Vinted ; on garde aussi le titre (pour retrouver le numéro à la vente, les
   // commandes n'exposant pas l'id d'article). Synchronisé (vinted_annonce_numeros).
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
+  // Historique de TOUS les numéros déjà attribués (append-only) : un numéro
+  // utilisé n'est jamais réattribué, pour ne pas fausser la comptabilité.
+  const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
+  const recordUsedNumero = (num) => {
+    const n = parseInt(String(num), 10);
+    if (isNaN(n) || n <= 0) return;
+    setUsedNumeros(prev => { if (prev.includes(n)) return prev; const u = [...prev, n]; save('vinted_used_numeros', u); return u; });
+  };
+  // Prochain numéro suggéré = plus grand jamais utilisé + 1.
+  const nextNumero = useMemo(() => {
+    let m = 0;
+    usedNumeros.forEach(x => { const n = parseInt(String(x), 10); if (!isNaN(n) && n > m) m = n; });
+    Object.values(numeros).forEach(e => { const n = parseInt(String(e.numero), 10); if (!isNaN(n) && n > m) m = n; });
+    return m + 1;
+  }, [usedNumeros, numeros]);
+  // Un numéro est "déjà pris" s'il est utilisé par une autre annonce OU s'il a
+  // déjà servi par le passé (historique), sauf s'il est déjà celui de CETTE annonce.
+  const numeroTaken = (num, itemId) => {
+    const n = String(num).trim(); if (!n) return false;
+    const nl = n.toLowerCase();
+    if (String(numeros[itemId]?.numero || '').trim().toLowerCase() === nl) return false;
+    for (const k in numeros) { if (k !== itemId && String(numeros[k].numero || '').trim().toLowerCase() === nl) return true; }
+    const ni = parseInt(n, 10);
+    if (!isNaN(ni) && usedNumeros.includes(ni)) return true;
+    return false;
+  };
   // Sélecteur d'achat : relier une annonce à un de tes achats Vinted pour
   // récupérer le prix payé automatiquement. Ne propose que les achats pas encore
   // attribués à une autre annonce.
@@ -3217,6 +3280,8 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }
     const u = { ...numeros };
     const cur = u[item.id] || {};
     const next = { ...cur, ...patch, title: item.title, accountId: selectedId, photo: item.photo || null, price: item.price ?? null };
+    // Date de première numérotation (sert au "temps de vente").
+    if (patch.numero && String(patch.numero).trim() && !cur.numberedAt) next.numberedAt = new Date().toISOString();
     const emptyNum = !String(next.numero || '').trim();
     const emptyBuy = next.buyPrice == null || String(next.buyPrice).trim() === '';
     if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
@@ -3241,15 +3306,30 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }
   const comptaTotals = useMemo(() => {
     if (category !== 'sold') return null;
     let ca = 0, cout = 0, nb = 0, nbCout = 0;
+    let best = null, worst = null, margeSum = 0, margeNb = 0;
+    let daysSum = 0, daysNb = 0;
     for (const o of view.items) {
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount != null ? Number(o.price.amount) : 0;
       ca += sell; nb += 1;
       const e = entryByTitle(o.title);
       const buy = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? parseFloat(String(e.buyPrice).replace(',', '.')) : null;
-      if (buy != null && !isNaN(buy)) { cout += buy; nbCout += 1; }
+      if (buy != null && !isNaN(buy)) {
+        cout += buy; nbCout += 1;
+        const marge = sell - buy;
+        if (best == null || marge > best.marge) best = { marge, title: o.title };
+        if (worst == null || marge < worst.marge) worst = { marge, title: o.title };
+        if (sell > 0) { margeSum += (marge / sell) * 100; margeNb += 1; }
+      }
+      // Temps de vente (si la paire a été numérotée avant la vente).
+      if (e && e.numberedAt && o.date) {
+        const d = (new Date(o.date).getTime() - new Date(e.numberedAt).getTime()) / 86400000;
+        if (d >= 0 && d < 3650) { daysSum += d; daysNb += 1; }
+      }
     }
-    return { ca, cout, benef: ca - cout, nb, nbCout };
+    return { ca, cout, benef: ca - cout, nb, nbCout, best, worst,
+      margeMoy: margeNb ? margeSum / margeNb : null,
+      joursMoy: daysNb ? daysSum / daysNb : null };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, view.items, numeros]);
 
@@ -3535,11 +3615,18 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }
                               )
                             )}
                           </div>
+                          {num && numeroTaken(num,item.id) && (
+                            <div style={{fontSize:10,color:C.danger,fontWeight:700,padding:'0 10px 4px'}}>⚠️ Numéro déjà utilisé — choisis-en un autre.</div>
+                          )}
                           <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
-                            <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                            <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${num&&numeroTaken(num,item.id)?C.danger:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
                               <span style={{fontSize:10,color:C.muted,fontWeight:700}}>N°</span>
-                              <input value={num} onChange={e=>updatePair(item,{numero:e.target.value})} placeholder="—"
+                              <input value={num} onChange={e=>updatePair(item,{numero:e.target.value})} onBlur={()=>{ if(num&&!numeroTaken(num,item.id)) recordUsedNumero(num); }} placeholder="—"
                                 style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                              {!num && (
+                                <button type="button" onClick={()=>{ updatePair(item,{numero:String(nextNumero)}); recordUsedNumero(nextNumero); }} title="Attribuer le prochain numéro libre"
+                                  style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:6,fontSize:10,fontWeight:800,padding:'2px 6px',cursor:'pointer'}}>+{nextNumero}</button>
+                              )}
                             </div>
                             <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${entry.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
                               <input value={buy} onChange={e=>updatePair(item,{buyPrice:e.target.value,buyFromId:null})} placeholder="achat" inputMode="decimal"
@@ -3581,6 +3668,14 @@ function VintedAccounts({ accounts, setAccounts, garageGrid, onLocate, onStore }
                           <div style={{fontSize:18,fontWeight:900,color:comptaTotals.benef>=0?INV_STATUS.online.color:C.danger}}>{comptaTotals.benef.toFixed(2).replace('.',',')} €</div>
                           <div style={{fontSize:9,color:C.muted}}>CA − coût</div>
                         </div>
+                      </div>
+                    )}
+                    {category==='sold' && comptaTotals && comptaTotals.nbCout>0 && (
+                      <div style={{display:'flex',flexWrap:'wrap',gap:14,fontSize:12,color:C.muted,marginBottom:12,padding:'2px 2px'}}>
+                        {comptaTotals.margeMoy!=null && <span>Marge moyenne : <b style={{color:C.text}}>{comptaTotals.margeMoy.toFixed(0)} %</b></span>}
+                        {comptaTotals.best && <span>Meilleure : <b style={{color:INV_STATUS.online.color}}>+{comptaTotals.best.marge.toFixed(2).replace('.',',')}€</b></span>}
+                        {comptaTotals.worst && <span>Pire : <b style={{color:comptaTotals.worst.marge>=0?C.text:C.danger}}>{comptaTotals.worst.marge>=0?'+':''}{comptaTotals.worst.marge.toFixed(2).replace('.',',')}€</b></span>}
+                        {comptaTotals.joursMoy!=null && <span>Temps de vente moyen : <b style={{color:C.text}}>{Math.round(comptaTotals.joursMoy)} j</b></span>}
                       </div>
                     )}
                     {category==='sold' && comptaTotals && (comptaTotals.nb-comptaTotals.nbCout)>0 && (
