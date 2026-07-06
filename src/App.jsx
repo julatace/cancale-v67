@@ -3923,6 +3923,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const titleCount = useMemo(() => { const m={}; Object.values(numeros).forEach(e=>{ const t=normTitle(e.title); if(t) m[t]=(m[t]||0)+1; }); return m; }, [numeros]);
   const titleAmbiguous = (title) => (titleCount[normTitle(title)]||0) > 1;
 
+  // Ancienneté d'une annonce (jours en ligne). On prend la date Vinted de mise en
+  // ligne si dispo (createdTs, en secondes ou ms), sinon la date de numérotation
+  // (quand on a commencé à la suivre). null si on ne sait pas.
+  const SLEEP_DAYS = 30; // seuil « paire qui dort »
+  const listedAgeDays = (it) => {
+    let ts = null;
+    if (it.createdTs!=null) ts = it.createdTs < 1e12 ? it.createdTs*1000 : it.createdTs;
+    else { const e = numeros[it.id]; if (e?.numberedAt) { const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } }
+    return ts!=null ? Math.floor((Date.now()-ts)/86400000) : null;
+  };
+
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
   const matchOrd = (o) => {
     const q = ordSearch.trim().toLowerCase(); if (!q) return true;
@@ -3954,20 +3965,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       arr = arr.filter(it=> it.views!=null && it.views>=20 && (it.favourites??0) <= 1);
       arr.sort((a,b)=>(b.views??0)-(a.views??0));
     }
+    else if (annSort==='sleeping') {
+      // « Qui dorment » : en ligne depuis longtemps -> baisser le prix / republier.
+      arr = arr.map(it=>({it,age:listedAgeDays(it)})).filter(x=>x.age!=null&&x.age>=SLEEP_DAYS)
+               .sort((a,b)=>b.age-a.age).map(x=>x.it);
+    }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, annSearch, annSort, numeros]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
   const annStats = useMemo(() => {
     const arr = listings.items || [];
-    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0;
+    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0;
     for (const it of arr) {
       if (it.price!=null) val += Number(it.price);
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
       if (it.views!=null) { views+=it.views; hasView=true; }
       if (!(numeros[it.id]?.numero)) sansNum++;
+      const age = listedAgeDays(it); if (age!=null && age>=SLEEP_DAYS) sleeping++;
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, numeros]);
 
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
@@ -4291,7 +4309,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             {annStats.hasFav && <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
             {annStats.hasView && <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>👁 {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:800,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
+            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:800,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:999,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment</button>}
           </div>
+          {annStats.sleeping>0 && annSort!=='sleeping' && (
+            <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
+              😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours — pense à <b>baisser le prix</b> ou <b>republier</b>. <button onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
+            </div>
+          )}
           {/* Recherche + tri */}
           <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="🔎 Rechercher (titre, marque, N°)…"
@@ -4304,6 +4328,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               {annStats.hasFav && <option value="favs">Plus aimées ❤️</option>}
               {annStats.hasView && <option value="views">Plus vues 👁</option>}
               {annStats.hasView && <option value="boost">À booster 💡</option>}
+              {annStats.sleeping>0 && <option value="sleeping">Qui dorment 😴</option>}
               <option value="nonum">Sans numéro</option>
             </select>
           </div>
@@ -4317,6 +4342,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };
             const e = numeros[it.id] || {}; const num = e.numero || ''; const buy = e.buyPrice ?? '';
             const atGarage = inGarage(num);
+            const age = listedAgeDays(it); const sleeps = age!=null && age>=SLEEP_DAYS;
             return (
               <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:14,overflow:'hidden',background:C.card,border:`1px solid ${num?C.accent:C.border}`,display:'flex',flexDirection:'column'}}>
                 <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
@@ -4324,6 +4350,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:34}}>👟</span>}
                   </div>
                   {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'3px 9px',borderRadius:999}}>N°{num}</div>}
+                  {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:900,padding:'3px 8px',borderRadius:999}}>😴 {age}j</div>}
                 </a>
                 <div style={{padding:'8px 10px 6px'}}>
                   <div style={{fontSize:16,fontWeight:900,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
