@@ -4294,8 +4294,16 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 function Comptabilite({ accounts }) {
   const [numeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [sub, setSub] = useState('ventes'); // ventes | achats
-  const [vFilter, setVFilter] = useState('encours'); // encours | finalisees | all
-  const [aFilter, setAFilter] = useState('attente'); // attente | recus | all
+  const [vFilter, setVFilter] = useState('all'); // encours | finalisees | annulees | all
+  const [aFilter, setAFilter] = useState('all'); // attente | recus | all
+  // Statut d'un ACHAT : un achat "reçu" n'a pas le mot "finalisé" (c'est
+  // spécifique aux ventes). On élargit donc la détection pour les achats.
+  const purchasePhase = (status) => {
+    const s = status || '';
+    if (/annul|rembours|refus/i.test(s)) return 'cancelled';
+    if (/finalis|livr|termin|re[çc]u|valid|complet|arriv/i.test(s)) return 'completed';
+    return 'pending';
+  };
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
   const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
@@ -4448,14 +4456,14 @@ function Comptabilite({ accounts }) {
         {buys.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des achats…</div>}
         {buys.items && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat.</div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(buys.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).map(o=>(
+          {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).map(o=>(
             <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:classifyOrderStatus(o.status)==='cancelled'?0.6:1}}>
               <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
-                <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)} · {(() => { const s=classifyOrderStatus(o.status); return <span style={{color:s==='completed'?INV_STATUS.online.color:s==='cancelled'?C.danger:C.warn}}>{s==='completed'?'reçu':s==='cancelled'?'annulé':'en attente'}</span>; })()}</div>
+                <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)} · {(() => { const s=purchasePhase(o.status); return <span style={{color:s==='completed'?INV_STATUS.online.color:s==='cancelled'?C.danger:C.warn}}>{s==='completed'?'reçu':s==='cancelled'?'annulé':'en attente'}</span>; })()}</div>
               </div>
               <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
             </div>
