@@ -670,6 +670,31 @@ const TABS=[
   {id:'garage',   icon:'🏠',label:'Garage'},
   {id:'vintedaccounts',icon:'🔗',label:'Comptes Vinted'},
 ];
+// Barre de navigation du bas (façon Vinted) : les 5 écrans principaux.
+const BOTTOM_TABS=[
+  {id:'dashboard',    icon:'📊',label:'Stats'},
+  {id:'comptabilite', icon:'💸',label:'Compta'},
+  {id:'invoices',     icon:'📄',label:'Factures'},
+  {id:'garage',       icon:'🏠',label:'Garage'},
+  {id:'vintedaccounts',icon:'🔗',label:'Comptes'},
+];
+function BottomBar({tab,setTab}) {
+  return (
+    <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',
+      background:C.surface,borderTop:`1px solid ${C.border}`,boxShadow:'0 -2px 10px rgba(0,0,0,0.08)',
+      paddingBottom:'env(safe-area-inset-bottom)'}}>
+      {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
+        <button key={t.id} type="button" onClick={()=>setTab(t.id)} style={{
+          flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 2px 7px',
+          background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
+          color:on?C.accent:C.muted}}>
+          <span style={{fontSize:21,lineHeight:1,opacity:on?1:0.65}}>{t.icon}</span>
+          <span style={{fontSize:10,fontWeight:on?800:600}}>{t.label}</span>
+        </button>
+      );})}
+    </nav>
+  );
+}
 // Ancienne application : le catalogue et les ventes historiques restent
 // accessibles (les stats du tableau de bord les lisent toujours) mais sont
 // ranges a part, hors du flux principal, comme demande.
@@ -4426,7 +4451,7 @@ function Comptabilite({ accounts }) {
       {accounts.length===0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
 
       <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-        {[['ventes','💸 Ventes'],['achats','🛍️ Achats'],['annonces','🟢 Annonces'],['messages','💬 Messages'],['bordereaux','📄 Bordereaux']].map(([id,label])=>(
+        {[['ventes','💸 Ventes'],['achats','🛍️ Achats'],['annonces','🟢 Annonces'],['bordereaux','📄 Bordereaux']].map(([id,label])=>(
           <button key={id} onClick={()=>setSub(id)} style={{padding:'6px 14px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:700,fontSize:13,cursor:'pointer'}}>{label}</button>
         ))}
       </div>
@@ -4625,6 +4650,37 @@ function Comptabilite({ accounts }) {
   );
 }
 
+/* ── Paramètres (accessible via le rouage en haut à droite) ──────────────── */
+function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
+  const Row = ({icon,title,desc,onClick,color}) => (
+    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'14px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10}}>
+      <span style={{fontSize:22,flexShrink:0}}>{icon}</span>
+      <span style={{flex:1,minWidth:0}}>
+        <span style={{display:'block',fontSize:14,fontWeight:800,color:color||C.text}}>{title}</span>
+        {desc && <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>{desc}</span>}
+      </span>
+      <span style={{color:C.muted,fontSize:18}}>›</span>
+    </button>
+  );
+  return (
+    <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
+      <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 16px'}}>⚙️ Paramètres</h2>
+
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'0 0 8px 2px'}}>Sauvegarde</div>
+      <Row icon="📤" title="Exporter mes données" desc="Télécharge une sauvegarde (catalogue, ventes, garage)." onClick={onExport}/>
+      <Row icon="📥" title="Importer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde." onClick={onImport} color={C.blue}/>
+
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Ancienne application</div>
+      <Row icon="📦" title="Ancien catalogue" desc="Les paires de l'ancienne appli (toujours comptées dans les stats)." onClick={()=>setTab('catalog')}/>
+      <Row icon="💸" title="Anciennes ventes" desc="Les ventes historiques de l'ancienne appli." onClick={()=>setTab('sales')}/>
+      <Row icon="🟢" title="Stock Vinted (ancien)" desc="L'ancienne liste de numéros en ligne." onClick={()=>setTab('stockvinted')}/>
+
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Affichage</div>
+      <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab,setTab]=useState('dashboard');
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
@@ -4655,6 +4711,7 @@ export default function App() {
   const [inventory,setInventory]=useState(()=>load('vinted_inventory',[]));
   const [garageLocate,setGarageLocate]=useState(null); // numéro à localiser dans le garage
   const [garagePlace,setGaragePlace]=useState(null); // numéro à ranger dans une case du garage
+  const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
@@ -4964,13 +5021,6 @@ export default function App() {
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'hidden',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          {/* Bouton menu hamburger */}
-          <button type="button" onClick={()=>setMenuOpen(true)} title="Menu" aria-label="Ouvrir le menu"
-            style={{display:'flex',flexDirection:'column',justifyContent:'center',gap:4,width:38,height:38,background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,cursor:'pointer',padding:'0 9px',flexShrink:0}}>
-            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
-            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
-            <span style={{display:'block',height:2,background:C.text,borderRadius:2}}/>
-          </button>
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div
@@ -5028,59 +5078,9 @@ export default function App() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>
-            <button type="button" onClick={()=>{
-              try {
-                const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()};
-                const json=JSON.stringify(data,null,2);
-                const blob=new Blob([json],{type:'application/json'});
-                const url=URL.createObjectURL(blob);
-                const a=document.createElement('a');
-                const date=new Date().toISOString().slice(0,10);
-                a.href=url;
-                a.download=`cancale-backup-${date}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-              } catch(err) {
-                alert('Erreur export : '+err.message);
-              }
-            }} title="Télécharger une sauvegarde"
-              style={{background:'transparent',border:`1px solid ${C.accent}66`,borderRadius:999,padding:'6px 12px',color:C.accent,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>
-              📤 Exporter
-            </button>
-            <button type="button" onClick={()=>{
-              const inp=document.createElement('input');
-              inp.type='file';
-              inp.accept='.json,application/json';
-              inp.onchange=async(e)=>{
-                const file=e.target.files[0];
-                if(!file) return;
-                try {
-                  const text=await file.text();
-                  const data=JSON.parse(text);
-                  if(!data.catalog&&!data.sales&&!data.garageGrid){
-                    alert('⚠ Fichier invalide : aucun catalogue/ventes/garage trouvé.');
-                    return;
-                  }
-                  let msg='Importer ce fichier ?\n\n';
-                  if(data.catalog) msg+=`📦 Catalogue : ${data.catalog.length} paires\n`;
-                  if(data.sales) msg+=`💸 Ventes : ${data.sales.length} ventes\n`;
-                  if(data.garageGrid) msg+=`🏠 Garage : ${Object.values(data.garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length} paires\n`;
-                  msg+='\n⚠ Tes données actuelles seront REMPLACÉES.';
-                  if(!window.confirm(msg)) return;
-                  if(data.catalog) {setCatalog(data.catalog); save('vinted_catalog',data.catalog);try{localStorage.setItem('vinted_sv_seen_catalog',JSON.stringify(data.catalog.map(p=>String(p.id||'').trim()).filter(Boolean)));}catch{}}
-                  if(data.sales) {setSales(data.sales); save('vinted_sales',data.sales);}
-                  if(data.garageGrid) {setGarageGrid(data.garageGrid); save('vinted_garage_grid',data.garageGrid);}
-                  alert('✓ Import réussi !');
-                } catch(err) {
-                  alert('Erreur lecture du fichier : '+err.message);
-                }
-              };
-              inp.click();
-            }} title="Importer une sauvegarde"
-              style={{background:'transparent',border:`1px solid ${C.blue}66`,borderRadius:999,padding:'6px 12px',color:C.blue,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'inherit'}}>
-              📥 Importer
+            <button type="button" onClick={()=>setTab('settings')} title="Paramètres"
+              style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
+              ⚙️
             </button>
           </div>
         </div>
@@ -5108,8 +5108,21 @@ export default function App() {
           <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:6,color:'#fff',cursor:'pointer',fontSize:16,fontWeight:900,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
-      <Nav tab={tab} setTab={setTab} open={menuOpen} setOpen={setMenuOpen}/>
-      <main style={{maxWidth:1200,margin:'0 auto'}}>
+      <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:80}}
+        onTouchStart={e=>{ const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY}; }}
+        onTouchEnd={e=>{
+          const s=swipeStart.current; if(!s) return; swipeStart.current=null;
+          const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
+          const dx=t.clientX-s.x, dy=t.clientY-s.y;
+          if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)*2){
+            const idx=BOTTOM_TABS.findIndex(x=>x.id===tab);
+            if(idx>=0){ const ni=dx<0?Math.min(BOTTOM_TABS.length-1,idx+1):Math.max(0,idx-1); if(ni!==idx) setTab(BOTTOM_TABS[ni].id); }
+          }
+        }}>
+        {tab==='settings'&&<SettingsScreen setTab={setTab}
+          onExport={()=>{ try{ const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()}; const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);}catch(err){alert('Erreur export : '+err.message);} }}
+          onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;} let msg='Importer ce fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES.'; if(!window.confirm(msg))return; if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);} if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);} if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);} alert('✓ Import réussi !'); }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
+          dark={dark} toggleDark={toggleDark}/>}
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
@@ -5126,6 +5139,7 @@ export default function App() {
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts}/>}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} garageGrid={garageGrid} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }} onStore={(numero)=>{ setGaragePlace(String(numero)); setTab('garage'); }}/>}
       </main>
+      <BottomBar tab={tab} setTab={setTab}/>
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
