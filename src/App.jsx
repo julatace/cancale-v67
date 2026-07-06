@@ -413,6 +413,16 @@ const mapWardrobeItem = (it) => ({
   brand: it.brand_title || it.brand?.title || null,
   size: it.size_title || it.size?.title || null,
   condition: it.status || null,
+  // Engagement (défensif : présent sur la plupart des articles wardrobe, mais on
+  // ne suppose rien — n'affiché que si c'est bien un nombre). Précieux pour un
+  // revendeur : beaucoup de vues sans vente = prix trop haut ; favoris = proche
+  // de vendre. Voir badges dans l'onglet Annonces.
+  views: Number.isFinite(it.view_count) ? it.view_count : null,
+  favourites: Number.isFinite(it.favourite_count) ? it.favourite_count
+            : (Number.isFinite(it.favourites_count) ? it.favourites_count : null),
+  // Timestamp de mise en ligne (secondes epoch) si Vinted le fournit -> "âge".
+  createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts
+           : (it.photo?.high_resolution?.timestamp && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null),
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
@@ -3854,6 +3864,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
   const [msgAcc, setMsgAcc] = useState('all'); // filtre compte pour les messages
+  const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
+  const [annSort, setAnnSort] = useState('recent'); // recent | price_desc | price_asc | favs | views | nonum
   const [pickerFor, setPickerFor] = useState(null);
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
 
@@ -3905,6 +3917,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // pour prévenir au lieu de risquer d'attribuer le mauvais numéro.
   const titleCount = useMemo(() => { const m={}; Object.values(numeros).forEach(e=>{ const t=normTitle(e.title); if(t) m[t]=(m[t]||0)+1; }); return m; }, [numeros]);
   const titleAmbiguous = (title) => (titleCount[normTitle(title)]||0) > 1;
+
+  // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
+  // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
+  const annShown = useMemo(() => {
+    let arr = [...(listings.items || [])];
+    const q = annSearch.trim().toLowerCase();
+    if (q) arr = arr.filter(it => {
+      const num = String(numeros[it.id]?.numero || '');
+      return (it.title||'').toLowerCase().includes(q)
+        || (it.brand||'').toLowerCase().includes(q)
+        || num.toLowerCase()===q || num.toLowerCase().includes(q);
+    });
+    const price = it => (it.price!=null ? Number(it.price) : 0);
+    if (annSort==='price_desc') arr.sort((a,b)=>price(b)-price(a));
+    else if (annSort==='price_asc') arr.sort((a,b)=>price(a)-price(b));
+    else if (annSort==='favs') arr.sort((a,b)=>(b.favourites??-1)-(a.favourites??-1));
+    else if (annSort==='views') arr.sort((a,b)=>(b.views??-1)-(a.views??-1));
+    else if (annSort==='nonum') arr = arr.filter(it=>!(numeros[it.id]?.numero));
+    return arr;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, annSearch, annSort, numeros]);
+  // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
+  const annStats = useMemo(() => {
+    const arr = listings.items || [];
+    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0;
+    for (const it of arr) {
+      if (it.price!=null) val += Number(it.price);
+      if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
+      if (it.views!=null) { views+=it.views; hasView=true; }
+      if (!(numeros[it.id]?.numero)) sansNum++;
+    }
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum };
+  }, [listings.items, numeros]);
 
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
   const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; };
@@ -4126,11 +4171,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {listings.loading && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
         {listings.items && !listings.error && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune annonce en ligne.<br/><span style={{fontSize:11.5}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici.</span></div>}
-        {listings.items && listings.items.length>0 && (
+        {listings.items && listings.items.length>0 && (<>
+          {/* Bandeau de stats façon outil pro */}
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+            <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>{annStats.n} en ligne</span>
+            <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
+            {annStats.hasFav && <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
+            {annStats.hasView && <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>👁 {annStats.views}</span>}
+            {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:800,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
+          </div>
+          {/* Recherche + tri */}
+          <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+            <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="🔎 Rechercher (titre, marque, N°)…"
+              style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
+            <select value={annSort} onChange={e=>setAnnSort(e.target.value)}
+              style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:700}}>
+              <option value="recent">Ordre Vinted</option>
+              <option value="price_desc">Prix ↓</option>
+              <option value="price_asc">Prix ↑</option>
+              {annStats.hasFav && <option value="favs">Plus aimées ❤️</option>}
+              {annStats.hasView && <option value="views">Plus vues 👁</option>}
+              <option value="nonum">Sans numéro</option>
+            </select>
+          </div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</div>
+        </>)}
+        {listings.items && listings.items.length>0 && annShown.length===0 && (
+          <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px'}}>Aucune annonce ne correspond.</div>
         )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
-          {(listings.items||[]).map(it=>{
+          {annShown.map(it=>{
             const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };
             const e = numeros[it.id] || {}; const num = e.numero || ''; const buy = e.buyPrice ?? '';
             const atGarage = inGarage(num);
@@ -4146,6 +4216,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <div style={{fontSize:16,fontWeight:900,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
                   <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.brand||it.title}</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
+                  {(it.views!=null||it.favourites!=null) && (
+                    <div style={{marginTop:4,display:'flex',alignItems:'center',gap:8,fontSize:11,color:C.muted,fontWeight:700}}>
+                      {it.views!=null && <span>👁 {it.views}</span>}
+                      {it.favourites!=null && <span>❤️ {it.favourites}</span>}
+                      {it.views>=30 && it.favourites===0 && <span title="Beaucoup de vues mais aucun favori : le prix est peut-être trop haut." style={{color:C.warn}}>💡 prix ?</span>}
+                    </div>
+                  )}
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
                     {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
