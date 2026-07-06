@@ -4330,6 +4330,10 @@ function AcctTag({ acc, name }) {
   </span>;
 }
 
+// Cache partagé entre les onglets (évite de recharger à chaque changement
+// d'onglet) : moins de requêtes, navigation instantanée. TTL court.
+const _acctCache = {};
+const _CACHE_TTL = 180000; // 3 min
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
@@ -4383,32 +4387,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
   const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
+  // Fiabilité : deux annonces avec le MÊME titre rendent l'attribution d'une
+  // vente ambiguë (le lien vente↔paire se fait par le titre). On les détecte
+  // pour prévenir au lieu de risquer d'attribuer le mauvais numéro.
+  const titleCount = useMemo(() => { const m={}; Object.values(numeros).forEach(e=>{ const t=normTitle(e.title); if(t) m[t]=(m[t]||0)+1; }); return m; }, [numeros]);
+  const titleAmbiguous = (title) => (titleCount[normTitle(title)]||0) > 1;
 
-  const loadOrders = async (type, setter) => {
+  const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
+  const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; };
+
+  const loadOrders = async (type, setter, force) => {
+    const cached = !force && fromCache(type);
+    if (cached) { setter({ loading:false, items:cached }); return; }
     setter({ loading:true, items:null });
     const seen = new Set(); const out = [];
     for (const acc of accounts) {
-      const res = await fetchVintedOrders(acc, type, 1, 'all');
+      const res = await fetchVintedOrders(acc, type, 1, 'all', { force });
       if (res.ok) for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } }
     }
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
-    setter({ loading:false, items: out });
+    putCache(type, out); setter({ loading:false, items: out });
   };
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
   useEffect(() => { if (curSub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
-  const loadListings = async () => {
+  const loadListings = async (force) => {
+    const cached = !force && fromCache('listings');
+    if (cached) { setListings({ loading:false, items:cached }); return; }
     setListings({ loading:true, items:null });
     const out = [];
-    for (const acc of accounts) { const r = await fetchVintedListings(acc); if (r.ok) r.items.forEach(it => out.push({ ...it, _acc:acc })); }
-    setListings({ loading:false, items: out });
+    for (const acc of accounts) { const r = await fetchVintedListings(acc, 1, { force }); if (r.ok) r.items.forEach(it => out.push({ ...it, _acc:acc })); }
+    putCache('listings', out); setListings({ loading:false, items: out });
   };
-  const loadConvs = async () => {
+  const loadConvs = async (force) => {
+    const cached = !force && fromCache('convs');
+    if (cached) { setConvs({ loading:false, items:cached }); return; }
     setConvs({ loading:true, items:null });
     const out = [];
-    for (const acc of accounts) { const r = await fetchVintedConversations(acc); if (r.ok) r.items.forEach(c => out.push({ ...c, _acc:acc })); }
+    for (const acc of accounts) { const r = await fetchVintedConversations(acc, 1, { force }); if (r.ok) r.items.forEach(c => out.push({ ...c, _acc:acc })); }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
-    setConvs({ loading:false, items: out });
+    putCache('convs', out); setConvs({ loading:false, items: out });
   };
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -4503,7 +4521,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         )}
         {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
           <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
-            ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Comptes Vinted → Annonces » (bouton 🔗).
+            ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Annonces » (bouton 🔗).
           </div>
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
@@ -4519,7 +4537,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {(sales.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).map(o=>{
             const st = classifyOrderStatus(o.status);
-            const e = entryByTitle(o.title); const num = e?.numero;
+            const amb = titleAmbiguous(o.title);
+            const e = amb ? null : entryByTitle(o.title); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
             const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy : null;
@@ -4534,12 +4553,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span>
+                    {amb && <span style={{color:C.danger,fontWeight:800}} title="Plusieurs annonces ont ce même titre : impossible d'attribuer le numéro de façon sûre. Rends les titres uniques.">⚠️ titre en double</span>}
                   </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
                   <div style={{fontSize:14,fontWeight:900,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:11,fontWeight:800,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
-                  {benef==null && buy==null && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
+                  {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
                 {num && st!=='cancelled' && (
                   <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} title="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
@@ -4605,6 +4625,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
                     {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
+                    {titleAmbiguous(it.title) && <span style={{fontSize:10,color:C.danger,fontWeight:800}} title="Une autre annonce a le même titre : la vente ne pourra pas être attribuée sûrement. Rends le titre unique.">⚠️ titre en double</span>}
                   </div>
                 </div>
                 <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
@@ -4660,7 +4681,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes ventes numérotées : clique 📄 pour sortir le bordereau annoté (numéro + titre).</div>
         {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
         {(() => {
-          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled' && entryByTitle(o.title)?.numero);
+          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled' && !titleAmbiguous(o.title) && entryByTitle(o.title)?.numero);
           if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune vente numérotée.</div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
