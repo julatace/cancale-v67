@@ -670,26 +670,30 @@ const TABS=[
   {id:'garage',   icon:'🏠',label:'Garage'},
   {id:'vintedaccounts',icon:'🔗',label:'Comptes Vinted'},
 ];
-// Barre de navigation du bas (façon Vinted) : les 5 écrans principaux.
+// Barre de navigation du bas (façon Vinted) : un onglet dédié par catégorie.
+// Défilable horizontalement (plus de 5 entrées).
 const BOTTOM_TABS=[
   {id:'dashboard',    icon:'📊',label:'Stats'},
-  {id:'comptabilite', icon:'💸',label:'Compta'},
-  {id:'invoices',     icon:'📄',label:'Factures'},
+  {id:'cat_annonces', icon:'🟢',label:'Annonces'},
+  {id:'cat_ventes',   icon:'💸',label:'Ventes'},
+  {id:'cat_achats',   icon:'🛍️',label:'Achats'},
+  {id:'cat_bord',     icon:'📄',label:'Bordereaux'},
+  {id:'cat_msg',      icon:'💬',label:'Messages'},
   {id:'garage',       icon:'🏠',label:'Garage'},
-  {id:'vintedaccounts',icon:'🔗',label:'Comptes'},
+  {id:'invoices',     icon:'🧾',label:'Factures'},
 ];
 function BottomBar({tab,setTab}) {
   return (
-    <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',
+    <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'auto',
       background:C.surface,borderTop:`1px solid ${C.border}`,boxShadow:'0 -2px 10px rgba(0,0,0,0.08)',
-      paddingBottom:'env(safe-area-inset-bottom)'}}>
+      paddingBottom:'env(safe-area-inset-bottom)',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
       {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} style={{
-          flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 2px 7px',
+          flex:'1 0 auto',minWidth:64,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 6px 7px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
           color:on?C.accent:C.muted}}>
-          <span style={{fontSize:21,lineHeight:1,opacity:on?1:0.65}}>{t.icon}</span>
-          <span style={{fontSize:10,fontWeight:on?800:600}}>{t.label}</span>
+          <span style={{fontSize:20,lineHeight:1,opacity:on?1:0.65}}>{t.icon}</span>
+          <span style={{fontSize:10,fontWeight:on?800:600,whiteSpace:'nowrap'}}>{t.label}</span>
         </button>
       );})}
     </nav>
@@ -4326,9 +4330,40 @@ function AcctTag({ acc, name }) {
   </span>;
 }
 
-function Comptabilite({ accounts }) {
-  const [numeros] = useState(() => load('vinted_annonce_numeros', {}));
-  const [sub, setSub] = useState('ventes'); // ventes | achats | annonces | messages | bordereaux
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
+  const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
+  const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
+  const [sub, setSubRaw] = useState(only || 'ventes'); // ventes | achats | annonces | messages | bordereaux
+  const setSub = only ? (()=>{}) : setSubRaw;
+  const curSub = only || sub;
+  const [msgAcc, setMsgAcc] = useState('all'); // filtre compte pour les messages
+  const [pickerFor, setPickerFor] = useState(null);
+  const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
+
+  // Numéros : édition depuis l'onglet Annonces.
+  const updatePair = (item, patch) => {
+    setNumeros(prev => {
+      const u = { ...prev }; const c = u[item.id] || {};
+      const next = { ...c, ...patch, title:item.title, photo:item.photo||null, price:item.price??null, accountId:item._acc?.vinted_user_id };
+      const emptyNum = !String(next.numero||'').trim();
+      const emptyBuy = next.buyPrice==null || String(next.buyPrice).trim()==='';
+      if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
+      save('vinted_annonce_numeros', u); return u;
+    });
+  };
+  const recordUsed = (num) => { const n=parseInt(String(num),10); if(isNaN(n)||n<=0) return; setUsedNumeros(prev=>{ if(prev.includes(n))return prev; const u=[...prev,n]; save('vinted_used_numeros',u); return u; }); };
+  const nextNumero = useMemo(() => { let m=0; usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>m)m=n;}); Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>m)m=n;}); return m+1; }, [usedNumeros, numeros]);
+  const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
+  const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
+  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros]);
+  const openPicker = async (item) => {
+    setPickerFor(item); setPurchasesPick({loading:true,items:[]});
+    const seen=new Set(); const out=[];
+    for(const acc of accounts){ const r=await fetchVintedOrders(acc,'purchased',1,'all'); if(r.ok) for(const o of r.items){ const id=String(o.transaction_id); if(!seen.has(id)){seen.add(id); out.push({...o,_acc:acc});} } }
+    out.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+    setPurchasesPick({loading:false,items:out});
+  };
+  const choosePick = (p) => { const price=p.price?.amount!=null?Number(p.price.amount):null; updatePair(pickerFor,{buyPrice:price!=null?String(price):'',buyFromId:p.transaction_id?String(p.transaction_id):null}); setPickerFor(null); };
   const [vFilter, setVFilter] = useState('all'); // encours | finalisees | annulees | all
   const [aFilter, setAFilter] = useState('all'); // attente | recus | all
   // Statut d'un ACHAT : un achat "reçu" n'a pas le mot "finalisé" (c'est
@@ -4360,7 +4395,7 @@ function Comptabilite({ accounts }) {
     setter({ loading:false, items: out });
   };
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
-  useEffect(() => { if (sub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (curSub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
   const loadListings = async () => {
     setListings({ loading:true, items:null });
@@ -4375,8 +4410,8 @@ function Comptabilite({ accounts }) {
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
     setConvs({ loading:false, items: out });
   };
-  useEffect(() => { if (sub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if (sub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
   const openConversation = async (conv) => {
     setOpenConv({ loading:true, error:null, conversation:null, messages:[], header:{ login:conv.opposite_user?.login, title:conv.description, photo:conv.opposite_user?.photo?.url||conv.item_photos?.[0]?.url||null } });
@@ -4447,16 +4482,18 @@ function Comptabilite({ accounts }) {
   return (
     <div style={{padding:'16px 14px 40px'}}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
-      <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 14px'}}>💸 Comptabilité</h2>
+      <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 14px'}}>{only?({ventes:'💸 Ventes',achats:'🛍️ Achats',annonces:'🟢 Annonces',bordereaux:'📄 Bordereaux',messages:'💬 Messages'}[only]||'Comptabilité'):'💸 Comptabilité'}</h2>
       {accounts.length===0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
 
-      <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-        {[['ventes','💸 Ventes'],['achats','🛍️ Achats'],['annonces','🟢 Annonces'],['bordereaux','📄 Bordereaux']].map(([id,label])=>(
-          <button key={id} onClick={()=>setSub(id)} style={{padding:'6px 14px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:700,fontSize:13,cursor:'pointer'}}>{label}</button>
-        ))}
-      </div>
+      {!only && (
+        <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+          {[['ventes','💸 Ventes'],['achats','🛍️ Achats'],['annonces','🟢 Annonces'],['bordereaux','📄 Bordereaux']].map(([id,label])=>(
+            <button key={id} onClick={()=>setSub(id)} style={{padding:'6px 14px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:700,fontSize:13,cursor:'pointer'}}>{label}</button>
+          ))}
+        </div>
+      )}
 
-      {sub==='ventes' && (<>
+      {curSub==='ventes' && (<>
         {totals.nb>0 && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
@@ -4513,7 +4550,7 @@ function Comptabilite({ accounts }) {
         </div>
       </>)}
 
-      {sub==='achats' && (<>
+      {curSub==='achats' && (<>
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
@@ -4542,35 +4579,63 @@ function Comptabilite({ accounts }) {
       </>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
-      {sub==='annonces' && (<>
+      {curSub==='annonces' && (<>
         {listings.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des annonces…</div>}
         {listings.items && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune annonce en ligne.</div>}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:14}}>
+        {listings.items && listings.items.length>0 && (
+          <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</div>
+        )}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
           {(listings.items||[]).map(it=>{
-            const e = entryByTitle(it.title); const num = e?.numero;
+            const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };
+            const e = numeros[it.id] || {}; const num = e.numero || ''; const buy = e.buyPrice ?? '';
+            const atGarage = inGarage(num);
             return (
-              <a key={it._acc.vinted_user_id+'_'+it.id} href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',borderRadius:12,overflow:'hidden',background:C.card,border:`1px solid ${num?C.accent:C.border}`,display:'block',position:'relative'}}>
-                <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:30}}>👟</span>}
-                </div>
-                {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:12,fontWeight:900,padding:'3px 8px',borderRadius:999}}>N°{num}</div>}
-                <div style={{padding:'8px 10px'}}>
-                  <div style={{fontSize:15,fontWeight:900,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
+              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:14,overflow:'hidden',background:C.card,border:`1px solid ${num?C.accent:C.border}`,display:'flex',flexDirection:'column'}}>
+                <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
+                  <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:34}}>👟</span>}
+                  </div>
+                  {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'3px 9px',borderRadius:999}}>N°{num}</div>}
+                </a>
+                <div style={{padding:'8px 10px 6px'}}>
+                  <div style={{fontSize:16,fontWeight:900,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
                   <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.brand||it.title}</div>
-                  <div style={{marginTop:5}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/></div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
+                  <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
+                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
+                  </div>
                 </div>
-              </a>
+                <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
+                  <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                    <span style={{fontSize:10,color:C.muted,fontWeight:700}}>N°</span>
+                    <input value={num} onChange={ev=>updatePair(item,{numero:ev.target.value})} onBlur={ev=>recordUsed(ev.target.value)} placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                  </div>
+                  <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                    <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                    <span style={{fontSize:10,color:C.muted}}>€</span>
+                  </div>
+                  <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
+                </div>
+              </div>
             );
           })}
         </div>
       </>)}
 
-      {/* ── Messages (toutes conversations, tous comptes) ── */}
-      {sub==='messages' && (<>
+      {/* ── Messages (séparés par compte via le sélecteur) ── */}
+      {curSub==='messages' && (<>
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+          <button onClick={()=>setMsgAcc('all')} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc==='all'?C.accent:C.border}`,background:msgAcc==='all'?C.accent:'transparent',color:msgAcc==='all'?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>Tous</button>
+          {accounts.map(acc=>(
+            <button key={acc.vinted_user_id} onClick={()=>setMsgAcc(acc.vinted_user_id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc===acc.vinted_user_id?acctColor(acc.vinted_user_id):C.border}`,background:msgAcc===acc.vinted_user_id?acctColor(acc.vinted_user_id):'transparent',color:msgAcc===acc.vinted_user_id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{accNameOf(acc)}</button>
+          ))}
+        </div>
         {convs.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des messages…</div>}
-        {convs.items && convs.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune conversation.</div>}
+        {convs.items && convs.items.filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc).length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune conversation.</div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(convs.items||[]).map((conv,i)=>{
+          {(convs.items||[]).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc).map((conv,i)=>{
             const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
             return (
               <button key={(conv.id||i)+'_'+conv._acc.vinted_user_id} type="button" onClick={()=>openConversation(conv)} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',textAlign:'left',width:'100%'}}>
@@ -4591,7 +4656,7 @@ function Comptabilite({ accounts }) {
       </>)}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
-      {sub==='bordereaux' && (<>
+      {curSub==='bordereaux' && (<>
         <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes ventes numérotées : clique 📄 pour sortir le bordereau annoté (numéro + titre).</div>
         {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
         {(() => {
@@ -4618,6 +4683,36 @@ function Comptabilite({ accounts }) {
           );
         })()}
       </>)}
+
+      {/* Modale : relier un achat (depuis Annonces) */}
+      {pickerFor && (
+        <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{fontSize:14,fontWeight:800,color:C.text}}>Quel achat correspond à cette paire ?</div>
+              <button type="button" onClick={()=>setPickerFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'8px 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
+              {purchasesPick.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement de tes achats…</div>}
+              {!purchasesPick.loading && (() => {
+                const curId = numeros[pickerFor.id]?.buyFromId;
+                const avail = purchasesPick.items.filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId));
+                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat disponible.</div>;
+                return avail.map(p => (
+                  <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
+                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title}</div>
+                      <div style={{fontSize:10,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
+                    </div>
+                    <div style={{fontSize:15,fontWeight:900,color:C.text,flexShrink:0}}>{p.price?.amount} {cur(p.price?.currency_code)}</div>
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modale conversation */}
       {openConv && (
@@ -4666,7 +4761,10 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
     <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
       <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 16px'}}>⚙️ Paramètres</h2>
 
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'0 0 8px 2px'}}>Sauvegarde</div>
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'0 0 8px 2px'}}>Comptes Vinted</div>
+      <Row icon="🔗" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
+
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
       <Row icon="📤" title="Exporter mes données" desc="Télécharge une sauvegarde (catalogue, ventes, garage)." onClick={onExport}/>
       <Row icon="📥" title="Importer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde." onClick={onImport} color={C.blue}/>
 
@@ -5098,7 +5196,7 @@ export default function App() {
       )}
       {/* Bandeau nouveautés Vinted (à l'ouverture) — clic = va aux comptes */}
       {vintedNotif&&(vintedNotif.messages>0||vintedNotif.ventes>0)&&(
-        <div onClick={()=>{setTab('vintedaccounts');setVintedNotif(null);}} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.blue||C.accent,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+        <div onClick={()=>{setTab('cat_msg');setVintedNotif(null);}} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.blue||C.accent,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
           <span>
             🔔 {vintedNotif.ventes>0&&`${vintedNotif.ventes} nouvelle${vintedNotif.ventes>1?'s':''} vente${vintedNotif.ventes>1?'s':''}`}
             {vintedNotif.ventes>0&&vintedNotif.messages>0&&' · '}
@@ -5136,7 +5234,8 @@ export default function App() {
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
-        {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts}/>}
+        {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} garageGrid={garageGrid} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }} onStore={(numero)=>{ setGaragePlace(String(numero)); setTab('garage'); }}/>}
       </main>
       <BottomBar tab={tab} setTab={setTab}/>
