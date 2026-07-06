@@ -889,6 +889,45 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
   );
 }
 
+// Carte d'accueil affichée tant qu'aucun compte Vinted n'est connecté : guide
+// le nouvel utilisateur en 3 étapes (installer l'extension, se connecter sur
+// Vinted, revenir). Disparaît d'elle-même dès qu'un compte est capté.
+function Onboarding({ setTab }) {
+  const steps = [
+    { n:1, t:'Installe l\'extension Chrome', d:'« Shop Cancale35 – Vinted Sync » (mode développeur). Elle synchronise tes données Vinted en toute discrétion, sans jamais toucher à ton mot de passe.' },
+    { n:2, t:'Connecte-toi sur vinted.fr', d:'Ouvre ta boutique une fois, connecté. L\'extension capte automatiquement ton compte et tes annonces — aucune manip supplémentaire.' },
+    { n:3, t:'Reviens ici', d:'Tes annonces, ventes, achats et messages apparaissent tout seuls. Mets un numéro sur chaque paire pour la retrouver au garage et sur le bordereau.' },
+  ];
+  return (
+    <div style={{padding:'20px 16px 8px'}}>
+      <div style={{borderRadius:18,border:`1px solid ${C.border}`,background:C.card,padding:'22px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.04)'}}>
+        <div style={{fontSize:22,fontWeight:900,color:C.text,marginBottom:6}}>Bienvenue 👋</div>
+        <div style={{fontSize:14,color:C.muted,lineHeight:1.5,marginBottom:20}}>
+          Ton outil de gestion pour la revente de sneakers. Connecte ton compte Vinted pour commencer — c'est parti en 3 étapes :
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          {steps.map(s=>(
+            <div key={s.n} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
+              <div style={{flexShrink:0,width:32,height:32,borderRadius:999,background:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900}}>{s.n}</div>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:800,color:C.text}}>{s.t}</div>
+                <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>{s.d}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={()=>setTab('vintedaccounts')}
+          style={{marginTop:22,width:'100%',background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'13px 16px',cursor:'pointer',fontSize:15,fontWeight:800}}>
+          Voir mes comptes connectés
+        </button>
+        <div style={{fontSize:11.5,color:C.muted,textAlign:'center',marginTop:12,lineHeight:1.4}}>
+          Déjà des données ailleurs ? Va dans ⚙️ Paramètres → Importer pour les récupérer.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({catalog,sales,garageGrid,invoices}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
@@ -3763,6 +3802,47 @@ function AcctTag({ acc, name }) {
   </span>;
 }
 
+// Squelettes de chargement : un rectangle gris animé, plus agréable qu'un texte
+// « Chargement… » figé. `variant` = 'card' (grille d'annonces) ou 'row' (listes).
+function Skeleton({ variant='row', count=6 }) {
+  const bg = C.border;
+  const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:8 };
+  if (variant==='card') {
+    return <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
+      {Array.from({length:count}).map((_,i)=>(
+        <div key={i} style={{borderRadius:14,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`}}>
+          <div style={{...shimmer,width:'100%',aspectRatio:'3/4',borderRadius:0}}/>
+          <div style={{padding:'8px 10px 10px',display:'flex',flexDirection:'column',gap:6}}>
+            <div style={{...shimmer,height:14,width:'55%'}}/>
+            <div style={{...shimmer,height:11,width:'80%'}}/>
+          </div>
+        </div>
+      ))}
+    </div>;
+  }
+  return <div style={{display:'flex',flexDirection:'column',gap:10}}>
+    {Array.from({length:count}).map((_,i)=>(
+      <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12,background:C.surface}}>
+        <div style={{...shimmer,width:48,height:48,borderRadius:10,flexShrink:0}}/>
+        <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{...shimmer,height:13,width:'45%'}}/>
+          <div style={{...shimmer,height:11,width:'70%'}}/>
+        </div>
+      </div>
+    ))}
+  </div>;
+}
+
+// État d'erreur de chargement, avec un bouton « Réessayer ».
+function LoadError({ onRetry }) {
+  return <div style={{textAlign:'center',padding:'28px 16px'}}>
+    <div style={{fontSize:32,marginBottom:8}}>😕</div>
+    <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>Impossible de charger ces données</div>
+    <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.4}}>Vérifie ta connexion, ou que ton compte Vinted est toujours actif.</div>
+    <button onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:999,padding:'8px 20px',cursor:'pointer',fontSize:13,fontWeight:700}}>Réessayer</button>
+  </div>;
+}
+
 // Cache partagé entre les onglets (évite de recharger à chaque changement
 // d'onglet) : moins de requêtes, navigation instantanée. TTL court.
 const _acctCache = {};
@@ -3832,14 +3912,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const loadOrders = async (type, setter, force) => {
     const cached = !force && fromCache(type);
     if (cached) { setter({ loading:false, items:cached }); return; }
-    setter({ loading:true, items:null });
-    const seen = new Set(); const out = [];
+    setter({ loading:true, items:null, error:false });
+    const seen = new Set(); const out = []; let anyOk=false, anyErr=false;
     for (const acc of accounts) {
       const res = await fetchVintedOrders(acc, type, 1, 'all', { force });
-      if (res.ok) for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } }
+      if (res.ok) { anyOk=true; for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } } }
+      else anyErr=true;
     }
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
-    putCache(type, out); setter({ loading:false, items: out });
+    // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
+    const error = out.length===0 && anyErr && !anyOk;
+    if (!error) putCache(type, out);
+    setter({ loading:false, items: out, error });
   };
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
   useEffect(() => { if (curSub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -3847,19 +3931,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const loadListings = async (force) => {
     const cached = !force && fromCache('listings');
     if (cached) { setListings({ loading:false, items:cached }); return; }
-    setListings({ loading:true, items:null });
-    const out = [];
-    for (const acc of accounts) { const r = await fetchVintedListings(acc, 1, { force }); if (r.ok) r.items.forEach(it => out.push({ ...it, _acc:acc })); }
-    putCache('listings', out); setListings({ loading:false, items: out });
+    setListings({ loading:true, items:null, error:false });
+    const out = []; let anyOk=false, anyErr=false;
+    for (const acc of accounts) { const r = await fetchVintedListings(acc, 1, { force }); if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); } else anyErr=true; }
+    const error = out.length===0 && anyErr && !anyOk;
+    if (!error) putCache('listings', out);
+    setListings({ loading:false, items: out, error });
   };
   const loadConvs = async (force) => {
     const cached = !force && fromCache('convs');
     if (cached) { setConvs({ loading:false, items:cached }); return; }
-    setConvs({ loading:true, items:null });
-    const out = [];
-    for (const acc of accounts) { const r = await fetchVintedConversations(acc, 1, { force }); if (r.ok) r.items.forEach(c => out.push({ ...c, _acc:acc })); }
+    setConvs({ loading:true, items:null, error:false });
+    const out = []; let anyOk=false, anyErr=false;
+    for (const acc of accounts) { const r = await fetchVintedConversations(acc, 1, { force }); if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else anyErr=true; }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
-    putCache('convs', out); setConvs({ loading:false, items: out });
+    const error = out.length===0 && anyErr && !anyOk;
+    if (!error) putCache('convs', out);
+    setConvs({ loading:false, items: out, error });
   };
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -3965,8 +4053,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
           )}
         </div>
-        {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des ventes…</div>}
-        {sales.items && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune vente.</div>}
+        {sales.loading && <Skeleton variant="row" count={5}/>}
+        {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
+        {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:11.5}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {(sales.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).map(o=>{
             const st = classifyOrderStatus(o.status);
@@ -4009,8 +4098,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
           ))}
         </div>
-        {buys.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des achats…</div>}
-        {buys.items && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat.</div>}
+        {buys.loading && <Skeleton variant="row" count={5}/>}
+        {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
+        {buys.items && !buys.error && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucun achat pour l'instant.<br/><span style={{fontSize:11.5}}>Tes achats Vinted apparaîtront ici automatiquement.</span></div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).map(o=>(
             <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:classifyOrderStatus(o.status)==='cancelled'?0.6:1}}>
@@ -4033,8 +4123,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
       {curSub==='annonces' && (<>
-        {listings.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des annonces…</div>}
-        {listings.items && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune annonce en ligne.</div>}
+        {listings.loading && <Skeleton variant="card" count={6}/>}
+        {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
+        {listings.items && !listings.error && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune annonce en ligne.<br/><span style={{fontSize:11.5}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici.</span></div>}
         {listings.items && listings.items.length>0 && (
           <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</div>
         )}
@@ -4086,8 +4177,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <button key={acc.vinted_user_id} onClick={()=>setMsgAcc(acc.vinted_user_id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc===acc.vinted_user_id?acctColor(acc.vinted_user_id):C.border}`,background:msgAcc===acc.vinted_user_id?acctColor(acc.vinted_user_id):'transparent',color:msgAcc===acc.vinted_user_id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{accNameOf(acc)}</button>
           ))}
         </div>
-        {convs.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des messages…</div>}
-        {convs.items && convs.items.filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc).length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune conversation.</div>}
+        {convs.loading && <Skeleton variant="row" count={5}/>}
+        {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
+        {convs.items && !convs.error && convs.items.filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc).length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune conversation.<br/><span style={{fontSize:11.5}}>Tes échanges Vinted s'afficheront ici.</span></div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {(convs.items||[]).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc).map((conv,i)=>{
             const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
@@ -4112,10 +4204,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
         <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes ventes numérotées : clique 📄 pour sortir le bordereau annoté (numéro + titre).</div>
-        {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
+        {sales.loading && <Skeleton variant="row" count={4}/>}
+        {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {(() => {
+          if (sales.loading || sales.error) return null;
           const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled' && !titleAmbiguous(o.title) && entryByTitle(o.title)?.numero);
-          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune vente numérotée.</div>;
+          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente numérotée.<br/><span style={{fontSize:11.5}}>Numérote tes annonces pour générer leurs bordereaux ici.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {list.map(o=>{ const num=entryByTitle(o.title).numero; const st=classifyOrderStatus(o.status);
@@ -4343,6 +4437,23 @@ export default function App() {
   // un robot, ce que Vinted surveille. Desormais le token n'est rafraichi que
   // pour le compte reellement consulté, et seulement s'il a expiré (via le
   // proxy, sur 401). C'est le comportement le plus proche d'un vrai utilisateur.
+
+  // Au démarrage : charger la liste des comptes Vinted depuis Supabase, pour que
+  // TOUTE l'app (onglets Ventes/Achats/Annonces/Messages, notif, accueil) en
+  // dispose immédiatement — avant, ils n'étaient chargés qu'en visitant l'écran
+  // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
+  // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
+  const [accountsLoaded,setAccountsLoaded]=useState(false);
+  useEffect(()=>{
+    let stop=false;
+    (async()=>{
+      const list=await fetchVintedAccounts();
+      if(stop) return;
+      if(list && list.length){ setVintedAccounts(list); try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){} }
+      setAccountsLoaded(true);
+    })();
+    return ()=>{ stop=true; };
+  },[]);
 
   // Au démarrage : charger depuis le cloud Supabase (synchro Mac <-> iPhone)
   // Si le cloud a des données, elles remplacent les données locales.
@@ -4679,7 +4790,7 @@ export default function App() {
           <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:6,color:'#fff',cursor:'pointer',fontSize:16,fontWeight:900,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
-      <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:80}}
+      <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:'calc(84px + env(safe-area-inset-bottom))'}}
         onTouchStart={e=>{ const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY}; }}
         onTouchEnd={e=>{
           const s=swipeStart.current; if(!s) return; swipeStart.current=null;
@@ -4694,6 +4805,7 @@ export default function App() {
           onExport={()=>{ try{ const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()}; const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);}catch(err){alert('Erreur export : '+err.message);} }}
           onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;} let msg='Importer ce fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES.'; if(!window.confirm(msg))return; if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);} if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);} if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);} alert('✓ Import réussi !'); }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
           dark={dark} toggleDark={toggleDark}/>}
+        {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&<Onboarding setTab={setTab}/>}
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
