@@ -1,10 +1,16 @@
-// Service worker : sert les PDFs bordereaux via une vraie URL HTTPS
-// → AirPrint peut fetcher /print-pdf/{id} et imprimer le vrai contenu PDF
+// Service worker : (1) rend l'app installable + consultable hors-ligne (PWA) ;
+// (2) sert les PDFs bordereaux via une vraie URL HTTPS pour AirPrint.
 
+const CACHE = 'cancale-shell-v1';
 const pdfStore = {};
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', event => event.waitUntil(clients.claim()));
+self.addEventListener('activate', event => event.waitUntil((async () => {
+  // Purge les anciens caches de coquille lors d'une mise à jour.
+  const keys = await caches.keys();
+  await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+  await clients.claim();
+})()));
 
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'STORE_PDF') {
@@ -13,8 +19,19 @@ self.addEventListener('message', event => {
   }
 });
 
+// Stratégie réseau :
+//  - /print-pdf/{id} : servi depuis la mémoire (bordereaux AirPrint).
+//  - navigation (chargement de la page) : réseau d'abord, cache en secours
+//    (permet d'ouvrir l'app hors-ligne avec le dernier écran connu).
+//  - assets même origine (JS/CSS/images du build) : cache d'abord, réseau sinon,
+//    et on met en cache au passage. On ne touche JAMAIS aux appels Supabase /
+//    Vinted / proxy (cross-origin) : ils passent directement au réseau, pour ne
+//    pas servir de données périmées.
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // 1) Bordereaux PDF en mémoire.
   if (url.pathname.startsWith('/print-pdf/')) {
     const id = url.pathname.slice('/print-pdf/'.length);
     const base64 = pdfStore[id];
@@ -33,5 +50,39 @@ self.addEventListener('fetch', event => {
         });
       })());
     }
+    return;
   }
+
+  // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  // 2) Navigation : réseau d'abord, secours cache.
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        const cache = await caches.open(CACHE);
+        cache.put('/', fresh.clone()).catch(() => {});
+        return fresh;
+      } catch (_) {
+        const cache = await caches.open(CACHE);
+        return (await cache.match('/')) || (await cache.match(req)) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // 3) Assets du build (immuables, hashés) : cache d'abord.
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const hit = await cache.match(req);
+    if (hit) return hit;
+    try {
+      const res = await fetch(req);
+      if (res && res.status === 200 && res.type === 'basic') cache.put(req, res.clone()).catch(() => {});
+      return res;
+    } catch (_) {
+      return hit || Response.error();
+    }
+  })());
 });
