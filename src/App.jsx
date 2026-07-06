@@ -4294,6 +4294,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 function Comptabilite({ accounts }) {
   const [numeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [sub, setSub] = useState('ventes'); // ventes | achats
+  const [vFilter, setVFilter] = useState('encours'); // encours | finalisees | all
+  const [aFilter, setAFilter] = useState('attente'); // attente | recus | all
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
   const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
@@ -4375,10 +4377,15 @@ function Comptabilite({ accounts }) {
             ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Comptes Vinted → Annonces » (bouton 🔗).
           </div>
         )}
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+          {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes']].map(([id,label])=>(
+            <button key={id} onClick={()=>setVFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
+          ))}
+        </div>
         {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des ventes…</div>}
         {sales.items && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune vente.</div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(sales.items||[]).map(o=>{
+          {(sales.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).map(o=>{
             const st = classifyOrderStatus(o.status);
             const e = entryByTitle(o.title); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
@@ -4408,17 +4415,22 @@ function Comptabilite({ accounts }) {
       </>)}
 
       {sub==='achats' && (<>
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+          {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
+            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
+          ))}
+        </div>
         {buys.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des achats…</div>}
         {buys.items && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat.</div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(buys.items||[]).map(o=>(
+          {(buys.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).map(o=>(
             <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:classifyOrderStatus(o.status)==='cancelled'?0.6:1}}>
               <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
-                <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)}</div>
+                <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)} · {(() => { const s=classifyOrderStatus(o.status); return <span style={{color:s==='completed'?INV_STATUS.online.color:s==='cancelled'?C.danger:C.warn}}>{s==='completed'?'reçu':s==='cancelled'?'annulé':'en attente'}</span>; })()}</div>
               </div>
               <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
             </div>
