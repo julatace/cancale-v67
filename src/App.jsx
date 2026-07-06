@@ -4291,9 +4291,19 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 }
 
 /* ── Comptabilité (onglet dédié, tous comptes agrégés) ──────────────────── */
+// Couleur stable par compte (pour l'étiquette "d'où vient" chaque ligne).
+const ACCT_COLORS = ['#2f80ed','#9b51e0','#eb5757','#27ae60','#f2994a','#00b8a9','#e056fd','#f39c12'];
+const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
+function AcctTag({ acc, name }) {
+  const col = acctColor(acc?.vinted_user_id);
+  return <span style={{display:'inline-flex',alignItems:'center',gap:4,background:col+'22',color:col,fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>
+    <span style={{width:6,height:6,borderRadius:999,background:col}}/>{name}
+  </span>;
+}
+
 function Comptabilite({ accounts }) {
   const [numeros] = useState(() => load('vinted_annonce_numeros', {}));
-  const [sub, setSub] = useState('ventes'); // ventes | achats
+  const [sub, setSub] = useState('ventes'); // ventes | achats | annonces | messages | bordereaux
   const [vFilter, setVFilter] = useState('all'); // encours | finalisees | annulees | all
   const [aFilter, setAFilter] = useState('all'); // attente | recus | all
   // Statut d'un ACHAT : un achat "reçu" n'a pas le mot "finalisé" (c'est
@@ -4306,7 +4316,11 @@ function Comptabilite({ accounts }) {
   };
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
+  const [listings, setListings] = useState({ loading:false, items:null });
+  const [convs, setConvs] = useState({ loading:false, items:null });
+  const [openConv, setOpenConv] = useState(null);
   const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
+  const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
   const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
 
@@ -4322,6 +4336,29 @@ function Comptabilite({ accounts }) {
   };
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
   useEffect(() => { if (sub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+
+  const loadListings = async () => {
+    setListings({ loading:true, items:null });
+    const out = [];
+    for (const acc of accounts) { const r = await fetchVintedListings(acc); if (r.ok) r.items.forEach(it => out.push({ ...it, _acc:acc })); }
+    setListings({ loading:false, items: out });
+  };
+  const loadConvs = async () => {
+    setConvs({ loading:true, items:null });
+    const out = [];
+    for (const acc of accounts) { const r = await fetchVintedConversations(acc); if (r.ok) r.items.forEach(c => out.push({ ...c, _acc:acc })); }
+    out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
+    setConvs({ loading:false, items: out });
+  };
+  useEffect(() => { if (sub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (sub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+
+  const openConversation = async (conv) => {
+    setOpenConv({ loading:true, error:null, conversation:null, messages:[], header:{ login:conv.opposite_user?.login, title:conv.description, photo:conv.opposite_user?.photo?.url||conv.item_photos?.[0]?.url||null } });
+    const res = await fetchVintedConversationDetail(conv._acc, conv.id);
+    if (!res.ok) { setOpenConv(o => ({ ...o, loading:false, error:res.error })); return; }
+    setOpenConv(o => ({ ...o, loading:false, conversation:res.conversation, messages:normalizeConversationMessages(res.conversation) }));
+  };
 
   const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
@@ -4388,9 +4425,9 @@ function Comptabilite({ accounts }) {
       <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 14px'}}>💸 Comptabilité</h2>
       {accounts.length===0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
 
-      <div style={{display:'flex',gap:8,marginBottom:16}}>
-        {[['ventes','Ventes'],['achats','Achats']].map(([id,label])=>(
-          <button key={id} onClick={()=>setSub(id)} style={{padding:'6px 16px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:700,fontSize:13,cursor:'pointer'}}>{label}</button>
+      <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+        {[['ventes','💸 Ventes'],['achats','🛍️ Achats'],['annonces','🟢 Annonces'],['messages','💬 Messages'],['bordereaux','📄 Bordereaux']].map(([id,label])=>(
+          <button key={id} onClick={()=>setSub(id)} style={{padding:'6px 14px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:700,fontSize:13,cursor:'pointer'}}>{label}</button>
         ))}
       </div>
 
@@ -4431,7 +4468,11 @@ function Comptabilite({ accounts }) {
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
-                  <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)} · <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span></div>
+                  <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                    <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
+                    <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span>
+                  </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
                   <div style={{fontSize:14,fontWeight:900,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
@@ -4463,13 +4504,123 @@ function Comptabilite({ accounts }) {
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
-                <div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · {accName(o._acc)} · {(() => { const s=purchasePhase(o.status); return <span style={{color:s==='completed'?INV_STATUS.online.color:s==='cancelled'?C.danger:C.warn}}>{s==='completed'?'reçu':s==='cancelled'?'annulé':'en attente'}</span>; })()}</div>
+                <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                  <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
+                  {(() => { const s=purchasePhase(o.status); return <span style={{color:s==='completed'?INV_STATUS.online.color:s==='cancelled'?C.danger:C.warn,fontWeight:700}}>{s==='completed'?'reçu':s==='cancelled'?'annulé':'en attente'}</span>; })()}
+                </div>
               </div>
               <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
             </div>
           ))}
         </div>
       </>)}
+
+      {/* ── Annonces (toutes en ligne, tous comptes) ── */}
+      {sub==='annonces' && (<>
+        {listings.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des annonces…</div>}
+        {listings.items && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune annonce en ligne.</div>}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:14}}>
+          {(listings.items||[]).map(it=>{
+            const e = entryByTitle(it.title); const num = e?.numero;
+            return (
+              <a key={it._acc.vinted_user_id+'_'+it.id} href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',borderRadius:12,overflow:'hidden',background:C.card,border:`1px solid ${num?C.accent:C.border}`,display:'block',position:'relative'}}>
+                <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:30}}>👟</span>}
+                </div>
+                {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:12,fontWeight:900,padding:'3px 8px',borderRadius:999}}>N°{num}</div>}
+                <div style={{padding:'8px 10px'}}>
+                  <div style={{fontSize:15,fontWeight:900,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
+                  <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.brand||it.title}</div>
+                  <div style={{marginTop:5}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/></div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </>)}
+
+      {/* ── Messages (toutes conversations, tous comptes) ── */}
+      {sub==='messages' && (<>
+        {convs.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement des messages…</div>}
+        {convs.items && convs.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune conversation.</div>}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {(convs.items||[]).map((conv,i)=>{
+            const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
+            return (
+              <button key={(conv.id||i)+'_'+conv._acc.vinted_user_id} type="button" onClick={()=>openConversation(conv)} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',textAlign:'left',width:'100%'}}>
+                {photo?<img src={photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:<div style={{width:40,height:40,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.opposite_user?.login||'Conversation'}</div>
+                  <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.description||''}</div>
+                  <div style={{marginTop:4}}><AcctTag acc={conv._acc} name={accNameOf(conv._acc)}/></div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+                  <span style={{fontSize:10,color:C.muted}}>{conv.updated_at?new Date(conv.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
+                  {conv.unread && <span style={{width:9,height:9,borderRadius:999,background:C.accent}}/>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </>)}
+
+      {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
+      {sub==='bordereaux' && (<>
+        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes ventes numérotées : clique 📄 pour sortir le bordereau annoté (numéro + titre).</div>
+        {sales.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
+        {(() => {
+          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled' && entryByTitle(o.title)?.numero);
+          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucune vente numérotée.</div>;
+          return (
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {list.map(o=>{ const num=entryByTitle(o.title).numero; const st=classifyOrderStatus(o.status);
+                return (
+                  <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
+                    <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{num} · {o.title}</div>
+                      <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                        <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                        <span style={{color:st==='completed'?INV_STATUS.online.color:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':'en cours'}</span>
+                      </div>
+                    </div>
+                    <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:13,fontWeight:800}}>📄 Bordereau</button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </>)}
+
+      {/* Modale conversation */}
+      {openConv && (
+        <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              {openConv.header?.photo?<img src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>💬</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:800,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
+                <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div>
+              </div>
+              <button type="button" onClick={()=>setOpenConv(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
+              {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
+              {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
+              {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
+                m.kind==='event'
+                  ? <div key={i} style={{alignSelf:'center',fontSize:10,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}</div>
+                  : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
+                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:14,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                    </div>
+              ))}
+              {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
