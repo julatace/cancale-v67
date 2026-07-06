@@ -3914,6 +3914,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
   const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
+  // Montant d'un champ € (prix d'achat, frais/boost) -> nombre ou 0.
+  const eur = (v) => { if (v==null || String(v).trim()==='') return 0; const n = parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; };
+  const feesOf = (e) => e ? eur(e.fees) : 0;
   // Fiabilité : deux annonces avec le MÊME titre rendent l'attribution d'une
   // vente ambiguë (le lien vente↔paire se fait par le titre). On les détecte
   // pour prévenir au lieu de risquer d'attribuer le mauvais numéro.
@@ -4024,15 +4027,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
   const totals = useMemo(() => {
     const items = sales.items || [];
-    let ca=0, cout=0, nb=0, nbCout=0, margeSum=0, margeNb=0;
+    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0;
     for (const o of items) {
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; ca+=sell; nb+=1;
       const e = entryByTitle(o.title);
+      const fee = feesOf(e); frais += fee;
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy)/sell)*100; margeNb+=1; } }
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, benef:ca-cout, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros]);
 
@@ -4065,7 +4069,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (buy!=null && !isNaN(buy)) {
         const b = extractBrand(o.title) || '—';
         if (!brands[b]) brands[b] = { benef:0, nb:0 };
-        brands[b].benef += (sell-buy); brands[b].nb += 1;
+        brands[b].benef += (sell-buy-feesOf(e)); brands[b].nb += 1;
       }
     }
     let bestBrand=null;
@@ -4105,16 +4109,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
-    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Bénéfice','Statut']];
+    const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Boost','Bénéfice net','Statut']];
     (sales.items||[]).forEach(o=>{
       const st = classifyOrderStatus(o.status);
       const e = entryByTitle(o.title); const num = e?.numero || '';
       const sell = o.price?.amount!=null ? Number(o.price.amount) : '';
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : '';
-      const benef = (buy!=='' && sell!=='' && !isNaN(buy)) ? (sell-buy).toFixed(2) : '';
+      const fee = feesOf(e);
+      const benef = (buy!=='' && sell!=='' && !isNaN(buy)) ? (sell-buy-fee).toFixed(2) : '';
       rows.push([
         o.date?new Date(o.date).toLocaleDateString('fr-FR'):'', accName(o._acc), num, o.title||'',
         sell===''?'':String(sell).replace('.',','), buy===''?'':String(buy).replace('.',','),
+        fee>0?String(fee.toFixed(2)).replace('.',','):'',
         benef===''?'':String(benef).replace('.',','), st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours',
       ]);
     });
@@ -4144,7 +4150,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             <StatBox label="Coût d'achat" value={fmtE(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
-            <StatBox label="Bénéfice" value={fmtE(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − coût'}/>
+            {totals.frais>0 && <StatBox label="Boosts" value={fmtE(totals.frais)} sub="mises en avant"/>}
+            <StatBox label="Bénéfice net" value={fmtE(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût')}/>
           </div>
         )}
         {/* Analyse de perf : temps de vente, écoulement, meilleure marque */}
@@ -4207,7 +4214,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const e = amb ? null : entryByTitle(o.title); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-            const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy : null;
+            const fees = feesOf(e);
+            const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy-fees : null;
             return (
               <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:st==='cancelled'?0.6:1}}>
                 <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -4225,6 +4233,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 <div style={{textAlign:'right',flexShrink:0}}>
                   <div style={{fontSize:14,fontWeight:900,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:11,fontWeight:800,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
+                  {benef!=null && fees>0 && <div style={{fontSize:9.5,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
                   {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
                 {num && st!=='cancelled' && (
@@ -4344,6 +4353,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   </div>
                   <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
                 </div>
+                {num && (
+                  <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
+                    <span style={{fontSize:10,color:C.muted,fontWeight:700}}>💡 boost</span>
+                    <input value={e.fees ?? ''} onChange={ev=>updatePair(item,{fees:ev.target.value})} placeholder="0" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                    <span style={{fontSize:10,color:C.muted}}>€</span>
+                  </div>
+                )}
               </div>
             );
           })}
