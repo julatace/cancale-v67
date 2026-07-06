@@ -33,6 +33,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
+  'vinted_goal',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -3865,7 +3866,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const curSub = only || sub;
   const [msgAcc, setMsgAcc] = useState('all'); // filtre compte pour les messages
   const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
-  const [annSort, setAnnSort] = useState('recent'); // recent | price_desc | price_asc | favs | views | nonum
+  const [annSort, setAnnSort] = useState('recent'); // recent | price_desc | price_asc | favs | views | nonum | boost
+  const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
   const [pickerFor, setPickerFor] = useState(null);
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
 
@@ -3918,6 +3920,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const titleCount = useMemo(() => { const m={}; Object.values(numeros).forEach(e=>{ const t=normTitle(e.title); if(t) m[t]=(m[t]||0)+1; }); return m; }, [numeros]);
   const titleAmbiguous = (title) => (titleCount[normTitle(title)]||0) > 1;
 
+  // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
+  const matchOrd = (o) => {
+    const q = ordSearch.trim().toLowerCase(); if (!q) return true;
+    const e = entryByTitle(o.title); const num = String(e?.numero||'');
+    const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
+    return (o.title||'').toLowerCase().includes(q) || num===q || num.includes(q) || buyer.includes(q);
+  };
+
   // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
   // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
   const annShown = useMemo(() => {
@@ -3935,6 +3945,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     else if (annSort==='favs') arr.sort((a,b)=>(b.favourites??-1)-(a.favourites??-1));
     else if (annSort==='views') arr.sort((a,b)=>(b.views??-1)-(a.views??-1));
     else if (annSort==='nonum') arr = arr.filter(it=>!(numeros[it.id]?.numero));
+    else if (annSort==='boost') {
+      // « À booster » : les paires qui ont de l'audience mais ne se vendent pas
+      // (beaucoup de vues, peu/pas de favoris) -> candidates à une baisse de prix.
+      arr = arr.filter(it=> it.views!=null && it.views>=20 && (it.favourites??0) <= 1);
+      arr.sort((a,b)=>(b.views??0)-(a.views??0));
+    }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, annSearch, annSort, numeros]);
@@ -4020,6 +4036,52 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros]);
 
+  // ── Analyse de perf (façon outil pro) ──────────────────────────────
+  // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
+  // CA finalisé du mois en cours.
+  const [goal, setGoal] = useState(() => Number(load('vinted_goal', 0)) || 0);
+  const [goalEdit, setGoalEdit] = useState(false);
+  const saveGoal = (v) => { const n = Math.max(0, Math.round(Number(v)||0)); setGoal(n); save('vinted_goal', n); };
+  // Métriques : temps de vente moyen (jours entre la numérotation de l'annonce et
+  // la vente), taux d'écoulement (vendues / (vendues + en ligne)), meilleure
+  // marque (bénéfice moyen par paire), et CA du mois en cours.
+  const perf = useMemo(() => {
+    const items = sales.items || [];
+    let daysSum=0, daysNb=0, caMois=0;
+    const now = new Date(); const ym = now.getFullYear()*100 + now.getMonth();
+    const brands = {}; // marque -> {benef, nb}
+    for (const o of items) {
+      if (classifyOrderStatus(o.status) !== 'completed') continue;
+      const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
+      const e = entryByTitle(o.title);
+      if (o.date) { const d=new Date(o.date); if (!isNaN(d) && d.getFullYear()*100+d.getMonth()===ym) caMois += sell; }
+      // Temps de vente : de la numérotation (mise en suivi) à la date de vente.
+      if (e && e.numberedAt && o.date) {
+        const j = (new Date(o.date) - new Date(e.numberedAt)) / 86400000;
+        if (j>=0 && j<3650) { daysSum+=j; daysNb+=1; }
+      }
+      // Meilleure marque : bénéfice moyen par paire (si prix d'achat connu).
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      if (buy!=null && !isNaN(buy)) {
+        const b = extractBrand(o.title) || '—';
+        if (!brands[b]) brands[b] = { benef:0, nb:0 };
+        brands[b].benef += (sell-buy); brands[b].nb += 1;
+      }
+    }
+    let bestBrand=null;
+    Object.entries(brands).forEach(([b,v])=>{ if (v.nb>=2){ const moy=v.benef/v.nb; if (!bestBrand||moy>bestBrand.moy) bestBrand={ brand:b, moy, nb:v.nb }; } });
+    // Taux d'écoulement : nécessite le nb d'annonces en ligne (chargé si dispo).
+    const online = (listings.items||[]).length;
+    const vendues = items.filter(o=>classifyOrderStatus(o.status)==='completed').length;
+    const ecoul = (online+vendues)>0 ? (vendues/(online+vendues))*100 : null;
+    return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, listings.items, numeros]);
+
+  // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
+  // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
+  useEffect(() => { if (curSub==='ventes' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+
   const startBordereau = async (numero, title, acc) => {
     bordCtx.current = { numero, title };
     const lbl = acc ? await fetchCapturedLabel(acc.vinted_user_id) : null;
@@ -4085,6 +4147,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <StatBox label="Bénéfice" value={fmtE(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − coût'}/>
           </div>
         )}
+        {/* Analyse de perf : temps de vente, écoulement, meilleure marque */}
+        {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
+          <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
+            {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
+            {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
+            {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} color={INV_STATUS.online.color} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
+          </div>
+        )}
+        {/* Objectif de CA mensuel */}
+        {accounts.length>0 && (()=>{ const pct = goal>0 ? Math.min(100, (perf.caMois/goal)*100) : 0; return (
+          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:goal>0?8:0,flexWrap:'wrap',gap:6}}>
+              <div style={{fontSize:12,fontWeight:800,color:C.text}}>🎯 Objectif du mois</div>
+              {goalEdit ? (
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <input autoFocus type="number" defaultValue={goal||''} placeholder="0" onKeyDown={e=>{ if(e.key==='Enter'){ saveGoal(e.target.value); setGoalEdit(false);} if(e.key==='Escape') setGoalEdit(false); }}
+                    onBlur={e=>{ saveGoal(e.target.value); setGoalEdit(false); }} style={{width:90,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',fontSize:13,fontWeight:700,background:C.bg,color:C.text,outline:'none'}}/>
+                  <span style={{fontSize:12,color:C.muted}}>€</span>
+                </div>
+              ) : (
+                <button onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
+                  {goal>0 ? `${perf.caMois.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
+                </button>
+              )}
+            </div>
+            {goal>0 && (
+              <div style={{height:8,borderRadius:999,background:C.border,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${pct}%`,background:pct>=100?INV_STATUS.online.color:C.accent,borderRadius:999,transition:'width .4s'}}/>
+              </div>
+            )}
+            {goal>0 && <div style={{fontSize:11,color:C.muted,marginTop:5}}>{pct>=100?'🎉 Objectif atteint !':`${(goal-perf.caMois).toFixed(0)} € restants ce mois-ci`}</div>}
+          </div>
+        ); })()}
         {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
           <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
             ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Annonces » (bouton 🔗).
@@ -4098,11 +4193,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
           )}
         </div>
+        {sales.items && sales.items.length>0 && (
+          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, acheteur)…"
+            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
+        )}
         {sales.loading && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:11.5}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(sales.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).map(o=>{
+          {(sales.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).filter(o=>matchOrd(o)).map(o=>{
             const st = classifyOrderStatus(o.status);
             const amb = titleAmbiguous(o.title);
             const e = amb ? null : entryByTitle(o.title); const num = e?.numero;
@@ -4143,11 +4242,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
           ))}
         </div>
+        {buys.items && buys.items.length>0 && (
+          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
+            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
+        )}
         {buys.loading && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
         {buys.items && !buys.error && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucun achat pour l'instant.<br/><span style={{fontSize:11.5}}>Tes achats Vinted apparaîtront ici automatiquement.</span></div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).map(o=>(
+          {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o)).map(o=>(
             <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:classifyOrderStatus(o.status)==='cancelled'?0.6:1}}>
               <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
@@ -4191,6 +4294,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               <option value="price_asc">Prix ↑</option>
               {annStats.hasFav && <option value="favs">Plus aimées ❤️</option>}
               {annStats.hasView && <option value="views">Plus vues 👁</option>}
+              {annStats.hasView && <option value="boost">À booster 💡</option>}
               <option value="nonum">Sans numéro</option>
             </select>
           </div>
