@@ -34,7 +34,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
-  'vinted_txn_link',
+  'vinted_txn_link','vinted_sales_hidden',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -4100,6 +4100,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
   const [msgAcc, setMsgAcc] = useState('all'); // filtre compte pour les messages
+  // Ventes masquées de la compta (par n° de transaction). Réversible.
+  const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
+  const [showHidden, setShowHidden] = useState(false);
+  const isHidden = (o) => hiddenSales.has(String(o.transaction_id));
+  const toggleHidden = (tid) => {
+    setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
+  };
   const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
   const [annSort, setAnnSort] = useState('recent'); // recent | price_desc | price_asc | favs | views | nonum | boost
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
@@ -4288,6 +4295,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const items = sales.items || [];
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0;
     for (const o of items) {
+      if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; ca+=sell; nb+=1;
       const e = entryByTitle(o.title);
@@ -4297,7 +4305,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     }
     return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros]);
+  }, [sales.items, numeros, hiddenSales]);
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
@@ -4314,6 +4322,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const now = new Date(); const ym = now.getFullYear()*100 + now.getMonth();
     const brands = {}; // marque -> {benef, nb}
     for (const o of items) {
+      if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
       const e = entryByTitle(o.title);
@@ -4335,11 +4344,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     Object.entries(brands).forEach(([b,v])=>{ if (v.nb>=2){ const moy=v.benef/v.nb; if (!bestBrand||moy>bestBrand.moy) bestBrand={ brand:b, moy, nb:v.nb }; } });
     // Taux d'écoulement : nécessite le nb d'annonces en ligne (chargé si dispo).
     const online = (listings.items||[]).length;
-    const vendues = items.filter(o=>classifyOrderStatus(o.status)==='completed').length;
+    const vendues = items.filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='completed').length;
     const ecoul = (online+vendues)>0 ? (vendues/(online+vendues))*100 : null;
     return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, numeros]);
+  }, [sales.items, listings.items, numeros, hiddenSales]);
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
@@ -4351,6 +4360,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     for (let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ ym:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, benef:0 }); }
     const idx = {}; months.forEach((m,i)=>{ idx[m.ym]=i; });
     for (const o of (sales.items||[])){
+      if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
       const d=new Date(o.date); if(isNaN(d)) continue;
       const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -4364,7 +4374,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const total = months.reduce((s,m)=>s+m.ca,0);
     return { months, max, total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros]);
+  }, [sales.items, numeros, hiddenSales]);
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   const [showReport, setShowReport] = useState(false);
@@ -4386,6 +4396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0;
     const saleLines=[];
     for (const o of (sales.items||[])) {
+      if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status)!=='completed') continue;
       if (ymOf(o.date)!==reportMonth) continue;
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
@@ -4412,7 +4423,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const urssaf = ca * 0.135;
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportMonth, numeros]);
+  }, [sales.items, buys.items, reportMonth, numeros, hiddenSales]);
 
   const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
 
@@ -4520,7 +4531,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
     const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Boost','Bénéfice net','Statut']];
-    (sales.items||[]).forEach(o=>{
+    (sales.items||[]).filter(o=>!isHidden(o)).forEach(o=>{
       const st = classifyOrderStatus(o.status);
       const e = entryByTitle(o.title); const num = e?.numero || '';
       const sell = o.price?.amount!=null ? Number(o.price.amount) : '';
@@ -4652,9 +4663,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {sales.loading && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:11.5}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
+        {(()=>{ const nbH=(sales.items||[]).filter(o=>isHidden(o)).length; return nbH>0 ? (
+          <div style={{fontSize:11.5,color:C.muted,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+            🚫 {nbH} vente{nbH>1?'s':''} masquée{nbH>1?'s':''} de la compta
+            <button onClick={()=>setShowHidden(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontWeight:700,fontSize:11.5,padding:0}}>{showHidden?'cacher':'afficher'}</button>
+          </div>
+        ) : null; })()}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(sales.items||[]).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).filter(o=>matchOrd(o)).map(o=>{
+          {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).filter(o=>matchOrd(o)).map(o=>{
             const st = classifyOrderStatus(o.status);
+            const hidden = isHidden(o);
             const amb = titleAmbiguous(o.title);
             const e = amb ? null : entryByTitle(o.title); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
@@ -4662,7 +4680,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const fees = feesOf(e);
             const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy-fees : null;
             return (
-              <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:st==='cancelled'?0.6:1}}>
+              <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,opacity:hidden?0.5:(st==='cancelled'?0.6:1)}}>
                 <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
                 </div>
@@ -4683,9 +4701,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {benef!=null && fees>0 && <div style={{fontSize:9.5,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
                   {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
-                {needsBordereau(o.status) && (
+                {needsBordereau(o.status) && !hidden && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
                 )}
+                <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title={hidden?'Réintégrer à la compta':'Masquer de la compta'} aria-label={hidden?'Réafficher':'Masquer'} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:hidden?(C.blue||C.accent):C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>{hidden?'↩︎':'🚫'}</button>
               </div>
             );
           })}
