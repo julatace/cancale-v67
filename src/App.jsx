@@ -34,7 +34,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
-  'vinted_txn_link','vinted_sales_hidden',
+  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -3468,6 +3468,11 @@ function VintedAccounts({ accounts, setAccounts }) {
   const [labels, setLabels] = useState(() => load('vinted_account_labels', {}));
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
+  // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
+  const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
+  const toggleAcctCompta = (uid) => {
+    setHiddenAccts(prev => { const n = new Set(prev); const k = String(uid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
+  };
 
   const startEditLabel = (acc) => { setEditingLabel(acc.vinted_user_id); setLabelDraft(labels[acc.vinted_user_id] || acc.login || ''); };
   const commitLabel = (acc) => {
@@ -3570,6 +3575,12 @@ function VintedAccounts({ accounts, setAccounts }) {
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                   {tr && !tr.loading && <span style={{fontSize:11,fontWeight:700,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
+                  {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
+                    <button onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est EXCLU de ta comptabilité':'Ce compte compte dans ta comptabilité'}
+                      style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:off?C.muted:C.accent}}>
+                      {off ? '🚫 Hors compta' : '✅ Dans la compta'}
+                    </button>
+                  ); })()}
                   <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
@@ -4102,8 +4113,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [msgAcc, setMsgAcc] = useState('all'); // filtre compte pour les messages
   // Ventes masquées de la compta (par n° de transaction). Réversible.
   const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
+  // Comptes entiers exclus de la compta (par vinted_user_id).
+  const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
   const [showHidden, setShowHidden] = useState(false);
-  const isHidden = (o) => hiddenSales.has(String(o.transaction_id));
+  const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || hiddenAccts.has(String(o._acc?.vinted_user_id));
   const toggleHidden = (tid) => {
     setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
   };
@@ -4162,6 +4175,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
   const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
+  const entryKeyByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return k; } return null; };
+  // Lien VENTE↔PAIRE verrouillé par n° de transaction (robuste, permanent, gère
+  // les titres en double une fois établi). L'app le remplit AUTOMATIQUEMENT quand
+  // le titre d'une vente correspond à une SEULE annonce numérotée (cas non
+  // ambigu). Le pipeline mail/bordereau réutilisera ce lien.
+  const [txnLink, setTxnLink] = useState(() => load('vinted_txn_link', {}));
+  // Retrouve l'entrée numéro d'une vente : par le lien transaction si connu,
+  // sinon par le titre (si non ambigu). Permet de coller le bon N° SANS avoir le
+  // numéro dans le titre.
+  const resolvedEntry = (o) => {
+    const linked = o && o.transaction_id != null ? txnLink[String(o.transaction_id)] : null;
+    if (linked && numeros[linked]) return numeros[linked];
+    if (o && !titleAmbiguous(o.title)) return entryByTitle(o.title);
+    return null;
+  };
   // Montant d'un champ € (prix d'achat, frais/boost) -> nombre ou 0.
   const eur = (v) => { if (v==null || String(v).trim()==='') return 0; const n = parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; };
   const feesOf = (e) => e ? eur(e.fees) : 0;
@@ -4185,7 +4213,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
   const matchOrd = (o) => {
     const q = ordSearch.trim().toLowerCase(); if (!q) return true;
-    const e = entryByTitle(o.title); const num = String(e?.numero||'');
+    const e = resolvedEntry(o); const num = String(e?.numero||'');
     const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
     return (o.title||'').toLowerCase().includes(q) || num===q || num.includes(q) || buyer.includes(q);
   };
@@ -4258,6 +4286,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
   useEffect(() => { if (curSub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
+  // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
+  // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
+  // transaction. C'est permanent et robuste (survit aux titres en double créés
+  // plus tard) et servira au tampon auto des bordereaux. Aucune action requise.
+  useEffect(() => {
+    if (!sales.items || !sales.items.length) return;
+    let changed = false; const next = { ...txnLink };
+    for (const o of sales.items) {
+      if (classifyOrderStatus(o.status) !== 'completed') continue;
+      const tid = o.transaction_id != null ? String(o.transaction_id) : null;
+      if (!tid || next[tid]) continue;
+      if (titleAmbiguous(o.title)) continue;
+      const key = entryKeyByTitle(o.title);
+      if (key) { next[tid] = key; changed = true; }
+    }
+    if (changed) { setTxnLink(next); save('vinted_txn_link', next); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros]);
+
   const loadListings = async (force) => {
     const cached = !force && fromCache('listings');
     if (cached) { setListings({ loading:false, items:cached }); return; }
@@ -4298,14 +4345,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; ca+=sell; nb+=1;
-      const e = entryByTitle(o.title);
+      const e = resolvedEntry(o);
       const fee = feesOf(e); frais += fee;
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
     return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, hiddenSales]);
+  }, [sales.items, numeros, hiddenSales, hiddenAccts]);
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
@@ -4325,7 +4372,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
-      const e = entryByTitle(o.title);
+      const e = resolvedEntry(o);
       if (o.date) { const d=new Date(o.date); if (!isNaN(d) && d.getFullYear()*100+d.getMonth()===ym) caMois += sell; }
       // Temps de vente : de la numérotation (mise en suivi) à la date de vente.
       if (e && e.numberedAt && o.date) {
@@ -4348,7 +4395,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const ecoul = (online+vendues)>0 ? (vendues/(online+vendues))*100 : null;
     return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, numeros, hiddenSales]);
+  }, [sales.items, listings.items, numeros, hiddenSales, hiddenAccts]);
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
@@ -4366,7 +4413,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       if (idx[ym]==null) continue;
       const sell=o.price?.amount!=null?Number(o.price.amount):0;
-      const e=entryByTitle(o.title); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
+      const e=resolvedEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
       months[idx[ym]].ca+=sell;
       if(buy!=null&&!isNaN(buy)) months[idx[ym]].benef += (sell-buy-feesOf(e));
     }
@@ -4374,7 +4421,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const total = months.reduce((s,m)=>s+m.ca,0);
     return { months, max, total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, hiddenSales]);
+  }, [sales.items, numeros, hiddenSales, hiddenAccts]);
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   const [showReport, setShowReport] = useState(false);
@@ -4400,7 +4447,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (classifyOrderStatus(o.status)!=='completed') continue;
       if (ymOf(o.date)!==reportMonth) continue;
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
-      const e = entryByTitle(o.title); const fee=feesOf(e);
+      const e = resolvedEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       ca+=sell; nb+=1; frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); }
@@ -4423,7 +4470,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const urssaf = ca * 0.135;
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportMonth, numeros, hiddenSales]);
+  }, [sales.items, buys.items, reportMonth, numeros, hiddenSales, hiddenAccts]);
 
   const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
 
@@ -4533,7 +4580,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Boost','Bénéfice net','Statut']];
     (sales.items||[]).filter(o=>!isHidden(o)).forEach(o=>{
       const st = classifyOrderStatus(o.status);
-      const e = entryByTitle(o.title); const num = e?.numero || '';
+      const e = resolvedEntry(o); const num = e?.numero || '';
       const sell = o.price?.amount!=null ? Number(o.price.amount) : '';
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : '';
       const fee = feesOf(e);
@@ -4674,7 +4721,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
             const amb = titleAmbiguous(o.title);
-            const e = amb ? null : entryByTitle(o.title); const num = e?.numero;
+            const e = resolvedEntry(o); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
             const fees = feesOf(e);
@@ -4896,7 +4943,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente à expédier.<br/><span style={{fontSize:11.5}}>Les bordereaux apparaissent pour les ventes en cours d'expédition.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {list.map(o=>{ const amb=titleAmbiguous(o.title); const num=amb?'':(entryByTitle(o.title)?.numero||''); const st=classifyOrderStatus(o.status);
+              {list.map(o=>{ const amb=titleAmbiguous(o.title); const num=amb?'':(resolvedEntry(o)?.numero||''); const st=classifyOrderStatus(o.status);
                 return (
                   <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
                     <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>

@@ -197,6 +197,21 @@ async function storeHarvestRow(uid, type, payload, domain) {
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data }], 'id');
 }
 
+// Recupere TOUTES les pages de commandes d'un type (ventes/achats), en douceur.
+// On s'arrete quand une page est incomplete (derniere) ou au plafond de securite.
+async function fetchAllOrders(acc, type, maxPages = 8) {
+  let all = []; let pagination = null;
+  for (let page = 1; page <= maxPages; page++) {
+    const r = await vintedGet(acc, `/api/v2/my_orders?type=${type}&page=${page}&per_page=40`);
+    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) break;
+    all = all.concat(r.json.my_orders);
+    pagination = r.json.pagination || pagination;
+    if (r.json.my_orders.length < 40) break; // derniere page atteinte
+    await wait(1200); // pause entre pages (discret)
+  }
+  return { my_orders: all, pagination };
+}
+
 // Rafraichit toutes les donnees d'UN compte.
 async function activeFetchAccount(acc) {
   const uid = acc.vinted_user_id;
@@ -229,14 +244,14 @@ async function activeFetchAccount(acc) {
     await wait(1500);
   }
 
-  // 3) Ventes.
-  const sold = await vintedGet(acc, '/api/v2/my_orders?type=sold&page=1&per_page=40');
-  if (sold.ok && sold.json) await storeHarvestRow(uid, 'orders_sold', sold.json, domain);
+  // 3) Ventes (TOUTES les pages, pour une compta complete).
+  const sold = await fetchAllOrders(acc, 'sold');
+  if (sold && sold.my_orders.length) await storeHarvestRow(uid, 'orders_sold', sold, domain);
   await wait(1500);
 
-  // 4) Achats.
-  const bought = await vintedGet(acc, '/api/v2/my_orders?type=purchased&page=1&per_page=40');
-  if (bought.ok && bought.json) await storeHarvestRow(uid, 'orders_purchased', bought.json, domain);
+  // 4) Achats (toutes les pages).
+  const bought = await fetchAllOrders(acc, 'purchased');
+  if (bought && bought.my_orders.length) await storeHarvestRow(uid, 'orders_purchased', bought, domain);
   await wait(1500);
 
   // 5) Messages (inbox).
