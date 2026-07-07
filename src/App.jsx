@@ -546,6 +546,11 @@ const readPdfFirstPageSize = async (pdfArrayBuffer) => {
 };
 // Empreinte de format = dimensions arrondies (ex "210x297").
 const bordereauFormatKey = (w, h) => `${Math.round(w)}x${Math.round(h)}`;
+// Emplacement par défaut intelligent du tampon : en HAUT À GAUCHE. Sur le
+// bordereau Vinted (A4 : instructions en haut, étiquette/code-barres en bas),
+// le haut est vide -> on ne recouvre jamais le code-barres. Fonctionne aussi
+// pour les autres formats (le haut est presque toujours dégagé).
+const smartDefaultBordPos = (w, h) => ({ xr: 0.05, yr: 0.02 });
 
 // pdf-lib est charge dynamiquement (import()) pour ne pas alourdir le bundle
 // initial - il n'est telecharge que la 1re fois qu'on genere un bordereau.
@@ -4038,8 +4043,8 @@ function BordPlacer({ place, onConfirm, onCancel }) {
   const padRef = React.useRef(null);
   const boxW = Math.min(w*0.62, 230), boxH = 46;      // taille réelle du tampon (pt)
   const wr = boxW/w, hr = boxH/h;                       // taille en ratio de page
-  const [xr,setXr] = useState(0.04);
-  const [yr,setYr] = useState(Math.max(0, 1 - hr - 0.03)); // par défaut en bas à gauche
+  const [xr,setXr] = useState(place.initPos?.xr ?? 0.05);
+  const [yr,setYr] = useState(place.initPos?.yr ?? 0.02); // défaut : haut de page
   const dragging = React.useRef(false);
   const moveTo = (cx, cy) => {
     const r = padRef.current?.getBoundingClientRect(); if(!r) return;
@@ -4454,23 +4459,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     setTimeout(()=>URL.revokeObjectURL(url),4000);
   };
 
-  // Routeur commun : lit le format du bordereau. Si on connaît déjà où tamponner
-  // pour ce format -> on tamponne direct. Sinon -> modale de placement.
+  // Routeur commun : lit le format du bordereau, tamponne à l'emplacement connu
+  // pour ce format (ou au défaut intelligent = haut de page, jamais sur le
+  // code-barres). On stocke tout pour permettre de DÉPLACER ensuite.
   const processBordereau = async (numero, title, pdfBuf) => {
     try {
       const { width, height } = await readPdfFirstPageSize(pdfBuf);
       const key = bordereauFormatKey(width, height);
-      const saved = bordFormats[key];
-      if (saved) { const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, saved); setBordResult(r); return; }
-      const blobUrl = URL.createObjectURL(new Blob([pdfBuf], { type:'application/pdf' }));
-      setBordPlace({ numero, title, pdfBuf, w:width, h:height, key, blobUrl });
+      let pos = bordFormats[key];
+      if (!pos) { pos = smartDefaultBordPos(width, height); const next = { ...bordFormats, [key]: pos }; setBordFormats(next); save('vinted_bordereau_formats', next); }
+      const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
+      setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
     } catch(err){ alert('Impossible de lire ce PDF : '+String(err)); }
+  };
+  // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
+  const adjustBordPlacement = () => {
+    const r = bordResult; if(!r || !r.pdfBuf) return;
+    const blobUrl = URL.createObjectURL(new Blob([r.pdfBuf], { type:'application/pdf' }));
+    setBordPlace({ numero:r.numero, title:r.title, pdfBuf:r.pdfBuf, w:r.w, h:r.h, key:r.key, blobUrl, initPos: bordFormats[r.key] });
+    if (r.url) URL.revokeObjectURL(r.url);
+    setBordResult(null);
   };
   const confirmBordPlacement = async (pos) => {
     const p = bordPlace; if(!p) return;
     const next = { ...bordFormats, [p.key]: pos };
     setBordFormats(next); save('vinted_bordereau_formats', next);
-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult(r); } catch(err){ alert('Erreur : '+String(err)); }
+    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, w:p.w, h:p.h }); } catch(err){ alert('Erreur : '+String(err)); }
     URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
   };
   const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
@@ -4912,6 +4926,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{fontSize:12.5,color:C.muted,lineHeight:1.45,marginBottom:16}}>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:800,textDecoration:'none',marginBottom:8}}>📄 Ouvrir le bordereau</a>
+            {bordResult.pdfBuf && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:700,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:700,padding:'8px'}}>Fermer</button>
           </div>
         </div>
