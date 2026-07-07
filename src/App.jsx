@@ -378,6 +378,31 @@ const fetchVintedConversationDetail = async (account, conversationId) => {
 };
 
 // Aplati les entites d'une conversation en messages affichables et tries.
+// Extrait TOUT le texte lisible d'une entité d'évènement système : titre,
+// sous-titre, corps, actions... ET surtout tout champ qui ressemble à un CODE
+// (retrait en point relais, PIN, suivi, référence). Vinted range parfois le
+// « code de retrait » dans un champ imbriqué : on scanne défensivement pour ne
+// rien cacher (« voir tout dans la conv »).
+const extractEventText = (e, entity_type) => {
+  const parts = [];
+  ['title','subtitle','body','text','header','description'].forEach(k => { if (typeof e[k] === 'string' && e[k].trim()) parts.push(e[k].trim()); });
+  const seen = new Set(parts);
+  const scan = (obj, depth = 0) => {
+    if (!obj || typeof obj !== 'object' || depth > 3) return;
+    for (const k in obj) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) {
+        // Champs qui portent typiquement un code / numéro de suivi / retrait.
+        if (/code|pin|pickup|retrait|tracking|suivi|reference|référence|numero|numéro|colis|shipment|drop/i.test(k) && !seen.has(v.trim())) {
+          seen.add(v.trim()); parts.push(`${k}: ${v.trim()}`);
+        }
+      } else if (v && typeof v === 'object') scan(v, depth + 1);
+    }
+  };
+  scan(e);
+  return parts.length ? [...new Set(parts)].join(' · ') : entity_type;
+};
+
 const normalizeConversationMessages = (conversation) => {
   if (!conversation || !Array.isArray(conversation.messages)) return [];
   const oppId = conversation.opposite_user?.id;
@@ -387,10 +412,9 @@ const normalizeConversationMessages = (conversation) => {
     if (m.entity_type === 'message') {
       return { kind: 'message', mine: oppId != null && e.user_id !== oppId, body: e.body || '', photos: e.photos || [], ts };
     }
-    // Evenements systeme (offre, statut, action) : on montre un libelle.
-    const label = e.title || e.body || e.subtitle || m.entity_type;
-    const extra = (e.title && e.body && e.body !== e.title) ? e.body : '';
-    return { kind: 'event', body: [label, extra].filter(Boolean).join(' — '), ts };
+    // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
+    // codes de retrait compris.
+    return { kind: 'event', body: extractEventText(e, m.entity_type), ts };
   });
 };
 
@@ -4169,6 +4193,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
   useEffect(() => { if (curSub==='ventes' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
+  // Tendance sur 6 mois (CA finalisé + bénéfice net) pour le mini-graphique.
+  const monthlyChart = useMemo(() => {
+    const now = new Date(); const months = [];
+    for (let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ ym:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, benef:0 }); }
+    const idx = {}; months.forEach((m,i)=>{ idx[m.ym]=i; });
+    for (const o of (sales.items||[])){
+      if (classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
+      const d=new Date(o.date); if(isNaN(d)) continue;
+      const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (idx[ym]==null) continue;
+      const sell=o.price?.amount!=null?Number(o.price.amount):0;
+      const e=entryByTitle(o.title); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
+      months[idx[ym]].ca+=sell;
+      if(buy!=null&&!isNaN(buy)) months[idx[ym]].benef += (sell-buy-feesOf(e));
+    }
+    const max = Math.max(1, ...months.map(m=>Math.max(m.ca, m.benef)));
+    const total = months.reduce((s,m)=>s+m.ca,0);
+    return { months, max, total };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros]);
+
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
@@ -4362,6 +4407,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               </div>
             )}
             {goal>0 && <div style={{fontSize:11,color:C.muted,marginTop:5}}>{pct>=100?'🎉 Objectif atteint !':`${(goal-perf.caMois).toFixed(0)} € restants ce mois-ci`}</div>}
+          </div>
+        ); })()}
+        {/* Graphique de tendance 6 mois : CA + bénéfice net */}
+        {monthlyChart.total>0 && (()=>{ const W=320, H=110, pad=6, bw=(W-pad*2)/6, gcol=INV_STATUS.online.color; return (
+          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px',marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,flexWrap:'wrap',gap:6}}>
+              <div style={{fontSize:12,fontWeight:800,color:C.text}}>📈 Tendance — 6 mois</div>
+              <div style={{display:'flex',gap:12,fontSize:10.5,fontWeight:700}}>
+                <span style={{color:C.accent}}>▮ CA</span><span style={{color:gcol}}>▮ Bénéfice net</span>
+              </div>
+            </div>
+            <div style={{width:'100%',overflowX:'auto'}}>
+              <svg viewBox={`0 0 ${W} ${H+20}`} style={{width:'100%',minWidth:280,height:'auto',display:'block'}} role="img" aria-label="Graphique du chiffre d'affaires et du bénéfice net sur 6 mois">
+                {monthlyChart.months.map((m,i)=>{
+                  const x=pad+i*bw; const caH=(m.ca/monthlyChart.max)*H; const beH=(Math.max(0,m.benef)/monthlyChart.max)*H;
+                  const barW=bw*0.30;
+                  return (
+                    <g key={i}>
+                      <rect x={x+bw*0.5-barW-1} y={H-caH} width={barW} height={caH} rx={2} fill={C.accent}/>
+                      <rect x={x+bw*0.5+1} y={H-beH} width={barW} height={beH} rx={2} fill={gcol}/>
+                      <text x={x+bw*0.5} y={H+14} textAnchor="middle" fontSize="9" fill={C.muted} fontWeight="700">{m.label}</text>
+                    </g>
+                  );
+                })}
+                <line x1={pad} y1={H} x2={W-pad} y2={H} stroke={C.border} strokeWidth="1"/>
+              </svg>
+            </div>
           </div>
         ); })()}
         {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
@@ -4725,7 +4797,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
               {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
                 m.kind==='event'
-                  ? <div key={i} style={{alignSelf:'center',fontSize:10,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}</div>
+                  ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
+                      ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:12,padding:'8px 12px',textAlign:'center'}}>
+                          <div style={{fontSize:9.5,fontWeight:800,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
+                          <div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
+                        </div>
+                      : <div key={i} style={{alignSelf:'center',fontSize:10,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}</div>)
                   : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
                       <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:14,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
                     </div>
