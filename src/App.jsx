@@ -983,7 +983,7 @@ function Onboarding({ setTab }) {
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -1232,6 +1232,27 @@ function Dashboard({catalog,sales,garageGrid,invoices}) {
         <h2 style={{margin:0,color:C.text,fontSize:24,fontWeight:800,letterSpacing:-0.5}}>Tableau de bord</h2>
         <div style={{fontSize:12,color:C.muted,marginTop:2}}>Vue d'ensemble de ton activité</div>
       </div>
+
+      {/* Résumé Vinted EN DIRECT (cliquable) */}
+      {liveStats && (
+        <div>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:8}}>Vinted en direct · ce mois</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',gap:10}}>
+            {[
+              {k:'caMois', icon:'💸', label:'CA du mois', val:`${liveStats.caMois.toFixed(0)} €`, go:'cat_ventes', color:C.accent},
+              {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours, go:'cat_ventes', color:C.warn},
+              {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.blue||C.accent},
+              {k:'unread', icon:'💬', label:'Messages non lus', val:liveStats.unread, go:'cat_msg', color:liveStats.unread>0?C.danger:C.muted},
+            ].map(s=>(
+              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'12px 14px',cursor:'pointer',display:'flex',flexDirection:'column',gap:2}}>
+                <span style={{fontSize:16}}>{s.icon}</span>
+                <span style={{fontSize:22,fontWeight:900,color:s.color,letterSpacing:-0.5}}>{s.val}</span>
+                <span style={{fontSize:11,color:C.muted,fontWeight:600}}>{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats principales */}
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
@@ -4910,6 +4931,7 @@ export default function App() {
   // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
+  const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   useEffect(()=>{
     let stop=false;
     (async()=>{
@@ -5115,6 +5137,31 @@ export default function App() {
   // harvest_* de Supabase) : aucune requête vers Vinted. Les messages non lus
   // sont affichés en absolu (tu en as X) ; les ventes en nouveauté depuis la
   // dernière ouverture. Se lance une fois quand les comptes sont chargés.
+  // Résumé « en direct » pour l'écran d'accueil : CA finalisé du mois, ventes en
+  // cours, annonces en ligne, messages non lus — agrégés sur tous les comptes,
+  // en lecture moissonnée (0 requête Vinted quand la donnée est déjà captée).
+  useEffect(()=>{
+    if(!accountsLoaded || !vintedAccounts || vintedAccounts.length===0) return;
+    let stop=false;
+    (async()=>{
+      const now=new Date(); const ym=now.getFullYear()*100+now.getMonth();
+      let caMois=0, enCours=0, online=0, unread=0, ok=false;
+      for(const a of vintedAccounts){
+        const sold=await fetchVintedOrders(a,'sold',1,'all');
+        if(sold.ok){ ok=true; for(const o of sold.items){
+          const st=classifyOrderStatus(o.status);
+          if(st==='pending') enCours++;
+          if(st==='completed' && o.date){ const d=new Date(o.date); if(!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym) caMois+=(o.price?.amount!=null?Number(o.price.amount):0); }
+        }}
+        const list=await fetchVintedListings(a,1); if(list.ok){ ok=true; online+=list.items.length; }
+        const conv=await fetchVintedConversations(a,1); if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
+      }
+      if(!stop && ok) setLiveStats({caMois,enCours,online,unread});
+    })();
+    return ()=>{stop=true;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[accountsLoaded, vintedAccounts]);
+
   const vintedNotifChecked = React.useRef(false);
   useEffect(()=>{
     if(!vintedAccounts || vintedAccounts.length===0 || vintedNotifChecked.current) return;
@@ -5272,7 +5319,7 @@ export default function App() {
           onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;} let msg='Importer ce fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES.'; if(!window.confirm(msg))return; if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);} if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);} if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);} alert('✓ Import réussi !'); }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
           dark={dark} toggleDark={toggleDark}/>}
         {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices}/>}
+        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
