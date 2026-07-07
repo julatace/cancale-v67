@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Shop Cancale35 - Vinted Sync",
-  "version": "2.2.0",
-  "description": "Synchronise, depuis TON navigateur, tes comptes et tes donnees Vinted (annonces, ventes, messages) vers l'app Cancale Shoes Store. Capture passive : aucune requete supplementaire vers Vinted.",
+  "name": "VRM - Vinted Sync",
+  "version": "3.0.0",
+  "description": "Synchronise, depuis TON navigateur (ton IP), tes comptes et donnees Vinted (annonces, ventes, achats, messages) vers VRM. Fetch actif de tous les comptes + capture passive. Aucun appel via un serveur.",
   "permissions": ["cookies", "storage", "alarms"],
   "host_permissions": [
     "https://*.vinted.fr/*",

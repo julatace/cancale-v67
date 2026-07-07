@@ -34,6 +34,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
+  'vinted_txn_link',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)

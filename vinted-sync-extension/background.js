@@ -134,7 +134,7 @@ async function storeHarvest(domain, type, id, body) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.from !== 'cancale-content') {
     if (msg && msg.from === 'cancale-popup' && msg.action === 'syncNow') {
-      captureAllAccounts().then((r) => sendResponse({ ok: true, accounts: r }));
+      captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
       return true; // reponse asynchrone
     }
     return;
@@ -159,14 +159,134 @@ async function storeLabel(domain, url, b64) {
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
 }
 
+// --- FETCH ACTIF (v3) ------------------------------------------------------
+// En plus de la capture passive, l'extension va CHERCHER activement les donnees
+// de TOUS les comptes lies, depuis TON navigateur / TON IP (jamais un serveur).
+// Ainsi l'app est a jour sans que tu ouvres chaque page Vinted, et sans passer
+// par le proxy Vercel (IP datacenter = risque). On utilise le token Bearer de
+// chaque compte, SANS cookie (credentials:'omit') pour ne pas melanger les
+// comptes. Rythme doux : un compte a la fois, avec des pauses.
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Un GET Vinted authentifie pour un compte donne (depuis le navigateur).
+async function vintedGet(acc, endpoint) {
+  try {
+    const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
+      method: 'GET',
+      credentials: 'omit',
+      headers: {
+        'Authorization': `Bearer ${acc.access_token}`,
+        'x-anon-id': acc.anon_id || '',
+        'x-csrf-token': acc.csrf_token || '',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+        'locale': 'fr-FR',
+      },
+    });
+    let json = null;
+    try { json = await res.json(); } catch (_) {}
+    return { status: res.status, ok: res.ok, json };
+  } catch (_) { return { status: 0, ok: false, json: null }; }
+}
+
+// Range une reponse Vinted dans une ligne harvest_{uid}_{type} (meme format que
+// la capture passive, donc l'app la lit deja).
+async function storeHarvestRow(uid, type, payload, domain) {
+  const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: new Date().toISOString(), payload };
+  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data }], 'id');
+}
+
+// Rafraichit toutes les donnees d'UN compte.
+async function activeFetchAccount(acc) {
+  const uid = acc.vinted_user_id;
+  if (!uid || !acc.access_token) return;
+  const domain = acc.domain || 'www.vinted.fr';
+
+  // 1) Profil (donne l'id de PROFIL, different de l'account_id, requis pour le
+  //    dressing) + le pseudo.
+  const prof = await vintedGet(acc, '/api/v2/users/current');
+  if (prof.ok && prof.json) {
+    await storeHarvestRow(uid, 'profile', prof.json, domain);
+    const login = prof.json.user && prof.json.user.login;
+    if (login) {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ login }),
+        });
+      } catch (_) {}
+    }
+  }
+  await wait(1500);
+
+  // 2) Annonces en ligne (dressing) via l'ID DE PROFIL.
+  const profileId = prof.json && prof.json.user && prof.json.user.id;
+  if (profileId) {
+    const w = await vintedGet(acc, `/api/v2/wardrobe/${profileId}/items?page=1&per_page=100`);
+    if (w.ok && w.json) await storeHarvestRow(uid, 'listings', w.json, domain);
+    await wait(1500);
+  }
+
+  // 3) Ventes.
+  const sold = await vintedGet(acc, '/api/v2/my_orders?type=sold&page=1&per_page=40');
+  if (sold.ok && sold.json) await storeHarvestRow(uid, 'orders_sold', sold.json, domain);
+  await wait(1500);
+
+  // 4) Achats.
+  const bought = await vintedGet(acc, '/api/v2/my_orders?type=purchased&page=1&per_page=40');
+  if (bought.ok && bought.json) await storeHarvestRow(uid, 'orders_purchased', bought.json, domain);
+  await wait(1500);
+
+  // 5) Messages (inbox).
+  const inbox = await vintedGet(acc, '/api/v2/inbox?page=1&per_page=30');
+  if (inbox.ok && inbox.json) await storeHarvestRow(uid, 'inbox', inbox.json, domain);
+}
+
+// Recupere la liste des comptes lies depuis Supabase.
+async function getStoredAccounts() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (_) { return []; }
+}
+
+// Rafraichit TOUS les comptes, un par un, en douceur (pauses entre comptes).
+let activeFetchRunning = false;
+async function activeFetchAll() {
+  if (activeFetchRunning) return;
+  activeFetchRunning = true;
+  try {
+    const accts = await getStoredAccounts();
+    for (const acc of accts) {
+      await activeFetchAccount(acc);
+      await wait(4000); // pause entre comptes (rythme humain, discret)
+    }
+    try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeCount: accts.length }); } catch (_) {}
+  } finally { activeFetchRunning = false; }
+}
+
 // --- Declencheurs ----------------------------------------------------------
 
-chrome.runtime.onInstalled.addListener(() => { captureAllAccounts(); });
-chrome.runtime.onStartup.addListener(() => { captureAllAccounts(); });
+// Au demarrage / installation : on capte les comptes PUIS on rafraichit tout.
+function fullSync() { captureAllAccounts().then(() => activeFetchAll()); }
+
+chrome.runtime.onInstalled.addListener(() => { fullSync(); });
+chrome.runtime.onStartup.addListener(() => { fullSync(); });
 
 try {
+  // Capture des comptes toutes les 10 min ; fetch actif toutes les 20 min
+  // (assez pour etre a jour, assez espace pour rester discret).
   chrome.alarms.create('cancale-sync', { periodInMinutes: 10 });
-  chrome.alarms.onAlarm.addListener((a) => { if (a.name === 'cancale-sync') captureAllAccounts(); });
+  chrome.alarms.create('cancale-active', { periodInMinutes: 20 });
+  chrome.alarms.onAlarm.addListener((a) => {
+    if (a.name === 'cancale-sync') captureAllAccounts();
+    else if (a.name === 'cancale-active') activeFetchAll();
+  });
 } catch (_) {}
 
 // Recapture immediatement quand un cookie de session Vinted change (login,
