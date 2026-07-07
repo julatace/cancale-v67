@@ -33,7 +33,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
-  'vinted_goal',
+  'vinted_goal','vinted_regime','vinted_tva',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -494,6 +494,49 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer) => {
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
   a.href = url;
   a.download = `bordereau-N${numero}${safeTitle?'-'+safeTitle:''}.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+};
+
+// Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
+// utile pour le registre d'achats d'un pro (surtout en régime de la marge, où
+// l'achat à un particulier n'a pas de facture TVA mais doit être tracé). Ce
+// n'est pas la facture officielle Vinted, mais un récapitulatif daté et complet.
+const generateAchatJustificatif = async (o, opts = {}) => {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([420, 560]);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const { height } = page.getSize();
+  let y = height - 48;
+  const line = (label, val, o2={}) => {
+    page.drawText(label, { x:32, y, size:9, font:reg, color:rgb(0.45,0.45,0.45) });
+    page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:rgb(0.1,0.1,0.1) });
+    y -= o2.gap || 40;
+  };
+  page.drawText('Justificatif d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
+  page.drawText(opts.shop || 'Shop Cancale35', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
+  page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 24;
+  line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
+  line('N° de transaction Vinted', o.transaction_id || '—');
+  line('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—');
+  line('Article', o.title || '—');
+  line('Montant payé (TTC)', o.price?.amount!=null ? `${Number(o.price.amount).toFixed(2)} ${o.price.currency_code==='EUR'?'€':o.price.currency_code||''}` : '—', { big:true });
+  line('Compte acheteur', opts.account || '—');
+  y -= 6;
+  const note = opts.regime==='marge'
+    ? 'Achat de seconde main a un particulier : pas de TVA deductible. A conserver pour le regime de la marge (TVA sur la marge a la revente).'
+    : 'Justificatif d\'achat a conserver avec ta comptabilite.';
+  // Retour à la ligne simple.
+  const wrap = (txt, max) => { const words=txt.split(' '); const rows=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>max){ rows.push(cur.trim()); cur=w; } else cur+=' '+w; } if(cur.trim()) rows.push(cur.trim()); return rows; };
+  wrap(note, 62).forEach((r,i)=> page.drawText(r, { x:32, y:y-i*13, size:8.5, font:reg, color:rgb(0.5,0.5,0.5) }));
+
+  const bytes = await pdf.save();
+  const blob = new Blob([bytes], { type:'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `justificatif-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 };
@@ -4104,6 +4147,100 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
   useEffect(() => { if (curSub==='ventes' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
+  // ── Rapport comptable (#3) ─────────────────────────────────────────
+  const [showReport, setShowReport] = useState(false);
+  const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const ymOf = (dstr) => { if(!dstr) return null; const d=new Date(dstr); if(isNaN(d)) return null; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+  // Mois disponibles (ventes + achats) pour le sélecteur.
+  const reportMonths = useMemo(() => {
+    const s = new Set();
+    (sales.items||[]).forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
+    (buys.items||[]).forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
+    s.add(reportMonth);
+    return [...s].sort().reverse();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, buys.items]);
+  const report = useMemo(() => {
+    const regime = load('vinted_regime','micro');
+    const tvaRate = Number(load('vinted_tva',20))||20;
+    const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
+    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0;
+    const saleLines=[];
+    for (const o of (sales.items||[])) {
+      if (classifyOrderStatus(o.status)!=='completed') continue;
+      if (ymOf(o.date)!==reportMonth) continue;
+      const sell = o.price?.amount!=null?Number(o.price.amount):0;
+      const e = entryByTitle(o.title); const fee=feesOf(e);
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      ca+=sell; nb+=1; frais+=fee;
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); }
+      saleLines.push({ date:o.date, num:e?.numero||'', title:o.title, sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee });
+    }
+    // Registre d'achats du mois (hors annulés).
+    const buyLines=[];
+    let achatsTotal=0;
+    for (const o of (buys.items||[])) {
+      if (classifyOrderStatus(o.status)==='cancelled') continue;
+      if (ymOf(o.date)!==reportMonth) continue;
+      const montant = o.price?.amount!=null?Number(o.price.amount):0;
+      achatsTotal+=montant;
+      buyLines.push({ o, date:o.date, seller:o.seller||o.user_login||o.opposite_user?.login||'', title:o.title, montant });
+    }
+    const benefNet = ca - cout - frais;
+    const marge = margeKnown - frais; // marge = ventes - achats - boosts (sur ventes au coût connu)
+    const tvaMarge = (regime==='marge' && marge>0) ? marge * (tvaRate/(100+tvaRate)) : 0;
+    const margeHT = marge - tvaMarge;
+    const urssaf = ca * 0.135;
+    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, buys.items, reportMonth, numeros]);
+
+  const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
+
+  // Export CSV du rapport (ventes + registre d'achats).
+  const exportReportCsv = () => {
+    const R=report; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+    const L=[];
+    L.push([`Rapport ${R.monthLabel}`]);
+    L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
+    L.push([]);
+    L.push(['VENTES']); L.push(['Date','N°','Titre','Vente','Achat','Boost','Bénéfice net']);
+    R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'',s.num,s.title,s.sell.toFixed(2),s.buy!=null?s.buy.toFixed(2):'',s.fee?s.fee.toFixed(2):'',s.buy!=null?(s.sell-s.buy-s.fee).toFixed(2):'']));
+    L.push(['','','TOTAL',R.ca.toFixed(2),R.cout.toFixed(2),R.frais.toFixed(2),R.benefNet.toFixed(2)]);
+    L.push([]);
+    L.push(['ACHATS (registre)']); L.push(['Date','Vendeur','Article','Montant']);
+    R.buyLines.forEach(b=>L.push([b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',b.seller,b.title,b.montant.toFixed(2)]));
+    L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
+    L.push([]);
+    if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
+    else { L.push(['CA encaissé',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
+    const csv = L.map(r=>r.map(e).join(';')).join('\n');
+    const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.csv`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  };
+  // Export PDF du rapport (récapitulatif).
+  const exportReportPdf = async () => {
+    const R=report;
+    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+    const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
+    let y=800; const T=(t,x,s,f,c)=>page.drawText(String(t),{x,y,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
+    T('Rapport comptable',40,22,bold,rgb(0,0.47,0.51)); y-=22; T(R.monthLabel+'  ·  '+(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur'),40,11,reg,rgb(0.4,0.4,0.4)); y-=28;
+    const kv=(k,v,big)=>{ T(k,40,9,reg,rgb(0.45,0.45,0.45)); page.drawText(String(v),{x:40,y:y-14,size:big?15:12,font:big?bold:reg,color:rgb(0.1,0.1,0.1)}); y-=big?36:30; };
+    kv('Chiffre d\'affaires encaissé', R.ca.toFixed(2)+' EUR', true);
+    kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
+    if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
+    if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR', true); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    kv('Nombre de ventes', String(R.nb));
+    kv('Achats du mois (registre)', R.buyLines.length+' — '+R.achatsTotal.toFixed(2)+' EUR');
+    y-=6; page.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
+    const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.pdf`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+  };
+
   const startBordereau = async (numero, title, acc) => {
     bordCtx.current = { numero, title };
     const lbl = acc ? await fetchCapturedLabel(acc.vinted_user_id) : null;
@@ -4214,8 +4351,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes']].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
           ))}
+          {accounts.length>0 && (
+            <button onClick={openReport} title="Rapport comptable mensuel" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Rapport</button>
+          )}
           {sales.items && sales.items.length>0 && (
-            <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
+            <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
           )}
         </div>
         {sales.items && sales.items.length>0 && (
@@ -4290,7 +4430,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {(() => { const s=purchasePhase(o.status); return <span style={{color:s==='completed'?INV_STATUS.online.color:s==='cancelled'?C.danger:C.warn,fontWeight:700}}>{s==='completed'?'reçu':s==='cancelled'?'annulé':'en attente'}</span>; })()}
                 </div>
               </div>
-              <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+                <div style={{fontSize:14,fontWeight:900,color:C.text}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
+                <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
+                  title="Télécharger un justificatif d'achat (PDF)" aria-label="Justificatif d'achat PDF"
+                  style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:700,padding:'3px 9px'}}>📄 Justif.</button>
+              </div>
             </div>
           ))}
         </div>
@@ -4487,6 +4632,61 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       )}
 
       {/* Modale conversation */}
+      {showReport && (
+        <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>📊 Rapport comptable</div>
+                <div style={{fontSize:11,color:C.muted}}>{report.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
+              </div>
+              <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:16}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                <span style={{fontSize:12,fontWeight:700,color:C.text}}>Mois</span>
+                <select value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px',fontSize:13,fontWeight:700,background:C.card,color:C.text,cursor:'pointer'}}>
+                  {reportMonths.map(m=>{ const [y,mo]=m.split('-'); const lbl=new Date(Number(y),Number(mo)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); return <option key={m} value={m}>{lbl}</option>; })}
+                </select>
+              </div>
+              {buys.loading && <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
+              {/* Chiffres clés selon le régime */}
+              <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                <StatBox label="CA encaissé" value={fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`}/>
+                {report.regime==='marge' ? (<>
+                  <StatBox label="Marge TTC" value={fmtE(report.marge)} color={report.marge>=0?INV_STATUS.online.color:C.danger}/>
+                  <StatBox label={`TVA marge ${report.tvaRate}%`} value={fmtE(report.tvaMarge)} color={C.warn}/>
+                  <StatBox label="Marge HT" value={fmtE(report.margeHT)}/>
+                </>) : (<>
+                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?INV_STATUS.online.color:C.danger} sub={report.frais>0?`boosts ${fmtE(report.frais)}`:undefined}/>
+                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} color={C.warn} sub="13,5% du CA"/>
+                </>)}
+              </div>
+              {report.nb>report.nbCout && <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>⚠️ {report.nb-report.nbCout} vente(s) sans prix d'achat — le calcul de marge est incomplet.</div>}
+              {/* Registre d'achats */}
+              <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(report.achatsTotal)} ({report.buyLines.length})</div>
+              {report.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat ce mois-ci{buys.items===null?' (registre en cours de chargement)':''}.</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8}}>
+                {report.buyLines.map((b,i)=>(
+                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
+                      <div style={{fontSize:10,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}€</div>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Justificatif d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8,padding:'12px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
+              <button onClick={exportReportCsv} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:700,padding:'10px'}}>⬇️ CSV</button>
+              <button onClick={exportReportPdf} style={{flex:1,border:'none',borderRadius:10,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:800,padding:'10px'}}>📄 PDF</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {openConv && (
         <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -4545,8 +4745,49 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
       <Row icon="💸" title="Anciennes ventes" desc="Les ventes historiques de l'ancienne appli." onClick={()=>setTab('sales')}/>
       <Row icon="🟢" title="Stock Vinted (ancien)" desc="L'ancienne liste de numéros en ligne." onClick={()=>setTab('stockvinted')}/>
 
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Comptabilité</div>
+      <RegimeSetting/>
+
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
+    </div>
+  );
+}
+
+// Réglage du régime fiscal : détermine comment le rapport comptable présente les
+// chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
+// régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
+function RegimeSetting() {
+  const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
+  const [tva, setTva] = useState(() => Number(load('vinted_tva', 20)) || 20);
+  const pick = (r) => { setRegime(r); save('vinted_regime', r); };
+  const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:4}}>Régime fiscal</div>
+      <div style={{fontSize:11.5,color:C.muted,marginBottom:10,lineHeight:1.4}}>Adapte le rapport comptable à ta situation.</div>
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA encaissé, bénéfice net, estimation des cotisations.'],
+          ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
+          <button key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:10,cursor:'pointer',
+            border:`1px solid ${regime===id?C.accent:C.border}`,background:regime===id?`${C.accent}12`:'transparent'}}>
+            <span style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:999,border:`2px solid ${regime===id?C.accent:C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {regime===id && <span style={{width:9,height:9,borderRadius:999,background:C.accent}}/>}
+            </span>
+            <span style={{minWidth:0}}>
+              <span style={{fontSize:13,fontWeight:800,color:C.text,display:'block'}}>{t}</span>
+              <span style={{fontSize:11.5,color:C.muted,lineHeight:1.4}}>{d}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {regime==='marge' && (
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
+          <span style={{fontSize:12,fontWeight:700,color:C.text}}>Taux de TVA</span>
+          <input type="number" value={tva} onChange={e=>setRate(e.target.value)} style={{width:64,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 8px',fontSize:13,fontWeight:700,background:C.bg,color:C.text,outline:'none'}}/>
+          <span style={{fontSize:12,color:C.muted}}>%</span>
+        </div>
+      )}
     </div>
   );
 }
