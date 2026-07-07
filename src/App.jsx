@@ -416,18 +416,48 @@ const extractEventText = (e, entity_type) => {
   return parts.length ? [...new Set(parts)].join(' · ') : entity_type;
 };
 
+// Récupère tous les LIENS d'une entité (le bordereau/étiquette d'expédition est
+// souvent un lien dans la conversation). On scanne en profondeur, on repère les
+// liens de type bordereau/étiquette/suivi pour les mettre en avant.
+const URL_RE = /(https?:\/\/[^\s"'<>]+)/gi;
+const extractLinks = (e) => {
+  const found = []; const seen = new Set();
+  const push = (url, ctx) => {
+    url = url.replace(/[.,)]+$/, '');
+    if (!/^https?:\/\//i.test(url) || seen.has(url)) return;
+    seen.add(url);
+    const hay = (url + ' ' + (ctx||'')).toLowerCase();
+    const isBordereau = /label|bordereau|shipping|shipment|étiquette|etiquette|parcel|colis|waybill|expedition|expédition|\.pdf/.test(hay);
+    found.push({ url, bordereau: isBordereau });
+  };
+  const scan = (obj, key = '', depth = 0) => {
+    if (obj == null || depth > 4) return;
+    if (typeof obj === 'string') {
+      let m; URL_RE.lastIndex = 0;
+      while ((m = URL_RE.exec(obj))) push(m[1], key);
+      // champ dédié dont la clé évoque un lien direct (url/link/href)
+      if (/url|link|href|download/i.test(key) && /^https?:\/\//i.test(obj)) push(obj, key);
+      return;
+    }
+    if (typeof obj === 'object') for (const k in obj) scan(obj[k], k, depth + 1);
+  };
+  scan(e);
+  return found;
+};
+
 const normalizeConversationMessages = (conversation) => {
   if (!conversation || !Array.isArray(conversation.messages)) return [];
   const oppId = conversation.opposite_user?.id;
   return conversation.messages.map((m) => {
     const e = m.entity || {};
     const ts = m.created_at_ts || e.created_at_ts || null;
+    const links = extractLinks(e);
     if (m.entity_type === 'message') {
-      return { kind: 'message', mine: oppId != null && e.user_id !== oppId, body: e.body || '', photos: e.photos || [], ts };
+      return { kind: 'message', mine: oppId != null && e.user_id !== oppId, body: e.body || '', photos: e.photos || [], ts, links };
     }
     // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
     // codes de retrait compris.
-    return { kind: 'event', body: extractEventText(e, m.entity_type), ts };
+    return { kind: 'event', body: extractEventText(e, m.entity_type), ts, links };
   });
 };
 
@@ -4956,16 +4986,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
               {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
+              {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
+              {!openConv.loading && !openConv.error && (()=>{ const bl=[...new Set(openConv.messages.flatMap(m=>(m.links||[]).filter(l=>l.bordereau).map(l=>l.url)))]; return bl.length>0 ? (
+                <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:12,padding:'10px 12px',marginBottom:4}}>
+                  <div style={{fontSize:10,fontWeight:800,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:6}}>📄 Bordereau détecté dans la conversation</div>
+                  {bl.map((u,i)=>(
+                    <a key={i} href={u} target="_blank" rel="noreferrer" style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'10px 12px',fontSize:13.5,fontWeight:800,textDecoration:'none',textAlign:'center',marginBottom:i<bl.length-1?6:0}}>Ouvrir le bordereau {bl.length>1?`(${i+1})`:''}</a>
+                  ))}
+                </div>
+              ) : null; })()}
               {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
                 m.kind==='event'
                   ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
                       ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:12,padding:'8px 12px',textAlign:'center'}}>
                           <div style={{fontSize:9.5,fontWeight:800,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
                           <div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
+                          {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:700,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
                         </div>
-                      : <div key={i} style={{alignSelf:'center',fontSize:10,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}</div>)
+                      : <div key={i} style={{alignSelf:'center',fontSize:10,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:700}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
                   : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
                       <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:14,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                      {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:11.5,fontWeight:700,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
                     </div>
               ))}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
