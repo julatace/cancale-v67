@@ -551,12 +551,18 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
-  a.href = url;
-  a.download = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}.pdf`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}.pdf`;
+  // Sur ordinateur, on déclenche le téléchargement direct. Sur iOS/iPhone, le
+  // `download` programmatique ne marche pas (le dossier reste vide) -> on renvoie
+  // l'URL pour que l'appelant affiche un bouton « Ouvrir » (vrai geste utilisateur).
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  if (!isIOS) {
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  return { url, filename };
 };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
@@ -4095,6 +4101,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [bordFormats, setBordFormats] = useState(() => load('vinted_bordereau_formats', {}));
   // Modale de placement du tampon quand un NOUVEAU format apparaît.
   const [bordPlace, setBordPlace] = useState(null); // { numero, title, pdfBuf, w, h, key, blobUrl }
+  // Résultat prêt : { url, filename } -> bouton « Ouvrir » (fiable sur iPhone).
+  const [bordResult, setBordResult] = useState(null);
   const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
   const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
@@ -4410,7 +4418,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const { width, height } = await readPdfFirstPageSize(pdfBuf);
       const key = bordereauFormatKey(width, height);
       const saved = bordFormats[key];
-      if (saved) { await annotateAndDownloadBordereau(numero, title, pdfBuf, saved); return; }
+      if (saved) { const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, saved); setBordResult(r); return; }
       const blobUrl = URL.createObjectURL(new Blob([pdfBuf], { type:'application/pdf' }));
       setBordPlace({ numero, title, pdfBuf, w:width, h:height, key, blobUrl });
     } catch(err){ alert('Impossible de lire ce PDF : '+String(err)); }
@@ -4419,7 +4427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const p = bordPlace; if(!p) return;
     const next = { ...bordFormats, [p.key]: pos };
     setBordFormats(next); save('vinted_bordereau_formats', next);
-    try { await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); } catch(err){ alert('Erreur : '+String(err)); }
+    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult(r); } catch(err){ alert('Erreur : '+String(err)); }
     URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
   };
   const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
@@ -4609,7 +4617,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {benef!=null && fees>0 && <div style={{fontSize:9.5,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
                   {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
-                {st!=='cancelled' && (
+                {st==='pending' && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
                 )}
               </div>
@@ -4787,14 +4795,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Toutes tes ventes : clique 📄 pour le bordereau annoté (numéro si dispo, sinon le titre).</div>
+        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Ventes <b>à expédier</b> : clique 📄 pour le bordereau annoté (numéro si dispo, sinon le titre).</div>
         {sales.loading && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {(() => {
           if (sales.loading || sales.error) return null;
-          // Toutes les ventes non annulées (numéro facultatif) + recherche.
-          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled').filter(o=>matchOrd(o));
-          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente.<br/><span style={{fontSize:11.5}}>Tes ventes apparaîtront ici pour sortir leurs bordereaux.</span></div>;
+          // Uniquement les ventes À EXPÉDIER (en cours), pas les finalisées/annulées.
+          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)==='pending').filter(o=>matchOrd(o));
+          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente à expédier.<br/><span style={{fontSize:11.5}}>Les bordereaux apparaissent pour les ventes en cours d'expédition.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {list.map(o=>{ const amb=titleAmbiguous(o.title); const num=amb?'':(entryByTitle(o.title)?.numero||''); const st=classifyOrderStatus(o.status);
@@ -4850,6 +4858,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
+
+      {bordResult && (
+        <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
+            <div style={{fontSize:34,marginBottom:6}}>✅</div>
+            <div style={{fontSize:16,fontWeight:900,color:C.text,marginBottom:4}}>Bordereau prêt</div>
+            <div style={{fontSize:12.5,color:C.muted,lineHeight:1.45,marginBottom:16}}>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</div>
+            <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
+              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:800,textDecoration:'none',marginBottom:8}}>📄 Ouvrir le bordereau</a>
+            <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:700,padding:'8px'}}>Fermer</button>
+          </div>
+        </div>
+      )}
 
       {showReport && (
         <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
