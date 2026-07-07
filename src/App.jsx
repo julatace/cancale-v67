@@ -955,9 +955,10 @@ function Onboarding({ setTab }) {
   return (
     <div style={{padding:'20px 16px 8px'}}>
       <div style={{borderRadius:18,border:`1px solid ${C.border}`,background:C.card,padding:'22px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.04)'}}>
-        <div style={{fontSize:22,fontWeight:900,color:C.text,marginBottom:6}}>Bienvenue 👋</div>
+        <div style={{fontSize:22,fontWeight:900,color:C.text,marginBottom:2}}>Bienvenue sur VRM 👋</div>
+        <div style={{fontSize:12,fontWeight:700,color:C.accent,letterSpacing:0.3,marginBottom:8}}>Vendre · Ranger · Marge</div>
         <div style={{fontSize:14,color:C.muted,lineHeight:1.5,marginBottom:20}}>
-          Ton outil de gestion pour la revente de sneakers. Connecte ton compte Vinted pour commencer — c'est parti en 3 étapes :
+          Le CRM des revendeurs Vinted : vends tes paires, range-les au garage, suis ta marge. Connecte ton compte Vinted pour commencer — c'est parti en 3 étapes :
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           {steps.map(s=>(
@@ -5095,7 +5096,7 @@ export default function App() {
       // Notification navigateur si activée
       if(notifEnabled){
         if(newV>0&&newF>0){
-          pushNotif('Shop Cancale35', `${newV} vente${newV>1?'s':''} comptabilisée${newV>1?'s':''} et ${newF} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`);
+          pushNotif('VRM', `${newV} vente${newV>1?'s':''} comptabilisée${newV>1?'s':''} et ${newF} facture${newF>1?'s':''} reçue${newF>1?'s':''}.`);
         } else if(newV>0){
           pushNotif('Vente comptabilisée', `${newV} nouvelle${newV>1?'s':''} vente${newV>1?'s':''} en comptabilité.`);
         } else if(newF>0){

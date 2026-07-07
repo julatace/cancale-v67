@@ -1,7 +1,7 @@
 {
-  "name": "Cancale Shoes Store",
-  "short_name": "Cancale",
-  "description": "Ton outil de gestion pour la revente de sneakers sur Vinted : catalogue, ventes, garage, annonces numérotées, bordereaux.",
+  "name": "VRM — Vendre · Ranger · Marge",
+  "short_name": "VRM",
+  "description": "Le CRM des revendeurs Vinted : vends, range tes paires au garage, suis ta marge. Catalogue, ventes, annonces numérotées, bordereaux, rapport comptable.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
