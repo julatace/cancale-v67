@@ -516,8 +516,9 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
   const first = pdf.getPages()[0];
   const { width, height } = first.getSize();
+  const hasNum = numero != null && String(numero).trim() !== '';
   if (pos && typeof pos.xr === 'number') {
-    // Tampon positionné : cartouche blanc + bord noir, N° en gros + titre.
+    // Tampon positionné : cartouche blanc + bord noir. N° (si présent) + titre.
     const boxW = Math.min(width * 0.62, 230);
     const boxH = 46;
     let x = pos.xr * width, yTop = pos.yr * height;
@@ -525,18 +526,27 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
     let y = height - yTop - boxH; // origine PDF en bas à gauche
     y = Math.max(2, Math.min(height - boxH - 2, y));
     first.drawRectangle({ x, y, width:boxW, height:boxH, color: rgb(1,1,1), borderColor: rgb(0,0,0), borderWidth:1.5 });
-    first.drawText(`N° ${numero}`, { x:x+8, y:y+boxH-26, size:20, font:bold, color:rgb(0,0,0) });
     const maxChars = Math.max(16, Math.floor((boxW - 16) / 5));
     const t = (title || '').slice(0, maxChars);
-    if (t) first.drawText(t, { x:x+8, y:y+6, size:9, font:reg, color:rgb(0.12,0.12,0.12) });
+    if (hasNum) {
+      first.drawText(`N° ${numero}`, { x:x+8, y:y+boxH-26, size:20, font:bold, color:rgb(0,0,0) });
+      if (t) first.drawText(t, { x:x+8, y:y+6, size:9, font:reg, color:rgb(0.12,0.12,0.12) });
+    } else if (t) {
+      // Pas de numéro : le titre prend toute la place, plus gros.
+      first.drawText(t.slice(0, Math.max(20, Math.floor((boxW-16)/6.5))), { x:x+8, y:y+boxH/2-6, size:13, font:bold, color:rgb(0,0,0) });
+    }
   } else {
     const bandH = 74;
     first.drawRectangle({ x:0, y:0, width, height:bandH, color: rgb(1,1,1) });
     first.drawRectangle({ x:0, y:bandH, width, height:2, color: rgb(0,0,0) });
-    first.drawText(`N° ${numero}`, { x:18, y:bandH-38, size:32, font:bold, color:rgb(0,0,0) });
     const maxChars = Math.max(20, Math.floor((width - 36) / 6.2));
     const t = (title || '').slice(0, maxChars);
-    if (t) first.drawText(t, { x:18, y:12, size:12, font:reg, color:rgb(0.12,0.12,0.12) });
+    if (hasNum) {
+      first.drawText(`N° ${numero}`, { x:18, y:bandH-38, size:32, font:bold, color:rgb(0,0,0) });
+      if (t) first.drawText(t, { x:18, y:12, size:12, font:reg, color:rgb(0.12,0.12,0.12) });
+    } else if (t) {
+      first.drawText(t, { x:18, y:bandH-46, size:20, font:bold, color:rgb(0.08,0.08,0.08) });
+    }
   }
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
@@ -544,7 +554,7 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
   const a = document.createElement('a');
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
   a.href = url;
-  a.download = `bordereau-N${numero}${safeTitle?'-'+safeTitle:''}.pdf`;
+  a.download = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 };
@@ -4169,17 +4179,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const cached = !force && fromCache(type);
     if (cached) { setter({ loading:false, items:cached }); return; }
     setter({ loading:true, items:null, error:false });
-    const seen = new Set(); const out = []; let anyOk=false, anyErr=false;
+    const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
     for (const acc of accounts) {
       const res = await fetchVintedOrders(acc, type, 1, 'all', { force });
       if (res.ok) { anyOk=true; for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } } }
-      else anyErr=true;
+      else { anyErr=true; failed.push(accNameOf(acc)); }
     }
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
     if (!error) putCache(type, out);
-    setter({ loading:false, items: out, error });
+    setter({ loading:false, items: out, error, failed });
   };
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
   useEffect(() => { if (curSub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -4547,6 +4557,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Annonces » (bouton 🔗).
           </div>
         )}
+        {sales.failed?.length>0 && (
+          <div style={{fontSize:12,fontWeight:700,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:10,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
+            ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
+          </div>
+        )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes']].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
@@ -4594,8 +4609,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {benef!=null && fees>0 && <div style={{fontSize:9.5,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
                   {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
-                {num && st!=='cancelled' && (
-                  <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} title="Bordereau annoté" aria-label={`Bordereau annoté N°${num}`} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
+                {st!=='cancelled' && (
+                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
                 )}
               </div>
             );
@@ -4772,24 +4787,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Tes ventes numérotées : clique 📄 pour sortir le bordereau annoté (numéro + titre).</div>
+        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Toutes tes ventes : clique 📄 pour le bordereau annoté (numéro si dispo, sinon le titre).</div>
         {sales.loading && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {(() => {
           if (sales.loading || sales.error) return null;
-          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled' && !titleAmbiguous(o.title) && entryByTitle(o.title)?.numero);
-          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente numérotée.<br/><span style={{fontSize:11.5}}>Numérote tes annonces pour générer leurs bordereaux ici.</span></div>;
+          // Toutes les ventes non annulées (numéro facultatif) + recherche.
+          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled').filter(o=>matchOrd(o));
+          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente.<br/><span style={{fontSize:11.5}}>Tes ventes apparaîtront ici pour sortir leurs bordereaux.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {list.map(o=>{ const num=entryByTitle(o.title).numero; const st=classifyOrderStatus(o.status);
+              {list.map(o=>{ const amb=titleAmbiguous(o.title); const num=amb?'':(entryByTitle(o.title)?.numero||''); const st=classifyOrderStatus(o.status);
                 return (
                   <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
                     <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{num} · {o.title}</div>
+                      <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</div>
                       <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                         <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                         <span style={{color:st==='completed'?INV_STATUS.online.color:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':'en cours'}</span>
+                        {!num && <span style={{color:C.muted}}>titre seul</span>}
                       </div>
                     </div>
                     <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:13,fontWeight:800}}>📄 Bordereau</button>
