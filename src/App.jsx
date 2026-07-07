@@ -4502,8 +4502,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   const onBordFile = async (e) => {
     const f = e.target.files && e.target.files[0]; e.target.value='';
-    const ctx = bordCtx.current; if (!f || !ctx) return;
+    let ctx = bordCtx.current; if (!f || !ctx) return;
     if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { alert('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
+    // Import direct (pas depuis une vente) : on demande le N° + le titre.
+    if (ctx.standalone) {
+      const numero = (window.prompt('Numéro de la paire (laisse vide si aucun) :', '') || '').trim();
+      const title = (window.prompt('Titre / description (ex : Nike Air Max 90) :', '') || '').trim();
+      ctx = { numero, title };
+    }
     try { await processBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ alert('Erreur : '+String(err)); }
   };
 
@@ -4854,7 +4860,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Ventes <b>à expédier</b> : clique 📄 pour le bordereau annoté (numéro si dispo, sinon le titre).</div>
+        {/* Import direct : marche toujours, même si la vente n'apparaît pas / iPhone */}
+        <button type="button" onClick={()=>{ bordCtx.current = { standalone:true }; bordRef.current?.click(); }}
+          style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'12px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:6}}>
+          📄 Importer un bordereau à tamponner
+        </button>
+        <div style={{fontSize:11,color:C.muted,marginBottom:14,lineHeight:1.4}}>Télécharge d'abord ton bordereau depuis Vinted (dans la conversation), puis choisis-le ici — l'app y imprime le N° + le titre. Ça marche sur iPhone (via Fichiers/iCloud).</div>
+        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Ou depuis une vente <b>à expédier</b> ci-dessous (numéro pré-rempli) :</div>
         {sales.loading && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {(() => {
