@@ -33,7 +33,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
-  'vinted_goal','vinted_regime','vinted_tva',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -493,24 +493,51 @@ const extractPairNumber = (text) => {
 // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
 // TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
 // telechargement. But : ne pas se tromper de paire quand on prepare un envoi.
+// Lit la taille (en points PDF) de la 1re page — sert d'empreinte de "format"
+// de bordereau (chaque transporteur a des dimensions d'étiquette différentes).
+const readPdfFirstPageSize = async (pdfArrayBuffer) => {
+  const { PDFDocument } = await import('pdf-lib');
+  const pdf = await PDFDocument.load(pdfArrayBuffer);
+  const { width, height } = pdf.getPages()[0].getSize();
+  return { width, height };
+};
+// Empreinte de format = dimensions arrondies (ex "210x297").
+const bordereauFormatKey = (w, h) => `${Math.round(w)}x${Math.round(h)}`;
+
 // pdf-lib est charge dynamiquement (import()) pour ne pas alourdir le bundle
 // initial - il n'est telecharge que la 1re fois qu'on genere un bordereau.
-const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer) => {
+// `pos` = { xr, yr } position (ratio 0..1, coin haut-gauche du tampon, yr depuis
+// le HAUT) choisie par l'utilisateur pour CE format. Si absent -> bandeau en bas
+// (comportement historique).
+const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const pdf = await PDFDocument.load(pdfArrayBuffer);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
   const first = pdf.getPages()[0];
-  const { width } = first.getSize();
-  const bandH = 74;
-  // Bandeau blanc + trait noir de separation.
-  first.drawRectangle({ x:0, y:0, width, height:bandH, color: rgb(1,1,1) });
-  first.drawRectangle({ x:0, y:bandH, width, height:2, color: rgb(0,0,0) });
-  first.drawText(`N° ${numero}`, { x:18, y:bandH-38, size:32, font:bold, color:rgb(0,0,0) });
-  // Titre tronque pour tenir sur une ligne.
-  const maxChars = Math.max(20, Math.floor((width - 36) / 6.2));
-  const t = (title || '').slice(0, maxChars);
-  if (t) first.drawText(t, { x:18, y:12, size:12, font:reg, color:rgb(0.12,0.12,0.12) });
+  const { width, height } = first.getSize();
+  if (pos && typeof pos.xr === 'number') {
+    // Tampon positionné : cartouche blanc + bord noir, N° en gros + titre.
+    const boxW = Math.min(width * 0.62, 230);
+    const boxH = 46;
+    let x = pos.xr * width, yTop = pos.yr * height;
+    x = Math.max(2, Math.min(width - boxW - 2, x));
+    let y = height - yTop - boxH; // origine PDF en bas à gauche
+    y = Math.max(2, Math.min(height - boxH - 2, y));
+    first.drawRectangle({ x, y, width:boxW, height:boxH, color: rgb(1,1,1), borderColor: rgb(0,0,0), borderWidth:1.5 });
+    first.drawText(`N° ${numero}`, { x:x+8, y:y+boxH-26, size:20, font:bold, color:rgb(0,0,0) });
+    const maxChars = Math.max(16, Math.floor((boxW - 16) / 5));
+    const t = (title || '').slice(0, maxChars);
+    if (t) first.drawText(t, { x:x+8, y:y+6, size:9, font:reg, color:rgb(0.12,0.12,0.12) });
+  } else {
+    const bandH = 74;
+    first.drawRectangle({ x:0, y:0, width, height:bandH, color: rgb(1,1,1) });
+    first.drawRectangle({ x:0, y:bandH, width, height:2, color: rgb(0,0,0) });
+    first.drawText(`N° ${numero}`, { x:18, y:bandH-38, size:32, font:bold, color:rgb(0,0,0) });
+    const maxChars = Math.max(20, Math.floor((width - 36) / 6.2));
+    const t = (title || '').slice(0, maxChars);
+    if (t) first.drawText(t, { x:18, y:12, size:12, font:reg, color:rgb(0.12,0.12,0.12) });
+  }
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
@@ -3943,6 +3970,60 @@ function LoadError({ onRetry }) {
   </div>;
 }
 
+// Modale de placement du tampon sur un NOUVEAU format de bordereau. L'utilisateur
+// fait glisser le cartouche « N° + titre » là où il y a de la place sur SON
+// étiquette (proportions réelles de la page), puis l'app mémorise cette position
+// pour ce format et ne redemandera plus.
+function BordPlacer({ place, onConfirm, onCancel }) {
+  const { numero, title, w, h, blobUrl } = place;
+  const padRef = React.useRef(null);
+  const boxW = Math.min(w*0.62, 230), boxH = 46;      // taille réelle du tampon (pt)
+  const wr = boxW/w, hr = boxH/h;                       // taille en ratio de page
+  const [xr,setXr] = useState(0.04);
+  const [yr,setYr] = useState(Math.max(0, 1 - hr - 0.03)); // par défaut en bas à gauche
+  const dragging = React.useRef(false);
+  const moveTo = (cx, cy) => {
+    const r = padRef.current?.getBoundingClientRect(); if(!r) return;
+    let nx = (cx - r.left)/r.width - wr/2;
+    let ny = (cy - r.top)/r.height - hr/2;
+    nx = Math.max(0, Math.min(1-wr, nx));
+    ny = Math.max(0, Math.min(1-hr, ny));
+    setXr(nx); setYr(ny);
+  };
+  const pt = (e)=> e.touches && e.touches[0] ? e.touches[0] : e;
+  const onDown = (e)=>{ dragging.current=true; const p=pt(e); moveTo(p.clientX,p.clientY); };
+  const onMove = (e)=>{ if(!dragging.current) return; const p=pt(e); moveTo(p.clientX,p.clientY); if(e.cancelable) e.preventDefault(); };
+  const onUp = ()=>{ dragging.current=false; };
+  return (
+    <div onClick={onCancel} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:420,width:'100%',maxHeight:'92vh',overflow:'auto',padding:16}}>
+        <div style={{fontSize:15,fontWeight:900,color:C.text,marginBottom:2}}>📄 Nouveau format de bordereau</div>
+        <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginBottom:12}}>
+          Fais glisser l'étiquette <b>N° + titre</b> là où il y a de la place sur ton bordereau. L'app <b>retiendra</b> cet emplacement pour ce format.
+          <button onClick={()=>window.open(blobUrl,'_blank')} style={{marginLeft:6,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:700,cursor:'pointer',padding:0,fontSize:12}}>👁 Voir mon bordereau</button>
+        </div>
+        <div ref={padRef}
+          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+          onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+          style={{position:'relative',aspectRatio:`${w} / ${h}`,maxWidth:'100%',maxHeight:'56vh',margin:'0 auto',background:C.surface,border:`1px dashed ${C.border}`,borderRadius:8,touchAction:'none',cursor:'grab',overflow:'hidden'}}>
+          {/* Repères de zones (indicatif) */}
+          <div style={{position:'absolute',top:0,left:0,right:0,height:'34%',background:`${C.muted}0d`,borderBottom:`1px dashed ${C.border}`}}/>
+          <div style={{position:'absolute',top:'4%',left:0,right:0,textAlign:'center',fontSize:9,color:C.muted}}>haut (souvent code-barres / adresse)</div>
+          {/* Le tampon déplaçable */}
+          <div style={{position:'absolute',left:`${xr*100}%`,top:`${yr*100}%`,width:`${wr*100}%`,height:`${hr*100}%`,background:'#fff',border:'1.5px solid #000',borderRadius:4,display:'flex',flexDirection:'column',justifyContent:'center',padding:'2px 5px',boxSizing:'border-box',boxShadow:'0 1px 6px rgba(0,0,0,.25)',cursor:'grab'}}>
+            <div style={{fontSize:'min(3.4vw,15px)',fontWeight:900,color:'#000',lineHeight:1}}>N° {numero}</div>
+            <div style={{fontSize:'min(2.4vw,9px)',color:'#222',lineHeight:1.1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{title}</div>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:14}}>
+          <button onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:700,padding:'10px'}}>Annuler</button>
+          <button onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:10,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:800,padding:'10px'}}>Valider & tamponner</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Cache partagé entre les onglets (évite de recharger à chaque changement
 // d'onglet) : moins de requêtes, navigation instantanée. TTL court.
 const _acctCache = {};
@@ -4000,6 +4081,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
   const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
+  // Formats de bordereaux mémorisés : { [empreinte dimensions] : {xr,yr} }.
+  const [bordFormats, setBordFormats] = useState(() => load('vinted_bordereau_formats', {}));
+  // Modale de placement du tampon quand un NOUVEAU format apparaît.
+  const [bordPlace, setBordPlace] = useState(null); // { numero, title, pdfBuf, w, h, key, blobUrl }
   const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
   const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
@@ -4308,13 +4393,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     setTimeout(()=>URL.revokeObjectURL(url),4000);
   };
 
+  // Routeur commun : lit le format du bordereau. Si on connaît déjà où tamponner
+  // pour ce format -> on tamponne direct. Sinon -> modale de placement.
+  const processBordereau = async (numero, title, pdfBuf) => {
+    try {
+      const { width, height } = await readPdfFirstPageSize(pdfBuf);
+      const key = bordereauFormatKey(width, height);
+      const saved = bordFormats[key];
+      if (saved) { await annotateAndDownloadBordereau(numero, title, pdfBuf, saved); return; }
+      const blobUrl = URL.createObjectURL(new Blob([pdfBuf], { type:'application/pdf' }));
+      setBordPlace({ numero, title, pdfBuf, w:width, h:height, key, blobUrl });
+    } catch(err){ alert('Impossible de lire ce PDF : '+String(err)); }
+  };
+  const confirmBordPlacement = async (pos) => {
+    const p = bordPlace; if(!p) return;
+    const next = { ...bordFormats, [p.key]: pos };
+    setBordFormats(next); save('vinted_bordereau_formats', next);
+    try { await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); } catch(err){ alert('Erreur : '+String(err)); }
+    URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
+  };
+  const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
+
   const startBordereau = async (numero, title, acc) => {
     bordCtx.current = { numero, title };
     const lbl = acc ? await fetchCapturedLabel(acc.vinted_user_id) : null;
     if (lbl && lbl.pdfB64) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
-      if (age<20 && window.confirm(`Tamponner le dernier bordereau téléchargé avec le N°${numero} (${title}) ?\n\nOK = oui · Annuler = choisir un fichier`)) {
-        try { await annotateAndDownloadBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; } catch(_){}
+      if (age<20 && window.confirm(`Utiliser le dernier bordereau téléchargé pour le N°${numero} (${title}) ?\n\nOK = oui · Annuler = choisir un fichier`)) {
+        try { await processBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; } catch(_){}
       }
     }
     bordRef.current?.click();
@@ -4323,7 +4429,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const f = e.target.files && e.target.files[0]; e.target.value='';
     const ctx = bordCtx.current; if (!f || !ctx) return;
     if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { alert('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
-    try { await annotateAndDownloadBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ alert('Erreur : '+String(err)); }
+    try { await processBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ alert('Erreur : '+String(err)); }
   };
 
   const fmtE = (n)=> (n==null?'—':Number(n).toFixed(2).replace('.',',')+' €');
@@ -4726,6 +4832,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       )}
 
       {/* Modale conversation */}
+      {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
+
       {showReport && (
         <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -4846,6 +4954,8 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Comptabilité</div>
       <RegimeSetting/>
+      <div style={{height:10}}/>
+      <Row icon="📄" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={()=>{ if(window.confirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); alert('✓ Emplacements réinitialisés.'); } }}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
