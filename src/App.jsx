@@ -293,6 +293,19 @@ const classifyOrderStatus = (status) => {
   if (/finalis/i.test(s)) return 'completed';
   return 'pending';
 };
+// Une vente a besoin d'un BORDEREAU seulement si elle est À EXPÉDIER : ni
+// annulée, ni finalisée, ni déjà expédiée/livrée. On exclut donc les statuts
+// « expédié / en transit / livré / finalisé ». Le reste (payé, en attente
+// d'expédition, en préparation…) = à expédier. Statut inconnu -> on montre quand
+// même (mieux vaut proposer que cacher à tort).
+const needsBordereau = (status) => {
+  const s = (status || '').toLowerCase();
+  if (!s) return true;
+  if (/annul|refus|rembours|cancel/.test(s)) return false;
+  if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
+  if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
+  return true;                                                              // à expédier
+};
 
 // Recupere une page d'achats ou de ventes pour un compte (endpoint reel
 // trouve via "Copy as fetch" : www.vinted.fr/api/v2/my_orders).
@@ -4608,6 +4621,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span>
+                    {o.status && <span style={{color:C.muted,fontStyle:'italic',opacity:0.8}} title="Statut exact renvoyé par Vinted">« {o.status} »</span>}
+                    {needsBordereau(o.status) && <span style={{color:C.accent,fontWeight:800}}>· à expédier</span>}
                     {amb && <span style={{color:C.danger,fontWeight:800}} title="Plusieurs annonces ont ce même titre : impossible d'attribuer le numéro de façon sûre. Rends les titres uniques.">⚠️ titre en double</span>}
                   </div>
                 </div>
@@ -4617,7 +4632,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {benef!=null && fees>0 && <div style={{fontSize:9.5,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
                   {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
-                {st==='pending' && (
+                {needsBordereau(o.status) && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
                 )}
               </div>
@@ -4800,8 +4815,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {(() => {
           if (sales.loading || sales.error) return null;
-          // Uniquement les ventes À EXPÉDIER (en cours), pas les finalisées/annulées.
-          const list = (sales.items||[]).filter(o=>classifyOrderStatus(o.status)==='pending').filter(o=>matchOrd(o));
+          // Uniquement les ventes À EXPÉDIER (ni expédiées, ni finalisées, ni annulées).
+          const list = (sales.items||[]).filter(o=>needsBordereau(o.status)).filter(o=>matchOrd(o));
           if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente à expédier.<br/><span style={{fontSize:11.5}}>Les bordereaux apparaissent pour les ventes en cours d'expédition.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
