@@ -4748,6 +4748,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {benef!=null && fees>0 && <div style={{fontSize:9.5,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
                   {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
+                {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
+                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:14,padding:'6px 8px'}}>📍</button>
+                )}
                 {needsBordereau(o.status) && !hidden && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
                 )}
