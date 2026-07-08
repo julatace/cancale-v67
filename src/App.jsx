@@ -4594,17 +4594,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); mo.cout+=buy; mo.nbCout+=1; }
     }
     let achatsTotal=0, achatsNb=0;
+    const buyLines=[];
     for (const o of (buys.items||[])) {
       if (classifyOrderStatus(o.status)==='cancelled' || !o.date) continue;
       const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
-      achatsTotal += o.price?.amount!=null?Number(o.price.amount):0; achatsNb+=1;
+      const montant = o.price?.amount!=null?Number(o.price.amount):0;
+      achatsTotal += montant; achatsNb+=1;
+      buyLines.push({ o, date:o.date, seller:o.seller||o.user_login||o.opposite_user?.login||'', title:o.title, montant });
     }
+    buyLines.sort((a,b)=> new Date(b.date)-new Date(a.date));
     const benefNet = ca - cout - frais;
     const marge = margeKnown - frais;
     const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
     const urssaf = ca*0.135;
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb };
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buys.items, reportYear, numeros, hiddenSales, hiddenAccts]);
   const openAnnual = () => { setShowAnnual(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
@@ -4618,7 +4622,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.ca-m.cout-m.frais).toFixed(2), String(m.nb)]));
     L.push(['TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2), String(R.nb)]);
     L.push([]);
-    L.push(['Achats (registre)', R.achatsTotal.toFixed(2), `${R.achatsNb} achats`]);
+    L.push(['ACHATS (registre)']); L.push(['Date','Vendeur','Article','Montant']);
+    R.buyLines.forEach(b=>L.push([b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',b.seller,b.title,b.montant.toFixed(2)]));
+    L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
+    L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
     else { L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
@@ -5212,7 +5219,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   </tbody>
                 </table>
               </div>
-              <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Achats de l'année : <b style={{color:C.text}}>{fmtE(annual.achatsTotal)}</b> ({annual.achatsNb})</div>
+              <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(annual.achatsTotal)} ({annual.buyLines.length})</div>
+              {buys.items===null && <div style={{fontSize:11.5,color:C.muted,marginBottom:8}}>Registre en cours de chargement…</div>}
+              {buys.items!==null && annual.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat cette année.</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:12,maxHeight:260,overflowY:'auto'}}>
+                {annual.buyLines.map((b,i)=>(
+                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
+                      <div style={{fontSize:10,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}€</div>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime })} title="Justificatif d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
+                  </div>
+                ))}
+              </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12.5,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
                 <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12.5,fontWeight:800,cursor:'pointer'}}>📄 PDF</button>
