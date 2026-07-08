@@ -702,6 +702,19 @@ function extractBrand(text){
   for(const b of KNOWN_BRANDS){if(t.includes(b.toLowerCase())) return b;}
   return null;
 }
+// Extrait une pointure (taille chaussure) depuis un titre d'annonce. Heuristique
+// volontairement prudente : "taille 42", "T42", "pointure 40", ou un nombre isolé
+// dans la plage 34–52 (les modèles Nike 90/95/97/270… sont hors plage → ignorés).
+// Demi-pointures gérées (42,5). Sert uniquement aux stats de sourcing (approximatif).
+function extractSize(text){
+  if(!text) return null;
+  const t=String(text).toLowerCase().replace(',','.');
+  const grab=(m)=> m ? m[1]+(/\.5/.test(m[0])?'.5':'') : null;
+  let m=t.match(/(?:taille|pointure|t|eu|fr)\s*\.?\s*(3[4-9]|4[0-9]|5[0-2])(?:\.5)?/);
+  if(m) return grab(m);
+  m=t.match(/(?:^|[^0-9.])(3[4-9]|4[0-9]|5[0-2])(?:\.5)?(?:[^0-9]|$)/);
+  return grab(m);
+}
 const COUNTRY_MAP_DATA=[
   [['france'],'France'],[['allemagne','deutschland','germany'],'Allemagne'],
   [['belgique','belgium','belgie'],'Belgique'],[['espagne','españa','spain','espana'],'Espagne'],
@@ -4423,6 +4436,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, hiddenSales, hiddenAccts]);
 
+  // ── Stats de sourcing : quelles marques / tailles rapportent le plus ──
+  // Agrège les ventes finalisées (hors masquées) par marque et par taille :
+  // nb vendues, bénéfice moyen/paire (si prix d'achat connu), temps de vente moyen.
+  // But : savoir quoi racheter en priorité.
+  const [showSourcing, setShowSourcing] = useState(false);
+  const sourcing = useMemo(() => {
+    const items = sales.items || [];
+    const mk = () => ({ nb:0, ca:0, benef:0, benefNb:0, daysSum:0, daysNb:0 });
+    const brands={}, sizes={}; let total=0;
+    for (const o of items) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) !== 'completed') continue;
+      total+=1;
+      const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
+      const e = resolvedEntry(o);
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      const fee = feesOf(e);
+      const days = (e && e.numberedAt && o.date) ? (new Date(o.date)-new Date(e.numberedAt))/86400000 : null;
+      const b = extractBrand(o.title) || '—';
+      const s = extractSize(o.title) || '?';
+      for (const [map,key] of [[brands,b],[sizes,s]]) {
+        if (!map[key]) map[key]=mk();
+        const bk=map[key];
+        bk.nb+=1; bk.ca+=sell;
+        if (buy!=null && !isNaN(buy)) { bk.benef+=(sell-buy-fee); bk.benefNb+=1; }
+        if (days!=null && days>=0 && days<3650) { bk.daysSum+=days; bk.daysNb+=1; }
+      }
+    }
+    const finalize = (map) => Object.entries(map).map(([k,v])=>({
+      key:k, nb:v.nb, ca:v.ca,
+      benefMoy: v.benefNb ? v.benef/v.benefNb : null, benefNb:v.benefNb,
+      joursMoy: v.daysNb ? v.daysSum/v.daysNb : null,
+    })).sort((a,b)=> b.nb-a.nb || (b.benefMoy||-1e9)-(a.benefMoy||-1e9));
+    return { brands:finalize(brands), sizes:finalize(sizes), total };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, hiddenSales, hiddenAccts]);
+
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
@@ -4697,7 +4747,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
           ))}
           {accounts.length>0 && (
-            <button onClick={openReport} title="Rapport comptable mensuel" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Rapport</button>
+            <button onClick={()=>setShowSourcing(true)} title="Stats par marque et taille (quoi racheter)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>🎯 Sourcing</button>
+          )}
+          {accounts.length>0 && (
+            <button onClick={openReport} title="Rapport comptable mensuel" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Rapport</button>
           )}
           {sales.items && sales.items.length>0 && (
             <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
@@ -5014,6 +5067,55 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         </div>
       )}
 
+      {showSourcing && (
+        <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>🎯 Sourcing — quoi racheter</div>
+                <div style={{fontSize:11,color:C.muted}}>{sourcing.total} vente{sourcing.total>1?'s':''} finalisée{sourcing.total>1?'s':''} analysée{sourcing.total>1?'s':''}</div>
+              </div>
+              <button type="button" onClick={()=>setShowSourcing(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:16}}>
+              {sourcing.total===0 ? (
+                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Pas encore de vente finalisée à analyser.</div>
+              ) : (()=>{
+                const bestMargin = (rows)=> rows.reduce((mx,r)=> (r.benefMoy!=null && (mx==null || r.benefMoy>mx))?r.benefMoy:mx, null);
+                const Section = ({title, rows, hint})=>{
+                  const bm = bestMargin(rows);
+                  return (
+                    <div style={{marginBottom:18}}>
+                      <div style={{fontSize:12,fontWeight:800,color:C.text,marginBottom:2}}>{title}</div>
+                      <div style={{fontSize:10.5,color:C.muted,marginBottom:8}}>{hint}</div>
+                      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                        {rows.map((r,i)=>{ const top = r.benefMoy!=null && bm!=null && r.benefMoy===bm && r.benefNb>0;
+                          return (
+                          <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${top?(INV_STATUS.online.color+'88'):C.border}`,borderRadius:10,background:top?`${INV_STATUS.online.color}10`:C.card}}>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.key==='—'?'Marque inconnue':(r.key==='?'?'Taille inconnue':r.key)} {top && <span style={{fontSize:10,color:INV_STATUS.online.color,fontWeight:700}}>★ top marge</span>}</div>
+                              <div style={{fontSize:10.5,color:C.muted}}>{r.nb} vendue{r.nb>1?'s':''} · CA {fmtE(r.ca)}{r.joursMoy!=null?` · ${r.joursMoy.toFixed(0)} j en moy.`:''}</div>
+                            </div>
+                            <div style={{textAlign:'right',flexShrink:0}}>
+                              <div style={{fontSize:14,fontWeight:900,color:r.benefMoy==null?C.muted:(r.benefMoy>=0?INV_STATUS.online.color:C.danger)}}>{r.benefMoy==null?'—':`${r.benefMoy>=0?'+':''}${r.benefMoy.toFixed(0)}€`}</div>
+                              <div style={{fontSize:9.5,color:C.muted}}>{r.benefMoy==null?'achat inconnu':'bénéf./paire'}</div>
+                            </div>
+                          </div>
+                        );})}
+                      </div>
+                    </div>
+                  );
+                };
+                return (<>
+                  <Section title="Par marque" rows={sourcing.brands} hint="Trié par nb de ventes. Le bénéfice/paire aide à prioriser les rachats."/>
+                  <Section title="Par taille" rows={sourcing.sizes} hint="Taille estimée depuis le titre — approximatif. « ? » = pointure non détectée."/>
+                  <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Le bénéfice n'est calculé que pour les ventes dont le prix d'achat est renseigné (bouton 🔗 dans Annonces). Les marques reconnues viennent d'une liste interne.</div>
+                </>);
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
       {showReport && (
         <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
