@@ -4568,6 +4568,87 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     setTimeout(()=>URL.revokeObjectURL(url),4000);
   };
 
+  // ── Bilan annuel (récap 12 mois, prêt pour la déclaration) ──────────
+  const [showAnnual, setShowAnnual] = useState(false);
+  const [reportYear, setReportYear] = useState(() => new Date().getFullYear());
+  const reportYears = useMemo(() => {
+    const s = new Set([new Date().getFullYear()]);
+    (sales.items||[]).forEach(o=>{ const d=o.date&&new Date(o.date); if(d&&!isNaN(d)) s.add(d.getFullYear()); });
+    (buys.items||[]).forEach(o=>{ const d=o.date&&new Date(o.date); if(d&&!isNaN(d)) s.add(d.getFullYear()); });
+    return [...s].sort((a,b)=>b-a);
+  }, [sales.items, buys.items]);
+  const annual = useMemo(() => {
+    const regime = load('vinted_regime','micro');
+    const tvaRate = Number(load('vinted_tva',20))||20;
+    const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
+    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0;
+    for (const o of (sales.items||[])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
+      const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
+      const sell = o.price?.amount!=null?Number(o.price.amount):0;
+      const e = resolvedEntry(o); const fee=feesOf(e);
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      const mo=months[d.getMonth()];
+      ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); mo.cout+=buy; mo.nbCout+=1; }
+    }
+    let achatsTotal=0, achatsNb=0;
+    for (const o of (buys.items||[])) {
+      if (classifyOrderStatus(o.status)==='cancelled' || !o.date) continue;
+      const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
+      achatsTotal += o.price?.amount!=null?Number(o.price.amount):0; achatsNb+=1;
+    }
+    const benefNet = ca - cout - frais;
+    const marge = margeKnown - frais;
+    const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
+    const margeHT = marge - tvaMarge;
+    const urssaf = ca*0.135;
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, buys.items, reportYear, numeros, hiddenSales, hiddenAccts]);
+  const openAnnual = () => { setShowAnnual(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
+  const exportAnnualCsv = () => {
+    const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+    const L=[];
+    L.push([`Bilan annuel ${R.year}`]);
+    L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
+    L.push([]);
+    L.push(['Mois','CA encaissé','Coût achat','Boosts','Bénéfice net','Ventes']);
+    R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.ca-m.cout-m.frais).toFixed(2), String(m.nb)]));
+    L.push(['TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2), String(R.nb)]);
+    L.push([]);
+    L.push(['Achats (registre)', R.achatsTotal.toFixed(2), `${R.achatsNb} achats`]);
+    if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
+    else { L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
+    const csv = L.map(r=>r.map(e).join(';')).join('\n');
+    const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.csv`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  };
+  const exportAnnualPdf = async () => {
+    const R=annual;
+    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+    const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
+    let y=800; const T=(t,x,yy,s,f,c)=>page.drawText(String(t),{x,y:yy,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
+    T('Bilan annuel '+R.year,40,y,22,bold,rgb(0,0.47,0.51)); y-=20; T(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur',40,y,11,reg,rgb(0.4,0.4,0.4)); y-=26;
+    // Tableau mensuel
+    const cols=[[40,'Mois'],[150,'CA'],[240,'Coût'],[330,'Boosts'],[420,'Bénéf.'],[510,'Ventes']];
+    cols.forEach(([x,h])=>T(h,x,y,9,bold,rgb(0.3,0.3,0.3))); y-=4; page.drawLine({start:{x:40,y},end:{x:555,y},thickness:0.5,color:rgb(0.8,0.8,0.8)}); y-=14;
+    R.months.forEach(m=>{ T(m.label,40,y,9,reg); T(m.ca.toFixed(0),150,y,9,reg); T(m.cout.toFixed(0),240,y,9,reg); T(m.frais.toFixed(0),330,y,9,reg); T((m.ca-m.cout-m.frais).toFixed(0),420,y,9,reg); T(String(m.nb),510,y,9,reg); y-=15; });
+    page.drawLine({start:{x:40,y:y+4},end:{x:555,y:y+4},thickness:0.5,color:rgb(0.8,0.8,0.8)});
+    T('TOTAL',40,y-8,10,bold); T(R.ca.toFixed(0),150,y-8,10,bold); T(R.cout.toFixed(0),240,y-8,10,bold); T(R.frais.toFixed(0),330,y-8,10,bold); T(R.benefNet.toFixed(0),420,y-8,10,bold); T(String(R.nb),510,y-8,10,bold); y-=34;
+    const kv=(k,v)=>{ T(k,40,y,10,reg,rgb(0.4,0.4,0.4)); T(v,300,y,11,bold); y-=20; };
+    kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
+    if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
+    const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.pdf`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+  };
+
   // Routeur commun : lit le format du bordereau, tamponne à l'emplacement connu
   // pour ce format (ou au défaut intelligent = haut de page, jamais sur le
   // code-barres). On stocke tout pour permettre de DÉPLACER ensuite.
@@ -4751,6 +4832,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           )}
           {accounts.length>0 && (
             <button onClick={openReport} title="Rapport comptable mensuel" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Rapport</button>
+          )}
+          {accounts.length>0 && (
+            <button onClick={openAnnual} title="Bilan annuel (12 mois)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📅 Bilan</button>
           )}
           {sales.items && sales.items.length>0 && (
             <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
@@ -5067,6 +5151,77 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         </div>
       )}
 
+      {showAnnual && (
+        <div onClick={()=>setShowAnnual(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>📅 Bilan annuel</div>
+                <div style={{fontSize:11,color:C.muted}}>{annual.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
+              </div>
+              <button type="button" onClick={()=>setShowAnnual(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:16}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                <span style={{fontSize:12,fontWeight:700,color:C.text}}>Année</span>
+                <select value={reportYear} onChange={e=>setReportYear(Number(e.target.value))} style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px',fontSize:13,fontWeight:700,background:C.card,color:C.text,cursor:'pointer'}}>
+                  {reportYears.map(y=><option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              {buys.loading && <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
+              <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                <StatBox label="CA encaissé" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`}/>
+                {annual.regime==='marge' ? (<>
+                  <StatBox label="Marge TTC" value={fmtE(annual.marge)} color={annual.marge>=0?INV_STATUS.online.color:C.danger}/>
+                  <StatBox label={`TVA marge ${annual.tvaRate}%`} value={fmtE(annual.tvaMarge)} color={C.warn}/>
+                  <StatBox label="Marge HT" value={fmtE(annual.margeHT)}/>
+                </>) : (<>
+                  <StatBox label="Bénéfice net" value={fmtE(annual.benefNet)} color={annual.benefNet>=0?INV_STATUS.online.color:C.danger} sub={annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined}/>
+                  <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub="13,5% du CA"/>
+                </>)}
+              </div>
+              {annual.nb>annual.nbCout && <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
+              {/* Tableau mensuel */}
+              <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'6px 0 8px'}}>Détail par mois</div>
+              <div style={{overflowX:'auto',marginBottom:12}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:11.5}}>
+                  <thead><tr style={{color:C.muted,textAlign:'right'}}>
+                    <th style={{textAlign:'left',padding:'4px 6px',fontWeight:700}}>Mois</th>
+                    <th style={{padding:'4px 6px',fontWeight:700}}>CA</th>
+                    <th style={{padding:'4px 6px',fontWeight:700}}>Coût</th>
+                    <th style={{padding:'4px 6px',fontWeight:700}}>Bénéf.</th>
+                    <th style={{padding:'4px 6px',fontWeight:700}}>Ventes</th>
+                  </tr></thead>
+                  <tbody>
+                    {annual.months.map((m,i)=>{ const b=m.ca-m.cout-m.frais; return (
+                      <tr key={i} style={{borderTop:`1px solid ${C.border}`,color:C.text,textAlign:'right'}}>
+                        <td style={{textAlign:'left',padding:'5px 6px',textTransform:'capitalize'}}>{m.label}</td>
+                        <td style={{padding:'5px 6px'}}>{m.ca?m.ca.toFixed(0)+'€':'—'}</td>
+                        <td style={{padding:'5px 6px',color:C.muted}}>{m.cout?m.cout.toFixed(0)+'€':'—'}</td>
+                        <td style={{padding:'5px 6px',fontWeight:700,color:m.nbCout?(b>=0?INV_STATUS.online.color:C.danger):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+'€':'—'}</td>
+                        <td style={{padding:'5px 6px',color:C.muted}}>{m.nb||'—'}</td>
+                      </tr>
+                    );})}
+                    <tr style={{borderTop:`2px solid ${C.border}`,color:C.text,textAlign:'right',fontWeight:900}}>
+                      <td style={{textAlign:'left',padding:'6px'}}>TOTAL</td>
+                      <td style={{padding:'6px'}}>{annual.ca.toFixed(0)}€</td>
+                      <td style={{padding:'6px'}}>{annual.cout.toFixed(0)}€</td>
+                      <td style={{padding:'6px',color:annual.benefNet>=0?INV_STATUS.online.color:C.danger}}>{(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)}€</td>
+                      <td style={{padding:'6px'}}>{annual.nb}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Achats de l'année : <b style={{color:C.text}}>{fmtE(annual.achatsTotal)}</b> ({annual.achatsNb})</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12.5,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
+                <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12.5,fontWeight:800,cursor:'pointer'}}>📄 PDF</button>
+              </div>
+              <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
+            </div>
+          </div>
+        </div>
+      )}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
