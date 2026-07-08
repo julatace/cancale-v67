@@ -190,6 +190,56 @@ async function vintedGet(acc, endpoint) {
   } catch (_) { return { status: 0, ok: false, json: null }; }
 }
 
+// Renouvelle le token d'un compte — MAIS uniquement s'il est celui actuellement
+// connecte dans le navigateur (le cookie access_token_web decode le meme
+// account_id). Dans ce cas on declenche exactement le meme refresh que la page
+// Vinted fait d'elle-meme (POST /web/api/auth/refresh, cookies du navigateur) :
+// c'est indetectable et ca N'AJOUTE AUCUN signal multi-comptes. Pour un compte
+// NON actif, on ne fait RIEN (il se rafraichira quand tu l'ouvriras) — on refuse
+// volontairement le refresh de masse qui avait fait bloquer un compte.
+// Renvoie l'acc mis a jour (token frais) ou null.
+async function refreshIfActive(acc) {
+  const domain = acc.domain || 'www.vinted.fr';
+  const cookieTok = await getCookie(domain, 'access_token_web');
+  if (!cookieTok) return null;
+  const p = jwtPayload(cookieTok);
+  const cookieUid = p && p.account_id ? String(p.account_id) : null;
+  // Garde-fou : on ne rafraichit QUE le compte actuellement actif dans le navigateur.
+  if (!cookieUid || cookieUid !== String(acc.vinted_user_id)) return null;
+  try {
+    const res = await fetch(`https://${domain}/web/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include', // laisse le navigateur envoyer les cookies du compte actif
+      headers: {
+        'x-anon-id': acc.anon_id || '',
+        'x-csrf-token': acc.csrf_token || lastCsrfByDomain[domain] || '',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+      },
+      body: '{}',
+    });
+    if (!res.ok) return null;
+  } catch (_) { return null; }
+  await wait(400);
+  // Vinted a pose les nouveaux cookies (Set-Cookie applique par le navigateur) :
+  // on relit les tokens frais et on les persiste pour l'app + les prochains cycles.
+  const newAccess = await getCookie(domain, 'access_token_web');
+  const newRefresh = await getCookie(domain, 'refresh_token_web');
+  if (!newAccess || newAccess === acc.access_token) return null;
+  acc.access_token = newAccess;
+  if (newRefresh) acc.refresh_token = newRefresh;
+  await supabaseUpsert('vinted_accounts', [{
+    vinted_user_id: String(acc.vinted_user_id),
+    domain,
+    access_token: newAccess,
+    refresh_token: newRefresh || acc.refresh_token || null,
+    anon_id: acc.anon_id || null,
+    updated_at: new Date().toISOString(),
+  }], 'vinted_user_id');
+  return acc;
+}
+
 // Range une reponse Vinted dans une ligne harvest_{uid}_{type} (meme format que
 // la capture passive, donc l'app la lit deja).
 async function storeHarvestRow(uid, type, payload, domain) {
@@ -220,7 +270,15 @@ async function activeFetchAccount(acc) {
 
   // 1) Profil (donne l'id de PROFIL, different de l'account_id, requis pour le
   //    dressing) + le pseudo.
-  const prof = await vintedGet(acc, '/api/v2/users/current');
+  let prof = await vintedGet(acc, '/api/v2/users/current');
+  // Token expire ? Si ce compte est celui actif dans le navigateur, on le
+  // renouvelle (comme la page Vinted) puis on rejoue. acc.access_token est
+  // mis a jour en place -> tous les appels suivants (annonces/ventes/achats/
+  // messages) profitent du token frais. Sinon on laisse tomber sans risque.
+  if (prof.status === 401) {
+    const refreshed = await refreshIfActive(acc);
+    if (refreshed) { await wait(500); prof = await vintedGet(acc, '/api/v2/users/current'); }
+  }
   if (prof.ok && prof.json) {
     await storeHarvestRow(uid, 'profile', prof.json, domain);
     const login = prof.json.user && prof.json.user.login;
