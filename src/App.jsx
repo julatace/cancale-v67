@@ -4124,6 +4124,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
   const [msgAcc, setMsgAcc] = useState('all'); // filtre compte pour les messages
+  const [msgWaitingOnly, setMsgWaitingOnly] = useState(false); // n'afficher que les conversations en attente de réponse
   // Ventes masquées de la compta (par n° de transaction). Réversible.
   const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
   // Comptes entiers exclus de la compta (par vinted_user_id).
@@ -5064,26 +5065,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         </div>
         {convs.loading && <Skeleton variant="row" count={5}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
-        {convs.items && !convs.error && convs.items.filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc).length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune conversation.<br/><span style={{fontSize:11.5}}>Tes échanges Vinted s'afficheront ici.</span></div>}
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(convs.items||[]).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc).map((conv,i)=>{
-            const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
-            return (
-              <button key={(conv.id||i)+'_'+conv._acc.vinted_user_id} type="button" onClick={()=>openConversation(conv)} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',textAlign:'left',width:'100%'}}>
-                {photo?<img src={photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:<div style={{width:40,height:40,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.opposite_user?.login||'Conversation'}</div>
-                  <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.description||''}</div>
-                  <div style={{marginTop:4}}><AcctTag acc={conv._acc} name={accNameOf(conv._acc)}/></div>
+        {(() => {
+          const daysSince = (d)=>{ if(!d) return null; const t=new Date(d); if(isNaN(t)) return null; return Math.floor((Date.now()-t.getTime())/86400000); };
+          const base = (convs.items||[]).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc);
+          // "En attente de réponse" = conversation non lue (l'acheteur a écrit, tu
+          // n'as pas encore répondu). Triées de la plus ancienne à la plus récente.
+          const waiting = base.filter(c=>c.unread).sort((a,b)=> new Date(a.updated_at||0) - new Date(b.updated_at||0));
+          const oldest = waiting.length ? daysSince(waiting[0].updated_at) : null;
+          const shown = (msgWaitingOnly ? waiting : base);
+          return (<>
+            {waiting.length>0 && (
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,padding:'10px 12px',borderRadius:12,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
+                <span style={{fontSize:18}}>⏳</span>
+                <div style={{flex:1,minWidth:0,fontSize:12,color:C.text,fontWeight:700,lineHeight:1.35}}>
+                  {waiting.length} acheteur{waiting.length>1?'s':''} en attente de réponse
+                  {oldest!=null && oldest>=1 && <span style={{color:C.danger,fontWeight:800}}> · le plus ancien depuis {oldest} j</span>}
+                  <div style={{fontSize:10.5,color:C.muted,fontWeight:600}}>Répondre vite = meilleures évaluations.</div>
                 </div>
-                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
-                  <span style={{fontSize:10,color:C.muted}}>{conv.updated_at?new Date(conv.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
-                  {conv.unread && <span style={{width:9,height:9,borderRadius:999,background:C.accent}}/>}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                <button type="button" onClick={()=>setMsgWaitingOnly(v=>!v)} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:msgWaitingOnly?C.warn:'transparent',color:msgWaitingOnly?'#fff':C.warn,borderRadius:999,padding:'5px 10px',fontSize:11,fontWeight:800,cursor:'pointer'}}>{msgWaitingOnly?'Tout voir':'En attente'}</button>
+              </div>
+            )}
+            {convs.items && !convs.error && shown.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>{msgWaitingOnly?'Aucune conversation en attente. 👌':<>Aucune conversation.<br/><span style={{fontSize:11.5}}>Tes échanges Vinted s'afficheront ici.</span></>}</div>}
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {shown.map((conv,i)=>{
+                const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
+                const age = conv.unread ? daysSince(conv.updated_at) : null;
+                return (
+                  <button key={(conv.id||i)+'_'+conv._acc.vinted_user_id} type="button" onClick={()=>openConversation(conv)} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${conv.unread?(C.warn+'88'):C.border}`,background:conv.unread?`${C.warn}0c`:C.card,cursor:'pointer',textAlign:'left',width:'100%'}}>
+                    {photo?<img src={photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:<div style={{width:40,height:40,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.opposite_user?.login||'Conversation'}</div>
+                      <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.description||''}</div>
+                      <div style={{marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><AcctTag acc={conv._acc} name={accNameOf(conv._acc)}/>{conv.unread && <span style={{fontSize:10,color:C.warn,fontWeight:800}}>⏳ à répondre{age!=null&&age>=1?` · ${age}j`:''}</span>}</div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+                      <span style={{fontSize:10,color:C.muted}}>{conv.updated_at?new Date(conv.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
+                      {conv.unread && <span style={{width:9,height:9,borderRadius:999,background:C.warn}}/>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </>);
+        })()}
       </>)}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
