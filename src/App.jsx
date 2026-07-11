@@ -4532,17 +4532,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
   const totals = useMemo(() => {
     const items = sales.items || [];
-    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0;
+    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
     for (const o of items) {
       if (isHidden(o)) continue;
-      if (classifyOrderStatus(o.status) !== 'completed') continue;
-      const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; ca+=sell; nb+=1;
+      const stt = classifyOrderStatus(o.status);
+      const sellAmt = o.price?.amount!=null ? Number(o.price.amount) : 0;
+      // « En cours » = vendu mais pas encore finalisé (colis en route / livré non
+      // validé / bordereau) → argent qui arrive dans le porte-monnaie.
+      if (stt === 'pending') { enAttente += sellAmt; nbAttente += 1; }
+      if (stt !== 'completed') continue;
+      const sell = sellAmt; ca+=sell; nb+=1;
       const e = effEntry(o);
       const fee = feesOf(e); frais += fee;
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
@@ -4931,9 +4936,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       )}
 
       {curSub==='ventes' && (<>
-        {totals.nb>0 && (
+        {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            {totals.nbAttente>0 && <StatBox label="💰 En attente" value={fmtE(totals.enAttente)} color={C.warn} sub={`${totals.nbAttente} en cours · porte-monnaie`}/>}
             <StatBox label="Coût d'achat" value={fmtE(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
             {totals.frais>0 && <StatBox label="Boosts" value={fmtE(totals.frais)} sub="mises en avant"/>}
             <StatBox label="Bénéfice net" value={fmtE(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût')}/>
