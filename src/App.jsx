@@ -5034,6 +5034,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <span style={{fontSize:10,color:C.muted}}>€</span>
                   </div>
                 )}
+                {/* Assistant de baisse de prix : sur les paires qui dorment ou tres
+                    vues sans favori, on suggere un prix (-15%, arrondi) et un lien
+                    direct vers l'annonce pour le baisser. Le vrai 1-clic (ecriture
+                    directe) viendra une fois la requete captee par l'extension. */}
+                {it.price!=null && (sleeps || (it.views>=30 && it.favourites===0)) && (()=>{
+                  const sugg = Math.max(1, Math.round(Number(it.price)*0.85));
+                  if (!(sugg < Number(it.price))) return null;
+                  return (
+                    <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 10px 10px',padding:'6px 8px',borderRadius:8,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
+                      <span style={{fontSize:10.5,color:C.text,fontWeight:700,flex:1,minWidth:0,lineHeight:1.3}}>💸 Prix conseillé <b>{sugg} {cur(it.currency)}</b> <span style={{color:C.muted}}>(−15 %{sleeps?` · dort ${age}j`:''})</span></span>
+                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:800,padding:'5px 10px',borderRadius:8}}>🏷️ Baisser</a>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}
