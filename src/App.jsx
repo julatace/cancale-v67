@@ -156,6 +156,24 @@ const fetchHarvest = async (uid, type) => {
     return rows[0]?.data?.payload || null;
   } catch (_) { return null; }
 };
+// Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
+// = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
+const fetchEmailBordereaux = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.map(r => r.data).filter(d => d && d.pdfB64) // on ne garde que ceux avec un PDF
+      .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+  } catch (_) { return []; }
+};
+// Décode une chaîne base64 en Uint8Array (pour donner le PDF à pdf-lib).
+const b64ToBytes = (b64) => {
+  try { const bin = atob(String(b64 || '')); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+  catch (_) { return null; }
+};
 // Récupère les commandes moissonnées d'un côté donné (ventes ou achats). Les
 // lignes sont nommées harvest_{uid}_orders_{type} où {type} est le param d'URL
 // capté par l'extension (sold/sell pour les ventes, bought/buy/purchased pour
@@ -4156,6 +4174,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
+  const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
   const [sub, setSubRaw] = useState(only || 'ventes'); // ventes | achats | annonces | messages | bordereaux
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
@@ -4427,6 +4446,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (curSub==='bordereaux' && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
 
   // ── Migration one-shot : purge des numéros AUTO pollués ────────────────────
   // Une version antérieure basait l'auto-numérotation sur le garage (ancien) et a
@@ -5324,6 +5344,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           📄 Importer un bordereau à tamponner
         </button>
         <div style={{fontSize:11,color:C.muted,marginBottom:14,lineHeight:1.4}}>Télécharge d'abord ton bordereau depuis Vinted (dans la conversation), puis choisis-le ici — l'app y imprime le N° + le titre. Ça marche sur iPhone (via Fichiers/iCloud).</div>
+        {/* Bordereaux reçus AUTOMATIQUEMENT par email (pipeline usevrm) */}
+        {Array.isArray(emailBords) && emailBords.length>0 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {emailBords.map((b,i)=>(
+                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
+                  <span style={{fontSize:18}}>📄</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.numero?`N°${b.numero} · `:''}{b.modele||b.article||'Bordereau'}</div>
+                    <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
+                  </div>
+                  <button type="button" onClick={()=>{ const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;} processBordereau(b.numero||'', b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>Tamponner</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Ou depuis une vente <b>à expédier</b> ci-dessous (numéro pré-rempli) :</div>
         {sales.loading && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
