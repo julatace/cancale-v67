@@ -462,6 +462,34 @@ const normalizeConversationMessages = (conversation) => {
   });
 };
 
+// ── Pont vers l'extension VRM (v3.4+) ───────────────────────────────────────
+// Permet d'EXÉCUTER une action Vinted (répondre, faire une offre…) depuis le
+// navigateur de l'utilisateur (son IP), via bridge.js injecté par l'extension
+// sur cette page. Aucune écriture ne passe par un serveur → zéro risque de ban.
+// Si l'extension n'est pas là (mobile, pas Chrome…), vmrExtPresent() est faux et
+// l'app propose le repli « répondre sur Vinted ».
+let __vmrExtReady = false;
+if (typeof window !== 'undefined') {
+  try {
+    window.addEventListener('message', (e) => { if (e.source === window && e.data && e.data.__vmr === 'ready') __vmrExtReady = true; });
+    window.postMessage({ __vmr: 'ping' }, '*');
+    setTimeout(() => { try { window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {} }, 1500);
+  } catch (_) {}
+}
+const vmrExtPresent = () => __vmrExtReady;
+function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
+    const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
+    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'result' && e.data.reqId === reqId) { cleanup(); resolve(e.data); } };
+    const to = setTimeout(() => { cleanup(); resolve({ ok: false, error: 'timeout' }); }, timeoutMs);
+    window.addEventListener('message', onMsg);
+    try { window.postMessage({ __vmr: 'exec', reqId, uid, method, endpoint, body }, '*'); }
+    catch (e) { cleanup(); resolve({ ok: false, error: String(e) }); }
+  });
+}
+
 // Recupere les annonces actuellement EN LIGNE d'un compte (sa "penderie").
 // Endpoint reel confirme : GET /api/v2/wardrobe/{profil_id}/items.
 // ATTENTION : la penderie utilise l'ID DE PROFIL Vinted (celui du /member/...),
@@ -4179,6 +4207,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [listings, setListings] = useState({ loading:false, items:null });
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [replyBusy, setReplyBusy] = useState(false);
+  const [replyErr, setReplyErr] = useState(null);
   const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
   // Formats de bordereaux mémorisés : { [empreinte dimensions] : {xr,yr} }.
   const [bordFormats, setBordFormats] = useState(() => load('vinted_bordereau_formats', {}));
@@ -4345,10 +4376,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
   const openConversation = async (conv) => {
-    setOpenConv({ loading:true, error:null, conversation:null, messages:[], header:{ login:conv.opposite_user?.login, title:conv.description, photo:conv.opposite_user?.photo?.url||conv.item_photos?.[0]?.url||null } });
+    setReplyText(''); setReplyErr(null); setReplyBusy(false);
+    setOpenConv({ loading:true, error:null, conversation:null, messages:[], acc:conv._acc, convId:conv.id, header:{ login:conv.opposite_user?.login, title:conv.description, photo:conv.opposite_user?.photo?.url||conv.item_photos?.[0]?.url||null } });
     const res = await fetchVintedConversationDetail(conv._acc, conv.id);
     if (!res.ok) { setOpenConv(o => ({ ...o, loading:false, error:res.error })); return; }
     setOpenConv(o => ({ ...o, loading:false, conversation:res.conversation, messages:normalizeConversationMessages(res.conversation) }));
+  };
+
+  // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
+  // risque). Requête réelle captée : POST /api/v2/conversations/{id}/replies.
+  const sendReply = async () => {
+    const oc = openConv; const text = replyText.trim();
+    if (!oc || !oc.acc || !oc.convId || !text || replyBusy) return;
+    if (!vmrExtPresent()) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
+    setReplyBusy(true); setReplyErr(null);
+    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method:'POST', endpoint:`/api/v2/conversations/${oc.convId}/replies`, body:{ reply:{ body:text, photo_temp_uuids:null, is_personal_data_sharing_check_skipped:false } } });
+    setReplyBusy(false);
+    if (r && r.ok) {
+      setReplyText('');
+      setOpenConv(o => o ? ({ ...o, messages:[...o.messages, { kind:'message', mine:true, body:text }] }) : o);
+    } else {
+      setReplyErr((r && (r.error || (r.status ? 'HTTP '+r.status : ''))) || "Échec de l'envoi");
+    }
   };
 
   const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
@@ -5425,6 +5474,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               ))}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}
             </div>
+            {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
+            {!openConv.loading && !openConv.error && openConv.convId && (
+              <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+                {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
+                <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+                  <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
+                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()} style={{flexShrink:0,border:'none',borderRadius:12,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:800,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                </div>
+                {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:700,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
+              </div>
+            )}
           </div>
         </div>
       )}

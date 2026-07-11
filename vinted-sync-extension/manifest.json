@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "3.3.0",
-  "description": "Synchronise, depuis TON navigateur (ton IP), tes comptes et donnees Vinted (annonces, ventes, achats, messages) vers VRM. Fetch actif de tous les comptes + capture passive + renouvellement auto du login du compte actif + apprentissage des actions (prix, messages) pour le 1-clic. Aucun appel via un serveur.",
+  "version": "3.4.0",
+  "description": "Synchronise, depuis TON navigateur (ton IP), tes comptes et donnees Vinted (annonces, ventes, achats, messages) vers VRM. Fetch actif + capture passive + renouvellement auto du login + actions 1-clic (repondre, offre) executees depuis ton navigateur. Aucun appel via un serveur.",
   "permissions": ["cookies", "storage", "alarms"],
   "host_permissions": [
     "https://*.vinted.fr/*",
@@ -22,6 +22,15 @@
       ],
       "js": ["content.js"],
       "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://cancale-v67-ten.vercel.app/*",
+        "https://cancale-v67.vercel.app/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_idle",
       "all_frames": false
     }
   ],

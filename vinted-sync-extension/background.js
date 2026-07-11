@@ -137,6 +137,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
       return true; // reponse asynchrone
     }
+    // PONT APP -> EXTENSION : l'app VRM demande d'EXECUTER une action Vinted
+    // (repondre, faire une offre...) depuis TON navigateur/IP. On n'accepte que
+    // des endpoints /api/ Vinted, et on agit avec le token du compte vise.
+    if (msg && msg.from === 'vmr-bridge' && msg.action === 'exec') {
+      (async () => {
+        try {
+          if (!/^\/api\//.test(msg.endpoint || '')) { sendResponse({ ok: false, error: 'endpoint invalide' }); return; }
+          const accts = await getStoredAccounts();
+          const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
+          if (!acc) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
+          const r = await vintedSend(acc, msg.method || 'POST', msg.endpoint, msg.body);
+          sendResponse({ ok: r.ok, status: r.status, data: r.json });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true; // reponse asynchrone
+    }
     return;
   }
   const domain = msg.domain || 'www.vinted.fr';
@@ -255,6 +271,33 @@ async function refreshIfActive(acc) {
     updated_at: new Date().toISOString(),
   }], 'vinted_user_id');
   return acc;
+}
+
+// Un appel Vinted authentifie AVEC CORPS (POST/PUT/PATCH) pour executer une
+// action (repondre, offre, prix...). Meme auth que vintedGet. Sur 401, si le
+// compte est l'actif du navigateur, on renouvelle le token et on rejoue.
+async function vintedSend(acc, method, endpoint, body) {
+  const domain = acc.domain || 'www.vinted.fr';
+  const payload = (body != null && String(method).toUpperCase() !== 'GET')
+    ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined;
+  const doCall = () => fetch(`https://${domain}${endpoint}`, {
+    method: method || 'POST',
+    credentials: 'omit',
+    headers: {
+      'Authorization': `Bearer ${acc.access_token}`,
+      'x-anon-id': acc.anon_id || '',
+      'x-csrf-token': acc.csrf_token || lastCsrfByDomain[domain] || '',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'fr-FR,fr;q=0.9',
+    },
+    body: payload,
+  });
+  let res = await doCall();
+  if (res.status === 401) { const r = await refreshIfActive(acc); if (r) res = await doCall(); }
+  let json = null;
+  try { json = await res.json(); } catch (_) {}
+  return { status: res.status, ok: res.ok, json };
 }
 
 // Range une reponse Vinted dans une ligne harvest_{uid}_{type} (meme format que
