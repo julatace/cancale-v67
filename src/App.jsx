@@ -3658,6 +3658,12 @@ const INV_STATUS = {
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
 const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// Clé photo stable (indépendante de la taille d'image) extraite d'une URL Vinted :
+//   https://images1.vinted.net/t/{JETON}/{taille}/{n}.jpeg  ->  {JETON}
+// Le JETON identifie LA photo de l'article, identique sur l'annonce et sur la
+// vente. Permet de relier une VENTE à sa paire numérotée PAR LA PHOTO — même sans
+// numéro dans le titre, et même si le titre est en double.
+const photoKey = (url) => { const m = String(url || '').match(/\/t\/([^/?]+)/); return m ? m[1] : null; };
 function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLocate }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all'); // all | online | sold | stock
@@ -4229,9 +4235,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Retrouve l'entrée numéro d'une vente : par le lien transaction si connu,
   // sinon par le titre (si non ambigu). Permet de coller le bon N° SANS avoir le
   // numéro dans le titre.
+  // Index photo -> clé numéro (pour relier une vente à sa paire par la photo).
+  // On ignore une photo partagée par 2 entrées (ambiguë) pour ne pas se tromper.
+  const numerosByPhoto = useMemo(() => {
+    const m = {}; const dup = new Set();
+    for (const k in numeros) {
+      const pk = photoKey(numeros[k].photo);
+      if (!pk) continue;
+      if (m[pk] && m[pk] !== k) dup.add(pk); else m[pk] = k;
+    }
+    dup.forEach(pk => delete m[pk]);
+    return m;
+  }, [numeros]);
+  const entryKeyByPhoto = (o) => { const pk = o ? photoKey(o.photo_url || (o.photo && o.photo.url)) : null; return pk ? (numerosByPhoto[pk] || null) : null; };
   const resolvedEntry = (o) => {
     const linked = o && o.transaction_id != null ? txnLink[String(o.transaction_id)] : null;
     if (linked && numeros[linked]) return numeros[linked];
+    // 1) Par la PHOTO (fiable, gère les titres en double, sans N° dans le titre).
+    const pk = entryKeyByPhoto(o);
+    if (pk && numeros[pk]) return numeros[pk];
+    // 2) Sinon par le titre exact (si non ambigu).
     if (o && !titleAmbiguous(o.title)) return entryByTitle(o.title);
     return null;
   };
@@ -4343,8 +4366,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const tid = o.transaction_id != null ? String(o.transaction_id) : null;
       if (!tid || next[tid]) continue;
-      if (titleAmbiguous(o.title)) continue;
-      const key = entryKeyByTitle(o.title);
+      // On verrouille d'abord par la photo (marche même si le titre est en double),
+      // sinon par le titre exact non ambigu.
+      const key = entryKeyByPhoto(o) || (titleAmbiguous(o.title) ? null : entryKeyByTitle(o.title));
       if (key) { next[tid] = key; changed = true; }
     }
     if (changed) { setTxnLink(next); save('vinted_txn_link', next); }
