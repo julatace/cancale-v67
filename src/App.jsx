@@ -34,7 +34,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
-  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden',
+  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -4154,6 +4154,7 @@ const _CACHE_TTL = 180000; // 3 min
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
+  const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
   const [sub, setSubRaw] = useState(only || 'ventes'); // ventes | achats | annonces | messages | bordereaux
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
@@ -4242,7 +4243,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     for (const k in numeros) {
       const pk = photoKey(numeros[k].photo);
       if (!pk) continue;
-      if (m[pk] && m[pk] !== k) dup.add(pk); else m[pk] = k;
+      // Ambigu seulement si deux entrées ont un NUMÉRO DIFFÉRENT pour la même photo.
+      // (Une paire renvoyée puis republiée réutilise son numéro → non ambigu.)
+      if (m[pk]) { if (String(numeros[m[pk]].numero) !== String(numeros[k].numero)) dup.add(pk); }
+      else m[pk] = k;
     }
     dup.forEach(pk => delete m[pk]);
     return m;
@@ -4398,6 +4402,57 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+
+  // ── Numérotation AUTOMATIQUE des annonces en ligne ─────────────────────────
+  // Chaque annonce sans N° reçoit automatiquement le prochain numéro libre. Deux
+  // règles clés :
+  //  • RÉUTILISATION : si une annonce a la MÊME photo (ou le même titre) qu'une
+  //    paire déjà numérotée, on lui redonne CE numéro — ce qui gère les RETOURS /
+  //    litiges (une paire renvoyée puis republiée garde son numéro d'origine) et
+  //    les republications.
+  //  • Un numéro n'est jamais réattribué à une autre paire (vinted_used_numeros).
+  // Modifiable à la main ensuite (le champ N° reste éditable), et désactivable.
+  useEffect(() => {
+    if (!autoNum) return;
+    const items = listings.items || [];
+    if (!items.length) return;
+    // Numéros déjà pris (numérotation + historique + cases du garage) : on part
+    // AU-DESSUS du plus grand et on ne réutilise jamais un numéro déjà pris.
+    const taken = new Set();
+    let base = 0;
+    const noteTaken = (x) => { const n = parseInt(String(x), 10); if (!isNaN(n)) { taken.add(n); if (n > base) base = n; } };
+    usedNumeros.forEach(noteTaken);
+    Object.values(numeros).forEach(e => noteTaken(e.numero));
+    garageNums.forEach(noteTaken);
+    // Index des paires déjà numérotées (pour réutiliser sur retour/republication).
+    const byPhoto = {}, byTitle = {};
+    for (const k in numeros) {
+      const e = numeros[k]; if (!e || !String(e.numero || '').trim()) continue;
+      const pk = photoKey(e.photo); if (pk && !byPhoto[pk]) byPhoto[pk] = String(e.numero);
+      const t = normTitle(e.title); if (t && !byTitle[t]) byTitle[t] = String(e.numero);
+    }
+    const nextNum = { ...numeros };
+    const nextUsed = new Set(usedNumeros.map(x => parseInt(String(x), 10)).filter(n => !isNaN(n)));
+    let changed = false;
+    const sorted = [...items].sort((a, b) => (a.createdTs || 0) - (b.createdTs || 0));
+    for (const it of sorted) {
+      const cur = nextNum[it.id];
+      if (cur && String(cur.numero || '').trim()) continue; // déjà numérotée
+      const pk = photoKey(it.photo);
+      let num = (pk && byPhoto[pk]) || byTitle[normTitle(it.title)] || null; // réutilisation
+      if (!num) { do { base += 1; } while (taken.has(base)); num = String(base); taken.add(base); } // prochain numéro VRAIMENT libre
+      nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, price: it.price ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
+      nextUsed.add(parseInt(num, 10));
+      if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
+      const t = normTitle(it.title); if (t && !byTitle[t]) byTitle[t] = String(num);
+      changed = true;
+    }
+    if (changed) {
+      setNumeros(nextNum); save('vinted_annonce_numeros', nextNum);
+      const ua = [...nextUsed]; setUsedNumeros(ua); save('vinted_used_numeros', ua);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, autoNum]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
@@ -4958,6 +5013,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span>
                     {o.status && <span style={{color:C.muted,fontStyle:'italic',opacity:0.8}} title="Statut exact renvoyé par Vinted">« {o.status} »</span>}
                     {needsBordereau(o.status) && <span style={{color:C.accent,fontWeight:800}}>· à expédier</span>}
+                    {st==='cancelled' && num && <span style={{color:C.warn,fontWeight:800,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'1px 8px'}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>}
                     {amb && <span style={{color:C.danger,fontWeight:800}} title="Plusieurs annonces ont ce même titre : impossible d'attribuer le numéro de façon sûre. Rends les titres uniques.">⚠️ titre en double</span>}
                   </div>
                 </div>
@@ -5053,8 +5109,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               {annStats.sleeping>0 && <option value="sleeping">Qui dorment 😴</option>}
               <option value="nonum">Sans numéro</option>
             </select>
+            <button type="button" onClick={()=>{ const v=!autoNum; setAutoNum(v); save('vinted_autonum', v); }} title="Numéroter automatiquement chaque annonce (réutilise le numéro d'une paire renvoyée/republiée)" style={{border:`1px solid ${autoNum?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:autoNum?`${INV_STATUS.online.color}14`:'transparent',color:autoNum?INV_STATUS.online.color:C.text,cursor:'pointer'}}>{autoNum?'🔢 Auto N° ✓':'🔢 Auto N°'}</button>
           </div>
-          <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</div>
+          <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>{autoNum?<>Les numéros se mettent <b>automatiquement</b> (modifiables à la main). Une paire renvoyée puis republiée <b>garde son numéro</b>. Prochain libre : <b>{nextNumero}</b>.</>:<>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</>}</div>
         </>)}
         {listings.items && listings.items.length>0 && annShown.length===0 && (
           <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px'}}>Aucune annonce ne correspond.</div>
