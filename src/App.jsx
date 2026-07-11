@@ -4473,12 +4473,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const noteTaken = (x) => { const n = parseInt(String(x), 10); if (!isNaN(n)) { taken.add(n); if (n > base) base = n; } };
     usedNumeros.forEach(noteTaken);
     Object.values(numeros).forEach(e => noteTaken(e.numero));
-    // Index des paires déjà numérotées (pour réutiliser sur retour/republication).
-    const byPhoto = {}, byTitle = {};
+    // Index des paires déjà numérotées, UNIQUEMENT PAR PHOTO (fiable, unique par
+    // paire). On NE réutilise PAS par titre : deux paires différentes (ex. sur deux
+    // comptes) peuvent avoir le même titre → ça mélangerait leurs numéros.
+    const byPhoto = {};
     for (const k in numeros) {
       const e = numeros[k]; if (!e || !String(e.numero || '').trim()) continue;
       const pk = photoKey(e.photo); if (pk && !byPhoto[pk]) byPhoto[pk] = String(e.numero);
-      const t = normTitle(e.title); if (t && !byTitle[t]) byTitle[t] = String(e.numero);
     }
     const nextNum = { ...numeros };
     const nextUsed = new Set(usedNumeros.map(x => parseInt(String(x), 10)).filter(n => !isNaN(n)));
@@ -4488,12 +4489,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const cur = nextNum[it.id];
       if (cur && String(cur.numero || '').trim()) continue; // déjà numérotée
       const pk = photoKey(it.photo);
-      let num = (pk && byPhoto[pk]) || byTitle[normTitle(it.title)] || null; // réutilisation
+      let num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
       if (!num) { do { base += 1; } while (taken.has(base)); num = String(base); taken.add(base); } // prochain numéro VRAIMENT libre
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, price: it.price ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       nextUsed.add(parseInt(num, 10));
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
-      const t = normTitle(it.title); if (t && !byTitle[t]) byTitle[t] = String(num);
       changed = true;
     }
     if (changed) {
