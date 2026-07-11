@@ -4403,6 +4403,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
+  // ── Migration one-shot : purge des numéros AUTO pollués ────────────────────
+  // Une version antérieure basait l'auto-numérotation sur le garage (ancien) et a
+  // pu attribuer d'énormes numéros (ex. 1959+). On supprime les entrées AUTO (elles
+  // seront recréées proprement, à la suite des numéros manuels) et on ne garde
+  // dans l'historique que les numéros posés À LA MAIN. Tourne une seule fois.
+  useEffect(() => {
+    if (load('vinted_num_fix1', false)) return;
+    const cur = load('vinted_annonce_numeros', {}) || {};
+    const kept = {}; const manual = new Set();
+    for (const k in cur) {
+      const e = cur[k];
+      if (e && !e.auto) { kept[k] = e; const n = parseInt(String(e.numero), 10); if (!isNaN(n)) manual.add(n); }
+    }
+    const hadAuto = Object.keys(cur).length !== Object.keys(kept).length;
+    if (hadAuto) {
+      setNumeros(kept); save('vinted_annonce_numeros', kept);
+      const ua = [...manual].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
+    }
+    save('vinted_num_fix1', true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Numérotation AUTOMATIQUE des annonces en ligne ─────────────────────────
   // Chaque annonce sans N° reçoit automatiquement le prochain numéro libre. Deux
   // règles clés :
@@ -4416,14 +4438,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     if (!autoNum) return;
     const items = listings.items || [];
     if (!items.length) return;
-    // Numéros déjà pris (numérotation + historique + cases du garage) : on part
-    // AU-DESSUS du plus grand et on ne réutilise jamais un numéro déjà pris.
+    // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
+    // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
+    // et le garage (numéros hérités) — seule compte la numérotation de la nouvelle
+    // app (vinted_annonce_numeros + vinted_used_numeros). On part au-dessus du plus
+    // grand numéro NEUF déjà attribué et on ne réutilise jamais un numéro pris.
     const taken = new Set();
     let base = 0;
     const noteTaken = (x) => { const n = parseInt(String(x), 10); if (!isNaN(n)) { taken.add(n); if (n > base) base = n; } };
     usedNumeros.forEach(noteTaken);
     Object.values(numeros).forEach(e => noteTaken(e.numero));
-    garageNums.forEach(noteTaken);
     // Index des paires déjà numérotées (pour réutiliser sur retour/republication).
     const byPhoto = {}, byTitle = {};
     for (const k in numeros) {
