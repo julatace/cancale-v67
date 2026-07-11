@@ -35,6 +35,7 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
+  'vinted_sale_overrides',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -4262,6 +4263,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     if (o && !titleAmbiguous(o.title)) return entryByTitle(o.title);
     return null;
   };
+  // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
+  // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
+  // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
+  const [saleOv, setSaleOv] = useState(() => load('vinted_sale_overrides', {}));
+  const setSaleOverride = (tid, patch) => {
+    const k = String(tid);
+    setSaleOv(prev => {
+      const cur = { ...(prev[k] || {}), ...patch };
+      // Nettoie les champs vides ; supprime l'entrée si plus rien.
+      Object.keys(cur).forEach(f => { if (cur[f] == null || String(cur[f]).trim() === '') delete cur[f]; });
+      const u = { ...prev }; if (Object.keys(cur).length) u[k] = cur; else delete u[k];
+      save('vinted_sale_overrides', u); return u;
+    });
+  };
+  const effEntry = (o) => {
+    const base = resolvedEntry(o);
+    const ov = (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null;
+    if (!ov) return base;
+    const merged = { ...(base || {}) };
+    if (ov.numero != null && ov.numero !== '') merged.numero = ov.numero;
+    if (ov.buyPrice != null && ov.buyPrice !== '') merged.buyPrice = ov.buyPrice;
+    if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
+    return merged;
+  };
   // Montant d'un champ € (prix d'achat, frais/boost) -> nombre ou 0.
   const eur = (v) => { if (v==null || String(v).trim()==='') return 0; const n = parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; };
   const feesOf = (e) => e ? eur(e.fees) : 0;
@@ -4285,7 +4310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
   const matchOrd = (o) => {
     const q = ordSearch.trim().toLowerCase(); if (!q) return true;
-    const e = resolvedEntry(o); const num = String(e?.numero||'');
+    const e = effEntry(o); const num = String(e?.numero||'');
     const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
     return (o.title||'').toLowerCase().includes(q) || num===q || num.includes(q) || buyer.includes(q);
   };
@@ -4512,14 +4537,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; ca+=sell; nb+=1;
-      const e = resolvedEntry(o);
+      const e = effEntry(o);
       const fee = feesOf(e); frais += fee;
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
     return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
@@ -4539,7 +4564,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
-      const e = resolvedEntry(o);
+      const e = effEntry(o);
       if (o.date) { const d=new Date(o.date); if (!isNaN(d) && d.getFullYear()*100+d.getMonth()===ym) caMois += sell; }
       // Temps de vente : de la numérotation (mise en suivi) à la date de vente.
       if (e && e.numberedAt && o.date) {
@@ -4562,7 +4587,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const ecoul = (online+vendues)>0 ? (vendues/(online+vendues))*100 : null;
     return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, numeros, hiddenSales, hiddenAccts]);
+  }, [sales.items, listings.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
@@ -4580,7 +4605,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       if (idx[ym]==null) continue;
       const sell=o.price?.amount!=null?Number(o.price.amount):0;
-      const e=resolvedEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
+      const e=effEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
       months[idx[ym]].ca+=sell;
       if(buy!=null&&!isNaN(buy)) months[idx[ym]].benef += (sell-buy-feesOf(e));
     }
@@ -4588,7 +4613,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const total = months.reduce((s,m)=>s+m.ca,0);
     return { months, max, total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
   // ── Stats de sourcing : quelles marques / tailles rapportent le plus ──
   // Agrège les ventes finalisées (hors masquées) par marque et par taille :
@@ -4604,7 +4629,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       total+=1;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
-      const e = resolvedEntry(o);
+      const e = effEntry(o);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       const fee = feesOf(e);
       const days = (e && e.numberedAt && o.date) ? (new Date(o.date)-new Date(e.numberedAt))/86400000 : null;
@@ -4625,7 +4650,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     })).sort((a,b)=> b.nb-a.nb || (b.benefMoy||-1e9)-(a.benefMoy||-1e9));
     return { brands:finalize(brands), sizes:finalize(sizes), total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   const [showReport, setShowReport] = useState(false);
@@ -4651,7 +4676,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (classifyOrderStatus(o.status)!=='completed') continue;
       if (ymOf(o.date)!==reportMonth) continue;
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
-      const e = resolvedEntry(o); const fee=feesOf(e);
+      const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       ca+=sell; nb+=1; frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); }
@@ -4674,7 +4699,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const urssaf = ca * 0.135;
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportMonth, numeros, hiddenSales, hiddenAccts]);
+  }, [sales.items, buys.items, reportMonth, numeros, saleOv, hiddenSales, hiddenAccts]);
 
   const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
 
@@ -4741,7 +4766,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
       const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
-      const e = resolvedEntry(o); const fee=feesOf(e);
+      const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       const mo=months[d.getMonth()];
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
@@ -4764,7 +4789,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const urssaf = ca*0.135;
     return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportYear, numeros, hiddenSales, hiddenAccts]);
+  }, [sales.items, buys.items, reportYear, numeros, saleOv, hiddenSales, hiddenAccts]);
   const openAnnual = () => { setShowAnnual(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
   const exportAnnualCsv = () => {
     const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
@@ -4872,7 +4897,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Boost','Bénéfice net','Statut']];
     (sales.items||[]).filter(o=>!isHidden(o)).forEach(o=>{
       const st = classifyOrderStatus(o.status);
-      const e = resolvedEntry(o); const num = e?.numero || '';
+      const e = effEntry(o); const num = e?.numero || '';
       const sell = o.price?.amount!=null ? Number(o.price.amount) : '';
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : '';
       const fee = feesOf(e);
@@ -5019,13 +5044,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
             const amb = titleAmbiguous(o.title);
-            const e = resolvedEntry(o); const num = e?.numero;
+            const e = effEntry(o); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
             const fees = feesOf(e);
             const benef = (buy!=null && !isNaN(buy) && sell!=null) ? sell-buy-fees : null;
+            const ov = saleOv[String(o.transaction_id)] || {};
+            const baseE = resolvedEntry(o);
+            const baseNum = baseE?.numero || '';
+            const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             return (
-              <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,opacity:hidden?0.5:(st==='cancelled'?0.6:1)}}>
+              <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:8}}>
+               <div style={{display:'flex',gap:10,alignItems:'center'}}>
                 <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
                 </div>
@@ -5054,6 +5084,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
                 )}
                 <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title={hidden?'Réintégrer à la compta':'Masquer de la compta'} aria-label={hidden?'Réafficher':'Masquer'} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:hidden?(C.blue||C.accent):C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>{hidden?'↩︎':'🚫'}</button>
+               </div>
+               {/* Saisie manuelle par vente : N° et prix d'achat, même pour une paire jamais numérotée. */}
+               {!hidden && (
+                 <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center'}}>
+                   <div style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.numero!=null?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'3px 6px',background:C.bg,width:78,flexShrink:0}}>
+                     <span style={{fontSize:10,color:C.muted,fontWeight:700}}>N°</span>
+                     <input value={ov.numero ?? ''} onChange={ev=>setSaleOverride(o.transaction_id,{numero:ev.target.value})} placeholder={baseNum||'—'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                   </div>
+                   <div style={{flex:1,display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.buyPrice!=null?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'3px 8px',background:C.bg}}>
+                     <input value={ov.buyPrice ?? ''} onChange={ev=>setSaleOverride(o.transaction_id,{buyPrice:ev.target.value})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"ajouter le prix d'achat €"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:700,outline:'none'}}/>
+                     <span style={{fontSize:10,color:C.muted}}>€</span>
+                   </div>
+                   {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:9.5,color:INV_STATUS.online.color,fontWeight:800,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
+                 </div>
+               )}
               </div>
             );
           })}
@@ -5283,7 +5328,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente à expédier.<br/><span style={{fontSize:11.5}}>Les bordereaux apparaissent pour les ventes en cours d'expédition.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {list.map(o=>{ const amb=titleAmbiguous(o.title); const num=amb?'':(resolvedEntry(o)?.numero||''); const st=classifyOrderStatus(o.status);
+              {list.map(o=>{ const amb=titleAmbiguous(o.title); const num=amb?'':(effEntry(o)?.numero||''); const st=classifyOrderStatus(o.status);
                 return (
                   <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
                     <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
