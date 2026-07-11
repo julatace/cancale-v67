@@ -148,8 +148,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeHarvest(domain, msg.type, msg.id, msg.body);
   } else if (msg.kind === 'label' && msg.b64) {
     storeLabel(domain, msg.url, msg.b64);
+  } else if (msg.kind === 'writereq' && msg.url) {
+    storeWriteReq(domain, msg.method, msg.url, msg.body);
   }
 });
+
+// Range une requete d'ECRITURE observee (baisser prix, message...) dans une
+// ligne dediee, une par type d'action (regroupee par chemin). Pure observation :
+// sert a l'app pour reproduire ensuite l'action exacte en 1 clic, sans deviner.
+async function storeWriteReq(domain, method, url, body) {
+  const uid = await activeAccountId(domain);
+  if (!uid) return;
+  let path = url;
+  try { path = new URL(url, `https://${domain}`).pathname; } catch (_) {}
+  // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
+  // (ex: /api/v2/items/123 et /api/v2/items/456 -> meme cle).
+  const key = (path.replace(/\/\d+/g, '/_id').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || 'root';
+  const data = { uid, method, url, path, body: body || '', capturedAt: new Date().toISOString() };
+  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
+}
 
 // Range le dernier bordereau (PDF) telecharge, pour que l'app le tamponne.
 async function storeLabel(domain, url, b64) {

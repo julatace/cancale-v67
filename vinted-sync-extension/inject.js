@@ -63,6 +63,29 @@
     if (text && text.length < 800000) post({ kind: 'harvest', type: h.type, id: h.id, url, body: text });
   };
 
+  // CAPTURE PASSIVE DES REQUETES D'ECRITURE. Toujours de l'OBSERVATION pure : on
+  // note la forme des requetes que TU declenches quand tu agis sur Vinted
+  // (baisser un prix, repondre a un message...). Ca sert a l'app pour reproduire
+  // ensuite exactement la meme action en 1 clic, sans jamais deviner. On exclut
+  // le bruit (tracking/metrics) et on ne garde que les vraies actions API.
+  const WRITE_METHODS = /^(POST|PUT|PATCH|DELETE)$/i;
+  const WRITE_NOISE = /(track|metric|event|impression|visit|telemetr|analytic|log|pageview|consent)/i;
+  const sendWriteReq = (method, url, body) => {
+    try {
+      if (!WRITE_METHODS.test(method || '')) return;
+      if (!/\/api\//.test(url || '')) return;
+      if (WRITE_NOISE.test(url)) return;
+      let b = body;
+      if (b && typeof b !== 'string') {
+        if (typeof URLSearchParams !== 'undefined' && b instanceof URLSearchParams) b = b.toString();
+        else if (typeof FormData !== 'undefined' && b instanceof FormData) b = '[FormData]';
+        else { try { b = JSON.stringify(b); } catch (_) { b = String(b); } }
+      }
+      if (b && b.length > 100000) b = b.slice(0, 100000);
+      post({ kind: 'writereq', method: String(method).toUpperCase(), url, body: b || '' });
+    } catch (_) {}
+  };
+
   // Convertit un ArrayBuffer en base64 (par morceaux pour eviter le débordement
   // de pile sur les gros PDF).
   const abToB64 = (buf) => {
@@ -96,6 +119,8 @@
         const url = (typeof input === 'string') ? input : (input && input.url) || '';
         if (init && init.headers) sendCsrf(init.headers);
         else if (input && input.headers) sendCsrf(input.headers);
+        const method = (init && init.method) || (input && input.method) || 'GET';
+        sendWriteReq(method, url, init && init.body);
         const p = origFetch.apply(this, arguments);
         p.then((res) => {
           try {
@@ -122,15 +147,17 @@
     const origSetHeader = XHR.prototype.setRequestHeader;
     XHR.prototype.open = function (method, url) {
       this.__cancaleUrl = url;
+      this.__cancaleMethod = method;
       return origOpen.apply(this, arguments);
     };
     XHR.prototype.setRequestHeader = function (name, value) {
       try { if (String(name).toLowerCase() === 'x-csrf-token' && value) post({ kind: 'csrf', csrf: value }); } catch (_) {}
       return origSetHeader.apply(this, arguments);
     };
-    XHR.prototype.send = function () {
+    XHR.prototype.send = function (bodyArg) {
       try {
         const url = this.__cancaleUrl || '';
+        sendWriteReq(this.__cancaleMethod, url, bodyArg);
         this.addEventListener('load', function () {
           try {
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';

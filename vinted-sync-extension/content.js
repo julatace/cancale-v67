@@ -29,6 +29,7 @@
         type: d.type,
         id: d.id,
         url: d.url,
+        method: d.method,
         body: d.body,
         csrf: d.csrf,
         b64: d.b64,
