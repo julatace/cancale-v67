@@ -5069,7 +5069,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).filter(o=>matchOrd(o)).map(o=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
-            const amb = titleAmbiguous(o.title);
             const e = effEntry(o); const num = e?.numero;
             const sell = o.price?.amount!=null?Number(o.price.amount):null;
             const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
@@ -5094,14 +5093,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     {o.status && <span style={{color:C.muted,fontStyle:'italic',opacity:0.8}} title="Statut exact renvoyé par Vinted">« {o.status} »</span>}
                     {needsBordereau(o.status) && <span style={{color:C.accent,fontWeight:800}}>· à expédier</span>}
                     {st==='cancelled' && num && <span style={{color:C.warn,fontWeight:800,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'1px 8px'}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>}
-                    {amb && <span style={{color:C.danger,fontWeight:800}} title="Plusieurs annonces ont ce même titre : impossible d'attribuer le numéro de façon sûre. Rends les titres uniques.">⚠️ titre en double</span>}
+                    {!num && st!=='cancelled' && <span style={{color:C.warn,fontWeight:800}} title="Paire pas encore identifiée automatiquement (photo non reconnue). Ajoute son N° et son prix d'achat dans les champs ci-dessous.">⚠️ à identifier</span>}
                   </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
                   <div style={{fontSize:14,fontWeight:900,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:11,fontWeight:800,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9.5,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
-                  {benef==null && buy==null && !amb && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
+                  {benef==null && buy==null && <div style={{fontSize:10,color:C.muted}}>achat ?</div>}
                 </div>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:14,padding:'6px 8px'}}>📍</button>
@@ -5240,7 +5239,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
                     {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
-                    {titleAmbiguous(it.title) && <span style={{fontSize:10,color:C.danger,fontWeight:800}} title="Une autre annonce a le même titre : la vente ne pourra pas être attribuée sûrement. Rends le titre unique.">⚠️ titre en double</span>}
+                    {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
                 </div>
                 <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
@@ -5372,7 +5371,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente à expédier.<br/><span style={{fontSize:11.5}}>Les bordereaux apparaissent pour les ventes en cours d'expédition.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {list.map(o=>{ const amb=titleAmbiguous(o.title); const num=amb?'':(effEntry(o)?.numero||''); const st=classifyOrderStatus(o.status);
+              {list.map(o=>{ const num=effEntry(o)?.numero||''; const st=classifyOrderStatus(o.status);
                 return (
                   <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
                     <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
