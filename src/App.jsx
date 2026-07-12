@@ -4190,7 +4190,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
   };
   const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
-  const [annSort, setAnnSort] = useState('recent'); // recent | price_desc | price_asc | favs | views | nonum | boost
+  const [annSort, setAnnSort] = useState('oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
   const [pickerFor, setPickerFor] = useState(null);
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
@@ -4346,7 +4346,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         || num.toLowerCase()===q || num.toLowerCase().includes(q);
     });
     const price = it => (it.price!=null ? Number(it.price) : 0);
-    if (annSort==='price_desc') arr.sort((a,b)=>price(b)-price(a));
+    // Timestamp d'ajout : date de mise en ligne Vinted (createdTs) sinon date de
+    // numérotation. Sert au tri « du plus ancien au plus récent ».
+    const addedTs = it => { if (it.createdTs!=null) return it.createdTs<1e12 ? it.createdTs*1000 : it.createdTs; const e=numeros[it.id]; return e&&e.numberedAt ? new Date(e.numberedAt).getTime() : 0; };
+    if (annSort==='oldest') arr.sort((a,b)=>addedTs(a)-addedTs(b));
+    else if (annSort==='price_desc') arr.sort((a,b)=>price(b)-price(a));
     else if (annSort==='price_asc') arr.sort((a,b)=>price(a)-price(b));
     else if (annSort==='favs') arr.sort((a,b)=>(b.favourites??-1)-(a.favourites??-1));
     else if (annSort==='views') arr.sort((a,b)=>(b.views??-1)-(a.views??-1));
@@ -5194,6 +5198,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
             <select value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:700}}>
+              <option value="oldest">Date d'ajout (ancienne → récente)</option>
               <option value="recent">Ordre Vinted</option>
               <option value="price_desc">Prix ↓</option>
               <option value="price_asc">Prix ↑</option>
