@@ -1561,7 +1561,7 @@ function Catalog({catalog,setCatalog,onDeleteId,accounts,photos,setPhotos}) {
 }
 
 /* ── Ventes ──────────────────────────────────────────── */
-function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accounts}) {
+function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accounts,proFacture}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [newRow,setNewRow]=useState({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:'',account:''});
@@ -2085,13 +2085,23 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
                     <td style={{padding:'2px 10px',color:C.warn,whiteSpace:'nowrap'}}>×{fmtN(v.multi)}</td>
                     <td style={{padding:'2px 10px',whiteSpace:'nowrap'}}>
                       {(() => {
+                        // Cherche d'abord une facture existante
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
-                        if(!inv) return <span style={{color:C.muted,fontSize:11}}>—</span>;
-                        return <button type="button" onClick={()=>generatePDF(inv,invoiceSettings||{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'})}
+                        if(inv) return <button type="button" onClick={()=>generatePDF(inv,invoiceSettings||{},proFacture)}
                           title={`Voir la facture ${inv.number}`}
                           style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'monospace'}}>
                           📄 {inv.number}
                         </button>;
+                        // Vente avec coordonnées acheteur (email Pro) → génère directement
+                        if(v.buyerEmail){
+                          const fakeInv={...v,itemName:v.productId,number:'',numero:v.numero||''};
+                          return <button type="button" onClick={()=>generatePDF(fakeInv,invoiceSettings||{},proFacture)}
+                            title={`Générer facture pour ${v.buyerEmail}`}
+                            style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accent,padding:'2px 8px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'monospace'}}>
+                            📄 Pro
+                          </button>;
+                        }
+                        return <span style={{color:C.muted,fontSize:11}}>—</span>;
                       })()}
                     </td>
                     <td style={{padding:'2px 10px'}}>
@@ -2730,9 +2740,21 @@ function fmtDate(d) {
 }
 
 // Génération du PDF (HTML imprimable qui s'ouvre dans une nouvelle fenêtre)
-function generatePDF(inv,settings) {
+function generatePDF(inv,settings,proFacture) {
   let _logo=LOGO_CANCALE;
   try{ const _c=localStorage.getItem('vinted_custom_logo'); if(_c){ _logo=JSON.parse(_c); } }catch(_){}
+  const pf=proFacture&&proFacture.actif?proFacture:null;
+  if(pf&&pf.logo) _logo=pf.logo;
+  const companyName=pf?pf.nom:settings.companyName;
+  const companyType=pf?'':settings.companyType;
+  const companyAddr=pf?(pf.adresse+(pf.codePostal||pf.ville?' – ':'')+[pf.codePostal,pf.ville].filter(Boolean).join(' ')):settings.companyAddress;
+  const companySiret=pf?pf.siret:settings.siret;
+  const companyTva=pf?pf.tva:'';
+  const footer=pf?pf.mentions:(settings.footer||'Merci pour votre achat !');
+  const tauxTva=pf?parseFloat(pf.tauxTva||'0'):0;
+  const sellTTC=+(+inv.sellPrice||0);
+  const sellHT=tauxTva>0?+(sellTTC/(1+tauxTva/100)).toFixed(2):sellTTC;
+  const montantTva=tauxTva>0?+(sellTTC-sellHT).toFixed(2):0;
   const html=`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Facture ${inv.number}</title>
 <style>
@@ -2779,29 +2801,29 @@ td.right{text-align:right;}
 <div class="parties">
   <div class="party">
     <div class="party-label">De :</div>
-    <div class="party-info"><b>${settings.companyName}</b><br>${settings.companyType}<br>${settings.companyAddress}<br>SIRET : ${settings.siret}</div>
+    <div class="party-info"><b>${companyName}</b>${companyType?'<br>'+companyType:''}${companyAddr?'<br>'+companyAddr:''}${companySiret?'<br>SIRET : '+companySiret:''}${companyTva?'<br>N° TVA : '+companyTva:''}</div>
   </div>
   <div class="party" style="text-align:right">
     <div class="party-label">À :</div>
-    <div class="party-info"><b>${inv.buyerEmail||''}</b><br>${inv.buyerName||''}${inv.buyerAddress?', '+inv.buyerAddress:''}</div>
+    <div class="party-info"><b>${inv.buyerName||''}</b>${inv.buyerAddress?'<br>'+inv.buyerAddress:''}${inv.buyerEmail?'<br>'+inv.buyerEmail:''}</div>
   </div>
 </div>
 <table>
-  <thead><tr><th>Objet</th><th class="right">Quantité</th><th class="right">Prix unitaire (HT)</th><th class="right">Montant (HT)</th></tr></thead>
-  <tbody><tr><td>${inv.itemName||''}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td></tr></tbody>
+  <thead><tr><th>Objet</th><th class="right">Quantité</th><th class="right">Prix HT</th><th class="right">Montant HT</th></tr></thead>
+  <tbody><tr><td>${inv.itemName||inv.productId||''}</td><td class="right">1</td><td class="right">${sellHT.toFixed(2)} €</td><td class="right">${sellHT.toFixed(2)} €</td></tr></tbody>
 </table>
 <div class="totals">
-  <div class="row"><b>Sous-total (TTC) :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
-  <div class="row total"><b>Total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
-  <div class="row"><b>Montant payé :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
+  ${tauxTva>0?`<div class="row"><span>Sous-total HT :</span> <span>${sellHT.toFixed(2)} €</span></div><div class="row"><span>TVA ${tauxTva}% :</span> <span>${montantTva.toFixed(2)} €</span></div>`:'<div class="row"><span>TVA non applicable – art. 293 B du CGI</span></div>'}
+  <div class="row total"><b>Total TTC :</b> <b>${sellTTC.toFixed(2)} €</b></div>
+  <div class="row"><b>Montant payé :</b> <b>${sellTTC.toFixed(2)} €</b></div>
 </div>
 <div class="acquittee">Facture acquittée</div>
 <div class="remarques">
   <div class="label">Remarques :</div>
-  ${inv.vintedNumber?`<p>Transaction Vinted n°${inv.vintedNumber}</p>`:''}
-  <p>${settings.footer||'Merci pour votre achat !'}</p>
+  ${inv.numero?`<p>Transaction Vinted n°${inv.numero}</p>`:inv.vintedNumber?`<p>Transaction Vinted n°${inv.vintedNumber}</p>`:''}
+  ${footer?`<p>${footer}</p>`:''}
 </div>
-<div class="footer">N° d'étiquetage : ${inv.productId}</div>
+<div class="footer">N° article : ${inv.productId||''}</div>
 <script>setTimeout(()=>{window.print();},400);</script>
 </body></html>`;
   const w=window.open('','_blank');
@@ -3878,7 +3900,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
               numero: v.numero,
               productId: v.modele||'',
               buyPrice: null,
-              sellPrice: null,
+              sellPrice: v.sellPrice??null,
               profit: null,
               multi: null,
               saleDate: v.date||'',
@@ -3887,6 +3909,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
               statut: 'en attente',
               source: 'email',
               createdAt: new Date().toISOString(),
+              // Données acheteur Pro Vinted
+              ...(v.buyerEmail?{buyerEmail:v.buyerEmail}:{}),
+              ...(v.buyerName?{buyerName:v.buyerName}:{}),
+              ...(v.buyerAddress?{buyerAddress:v.buyerAddress}:{}),
+              ...(v.buyerPseudo?{buyerPseudo:v.buyerPseudo}:{}),
             }));
           if(pendingSales.length>0){
             const updatedS=[...pendingSales,...currentSales];
@@ -4520,7 +4547,7 @@ export default function App() {
           setStockVinted(u); save('vinted_stock_vinted',u);
           try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
         }}/>}
-        {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts}/>}
+        {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts} proFacture={proFacture}/>}
         {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} setSales={setSales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
         {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales} setStockVinted={setStockVinted} accounts={accounts}/>}
