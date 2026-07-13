@@ -22,6 +22,7 @@ function processVintedEmails() {
   processVintedSales();
   processVintedPayments();
   processVintedBordereaux();
+  rappelColisNonEnvoyes();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -225,6 +226,60 @@ function processVintedBordereaux() {
     firebasePut('/vinted_incoming_bordereaux', all);
     Logger.log('Bordereaux ajoutés : ' + newBordereaux.length);
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// RAPPEL COLIS NON ENVOYÉS
+// Lit les bordereaux de VRM dans Firebase. Si un colis n'est pas
+// expédié (statut "à imprimer") et que la date limite est à moins
+// de 24h (ou dépassée), envoie UN email de rappel au vendeur.
+// Un seul rappel par colis (dédoublonné dans /vrm_rappels_envoyes).
+// ════════════════════════════════════════════════════════════
+function rappelColisNonEnvoyes() {
+  const bordereaux = firebaseGet('/vinted_bordereaux');
+  if (!bordereaux || !Array.isArray(bordereaux)) return;
+
+  const dejaRappele = firebaseGet('/vrm_rappels_envoyes') || {};
+  const now = new Date();
+
+  const parseLimite = (d) => {
+    const p = String(d || '').split('/');
+    return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0], 23, 59) : null;
+  };
+
+  const urgents = bordereaux.filter(b => {
+    if ((b.statut || 'à imprimer') !== 'à imprimer') return false;
+    const limite = parseLimite(b.dateLimite);
+    if (!limite) return false;
+    const key = String(b.numero || b.id);
+    if (dejaRappele[key]) return false;              // déjà rappelé
+    return (limite - now) < 24 * 60 * 60 * 1000;     // < 24h ou dépassé
+  });
+
+  if (urgents.length === 0) return;
+
+  const lignes = urgents.map(b => {
+    const limite = parseLimite(b.dateLimite);
+    const retard = limite < now;
+    return '• N°' + (b.numero || '?') + ' — ' + (b.modele || 'article') +
+           (retard ? ' — ⚠ DÉLAI DÉPASSÉ (' + b.dateLimite + ')'
+                   : ' — à envoyer avant le ' + b.dateLimite);
+  }).join('\n');
+
+  const destinataire = Session.getActiveUser().getEmail();
+  GmailApp.sendEmail(
+    destinataire,
+    '⚠ VRM — ' + urgents.length + ' colis à envoyer' +
+      (urgents.some(b => parseLimite(b.dateLimite) < now) ? ' (délai dépassé !)' : ' avant demain'),
+    'Bonjour,\n\nCes ventes Vinted attendent leur expédition :\n\n' + lignes +
+    '\n\nImprime les bordereaux dans VRM (onglet Bordereaux) et dépose les colis.' +
+    '\nPassé le délai, Vinted annule la vente et rembourse l\'acheteur.\n\n— VRM'
+  );
+
+  // Marque ces colis comme rappelés (un seul email par colis)
+  urgents.forEach(b => { dejaRappele[String(b.numero || b.id)] = new Date().toISOString(); });
+  firebasePut('/vrm_rappels_envoyes', dejaRappele);
+  Logger.log('Rappel colis envoyé (' + urgents.length + ' colis) à ' + destinataire);
 }
 
 // ════════════════════════════════════════════════════════════

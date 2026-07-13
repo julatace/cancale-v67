@@ -62,7 +62,7 @@ const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted','vinted_accounts',
-  'vinted_bordereaux','vinted_appsscript_url',
+  'vinted_bordereaux','vinted_appsscript_url','vrm_objectif',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -506,10 +506,31 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
+function Dashboard({catalog,sales,garageGrid,invoices,accounts,bordereaux,objectif,saveObjectif}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
+  const [editObjectif,setEditObjectif]=useState(false);
+  const [objectifDraft,setObjectifDraft]=useState('');
+
+  // Somme des portes-monnaies de tous les comptes (saisis dans Paramètres → Comptes)
+  const wallets=useMemo(()=>{
+    const items=(accounts||[])
+      .map(a=>({...a,solde:parseFloat(String(a.wallet||'').replace(',','.'))||0}))
+      .filter(a=>a.wallet!==undefined&&a.wallet!==''&&!isNaN(parseFloat(String(a.wallet).replace(',','.'))));
+    return {items,total:items.reduce((s,a)=>s+a.solde,0)};
+  },[accounts]);
+
+  // Colis pas encore expédiés dont la date limite approche (bordereaux Gmail)
+  const colisUrgents=useMemo(()=>{
+    const now=new Date();
+    const parseD=(d)=>{const p=String(d||'').split('/');return p.length===3?new Date(+p[2],+p[1]-1,+p[0],23,59):null;};
+    return (Array.isArray(bordereaux)?bordereaux:[])
+      .filter(b=>(b.statut||'à imprimer')==='à imprimer'&&b.dateLimite)
+      .map(b=>({...b,limite:parseD(b.dateLimite)}))
+      .filter(b=>b.limite&&(b.limite-now)<36*60*60*1000) // dans moins de 36h (ou dépassé)
+      .sort((a,b)=>a.limite-b.limite);
+  },[bordereaux]);
 
   // Paires réellement présentes dans le garage (mémorisé)
   const garageVals=useMemo(()=>
@@ -773,6 +794,25 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
         <div style={{fontSize:12,color:C.muted,marginTop:2}}>Vue d'ensemble de ton activité</div>
       </div>
 
+      {/* ⚠ Colis à expédier avant la date limite */}
+      {colisUrgents.length>0&&(
+        <Card style={{padding:14,border:`1.5px solid ${C.danger}`,background:C.danger+'12'}}>
+          <div style={{fontWeight:800,color:C.danger,fontSize:14,marginBottom:6}}>
+            ⚠️ {colisUrgents.length} colis à envoyer {colisUrgents.some(b=>b.limite<new Date())?'— délai dépassé !':'rapidement'}
+          </div>
+          {colisUrgents.slice(0,5).map(b=>(
+            <div key={b.id} style={{fontSize:12,color:C.text,display:'flex',gap:8,flexWrap:'wrap',padding:'3px 0'}}>
+              <span style={{fontWeight:700}}>N°{b.numero||'?'}</span>
+              <span style={{color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:220}}>{b.modele||''}</span>
+              <span style={{color:b.limite<new Date()?C.danger:C.warn,fontWeight:700,marginLeft:'auto'}}>
+                {b.limite<new Date()?'⏰ dépassé':`avant le ${b.dateLimite}`}
+              </span>
+            </div>
+          ))}
+          <div style={{fontSize:11,color:C.muted,marginTop:6}}>Imprime le bordereau dans l'onglet Bordereaux puis dépose le colis. Passé le délai, Vinted annule la vente.</div>
+        </Card>
+      )}
+
       {/* Camemberts */}
       {(brandStats.length>0||countryStats.length>0)&&(
         <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
@@ -845,6 +885,90 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
           </div>
         </div>
       </Card>
+
+      {/* 🎯 Objectif mensuel */}
+      <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <div style={{fontSize:11,color:C.accent,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>
+            🎯 Objectif de {moisCourant.nom}
+          </div>
+          <button onClick={()=>{setObjectifDraft(String(objectif?.montant||''));setEditObjectif(e=>!e);}}
+            style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:14,color:C.muted,padding:'3px 12px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+            {objectif?.montant?'Modifier':'Définir'}
+          </button>
+        </div>
+        {editObjectif&&(
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:12}}>
+            <input value={objectifDraft} onChange={e=>setObjectifDraft(e.target.value)} placeholder="ex : 2000" inputMode="decimal"
+              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:13,fontFamily:'inherit',outline:'none',width:110}}/>
+            <div style={{display:'flex',gap:4}}>
+              {[['ca','CA'],['profit','Bénéfice']].map(([k,lb])=>(
+                <button key={k} onClick={()=>saveObjectif({...objectif,type:k})} style={{
+                  padding:'4px 12px',borderRadius:16,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                  background:(objectif?.type||'ca')===k?C.accent:'transparent',
+                  color:(objectif?.type||'ca')===k?'#fff':C.muted,
+                  border:`1.5px solid ${(objectif?.type||'ca')===k?C.accent:C.border}`,
+                }}>{lb}</button>
+              ))}
+            </div>
+            <Btn small color={C.accent} onClick={()=>{
+              const m=parseFloat(objectifDraft.replace(',','.'));
+              if(isNaN(m)||m<=0){alert('Montant invalide');return;}
+              saveObjectif({...objectif,montant:m});setEditObjectif(false);
+            }}>Valider</Btn>
+          </div>
+        )}
+        {objectif?.montant?(()=>{
+          const cible=+objectif.montant;
+          const actuel=(objectif.type||'ca')==='profit'?moisCourant.profit:moisCourant.ca;
+          const pct=Math.min(100,Math.max(0,actuel/cible*100));
+          const reste=Math.max(0,cible-actuel);
+          const now=new Date();
+          const joursMois=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+          const joursRestants=joursMois-now.getDate();
+          const moyenne=moisCourant.count>0?actuel/moisCourant.count:0;
+          const ventesManquantes=moyenne>0?Math.ceil(reste/moyenne):null;
+          return (
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
+                <span style={{fontSize:22,fontWeight:800,color:pct>=100?C.accent:C.text}}>{fmt(actuel)}</span>
+                <span style={{fontSize:13,color:C.muted}}>/ {fmt(cible)} <span style={{fontSize:11}}>({(objectif.type||'ca')==='profit'?'bénéfice':'CA'})</span></span>
+              </div>
+              <div style={{height:12,background:C.border,borderRadius:8,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${pct}%`,background:pct>=100?C.accent:`linear-gradient(90deg,${C.accent},${C.blue})`,borderRadius:8,transition:'width .4s'}}/>
+              </div>
+              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.6}}>
+                {pct>=100
+                  ?<span style={{color:C.accent,fontWeight:700}}>🎉 Objectif atteint ! ({Math.round(pct)} %)</span>
+                  :<>Il reste <b style={{color:C.text}}>{fmt(reste)}</b> ({Math.round(pct)} % fait) et <b style={{color:C.text}}>{joursRestants} jour{joursRestants>1?'s':''}</b>{ventesManquantes?<> — soit environ <b style={{color:C.text}}>{ventesManquantes} vente{ventesManquantes>1?'s':''}</b> à ta moyenne actuelle</>:null}.</>
+                }
+              </div>
+            </div>
+          );
+        })():!editObjectif&&(
+          <div style={{fontSize:12,color:C.muted}}>Fixe-toi un objectif de CA ou de bénéfice pour le mois — la progression s'affichera ici.</div>
+        )}
+      </Card>
+
+      {/* 💰 Portes-monnaies */}
+      {wallets.items.length>0&&(
+        <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:11,color:C.warn,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:12}}>
+            💰 Portes-monnaies — tous comptes
+          </div>
+          <div style={{fontSize:28,fontWeight:800,color:C.accent,letterSpacing:-0.5,marginBottom:10}}>{fmt(wallets.total)}</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {wallets.items.map(a=>(
+              <div key={a.id} style={{display:'flex',alignItems:'center',gap:6,background:C.bg,border:`1px solid ${a.color}55`,borderRadius:16,padding:'4px 12px'}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:a.color,flexShrink:0}}/>
+                <span style={{fontSize:12,fontWeight:700,color:C.text}}>{a.name}</span>
+                <span style={{fontSize:12,fontWeight:800,color:C.accent}}>{fmt(a.solde)}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:10,color:C.muted,marginTop:8}}>Les soldes se modifient dans Paramètres → Comptes → Porte-monnaie.</div>
+        </Card>
+      )}
 
       {/* Estimation cotisations du MOIS EN COURS */}
       <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
@@ -1100,6 +1224,7 @@ function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,d
             {row((()=>{const pl=PLATFORMS[acc.platform||'vinted']||PLATFORMS.vinted;return `Pseudo ${pl.label} :`;})(),'pseudo',i,acc,'mon_pseudo')}
             {row('Email iCloud :','email',i,acc,'exemple@icloud.com')}
             {row('Téléphone :','phone',i,acc,'+33 6 00 00 00 00')}
+            {row('Porte-monnaie € :','wallet',i,acc,'0,00')}
           </div>
         ))}
       </Card>
@@ -4338,6 +4463,9 @@ export default function App() {
   }));
   // La config est aussi poussée dans Firebase : c'est elle qui autorise (ou non)
   // Apps Script à envoyer les factures. Toggle OFF → l'envoi s'arrête à la synchro suivante.
+  // Objectif mensuel (CA ou bénéfice) affiché sur le Dashboard
+  const [objectif,setObjectif]=useState(()=>load('vrm_objectif',{montant:'',type:'ca'}));
+  const saveObjectif=(v)=>{setObjectif(v);save('vrm_objectif',v);};
   const saveProFacture=(v)=>{
     setProFacture(v);save('vrm_pro_facture',v);
     try{
@@ -4453,6 +4581,7 @@ export default function App() {
         apply('vinted_accounts', setAccounts);
         apply('vinted_bordereaux', setBordereaux);
         apply('vinted_appsscript_url', setAppsScriptUrl);
+        apply('vrm_objectif', setObjectif);
         setSyncStatus('synced');
         setLastSync(new Date());
       } else {
@@ -4653,7 +4782,7 @@ export default function App() {
       )}
       <Nav tab={tab} setTab={setTab}/>
       <main style={{maxWidth:1200,margin:'0 auto'}}>
-        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} accounts={accounts}/>}
+        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} accounts={accounts} bordereaux={bordereaux} objectif={objectif} saveObjectif={saveObjectif}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} accounts={accounts} photos={photos} setPhotos={setPhotos} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
           const n=norm(id);
