@@ -50,6 +50,13 @@ const INIT_SAL = [{"id":"s0001","productId":"Casquette roger","buyPrice":14.5,"s
 // Base de donnees en ligne : les donnees sont partagees entre tous les appareils
 const FIREBASE_URL = "https://shop-cancale67-default-rtdb.europe-west1.firebasedatabase.app/cancale.json";
 
+// Jeton d'accès Firebase (optionnel) : si renseigné dans les Paramètres, il est ajouté
+// à toutes les requêtes (?auth=...). Permet de verrouiller la base avec des règles
+// { ".read": false, ".write": false } — seuls VRM et Apps Script y accèdent alors.
+// Stocké UNIQUEMENT en local (jamais synchronisé dans le cloud qu'il protège).
+const fbToken=()=>{ try{ const v=localStorage.getItem('vinted_fb_token'); return v?(JSON.parse(v)||''):''; }catch{ return ''; } };
+const fbUrl=(url)=>{ const t=fbToken(); return t?url+(url.includes('?')?'&':'?')+'auth='+encodeURIComponent(t):url; };
+
 // Liste des cles synchronisees dans le cloud (logo exclu — trop lourd)
 const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
@@ -69,7 +76,7 @@ const load = (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.par
 // Recupere TOUT le contenu du cloud (au demarrage)
 const cloudLoad = async () => {
   try {
-    const res = await fetch(FIREBASE_URL);
+    const res = await fetch(fbUrl(FIREBASE_URL));
     if (!res.ok) return null;
     const data = await res.json();
     return data || null;
@@ -85,7 +92,7 @@ const cloudPush = () => {
     try {
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { try { payload[k] = JSON.parse(v); } catch { payload[k] = v; } } });
-      const res = await fetch(FIREBASE_URL, {
+      const res = await fetch(fbUrl(FIREBASE_URL), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1111,6 +1118,22 @@ function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,d
         <div style={{fontSize:11,color:C.muted}}>Dans Apps Script → Déployer → Gérer les déploiements → copie l'URL</div>
       </Card>
 
+      {/* Clé secrète Firebase */}
+      <Card style={{padding:14,display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{fontWeight:700,color:C.text,fontSize:14}}>🔒 Clé secrète Firebase</div>
+        <div style={{fontSize:12,color:C.muted}}>Protège ta base de données : une fois les règles Firebase verrouillées, seuls VRM et Apps Script (avec cette clé) peuvent lire ou écrire. Stockée uniquement sur cet appareil.</div>
+        <input
+          type="password"
+          defaultValue={fbToken()}
+          onChange={e=>{try{localStorage.setItem('vinted_fb_token',JSON.stringify(e.target.value.trim()));}catch(_){}}}
+          placeholder="Colle ici le secret de base de données Firebase"
+          style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:12,fontFamily:'inherit',outline:'none',width:'100%'}}
+          onFocus={e=>e.target.style.borderColor=C.accent}
+          onBlur={e=>e.target.style.borderColor=C.border}
+        />
+        <div style={{fontSize:11,color:C.muted}}>Console Firebase → ⚙ Paramètres du projet → Comptes de service → Codes secrets de base de données</div>
+      </Card>
+
       <Card style={{padding:12,fontSize:12,color:C.muted,lineHeight:1.6}}>
         <div style={{fontWeight:700,color:C.text,marginBottom:4}}>Comment ça marche</div>
         L'email iCloud permet la détection automatique du compte dans le script Apps Script. Le pseudo et le téléphone sont pour ta gestion interne. Tout est synchronisé dans le cloud.
@@ -1197,7 +1220,7 @@ function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,d
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
           <div>
             <div style={{fontSize:13,fontWeight:700,color:C.text}}>Envoi automatique des factures</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>VRM envoie la facture PDF à l'acheteur dès qu'une vente est enregistrée</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>La facture part par email à l'acheteur dès qu'une vente Pro arrive. Rien ne s'envoie sans ton accord — tu peux couper à tout moment, l'arrêt est immédiat.</div>
           </div>
           <button onClick={()=>saveProFacture({...proFacture,autoSend:!proFacture.autoSend})} style={{
             flexShrink:0,marginLeft:12,padding:'6px 16px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
@@ -1208,7 +1231,7 @@ function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,d
         </div>
         {proFacture.autoSend&&(
           <div style={{fontSize:11,color:C.warn,background:C.warn+'18',borderRadius:6,padding:'8px 10px',lineHeight:1.5}}>
-            ⚠ L'envoi automatique nécessite que l'adresse email de l'acheteur soit présente dans l'email Vinted (comptes Pro uniquement). Assure-toi que le script Apps Script est configuré et actif.
+            ⚠ L'envoi automatique nécessite que l'adresse email de l'acheteur soit présente dans l'email Vinted (comptes Pro uniquement) et que le script Apps Script soit actif. Pour arrêter les envois, remets le bouton sur OFF : plus aucune facture ne partira.
           </div>
         )}
       </Card>
@@ -2401,12 +2424,14 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
       return isNaN(n)?mx:Math.max(mx,n);
     },0);
     const newInvoices=toCreate.map(s=>{
-      maxNum+=1;
+      // Si Apps Script a déjà envoyé la facture, on reprend son numéro tel quel
+      let number=s.factureNumber||'';
+      if(!number){maxNum+=1;number=`${pref}-${year}-${String(maxNum).padStart(4,'0')}`;}
       return {
         id:'inv_pro_'+s.id,
         saleId:s.id,
         numero:s.numero||'',
-        number:`${pref}-${year}-${String(maxNum).padStart(4,'0')}`,
+        number,
         productId:s.productId||'',
         itemName:s.productId||'',
         sellPrice:String(s.sellPrice||''),
@@ -2415,6 +2440,8 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
         buyerEmail:s.buyerEmail||'',
         buyerAddress:s.buyerAddress||'',
         buyerPseudo:s.buyerPseudo||'',
+        envoyee:!!s.factureSent,
+        sentAt:s.factureSentAt||'',
         source:'vinted_pro_auto',
         createdAt:new Date().toISOString(),
       };
@@ -2586,6 +2613,7 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
                       <span style={{fontWeight:800,fontSize:13,color:C.accent}}>N°{s.numero||s.productId||'?'}</span>
                       <span style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:180}}>{s.productId||''}</span>
                       {isPro&&<span style={{fontSize:10,fontWeight:800,background:C.accent+'22',color:C.accent,borderRadius:10,padding:'1px 7px'}}>PRO</span>}
+                      {(s.factureSent||inv?.envoyee)&&<span title="Facture envoyée automatiquement par email" style={{fontSize:10,fontWeight:800,background:C.blue+'22',color:C.blue,borderRadius:10,padding:'1px 7px'}}>📧 envoyée</span>}
                       {s.sellPrice&&<span style={{fontSize:12,fontWeight:700,color:C.accent,marginLeft:'auto'}}>{(+s.sellPrice).toFixed(2)} €</span>}
                     </div>
                     <div style={{fontSize:11,color:C.muted,display:'flex',gap:12,flexWrap:'wrap'}}>
@@ -2655,7 +2683,10 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
                   <td style={{padding:'8px',color:C.warn,fontWeight:800,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
-                  <td style={{padding:'8px',color:C.accent,fontWeight:700,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}</td>
+                  <td style={{padding:'8px',color:C.accent,fontWeight:700,fontFamily:'monospace',fontSize:11,whiteSpace:'nowrap'}}>
+                    {inv.number||'—'}
+                    {inv.envoyee&&<span title={`Envoyée par email${inv.sentAt?' le '+inv.sentAt:''}`} style={{marginLeft:5,fontSize:10,fontWeight:800,background:C.accent+'22',color:C.accent,borderRadius:8,padding:'1px 6px',fontFamily:'inherit'}}>📧 envoyée</span>}
+                  </td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:700}}>{fmt(+inv.sellPrice||0)}</td>
@@ -3672,7 +3703,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
     if(!b||!b.id) return;
     setLoadingPdf(b.id);
     try {
-      const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
+      const res=await fetch(fbUrl(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`));
       const base64=await res.json();
       if(base64&&typeof base64==='string'){
         const bin=atob(base64);
@@ -3758,7 +3789,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
       const pages=[];
       for(const b of items){
         try{
-          const res=await fetch(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`);
+          const res=await fetch(fbUrl(`${FIREBASE_BASE}/vinted_bordereau_pdfs/${b.id}.json`));
           const base64=await res.json();
           if(!base64||typeof base64!=='string') continue;
           const bin=atob(base64);
@@ -3851,7 +3882,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
   const syncGmailSalesSilent=async()=>{
     try{
       const FBASE=FIREBASE_URL.replace('.json','');
-      const res=await fetch(`${FBASE}/vinted_incoming_sales.json`);
+      const res=await fetch(fbUrl(`${FBASE}/vinted_incoming_sales.json`));
       const incoming=await res.json();
       const currentAll=Array.isArray(bordereaux)?bordereaux:[];
       const existingNums=new Set(currentAll.map(b=>String(b.numero||'')).filter(Boolean));
@@ -3890,10 +3921,10 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             if(changed){localStorage.setItem('vinted_stock_vinted',JSON.stringify(sv));setStockVinted(sv);}
           }catch(_){}
         }
-        await fetch(`${FBASE}/vinted_incoming_sales.json`,{method:'DELETE'});
+        await fetch(fbUrl(`${FBASE}/vinted_incoming_sales.json`),{method:'DELETE'});
       }
       // Paiements reçus
-      const resP=await fetch(`${FBASE}/vinted_incoming_payments.json`);
+      const resP=await fetch(fbUrl(`${FBASE}/vinted_incoming_payments.json`));
       const payments=await resP.json();
       if(payments&&Array.isArray(payments)&&payments.length>0){
         const cat=Array.isArray(catalog)?catalog:[];
@@ -3922,7 +3953,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
           updated=true;
         });
         if(updated){setSales(latestSales);save('vinted_sales',latestSales);}
-        await fetch(`${FBASE}/vinted_incoming_payments.json`,{method:'DELETE'});
+        await fetch(fbUrl(`${FBASE}/vinted_incoming_payments.json`),{method:'DELETE'});
       }
     }catch(_){}
   };
@@ -3937,7 +3968,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
       }
 
       // --- Nouvelles ventes : crée bordereaux + entrée Ventes "en attente" ---
-      const res=await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`);
+      const res=await fetch(fbUrl(`${FIREBASE_BASE}/vinted_incoming_sales.json`));
       const incoming=await res.json();
       const existingNums=new Set(all.map(b=>String(b.numero||'')).filter(Boolean));
       const currentSales=Array.isArray(sales)?[...sales]:[];
@@ -3986,6 +4017,8 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
               ...(v.buyerName?{buyerName:v.buyerName}:{}),
               ...(v.buyerAddress?{buyerAddress:v.buyerAddress}:{}),
               ...(v.buyerPseudo?{buyerPseudo:v.buyerPseudo}:{}),
+              // Facture déjà envoyée automatiquement par Apps Script ?
+              ...(v.factureSent?{factureSent:true,factureNumber:v.factureNumber||'',factureSentAt:v.factureSentAt||''}:{}),
             }));
           if(pendingSales.length>0){
             const updatedS=[...pendingSales,...currentSales];
@@ -4006,11 +4039,11 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
           }catch(_){}
           addedCount=toAdd.length;
         }
-        await fetch(`${FIREBASE_BASE}/vinted_incoming_sales.json`,{method:'DELETE'});
+        await fetch(fbUrl(`${FIREBASE_BASE}/vinted_incoming_sales.json`),{method:'DELETE'});
       }
 
       // --- Paiements reçus : finalise la vente en attente ---
-      const resP=await fetch(`${FIREBASE_BASE}/vinted_incoming_payments.json`);
+      const resP=await fetch(fbUrl(`${FIREBASE_BASE}/vinted_incoming_payments.json`));
       const payments=await resP.json();
       if(payments&&Array.isArray(payments)&&payments.length>0){
         const cat=Array.isArray(catalog)?catalog:[];
@@ -4057,7 +4090,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
         });
 
         if(payUpdated){ setSales(latestSales); save('vinted_sales',latestSales); }
-        await fetch(`${FIREBASE_BASE}/vinted_incoming_payments.json`,{method:'DELETE'});
+        await fetch(fbUrl(`${FIREBASE_BASE}/vinted_incoming_payments.json`),{method:'DELETE'});
       }
 
       setSyncMsg(addedCount>0
@@ -4303,7 +4336,16 @@ export default function App() {
     actif:false,autoSend:false,nom:'',adresse:'',codePostal:'',ville:'',
     siret:'',tva:'',prefixe:'FA',tauxTva:'20',mentions:'',logo:'',
   }));
-  const saveProFacture=(v)=>{setProFacture(v);save('vrm_pro_facture',v);};
+  // La config est aussi poussée dans Firebase : c'est elle qui autorise (ou non)
+  // Apps Script à envoyer les factures. Toggle OFF → l'envoi s'arrête à la synchro suivante.
+  const saveProFacture=(v)=>{
+    setProFacture(v);save('vrm_pro_facture',v);
+    try{
+      fetch(fbUrl(FIREBASE_URL.replace('.json','')+'/vrm_pro_facture.json'),{
+        method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v),
+      }).catch(()=>{});
+    }catch(_){}
+  };
   const logoSrc = customLogo || LOGO_CANCALE;
   const logoInputRef = React.useRef(null);
   const handleLogoChange = (e) => {
@@ -4389,7 +4431,7 @@ export default function App() {
             // Nettoyer Firebase : écraser avec données migrées + nullifier les anciennes clés
             const nullKeys={};
             OLD_ZONES.forEach(z=>{for(let ci=0;ci<z.cols;ci++) nullKeys[`${z.id}_${ci}`]=null;});
-            fetch(FIREBASE_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},
+            fetch(fbUrl(FIREBASE_URL),{method:'PATCH',headers:{'Content-Type':'application/json'},
               body:JSON.stringify({vinted_garage_grid:{...mig.garageGrid,...nullKeys},
                 vinted_blocked:mig.blockedCells,vinted_extracols:mig.extraCols,vinted_colors:mig.cellColors})
             }).catch(()=>{});
