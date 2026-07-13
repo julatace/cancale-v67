@@ -973,12 +973,21 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
       {/* Stats par compte */}
       {accounts&&accounts.length>0&&(()=>{
         const encaissees2=sales.filter(v=>v.receiveDate&&v.receiveDate.trim()!=='');
+        const matchAcc=(s)=>{
+          const c=String(s.compte||'').toLowerCase().trim();
+          if(!c) return null;
+          return accounts.find(a=>
+            (a.pseudo&&a.pseudo.toLowerCase()===c)||
+            (a.email&&a.email.split('@')[0].toLowerCase()===c)||
+            (a.name&&a.name.toLowerCase()===c)
+          )||null;
+        };
         return (
           <Card>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:10,fontWeight:700}}>Stats par compte</div>
             <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
               {accounts.map(acc=>{
-                const accSales=encaissees2.filter(v=>v.account===acc.id);
+                const accSales=encaissees2.filter(v=>matchAcc(v)?.id===acc.id);
                 const accCA=accSales.reduce((s,v)=>s+ +v.sellPrice,0);
                 const accProfit=accSales.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0);
                 return (
@@ -1469,6 +1478,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
   const [selectMode,setSelectMode]=useState(false);
   const [selectedIds,setSelectedIds]=useState(new Set());
   const [isDragging,setIsDragging]=useState(false);
+  const [showCsvImport,setShowCsvImport]=useState(false);
+  const [csvPreview,setCsvPreview]=useState(null); // {rows, headers, colMap, compte}
   const dragModeRef=React.useRef('add');
   const selectedIdsRef=React.useRef(new Set());
   selectedIdsRef.current=selectedIds;
@@ -1536,6 +1547,84 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
       return ns;
     });
     setSales(u); save('vinted_sales',u);
+  };
+
+  const handleCsvFile=(file)=>{
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      const text=e.target.result.replace(/^﻿/,'');
+      const firstLine=text.split('\n')[0];
+      const sep=firstLine.split(';').length>firstLine.split(',').length?';':',';
+      const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+      if(lines.length<2){alert('Fichier CSV vide ou invalide');return;}
+      const parseCell=c=>c.replace(/^["']|["']$/g,'').trim();
+      const headers=lines[0].split(sep).map(parseCell);
+      const colMap={};
+      headers.forEach((h,i)=>{
+        const l=h.toLowerCase();
+        if(l.includes('prix')||l.includes('price')||l.includes('montant')||l.includes('total')||l.includes('amount')) colMap.price=i;
+        if(l.includes('date vente')||l.includes('vendu le')||l.includes('sale date')||l.includes('date de vente')) colMap.date=i;
+        else if(l.includes('date')&&colMap.date===undefined) colMap.date=i;
+        if(l.includes('titre')||l.includes('annonce')||l.includes('article')||l.includes('produit')||l.includes('description')) colMap.title=i;
+        if(l.includes('référence')||l.includes('reference')||l.includes('commande')||l.includes('order')||l.includes('numéro')) colMap.ref=i;
+        if(l.includes('taille')||l.includes('size')) colMap.size=i;
+      });
+      const rows=lines.slice(1).map(line=>{
+        const cells=line.split(sep).map(parseCell);
+        return {
+          title:colMap.title!==undefined?cells[colMap.title]||'':'',
+          price:colMap.price!==undefined?cells[colMap.price]||'':'',
+          date:colMap.date!==undefined?cells[colMap.date]||'':'',
+          ref:colMap.ref!==undefined?cells[colMap.ref]||'':'',
+          size:colMap.size!==undefined?cells[colMap.size]||'':'',
+        };
+      }).filter(r=>r.price&&parseFloat(r.price.replace(',','.').replace(/[^0-9.]/g,''))>0);
+      if(rows.length===0){alert('Aucune ligne valide détectée. Vérifiez le format du fichier.');return;}
+      const defaultCompte=(accounts&&accounts.length>0)?accounts[0].name:'';
+      setCsvPreview({rows,headers,colMap,sep,compte:defaultCompte});
+      setShowCsvImport(true);
+    };
+    reader.readAsText(file,'UTF-8');
+  };
+
+  const confirmCsvImport=()=>{
+    if(!csvPreview) return;
+    const {rows,compte}=csvPreview;
+    const parseDate=(d)=>{
+      if(!d) return '';
+      d=d.trim();
+      if(/^\d{4}-\d{2}-\d{2}/.test(d)){const[y,m,dd]=d.split('-');return `${dd.slice(0,2)}/${m}/${y}`;}
+      if(/^\d{2}[/.-]\d{2}[/.-]\d{4}/.test(d)){return d.replace(/[.-]/g,'/').slice(0,10);}
+      if(/^\d{2}[/.-]\d{2}[/.-]\d{2}$/.test(d)){const p=d.split(/[/.-]/);return `${p[0]}/${p[1]}/20${p[2]}`;}
+      return d;
+    };
+    const newSales=rows.map(r=>{
+      const price=parseFloat(r.price.replace(',','.').replace(/[^0-9.]/g,''))||0;
+      const saleDate=parseDate(r.date);
+      const catItem=r.ref?(catalog||[]).find(x=>String(x.id)===String(r.ref).trim()):null;
+      const buy=catItem?+catItem.buyPrice:0;
+      return {
+        id:uid(),
+        productId:catItem?catItem.id:r.ref||r.title.slice(0,30)||'',
+        buyPrice:buy,
+        sellPrice:price,
+        profit:+(price-buy).toFixed(2),
+        multi:buy>0?+(price/buy).toFixed(2):0,
+        saleDate,
+        receiveDate:'',
+        createdAt:new Date().toISOString(),
+        compte:compte||'',
+        source:'csv_import',
+      };
+    });
+    const existingIds=new Set(sales.map(s=>s.productId+'|'+s.saleDate+'|'+s.sellPrice));
+    const deduped=newSales.filter(s=>!existingIds.has(s.productId+'|'+s.saleDate+'|'+s.sellPrice));
+    const skipped=newSales.length-deduped.length;
+    const updated=[...deduped,...sales];
+    setSales(updated);save('vinted_sales',updated);
+    setShowCsvImport(false);setCsvPreview(null);
+    alert(`✅ ${deduped.length} vente(s) importée(s)${skipped>0?` (${skipped} doublon(s) ignoré(s))`:''}. Pense à renseigner le prix d'achat pour les nouvelles entrées.`);
   };
 
   const del=(sid,pid)=>{
@@ -1655,6 +1744,49 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
           <button onClick={()=>setCrossAlert(null)} style={{alignSelf:'flex-end',background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.5)',color:'#fff',borderRadius:6,padding:'5px 14px',fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>✓ OK, compris</button>
         </div>
       )}
+      {/* Import CSV preview */}
+      {showCsvImport&&csvPreview&&(
+        <div style={{background:C.card,border:`1px solid ${C.accent}66`,borderRadius:10,padding:'14px',display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{fontWeight:800,color:C.text,fontSize:13}}>📥 Import CSV Vinted — {csvPreview.rows.length} ligne(s) détectée(s)</div>
+            <button onClick={()=>{setShowCsvImport(false);setCsvPreview(null);}} style={{background:'transparent',border:'none',color:C.muted,fontSize:18,cursor:'pointer'}}>✕</button>
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:12,color:C.muted}}>Attribuer à :</span>
+            <select value={csvPreview.compte} onChange={e=>setCsvPreview(p=>({...p,compte:e.target.value}))}
+              style={{padding:'5px 10px',borderRadius:6,border:`1px solid ${C.border}`,background:C.surface,color:C.text,fontSize:12,fontFamily:'inherit'}}>
+              {(accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}
+              <option value="">— Sans compte —</option>
+            </select>
+          </div>
+          <div style={{overflowX:'auto',maxHeight:200,border:`1px solid ${C.border}`,borderRadius:6}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+              <thead>
+                <tr style={{background:C.surface}}>
+                  <th style={{padding:'4px 8px',textAlign:'left',color:C.muted,fontWeight:600}}>Titre / Réf</th>
+                  <th style={{padding:'4px 8px',textAlign:'right',color:C.muted,fontWeight:600}}>Prix</th>
+                  <th style={{padding:'4px 8px',textAlign:'left',color:C.muted,fontWeight:600}}>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {csvPreview.rows.slice(0,10).map((r,i)=>(
+                  <tr key={i} style={{borderTop:`1px solid ${C.border}`}}>
+                    <td style={{padding:'4px 8px',color:C.text,maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.title||r.ref||'—'}</td>
+                    <td style={{padding:'4px 8px',textAlign:'right',color:C.accent,fontWeight:700}}>{r.price}</td>
+                    <td style={{padding:'4px 8px',color:C.muted}}>{r.date}</td>
+                  </tr>
+                ))}
+                {csvPreview.rows.length>10&&<tr><td colSpan={3} style={{padding:'4px 8px',color:C.muted,textAlign:'center',fontSize:10}}>… et {csvPreview.rows.length-10} autres</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <div style={{fontSize:11,color:C.muted}}>⚠️ Les prix d'achat seront à 0 sauf si le numéro de référence correspond à un article du catalogue. Tu pourras les corriger manuellement.</div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={confirmCsvImport} style={{flex:1,padding:'8px 0',borderRadius:8,background:C.accent,color:'#fff',border:'none',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>✅ Importer {csvPreview.rows.length} vente(s)</button>
+            <button onClick={()=>{setShowCsvImport(false);setCsvPreview(null);}} style={{padding:'8px 16px',borderRadius:8,background:'transparent',color:C.muted,border:`1px solid ${C.border}`,fontWeight:600,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+          </div>
+        </div>
+      )}
       {/* Bandeau mois en cours */}
       <div style={{display:'flex',flexWrap:'wrap',gap:14,background:C.card,
         border:`1px solid ${C.blue}44`,borderRadius:8,padding:'12px 16px'}}>
@@ -1677,6 +1809,10 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
           }}>👤 Par compte</button>
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
           <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
+          <label style={{cursor:'pointer'}}>
+            <input type="file" accept=".csv,.txt" style={{display:'none'}} onChange={e=>{handleCsvFile(e.target.files[0]);e.target.value='';}}/>
+            <span style={{padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',background:'transparent',color:C.muted,border:`1.5px solid ${C.border}`,display:'inline-block'}}>📥 Importer CSV</span>
+          </label>
           <Btn small onClick={()=>{
             if(fullFiltered.length===0){alert('Aucune vente à exporter');return;}
             const headers=['ID','N° Paire','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
