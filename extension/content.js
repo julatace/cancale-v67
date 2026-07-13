@@ -80,6 +80,71 @@ async function syncBalance() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// ANNONCES — quand tu es sur TON profil, l'extension lit tes
+// annonces en ligne (titre, prix, n° d'article) et les envoie à VRM.
+// Le scan s'accumule pendant que tu fais défiler la page.
+// ═══════════════════════════════════════════════════════════
+
+const seenItems = {}; // par pseudo : { itemId: {id,title,price,url} }
+
+// Sommes-nous sur la page du profil du compte connecté ?
+function ownProfilePseudo() {
+  const m = location.pathname.match(/\/member\/\d+-([a-z0-9._-]+)/i);
+  if (!m) return null;
+  const pseudo = detectPseudo();
+  return (pseudo && m[1].toLowerCase() === pseudo) ? pseudo : null;
+}
+
+function scanAnnonces(pseudo) {
+  if (!seenItems[pseudo]) seenItems[pseudo] = {};
+  const bucket = seenItems[pseudo];
+  document.querySelectorAll('a[href*="/items/"]').forEach(a => {
+    const m = (a.getAttribute('href') || '').match(/\/items\/(\d+)/);
+    if (!m) return;
+    const id = m[1];
+    const img = a.querySelector('img');
+    const title = (a.getAttribute('title') || (img && img.alt) || '').trim();
+    const tile = a.closest('div[class],li') || a.parentElement || a;
+    const pm = (tile.innerText || '').match(/(\d{1,4}(?:[,.]\d{2})?)\s*€/);
+    const price = pm ? parseFloat(pm[1].replace(',', '.')) : null;
+    if (!bucket[id] || (price !== null && bucket[id].price === null) || (title && !bucket[id].title)) {
+      bucket[id] = { id, title, price, url: 'https://www.vinted.fr/items/' + id };
+    }
+  });
+}
+
+async function syncAnnonces() {
+  const pseudo = ownProfilePseudo();
+  if (!pseudo) return;
+  scanAnnonces(pseudo);
+  const items = Object.values(seenItems[pseudo] || {});
+  if (items.length === 0) return;
+
+  const sig = items.map(i => i.id).sort().join(',');
+  const cacheKey = 'vrm_last_annonces_' + pseudo;
+  if (sessionStorage.getItem(cacheKey) === sig) return; // rien de nouveau
+
+  const key = await walletKey(pseudo);
+  try {
+    await fetch(authUrl('/vrm_annonces/' + encodeURIComponent(key)), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pseudo: pseudo,
+        count: items.length,
+        items: items,
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    sessionStorage.setItem(cacheKey, sig);
+    console.log('[VRM] Annonces synchronisées :', pseudo, items.length);
+  } catch (e) {
+    console.warn('[VRM] Échec synchro annonces', e);
+  }
+}
+
 // Vinted est une SPA : on re-scanne à chaque navigation + toutes les 20 s
 syncBalance();
-setInterval(syncBalance, 20000);
+syncAnnonces();
+setInterval(() => { syncBalance(); syncAnnonces(); }, 20000);

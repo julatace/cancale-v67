@@ -26,6 +26,13 @@ au moins une fois pour synchroniser tous les soldes.
 Ouvre `content.js` et renseigne `FIREBASE_SECRET` avec la même clé que
 dans VRM → Paramètres → Clé secrète Firebase, puis recharge l'extension.
 
+## Annonces
+
+Quand tu ouvres **ton profil** Vinted (ton dressing), l'extension lit tes
+annonces en ligne (titre, prix, n° d'article) et les synchronise dans VRM
+(Dashboard → 📣 Annonces en ligne). Fais défiler ton dressing jusqu'en bas
+pour capter toutes les annonces — le scan s'accumule pendant le défilement.
+
 ## iPhone
 
 Les extensions Chrome ne fonctionnent pas sur iPhone. Sur mobile, le solde

@@ -516,14 +516,31 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts,bordereaux,object
   // Soldes automatiques : alimentés par l'extension Vinted et les emails
   // (Apps Script crédite à chaque paiement, débite à chaque virement banque)
   const [autoWallets,setAutoWallets]=useState(null);
+  const [annonces,setAnnonces]=useState(null); // synchronisées par l'extension Vinted
+  const [annoncesOpen,setAnnoncesOpen]=useState(null); // clé du compte déplié
   useEffect(()=>{
     let stop=false;
-    const fetchWallets=()=>fetch(fbUrl(FIREBASE_URL.replace('.json','')+'/vrm_wallets.json'))
-      .then(r=>r.json()).then(d=>{if(!stop&&d)setAutoWallets(d);}).catch(()=>{});
-    fetchWallets();
-    const iv=setInterval(fetchWallets,2*60*1000); // rafraîchit toutes les 2 min
+    const base=FIREBASE_URL.replace('.json','');
+    const fetchAuto=()=>{
+      fetch(fbUrl(base+'/vrm_wallets.json')).then(r=>r.json()).then(d=>{if(!stop&&d)setAutoWallets(d);}).catch(()=>{});
+      fetch(fbUrl(base+'/vrm_annonces.json')).then(r=>r.json()).then(d=>{if(!stop&&d)setAnnonces(d);}).catch(()=>{});
+    };
+    fetchAuto();
+    const iv=setInterval(fetchAuto,2*60*1000); // rafraîchit toutes les 2 min
     return ()=>{stop=true;clearInterval(iv);};
   },[]);
+
+  // Annonces par compte : rattache chaque clé (id de compte ou pseudo) à son compte VRM
+  const annoncesParCompte=useMemo(()=>{
+    if(!annonces) return [];
+    return Object.entries(annonces).map(([key,data])=>{
+      const acc=(accounts||[]).find(a=>a.id===key)||
+        (accounts||[]).find(a=>(a.pseudo||'').toLowerCase()===(data.pseudo||key).toLowerCase());
+      const items=Array.isArray(data.items)?data.items:Object.values(data.items||{});
+      const totalPrix=items.reduce((s,i)=>s+(typeof i.price==='number'?i.price:0),0);
+      return {key,acc,pseudo:data.pseudo||key,count:data.count||items.length,items,totalPrix,updatedAt:data.updatedAt};
+    }).sort((a,b)=>b.count-a.count);
+  },[annonces,accounts]);
 
   // Somme des portes-monnaies : solde auto en priorité, sinon saisie manuelle
   const wallets=useMemo(()=>{
@@ -983,6 +1000,52 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts,bordereaux,object
             ))}
           </div>
           <div style={{fontSize:10,color:C.muted,marginTop:8}}>⟳ = solde automatique (extension Vinted + emails : paiement reçu = +, virement banque = −). Pour recalibrer : Paramètres → Comptes → Porte-monnaie.</div>
+        </Card>
+      )}
+
+      {/* 📣 Annonces en ligne (synchronisées par l'extension Vinted) */}
+      {annoncesParCompte.length>0&&(
+        <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:12}}>
+            📣 Annonces en ligne — {annoncesParCompte.reduce((s,a)=>s+a.count,0)} au total
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {annoncesParCompte.map(g=>{
+              const color=g.acc?.color||C.blue;
+              const nom=g.acc?.name||g.pseudo;
+              const open=annoncesOpen===g.key;
+              return (
+                <div key={g.key} style={{background:C.bg,border:`1px solid ${color}44`,borderRadius:10,overflow:'hidden'}}>
+                  <button onClick={()=>setAnnoncesOpen(open?null:g.key)} style={{
+                    width:'100%',display:'flex',alignItems:'center',gap:8,padding:'9px 12px',
+                    background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left',
+                  }}>
+                    <span style={{width:9,height:9,borderRadius:'50%',background:color,flexShrink:0}}/>
+                    <span style={{fontSize:13,fontWeight:700,color:C.text}}>{nom}</span>
+                    <span style={{fontSize:12,fontWeight:800,color:C.blue}}>{g.count} annonce{g.count>1?'s':''}</span>
+                    {g.totalPrix>0&&<span style={{fontSize:11,color:C.muted}}>· {fmt(g.totalPrix)} en ligne</span>}
+                    <span style={{marginLeft:'auto',color:C.muted,fontSize:11}}>{open?'▲':'▼'}</span>
+                  </button>
+                  {open&&(
+                    <div style={{maxHeight:260,overflowY:'auto',borderTop:`1px solid ${C.border}`}}>
+                      {g.items.slice().sort((a,b)=>(b.price||0)-(a.price||0)).map(it=>(
+                        <a key={it.id} href={it.url} target="_blank" rel="noreferrer" style={{
+                          display:'flex',alignItems:'center',gap:8,padding:'6px 12px',textDecoration:'none',
+                          borderBottom:`1px solid ${C.border}55`,
+                        }}>
+                          <span style={{fontSize:12,color:C.text,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title||('Article '+it.id)}</span>
+                          <span style={{fontSize:12,fontWeight:800,color:C.accent,flexShrink:0}}>{typeof it.price==='number'?fmt(it.price):'—'}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{fontSize:10,color:C.muted,marginTop:8}}>
+            Mis à jour à chaque visite de ton profil Vinted (extension Chrome). Fais défiler ton dressing en entier pour tout capter.
+          </div>
         </Card>
       )}
 
