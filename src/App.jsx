@@ -2262,7 +2262,7 @@ function Door({h}) {
 }
 
 /* ── Factures ───────────────────────────────────────── */
-function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,setInvoiceSettings}) {
+function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,setInvoiceSettings,proFacture}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('ventes_attente'); // 'ventes_attente' | 'ventes_finalisees' | 'attente' | 'comptabilisees'
@@ -2364,15 +2364,65 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
   },[]);
   
   // Numéro auto pour la prochaine facture
+  const pfPrefixe=(proFacture&&proFacture.actif&&proFacture.prefixe)?proFacture.prefixe:'FA';
   const nextInvoiceNumber=useMemo(()=>{
     const year=new Date().getFullYear();
-    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`));
-    const maxNum=yearInvoices.reduce((mx,i)=>{
-      const n=parseInt(i.number.split('-')[1],10);
+    const maxNum=invoices.reduce((mx,i)=>{
+      if(!i.number) return mx;
+      const parts=i.number.split('-');
+      const n=parseInt(parts[parts.length-1],10);
       return isNaN(n)?mx:Math.max(mx,n);
     },0);
-    return `${year}-${String(maxNum+1).padStart(6,'0')}`;
-  },[invoices]);
+    return `${pfPrefixe}-${year}-${String(maxNum+1).padStart(4,'0')}`;
+  },[invoices,pfPrefixe]);
+
+  // Ref pour éviter les boucles dans l'effet d'auto-création
+  const invoicesRef=React.useRef(invoices);
+  invoicesRef.current=invoices;
+
+  // Auto-création des factures pour les ventes Pro (avec buyerEmail) quand proFacture est actif
+  useEffect(()=>{
+    if(!proFacture?.actif) return;
+    const proSales=(Array.isArray(sales)?sales:[]).filter(s=>s.buyerEmail);
+    if(proSales.length===0) return;
+    const cur=invoicesRef.current;
+    const existingNums=new Set(cur.map(i=>String(i.numero||'')).filter(Boolean));
+    const existingSaleIds=new Set(cur.map(i=>String(i.saleId||'')).filter(Boolean));
+    const toCreate=proSales.filter(s=>
+      !(s.numero&&existingNums.has(String(s.numero)))&&!existingSaleIds.has(s.id)
+    );
+    if(toCreate.length===0) return;
+    const year=new Date().getFullYear();
+    const pref=(proFacture.prefixe)||'FA';
+    let maxNum=cur.reduce((mx,i)=>{
+      if(!i.number) return mx;
+      const parts=i.number.split('-');
+      const n=parseInt(parts[parts.length-1],10);
+      return isNaN(n)?mx:Math.max(mx,n);
+    },0);
+    const newInvoices=toCreate.map(s=>{
+      maxNum+=1;
+      return {
+        id:'inv_pro_'+s.id,
+        saleId:s.id,
+        numero:s.numero||'',
+        number:`${pref}-${year}-${String(maxNum).padStart(4,'0')}`,
+        productId:s.productId||'',
+        itemName:s.productId||'',
+        sellPrice:String(s.sellPrice||''),
+        saleDate:s.saleDate||'',
+        buyerName:s.buyerName||'',
+        buyerEmail:s.buyerEmail||'',
+        buyerAddress:s.buyerAddress||'',
+        buyerPseudo:s.buyerPseudo||'',
+        source:'vinted_pro_auto',
+        createdAt:new Date().toISOString(),
+      };
+    });
+    const updated=[...newInvoices,...cur];
+    setInvoices(updated);save('vinted_invoices',updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[sales,proFacture?.actif,proFacture?.prefixe]);
   
   // Set des productIds qui sont déjà dans Ventes (= comptabilisés)
   const accountedSet=useMemo(()=>{
@@ -2522,27 +2572,49 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
               </div>
             )}
             {gmailSales.map(s=>{
-              const canDelete=zone==='ventes_attente';
+              const inv=invoices.find(i=>String(i.saleId||'')===s.id||(s.numero&&String(i.numero||'')===String(s.numero)));
+              const isPro=!!s.buyerEmail;
               return (
                 <div key={s.id} style={{
-                  background:C.card,border:`1px solid ${C.border}`,borderRadius:10,
+                  background:C.card,
+                  border:`1px solid ${isPro?C.accent+'66':C.border}`,
+                  borderRadius:10,
                   padding:'12px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',
                 }}>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:3}}>
+                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:4}}>
                       <span style={{fontWeight:800,fontSize:13,color:C.accent}}>N°{s.numero||s.productId||'?'}</span>
-                      <span style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:200}}>{s.productId||<span style={{color:C.muted,fontStyle:'italic'}}>Modèle inconnu</span>}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:180}}>{s.productId||''}</span>
+                      {isPro&&<span style={{fontSize:10,fontWeight:800,background:C.accent+'22',color:C.accent,borderRadius:10,padding:'1px 7px'}}>PRO</span>}
+                      {s.sellPrice&&<span style={{fontSize:12,fontWeight:700,color:C.accent,marginLeft:'auto'}}>{(+s.sellPrice).toFixed(2)} €</span>}
                     </div>
                     <div style={{fontSize:11,color:C.muted,display:'flex',gap:12,flexWrap:'wrap'}}>
-                      {s.saleDate&&<span>📅 Vente : {s.saleDate}</span>}
-                      {s.receiveDate&&<span>💳 Reçu : {s.receiveDate}</span>}
-                        </div>
+                      {s.saleDate&&<span>📅 {s.saleDate}</span>}
+                      {s.receiveDate&&<span>💳 {s.receiveDate}</span>}
+                      {s.compte&&<span>👤 {s.compte}</span>}
+                    </div>
+                    {isPro&&(
+                      <div style={{marginTop:5,fontSize:11,display:'flex',flexDirection:'column',gap:2}}>
+                        {s.buyerName&&<span style={{color:C.text,fontWeight:600}}>{s.buyerName}</span>}
+                        {s.buyerAddress&&<span style={{color:C.muted}}>{s.buyerAddress}</span>}
+                        <span style={{color:C.blue}}>{s.buyerEmail}</span>
+                      </div>
+                    )}
                   </div>
-                  {canDelete&&<button onClick={()=>{
-                    if(!window.confirm('Supprimer cette vente en attente ?')) return;
-                    const u=(Array.isArray(sales)?sales:[]).filter(x=>x.id!==s.id);
-                    setSales(u); save('vinted_sales',u);
-                  }} style={{padding:'6px 10px',borderRadius:8,background:'transparent',color:C.danger,border:`1px solid ${C.danger}`,fontSize:12,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>🗑️</button>}
+                  <div style={{display:'flex',gap:6,alignItems:'center',flexShrink:0}}>
+                    {isPro&&(
+                      <button onClick={()=>generatePDF(inv||{...s,itemName:s.productId,number:inv?.number||''},invoiceSettings||{},proFacture)}
+                        title="Générer la facture PDF"
+                        style={{padding:'6px 10px',borderRadius:8,background:`${C.blue}22`,color:C.blue,border:`1px solid ${C.blue}66`,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                        📄 {inv?.number?inv.number:'Facture'}
+                      </button>
+                    )}
+                    <button onClick={()=>{
+                      if(!window.confirm('Supprimer cette vente en attente ?')) return;
+                      const u=(Array.isArray(sales)?sales:[]).filter(x=>x.id!==s.id);
+                      setSales(u); save('vinted_sales',u);
+                    }} style={{padding:'6px 10px',borderRadius:8,background:'transparent',color:C.danger,border:`1px solid ${C.danger}`,fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>🗑️</button>
+                  </div>
                 </div>
               );
             })}
@@ -2589,7 +2661,7 @@ function Invoices({invoices,setInvoices,catalog,sales,setSales,invoiceSettings,s
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:700}}>{fmt(+inv.sellPrice||0)}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,invoiceSettings)} color={C.blue} style={{marginRight:4}}>📄</Btn>
+                    <Btn small onClick={()=>generatePDF(inv,invoiceSettings||{},proFacture)} color={C.blue} style={{marginRight:4}}>📄</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
                 </tr>
@@ -4548,7 +4620,7 @@ export default function App() {
           try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
         }}/>}
         {tab==='sales'      &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} accounts={accounts} proFacture={proFacture}/>}
-        {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} setSales={setSales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
+        {tab==='invoices'   &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} setSales={setSales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} proFacture={proFacture}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices} accounts={accounts} catalog={catalog}/>}
         {tab==='bordereaux' &&<BordereauxView bordereaux={bordereaux} setBordereaux={setBordereaux} appsScriptUrl={appsScriptUrl} photos={photos} catalog={catalog} sales={sales} setSales={setSales} setStockVinted={setStockVinted} accounts={accounts}/>}
         {tab==='garage'     &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} accounts={accounts}/>}
