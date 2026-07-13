@@ -14,6 +14,7 @@ const THEMES = {
 };
 let C = THEMES.light;
 
+const escapeRe=(s)=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function hexShade(hex,pct){
   if(!hex||hex[0]!=='#') return hex;
   const num=parseInt(hex.slice(1),16);
@@ -541,15 +542,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
   // Stock & valeur (mémorisés)
   const stockCount=garageVals.length;
   const stockValue=useMemo(()=>garageVals.reduce((s,id)=>s+(catMap[id]||0),0),[garageVals,catMap]);
-  const freeSlots=TOTAL_SLOTS-stockCount;
-  const fillRate=Math.round((stockCount/TOTAL_SLOTS)*100);
-  
-  const totalSold=useMemo(()=>catalog.filter(p=>p.status==='vendu').length,[catalog]);
   const encaissees=useMemo(()=>sales.filter(v=>v.receiveDate&&v.receiveDate.trim()!==''),[sales]);
   const ca=useMemo(()=>encaissees.reduce((s,v)=>s+ +v.sellPrice,0),[encaissees]);
   const profit=useMemo(()=>encaissees.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0),[encaissees]);
-  const enAttente=useMemo(()=>sales.filter(v=>!v.receiveDate||v.receiveDate.trim()===''),[sales]);
-  const caAttente=useMemo(()=>enAttente.reduce((s,v)=>s+ +v.sellPrice,0),[enAttente]);
   const avgX=useMemo(()=>encaissees.length?(encaissees.reduce((s,v)=>s+ +v.multi,0)/encaissees.length).toFixed(2):'—',[encaissees]);
   const avgMargin=ca>0?((profit/ca)*100).toFixed(1):'0';
   const avgSale=encaissees.length?(ca/encaissees.length):0;
@@ -1516,7 +1511,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,accou
       const ns=new Set(selectedIdsRef.current);
       if(dragModeRef.current==='add') ns.add(vid); else ns.delete(vid);
       // Si pas de changement, on ne re-render pas
-      if(ns.size===selectedIdsRef.current.size&&dragModeRef.current==='add'?selectedIdsRef.current.has(vid):!selectedIdsRef.current.has(vid)) return;
+      const noChange=(ns.size===selectedIdsRef.current.size)&&(dragModeRef.current==='add'?selectedIdsRef.current.has(vid):!selectedIdsRef.current.has(vid));
+      if(noChange) return;
       setSelectedIds(ns);
     };
     
@@ -3429,7 +3425,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
     const txt=String(modele||'');
     const catItem=(catalog||[]).find(item=>{
       const n=String(item.id||'').trim();
-      return n&&new RegExp('\\b'+n+'\\b').test(txt);
+      return n&&new RegExp('\\b'+escapeRe(n)+'\\b').test(txt);
     });
     if(catItem){
       // Priorité aux listings
@@ -3693,7 +3689,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             let changed=false;
             toAdd.forEach(v=>{
               const txt=String(v.modele||'');
-              const match=sv.find(x=>{const n=typeof x==='string'?x:(x.num||'');return n&&new RegExp('\\b'+n+'\\b').test(txt);});
+              const match=sv.find(x=>{const n=typeof x==='string'?x:(x.num||'');return n&&new RegExp('\\b'+escapeRe(n)+'\\b').test(txt);});
               if(match){const n=typeof match==='string'?match:match.num;sv=sv.filter(x=>(typeof x==='string'?x:(x.num||''))!==n);changed=true;}
             });
             if(changed){localStorage.setItem('vinted_stock_vinted',JSON.stringify(sv));setStockVinted(sv);}
@@ -3803,7 +3799,7 @@ function BordereauxView({bordereaux,setBordereaux,appsScriptUrl,photos,catalog,s
             let changed=false;
             toAdd.forEach(v=>{
               const txt=String(v.modele||'');
-              const match=sv.find(x=>{const n=typeof x==='string'?x:(x.num||'');return n&&new RegExp('\\b'+n+'\\b').test(txt);});
+              const match=sv.find(x=>{const n=typeof x==='string'?x:(x.num||'');return n&&new RegExp('\\b'+escapeRe(n)+'\\b').test(txt);});
               if(match){const n=typeof match==='string'?match:match.num;sv=sv.filter(x=>(typeof x==='string'?x:(x.num||''))!==n);changed=true;}
             });
             if(changed){localStorage.setItem('vinted_stock_vinted',JSON.stringify(sv));setStockVinted(sv);}
@@ -4103,7 +4099,6 @@ export default function App() {
   const [photos,setPhotos]=useState(()=>load('vinted_photos',{}));
   const [bordereaux,setBordereaux]=useState(()=>load('vinted_bordereaux',[]));
   const [appsScriptUrl,setAppsScriptUrl]=useState(()=>load('vinted_appsscript_url',''));
-  const [defaultSalesAccount,setDefaultSalesAccount]=useState(()=>load('vinted_default_sales_account',''));
   const logoSrc = customLogo || LOGO_CANCALE;
   const logoInputRef = React.useRef(null);
   const handleLogoChange = (e) => {
@@ -4270,7 +4265,7 @@ export default function App() {
       setStockVinted(finalStock); save('vinted_stock_vinted',finalStock);
       save('vinted_sv_auto_removed',stillRemoved);
     }
-  },[invoices,synced]);
+  },[invoices,stockVinted,synced]);
 
   // 2) Nouveaux numéros ajoutés au catalogue À PARTIR DE MAINTENANT
   //    => ajout automatique au Stock Vinted.
@@ -4312,7 +4307,7 @@ export default function App() {
       // Garder la liste vue à jour (au cas où des ids auraient été retirés)
       save('vinted_sv_seen_catalog',currentIds);
     }
-  },[catalog,synced]);
+  },[catalog,invoices,stockVinted,synced]);
 
   // ── Notifications : ventes comptabilisées + factures reçues ──
   // Après chargement, on compare le nombre actuel de ventes (=comptabilisées)
