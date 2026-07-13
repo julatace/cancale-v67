@@ -1009,7 +1009,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts}) {
 }
 
 /* ── Comptes ─────────────────────────────────────────── */
-function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,dark,toggleDark,notifEnabled,onToggleNotif,onExport,onImport}) {
+function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,dark,toggleDark,notifEnabled,onToggleNotif,onExport,onImport,proFacture,saveProFacture}) {
   const saveAcc=(a)=>{setAccounts(a);save('vinted_accounts',a);};
   const addAcc=()=>{
     const COLORS=['#007782','#e67e22','#9b59b6','#e74c3c','#27ae60','#2980b9','#f39c12','#1abc9c'];
@@ -1115,6 +1115,107 @@ function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,d
         <div style={{fontWeight:700,color:C.text,marginBottom:4}}>Comment ça marche</div>
         L'email iCloud permet la détection automatique du compte dans le script Apps Script. Le pseudo et le téléphone sont pour ta gestion interne. Tout est synchronisé dans le cloud.
       </Card>
+
+      {/* ── Facturation Pro ── */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Facturation Pro</h2>
+        <button onClick={()=>saveProFacture({...proFacture,actif:!proFacture.actif})} style={{
+          padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+          background:proFacture.actif?C.accent:'transparent',
+          color:proFacture.actif?'#fff':C.muted,
+          border:`1.5px solid ${proFacture.actif?C.accent:C.border}`,
+        }}>{proFacture.actif?'Activée':'Désactivée'}</button>
+      </div>
+      {proFacture.actif&&(
+      <Card style={{padding:14,display:'flex',flexDirection:'column',gap:10}}>
+        {/* Logo */}
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {proFacture.logo&&<img src={proFacture.logo} alt="logo" style={{height:52,width:52,objectFit:'contain',borderRadius:8,border:`1px solid ${C.border}`,background:'#fff'}}/>}
+          <div style={{display:'flex',flexDirection:'column',gap:4,flex:1}}>
+            <span style={{fontSize:11,color:C.muted}}>Logo de facturation</span>
+            <div style={{display:'flex',gap:6}}>
+              <label style={{cursor:'pointer'}}>
+                <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
+                  const f=e.target.files[0];if(!f)return;
+                  const r=new FileReader();
+                  r.onload=ev=>saveProFacture({...proFacture,logo:ev.target.result});
+                  r.readAsDataURL(f);e.target.value='';
+                }}/>
+                <span style={{padding:'4px 10px',borderRadius:16,fontSize:11,fontWeight:700,cursor:'pointer',background:'transparent',color:C.blue,border:`1.5px solid ${C.blue}66`,display:'inline-block'}}>
+                  {proFacture.logo?'Changer':'Ajouter logo'}
+                </span>
+              </label>
+              {proFacture.logo&&<button onClick={()=>saveProFacture({...proFacture,logo:''})} style={{padding:'4px 10px',borderRadius:16,fontSize:11,fontWeight:700,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Supprimer</button>}
+            </div>
+          </div>
+        </div>
+
+        {/* Champs infos */}
+        {[
+          ['Nom commercial','nom','Mon auto-entreprise'],
+          ['Adresse','adresse','1 rue du Commerce'],
+          ['Code postal','codePostal','35000'],
+          ['Ville','ville','Rennes'],
+          ['SIRET','siret','000 000 000 00000'],
+          ['N° TVA intracom.','tva','FR 00 000000000'],
+          ['Préfixe facture','prefixe','FA'],
+        ].map(([label,field,placeholder])=>(
+          <div key={field} style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',minWidth:110}}>{label}</span>
+            <input value={proFacture[field]||''} onChange={e=>saveProFacture({...proFacture,[field]:e.target.value})}
+              placeholder={placeholder}
+              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:13,fontFamily:'inherit',outline:'none',flex:1}}
+              onFocus={e=>e.target.style.borderColor=C.accent}
+              onBlur={e=>e.target.style.borderColor=C.border}/>
+          </div>
+        ))}
+
+        {/* Taux TVA */}
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',minWidth:110}}>Taux TVA</span>
+          <select value={proFacture.tauxTva||'20'} onChange={e=>saveProFacture({...proFacture,tauxTva:e.target.value})}
+            style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:13,fontFamily:'inherit',outline:'none',flex:1}}>
+            <option value="0">0 % (franchise en base)</option>
+            <option value="5.5">5,5 %</option>
+            <option value="10">10 %</option>
+            <option value="20">20 %</option>
+          </select>
+        </div>
+
+        {/* Mentions légales */}
+        <div style={{display:'flex',flexDirection:'column',gap:4}}>
+          <span style={{fontSize:11,color:C.muted}}>Mentions légales / pied de facture</span>
+          <textarea value={proFacture.mentions||''} onChange={e=>saveProFacture({...proFacture,mentions:e.target.value})}
+            placeholder="TVA non applicable – art. 293 B du CGI&#10;Merci pour votre achat !"
+            rows={3}
+            style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:12,fontFamily:'inherit',outline:'none',resize:'vertical'}}
+            onFocus={e=>e.target.style.borderColor=C.accent}
+            onBlur={e=>e.target.style.borderColor=C.border}/>
+        </div>
+
+        {/* Toggle envoi auto */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text}}>Envoi automatique des factures</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>VRM envoie la facture PDF à l'acheteur dès qu'une vente est enregistrée</div>
+          </div>
+          <button onClick={()=>saveProFacture({...proFacture,autoSend:!proFacture.autoSend})} style={{
+            flexShrink:0,marginLeft:12,padding:'6px 16px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+            background:proFacture.autoSend?C.accent:'transparent',
+            color:proFacture.autoSend?'#fff':C.muted,
+            border:`1.5px solid ${proFacture.autoSend?C.accent:C.border}`,
+          }}>{proFacture.autoSend?'ON':'OFF'}</button>
+        </div>
+        {proFacture.autoSend&&(
+          <div style={{fontSize:11,color:C.warn,background:C.warn+'18',borderRadius:6,padding:'8px 10px',lineHeight:1.5}}>
+            ⚠ L'envoi automatique nécessite que l'adresse email de l'acheteur soit présente dans l'email Vinted (comptes Pro uniquement). Assure-toi que le script Apps Script est configuré et actif.
+          </div>
+        )}
+      </Card>
+      )}
+      {!proFacture.actif&&(
+        <div style={{fontSize:12,color:C.muted,textAlign:'center',padding:'6px 0'}}>Active la facturation pour configurer tes informations pro et l'envoi automatique des factures PDF.</div>
+      )}
     </div>
   );
 }
@@ -4099,6 +4200,11 @@ export default function App() {
   const [photos,setPhotos]=useState(()=>load('vinted_photos',{}));
   const [bordereaux,setBordereaux]=useState(()=>load('vinted_bordereaux',[]));
   const [appsScriptUrl,setAppsScriptUrl]=useState(()=>load('vinted_appsscript_url',''));
+  const [proFacture,setProFacture]=useState(()=>load('vrm_pro_facture',{
+    actif:false,autoSend:false,nom:'',adresse:'',codePostal:'',ville:'',
+    siret:'',tva:'',prefixe:'FA',tauxTva:'20',mentions:'',logo:'',
+  }));
+  const saveProFacture=(v)=>{setProFacture(v);save('vrm_pro_facture',v);};
   const logoSrc = customLogo || LOGO_CANCALE;
   const logoInputRef = React.useRef(null);
   const handleLogoChange = (e) => {
@@ -4431,7 +4537,7 @@ export default function App() {
               <span style={{fontWeight:800,fontSize:18,color:C.accent}}>⚙️ Paramètres</span>
               <button onClick={()=>setShowSettings(false)} style={{background:'transparent',border:'none',color:C.muted,fontSize:22,cursor:'pointer',lineHeight:1,padding:'4px 8px'}}>×</button>
             </div>
-            <AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl}
+            <AccountsSettings accounts={accounts} setAccounts={setAccounts} appsScriptUrl={appsScriptUrl} setAppsScriptUrl={setAppsScriptUrl} proFacture={proFacture} saveProFacture={saveProFacture}
               dark={dark} toggleDark={toggleDark} notifEnabled={notifEnabled}
               onToggleNotif={async()=>{
                 if(!notifEnabled){
