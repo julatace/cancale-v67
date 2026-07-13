@@ -21,8 +21,10 @@ function doGet(e) {
 function processVintedEmails() {
   processVintedSales();
   processVintedPayments();
+  processVintedVirements();
   processVintedBordereaux();
   rappelColisNonEnvoyes();
+  flushWalletDeltas(); // applique les mouvements de porte-monnaie accumulés
 }
 
 // ════════════════════════════════════════════════════════════
@@ -140,6 +142,9 @@ function processVintedPayments() {
         emailId:     emailId,
       });
 
+      // Porte-monnaie : paiement reçu → le solde du compte augmente
+      if (amount) walletDelta(walletKeyForMsg(msg), +amount);
+
       thread.addLabel(label);
     });
   });
@@ -149,6 +154,82 @@ function processVintedPayments() {
     firebasePut('/vinted_incoming_payments', all);
     Logger.log('Paiements ajoutés : ' + newPayments.length);
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// 2b. VIREMENTS VERS LA BANQUE
+// "Ton virement de X € est en route vers ton compte bancaire"
+// → le solde du porte-monnaie diminue
+// ════════════════════════════════════════════════════════════
+function processVintedVirements() {
+  const label = getOrCreateLabel(LABEL_NAME);
+  const threads = GmailApp.search(
+    'from:(noreply@vinted.fr OR no-reply@vinted.fr) -label:' + LABEL_NAME + ' virement newer_than:14d'
+  );
+
+  threads.forEach(thread => {
+    const msgs = thread.getMessages();
+    msgs.forEach(msg => {
+      if (!isVirementEmail(msg)) return;
+      const body   = msg.getPlainBody() || msg.getBody();
+      const amount = extractPrice(body);
+      if (amount) {
+        walletDelta(walletKeyForMsg(msg), -amount);
+        Logger.log('Virement banque détecté : -' + amount + ' €');
+      }
+      thread.addLabel(label);
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// PORTE-MONNAIE — solde automatique par compte
+// Stocké dans /vrm_wallets/{accountId} = { solde, updatedAt, source }
+// VRM peut recalibrer le solde à tout moment (Paramètres → Comptes).
+// ════════════════════════════════════════════════════════════
+
+let _accountsCache;
+function getVrmAccounts() {
+  if (_accountsCache !== undefined) return _accountsCache;
+  _accountsCache = firebaseGet('/vinted_accounts') || [];
+  return _accountsCache;
+}
+
+// Identifie le compte destinataire d'un email (via l'adresse To,
+// comparée aux emails des comptes configurés dans VRM)
+function walletKeyForMsg(msg) {
+  const to = ((msg.getTo() || '') + ' ' + (msg.getCc() || '')).toLowerCase();
+  const accounts = getVrmAccounts();
+  for (let i = 0; i < accounts.length; i++) {
+    const a = accounts[i];
+    if (a.email && to.indexOf(a.email.toLowerCase()) > -1) return a.id;
+  }
+  if (accounts.length === 1) return accounts[0].id;
+  const m = to.match(/([a-z0-9._%+\-]+)@/);
+  return m ? m[1] : 'principal';
+}
+
+// Les mouvements sont accumulés pendant l'exécution puis appliqués en une fois
+let _walletDeltas = {};
+function walletDelta(key, amount) {
+  if (!key || !amount) return;
+  _walletDeltas[key] = (_walletDeltas[key] || 0) + amount;
+}
+function flushWalletDeltas() {
+  const keys = Object.keys(_walletDeltas);
+  if (keys.length === 0) return;
+  const wallets = firebaseGet('/vrm_wallets') || {};
+  keys.forEach(k => {
+    const cur = (wallets[k] && typeof wallets[k].solde === 'number') ? wallets[k].solde : 0;
+    wallets[k] = {
+      solde: Math.round((cur + _walletDeltas[k]) * 100) / 100,
+      updatedAt: new Date().toISOString(),
+      source: 'auto',
+    };
+  });
+  firebasePut('/vrm_wallets', wallets);
+  Logger.log('Portes-monnaies mis à jour : ' + JSON.stringify(_walletDeltas));
+  _walletDeltas = {};
 }
 
 // ════════════════════════════════════════════════════════════
@@ -389,11 +470,22 @@ function isSaleEmail(msg) {
 }
 
 function isPaymentEmail(msg) {
+  if (isVirementEmail(msg)) return false; // virement banque = débit, pas un paiement
   const s = (msg.getSubject() || '').toLowerCase();
   const b = (msg.getPlainBody() || msg.getBody() || '').toLowerCase().slice(0, 1500);
   return s.includes('paiement') || s.includes('argent disponible') ||
          b.includes('paiement reçu') || b.includes('argent disponible') ||
-         b.includes('virement') || b.includes('encaissé');
+         b.includes('encaissé');
+}
+
+// Virement du porte-monnaie Vinted vers le compte bancaire (retrait)
+function isVirementEmail(msg) {
+  const s = (msg.getSubject() || '').toLowerCase();
+  const b = (msg.getPlainBody() || msg.getBody() || '').toLowerCase().slice(0, 1500);
+  const mentionne = s.includes('virement') || b.includes('virement');
+  const versBanque = s.includes('compte bancaire') || b.includes('compte bancaire') ||
+                     b.includes('en route vers') || b.includes('iban');
+  return mentionne && versBanque;
 }
 
 function isBordereauEmail(msg) {

@@ -513,13 +513,28 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts,bordereaux,object
   const [editObjectif,setEditObjectif]=useState(false);
   const [objectifDraft,setObjectifDraft]=useState('');
 
-  // Somme des portes-monnaies de tous les comptes (saisis dans Paramètres → Comptes)
+  // Soldes automatiques : alimentés par l'extension Vinted et les emails
+  // (Apps Script crédite à chaque paiement, débite à chaque virement banque)
+  const [autoWallets,setAutoWallets]=useState(null);
+  useEffect(()=>{
+    let stop=false;
+    const fetchWallets=()=>fetch(fbUrl(FIREBASE_URL.replace('.json','')+'/vrm_wallets.json'))
+      .then(r=>r.json()).then(d=>{if(!stop&&d)setAutoWallets(d);}).catch(()=>{});
+    fetchWallets();
+    const iv=setInterval(fetchWallets,2*60*1000); // rafraîchit toutes les 2 min
+    return ()=>{stop=true;clearInterval(iv);};
+  },[]);
+
+  // Somme des portes-monnaies : solde auto en priorité, sinon saisie manuelle
   const wallets=useMemo(()=>{
-    const items=(accounts||[])
-      .map(a=>({...a,solde:parseFloat(String(a.wallet||'').replace(',','.'))||0}))
-      .filter(a=>a.wallet!==undefined&&a.wallet!==''&&!isNaN(parseFloat(String(a.wallet).replace(',','.'))));
+    const items=(accounts||[]).map(a=>{
+      const auto=autoWallets&&(autoWallets[a.id]||((a.pseudo&&autoWallets[a.pseudo])||null));
+      const manuel=parseFloat(String(a.wallet||'').replace(',','.'));
+      const solde=(auto&&typeof auto.solde==='number')?auto.solde:(isNaN(manuel)?null:manuel);
+      return {...a,solde,auto:!!(auto&&typeof auto.solde==='number')};
+    }).filter(a=>a.solde!==null);
     return {items,total:items.reduce((s,a)=>s+a.solde,0)};
-  },[accounts]);
+  },[accounts,autoWallets]);
 
   // Colis pas encore expédiés dont la date limite approche (bordereaux Gmail)
   const colisUrgents=useMemo(()=>{
@@ -963,10 +978,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,accounts,bordereaux,object
                 <span style={{width:8,height:8,borderRadius:'50%',background:a.color,flexShrink:0}}/>
                 <span style={{fontSize:12,fontWeight:700,color:C.text}}>{a.name}</span>
                 <span style={{fontSize:12,fontWeight:800,color:C.accent}}>{fmt(a.solde)}</span>
+                {a.auto&&<span title="Solde synchronisé automatiquement" style={{fontSize:10}}>⟳</span>}
               </div>
             ))}
           </div>
-          <div style={{fontSize:10,color:C.muted,marginTop:8}}>Les soldes se modifient dans Paramètres → Comptes → Porte-monnaie.</div>
+          <div style={{fontSize:10,color:C.muted,marginTop:8}}>⟳ = solde automatique (extension Vinted + emails : paiement reçu = +, virement banque = −). Pour recalibrer : Paramètres → Comptes → Porte-monnaie.</div>
         </Card>
       )}
 
@@ -1153,7 +1169,21 @@ function AccountsSettings({accounts,setAccounts,appsScriptUrl,setAppsScriptUrl,d
     if(!window.confirm('Supprimer ce compte ?')) return;
     saveAcc(accounts.filter(a=>a.id!==id));
   };
-  const upd=(i,field,val)=>{const a=[...accounts];a[i]={...a[i],[field]:val};saveAcc(a);};
+  const upd=(i,field,val)=>{
+    const a=[...accounts];a[i]={...a[i],[field]:val};saveAcc(a);
+    // Le champ porte-monnaie sert de recalibrage : on écrase le solde auto dans Firebase
+    if(field==='wallet'){
+      const solde=parseFloat(String(val).replace(',','.'));
+      if(!isNaN(solde)){
+        try{
+          fetch(fbUrl(FIREBASE_URL.replace('.json','')+'/vrm_wallets/'+encodeURIComponent(a[i].id)+'.json'),{
+            method:'PUT',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({solde,updatedAt:new Date().toISOString(),source:'manuel'}),
+          }).catch(()=>{});
+        }catch(_){}
+      }
+    }
+  };
   const inputStyle={background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'6px 10px',fontSize:13,fontFamily:'inherit',outline:'none',width:'100%'};
   const row=(label,field,i,acc,placeholder)=>(
     <div style={{display:'flex',alignItems:'center',gap:8}}>

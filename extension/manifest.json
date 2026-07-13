@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "VRM — Porte-monnaie Vinted",
+  "version": "1.0",
+  "description": "Lit le solde de ton porte-monnaie sur Vinted et le synchronise dans VRM automatiquement.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.vinted.fr/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://shop-cancale67-default-rtdb.europe-west1.firebasedatabase.app/*"
+  ]
+}
