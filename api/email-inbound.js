@@ -17,6 +17,8 @@
 // contentType, content(base64)}] } — ce que renvoie un Worker Cloudflare.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { sendPushToAll } from './_lib/push.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -219,6 +221,8 @@ export default async function handler(req, res) {
         data: { type: 'bordereau', ...data, account: acc.login || '', uid: acc.uid || '', pdfB64: pdf ? pdf.contentB64 : null, filename: pdf ? pdf.filename : null, receivedAt: now },
       };
       await supabaseUpsert([row]);
+      // Notif push : bordereau prêt = colis à expédier.
+      try { await sendPushToAll({ title: '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''} : à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/' }); } catch (_) {}
       res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf });
       return;
     }
@@ -227,6 +231,8 @@ export default async function handler(req, res) {
     if (/transaction\s+finalis/i.test(subject)) {
       const key = shortHash(subject + '|' + (mail.text || '').slice(0, 400));
       await supabaseUpsert([{ id: `email_final_${key}`, data: { type: 'finalisation', subject, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+      // Notif push : l'argent arrive dans le porte-monnaie.
+      try { await sendPushToAll({ title: '💰 Argent reçu', body: subject.replace(/vinted/gi, '').trim() || 'Une transaction vient d\'être finalisée.', tag: `final-${key}`, url: '/' }); } catch (_) {}
       res.status(200).json({ ok: true, type: 'finalisation' });
       return;
     }
@@ -237,6 +243,8 @@ export default async function handler(req, res) {
       if (!data) { res.status(200).json({ ok: false, type: 'vente', error: 'parse échec' }); return; }
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+      // Notif push : vente en temps réel, même app fermée et ordi éteint.
+      try { await sendPushToAll({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/' }); } catch (_) {}
       res.status(200).json({ ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero });
       return;
     }

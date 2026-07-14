@@ -5790,8 +5790,88 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
       <div style={{height:10}}/>
       <Row icon="📄" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={()=>{ if(window.confirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); alert('✓ Emplacements réinitialisés.'); } }}/>
 
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Notifications</div>
+      <PushSetting/>
+
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
+    </div>
+  );
+}
+
+// Notifications push : ventes / bordereaux / argent reçu en temps réel, même
+// app fermée. Nécessite l'app installée sur l'écran d'accueil (iPhone) et le
+// pipeline email branché (api/email-inbound.js). Un abonnement par appareil.
+const VAPID_PUBLIC_KEY='BBQbRWE86gwZClx3buB8J2JJrd-Kg7aYR-HJqev811KmNnTxLxOAwxFhwF8MfvzHp1-K4tnmjFfQZxVaoB7psi8';
+function PushSetting() {
+  const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
+  const [msg, setMsg] = useState(null);
+  const b64ToU8 = (s) => { const p='='.repeat((4-s.length%4)%4); const b=(s+p).replace(/-/g,'+').replace(/_/g,'/'); const r=atob(b); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); };
+
+  useEffect(() => { (async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') { setState('unsupported'); return; }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      setState(sub && Notification.permission === 'granted' ? 'on' : 'off');
+    } catch (_) { setState('off'); }
+  })(); }, []);
+
+  const enable = async () => {
+    setState('busy'); setMsg(null);
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { setState('off'); setMsg('Permission refusée. Autorise les notifications dans les réglages du site.'); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC_KEY) });
+      const r = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: sub.toJSON() }) });
+      if (!r.ok) throw new Error('enregistrement serveur échoué');
+      setState('on'); setMsg('✅ Activé sur cet appareil.');
+    } catch (e) { setState('off'); setMsg('Impossible d\'activer : ' + (e?.message || e)); }
+  };
+
+  const disable = async () => {
+    setState('busy'); setMsg(null);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unsubscribe', endpoint: sub.endpoint }) }).catch(()=>{});
+        await sub.unsubscribe();
+      }
+      setState('off'); setMsg('Notifications coupées sur cet appareil.');
+    } catch (_) { setState('off'); }
+  };
+
+  const test = async () => {
+    setMsg(null);
+    try {
+      const r = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) });
+      const j = await r.json().catch(()=>({}));
+      setMsg(j.sent > 0 ? `✅ Test envoyé à ${j.sent} appareil${j.sent>1?'s':''} — la notif doit apparaître.` : '⚠ Aucun appareil abonné n\'a reçu le test.');
+    } catch (e) { setMsg('Erreur test : ' + (e?.message || e)); }
+  };
+
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:4}}>🔔 Notifications push</div>
+      <div style={{fontSize:11.5,color:C.muted,marginBottom:10,lineHeight:1.4}}>
+        Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
+        {state==='unsupported' && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
+      </div>
+      {state!=='unsupported' && (
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          {state!=='on' ? (
+            <button onClick={enable} disabled={state==='busy'||state==='checking'} style={{flex:1,minWidth:130,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:state==='busy'?0.6:1}}>
+              {state==='busy'?'…':'Activer sur cet appareil'}
+            </button>
+          ) : (<>
+            <button onClick={test} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Tester</button>
+            <button onClick={disable} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Désactiver</button>
+          </>)}
+        </div>
+      )}
+      {msg && <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.4}}>{msg}</div>}
     </div>
   );
 }
