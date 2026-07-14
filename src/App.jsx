@@ -4681,6 +4681,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
+  // ── Vérificateur d'achat ───────────────────────────────────────────
+  // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
+  // modèle précis (nb, prix moyen, temps de vente, bénéf) + verdict achat.
+  const [srcQuery, setSrcQuery] = useState('');
+  const [srcPrice, setSrcPrice] = useState('');
+  const checker = useMemo(() => {
+    const q = normTitle(srcQuery);
+    if (!q || q.length < 2) return null;
+    const words = q.split(' ').filter(w => w.length >= 2);
+    if (!words.length) return null;
+    const match = (t) => { const n = normTitle(t); return words.every(w => n.includes(w)); };
+    let nb=0, caSum=0, daysSum=0, daysNb=0, benefSum=0, benefNb=0, lastDate=null;
+    for (const o of (sales.items||[])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) !== 'completed') continue;
+      if (!match(o.title)) continue;
+      nb+=1;
+      const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; caSum+=sell;
+      if (o.date) { const d=new Date(o.date); if(!isNaN(d) && (!lastDate || d>lastDate)) lastDate=d; }
+      const e = effEntry(o);
+      if (e && e.numberedAt && o.date) { const j=(new Date(o.date)-new Date(e.numberedAt))/86400000; if(j>=0&&j<3650){daysSum+=j;daysNb+=1;} }
+      const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
+      if (buy!=null && !isNaN(buy)) { benefSum += (sell-buy-feesOf(e)); benefNb+=1; }
+    }
+    const online = (listings.items||[]).filter(it=>match(it.title)).length;
+    const avgSell = nb ? caSum/nb : null;
+    const p = parseFloat(String(srcPrice).replace(',','.'));
+    const price = (!isNaN(p) && p>0) ? p : null;
+    const estBenef = (avgSell!=null && price!=null) ? avgSell - price : null;
+    return { nb, avgSell, joursMoy: daysNb?daysSum/daysNb:null, benefMoy: benefNb?benefSum/benefNb:null, benefNb, online, lastDate, price, estBenef };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [srcQuery, srcPrice, sales.items, listings.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
@@ -5540,6 +5573,40 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               <button type="button" onClick={()=>setShowSourcing(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
+              {/* Vérificateur d'achat : en friperie, tape le modèle + le prix demandé */}
+              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px',marginBottom:16}}>
+                <div style={{fontSize:12,fontWeight:800,color:C.text,marginBottom:2}}>🔍 Vérificateur d'achat</div>
+                <div style={{fontSize:10.5,color:C.muted,marginBottom:8}}>En friperie : tape le modèle et le prix demandé → tes propres ventes te disent si ça vaut le coup.</div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:checker?10:0}}>
+                  <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder="Modèle (ex : gel-lyte, spezial…)"
+                    style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
+                  <input value={srcPrice} onChange={e=>setSrcPrice(e.target.value)} placeholder="Prix demandé €" inputMode="decimal"
+                    style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
+                </div>
+                {checker && (checker.nb===0 ? (
+                  <div style={{fontSize:12,color:C.muted}}>Aucune vente finalisée ne correspond à « {srcQuery.trim()} ». Essaie un mot plus court (ex : juste la marque).</div>
+                ) : (()=>{
+                  const ok = checker.estBenef!=null ? (checker.estBenef>=15?'go':checker.estBenef>=5?'mid':'no') : null;
+                  const okCol = ok==='go'?INV_STATUS.online.color:ok==='mid'?C.warn:C.danger;
+                  return (<>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:checker.estBenef!=null?10:0}}>
+                      <StatBox label="Déjà vendues" value={checker.nb} sub={checker.lastDate?`dernière : ${checker.lastDate.toLocaleDateString('fr-FR')}`:undefined}/>
+                      <StatBox label="Prix de vente moyen" value={fmtE(checker.avgSell)} color={C.accent}/>
+                      {checker.joursMoy!=null && <StatBox label="Temps de vente" value={`${checker.joursMoy.toFixed(0)} j`}/>}
+                      {checker.benefMoy!=null && <StatBox label="Bénéf. moyen/paire" value={fmtE(checker.benefMoy)} color={checker.benefMoy>=0?INV_STATUS.online.color:C.danger} sub={`sur ${checker.benefNb} connue${checker.benefNb>1?'s':''}`}/>}
+                      {checker.online>0 && <StatBox label="Déjà en ligne" value={checker.online} color={C.warn} sub="chez toi"/>}
+                    </div>
+                    {checker.estBenef!=null && (
+                      <div style={{border:`1.5px solid ${okCol}`,background:`${okCol}14`,borderRadius:10,padding:'9px 12px'}}>
+                        <div style={{fontSize:13,fontWeight:900,color:okCol}}>
+                          {ok==='go'?'🟢 Fonce':ok==='mid'?'🟡 Négocie':'🔴 Laisse'} — bénéfice estimé {checker.estBenef>=0?'+':''}{checker.estBenef.toFixed(0)} €
+                        </div>
+                        <div style={{fontSize:10.5,color:C.muted,marginTop:3}}>Prix de vente moyen {fmtE(checker.avgSell)} − prix demandé {fmtE(checker.price)} (hors boost/frais).</div>
+                      </div>
+                    )}
+                  </>);
+                })())}
+              </div>
               {sourcing.total===0 ? (
                 <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Pas encore de vente finalisée à analyser.</div>
               ) : (()=>{
