@@ -46,7 +46,10 @@ function forwardVintedEmails() {
   const label = GmailApp.getUserLabelByName(LABEL) || GmailApp.createLabel(LABEL);
   // Emails Vinted + transporteurs (suivi colis), pas encore traités,
   // reçus depuis la date réglée dans l'app
-  const threads = GmailApp.search('from:(vinted OR mondialrelay OR chronopost) -label:' + LABEL + ' after:' + getStartDate());
+  // privaterelay / icloudmail : emails Vinted passés par une adresse masquée
+  // iCloud (Apple réécrit parfois l'expéditeur). Les emails non pertinents
+  // sont simplement classés « ignoré » par le serveur, sans rien polluer.
+  const threads = GmailApp.search('from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail) -label:' + LABEL + ' after:' + getStartDate());
 
   let sent = 0;
   threads.forEach(thread => {

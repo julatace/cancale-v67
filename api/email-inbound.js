@@ -304,8 +304,13 @@ export default async function handler(req, res) {
 
   try {
     // 0) TRANSPORTEURS (Mondial Relay / Chronopost) → suivi de colis.
-    const carrier = /mondial\s*relay|mondialrelay/i.test(mail.from) ? 'mondialrelay'
-                  : /chronopost/i.test(mail.from) ? 'chronopost' : null;
+    // L'expéditeur peut être réécrit par un relais (adresse masquée iCloud) :
+    // on regarde alors aussi le sujet — mais jamais pour un email Vinted
+    // (ses emails de bordereau peuvent citer le transporteur).
+    const fromVinted = /vinted/i.test(mail.from);
+    const carrierSrc = fromVinted ? mail.from : `${mail.from} ${subject}`;
+    const carrier = /mondial\s*relay|mondialrelay/i.test(carrierSrc) ? 'mondialrelay'
+                  : /chronopost/i.test(carrierSrc) ? 'chronopost' : null;
     if (carrier) {
       const track = parseCarrierEmail(mail, carrier);
       const rowId = `email_track_${carrier}_${track.suivi || shortHash(subject)}`;
