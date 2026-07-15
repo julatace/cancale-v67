@@ -182,6 +182,31 @@ const fetchEmailTracking = async () => {
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
 };
+// Factures Pro préparées par le serveur (lignes email_invoice_*) :
+// { number, status: draft|queued|sent, designation, prix, buyerName,
+//   buyerEmail, buyerAddress, html, createdAt, sentAt }
+const fetchProInvoices = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_invoice_*&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.filter(r => r.data).map(r => ({ _id: r.id, ...r.data }))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  } catch (_) { return []; }
+};
+const setProInvoiceStatus = async (inv, status) => {
+  try {
+    const data = { ...inv, status }; delete data._id;
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(inv._id)}`, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ data }),
+    });
+    return true;
+  } catch (_) { return false; }
+};
 // Page de suivi officielle du transporteur, n° pré-rempli.
 const trackUrl = (carrier, suivi) => {
   const s = encodeURIComponent(String(suivi || '').trim());
@@ -2361,8 +2386,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const [showForm,setShowForm]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
   const [fetching,setFetching]=useState(false);
+  const [proInvs,setProInvs]=useState(null); // factures Pro (pipeline email)
   const PER_PAGE=50;
-  
+  useEffect(()=>{ fetchProInvoices().then(setProInvs); },[]);
+
   // URL de l'API Apps Script (Vinted Auto)
   const VINTED_API_URL='https://script.google.com/macros/s/AKfycbzO-jwmFwOwJI49W0LjR8EOcIKAWsTzElWsWc6IVg0luX6MhbJNdOXzpe2BhYUCXmHb/exec';
   
@@ -2581,6 +2608,43 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         🔍 Recherche « {search} » dans toutes les factures — {fullList.length} résultat{fullList.length>1?'s':''}. Tu peux supprimer directement avec 🗑.
       </div>}
       
+      {/* Factures Pro (pipeline email) : préparées par le serveur, envoi Gmail */}
+      {Array.isArray(proInvs)&&proInvs.length>0&&(
+        <div>
+          <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>🧾 Factures Pro ({proInvs.length})</div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {proInvs.slice(0,20).map(inv=>{
+              const col=inv.status==='sent'?'#27a85d':inv.status==='queued'?C.warn:C.muted;
+              const lbl=inv.status==='sent'?'📧 envoyée':inv.status==='queued'?'⏳ envoi en cours':'brouillon';
+              return (
+                <div key={inv._id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:12,flexWrap:'wrap'}}>
+                  <div style={{flex:1,minWidth:140}}>
+                    <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>
+                      {inv.number} <span style={{fontSize:10.5,fontWeight:800,color:col,marginLeft:4}}>{lbl}</span>
+                    </div>
+                    <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:260}}>
+                      {inv.designation||'Article'} · {inv.prix} € · {inv.buyerName||inv.buyerEmail}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:6,flexShrink:0}}>
+                    <button type="button" onClick={()=>{ const w=window.open('','_blank'); if(w){ w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${inv.number}</title></head><body>${(inv.html||'').replace('cid:logoFacture','')}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`); w.document.close(); } }}
+                      style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
+                    {inv.status==='draft'&&inv.buyerEmail&&(
+                      <button type="button" onClick={async()=>{
+                        if(!window.confirm(`Envoyer la facture ${inv.number} à ${inv.buyerEmail} ?\n(part dans les 5 minutes via Gmail)`)) return;
+                        const ok=await setProInvoiceStatus(inv,'queued');
+                        if(ok) setProInvs(await fetchProInvoices()); else alert('Échec — réessaie.');
+                      }} style={{padding:'6px 12px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{fontSize:10.5,color:C.muted,marginTop:6,lineHeight:1.4}}>Préparées automatiquement à chaque vente Pro (coordonnées acheteur dans l'email Vinted). Réglages : Paramètres → Facturation Pro.</div>
+        </div>
+      )}
+
       {/* Sous-onglets zones */}
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
@@ -5861,8 +5925,128 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Emails Vinted</div>
       <EmailStartSetting/>
 
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Facturation Pro</div>
+      <ProFactureSetting/>
+
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
+    </div>
+  );
+}
+
+// Facturation Pro : réglages rangés dans Supabase (ligne vrm_pro_facture) —
+// c'est cette ligne que lit le serveur quand une vente Pro arrive. Le toggle
+// « envoi automatique » est LE consentement : OFF = aucune facture ne part
+// (les factures restent en brouillon, envoi manuel possible dans Factures).
+function ProFactureSetting() {
+  const DEFAULTS = { actif:false, autoSend:false, nom:'', adresse:'', codePostal:'', ville:'', siret:'', tva:'', prefixe:'FA', tauxTva:'0', mentions:'', logo:'' };
+  const [cfg, setCfg] = useState(null); // null = chargement
+  const [status, setStatus] = useState('');
+  const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+  const saveTimer = React.useRef(null);
+
+  useEffect(() => { (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_pro_facture&select=data`, { headers: HEADERS });
+      const rows = await res.json();
+      setCfg({ ...DEFAULTS, ...((rows[0] && rows[0].data) || {}) });
+    } catch (_) { setCfg({ ...DEFAULTS }); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  })(); }, []);
+
+  const persist = (next) => {
+    setCfg(next); setStatus('enregistrement…');
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+          method: 'POST',
+          headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify([{ id: 'vrm_pro_facture', data: next }]),
+        });
+        setStatus('✓ enregistré');
+      } catch (_) { setStatus('⚠ échec — réessaie'); }
+    }, 600);
+  };
+  const upd = (field, val) => persist({ ...cfg, [field]: val });
+
+  if (cfg === null) return <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px',fontSize:12,color:C.muted}}>Chargement…</div>;
+
+  const input = (field, placeholder, flex) => (
+    <input value={cfg[field]||''} onChange={e=>upd(field, e.target.value)} placeholder={placeholder}
+      style={{flex:flex||'1 1 130px',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',minWidth:0}}/>
+  );
+
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:4}}>
+        <div style={{fontSize:13,fontWeight:800,color:C.text}}>🧾 Facturation Pro</div>
+        <button onClick={()=>upd('actif', !cfg.actif)} style={{
+          padding:'4px 14px',borderRadius:999,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+          background:cfg.actif?C.accent:'transparent',color:cfg.actif?'#fff':C.muted,
+          border:`1.5px solid ${cfg.actif?C.accent:C.border}`,
+        }}>{cfg.actif?'Activée':'Désactivée'}</button>
+      </div>
+      <div style={{fontSize:11.5,color:C.muted,marginBottom:cfg.actif?12:0,lineHeight:1.4}}>
+        Pour les comptes Vinted Pro : l'email de vente contient les coordonnées de l'acheteur — l'app prépare la facture avec tes informations ci-dessous.
+      </div>
+      {cfg.actif && (<>
+        {/* Logo */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+          {cfg.logo && <img src={cfg.logo} alt="logo" style={{height:46,width:46,objectFit:'contain',borderRadius:8,border:`1px solid ${C.border}`,background:'#fff'}}/>}
+          <label style={{cursor:'pointer'}}>
+            <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
+              const f=e.target.files[0]; if(!f) return;
+              const r=new FileReader();
+              r.onload=ev=>upd('logo', ev.target.result);
+              r.readAsDataURL(f); e.target.value='';
+            }}/>
+            <span style={{padding:'6px 12px',borderRadius:999,fontSize:12,fontWeight:800,cursor:'pointer',background:'transparent',color:C.accent,border:`1.5px solid ${C.accent}66`,display:'inline-block'}}>
+              {cfg.logo?'Changer le logo':'Ajouter un logo'}
+            </span>
+          </label>
+          {cfg.logo && <button onClick={()=>upd('logo','')} style={{padding:'6px 12px',borderRadius:999,fontSize:12,fontWeight:800,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Retirer</button>}
+        </div>
+        {/* Identité */}
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:8}}>
+          {input('nom','Nom commercial','1 1 100%')}
+          {input('adresse','Adresse','1 1 100%')}
+          {input('codePostal','Code postal','1 1 90px')}
+          {input('ville','Ville')}
+          {input('siret','SIRET','1 1 100%')}
+          {input('tva','N° TVA intracom. (si assujetti)','1 1 100%')}
+        </div>
+        {/* Préfixe + taux TVA */}
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:8}}>
+          <span style={{fontSize:12,fontWeight:700,color:C.text}}>Préfixe</span>
+          {input('prefixe','FA','0 1 70px')}
+          <span style={{fontSize:12,fontWeight:700,color:C.text,marginLeft:6}}>TVA</span>
+          <select value={cfg.tauxTva||'0'} onChange={e=>upd('tauxTva', e.target.value)}
+            style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}>
+            <option value="0">0 % (franchise)</option>
+            <option value="5.5">5,5 %</option>
+            <option value="10">10 %</option>
+            <option value="20">20 %</option>
+          </select>
+        </div>
+        {/* Mentions */}
+        <textarea value={cfg.mentions||''} onChange={e=>upd('mentions', e.target.value)} rows={2}
+          placeholder="Mentions légales / pied de facture (ex : TVA non applicable – art. 293 B du CGI)"
+          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:12,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',resize:'vertical',marginBottom:8}}/>
+        {/* Envoi automatique */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>Envoi automatique à l'acheteur</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>Rien ne part sans ton accord. Tu peux couper à tout moment — l'arrêt est immédiat. OFF = les factures attendent dans l'onglet Factures.</div>
+          </div>
+          <button onClick={()=>upd('autoSend', !cfg.autoSend)} style={{
+            flexShrink:0,padding:'6px 16px',borderRadius:999,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+            background:cfg.autoSend?C.accent:'transparent',color:cfg.autoSend?'#fff':C.muted,
+            border:`1.5px solid ${cfg.autoSend?C.accent:C.border}`,
+          }}>{cfg.autoSend?'ON':'OFF'}</button>
+        </div>
+      </>)}
+      {status && <div style={{fontSize:11,color:status.includes('⚠')?C.danger:C.muted,marginTop:8}}>{status}</div>}
     </div>
   );
 }

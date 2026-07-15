@@ -85,6 +85,66 @@ function forwardVintedEmails() {
   });
 
   Logger.log(sent + ' email(s) transférés à VRM.');
+
+  // Envoie les factures Pro en attente (préparées par l'app).
+  sendQueuedInvoices();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// FACTURATION PRO — envoi des factures en file d'attente
+// L'app (via api/email-inbound) prépare les factures dans Supabase avec
+// status='queued' UNIQUEMENT si l'utilisateur a activé l'envoi auto
+// (ou s'il clique « Envoyer » manuellement sur une facture). Ce script
+// les envoie depuis cette boîte Gmail puis les marque 'sent'.
+// ════════════════════════════════════════════════════════════════════
+function sendQueuedInvoices() {
+  const headers = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY };
+  let rows, cfg;
+  try {
+    rows = JSON.parse(UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=like.email_invoice_*&select=id,data', { headers: headers, muteHttpExceptions: true }).getContentText());
+    const cfgRows = JSON.parse(UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=eq.vrm_pro_facture&select=data', { headers: headers, muteHttpExceptions: true }).getContentText());
+    cfg = (cfgRows[0] && cfgRows[0].data) || null;
+  } catch (e) { Logger.log('Factures : lecture impossible — ' + e); return; }
+
+  if (!cfg || !cfg.actif) return; // facturation coupée dans l'app → on ne touche à rien
+  const queued = (rows || []).filter(r => r.data && r.data.status === 'queued' && r.data.buyerEmail);
+  if (queued.length === 0) return;
+
+  queued.forEach(row => {
+    try {
+      const d = row.data;
+      const opts = { htmlBody: d.html, name: cfg.nom || 'Facturation' };
+      // Logo intégré dans l'email (le base64 des réglages devient une image inline)
+      if (cfg.logo && cfg.logo.indexOf('base64,') > -1) {
+        try {
+          const b64 = cfg.logo.split('base64,')[1];
+          const mime = (cfg.logo.match(/^data:([^;]+);/) || [])[1] || 'image/png';
+          opts.inlineImages = { logoFacture: Utilities.newBlob(Utilities.base64Decode(b64), mime, 'logo') };
+        } catch (e) {}
+      }
+      GmailApp.sendEmail(
+        d.buyerEmail,
+        'Votre facture ' + d.number + (cfg.nom ? ' – ' + cfg.nom : ''),
+        'Bonjour,\n\nVeuillez trouver votre facture ' + d.number + ' pour votre achat Vinted.\n\nMerci pour votre achat !',
+        opts
+      );
+      // Marque la facture comme envoyée.
+      const sentData = {};
+      for (const k in d) sentData[k] = d[k];
+      sentData.status = 'sent';
+      sentData.sentAt = new Date().toISOString();
+      UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=eq.' + encodeURIComponent(row.id), {
+        method: 'patch',
+        contentType: 'application/json',
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, Prefer: 'return=minimal' },
+        payload: JSON.stringify({ data: sentData }),
+        muteHttpExceptions: true,
+      });
+      Logger.log('Facture ' + d.number + ' envoyée à ' + d.buyerEmail);
+    } catch (e) {
+      Logger.log('Erreur envoi facture : ' + e);
+    }
+  });
 }
 
 // Outil : retire l'étiquette pour re-traiter les anciens emails (à la main)

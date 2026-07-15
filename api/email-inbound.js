@@ -191,6 +191,74 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
 
 // ── Handler ─────────────────────────────────────────────────────────────────
 
+// ── Facturation Pro ─────────────────────────────────────────────────────────
+// Si l'utilisateur a activé la facturation dans l'app (ligne vrm_pro_facture)
+// et que l'email de vente contient les coordonnées de l'acheteur (comptes
+// Vinted Pro), on prépare la facture. Elle part automatiquement (via le script
+// Gmail) UNIQUEMENT si le toggle « envoi automatique » est ON — sinon elle
+// attend un envoi manuel dans l'onglet Factures.
+
+async function supabaseGetRow(id) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return (rows[0] && rows[0].data) || null;
+  } catch (_) { return null; }
+}
+
+function buildInvoiceHtml(cfg, sale, number, dateStr) {
+  const tauxTva = parseFloat(cfg.tauxTva || '0') || 0;
+  const ttc = parseFloat(sale.prix) || 0;
+  const ht = tauxTva > 0 ? Math.round(ttc / (1 + tauxTva / 100) * 100) / 100 : ttc;
+  const tvaMt = tauxTva > 0 ? Math.round((ttc - ht) * 100) / 100 : 0;
+  const eur = n => n.toFixed(2).replace('.', ',') + ' €';
+  const adresse = [cfg.adresse, [cfg.codePostal, cfg.ville].filter(Boolean).join(' ')].filter(Boolean).join(' – ');
+  const lignesTva = tauxTva > 0
+    ? `<tr><td style="padding:6px 8px">Sous-total HT</td><td style="padding:6px 8px;text-align:right">${eur(ht)}</td></tr>` +
+      `<tr><td style="padding:6px 8px">TVA ${tauxTva} %</td><td style="padding:6px 8px;text-align:right">${eur(tvaMt)}</td></tr>`
+    : `<tr><td colspan="2" style="padding:6px 8px;color:#666;font-size:12px">TVA non applicable – art. 293 B du CGI</td></tr>`;
+  return `<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#222">` +
+    (cfg.logo ? `<img src="cid:logoFacture" style="max-height:80px;margin-bottom:16px" alt="logo"/>` : '') +
+    `<h2 style="margin:0 0 4px">FACTURE ${number}</h2>` +
+    `<p style="color:#666;margin:0 0 20px">Date : ${dateStr}</p>` +
+    `<table style="width:100%;margin-bottom:20px"><tr>` +
+    `<td style="vertical-align:top;font-size:13px"><b>${cfg.nom || ''}</b><br>${adresse}` +
+    (cfg.siret ? `<br>SIRET : ${cfg.siret}` : '') + (cfg.tva ? `<br>N° TVA : ${cfg.tva}` : '') + `</td>` +
+    `<td style="vertical-align:top;text-align:right;font-size:13px"><b>${sale.nomComplet || ''}</b><br>${sale.adresse || ''}<br>${sale.email}</td></tr></table>` +
+    `<table style="width:100%;border-collapse:collapse;font-size:13px">` +
+    `<tr style="background:#f5f5f5"><th style="text-align:left;padding:8px">Article</th><th style="text-align:right;padding:8px">Montant</th></tr>` +
+    `<tr><td style="padding:8px;border-bottom:1px solid #eee">${sale.designation || 'Article Vinted'}</td>` +
+    `<td style="padding:8px;text-align:right;border-bottom:1px solid #eee">${eur(ttc)}</td></tr>` +
+    lignesTva +
+    `<tr><td style="padding:8px"><b>Total TTC</b></td><td style="padding:8px;text-align:right"><b>${eur(ttc)}</b></td></tr>` +
+    `</table>` +
+    `<p style="color:#27a85d;font-weight:bold">Facture acquittée</p>` +
+    (cfg.mentions ? `<p style="font-size:12px;color:#666;white-space:pre-line">${cfg.mentions}</p>` : '') +
+    `</div>`;
+}
+
+async function createProInvoice(sale, acc, cfg, now) {
+  // Numéro séquentiel : compteur partagé dans Supabase (jamais réutilisé).
+  const counter = (parseInt(await supabaseGetRow('vrm_invoice_counter'), 10) || 0) + 1;
+  await supabaseUpsert([{ id: 'vrm_invoice_counter', data: counter }]);
+  const number = `${cfg.prefixe || 'FA'}-${new Date().getFullYear()}-${('0000' + counter).slice(-4)}`;
+  const dateStr = new Date().toLocaleDateString('fr-FR');
+  const html = buildInvoiceHtml(cfg, sale, number, dateStr);
+  const key = shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
+  const status = cfg.autoSend ? 'queued' : 'draft';
+  await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
+    type: 'facture_pro', number, status,
+    designation: sale.designation || '', prix: sale.prix || '',
+    buyerName: sale.nomComplet || '', buyerEmail: sale.email, buyerAddress: sale.adresse || '',
+    numero: sale.numero || '', pseudo: sale.pseudo || '',
+    account: acc.login || '', html, createdAt: now,
+  } }]);
+  return { number, status };
+}
+
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
 function parseCarrierEmail(mail, carrier) {
   const txt = mail.text || htmlToText(mail.html) || '';
@@ -291,7 +359,23 @@ export default async function handler(req, res) {
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
       try { await sendPushToAll({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/' }); } catch (_) {}
-      res.status(200).json({ ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero });
+      // Facturation Pro : ne se déclenche que si activée dans l'app ET que
+      // l'email contient l'adresse email de l'acheteur (comptes Pro).
+      let facture = null;
+      try {
+        if (data.email) {
+          const cfg = await supabaseGetRow('vrm_pro_facture');
+          if (cfg && cfg.actif) {
+            facture = await createProInvoice(data, acc, cfg, now);
+            try { await sendPushToAll({
+              title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
+              body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
+              tag: `inv-${facture.number}`, url: '/',
+            }); } catch (_) {}
+          }
+        }
+      } catch (_) {}
+      res.status(200).json({ ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
       return;
     }
 
