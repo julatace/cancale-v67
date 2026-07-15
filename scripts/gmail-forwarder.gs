@@ -19,12 +19,16 @@ const ENDPOINT = 'https://vrm.center/api/email-inbound';
 // définie sur Vercel, mettre la même valeur ici.
 const SECRET = '';
 
+// ⚙️ Ne traite QUE les emails reçus à partir de cette date (format AAAA/MM/JJ).
+// Modifie cette ligne pour remonter plus loin ou repartir d'une autre date.
+const START_DATE = '2026/07/15';
+
 const LABEL = 'vrm-traite'; // étiquette posée sur les emails déjà envoyés
 
 function forwardVintedEmails() {
   const label = GmailApp.getUserLabelByName(LABEL) || GmailApp.createLabel(LABEL);
-  // Emails Vinted récents pas encore traités (recherche large : tous domaines Vinted)
-  const threads = GmailApp.search('from:vinted -label:' + LABEL + ' newer_than:7d');
+  // Emails Vinted pas encore traités, reçus depuis START_DATE
+  const threads = GmailApp.search('from:vinted -label:' + LABEL + ' after:' + START_DATE);
 
   let sent = 0;
   threads.forEach(thread => {
