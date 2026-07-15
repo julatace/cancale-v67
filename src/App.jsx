@@ -5563,15 +5563,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
                   </div>
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
-                  <button type="button" onClick={()=>{
-                    const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
+                  <button type="button" onClick={async()=>{
                     const title=b.modele||b.article||'';
+                    // Bordereau déjà tamponné par le serveur → ouverture directe.
+                    if(b.pdfTamponneB64){
+                      try{
+                        const st=b64ToBytes(b.pdfTamponneB64);
+                        const orig=b64ToBytes(b.pdfB64);
+                        const {width,height}=await readPdfFirstPageSize(orig);
+                        const url=URL.createObjectURL(new Blob([st],{type:'application/pdf'}));
+                        const filename=`bordereau${b.numero?'-N'+b.numero:''}.pdf`;
+                        const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+                        if(!isIOS){ const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); }
+                        // La modale « Bordereau prêt » donne Ouvrir (AirPrint) + Ajuster l'emplacement.
+                        setBordResult({url, filename, numero:b.numero||'', title, pdfBuf:orig, key:bordereauFormatKey(width,height), w:width, h:height});
+                        return;
+                      }catch(_){/* retombe sur le tamponnage local */}
+                    }
+                    const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
                     // N° absent de l'email ? On le retrouve dans les annonces
                     // numérotées par le titre (sauf si le titre est ambigu).
                     let num=b.numero||'';
                     if(!num && title && !titleAmbiguous(title)){ const e2=entryByTitle(title); if(e2&&e2.numero) num=String(e2.numero); }
                     processBordereau(num, title, bytes);
-                  }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>Tamponner</button>
+                  }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>{b.pdfTamponneB64?'🖨 Imprimer':'Tamponner'}</button>
                 </div>
               ))}
             </div>

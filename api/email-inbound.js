@@ -18,6 +18,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { sendPushToAll } from './_lib/push.js';
+import { stampBordereau } from './_lib/stamp.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -275,6 +276,27 @@ async function createProInvoice(sale, acc, cfg, now) {
   return { number, status };
 }
 
+// Retrouve le N° d'une paire par le titre de l'annonce (annonces numérotées
+// de l'app, synchronisées). Refuse de deviner si deux annonces ont le même titre.
+async function findNumeroByTitle(title) {
+  if (!title) return '';
+  try {
+    const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const t = norm(title);
+    if (!t) return '';
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return '';
+    const rows = await res.json();
+    const map = (rows[0] && rows[0].vinted_annonce_numeros) || {};
+    const nums = [...new Set(Object.values(map)
+      .filter(e => e && e.numero && norm(e.title) === t)
+      .map(e => String(e.numero)))];
+    return nums.length === 1 ? nums[0] : '';
+  } catch (_) { return ''; }
+}
+
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
 function parseCarrierEmail(mail, carrier) {
   const txt = mail.text || htmlToText(mail.html) || '';
@@ -351,14 +373,33 @@ export default async function handler(req, res) {
       const data = parseBordereauEmail(mail);
       if (!data) { res.status(200).json({ ok: false, type: 'bordereau', error: 'parse échec' }); return; }
       const pdf = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
+      // N° absent du titre de l'annonce ? On le retrouve dans les annonces
+      // numérotées de l'app (correspondance de titre, jamais si ambigu).
+      if (!data.numero) data.numero = await findNumeroByTitle(data.modele || data.article);
+      // Tamponnage AUTOMATIQUE : N° + titre imprimés sur le PDF à l'emplacement
+      // mémorisé pour ce format d'étiquette (réglé une fois dans l'app).
+      let pdfTamponneB64 = null, posKnown = false;
+      if (pdf) {
+        try {
+          const rf = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`, {
+            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          });
+          const rfRows = rf.ok ? await rf.json() : [];
+          const formats = (rfRows[0] && rfRows[0].vinted_bordereau_formats) || {};
+          const st = await stampBordereau(pdf.contentB64, data.numero, data.modele || data.article || '', formats);
+          pdfTamponneB64 = st.b64; posKnown = st.posKnown;
+        } catch (_) { /* PDF récalcitrant → tamponnage manuel dans l'app */ }
+      }
       const row = {
         id: `email_bord_${data.transaction}`,
-        data: { type: 'bordereau', ...data, account: acc.login || '', uid: acc.uid || '', pdfB64: pdf ? pdf.contentB64 : null, filename: pdf ? pdf.filename : null, receivedAt: now },
+        data: { type: 'bordereau', ...data, account: acc.login || '', uid: acc.uid || '',
+          pdfB64: pdf ? pdf.contentB64 : null, filename: pdf ? pdf.filename : null,
+          pdfTamponneB64, posKnown, receivedAt: now },
       };
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
-      try { await sendPushToAll({ title: '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''} : à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/' }); } catch (_) {}
-      res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf });
+      try { await sendPushToAll({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/' }); } catch (_) {}
+      res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
     }
 
