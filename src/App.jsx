@@ -3627,6 +3627,29 @@ function VintedAccounts({ accounts, setAccounts }) {
     if (!u[String(uid)]) delete u[String(uid)];
     setAcctEmails(u); save('vinted_account_emails', u);
   };
+  // Auto-remplissage : l'extension capte le profil Vinted (users/current) qui
+  // contient l'email du compte. On remplit les champs vides automatiquement —
+  // la saisie manuelle reste possible et n'est jamais écrasée.
+  useEffect(() => { (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_profile&select=id,data`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      if (!res.ok) return;
+      const rows = await res.json();
+      setAcctEmails(prev => {
+        const u = { ...prev }; let changed = false;
+        rows.forEach(r => {
+          const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
+          const email = r.data && r.data.payload && r.data.payload.user && r.data.payload.user.email;
+          if (uid && email && !u[uid]) { u[uid] = email; changed = true; }
+        });
+        if (changed) save('vinted_account_emails', u);
+        return changed ? u : prev;
+      });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  })(); }, []);
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
   const toggleAcctCompta = (uid) => {
@@ -3733,7 +3756,7 @@ function VintedAccounts({ accounts, setAccounts }) {
                     <input
                       value={acctEmails[String(acc.vinted_user_id)] || ''}
                       onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
-                      placeholder="📧 Email du compte (masquée iCloud ou classique)"
+                      placeholder="📧 Email du compte (auto dès que l'extension capte le profil)"
                       title="L'adresse à laquelle Vinted écrit pour ce compte. Permet d'attribuer automatiquement les emails (ventes, bordereaux) au bon compte."
                       style={{marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
                       onFocus={e=>e.target.style.borderColor=C.accent}
