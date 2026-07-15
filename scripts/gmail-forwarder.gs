@@ -19,16 +19,33 @@ const ENDPOINT = 'https://vrm.center/api/email-inbound';
 // définie sur Vercel, mettre la même valeur ici.
 const SECRET = '';
 
-// ⚙️ Ne traite QUE les emails reçus à partir de cette date (format AAAA/MM/JJ).
-// Modifie cette ligne pour remonter plus loin ou repartir d'une autre date.
-const START_DATE = '2026/07/15';
+// La date de départ se règle DANS L'APP (Paramètres → Import des emails).
+// Elle est stockée dans Supabase ; le script la lit à chaque passage.
+// Valeur de secours si l'app n'a encore rien réglé :
+const DEFAULT_START = '2026/07/15';
+
+const SUPA = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyMjZ9.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+
+function getStartDate() {
+  try {
+    const r = UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=eq.vrm_email_config&select=data', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY },
+      muteHttpExceptions: true,
+    });
+    const rows = JSON.parse(r.getContentText());
+    const d = rows[0] && rows[0].data && rows[0].data.startDate; // 'AAAA-MM-JJ'
+    if (d) return d.replace(/-/g, '/');
+  } catch (e) {}
+  return DEFAULT_START;
+}
 
 const LABEL = 'vrm-traite'; // étiquette posée sur les emails déjà envoyés
 
 function forwardVintedEmails() {
   const label = GmailApp.getUserLabelByName(LABEL) || GmailApp.createLabel(LABEL);
-  // Emails Vinted pas encore traités, reçus depuis START_DATE
-  const threads = GmailApp.search('from:vinted -label:' + LABEL + ' after:' + START_DATE);
+  // Emails Vinted pas encore traités, reçus depuis la date réglée dans l'app
+  const threads = GmailApp.search('from:vinted -label:' + LABEL + ' after:' + getStartDate());
 
   let sent = 0;
   threads.forEach(thread => {

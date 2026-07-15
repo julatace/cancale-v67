@@ -5793,8 +5793,60 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Notifications</div>
       <PushSetting/>
 
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Emails Vinted</div>
+      <EmailStartSetting/>
+
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
+    </div>
+  );
+}
+
+// Date de départ de l'import des emails Vinted. Rangée dans Supabase
+// (ligne vrm_email_config) : le script Gmail la lit à chaque passage, donc
+// changer la date ici prend effet à la synchro suivante, sans toucher au script.
+function EmailStartSetting() {
+  const [date, setDate] = useState('');
+  const [status, setStatus] = useState('load'); // load | ok | saving | err
+  const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+
+  useEffect(() => { (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_config&select=data`, { headers: HEADERS });
+      const rows = await res.json();
+      setDate((rows[0] && rows[0].data && rows[0].data.startDate) || new Date().toISOString().slice(0,10));
+      setStatus('ok');
+    } catch (_) { setDate(new Date().toISOString().slice(0,10)); setStatus('ok'); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  })(); }, []);
+
+  const saveDate = async (v) => {
+    if (!v) return;
+    setDate(v); setStatus('saving');
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+        method: 'POST',
+        headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ id: 'vrm_email_config', data: { startDate: v, updatedAt: new Date().toISOString() } }]),
+      });
+      setStatus('ok');
+    } catch (_) { setStatus('err'); }
+  };
+
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:4}}>📬 Import des emails</div>
+      <div style={{fontSize:11.5,color:C.muted,marginBottom:10,lineHeight:1.4}}>
+        Les emails Vinted (ventes, bordereaux, paiements) ne sont pris en compte qu'à partir de cette date. Change-la ici, c'est appliqué à la prochaine synchro (≤ 5 min).
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <span style={{fontSize:12,fontWeight:700,color:C.text}}>À partir du</span>
+        <input type="date" value={date} onChange={e=>saveDate(e.target.value)} disabled={status==='load'}
+          style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
+        <span style={{fontSize:11,color:status==='err'?C.danger:C.muted}}>
+          {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':'✓ enregistré'}
+        </span>
+      </div>
     </div>
   );
 }
