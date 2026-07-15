@@ -6178,7 +6178,14 @@ function PushSetting() {
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      setState(sub && Notification.permission === 'granted' ? 'on' : 'off');
+      const on = sub && Notification.permission === 'granted';
+      setState(on ? 'on' : 'off');
+      // Auto-réparation : si l'appareil se croit abonné, on renvoie son
+      // abonnement au serveur (idempotent). Évite le cas « le téléphone est
+      // abonné mais le serveur ne le connaît pas ».
+      if (on) {
+        fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: sub.toJSON() }) }).catch(()=>{});
+      }
     } catch (_) { setState('off'); }
   })(); }, []);
 
