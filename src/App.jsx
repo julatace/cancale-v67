@@ -31,7 +31,7 @@ const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
-  'vinted_accounts','vinted_account_labels',
+  'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
@@ -3618,6 +3618,15 @@ function VintedAccounts({ accounts, setAccounts }) {
   const [labels, setLabels] = useState(() => load('vinted_account_labels', {}));
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
+  // Email associé à chaque compte (l'adresse à laquelle Vinted écrit — masquée
+  // iCloud ou classique). Sert au serveur pour attribuer chaque email de vente/
+  // bordereau au bon compte. Synchronisé (vinted_account_emails).
+  const [acctEmails, setAcctEmails] = useState(() => load('vinted_account_emails', {}));
+  const setAcctEmail = (uid, val) => {
+    const u = { ...acctEmails, [String(uid)]: val.trim() };
+    if (!u[String(uid)]) delete u[String(uid)];
+    setAcctEmails(u); save('vinted_account_emails', u);
+  };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
   const toggleAcctCompta = (uid) => {
@@ -3721,6 +3730,15 @@ function VintedAccounts({ accounts, setAccounts }) {
                       {acc.login && acc.login !== accountName(acc) ? `@${acc.login} · ` : ''}
                       maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}
                     </div>
+                    <input
+                      value={acctEmails[String(acc.vinted_user_id)] || ''}
+                      onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
+                      placeholder="📧 Email du compte (masquée iCloud ou classique)"
+                      title="L'adresse à laquelle Vinted écrit pour ce compte. Permet d'attribuer automatiquement les emails (ventes, bordereaux) au bon compte."
+                      style={{marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
+                      onFocus={e=>e.target.style.borderColor=C.accent}
+                      onBlur={e=>e.target.style.borderColor=C.border}
+                    />
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>

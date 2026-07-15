@@ -83,12 +83,28 @@ async function supabaseUpsert(rows) {
 // dans le texte brut du mail. (Optionnel : la donnée reste utile sans compte.)
 async function detectAccount(raw) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-    });
-    if (!res.ok) return { uid: '', login: '' };
-    const accts = await res.json();
+    const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
     const low = (raw || '').toLowerCase();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers });
+    const accts = res.ok ? await res.json() : [];
+    // 1) Par EMAIL de compte (renseigné dans l'app : Comptes liés → champ 📧).
+    //    Fiable même avec les adresses masquées iCloud : on cherche l'adresse
+    //    destinataire dans le texte brut du mail (To inclus).
+    try {
+      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`, { headers });
+      if (r2.ok) {
+        const rows = await r2.json();
+        const map = (rows[0] && rows[0].vinted_account_emails) || {};
+        for (const uid in map) {
+          const em = String(map[uid] || '').toLowerCase().trim();
+          if (em && low.includes(em)) {
+            const a = accts.find(x => String(x.vinted_user_id) === String(uid));
+            return { uid: String(uid), login: (a && a.login) || '' };
+          }
+        }
+      }
+    } catch (_) {}
+    // 2) Par pseudo cité dans le texte du mail.
     for (const a of accts) {
       if (a.login && low.includes(String(a.login).toLowerCase())) return { uid: String(a.vinted_user_id), login: a.login };
     }
