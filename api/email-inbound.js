@@ -191,6 +191,30 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
 
 // ── Handler ─────────────────────────────────────────────────────────────────
 
+// ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
+function parseCarrierEmail(mail, carrier) {
+  const txt = mail.text || htmlToText(mail.html) || '';
+  const all = (mail.subject || '') + '\n' + txt;
+
+  // N° de suivi / d'expédition
+  let suivi = null;
+  const m1 = all.match(/n[°o]\s*(?:d['e]?\s*)?(?:exp[ée]dition|colis|suivi|envoi)\s*[:\-]?\s*([A-Z0-9]{6,20})/i);
+  if (m1) suivi = m1[1];
+  if (!suivi && carrier === 'chronopost') {
+    const m = all.match(/\b([A-Z]{2}\d{9}[A-Z]{2})\b/); // format international XX123456789XX
+    if (m) suivi = m[1];
+  }
+  if (!suivi) { const m = all.match(/\b(\d{8,14})\b/); if (m) suivi = m[1]; }
+
+  // Étape du colis (du plus avancé au moins avancé)
+  const t = all.toLowerCase();
+  let status = 'info', label = 'Mise à jour';
+  if (/livr[ée]|remis au destinataire|a bien [ée]t[ée] retir[ée]|r[ée]ceptionn[ée]/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
+  else if (/disponible|à retirer|arriv[ée] (?:dans|en|au) point|pr[êe]t.*retrait/.test(t)) { status = 'available'; label = 'Arrivé au point de retrait'; }
+  else if (/acheminement|en transit|exp[ée]di[ée]|pris en charge|d[ée]pos[ée]|enregistr[ée]|en cours de livraison/.test(t)) { status = 'transit'; label = 'En transit'; }
+  return { suivi, status, label };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
@@ -211,6 +235,28 @@ export default async function handler(req, res) {
   const now = new Date().toISOString();
 
   try {
+    // 0) TRANSPORTEURS (Mondial Relay / Chronopost) → suivi de colis.
+    const carrier = /mondial\s*relay|mondialrelay/i.test(mail.from) ? 'mondialrelay'
+                  : /chronopost/i.test(mail.from) ? 'chronopost' : null;
+    if (carrier) {
+      const track = parseCarrierEmail(mail, carrier);
+      const rowId = `email_track_${carrier}_${track.suivi || shortHash(subject)}`;
+      await supabaseUpsert([{ id: rowId, data: {
+        type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
+        statusLabel: track.label, subject, receivedAt: now,
+      } }]);
+      // Notif push selon l'étape du colis.
+      const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦' };
+      const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis' };
+      try { await sendPushToAll({
+        title: `${icons[track.status]} ${titles[track.status]}`,
+        body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : 'Chronopost'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.`,
+        tag: `track-${track.suivi || rowId}`, url: '/',
+      }); } catch (_) {}
+      res.status(200).json({ ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
+      return;
+    }
+
     // 1) BORDEREAU (a une pièce jointe PDF) — prioritaire.
     if (/Bordereau\s+d['’]envoi/i.test(subject)) {
       const data = parseBordereauEmail(mail);

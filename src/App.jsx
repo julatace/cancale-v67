@@ -169,6 +169,32 @@ const fetchEmailBordereaux = async () => {
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
 };
+// Suivi colis reçu par EMAIL (Mondial Relay / Chronopost) : lignes email_track_*
+// = { carrier, suivi, status, statusLabel, subject, receivedAt }.
+const fetchEmailTracking = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_track_*&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.map(r => r.data).filter(Boolean)
+      .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+  } catch (_) { return []; }
+};
+// Page de suivi officielle du transporteur, n° pré-rempli.
+const trackUrl = (carrier, suivi) => {
+  const s = encodeURIComponent(String(suivi || '').trim());
+  if (/mondial/i.test(carrier || '')) return `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${s}`;
+  if (/chrono/i.test(carrier || '')) return `https://www.chronopost.fr/tracking-no-cdn/suivi-page?listeNumerosLT=${s}`;
+  return `https://www.google.com/search?q=${s}+suivi+colis`;
+};
+// Cartes des points de dépôt autour de soi (Google Maps géolocalise tout seul).
+const DEPOT_LINKS = [
+  { label: 'Mondial Relay', emoji: '📮', url: 'https://www.google.com/maps/search/point+relais+mondial+relay' },
+  { label: 'Chronopost', emoji: '🏤', url: 'https://www.google.com/maps/search/chronopost+shop2shop' },
+  { label: 'Vinted Go', emoji: '📦', url: 'https://www.google.com/maps/search/casier+vinted+go' },
+];
 // Décode une chaîne base64 en Uint8Array (pour donner le PDF à pdf-lib).
 const b64ToBytes = (b64) => {
   try { const bin = atob(String(b64 || '')); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
@@ -4175,6 +4201,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
+  const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   const [sub, setSubRaw] = useState(only || 'ventes'); // ventes | achats | annonces | messages | bordereaux
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
@@ -4451,6 +4478,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='bordereaux' && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if (curSub==='bordereaux' && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
 
   // ── Migration one-shot : purge des numéros AUTO pollués ────────────────────
   // Une version antérieure basait l'auto-numérotation sur le garage (ancien) et a
@@ -5382,6 +5410,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         </button>
         <div style={{fontSize:11,color:C.muted,marginBottom:14,lineHeight:1.4}}>Télécharge d'abord ton bordereau depuis Vinted (dans la conversation), puis choisis-le ici — l'app y imprime le N° + le titre. Ça marche sur iPhone (via Fichiers/iCloud).</div>
         {/* Bordereaux reçus AUTOMATIQUEMENT par email (pipeline usevrm) */}
+        {/* Points de dépôt autour de soi (Maps géolocalise) */}
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:14}}>
+          <span style={{fontSize:11.5,fontWeight:800,color:C.muted}}>📍 Points de dépôt :</span>
+          {DEPOT_LINKS.map(d=>(
+            <a key={d.label} href={d.url} target="_blank" rel="noreferrer" style={{
+              display:'inline-flex',alignItems:'center',gap:5,padding:'5px 11px',borderRadius:999,
+              border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:700,textDecoration:'none',
+            }}>{d.emoji} {d.label}</a>
+          ))}
+        </div>
+
+        {/* Suivi des colis (emails Mondial Relay / Chronopost transférés) */}
+        {Array.isArray(tracking) && tracking.length>0 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>🚚 Suivi des colis ({tracking.length})</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {tracking.slice(0,10).map((t,i)=>{
+                const col = t.status==='delivered'?INV_STATUS.online.color:t.status==='available'?C.accent:t.status==='transit'?C.warn:C.muted;
+                const icon = t.status==='delivered'?'✅':t.status==='available'?'📍':t.status==='transit'?'🚚':'📦';
+                return (
+                  <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:12}}>
+                    <span style={{fontSize:18}}>{icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12.5,fontWeight:800,color:col}}>{t.statusLabel||'Mise à jour'}</div>
+                      <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {/mondial/i.test(t.carrier)?'Mondial Relay':'Chronopost'}{t.suivi?` · n°${t.suivi}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
+                      </div>
+                    </div>
+                    {t.suivi && <a href={trackUrl(t.carrier,t.suivi)} target="_blank" rel="noreferrer" style={{flexShrink:0,padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {Array.isArray(emailBords) && emailBords.length>0 && (
           <div style={{marginBottom:16}}>
             <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
@@ -5393,6 +5457,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.numero?`N°${b.numero} · `:''}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
                   </div>
+                  {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
                   <button type="button" onClick={()=>{ const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;} processBordereau(b.numero||'', b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>Tamponner</button>
                 </div>
               ))}

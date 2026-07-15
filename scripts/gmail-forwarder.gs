@@ -44,8 +44,9 @@ const LABEL = 'vrm-traite'; // étiquette posée sur les emails déjà envoyés
 
 function forwardVintedEmails() {
   const label = GmailApp.getUserLabelByName(LABEL) || GmailApp.createLabel(LABEL);
-  // Emails Vinted pas encore traités, reçus depuis la date réglée dans l'app
-  const threads = GmailApp.search('from:vinted -label:' + LABEL + ' after:' + getStartDate());
+  // Emails Vinted + transporteurs (suivi colis), pas encore traités,
+  // reçus depuis la date réglée dans l'app
+  const threads = GmailApp.search('from:(vinted OR mondialrelay OR chronopost) -label:' + LABEL + ' after:' + getStartDate());
 
   let sent = 0;
   threads.forEach(thread => {
