@@ -5563,7 +5563,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
                   </div>
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
-                  <button type="button" onClick={()=>{ const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;} processBordereau(b.numero||'', b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>Tamponner</button>
+                  <button type="button" onClick={()=>{
+                    const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
+                    const title=b.modele||b.article||'';
+                    // N° absent de l'email ? On le retrouve dans les annonces
+                    // numérotées par le titre (sauf si le titre est ambigu).
+                    let num=b.numero||'';
+                    if(!num && title && !titleAmbiguous(title)){ const e2=entryByTitle(title); if(e2&&e2.numero) num=String(e2.numero); }
+                    processBordereau(num, title, bytes);
+                  }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>Tamponner</button>
                 </div>
               ))}
             </div>
