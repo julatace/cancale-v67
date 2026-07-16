@@ -4307,6 +4307,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
+  // Carte intégrée (points de dépôt / lieu de retrait) : s'ouvre DANS l'app,
+  // sans redirection. Géolocalisé si l'utilisateur l'autorise.
+  const [depotMap, setDepotMap] = useState(null); // { title, query, coords }
+  const openDepotMap = (title, query) => {
+    setDepotMap({ title, query, coords: null });
+    try {
+      if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
+        pos => setDepotMap(d => d ? { ...d, coords: `${pos.coords.latitude},${pos.coords.longitude}` } : d),
+        () => {}, { timeout: 5000, maximumAge: 300000 });
+    } catch (_) {}
+  };
   const [sub, setSubRaw] = useState(only || 'ventes'); // ventes | achats | annonces | messages | bordereaux
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
@@ -4619,10 +4630,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.account?` · ${t.account}`:''}
           </div>
           {t.lieu&&(
-            <a href={`https://www.google.com/maps/search/${encodeURIComponent(t.lieu)}`} target="_blank" rel="noreferrer"
-              style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:10.5,fontWeight:700,color:C.accent,textDecoration:'none',marginTop:3}}>
+            <button onClick={()=>openDepotMap('📍 '+t.lieu.slice(0,40), t.lieu)}
+              style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:10.5,fontWeight:700,color:C.accent,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',marginTop:3,textAlign:'left'}}>
               🗺 {t.lieu.slice(0,50)}
-            </a>
+            </button>
           )}
         </div>
         {t.code&&(
@@ -5596,17 +5607,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         </button>
         <div style={{fontSize:11,color:C.muted,marginBottom:14,lineHeight:1.4}}>Télécharge d'abord ton bordereau depuis Vinted (dans la conversation), puis choisis-le ici — l'app y imprime le N° + le titre. Ça marche sur iPhone (via Fichiers/iCloud).</div>
         {/* Bordereaux reçus AUTOMATIQUEMENT par email (pipeline usevrm) */}
-        {/* Points de dépôt autour de soi (Maps géolocalise) */}
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:14}}>
-          <span style={{fontSize:11.5,fontWeight:800,color:C.muted}}>📍 Points de dépôt :</span>
-          {DEPOT_LINKS.map(d=>(
-            <a key={d.label} href={d.url} target="_blank" rel="noreferrer" style={{
-              display:'inline-flex',alignItems:'center',gap:5,padding:'5px 11px',borderRadius:999,
-              border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:700,textDecoration:'none',
-            }}>{d.emoji} {d.label}</a>
-          ))}
-        </div>
-
         {Array.isArray(emailBords) && emailBords.length>0 && (
           <div style={{marginBottom:16}}>
             <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
@@ -5719,6 +5719,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
 
+      {/* Carte intégrée : points de dépôt / lieu de retrait — dans l'app, sans redirection */}
+      {depotMap && (
+        <div onClick={()=>setDepotMap(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1100,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'82vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{depotMap.title}</div>
+                <div style={{fontSize:10.5,color:C.muted}}>{depotMap.coords?'📍 autour de toi':'localisation en cours… (autorise la position pour centrer la carte)'}</div>
+              </div>
+              <button type="button" onClick={()=>setDepotMap(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+            </div>
+            {/* Choix du réseau (pour les dépôts) */}
+            <div style={{display:'flex',gap:6,padding:'8px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0,overflowX:'auto'}}>
+              {[['📮 Mondial Relay','point relais mondial relay'],['🏤 Chronopost','chronopost shop2shop relais pickup'],['📦 Vinted Go','casier vinted go']].map(([lb,q])=>(
+                <button key={lb} onClick={()=>setDepotMap(d=>({...d,query:q}))} style={{
+                  padding:'5px 12px',borderRadius:999,fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',
+                  background:depotMap.query===q?C.accent:'transparent',color:depotMap.query===q?'#fff':C.muted,
+                  border:`1.5px solid ${depotMap.query===q?C.accent:C.border}`,
+                }}>{lb}</button>
+              ))}
+            </div>
+            <iframe
+              title="Carte des points"
+              src={`https://maps.google.com/maps?q=${encodeURIComponent(depotMap.query)}${depotMap.coords?`&sll=${depotMap.coords}`:''}&z=14&hl=fr&output=embed`}
+              style={{flex:1,border:'none',width:'100%'}}
+              allow="geolocation"
+            />
+          </div>
+        </div>
+      )}
+
       {bordResult && (
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
@@ -5727,6 +5758,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{fontSize:12.5,color:C.muted,lineHeight:1.45,marginBottom:16}}>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:800,textDecoration:'none',marginBottom:8}}>📄 Ouvrir le bordereau</a>
+            <button onClick={()=>openDepotMap('📍 Où déposer le colis ?','point relais mondial relay')} style={{width:'100%',border:`1px solid ${C.accent}66`,borderRadius:12,background:`${C.accent}10`,color:C.accent,padding:'11px 16px',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginTop:8}}>📍 Où déposer le colis ?</button>
             {bordResult.pdfBuf && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:700,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:700,padding:'8px'}}>Fermer</button>
           </div>
