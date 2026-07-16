@@ -4414,9 +4414,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const cache = load('vrm_geo_cache', {});
       if (cache[l] !== undefined) continue;
       try {
-        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(l + ', France')}`);
-        const js = await r.json();
-        const hit = js && js[0] ? { lat: +js[0].lat, lon: +js[0].lon } : null;
+        const ask = async (q) => {
+          const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q + ', France')}`);
+          const js = await r.json();
+          return js && js[0] ? { lat: +js[0].lat, lon: +js[0].lon } : null;
+        };
+        // 1er essai : le libellé complet. 2e essai : sans le nom de la boutique
+        // (« Maison de la Presse, 40 Rue du Port... » → « 40 Rue du Port... »,
+        // les commerces sont souvent absents des cartes, l'adresse jamais).
+        let hit = await ask(l);
+        if (!hit && l.includes(',')) { await new Promise(r2 => setTimeout(r2, 1100)); hit = await ask(l.split(',').slice(1).join(',').trim()); }
         setGeo(prev => { const u = { ...prev, [l]: hit }; save('vrm_geo_cache', u); return u; });
       } catch (_) {}
       await new Promise(r2 => setTimeout(r2, 1100)); // politesse Nominatim

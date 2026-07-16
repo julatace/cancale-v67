@@ -343,7 +343,24 @@ function parseCarrierEmail(mail, carrier) {
 
   // Lieu de retrait : nom/adresse du point relais ou du locker.
   let lieu = null;
-  for (const pat of [
+  // Format réel Mondial Relay : « Point Relais » sur sa ligne, puis le nom
+  // (Maison de la Presse) et l'adresse (40 Rue du Port / 35260 Cancale)
+  // sur les lignes SUIVANTES.
+  {
+    const lines = txt.split('\n').map(l => l.trim());
+    const idx = lines.findIndex(l => /^point\s+(?:relais|de\s+retrait)\b[\s:–-]*$/i.test(l));
+    if (idx >= 0) {
+      const parts = [];
+      for (let i = idx + 1; i < lines.length && parts.length < 3; i++) {
+        const l = lines[i];
+        if (!l) { if (parts.length) break; else continue; }
+        if (/horaires|ouvert|lundi|mardi|retrouve|suivez|https?:|désabonn|code|colis/i.test(l)) break;
+        parts.push(l.replace(/\s+/g, ' '));
+      }
+      if (parts.length) lieu = parts.join(', ');
+    }
+  }
+  if (!lieu) for (const pat of [
     /point\s+relais\s*[:\-]?\s*([^\n]{5,90})/i,
     /(?:disponible|à retirer|retire[rz]?(?:\s+ton\s+colis)?)\s+(?:chez|au|à|dans)\s+([^\n]{5,90})/i,
     /adresse\s+du\s+point\s*[:\-]?\s*([^\n]{5,90})/i,
