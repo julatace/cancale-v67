@@ -537,6 +537,23 @@ export default async function handler(req, res) {
       return;
     }
 
+    // 6) FAVORI → signal d'achat imminent : bon moment pour faire une offre.
+    if (/favoris?\b/i.test(textAll)) {
+      const m = textAll.match(/(\S+)\s+a ajouté ton article\s*[«"“']?\s*(.+?)\s*[»"”']?\s+dans ses favoris/i);
+      const qui = (m && m[1]) || '';
+      const article = (m && m[2]) || '';
+      const prix = (textAll.match(/(\d+[,.]\d{2})\s*€/) || [])[1] || '';
+      const key = shortHash(subject + (mail.text || '').slice(0, 200));
+      try { await sendPushToAll({
+        title: '❤️ Nouveau favori !',
+        body: `${qui || 'Quelqu\'un'} craque sur « ${(article || 'ton article').slice(0, 45)} »${prix ? ` (${prix} €)` : ''}${acc.login ? ` (${acc.login})` : ''} — fais-lui une offre !`,
+        tag: `fav-${key}`, url: '/',
+      }); } catch (_) {}
+      await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
+      res.status(200).json({ ok: true, type: 'favori', de: qui, article });
+      return;
+    }
+
     await logEmail({ type: 'ignoré', subject, from: mail.from });
     res.status(200).json({ ok: true, type: 'ignoré', subject });
   } catch (e) {
