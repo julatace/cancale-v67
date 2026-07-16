@@ -4398,14 +4398,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     });
   };
   const recordUsed = (num) => { const n=parseInt(String(num),10); if(isNaN(n)||n<=0) return; setUsedNumeros(prev=>{ if(prev.includes(n))return prev; const u=[...prev,n]; save('vinted_used_numeros',u); return u; }); };
-  // Prochain N° suggéré = max de TOUTES les sources + 1 : numéros déjà utilisés,
-  // annonces numérotées, ET numéros posés sur les ventes (sale_overrides) —
-  // sinon on resuggère un numéro qu'on vient de donner à une vente (doublon !).
-  const nextNumero = useMemo(() => { let m=0;
-    usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>m)m=n;});
-    Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>m)m=n;});
-    Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n)&&n>m)m=n;});
-    return m+1; }, [usedNumeros, numeros, saleOv]);
+  // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
   const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros]);
@@ -4499,6 +4492,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       save('vinted_sale_overrides', u); return u;
     });
   };
+  // Prochain N° suggéré = max de TOUTES les sources + 1 : numéros déjà utilisés,
+  // annonces numérotées, ET numéros posés sur les ventes (saleOv, déclaré
+  // juste au-dessus) — sinon on resuggère un numéro déjà donné (doublon !).
+  const nextNumero = useMemo(() => { let m=0;
+    usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>m)m=n;});
+    Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>m)m=n;});
+    Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n)&&n>m)m=n;});
+    return m+1; }, [usedNumeros, numeros, saleOv]);
+
   const effEntry = (o) => {
     const base = resolvedEntry(o);
     const ov = (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null;
