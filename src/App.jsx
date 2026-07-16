@@ -5565,6 +5565,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
                   <button type="button" onClick={async()=>{
                     const title=b.modele||b.article||'';
+                    // Si le serveur a tamponné SANS numéro mais qu'on en connaît un
+                    // maintenant (annonce numérotée après coup), on retamponne ici
+                    // avec le bon N° plutôt que d'imprimer la version sans numéro.
+                    if(b.pdfTamponneB64 && !b.numero && title && !titleAmbiguous(title)){
+                      const e2=entryByTitle(title);
+                      if(e2&&e2.numero){ const bytes=b64ToBytes(b.pdfB64); if(bytes){ processBordereau(String(e2.numero), title, bytes); return; } }
+                    }
                     // Bordereau déjà tamponné par le serveur → ouverture directe.
                     if(b.pdfTamponneB64){
                       try{

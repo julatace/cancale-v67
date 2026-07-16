@@ -199,7 +199,9 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
   if (trans) data.transaction = trans[1].trim();
   let suivi = all.match(/N[°ºo]?\s*de\s*suivi\s*:?\s*([A-Z]{2}[A-Z0-9]{6,})/i);
   if (!suivi) suivi = all.match(/suivi\s*:?\s*([A-Z]{2}[A-Z0-9]{6,})/i);
-  if (suivi) data.suivi = suivi[1].trim();
+  // Garde-fou : un vrai n° de suivi est en MAJUSCULES/chiffres — sinon c'est un
+  // mot de phrase attrapé par erreur (ex. « suivi apparaissent »).
+  if (suivi && /^[A-Z0-9]{8,}$/.test(suivi[1].trim())) data.suivi = suivi[1].trim();
   const date = all.match(/avant\s*le\s*:?\s*(\d{2}\/\d{2}\/\d{4}[\s\dh:]*?)(?:\s*pour|\n|$)/i);
   if (date) data.dateLimite = date[1].trim().replace(/\s+/g, ' ');
 
