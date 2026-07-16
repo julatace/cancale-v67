@@ -49,7 +49,11 @@ function forwardVintedEmails() {
   // privaterelay / icloudmail : emails Vinted passés par une adresse masquée
   // iCloud (Apple réécrit parfois l'expéditeur). Les emails non pertinents
   // sont simplement classés « ignoré » par le serveur, sans rien polluer.
-  const threads = GmailApp.search('from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail) -label:' + LABEL + ' after:' + getStartDate());
+  // Deux filets : par EXPÉDITEUR (emails automatiques : Vinted, transporteurs,
+  // relais Apple des adresses masquées) ET par SUJET (emails transférés À LA
+  // MAIN — un transfert manuel a ton adresse comme expéditeur, mais garde le
+  // sujet d'origine : « Fwd: Ton article s'est vendu ! »...).
+  const threads = GmailApp.search('{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail) subject:(vinted OR vendu OR bordereau OR colis)} -label:' + LABEL + ' after:' + getStartDate());
 
   let sent = 0;
   threads.forEach(thread => {
