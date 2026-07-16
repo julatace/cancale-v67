@@ -4670,42 +4670,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         || items.find(o => normTitle(o.title).includes(n) || n.includes(normTitle(o.title)))
         || null;
   };
-  // Carte « colis à retirer » : code de retrait + QR + photo de l'article.
-  const RetraitCard = ({t}) => {
-    const buy = buyForTrack(t);
-    return (
-      <div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 12px',border:`1.5px solid ${C.accent}`,background:`${C.accent}0d`,borderRadius:12,flexWrap:'wrap'}}>
-        <div style={{width:52,height:52,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-          {buy&&buy.photo_url?<img src={buy.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>📦</span>}
-        </div>
-        <div style={{flex:1,minWidth:120}}>
-          <div style={{fontSize:12.5,fontWeight:800,color:C.accent}}>📍 À retirer</div>
-          <div style={{fontSize:11.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:220}}>
-            {(buy&&buy.title)||t.artTitle||'Colis'}
-          </div>
-          <div style={{fontSize:10,color:C.muted}}>
-            {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.account?` · ${t.account}`:''}
-          </div>
-          {t.lieu&&(
-            <button onClick={()=>openDepotMap('📍 '+t.lieu.slice(0,40), t.lieu)}
-              style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:10.5,fontWeight:700,color:C.accent,background:'transparent',border:'none',padding:0,cursor:'pointer',fontFamily:'inherit',marginTop:3,textAlign:'left'}}>
-              🗺 {t.lieu.slice(0,50)}
-            </button>
-          )}
-        </div>
-        {t.code&&(
-          <div style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:10,padding:'6px 14px'}}>
-            <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>Code de retrait</div>
-            <div style={{fontSize:20,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{t.code}</div>
-          </div>
-        )}
-        {t.qrB64&&(
-          <img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR de retrait"
-            style={{width:86,height:86,objectFit:'contain',background:'#fff',borderRadius:10,border:`1px solid ${C.border}`,flexShrink:0}}/>
-        )}
-      </div>
-    );
-  };
+  // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
+  //  Achats, avec le nombre de colis en badge sur chaque point.)
 
   // ── Migration one-shot : purge des numéros AUTO pollués ────────────────────
   // Une version antérieure basait l'auto-numérotation sur le garage (ancien) et a
@@ -5440,15 +5406,68 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       </>)}
 
       {curSub==='achats' && (<>
-        {/* Suivi des colis achetés : à retirer (code + QR + photo + lieu),
-            en transit, livrés — alimenté par les emails transporteurs/Vinted */}
-        {Array.isArray(tracking) && tracking.length>0 && (
+        {/* Colis à retirer : GROUPÉS PAR POINT RELAIS, avec le nombre de colis
+            en badge sur chaque point. Alimenté par les emails transporteurs. */}
+        {(()=>{
+          const avail=(tracking||[]).filter(t=>t.status==='available');
+          if(!avail.length) return null;
+          const points={};
+          avail.forEach(t=>{
+            const key=t.lieu||(/mondial/i.test(t.carrier)?'Point Mondial Relay':/chrono/i.test(t.carrier)?'Point Chronopost':'Point de retrait Vinted');
+            (points[key]=points[key]||[]).push(t);
+          });
+          return (
+            <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
+              {Object.entries(points).map(([lieu,colis])=>(
+                <div key={lieu} style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}0d`,borderRadius:14,overflow:'hidden'}}>
+                  {/* En-tête du point relais : nom + badge nombre de colis */}
+                  <button onClick={()=>openDepotMap('📍 '+lieu, lieu)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                    <span style={{position:'relative',flexShrink:0,fontSize:26}}>
+                      📍
+                      <span style={{position:'absolute',top:-6,right:-10,minWidth:20,height:20,borderRadius:999,background:C.danger,color:'#fff',fontSize:12,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 1px 4px rgba(0,0,0,0.25)'}}>{colis.length}</span>
+                    </span>
+                    <span style={{flex:1,minWidth:0}}>
+                      <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
+                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700}}>{colis.length} colis à retirer · voir sur la carte</span>
+                    </span>
+                  </button>
+                  {/* Les colis qui attendent à ce point */}
+                  <div style={{borderTop:`1px solid ${C.accent}33`}}>
+                    {colis.map((t,i)=>{
+                      const buy=buyForTrack(t);
+                      return (
+                        <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 13px',borderTop:i>0?`1px solid ${C.accent}22`:'none'}}>
+                          <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            {buy&&buy.photo_url?<img src={buy.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📦</span>}
+                          </div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
+                            <div style={{fontSize:10,color:C.muted}}>{/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · ${t.suivi}`:''}{t.account?` · ${t.account}`:''}</div>
+                          </div>
+                          {t.code&&(
+                            <div style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:8,padding:'3px 10px'}}>
+                              <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>Code</div>
+                              <div style={{fontSize:15,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:1.5}}>{t.code}</div>
+                            </div>
+                          )}
+                          {t.qrB64&&<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:44,height:44,objectFit:'contain',background:'#fff',borderRadius:6,border:`1px solid ${C.border}`,flexShrink:0}}/>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        {/* Colis en route / livrés */}
+        {(()=>{
+          const rest=(tracking||[]).filter(t=>t.status!=='available');
+          if(!rest.length) return null;
+          return (
           <div style={{marginBottom:14}}>
-            <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>🚚 Mes colis ({tracking.length})</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {tracking.slice(0,10).map((t,i)=>{
-                // Colis à retirer : carte enrichie (code + QR + photo + lieu)
-                if (t.status==='available') return <RetraitCard key={i} t={t}/>;
+              {rest.slice(0,8).map((t,i)=>{
                 const col = t.status==='delivered'?INV_STATUS.online.color:t.status==='transit'?C.warn:C.muted;
                 const icon = t.status==='delivered'?'✅':t.status==='transit'?'🚚':'📦';
                 return (
@@ -5466,7 +5485,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               })}
             </div>
           </div>
-        )}
+          );
+        })()}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
@@ -5820,16 +5840,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               </div>
               <button type="button" onClick={()=>setDepotMap(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
             </div>
-            {/* Choix du réseau (pour les dépôts) */}
-            <div style={{display:'flex',gap:6,padding:'8px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0,overflowX:'auto'}}>
-              {[['📮 Mondial Relay','point relais mondial relay'],['🏤 Chronopost','chronopost shop2shop relais pickup'],['📦 Vinted Go','casier vinted go']].map(([lb,q])=>(
-                <button key={lb} onClick={()=>setDepotMap(d=>({...d,query:q}))} style={{
-                  padding:'5px 12px',borderRadius:999,fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',
-                  background:depotMap.query===q?C.accent:'transparent',color:depotMap.query===q?'#fff':C.muted,
-                  border:`1.5px solid ${depotMap.query===q?C.accent:C.border}`,
-                }}>{lb}</button>
-              ))}
-            </div>
             <iframe
               title="Carte des points"
               src={`https://maps.google.com/maps?q=${encodeURIComponent(depotMap.query)}${depotMap.coords?`&sll=${depotMap.coords}`:''}&z=14&hl=fr&output=embed`}
@@ -5848,7 +5858,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{fontSize:12.5,color:C.muted,lineHeight:1.45,marginBottom:16}}>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:800,textDecoration:'none',marginBottom:8}}>📄 Ouvrir le bordereau</a>
-            <button onClick={()=>openDepotMap('📍 Où déposer le colis ?','point relais mondial relay')} style={{width:'100%',border:`1px solid ${C.accent}66`,borderRadius:12,background:`${C.accent}10`,color:C.accent,padding:'11px 16px',fontSize:13,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginTop:8}}>📍 Où déposer le colis ?</button>
             {bordResult.pdfBuf && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:700,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:700,padding:'8px'}}>Fermer</button>
           </div>
