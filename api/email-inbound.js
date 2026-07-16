@@ -411,7 +411,7 @@ export default async function handler(req, res) {
       try { await sendPushToAll({
         title: `${icons[track.status]} ${titles[track.status]}`,
         body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : carrier === 'chronopost' ? 'Chronopost' : 'Vinted'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.${track.status === 'available' && track.code ? ` Code de retrait : ${track.code}` : ''}`,
-        tag: `track-${track.suivi || rowId}`, url: '/',
+        tag: `track-${track.suivi || rowId}`, url: '/?tab=cat_achats',
       }); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       res.status(200).json({ ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
@@ -448,7 +448,7 @@ export default async function handler(req, res) {
       };
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
-      try { await sendPushToAll({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/' }); } catch (_) {}
+      try { await sendPushToAll({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }); } catch (_) {}
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
       res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
@@ -471,7 +471,7 @@ export default async function handler(req, res) {
       try { await sendPushToAll({
         title: '💰 Argent reçu',
         body: `${montant ? montant + ' € viré sur ton compte Vinted' : 'Transaction finalisée'}${article ? ' — ' + article.slice(0, 50) : ''}${acc.login ? ` (${acc.login})` : ''}.`,
-        tag: `final-${key}`, url: '/',
+        tag: `final-${key}`, url: '/?tab=cat_ventes',
       }); } catch (_) {}
       await logEmail({ type: 'finalisation', subject, from: mail.from, montant, article, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'finalisation', montant, article });
@@ -499,7 +499,7 @@ export default async function handler(req, res) {
       try { await sendPushToAll({
         title: '🛍 Achat confirmé',
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
-        tag: `achat-${key}`, url: '/',
+        tag: `achat-${key}`, url: '/?tab=cat_achats',
       }); } catch (_) {}
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
@@ -513,7 +513,7 @@ export default async function handler(req, res) {
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await sendPushToAll({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/' }); } catch (_) {}
+      try { await sendPushToAll({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }); } catch (_) {}
       // Facturation Pro : ne se déclenche que si activée dans l'app ET que
       // l'email contient l'adresse email de l'acheteur (comptes Pro).
       let facture = null;
@@ -525,7 +525,7 @@ export default async function handler(req, res) {
             try { await sendPushToAll({
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
               body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
-              tag: `inv-${facture.number}`, url: '/',
+              tag: `inv-${facture.number}`, url: '/?tab=invoices',
             }); } catch (_) {}
           }
         }
@@ -562,7 +562,7 @@ export default async function handler(req, res) {
       try { await sendPushToAll({
         title: `💰 Offre reçue${montant ? ' : ' + montant + ' €' : ''} !`,
         body: `${qui || 'Un acheteur'} propose ${montant ? montant + ' €' : 'un prix'}${article ? ` pour « ${article.trim().slice(0, 40)} »` : ''}${acc.login ? ` (${acc.login})` : ''} — expire en 24h.`,
-        tag: `offer-${key}`, url: '/',
+        tag: `offer-${key}`, url: '/?tab=cat_msg',
       }); } catch (_) {}
       await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'offre', montant, de: qui, article });
@@ -577,7 +577,7 @@ export default async function handler(req, res) {
       try { await sendPushToAll({
         title: `💬 ${qui || 'Message Vinted'}${acc.login ? ` → ${acc.login}` : ''}`,
         body: extrait ? `« ${extrait} »` : 'Nouveau message — ouvre Vinted pour répondre.',
-        tag: `msg-${key}`, url: '/',
+        tag: `msg-${key}`, url: '/?tab=cat_msg',
       }); } catch (_) {}
       await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'message', de: qui, extrait });
@@ -594,7 +594,7 @@ export default async function handler(req, res) {
       try { await sendPushToAll({
         title: '❤️ Nouveau favori !',
         body: `${qui || 'Quelqu\'un'} craque sur « ${(article || 'ton article').slice(0, 45)} »${prix ? ` (${prix} €)` : ''}${acc.login ? ` (${acc.login})` : ''} — fais-lui une offre !`,
-        tag: `fav-${key}`, url: '/',
+        tag: `fav-${key}`, url: '/?tab=cat_annonces',
       }); } catch (_) {}
       await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'favori', de: qui, article });

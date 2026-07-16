@@ -38,7 +38,14 @@ self.addEventListener('notificationclick', event => {
   const url = (event.notification.data && event.notification.data.url) || '/';
   event.waitUntil((async () => {
     const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const c of all) { if ('focus' in c) { c.focus(); return; } }
+    for (const c of all) {
+      if ('focus' in c) {
+        await c.focus();
+        // App déjà ouverte : on lui dit vers quel onglet sauter.
+        try { c.postMessage({ type: 'open-url', url }); } catch (_) {}
+        return;
+      }
+    }
     await clients.openWindow(url);
   })());
 });

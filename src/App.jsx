@@ -4468,7 +4468,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   const choosePick = (p) => { const price=p.price?.amount!=null?Number(p.price.amount):null; updatePair(pickerFor,{buyPrice:price!=null?String(price):'',buyFromId:p.transaction_id?String(p.transaction_id):null}); setPickerFor(null); };
   const [vFilter, setVFilter] = useState('all'); // encours | finalisees | annulees | all
-  const [aFilter, setAFilter] = useState('all'); // attente | recus | all
+  // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
+  // nombreuses et n'apparaissent que dans « Tous »).
+  const [aFilter, setAFilter] = useState('attente'); // attente | recus | all
   // Statut d'un ACHAT : un achat "reçu" n'a pas le mot "finalisé" (c'est
   // spécifique aux ventes). On élargit donc la détection pour les achats.
   const purchasePhase = (status) => {
@@ -6544,6 +6546,16 @@ function RegimeSetting() {
 
 export default function App() {
   const [tab,setTab]=useState('dashboard');
+  // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
+  // message du service worker (app déjà ouverte) → on saute au bon onglet.
+  useEffect(()=>{
+    const TABS_OK=['dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
+    const goto=(search)=>{ try{ const t=new URLSearchParams(search).get('tab'); if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
+    goto(window.location.search);
+    const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
+    if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
+    return ()=>{ if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
+  },[]);
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu
   C = dark ? THEMES.dark : THEMES.light;
@@ -6955,8 +6967,7 @@ export default function App() {
             <div style={{position:'absolute',bottom:0,left:0,right:0,height:13,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>✎</div>
           </div>
           <div>
-            <div style={{fontWeight:900,fontSize:19,color:C.accent,letterSpacing:-0.3,lineHeight:1}}>VRM</div>
-            <div style={{fontSize:9,color:C.muted,letterSpacing:2.5,textTransform:'uppercase',marginTop:3,fontWeight:600}}>Vendre · Ranger · Marge</div>
+            <div style={{fontWeight:900,fontSize:21,color:C.accent,letterSpacing:-0.3,lineHeight:1}}>VRM</div>
           </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:14}}>
