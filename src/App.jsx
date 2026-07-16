@@ -5540,7 +5540,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12.5,fontWeight:800,color:col}}>{t.statusLabel||'Mise à jour'}</div>
                       <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {/mondial/i.test(t.carrier)?'Mondial Relay':'Chronopost'}{t.suivi?` · n°${t.suivi}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
+                        {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
                       </div>
                     </div>
                     {t.suivi && <a href={trackUrl(t.carrier,t.suivi)} target="_blank" rel="noreferrer" style={{flexShrink:0,padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}

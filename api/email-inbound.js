@@ -351,14 +351,22 @@ export default async function handler(req, res) {
   const now = new Date().toISOString();
 
   try {
-    // 0) TRANSPORTEURS (Mondial Relay / Chronopost) → suivi de colis.
-    // L'expéditeur peut être réécrit par un relais (adresse masquée iCloud) :
-    // on regarde alors aussi le sujet — mais jamais pour un email Vinted
-    // (ses emails de bordereau peuvent citer le transporteur).
+    // 0) SUIVI DE COLIS.
+    // Trois provenances : les transporteurs eux-mêmes (Mondial Relay /
+    // Chronopost), leurs emails relayés par une adresse masquée iCloud
+    // (expéditeur réécrit → on regarde aussi le sujet), et les emails
+    // d'expédition de Vinted (shipping@relay.vinted.com). Jamais pour un
+    // bordereau (traité au point 1, prioritaire).
+    const isBordereauSubject = /Bordereau\s+d['’]envoi/i.test(subject);
     const fromVinted = /vinted/i.test(mail.from);
-    const carrierSrc = fromVinted ? mail.from : `${mail.from} ${subject}`;
-    const carrier = /mondial\s*relay|mondialrelay/i.test(carrierSrc) ? 'mondialrelay'
-                  : /chronopost/i.test(carrierSrc) ? 'chronopost' : null;
+    const isVintedShipping = /shipping@|relay\.vinted/i.test(mail.from);
+    const carrierSrc = (fromVinted && !isVintedShipping)
+      ? mail.from
+      : `${mail.from} ${subject} ${(mail.text || '').slice(0, 800)}`;
+    let carrier = /mondial\s*relay|mondialrelay/i.test(carrierSrc) ? 'mondialrelay'
+                : /chronopost/i.test(carrierSrc) ? 'chronopost' : null;
+    if (!carrier && isVintedShipping) carrier = 'vinted'; // suivi Vinted (Vinted Go...)
+    if (isBordereauSubject) carrier = null; // un bordereau n'est pas un suivi
     if (carrier) {
       const track = parseCarrierEmail(mail, carrier);
       const rowId = `email_track_${carrier}_${track.suivi || shortHash(subject)}`;
@@ -371,7 +379,7 @@ export default async function handler(req, res) {
       const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis' };
       try { await sendPushToAll({
         title: `${icons[track.status]} ${titles[track.status]}`,
-        body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : 'Chronopost'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.`,
+        body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : carrier === 'chronopost' ? 'Chronopost' : 'Vinted'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.`,
         tag: `track-${track.suivi || rowId}`, url: '/',
       }); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
