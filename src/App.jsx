@@ -5430,6 +5430,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                       <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
                       <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700}}>{colis.length} colis à retirer · voir sur la carte</span>
                     </span>
+                    <span onClick={async(ev)=>{
+                      ev.stopPropagation();
+                      const nom=window.prompt('Nom du point relais (ex : Maison de la Presse) :', colis[0].lieu||'');
+                      if(nom===null) return;
+                      // Enregistre le nom sur chaque colis de ce groupe (Supabase).
+                      for(const t of colis){
+                        const rowId=`email_track_${t.carrier}_${t.suivi||''}`;
+                        try{
+                          await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}`,{
+                            method:'PATCH',
+                            headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',Prefer:'return=minimal'},
+                            body:JSON.stringify({data:{...t,lieu:nom.trim()}}),
+                          });
+                        }catch(_){}
+                      }
+                      fetchEmailTracking().then(setTracking);
+                    }} title="Renommer ce point relais" style={{flexShrink:0,fontSize:14,color:C.muted,padding:'4px 6px'}}>✎</span>
                   </button>
                   {/* Les colis qui attendent à ce point */}
                   <div style={{borderTop:`1px solid ${C.accent}33`}}>
@@ -5721,37 +5738,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
                   </div>
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
-                  <button type="button" onClick={async()=>{
-                    const title=b.modele||b.article||'';
-                    // Si le serveur a tamponné SANS numéro mais qu'on en connaît un
-                    // maintenant (annonce numérotée après coup), on retamponne ici
-                    // avec le bon N° plutôt que d'imprimer la version sans numéro.
-                    if(b.pdfTamponneB64 && !b.numero && title && !titleAmbiguous(title)){
-                      const e2=entryByTitle(title);
-                      if(e2&&e2.numero){ const bytes=b64ToBytes(b.pdfB64); if(bytes){ processBordereau(String(e2.numero), title, bytes); return; } }
-                    }
-                    // Bordereau déjà tamponné par le serveur → ouverture directe.
-                    if(b.pdfTamponneB64){
-                      try{
-                        const st=b64ToBytes(b.pdfTamponneB64);
-                        const orig=b64ToBytes(b.pdfB64);
-                        const {width,height}=await readPdfFirstPageSize(orig);
-                        const url=URL.createObjectURL(new Blob([st],{type:'application/pdf'}));
-                        const filename=`bordereau${b.numero?'-N'+b.numero:''}.pdf`;
-                        const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-                        if(!isIOS){ const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); }
-                        // La modale « Bordereau prêt » donne Ouvrir (AirPrint) + Ajuster l'emplacement.
-                        setBordResult({url, filename, numero:b.numero||'', title, pdfBuf:orig, key:bordereauFormatKey(width,height), w:width, h:height});
-                        return;
-                      }catch(_){/* retombe sur le tamponnage local */}
-                    }
+                  <button type="button" onClick={()=>{
+                    // Tamponnage LOCAL systématique : utilise toujours
+                    // l'emplacement mémorisé LE PLUS RÉCENT pour ce format
+                    // (le pré-tamponnage serveur peut dater d'avant un réglage).
                     const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
+                    const title=b.modele||b.article||'';
                     // N° absent de l'email ? On le retrouve dans les annonces
                     // numérotées par le titre (sauf si le titre est ambigu).
                     let num=b.numero||'';
                     if(!num && title && !titleAmbiguous(title)){ const e2=entryByTitle(title); if(e2&&e2.numero) num=String(e2.numero); }
                     processBordereau(num, title, bytes);
-                  }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>{b.pdfTamponneB64?'🖨 Imprimer':'Tamponner'}</button>
+                  }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>🖨 Imprimer</button>
                   <button type="button" onClick={()=>toggleBordPrinted(b)}
                     title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé (grise la carte en attendant l\'expédition)'}
                     style={{flexShrink:0,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit',
@@ -6984,7 +6982,15 @@ export default function App() {
         </div>
       )}
       <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:'calc(84px + env(safe-area-inset-bottom))'}}
-        onTouchStart={e=>{ const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY}; }}
+        onTouchStart={e=>{
+          // Pas de navigation par balayage quand le geste commence dans une
+          // surface flottante (modale, ajustement du tampon, carte...) :
+          // sinon glisser le tampon changeait d'onglet et perdait le réglage !
+          let n=e.target, overlay=false;
+          while(n && n!==document.body){ try{ if(getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
+          if(overlay){ swipeStart.current=null; return; }
+          const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
+        }}
         onTouchEnd={e=>{
           const s=swipeStart.current; if(!s) return; swipeStart.current=null;
           const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
