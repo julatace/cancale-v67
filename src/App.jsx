@@ -5951,7 +5951,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 }
 
 /* ── Paramètres (accessible via le rouage en haut à droite) ──────────────── */
-function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
+function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
   const Row = ({icon,title,desc,onClick,color}) => (
     <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'14px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10}}>
       <span style={{fontSize:22,flexShrink:0}}>{icon}</span>
@@ -5985,6 +5985,20 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark }) {
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Notifications</div>
       <PushSetting/>
+      <div style={{height:10}}/>
+      {/* Alertes locales (l'ancien bouton 🔔 du haut, déplacé ici) : bandeau +
+          notification quand l'app est OUVERTE (ventes comptabilisées, factures). */}
+      <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:800,color:C.text}}>🛎 Alertes dans l'app</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.4}}>Bandeau + notification quand l'app est ouverte (ventes comptabilisées, factures reçues). Les notifications push ci-dessus couvrent le reste, app fermée.</div>
+        </div>
+        <button onClick={onToggleNotif} style={{
+          flexShrink:0,padding:'6px 16px',borderRadius:999,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+          background:notifEnabled?C.accent:'transparent',color:notifEnabled?'#fff':C.muted,
+          border:`1.5px solid ${notifEnabled?C.accent:C.border}`,
+        }}>{notifEnabled?'ON':'OFF'}</button>
+      </div>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Emails Vinted</div>
       <EmailStartSetting/>
@@ -6727,7 +6741,7 @@ export default function App() {
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {dark?'☀️':'🌙'}
             </button>
-            <button type="button" onClick={async()=>{
+            {false&&<button type="button" onClick={async()=>{
               if(!notifEnabled){
                 const res=await askNotifPermission();
                 if(res==='granted'){
@@ -6744,7 +6758,7 @@ export default function App() {
             }} title={notifEnabled?'Notifications activées (cliquer pour désactiver)':'Activer les notifications'}
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
-            </button>
+            </button>}
             <button type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
               style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               ⚙️
@@ -6787,6 +6801,22 @@ export default function App() {
           }
         }}>
         {tab==='settings'&&<SettingsScreen setTab={setTab}
+          notifEnabled={notifEnabled}
+          onToggleNotif={async()=>{
+            if(!notifEnabled){
+              const res=await askNotifPermission();
+              if(res==='granted'){
+                setNotifEnabled(true); save('vinted_notif_enabled',true);
+                pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
+              } else if(res==='denied'){
+                alert("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
+              } else if(res==='unsupported'){
+                alert("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
+              }
+            } else {
+              setNotifEnabled(false); save('vinted_notif_enabled',false);
+            }
+          }}
           onExport={()=>{ try{ const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()}; const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);}catch(err){alert('Erreur export : '+err.message);} }}
           onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;} let msg='Importer ce fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES.'; if(!window.confirm(msg))return; if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);} if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);} if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);} alert('✓ Import réussi !'); }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
           dark={dark} toggleDark={toggleDark}/>}
