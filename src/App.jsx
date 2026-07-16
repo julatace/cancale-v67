@@ -207,6 +207,28 @@ const setProInvoiceStatus = async (inv, status) => {
     return true;
   } catch (_) { return false; }
 };
+// Reçus d'achat archivés (emails Vinted « Ton reçu pour la commande... ») :
+// lignes email_achat_* = { subject, article, prix, transaction, texte, pdfB64 }.
+const fetchEmailAchats = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_achat_*&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.map(r => r.data).filter(Boolean);
+  } catch (_) { return []; }
+};
+// Ouvre le reçu authentique : PDF joint si présent, sinon l'email imprimable.
+const openReceipt = (a) => {
+  if (a.pdfB64) {
+    const bytes = b64ToBytes(a.pdfB64);
+    if (bytes) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); window.open(url, '_blank'); return; }
+  }
+  const w = window.open('', '_blank'); if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${(a.subject || 'Reçu Vinted').replace(/</g, '&lt;')}</title></head><body style="font-family:-apple-system,Arial,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;white-space:pre-wrap;line-height:1.5;color:#222"><h3>${(a.subject || '').replace(/</g, '&lt;')}</h3>${(a.texte || '').replace(/</g, '&lt;')}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  w.document.close();
+};
 // Page de suivi officielle du transporteur, n° pré-rempli.
 const trackUrl = (carrier, suivi) => {
   const s = encodeURIComponent(String(suivi || '').trim());
@@ -214,12 +236,32 @@ const trackUrl = (carrier, suivi) => {
   if (/chrono/i.test(carrier || '')) return `https://www.chronopost.fr/tracking-no-cdn/suivi-page?listeNumerosLT=${s}`;
   return `https://www.google.com/search?q=${s}+suivi+colis`;
 };
-// Cartes des points de dépôt autour de soi (Google Maps géolocalise tout seul).
-const DEPOT_LINKS = [
-  { label: 'Mondial Relay', emoji: '📮', url: 'https://www.google.com/maps/search/point+relais+mondial+relay' },
-  { label: 'Chronopost', emoji: '🏤', url: 'https://www.google.com/maps/search/chronopost+shop2shop' },
-  { label: 'Vinted Go', emoji: '📦', url: 'https://www.google.com/maps/search/casier+vinted+go' },
-];
+// Mini-carte OpenStreetMap SANS dépendance ni clé : 3×3 tuiles centrées sur le
+// point, épingle 📍 avec badge rouge = nombre de colis à y retirer.
+function OsmMap({ lat, lon, count, height = 185, onClick }) {
+  const z = 16, n = 2 ** z;
+  const xt = (lon + 180) / 360 * n;
+  const latr = lat * Math.PI / 180;
+  const yt = (1 - Math.log(Math.tan(latr) + 1 / Math.cos(latr)) / Math.PI) / 2 * n;
+  const xi = Math.floor(xt), yi = Math.floor(yt);
+  const tiles = [];
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) tiles.push({ dx, dy, url: `https://tile.openstreetmap.org/${z}/${xi + dx}/${yi + dy}.png` });
+  const px = (1 + (xt - xi)) * 256, py = (1 + (yt - yi)) * 256;
+  return (
+    <div onClick={onClick} style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#e8ecef', cursor: onClick ? 'pointer' : 'default' }}>
+      <div style={{ position: 'absolute', width: 768, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
+        {tiles.map((t, i) => (
+          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 1) * 256, top: (t.dy + 1) * 256 }} />
+        ))}
+      </div>
+      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -92%)', fontSize: 36, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))' }}>
+        📍
+        {count > 0 && <span style={{ position: 'absolute', top: -8, right: -14, minWidth: 22, height: 22, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 13, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{count}</span>}
+      </div>
+      <span style={{ position: 'absolute', right: 4, bottom: 2, fontSize: 8, color: '#555', background: 'rgba(255,255,255,0.75)', padding: '1px 4px', borderRadius: 3 }}>© OpenStreetMap</span>
+    </div>
+  );
+}
 // Décode une chaîne base64 en Uint8Array (pour donner le PDF à pdf-lib).
 const b64ToBytes = (b64) => {
   try { const bin = atob(String(b64 || '')); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
@@ -4355,17 +4397,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     return null;
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
-  // Carte intégrée (points de dépôt / lieu de retrait) : s'ouvre DANS l'app,
-  // sans redirection. Géolocalisé si l'utilisateur l'autorise.
-  const [depotMap, setDepotMap] = useState(null); // { title, query, coords }
-  const openDepotMap = (title, query) => {
-    setDepotMap({ title, query, coords: null });
-    try {
-      if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
-        pos => setDepotMap(d => d ? { ...d, coords: `${pos.coords.latitude},${pos.coords.longitude}` } : d),
-        () => {}, { timeout: 5000, maximumAge: 300000 });
-    } catch (_) {}
-  };
+  const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
+  // Reçu authentique correspondant à un achat : par n° de transaction, sinon titre.
+  const receiptFor = (o) => (achEmails || []).find(a =>
+    (a.transaction && String(a.transaction) === String(o.transaction_id)) ||
+    (a.article && normTitle(a.article) === normTitle(o.title))
+  ) || null;
+  // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
+  // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
+  const [geo, setGeo] = useState(() => load('vrm_geo_cache', {}));
+  const [openPoint, setOpenPoint] = useState(null); // lieu déplié (liste des colis)
+  useEffect(() => { (async () => {
+    const avail = (tracking || []).filter(t => t.status === 'available');
+    const lieux = [...new Set(avail.map(t => t.lieu).filter(l => l && !/^Point /.test(l)))];
+    for (const l of lieux) {
+      const cache = load('vrm_geo_cache', {});
+      if (cache[l] !== undefined) continue;
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(l + ', France')}`);
+        const js = await r.json();
+        const hit = js && js[0] ? { lat: +js[0].lat, lon: +js[0].lon } : null;
+        setGeo(prev => { const u = { ...prev, [l]: hit }; save('vrm_geo_cache', u); return u; });
+      } catch (_) {}
+      await new Promise(r2 => setTimeout(r2, 1100)); // politesse Nominatim
+    }
+  })(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracking]);
   const [sub, setSubRaw] = useState(only || 'ventes'); // ventes | achats | annonces | messages | bordereaux
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
@@ -4657,6 +4714,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
   useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
@@ -5416,23 +5474,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const key=t.lieu||(/mondial/i.test(t.carrier)?'Point Mondial Relay':/chrono/i.test(t.carrier)?'Point Chronopost':'Point de retrait Vinted');
             (points[key]=points[key]||[]).push(t);
           });
+          const singlePoint=Object.keys(points).length===1;
           return (
             <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
-              {Object.entries(points).map(([lieu,colis])=>(
-                <div key={lieu} style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}0d`,borderRadius:14,overflow:'hidden'}}>
-                  {/* En-tête du point relais : nom + badge nombre de colis */}
-                  <button onClick={()=>openDepotMap('📍 '+lieu, lieu)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+              {Object.entries(points).map(([lieu,colis])=>{
+                const g=geo[lieu];
+                const isOpen=singlePoint||openPoint===lieu;
+                return (
+                <div key={lieu} style={{border:`1.5px solid ${C.accent}`,background:C.card,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
+                  {/* Carte avec l'épingle numérotée (si le point est localisé) */}
+                  {g&&g.lat&&<OsmMap lat={g.lat} lon={g.lon} count={colis.length} onClick={()=>setOpenPoint(isOpen&&!singlePoint?null:lieu)}/>}
+                  {/* En-tête du point : nom + badge + renommer */}
+                  <button onClick={()=>setOpenPoint(isOpen&&!singlePoint?null:lieu)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                     <span style={{position:'relative',flexShrink:0,fontSize:26}}>
                       📍
                       <span style={{position:'absolute',top:-6,right:-10,minWidth:20,height:20,borderRadius:999,background:C.danger,color:'#fff',fontSize:12,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 1px 4px rgba(0,0,0,0.25)'}}>{colis.length}</span>
                     </span>
                     <span style={{flex:1,minWidth:0}}>
                       <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
-                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700}}>{colis.length} colis à retirer · voir sur la carte</span>
+                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700}}>{colis.length} colis à retirer{singlePoint?'':(isOpen?' · replier':' · voir les colis')}</span>
                     </span>
                     <span onClick={async(ev)=>{
                       ev.stopPropagation();
-                      const nom=window.prompt('Nom du point relais (ex : Maison de la Presse) :', colis[0].lieu||'');
+                      const nom=window.prompt('Nom du point relais (ex : Maison de la Presse, Cancale) :', colis[0].lieu||'');
                       if(nom===null) return;
                       // Enregistre le nom sur chaque colis de ce groupe (Supabase).
                       for(const t of colis){
@@ -5446,10 +5510,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                         }catch(_){}
                       }
                       fetchEmailTracking().then(setTracking);
-                    }} title="Renommer ce point relais" style={{flexShrink:0,fontSize:14,color:C.muted,padding:'4px 6px'}}>✎</span>
+                    }} title="Renommer ce point relais (permet de le localiser sur la carte)" style={{flexShrink:0,fontSize:14,color:C.muted,padding:'4px 6px'}}>✎</span>
                   </button>
                   {/* Les colis qui attendent à ce point */}
-                  <div style={{borderTop:`1px solid ${C.accent}33`}}>
+                  {isOpen&&<div style={{borderTop:`1px solid ${C.accent}33`}}>
                     {colis.map((t,i)=>{
                       const buy=buyForTrack(t);
                       return (
@@ -5471,9 +5535,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                         </div>
                       );
                     })}
-                  </div>
+                  </div>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           );
         })()}
@@ -5532,9 +5597,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
                 <div style={{fontSize:14,fontWeight:900,color:C.text}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
-                <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
-                  title="Télécharger un justificatif d'achat (PDF)" aria-label="Justificatif d'achat PDF"
-                  style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:700,padding:'3px 9px'}}>📄 Justif.</button>
+                {(()=>{ const rc=receiptFor(o); return rc ? (
+                  <button type="button" onClick={()=>openReceipt(rc)}
+                    title="Reçu Vinted authentique (email archivé)" aria-label="Reçu d'achat Vinted"
+                    style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:800,padding:'3px 9px'}}>📄 Reçu</button>
+                ) : (
+                  <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
+                    title="Télécharger un justificatif d'achat (PDF)" aria-label="Justificatif d'achat PDF"
+                    style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:700,padding:'3px 9px'}}>📄 Justif.</button>
+                ); })()}
               </div>
             </div>
           ))}
@@ -5826,27 +5897,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
-
-      {/* Carte intégrée : points de dépôt / lieu de retrait — dans l'app, sans redirection */}
-      {depotMap && (
-        <div onClick={()=>setDepotMap(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1100,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'82vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{depotMap.title}</div>
-                <div style={{fontSize:10.5,color:C.muted}}>{depotMap.coords?'📍 autour de toi':'localisation en cours… (autorise la position pour centrer la carte)'}</div>
-              </div>
-              <button type="button" onClick={()=>setDepotMap(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
-            </div>
-            <iframe
-              title="Carte des points"
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(depotMap.query)}${depotMap.coords?`&sll=${depotMap.coords}`:''}&z=14&hl=fr&output=embed`}
-              style={{flex:1,border:'none',width:'100%'}}
-              allow="geolocation"
-            />
-          </div>
-        </div>
-      )}
 
       {bordResult && (
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
@@ -6905,14 +6955,14 @@ export default function App() {
             <div style={{position:'absolute',bottom:0,left:0,right:0,height:13,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>✎</div>
           </div>
           <div>
-            <div style={{fontWeight:900,fontSize:19,color:C.accent,letterSpacing:-0.3,lineHeight:1}}>Cancale</div>
-            <div style={{fontSize:9,color:C.muted,letterSpacing:2.5,textTransform:'uppercase',marginTop:3,fontWeight:600}}>Shoes Store</div>
+            <div style={{fontWeight:900,fontSize:19,color:C.accent,letterSpacing:-0.3,lineHeight:1}}>VRM</div>
+            <div style={{fontSize:9,color:C.muted,letterSpacing:2.5,textTransform:'uppercase',marginTop:3,fontWeight:600}}>Vendre · Ranger · Marge</div>
           </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:14}}>
           <div style={{fontSize:12,display:'flex',gap:12,alignItems:'center'}}>
-            <span style={{color:C.accent,fontWeight:700}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>
-            <span style={{color:C.muted,fontWeight:700}}>💸 {sales.length}</span>
+            {false&&<span style={{color:C.accent,fontWeight:700}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
+            {false&&<span style={{color:C.muted,fontWeight:700}}>💸 {sales.length}</span>}
             <span title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
@@ -6927,12 +6977,12 @@ export default function App() {
               )}
             </span>
           </div>
-          {/* Boutons Mode sombre / Exporter / Importer */}
+          {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
           <div style={{display:'flex',gap:6}}>
-            <button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
+            {false&&<button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {dark?'☀️':'🌙'}
-            </button>
+            </button>}
             {false&&<button type="button" onClick={async()=>{
               if(!notifEnabled){
                 const res=await askNotifPermission();
