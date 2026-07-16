@@ -4583,7 +4583,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='bordereaux' && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
-  useEffect(() => { if (curSub==='bordereaux' && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
+  // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
+  // retrouver la photo de l'article correspondant.
+  useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
+  // Achat correspondant à un suivi : par titre d'article extrait de l'email.
+  const buyForTrack = (t) => {
+    const items = buys.items || [];
+    if (!t || !t.artTitle) return null;
+    const n = normTitle(t.artTitle);
+    if (!n) return null;
+    return items.find(o => normTitle(o.title) === n)
+        || items.find(o => normTitle(o.title).includes(n) || n.includes(normTitle(o.title)))
+        || null;
+  };
+  // Carte « colis à retirer » : code de retrait + QR + photo de l'article.
+  const RetraitCard = ({t}) => {
+    const buy = buyForTrack(t);
+    return (
+      <div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 12px',border:`1.5px solid ${C.accent}`,background:`${C.accent}0d`,borderRadius:12,flexWrap:'wrap'}}>
+        <div style={{width:52,height:52,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          {buy&&buy.photo_url?<img src={buy.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>📦</span>}
+        </div>
+        <div style={{flex:1,minWidth:120}}>
+          <div style={{fontSize:12.5,fontWeight:800,color:C.accent}}>📍 À retirer</div>
+          <div style={{fontSize:11.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:220}}>
+            {(buy&&buy.title)||t.artTitle||'Colis'}
+          </div>
+          <div style={{fontSize:10,color:C.muted}}>
+            {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.account?` · ${t.account}`:''}
+          </div>
+        </div>
+        {t.code&&(
+          <div style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:10,padding:'6px 14px'}}>
+            <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>Code de retrait</div>
+            <div style={{fontSize:20,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{t.code}</div>
+          </div>
+        )}
+        {t.qrB64&&(
+          <img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR de retrait"
+            style={{width:86,height:86,objectFit:'contain',background:'#fff',borderRadius:10,border:`1px solid ${C.border}`,flexShrink:0}}/>
+        )}
+      </div>
+    );
+  };
 
   // ── Migration one-shot : purge des numéros AUTO pollués ────────────────────
   // Une version antérieure basait l'auto-numérotation sur le garage (ancien) et a
@@ -5301,6 +5344,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       </>)}
 
       {curSub==='achats' && (<>
+        {/* Colis achetés arrivés au point de retrait : code + QR + photo */}
+        {(tracking||[]).filter(t=>t.status==='available').length>0&&(
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
+            {(tracking||[]).filter(t=>t.status==='available').map((t,i)=><RetraitCard key={i} t={t}/>)}
+          </div>
+        )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
@@ -5532,8 +5581,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>🚚 Suivi des colis ({tracking.length})</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {tracking.slice(0,10).map((t,i)=>{
-                const col = t.status==='delivered'?INV_STATUS.online.color:t.status==='available'?C.accent:t.status==='transit'?C.warn:C.muted;
-                const icon = t.status==='delivered'?'✅':t.status==='available'?'📍':t.status==='transit'?'🚚':'📦';
+                // Colis à retirer : carte enrichie (code + QR + photo de l'article)
+                if (t.status==='available') return <RetraitCard key={i} t={t}/>;
+                const col = t.status==='delivered'?INV_STATUS.online.color:t.status==='transit'?C.warn:C.muted;
+                const icon = t.status==='delivered'?'✅':t.status==='transit'?'🚚':'📦';
                 return (
                   <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:12}}>
                     <span style={{fontSize:18}}>{icon}</span>

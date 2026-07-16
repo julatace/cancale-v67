@@ -330,7 +330,18 @@ function parseCarrierEmail(mail, carrier) {
   if (/livr[ée]|remis au destinataire|a bien [ée]t[ée] retir[ée]|r[ée]ceptionn[ée]/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
   else if (/disponible|à retirer|arriv[ée] (?:dans|en|au) point|pr[êe]t.*retrait/.test(t)) { status = 'available'; label = 'Arrivé au point de retrait'; }
   else if (/acheminement|en transit|exp[ée]di[ée]|pris en charge|d[ée]pos[ée]|enregistr[ée]|en cours de livraison/.test(t)) { status = 'transit'; label = 'En transit'; }
-  return { suivi, status, label };
+
+  // Code de retrait (PIN) : « code de retrait : 123456 », « PIN : 1234 »...
+  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)\s*[:\-]?\s*([A-Z0-9]{4,8})\b/i) || [])[1] || null;
+  if (!code) {
+    const m = all.match(/\bcode\s*[:\-]\s*([A-Z0-9]{4,8})\b/i);
+    // garde-fou : ne pas confondre avec un code postal
+    if (m && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
+  }
+  // Titre de l'article (permet de retrouver la photo côté achats)
+  const artTitle = ((all.match(/(?:article|commande|achat)\s*[:\-]\s*([^\n]{4,70})/i) || [])[1] || '').trim() || null;
+
+  return { suivi, status, label, code, artTitle };
 }
 
 export default async function handler(req, res) {
@@ -371,17 +382,23 @@ export default async function handler(req, res) {
     if (isBordereauSubject) carrier = null; // un bordereau n'est pas un suivi
     if (carrier) {
       const track = parseCarrierEmail(mail, carrier);
+      // QR / code-barres de retrait éventuellement joint à l'email
+      const qr = (mail.attachments || []).find(a =>
+        /image\//i.test(a.contentType || '') && /qr|barre|barcode|code|retrait|pickup/i.test(a.filename || ''));
       const rowId = `email_track_${carrier}_${track.suivi || shortHash(subject)}`;
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
+        code: track.code || null, artTitle: track.artTitle || null,
+        qrB64: qr ? qr.contentB64 : null, qrType: qr ? qr.contentType : null,
+        account: acc.login || '',
       } }]);
       // Notif push selon l'étape du colis.
       const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦' };
       const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis' };
       try { await sendPushToAll({
         title: `${icons[track.status]} ${titles[track.status]}`,
-        body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : carrier === 'chronopost' ? 'Chronopost' : 'Vinted'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.`,
+        body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : carrier === 'chronopost' ? 'Chronopost' : 'Vinted'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.${track.status === 'available' && track.code ? ` Code de retrait : ${track.code}` : ''}`,
         tag: `track-${track.suivi || rowId}`, url: '/',
       }); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
