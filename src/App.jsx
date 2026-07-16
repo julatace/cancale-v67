@@ -33,7 +33,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
   'vinted_sale_overrides',
 ];
@@ -4306,6 +4306,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
+  // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
+  // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
+  const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
+  const bordKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+  const isBordPrinted = (b) => !!bordsPrinted[bordKey(b)];
+  const toggleBordPrinted = (b) => {
+    const k = bordKey(b); if (!k) return;
+    setBordsPrinted(prev => {
+      const u = { ...prev };
+      if (u[k]) delete u[k]; else u[k] = new Date().toISOString();
+      save('vinted_bords_printed', u); return u;
+    });
+  };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   // Carte intégrée (points de dépôt / lieu de retrait) : s'ouvre DANS l'app,
   // sans redirection. Géolocalisé si l'utilisateur l'autorise.
@@ -5611,8 +5624,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           <div style={{marginBottom:16}}>
             <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {emailBords.map((b,i)=>(
-                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
+              {[...emailBords].sort((a,b2)=>(isBordPrinted(a)?1:0)-(isBordPrinted(b2)?1:0)).map((b,i)=>(
+                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordPrinted(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
                   <span style={{fontSize:18}}>📄</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.numero?`N°${b.numero} · `:''}{b.modele||b.article||'Bordereau'}</div>
@@ -5650,6 +5663,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     if(!num && title && !titleAmbiguous(title)){ const e2=entryByTitle(title); if(e2&&e2.numero) num=String(e2.numero); }
                     processBordereau(num, title, bytes);
                   }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>{b.pdfTamponneB64?'🖨 Imprimer':'Tamponner'}</button>
+                  <button type="button" onClick={()=>toggleBordPrinted(b)}
+                    title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé (grise la carte en attendant l\'expédition)'}
+                    style={{flexShrink:0,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit',
+                      border:`1.5px solid ${isBordPrinted(b)?C.accent:C.border}`,
+                      background:isBordPrinted(b)?C.accent:'transparent',
+                      color:isBordPrinted(b)?'#fff':C.muted}}>
+                    {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
+                  </button>
                 </div>
               ))}
             </div>
