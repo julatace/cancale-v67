@@ -276,6 +276,16 @@ async function createProInvoice(sale, acc, cfg, now) {
   return { number, status };
 }
 
+// Journal des emails traités (30 derniers, même les « ignorés ») : permet de
+// vérifier qu'un email a bien atteint le serveur et comment il a été classé.
+async function logEmail(entry) {
+  try {
+    const cur = (await supabaseGetRow('email_journal')) || { entries: [] };
+    const entries = [{ ...entry, at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 30);
+    await supabaseUpsert([{ id: 'email_journal', data: { entries } }]);
+  } catch (_) {}
+}
+
 // Retrouve le N° d'une paire par le titre de l'annonce (annonces numérotées
 // de l'app, synchronisées). Refuse de deviner si deux annonces ont le même titre.
 async function findNumeroByTitle(title) {
@@ -364,6 +374,7 @@ export default async function handler(req, res) {
         body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : 'Chronopost'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.`,
         tag: `track-${track.suivi || rowId}`, url: '/',
       }); } catch (_) {}
+      await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       res.status(200).json({ ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;
     }
@@ -399,6 +410,7 @@ export default async function handler(req, res) {
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
       try { await sendPushToAll({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/' }); } catch (_) {}
+      await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
       res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
     }
@@ -409,6 +421,7 @@ export default async function handler(req, res) {
       await supabaseUpsert([{ id: `email_final_${key}`, data: { type: 'finalisation', subject, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : l'argent arrive dans le porte-monnaie.
       try { await sendPushToAll({ title: '💰 Argent reçu', body: subject.replace(/vinted/gi, '').trim() || 'Une transaction vient d\'être finalisée.', tag: `final-${key}`, url: '/' }); } catch (_) {}
+      await logEmail({ type: 'finalisation', subject, from: mail.from });
       res.status(200).json({ ok: true, type: 'finalisation' });
       return;
     }
@@ -437,10 +450,12 @@ export default async function handler(req, res) {
           }
         }
       } catch (_) {}
+      await logEmail({ type: 'vente', subject, from: mail.from, prix: data.prix, numero: data.numero, facture: facture ? facture.number : null });
       res.status(200).json({ ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
       return;
     }
 
+    await logEmail({ type: 'ignoré', subject, from: mail.from });
     res.status(200).json({ ok: true, type: 'ignoré', subject });
   } catch (e) {
     // On répond 200 pour éviter que le service de mail ne rejoue / bounce.
