@@ -4319,6 +4319,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       save('vinted_bords_printed', u); return u;
     });
   };
+  // Bordereau reçu pour une annonce = la paire est VENDUE, même si la synchro
+  // Vinted (extension) ne l'a pas encore reflété. Déduction par N° d'abord,
+  // sinon par titre — JAMAIS sur un titre ambigu (annonces en double).
+  const bordForItem = (title, numero) => {
+    const list = emailBords || [];
+    if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero)); if (hit) return hit; }
+    const n = normTitle(title || '');
+    if (!n || titleAmbiguous(title)) return null;
+    return list.find(bb => normTitle(bb.modele || bb.article || '') === n) || null;
+  };
+  // Photo de la paire d'un bordereau : par N° (annonces numérotées, fiable),
+  // sinon par titre non ambigu, sinon dans les annonces/ventes chargées.
+  const bordPhoto = (b) => {
+    if (b.numero) { for (const k in numeros) { const e2 = numeros[k]; if (e2 && String(e2.numero) === String(b.numero) && e2.photo) return e2.photo; } }
+    const title = b.modele || b.article || '';
+    if (title && !titleAmbiguous(title)) { const e2 = entryByTitle(title); if (e2 && e2.photo) return e2.photo; }
+    const n = normTitle(title);
+    if (n) {
+      const hit = (listings.items || []).find(o => normTitle(o.title) === n) || (sales.items || []).find(o => normTitle(o.title) === n);
+      if (hit) return hit.photo || hit.photo_url || null;
+    }
+    return null;
+  };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   // Carte intégrée (points de dépôt / lieu de retrait) : s'ouvre DANS l'app,
   // sans redirection. Géolocalisé si l'utilisateur l'autorise.
@@ -4611,7 +4634,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if (curSub==='bordereaux' && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
@@ -5204,6 +5227,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       )}
 
       {curSub==='ventes' && (<>
+        {/* Ventes déduites des bordereaux, pas encore dans la synchro Vinted */}
+        {(()=>{
+          const pending=(emailBords||[]).filter(b=>{
+            const n=normTitle(b.modele||b.article||'');
+            return n && !(sales.items||[]).some(o=>normTitle(o.title)===n);
+          });
+          if(!pending.length||sales.items===null) return null;
+          return (
+            <div style={{border:`1.5px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:12}}>
+              <div style={{fontSize:12.5,fontWeight:800,color:C.warn}}>📦 {pending.length} vente{pending.length>1?'s':''} repérée{pending.length>1?'s':''} via bordereau, pas encore synchronisée{pending.length>1?'s':''}</div>
+              <div style={{fontSize:11,color:C.text,marginTop:4,lineHeight:1.5}}>
+                {pending.map(b=>(b.numero?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
+              </div>
+              <div style={{fontSize:10.5,color:C.muted,marginTop:4}}>Elles apparaîtront dans la liste (et la compta) après ta prochaine navigation sur Vinted (l'extension re-capte tes ventes).</div>
+            </div>
+          );
+        })()}
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
@@ -5492,12 +5532,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const e = numeros[it.id] || {}; const num = e.numero || ''; const buy = e.buyPrice ?? '';
             const atGarage = inGarage(num);
             const age = listedAgeDays(it); const sleeps = age!=null && age>=SLEEP_DAYS;
+            // Bordereau reçu pour cette paire → elle est vendue, même si la
+            // synchro Vinted ne l'a pas encore retirée des annonces.
+            const soldBord = bordForItem(it.title, num);
             return (
-              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:14,overflow:'hidden',background:C.card,border:`1px solid ${num?C.accent:C.border}`,display:'flex',flexDirection:'column'}}>
+              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:14,overflow:'hidden',background:C.card,border:`1.5px solid ${soldBord?C.warn:num?C.accent:C.border}`,...(soldBord?{opacity:0.8}:{}),display:'flex',flexDirection:'column'}}>
                 <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
                   <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:34}}>👟</span>}
                   </div>
+                  {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:900,padding:'4px 8px',borderRadius:8,textAlign:'center'}}>📦 VENDUE — bordereau reçu</div>}
                   {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'3px 9px',borderRadius:999}}>N°{num}</div>}
                   {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:900,padding:'3px 8px',borderRadius:999}}>😴 {age}j</div>}
                 </a>
@@ -5625,8 +5669,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[...emailBords].sort((a,b2)=>(isBordPrinted(a)?1:0)-(isBordPrinted(b2)?1:0)).map((b,i)=>(
-                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordPrinted(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
-                  <span style={{fontSize:18}}>📄</span>
+                <div key={i} data-bord-card style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordPrinted(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
+                  {(()=>{ const ph=bordPhoto(b); return (
+                    <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      {ph?<img src={ph} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>📄</span>}
+                    </div>
+                  ); })()}
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.numero?`N°${b.numero} · `:''}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
