@@ -478,6 +478,34 @@ export default async function handler(req, res) {
       return;
     }
 
+    // 2b) ACHAT (confirmation de TA commande) — AVANT la branche vente :
+    // « tu as acheté » matcherait sinon le détecteur de ventes (« X a
+    // acheté ton article »). On archive l'email comme justificatif d'achat
+    // (texte + PDF joint éventuel) pour le registre d'achats.
+    const achText = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 2000)}`;
+    if (/(?:tu as|vous avez)\s+achet|merci pour (?:ton|votre) achat|confirmation d['']achat|ta commande|r[ée]capitulatif de (?:ta |votre )?commande/i.test(achText)) {
+      const prix = (achText.match(/(\d+[,.]\d{2})\s*€/) || [])[1] || '';
+      const article = ((achText.match(/(?:achet[ée]e?\s*:?\s*|article\s*:?\s*)[«"“']?([^«»"”'\n]{4,70})/i) || [])[1] || '').trim();
+      const transaction = (achText.match(/transaction\s*:?\s*#?(\d{6,})/i) || [])[1] || '';
+      const pdfA = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
+      const key = transaction || shortHash(subject + (mail.text || '').slice(0, 300));
+      await supabaseUpsert([{ id: `email_achat_${key}`, data: {
+        type: 'achat', subject, article, prix, transaction,
+        account: acc.login || '', uid: acc.uid || '',
+        texte: (mail.text || htmlToText(mail.html) || '').slice(0, 4000),
+        pdfB64: pdfA ? pdfA.contentB64 : null, filename: pdfA ? pdfA.filename : null,
+        receivedAt: now,
+      } }]);
+      try { await sendPushToAll({
+        title: '🛍 Achat confirmé',
+        body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
+        tag: `achat-${key}`, url: '/',
+      }); } catch (_) {}
+      await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
+      res.status(200).json({ ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
+      return;
+    }
+
     // 3) VENTE ("Ton article s'est vendu") → facture.
     if (/vendu/i.test(subject) || /a\s+achet/i.test(mail.text || '')) {
       const data = parseSaleEmail(mail);
