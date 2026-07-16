@@ -509,31 +509,50 @@ export default async function handler(req, res) {
 
     // 4) OFFRE reçue → notif immédiate (les offres expirent en 24h !).
     const textAll = `${subject}\n${mail.text || htmlToText(mail.html) || ''}`;
+    // Extrait le contenu utile qui suit une phrase d'annonce (le texte du
+    // message reçu, l'éventuel mot accompagnant une offre...). On coupe au
+    // premier élément d'habillage (boutons, pied de page, liens).
+    const extractAfter = (announceRe, maxLen = 140) => {
+      const lines = (mail.text || htmlToText(mail.html) || '').split('\n').map(l => l.trim());
+      const idx = lines.findIndex(l => announceRe.test(l));
+      if (idx < 0) return '';
+      const useful = [];
+      for (let i = idx + 1; i < lines.length && useful.length < 4; i++) {
+        const l = lines[i];
+        if (!l) continue;
+        if (/r[ée]pond|d[ée]sabonn|besoin d['']aide|vinted,?\s*uab|facebook|twitter|instagram|https?:|voir (?:le|la)|©|rejoins la/i.test(l)) break;
+        useful.push(l);
+      }
+      return useful.join(' ').slice(0, maxLen);
+    };
+
     if (/offre/i.test(subject) || /t['']a (?:fait|envoyé) une offre|nouvelle offre/i.test(textAll)) {
       const montant = (textAll.match(/(\d+[,.]?\d*)\s*€/) || [])[1] || '';
       const qui = (textAll.match(/(\S+)\s+t['']a\s+(?:fait|envoyé)\s+une\s+offre/i) || [])[1] || '';
+      const article = (textAll.match(/offre\s+(?:de\s+[\d,.]+\s*€\s+)?pour\s+[«"“']?([^«»"”'\n]{3,60})/i) || [])[1] || '';
       const key = shortHash(subject + (mail.text || '').slice(0, 200));
       try { await sendPushToAll({
-        title: '💰 Offre reçue !',
-        body: `${qui ? qui + ' propose ' : 'Offre de '}${montant ? montant + ' €' : 'nouveau montant'}${acc.login ? ` (${acc.login})` : ''} — réponds vite, elle expire en 24h.`,
+        title: `💰 Offre reçue${montant ? ' : ' + montant + ' €' : ''} !`,
+        body: `${qui || 'Un acheteur'} propose ${montant ? montant + ' €' : 'un prix'}${article ? ` pour « ${article.trim().slice(0, 40)} »` : ''}${acc.login ? ` (${acc.login})` : ''} — expire en 24h.`,
         tag: `offer-${key}`, url: '/',
       }); } catch (_) {}
-      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, account: acc.login || '' });
-      res.status(200).json({ ok: true, type: 'offre', montant, de: qui });
+      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, account: acc.login || '' });
+      res.status(200).json({ ok: true, type: 'offre', montant, de: qui, article });
       return;
     }
 
-    // 5) NOUVEAU MESSAGE → notif immédiate (la réponse se fait sur Vinted).
+    // 5) NOUVEAU MESSAGE → notif immédiate avec le TEXTE du message.
     if (/nouveau message|message de|t['']a envoyé un message|vous avez re[çc]u un message/i.test(textAll)) {
       const qui = (textAll.match(/(?:message de|de la part de)\s+(\S+)/i) || textAll.match(/(\S+)\s+t['']a envoyé/i) || [])[1] || '';
+      const extrait = extractAfter(/envoy[ée] un message|nouveau message|message de/i);
       const key = shortHash(subject + (mail.text || '').slice(0, 200));
       try { await sendPushToAll({
-        title: '💬 Nouveau message Vinted',
-        body: `${qui ? 'De ' + qui : 'Un acheteur t\'a écrit'}${acc.login ? ` (${acc.login})` : ''} — ouvre Vinted pour répondre.`,
+        title: `💬 ${qui || 'Message Vinted'}${acc.login ? ` → ${acc.login}` : ''}`,
+        body: extrait ? `« ${extrait} »` : 'Nouveau message — ouvre Vinted pour répondre.',
         tag: `msg-${key}`, url: '/',
       }); } catch (_) {}
-      await logEmail({ type: 'message', subject, from: mail.from, de: qui, account: acc.login || '' });
-      res.status(200).json({ ok: true, type: 'message', de: qui });
+      await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, account: acc.login || '' });
+      res.status(200).json({ ok: true, type: 'message', de: qui, extrait });
       return;
     }
 
