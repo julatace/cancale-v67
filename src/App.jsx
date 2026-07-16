@@ -33,7 +33,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
   'vinted_sale_overrides',
 ];
@@ -263,7 +263,8 @@ function OsmMap({ points, height = 210, selected, onSelect }) {
     <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#e8ecef' }}>
       <div style={{ position: 'absolute', width: 1280, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
         {tiles.map((t, i) => (
-          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256 }} />
+          // Carte légèrement grisée, façon Vinted : les épingles ressortent.
+          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256, filter: 'grayscale(0.85) brightness(1.04) contrast(0.92)' }} />
         ))}
       </div>
       {pts.map(p => {
@@ -4427,6 +4428,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
   const [geo, setGeo] = useState(() => load('vrm_geo_cache_v2', {}));
   const [openPoint, setOpenPoint] = useState(null); // lieu déplié (liste des colis)
+  // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
+  // les badges apparaissent à l'arrivée des colis. Synchronisé.
+  const [savedPoints, setSavedPoints] = useState(() => load('vrm_points_relais', []));
+  const addSavedPoint = async () => {
+    const input = window.prompt('Ton point relais (nom + ville ou adresse) :\nex : Maison de la Presse, 40 Rue du Port, Cancale');
+    if (!input || !input.trim()) return;
+    const ask = async (q) => {
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q + ', France')}`);
+        const js = await r.json();
+        return js && js[0] ? { lat: +js[0].lat, lon: +js[0].lon } : null;
+      } catch (_) { return null; }
+    };
+    let hit = await ask(input);
+    if (!hit && input.includes(',')) hit = await ask(input.split(',').slice(1).join(',').trim());
+    if (!hit) { alert('Adresse introuvable — précise la rue ou le code postal (ex : Maison de la Presse, 40 Rue du Port, 35260 Cancale).'); return; }
+    const nom = input.split(',')[0].trim();
+    const u = [...savedPoints.filter(sp => sp.nom !== nom), { nom, full: input.trim(), lat: hit.lat, lon: hit.lon }];
+    setSavedPoints(u); save('vrm_points_relais', u);
+  };
+  const removeSavedPoint = (nom) => {
+    const u = savedPoints.filter(sp => sp.nom !== nom);
+    setSavedPoints(u); save('vrm_points_relais', u);
+    setOpenPoint(null);
+  };
   useEffect(() => { (async () => {
     const avail = (tracking || []).filter(t => t.status === 'available');
     const lieux = [...new Set(avail.map(t => t.lieu).filter(l => l && !/^Point /.test(l)))];
@@ -5496,29 +5522,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       </>)}
 
       {curSub==='achats' && (<>
-        {/* Colis à retirer : GROUPÉS PAR POINT RELAIS, avec le nombre de colis
-            en badge sur chaque point. Alimenté par les emails transporteurs. */}
+        {/* Points relais façon Vinted : carte PERMANENTE de tes points habituels.
+            Les badges rouges apparaissent quand des colis y attendent. */}
         {(()=>{
           const avail=(tracking||[]).filter(t=>t.status==='available');
-          if(!avail.length) return null;
-          const points={};
+          if(!avail.length && !savedPoints.length) return null;
+          const norm=s=>String(s||'').toLowerCase();
+          // Groupes : points enregistrés d'abord, colis rattachés par nom.
+          const groups={};
+          savedPoints.forEach(sp=>{ groups[sp.nom]={colis:[],lat:sp.lat,lon:sp.lon,saved:true}; });
           avail.forEach(t=>{
-            const key=t.lieu||(/mondial/i.test(t.carrier)?'Point Mondial Relay':/chrono/i.test(t.carrier)?'Point Chronopost':'Point de retrait Vinted');
-            (points[key]=points[key]||[]).push(t);
+            const lieu=t.lieu||'';
+            const sp=savedPoints.find(sp2=>lieu&&(norm(lieu).includes(norm(sp2.nom))||norm(sp2.nom).includes(norm(lieu.split(',')[0]))));
+            const key=sp?sp.nom:(lieu||(/mondial/i.test(t.carrier)?'Point Mondial Relay':/chrono/i.test(t.carrier)?'Point Chronopost':'Point de retrait Vinted'));
+            if(!groups[key]) groups[key]={colis:[],saved:false};
+            groups[key].colis.push(t);
           });
-          const singlePoint=Object.keys(points).length===1;
-          const pins=Object.entries(points)
-            .map(([lieu,colis])=>({key:lieu,lat:geo[lieu]&&geo[lieu].lat,lon:geo[lieu]&&geo[lieu].lon,count:colis.length}))
-            .filter(p=>p.lat);
+          Object.entries(groups).forEach(([k,g])=>{ if(!g.lat&&geo[k]&&geo[k].lat){g.lat=geo[k].lat;g.lon=geo[k].lon;} });
+          const pins=Object.entries(groups).filter(([,g])=>g.lat).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length}));
+          const withColis=Object.entries(groups).filter(([,g])=>g.colis.length>0);
+          const singlePoint=withColis.length===1;
+          const selGroup=openPoint?groups[openPoint]:null;
           return (
             <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
-              {/* LA carte de la ville, façon Vinted : toutes les épingles, badge = nb de colis */}
+              {/* LA carte de la ville : toutes tes épingles, badges = colis en attente */}
               {pins.length>0&&(
-                <div style={{border:`1.5px solid ${C.accent}`,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
-                  <OsmMap points={pins} selected={openPoint} onSelect={k=>setOpenPoint(openPoint===k&&!singlePoint?null:k)}/>
+                <div style={{border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.07)'}}>
+                  <OsmMap points={pins} selected={openPoint} onSelect={k=>setOpenPoint(openPoint===k?null:k)}/>
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderTop:`1px solid ${C.border}`,background:C.card}}>
+                    <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:700}}>
+                      {avail.length>0?`📦 ${avail.length} colis à retirer`:"Aucun colis en attente — les badges s'allumeront à l'arrivée"}
+                    </span>
+                    <button onClick={addSavedPoint} style={{border:`1px solid ${C.border}`,borderRadius:999,background:'transparent',color:C.text,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Point relais</button>
+                  </div>
                 </div>
               )}
-              {Object.entries(points).map(([lieu,colis])=>{
+              {pins.length===0&&(
+                <button onClick={addSavedPoint} style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,color:C.accent,fontSize:12.5,fontWeight:800,padding:'14px 16px',cursor:'pointer',fontFamily:'inherit'}}>
+                  ➕ Ajoute tes points relais habituels — la carte de ta ville s'affichera ici en permanence
+                </button>
+              )}
+              {/* Point sélectionné sans colis en attente */}
+              {selGroup&&selGroup.colis.length===0&&(
+                <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
+                  <span style={{fontSize:18}}>📍</span>
+                  <span style={{flex:1,fontSize:12,color:C.text,fontWeight:700}}>{openPoint} <span style={{color:C.muted,fontWeight:600}}>— aucun colis en attente ici</span></span>
+                  {selGroup.saved&&<button onClick={()=>removeSavedPoint(openPoint)} style={{border:`1px solid ${C.danger}66`,borderRadius:8,background:'transparent',color:C.danger,fontSize:11,fontWeight:800,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>✕ Retirer</button>}
+                </div>
+              )}
+              {withColis.map(([lieu,g])=>{
+                const colis=g.colis;
                 const isOpen=singlePoint||openPoint===lieu;
                 return (
                 <div key={lieu} style={{border:`1.5px solid ${openPoint===lieu?C.accent:C.border}`,background:C.card,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
@@ -5532,11 +5585,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                       <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
                       <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700}}>{colis.length} colis à retirer{singlePoint?'':(isOpen?' · replier':' · voir les colis')}</span>
                     </span>
-                    <span onClick={async(ev)=>{
+                    {!g.saved&&<span onClick={async(ev)=>{
                       ev.stopPropagation();
                       const nom=window.prompt('Nom du point relais (ex : Maison de la Presse, Cancale) :', colis[0].lieu||'');
                       if(nom===null) return;
-                      // Enregistre le nom sur chaque colis de ce groupe (Supabase).
                       for(const t of colis){
                         const rowId=`email_track_${t.carrier}_${t.suivi||''}`;
                         try{
@@ -5548,7 +5600,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                         }catch(_){}
                       }
                       fetchEmailTracking().then(setTracking);
-                    }} title="Renommer ce point relais (permet de le localiser sur la carte)" style={{flexShrink:0,fontSize:14,color:C.muted,padding:'4px 6px'}}>✎</span>
+                    }} title="Renommer ce point relais (permet de le localiser sur la carte)" style={{flexShrink:0,fontSize:14,color:C.muted,padding:'4px 6px'}}>✎</span>}
                   </button>
                   {/* Les colis qui attendent à ce point */}
                   {isOpen&&<div style={{borderTop:`1px solid ${C.accent}33`}}>
