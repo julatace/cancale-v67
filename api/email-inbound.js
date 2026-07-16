@@ -465,6 +465,36 @@ export default async function handler(req, res) {
       return;
     }
 
+    // 4) OFFRE reçue → notif immédiate (les offres expirent en 24h !).
+    const textAll = `${subject}\n${mail.text || htmlToText(mail.html) || ''}`;
+    if (/offre/i.test(subject) || /t['']a (?:fait|envoyé) une offre|nouvelle offre/i.test(textAll)) {
+      const montant = (textAll.match(/(\d+[,.]?\d*)\s*€/) || [])[1] || '';
+      const qui = (textAll.match(/(\S+)\s+t['']a\s+(?:fait|envoyé)\s+une\s+offre/i) || [])[1] || '';
+      const key = shortHash(subject + (mail.text || '').slice(0, 200));
+      try { await sendPushToAll({
+        title: '💰 Offre reçue !',
+        body: `${qui ? qui + ' propose ' : 'Offre de '}${montant ? montant + ' €' : 'nouveau montant'}${acc.login ? ` (${acc.login})` : ''} — réponds vite, elle expire en 24h.`,
+        tag: `offer-${key}`, url: '/',
+      }); } catch (_) {}
+      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, account: acc.login || '' });
+      res.status(200).json({ ok: true, type: 'offre', montant, de: qui });
+      return;
+    }
+
+    // 5) NOUVEAU MESSAGE → notif immédiate (la réponse se fait sur Vinted).
+    if (/nouveau message|message de|t['']a envoyé un message|vous avez re[çc]u un message/i.test(textAll)) {
+      const qui = (textAll.match(/(?:message de|de la part de)\s+(\S+)/i) || textAll.match(/(\S+)\s+t['']a envoyé/i) || [])[1] || '';
+      const key = shortHash(subject + (mail.text || '').slice(0, 200));
+      try { await sendPushToAll({
+        title: '💬 Nouveau message Vinted',
+        body: `${qui ? 'De ' + qui : 'Un acheteur t\'a écrit'}${acc.login ? ` (${acc.login})` : ''} — ouvre Vinted pour répondre.`,
+        tag: `msg-${key}`, url: '/',
+      }); } catch (_) {}
+      await logEmail({ type: 'message', subject, from: mail.from, de: qui, account: acc.login || '' });
+      res.status(200).json({ ok: true, type: 'message', de: qui });
+      return;
+    }
+
     await logEmail({ type: 'ignoré', subject, from: mail.from });
     res.status(200).json({ ok: true, type: 'ignoré', subject });
   } catch (e) {

@@ -53,7 +53,7 @@ function forwardVintedEmails() {
   // relais Apple des adresses masquées) ET par SUJET (emails transférés À LA
   // MAIN — un transfert manuel a ton adresse comme expéditeur, mais garde le
   // sujet d'origine : « Fwd: Ton article s'est vendu ! »...).
-  const threads = GmailApp.search('{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail) subject:(vinted OR vendu OR bordereau OR colis)} -label:' + LABEL + ' after:' + getStartDate());
+  const threads = GmailApp.search('{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message)} -label:' + LABEL + ' after:' + getStartDate());
 
   let sent = 0;
   threads.forEach(thread => {
