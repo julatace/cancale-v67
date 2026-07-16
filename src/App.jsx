@@ -982,10 +982,22 @@ const BOTTOM_TABS=[
   {id:'invoices',     icon:'🧾',label:'Factures'},
 ];
 function BottomBar({tab,setTab}) {
+  // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
+  // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
+  const [kbOpen,setKbOpen]=React.useState(false);
+  React.useEffect(()=>{
+    const isField=el=>el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT');
+    const onIn=e=>{ if(isField(e.target)) setKbOpen(true); };
+    const onOut=()=>setTimeout(()=>{ if(!isField(document.activeElement)) setKbOpen(false); },80);
+    window.addEventListener('focusin',onIn);
+    window.addEventListener('focusout',onOut);
+    return ()=>{ window.removeEventListener('focusin',onIn); window.removeEventListener('focusout',onOut); };
+  },[]);
   return (
     <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'auto',
       background:C.surface,borderTop:`1px solid ${C.border}`,boxShadow:'0 -2px 10px rgba(0,0,0,0.08)',
-      paddingBottom:'env(safe-area-inset-bottom)',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
+      paddingBottom:'env(safe-area-inset-bottom)',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',
+      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .18s ease',pointerEvents:kbOpen?'none':'auto'}}>
       {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 0 auto',minWidth:64,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 6px 7px',
@@ -4386,7 +4398,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     });
   };
   const recordUsed = (num) => { const n=parseInt(String(num),10); if(isNaN(n)||n<=0) return; setUsedNumeros(prev=>{ if(prev.includes(n))return prev; const u=[...prev,n]; save('vinted_used_numeros',u); return u; }); };
-  const nextNumero = useMemo(() => { let m=0; usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>m)m=n;}); Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>m)m=n;}); return m+1; }, [usedNumeros, numeros]);
+  // Prochain N° suggéré = max de TOUTES les sources + 1 : numéros déjà utilisés,
+  // annonces numérotées, ET numéros posés sur les ventes (sale_overrides) —
+  // sinon on resuggère un numéro qu'on vient de donner à une vente (doublon !).
+  const nextNumero = useMemo(() => { let m=0;
+    usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>m)m=n;});
+    Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>m)m=n;});
+    Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n)&&n>m)m=n;});
+    return m+1; }, [usedNumeros, numeros, saleOv]);
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
   const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros]);
