@@ -239,19 +239,21 @@ const trackUrl = (carrier, suivi) => {
 // Carte de ville façon Vinted, SANS dépendance ni clé : tuiles OpenStreetMap,
 // une épingle 📍 par point relais avec badge rouge = nombre de colis.
 // points = [{ key, lat, lon, count }] ; tap sur une épingle → onSelect(key).
-function OsmMap({ points, height = 210, selected, onSelect }) {
+function OsmMap({ points, height = 230, selected, onSelect }) {
   const pts = (points || []).filter(p => p && p.lat && p.lon);
   if (!pts.length) return null;
   const proj = (lat, lon, zz) => { const n = 2 ** zz; const x = (lon + 180) / 360 * n; const latr = lat * Math.PI / 180; const y = (1 - Math.log(Math.tan(latr) + 1 / Math.cos(latr)) / Math.PI) / 2 * n; return { x, y }; };
-  // Zoom : le plus serré qui contient toutes les épingles dans la vue.
+  // Zoom : le plus serré qui contient toutes les épingles… puis on DÉZOOME d'un
+  // cran pour laisser de la marge et voir la ville autour (comme demandé).
   let z = 16;
   while (z > 11) {
     const ts = pts.map(p => proj(p.lat, p.lon, z));
     const spanX = Math.max(...ts.map(t => t.x)) - Math.min(...ts.map(t => t.x));
     const spanY = Math.max(...ts.map(t => t.y)) - Math.min(...ts.map(t => t.y));
-    if (spanX < 1.3 && spanY < (height / 256) * 0.8) break;
+    if (spanX < 1.5 && spanY < (height / 256) * 0.72) break;
     z--;
   }
+  if (pts.length > 1 && z > 12) z -= 1; // marge : on voit tout d'un coup
   const clat = (Math.min(...pts.map(p => p.lat)) + Math.max(...pts.map(p => p.lat))) / 2;
   const clon = (Math.min(...pts.map(p => p.lon)) + Math.max(...pts.map(p => p.lon))) / 2;
   const c = proj(clat, clon, z);
@@ -263,19 +265,21 @@ function OsmMap({ points, height = 210, selected, onSelect }) {
     <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#e8ecef' }}>
       <div style={{ position: 'absolute', width: 1280, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
         {tiles.map((t, i) => (
-          // Carte légèrement grisée, façon Vinted : les épingles ressortent.
-          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256, filter: 'grayscale(0.85) brightness(1.04) contrast(0.92)' }} />
+          // Carte grisée, façon Vinted : les épingles ressortent.
+          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256, filter: 'grayscale(0.9) brightness(1.05) contrast(0.9)' }} />
         ))}
       </div>
       {pts.map(p => {
         const t = proj(p.lat, p.lon, z);
         const ox = (t.x - c.x) * 256, oy = (t.y - c.y) * 256;
         const isSel = selected === p.key;
+        const emoji = p.picked ? '📍' : p.count > 0 ? '📍' : '📌';
         return (
           <div key={p.key} onClick={() => onSelect && onSelect(p.key)}
-            style={{ position: 'absolute', left: `calc(50% + ${ox}px)`, top: `calc(50% + ${oy}px)`, transform: `translate(-50%, -92%) scale(${isSel ? 1.25 : 1})`, fontSize: 34, cursor: 'pointer', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))', transition: 'transform .15s', zIndex: isSel ? 2 : 1 }}>
-            📍
-            {p.count > 0 && <span style={{ position: 'absolute', top: -8, right: -14, minWidth: 21, height: 21, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 12.5, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{p.count}</span>}
+            style={{ position: 'absolute', left: `calc(50% + ${ox}px)`, top: `calc(50% + ${oy}px)`, transform: `translate(-50%, -92%) scale(${isSel || p.picked ? 1.22 : 1})`, fontSize: 32, cursor: 'pointer', filter: `drop-shadow(0 2px 3px rgba(0,0,0,0.35)) ${p.picked ? '' : p.count > 0 ? '' : 'grayscale(0.5) opacity(0.85)'}`, transition: 'transform .15s', zIndex: isSel || p.picked ? 3 : 1 }}>
+            {emoji}
+            {p.picked && <span style={{ position: 'absolute', top: -6, right: -12, width: 20, height: 20, borderRadius: 999, background: '#2e9e5b', color: '#fff', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>✓</span>}
+            {!p.picked && p.count > 0 && <span style={{ position: 'absolute', top: -8, right: -14, minWidth: 21, height: 21, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 12.5, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{p.count}</span>}
           </div>
         );
       })}
@@ -4431,28 +4435,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
   const [savedPoints, setSavedPoints] = useState(() => load('vrm_points_relais', []));
-  const addSavedPoint = async () => {
-    const input = window.prompt('Ton point relais (nom + ville ou adresse) :\nex : Maison de la Presse, 40 Rue du Port, Cancale');
-    if (!input || !input.trim()) return;
-    const ask = async (q) => {
-      try {
-        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q + ', France')}`);
-        const js = await r.json();
-        return js && js[0] ? { lat: +js[0].lat, lon: +js[0].lon } : null;
-      } catch (_) { return null; }
-    };
-    let hit = await ask(input);
-    if (!hit && input.includes(',')) hit = await ask(input.split(',').slice(1).join(',').trim());
-    if (!hit) { alert('Adresse introuvable — précise la rue ou le code postal (ex : Maison de la Presse, 40 Rue du Port, 35260 Cancale).'); return; }
-    const nom = input.split(',')[0].trim();
-    const u = [...savedPoints.filter(sp => sp.nom !== nom), { nom, full: input.trim(), lat: hit.lat, lon: hit.lon }];
-    setSavedPoints(u); save('vrm_points_relais', u);
+  const persistPoints = (u) => { setSavedPoints(u); save('vrm_points_relais', u); };
+  // Sélecteur : tape une ville → l'app cherche TOUS les points relais réels
+  // qui s'y trouvent (OpenStreetMap) → carte + liste, tu coches ceux que tu utilises.
+  const [relayPicker, setRelayPicker] = useState(null); // {city, loading, found:[], picked:Set, error}
+  const openRelayPicker = async () => {
+    const city = window.prompt('Ta ville (les points relais qui s\'y trouvent te seront proposés) :', '');
+    if (!city || !city.trim()) return;
+    setRelayPicker({ city: city.trim(), loading: true, found: [], picked: new Set(), error: null });
+    try {
+      // 1) Bounding box de la ville
+      const gr = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(city.trim() + ', France')}`);
+      const gj = await gr.json();
+      if (!gj || !gj[0]) { setRelayPicker(p => p ? { ...p, loading: false, error: 'Ville introuvable — vérifie l\'orthographe.' } : p); return; }
+      const bb = gj[0].boundingbox; // [S, N, W, E]
+      const [S, N, W, E] = [bb[0], bb[1], bb[2], bb[3]];
+      // 2) Points relais candidats (lockers, tabac-presse, supérettes, poste)
+      const q = `[out:json][timeout:25];(node["amenity"="parcel_locker"](${S},${W},${N},${E});node["shop"="tobacco"](${S},${W},${N},${E});node["shop"="newsagent"](${S},${W},${N},${E});node["shop"="convenience"](${S},${W},${N},${E});node["amenity"="post_office"](${S},${W},${N},${E}););out center 60;`;
+      const or = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q) });
+      const oj = await or.json();
+      const typeLabel = (t) => t.amenity === 'parcel_locker' ? 'Casier' : t.amenity === 'post_office' ? 'Bureau de poste' : t.shop === 'tobacco' ? 'Tabac' : t.shop === 'newsagent' ? 'Presse' : 'Supérette';
+      const found = (oj.elements || []).map(e => {
+        const la = e.lat ?? (e.center && e.center.lat), lo = e.lon ?? (e.center && e.center.lon);
+        const t = e.tags || {};
+        return la && lo ? { id: String(e.id), nom: t.name || typeLabel(t), type: typeLabel(t), lat: +la, lon: +lo } : null;
+      }).filter(Boolean);
+      // Marque déjà-enregistrés
+      const savedNames = new Set(savedPoints.map(s => s.nom.toLowerCase()));
+      const picked = new Set(found.filter(f => savedNames.has(f.nom.toLowerCase())).map(f => f.id));
+      setRelayPicker(p => p ? { ...p, loading: false, found, picked, cityLat: +gj[0].lat, cityLon: +gj[0].lon } : p);
+    } catch (_) {
+      setRelayPicker(p => p ? { ...p, loading: false, error: 'Recherche indisponible, réessaie dans un instant.' } : p);
+    }
   };
-  const removeSavedPoint = (nom) => {
-    const u = savedPoints.filter(sp => sp.nom !== nom);
-    setSavedPoints(u); save('vrm_points_relais', u);
-    setOpenPoint(null);
+  const togglePick = (id) => setRelayPicker(p => { if (!p) return p; const s = new Set(p.picked); s.has(id) ? s.delete(id) : s.add(id); return { ...p, picked: s }; });
+  const saveRelayPicks = () => {
+    if (!relayPicker) return;
+    const chosen = relayPicker.found.filter(f => relayPicker.picked.has(f.id));
+    const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
+    chosen.forEach(f => byName.set(f.nom.toLowerCase(), { nom: f.nom, full: `${f.nom}, ${relayPicker.city}`, lat: f.lat, lon: f.lon, type: f.type }));
+    persistPoints([...byName.values()]);
+    setRelayPicker(null);
   };
+  const removeSavedPoint = (nom) => { persistPoints(savedPoints.filter(sp => sp.nom !== nom)); setOpenPoint(null); };
   useEffect(() => { (async () => {
     const avail = (tracking || []).filter(t => t.status === 'available');
     const lieux = [...new Set(avail.map(t => t.lieu).filter(l => l && !/^Point /.test(l)))];
@@ -5553,13 +5578,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:700}}>
                       {avail.length>0?`📦 ${avail.length} colis à retirer`:"Aucun colis en attente — les badges s'allumeront à l'arrivée"}
                     </span>
-                    <button onClick={addSavedPoint} style={{border:`1px solid ${C.border}`,borderRadius:999,background:'transparent',color:C.text,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Point relais</button>
+                    <button onClick={openRelayPicker} style={{border:`1px solid ${C.border}`,borderRadius:999,background:'transparent',color:C.text,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Point relais</button>
                   </div>
                 </div>
               )}
               {pins.length===0&&(
-                <button onClick={addSavedPoint} style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,color:C.accent,fontSize:12.5,fontWeight:800,padding:'14px 16px',cursor:'pointer',fontFamily:'inherit'}}>
-                  ➕ Ajoute tes points relais habituels — la carte de ta ville s'affichera ici en permanence
+                <button onClick={openRelayPicker} style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,color:C.accent,fontSize:12.5,fontWeight:800,padding:'14px 16px',cursor:'pointer',fontFamily:'inherit'}}>
+                  🗺 Choisis ta ville — tous les points relais qui s'y trouvent te seront proposés sur une carte
                 </button>
               )}
               {/* Point sélectionné sans colis en attente */}
@@ -5987,6 +6012,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
+
+      {/* Sélecteur de points relais par ville (carte + liste à cocher) */}
+      {relayPicker && (
+        <div onClick={()=>setRelayPicker(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1100,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>🗺 Points relais — {relayPicker.city}</div>
+                <div style={{fontSize:11,color:C.muted}}>{relayPicker.loading?'Recherche en cours…':`${relayPicker.found.length} point${relayPicker.found.length>1?'s':''} trouvé${relayPicker.found.length>1?'s':''} · coche ceux que tu utilises`}</div>
+              </div>
+              <button type="button" onClick={()=>setRelayPicker(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+            </div>
+            {relayPicker.loading && <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13}}>⏳ Recherche des points relais…</div>}
+            {!relayPicker.loading && relayPicker.error && <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.danger,fontSize:13,textAlign:'center',padding:20}}>{relayPicker.error}</div>}
+            {!relayPicker.loading && !relayPicker.error && (<>
+              {relayPicker.found.length>0 && <OsmMap points={relayPicker.found.map(f=>({key:f.id,lat:f.lat,lon:f.lon,picked:relayPicker.picked.has(f.id)}))} selected={null} onSelect={togglePick}/>}
+              <div style={{flex:1,overflow:'auto',padding:'8px 12px'}}>
+                {relayPicker.found.length===0 && <div style={{color:C.muted,fontSize:13,textAlign:'center',padding:'28px 12px',lineHeight:1.5}}>Aucun point relais détecté dans cette ville sur la carte. Essaie une ville proche, ou ajoute-le manuellement plus tard.</div>}
+                {relayPicker.found.map(f=>{ const on=relayPicker.picked.has(f.id); return (
+                  <button key={f.id} onClick={()=>togglePick(f.id)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 10px',border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}12`:C.card,borderRadius:10,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                    <span style={{width:22,height:22,borderRadius:6,border:`1.5px solid ${on?C.accent:C.border}`,background:on?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:13,fontWeight:900}}>{on?'✓':''}</span>
+                    <span style={{flex:1,minWidth:0}}>
+                      <span style={{display:'block',fontSize:13,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.nom}</span>
+                      <span style={{display:'block',fontSize:10.5,color:C.muted}}>{f.type}</span>
+                    </span>
+                  </button>
+                ); })}
+              </div>
+              <div style={{padding:'10px 14px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
+                <button onClick={saveRelayPicks} disabled={relayPicker.picked.size===0} style={{width:'100%',padding:'12px 16px',borderRadius:12,border:'none',background:relayPicker.picked.size?C.accent:C.border,color:'#fff',fontSize:14,fontWeight:800,cursor:relayPicker.picked.size?'pointer':'default',fontFamily:'inherit'}}>
+                  {relayPicker.picked.size?`Enregistrer ${relayPicker.picked.size} point${relayPicker.picked.size>1?'s':''}`:'Coche au moins un point'}
+                </button>
+              </div>
+            </>)}
+          </div>
+        </div>
+      )}
 
       {bordResult && (
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
