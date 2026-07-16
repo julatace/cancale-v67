@@ -236,28 +236,48 @@ const trackUrl = (carrier, suivi) => {
   if (/chrono/i.test(carrier || '')) return `https://www.chronopost.fr/tracking-no-cdn/suivi-page?listeNumerosLT=${s}`;
   return `https://www.google.com/search?q=${s}+suivi+colis`;
 };
-// Mini-carte OpenStreetMap SANS dépendance ni clé : 3×3 tuiles centrées sur le
-// point, épingle 📍 avec badge rouge = nombre de colis à y retirer.
-function OsmMap({ lat, lon, count, height = 185, onClick }) {
-  const z = 16, n = 2 ** z;
-  const xt = (lon + 180) / 360 * n;
-  const latr = lat * Math.PI / 180;
-  const yt = (1 - Math.log(Math.tan(latr) + 1 / Math.cos(latr)) / Math.PI) / 2 * n;
-  const xi = Math.floor(xt), yi = Math.floor(yt);
+// Carte de ville façon Vinted, SANS dépendance ni clé : tuiles OpenStreetMap,
+// une épingle 📍 par point relais avec badge rouge = nombre de colis.
+// points = [{ key, lat, lon, count }] ; tap sur une épingle → onSelect(key).
+function OsmMap({ points, height = 210, selected, onSelect }) {
+  const pts = (points || []).filter(p => p && p.lat && p.lon);
+  if (!pts.length) return null;
+  const proj = (lat, lon, zz) => { const n = 2 ** zz; const x = (lon + 180) / 360 * n; const latr = lat * Math.PI / 180; const y = (1 - Math.log(Math.tan(latr) + 1 / Math.cos(latr)) / Math.PI) / 2 * n; return { x, y }; };
+  // Zoom : le plus serré qui contient toutes les épingles dans la vue.
+  let z = 16;
+  while (z > 11) {
+    const ts = pts.map(p => proj(p.lat, p.lon, z));
+    const spanX = Math.max(...ts.map(t => t.x)) - Math.min(...ts.map(t => t.x));
+    const spanY = Math.max(...ts.map(t => t.y)) - Math.min(...ts.map(t => t.y));
+    if (spanX < 1.3 && spanY < (height / 256) * 0.8) break;
+    z--;
+  }
+  const clat = (Math.min(...pts.map(p => p.lat)) + Math.max(...pts.map(p => p.lat))) / 2;
+  const clon = (Math.min(...pts.map(p => p.lon)) + Math.max(...pts.map(p => p.lon))) / 2;
+  const c = proj(clat, clon, z);
+  const xi = Math.floor(c.x), yi = Math.floor(c.y);
   const tiles = [];
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) tiles.push({ dx, dy, url: `https://tile.openstreetmap.org/${z}/${xi + dx}/${yi + dy}.png` });
-  const px = (1 + (xt - xi)) * 256, py = (1 + (yt - yi)) * 256;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) tiles.push({ dx, dy, url: `https://tile.openstreetmap.org/${z}/${xi + dx}/${yi + dy}.png` });
+  const px = (2 + (c.x - xi)) * 256, py = (1 + (c.y - yi)) * 256; // le centre géo au centre visuel
   return (
-    <div onClick={onClick} style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#e8ecef', cursor: onClick ? 'pointer' : 'default' }}>
-      <div style={{ position: 'absolute', width: 768, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
+    <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#e8ecef' }}>
+      <div style={{ position: 'absolute', width: 1280, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
         {tiles.map((t, i) => (
-          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 1) * 256, top: (t.dy + 1) * 256 }} />
+          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256 }} />
         ))}
       </div>
-      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -92%)', fontSize: 36, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))' }}>
-        📍
-        {count > 0 && <span style={{ position: 'absolute', top: -8, right: -14, minWidth: 22, height: 22, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 13, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{count}</span>}
-      </div>
+      {pts.map(p => {
+        const t = proj(p.lat, p.lon, z);
+        const ox = (t.x - c.x) * 256, oy = (t.y - c.y) * 256;
+        const isSel = selected === p.key;
+        return (
+          <div key={p.key} onClick={() => onSelect && onSelect(p.key)}
+            style={{ position: 'absolute', left: `calc(50% + ${ox}px)`, top: `calc(50% + ${oy}px)`, transform: `translate(-50%, -92%) scale(${isSel ? 1.25 : 1})`, fontSize: 34, cursor: 'pointer', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))', transition: 'transform .15s', zIndex: isSel ? 2 : 1 }}>
+            📍
+            {p.count > 0 && <span style={{ position: 'absolute', top: -8, right: -14, minWidth: 21, height: 21, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 12.5, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{p.count}</span>}
+          </div>
+        );
+      })}
       <span style={{ position: 'absolute', right: 4, bottom: 2, fontSize: 8, color: '#555', background: 'rgba(255,255,255,0.75)', padding: '1px 4px', borderRadius: 3 }}>© OpenStreetMap</span>
     </div>
   );
@@ -4405,14 +4425,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   ) || null;
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
-  const [geo, setGeo] = useState(() => load('vrm_geo_cache', {}));
+  const [geo, setGeo] = useState(() => load('vrm_geo_cache_v2', {}));
   const [openPoint, setOpenPoint] = useState(null); // lieu déplié (liste des colis)
   useEffect(() => { (async () => {
     const avail = (tracking || []).filter(t => t.status === 'available');
     const lieux = [...new Set(avail.map(t => t.lieu).filter(l => l && !/^Point /.test(l)))];
     for (const l of lieux) {
-      const cache = load('vrm_geo_cache', {});
-      if (cache[l] !== undefined) continue;
+      const cache = load('vrm_geo_cache_v2', {});
+      const cached = cache[l];
+      // Déjà localisé → rien à faire. Échec récent (<1h) → on ne spamme pas ;
+      // échec ancien → on retente (le point a pu être renommé/corrigé).
+      if (cached && (cached.lat || (cached.failedAt && Date.now() - cached.failedAt < 3600e3))) continue;
       try {
         const ask = async (q) => {
           const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q + ', France')}`);
@@ -4424,7 +4447,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         // les commerces sont souvent absents des cartes, l'adresse jamais).
         let hit = await ask(l);
         if (!hit && l.includes(',')) { await new Promise(r2 => setTimeout(r2, 1100)); hit = await ask(l.split(',').slice(1).join(',').trim()); }
-        setGeo(prev => { const u = { ...prev, [l]: hit }; save('vrm_geo_cache', u); return u; });
+        setGeo(prev => { const u = { ...prev, [l]: hit || { failedAt: Date.now() } }; save('vrm_geo_cache_v2', u); return u; });
       } catch (_) {}
       await new Promise(r2 => setTimeout(r2, 1100)); // politesse Nominatim
     }
@@ -5484,15 +5507,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             (points[key]=points[key]||[]).push(t);
           });
           const singlePoint=Object.keys(points).length===1;
+          const pins=Object.entries(points)
+            .map(([lieu,colis])=>({key:lieu,lat:geo[lieu]&&geo[lieu].lat,lon:geo[lieu]&&geo[lieu].lon,count:colis.length}))
+            .filter(p=>p.lat);
           return (
             <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
+              {/* LA carte de la ville, façon Vinted : toutes les épingles, badge = nb de colis */}
+              {pins.length>0&&(
+                <div style={{border:`1.5px solid ${C.accent}`,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
+                  <OsmMap points={pins} selected={openPoint} onSelect={k=>setOpenPoint(openPoint===k&&!singlePoint?null:k)}/>
+                </div>
+              )}
               {Object.entries(points).map(([lieu,colis])=>{
-                const g=geo[lieu];
                 const isOpen=singlePoint||openPoint===lieu;
                 return (
-                <div key={lieu} style={{border:`1.5px solid ${C.accent}`,background:C.card,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
-                  {/* Carte avec l'épingle numérotée (si le point est localisé) */}
-                  {g&&g.lat&&<OsmMap lat={g.lat} lon={g.lon} count={colis.length} onClick={()=>setOpenPoint(isOpen&&!singlePoint?null:lieu)}/>}
+                <div key={lieu} style={{border:`1.5px solid ${openPoint===lieu?C.accent:C.border}`,background:C.card,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
                   {/* En-tête du point : nom + badge + renommer */}
                   <button onClick={()=>setOpenPoint(isOpen&&!singlePoint?null:lieu)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                     <span style={{position:'relative',flexShrink:0,fontSize:26}}>
