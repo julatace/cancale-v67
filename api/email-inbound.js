@@ -341,7 +341,19 @@ function parseCarrierEmail(mail, carrier) {
   // Titre de l'article (permet de retrouver la photo côté achats)
   const artTitle = ((all.match(/(?:article|commande|achat)\s*[:\-]\s*([^\n]{4,70})/i) || [])[1] || '').trim() || null;
 
-  return { suivi, status, label, code, artTitle };
+  // Lieu de retrait : nom/adresse du point relais ou du locker.
+  let lieu = null;
+  for (const pat of [
+    /point\s+relais\s*[:\-]?\s*([^\n]{5,90})/i,
+    /(?:disponible|à retirer|retire[rz]?(?:\s+ton\s+colis)?)\s+(?:chez|au|à|dans)\s+([^\n]{5,90})/i,
+    /adresse\s+du\s+point\s*[:\-]?\s*([^\n]{5,90})/i,
+    /\bchez\s+([A-Z][^\n]{4,80})/,
+  ]) {
+    const m = all.match(pat);
+    if (m) { lieu = m[1].trim().replace(/\s+/g, ' ').replace(/[.,;]\s*$/, ''); break; }
+  }
+
+  return { suivi, status, label, code, artTitle, lieu };
 }
 
 export default async function handler(req, res) {
@@ -389,7 +401,7 @@ export default async function handler(req, res) {
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
-        code: track.code || null, artTitle: track.artTitle || null,
+        code: track.code || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         qrB64: qr ? qr.contentB64 : null, qrType: qr ? qr.contentType : null,
         account: acc.login || '',
       } }]);

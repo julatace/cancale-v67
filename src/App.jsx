@@ -4613,6 +4613,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           <div style={{fontSize:10,color:C.muted}}>
             {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.account?` · ${t.account}`:''}
           </div>
+          {t.lieu&&(
+            <a href={`https://www.google.com/maps/search/${encodeURIComponent(t.lieu)}`} target="_blank" rel="noreferrer"
+              style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:10.5,fontWeight:700,color:C.accent,textDecoration:'none',marginTop:3}}>
+              🗺 {t.lieu.slice(0,50)}
+            </a>
+          )}
         </div>
         {t.code&&(
           <div style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:10,padding:'6px 14px'}}>
@@ -5344,10 +5350,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       </>)}
 
       {curSub==='achats' && (<>
-        {/* Colis achetés arrivés au point de retrait : code + QR + photo */}
-        {(tracking||[]).filter(t=>t.status==='available').length>0&&(
-          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
-            {(tracking||[]).filter(t=>t.status==='available').map((t,i)=><RetraitCard key={i} t={t}/>)}
+        {/* Suivi des colis achetés : à retirer (code + QR + photo + lieu),
+            en transit, livrés — alimenté par les emails transporteurs/Vinted */}
+        {Array.isArray(tracking) && tracking.length>0 && (
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>🚚 Mes colis ({tracking.length})</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {tracking.slice(0,10).map((t,i)=>{
+                // Colis à retirer : carte enrichie (code + QR + photo + lieu)
+                if (t.status==='available') return <RetraitCard key={i} t={t}/>;
+                const col = t.status==='delivered'?INV_STATUS.online.color:t.status==='transit'?C.warn:C.muted;
+                const icon = t.status==='delivered'?'✅':t.status==='transit'?'🚚':'📦';
+                return (
+                  <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:12}}>
+                    <span style={{fontSize:18}}>{icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12.5,fontWeight:800,color:col}}>{t.statusLabel||'Mise à jour'}</div>
+                      <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.artTitle?` · ${t.artTitle}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
+                      </div>
+                    </div>
+                    {t.suivi && <a href={trackUrl(t.carrier,t.suivi)} target="_blank" rel="noreferrer" style={{flexShrink:0,padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
@@ -5574,33 +5601,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             }}>{d.emoji} {d.label}</a>
           ))}
         </div>
-
-        {/* Suivi des colis (emails Mondial Relay / Chronopost transférés) */}
-        {Array.isArray(tracking) && tracking.length>0 && (
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>🚚 Suivi des colis ({tracking.length})</div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {tracking.slice(0,10).map((t,i)=>{
-                // Colis à retirer : carte enrichie (code + QR + photo de l'article)
-                if (t.status==='available') return <RetraitCard key={i} t={t}/>;
-                const col = t.status==='delivered'?INV_STATUS.online.color:t.status==='transit'?C.warn:C.muted;
-                const icon = t.status==='delivered'?'✅':t.status==='transit'?'🚚':'📦';
-                return (
-                  <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:12}}>
-                    <span style={{fontSize:18}}>{icon}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12.5,fontWeight:800,color:col}}>{t.statusLabel||'Mise à jour'}</div>
-                      <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
-                      </div>
-                    </div>
-                    {t.suivi && <a href={trackUrl(t.carrier,t.suivi)} target="_blank" rel="noreferrer" style={{flexShrink:0,padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {Array.isArray(emailBords) && emailBords.length>0 && (
           <div style={{marginBottom:16}}>
