@@ -4357,8 +4357,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // spécifique aux ventes). On élargit donc la détection pour les achats.
   const purchasePhase = (status) => {
     const s = status || '';
-    if (/annul|rembours|refus/i.test(s)) return 'cancelled';
-    if (/finalis|livr|termin|re[çc]u|valid|complet|arriv/i.test(s)) return 'completed';
+    if (/annul|rembours|refus|litige/i.test(s)) return 'cancelled';
+    // « La livraison n'a pas encore eu lieu... », « en attente de... »,
+    // « Paiement validé » : la commande est EN COURS, pas reçue.
+    if (/pas encore|en attente|suspendu|paiement valid/i.test(s)) return 'pending';
+    // livr[ée] (et pas « livraison ») : « Commande livrée » oui, « la
+    // livraison n'a pas eu lieu » non.
+    if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
     return 'pending';
   };
   const [sales, setSales] = useState({ loading:false, items:null });

@@ -455,13 +455,26 @@ export default async function handler(req, res) {
     }
 
     // 2) FINALISATION (argent reçu).
-    if (/transaction\s+finalis/i.test(subject)) {
+    // Formes réelles : « Transaction finalisée », « La transaction est
+    // finalisée », corps « Viré sur ton compte Vinted : 41,00 € ».
+    const finText = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 1500)}`;
+    if (/transaction\s+(?:est\s+)?finalis/i.test(finText) || /vir[ée]\s+sur\s+ton\s+compte/i.test(finText)) {
       const key = shortHash(subject + '|' + (mail.text || '').slice(0, 400));
-      await supabaseUpsert([{ id: `email_final_${key}`, data: { type: 'finalisation', subject, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+      const article = ((finText.match(/la vente de\s+(.+?)\s+a été réalis/i) || [])[1] || '').trim();
+      const montant = (finText.match(/vir[ée]\s+sur\s+ton\s+compte(?:\s+vinted)?\s*:?\s*(\d+[,.]\d{2})\s*€/i) || [])[1] || '';
+      const numero = (article.match(/\bn[°º]?\s*(\d{2,6})\b/i) || [])[1] || '';
+      await supabaseUpsert([{ id: `email_final_${key}`, data: {
+        type: 'finalisation', subject, article, montant, numero,
+        account: acc.login || '', uid: acc.uid || '', receivedAt: now,
+      } }]);
       // Notif push : l'argent arrive dans le porte-monnaie.
-      try { await sendPushToAll({ title: '💰 Argent reçu', body: subject.replace(/vinted/gi, '').trim() || 'Une transaction vient d\'être finalisée.', tag: `final-${key}`, url: '/' }); } catch (_) {}
-      await logEmail({ type: 'finalisation', subject, from: mail.from });
-      res.status(200).json({ ok: true, type: 'finalisation' });
+      try { await sendPushToAll({
+        title: '💰 Argent reçu',
+        body: `${montant ? montant + ' € viré sur ton compte Vinted' : 'Transaction finalisée'}${article ? ' — ' + article.slice(0, 50) : ''}${acc.login ? ` (${acc.login})` : ''}.`,
+        tag: `final-${key}`, url: '/',
+      }); } catch (_) {}
+      await logEmail({ type: 'finalisation', subject, from: mail.from, montant, article, account: acc.login || '' });
+      res.status(200).json({ ok: true, type: 'finalisation', montant, article });
       return;
     }
 
