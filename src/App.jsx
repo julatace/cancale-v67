@@ -239,6 +239,35 @@ const trackUrl = (carrier, suivi) => {
 // Carte de ville façon Vinted, SANS dépendance ni clé : tuiles OpenStreetMap,
 // une épingle 📍 par point relais avec badge rouge = nombre de colis.
 // points = [{ key, lat, lon, count }] ; tap sur une épingle → onSelect(key).
+// Transporteurs : couleur de marque + code court. Badges maison (pas les logos
+// officiels — évite tout souci de droits, et reste net et professionnel).
+const CARRIERS = {
+  mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#E2001A', fg: '#fff' },
+  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#00A0E3', fg: '#fff' },
+  ups:          { name: 'UPS',           short: 'UPS', bg: '#3C2415', fg: '#FFB500' },
+  vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff' },
+  relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#E30613', fg: '#fff' },
+  colissimo:    { name: 'Colissimo',     short: 'LP', bg: '#FFCD00', fg: '#111' },
+};
+const carrierKey = (raw) => {
+  const s = String(raw || '').toLowerCase();
+  if (/mondial/.test(s)) return 'mondialrelay';
+  if (/chrono/.test(s)) return 'chronopost';
+  if (/\bups\b/.test(s)) return 'ups';
+  if (/vinted/.test(s)) return 'vinted';
+  if (/relais\s*colis/.test(s)) return 'relaiscolis';
+  if (/coliss|la poste/.test(s)) return 'colissimo';
+  return null;
+};
+// Badge de transporteur (pastille de marque).
+function CarrierBadge({ carrier, size = 22 }) {
+  const c = CARRIERS[carrierKey(carrier)] || null;
+  if (!c) return null;
+  return (
+    <span title={c.name} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: size, height: size, padding: '0 5px', borderRadius: 6, background: c.bg, color: c.fg, fontSize: size * 0.46, fontWeight: 900, letterSpacing: 0.3, flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }}>{c.short}</span>
+  );
+}
+
 function OsmMap({ points, height = 230, selected, onSelect }) {
   const pts = (points || []).filter(p => p && p.lat && p.lon);
   if (!pts.length) return null;
@@ -259,31 +288,42 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
   const c = proj(clat, clon, z);
   const xi = Math.floor(c.x), yi = Math.floor(c.y);
   const tiles = [];
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) tiles.push({ dx, dy, url: `https://tile.openstreetmap.org/${z}/${xi + dx}/${yi + dy}.png` });
-  const px = (2 + (c.x - xi)) * 256, py = (1 + (c.y - yi)) * 256; // le centre géo au centre visuel
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) tiles.push({ dx, dy, x: xi + dx, y: yi + dy });
+  // Fond de carte clair et épuré (CartoDB « Voyager ») — rendu pro, façon Vinted.
+  const tileUrl = (x, y) => `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/${z}/${x}/${y}.png`;
+  const tileUrlHi = (x, y) => `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
+  const px = (2 + (c.x - xi)) * 256, py = (1 + (c.y - yi)) * 256;
   return (
-    <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#e8ecef' }}>
+    <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#eaeef2' }}>
       <div style={{ position: 'absolute', width: 1280, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
         {tiles.map((t, i) => (
-          // Carte grisée, façon Vinted : les épingles ressortent.
-          <img key={i} src={t.url} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256, filter: 'grayscale(0.9) brightness(1.05) contrast(0.9)' }} />
+          <img key={i} src={tileUrl(t.x, t.y)} onError={(e)=>{ if(e.target.dataset.f!=='1'){e.target.dataset.f='1'; e.target.src=`https://tile.openstreetmap.org/${z}/${t.x}/${t.y}.png`;} }} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256 }} />
         ))}
       </div>
       {pts.map(p => {
         const t = proj(p.lat, p.lon, z);
         const ox = (t.x - c.x) * 256, oy = (t.y - c.y) * 256;
         const isSel = selected === p.key;
-        const emoji = p.picked ? '📍' : p.count > 0 ? '📍' : '📌';
+        const car = CARRIERS[carrierKey(p.carrier)];
+        const col = car ? car.bg : (p.picked ? '#2e9e5b' : p.count > 0 ? '#e5484d' : '#8a94a6');
+        const inner = car ? car.short : (p.count > 0 ? String(p.count) : p.picked ? '✓' : '');
+        const innerFg = car ? car.fg : '#fff';
+        const dim = !car && !p.picked && !(p.count > 0);
         return (
           <div key={p.key} onClick={() => onSelect && onSelect(p.key)}
-            style={{ position: 'absolute', left: `calc(50% + ${ox}px)`, top: `calc(50% + ${oy}px)`, transform: `translate(-50%, -92%) scale(${isSel || p.picked ? 1.22 : 1})`, fontSize: 32, cursor: 'pointer', filter: `drop-shadow(0 2px 3px rgba(0,0,0,0.35)) ${p.picked ? '' : p.count > 0 ? '' : 'grayscale(0.5) opacity(0.85)'}`, transition: 'transform .15s', zIndex: isSel || p.picked ? 3 : 1 }}>
-            {emoji}
-            {p.picked && <span style={{ position: 'absolute', top: -6, right: -12, width: 20, height: 20, borderRadius: 999, background: '#2e9e5b', color: '#fff', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>✓</span>}
-            {!p.picked && p.count > 0 && <span style={{ position: 'absolute', top: -8, right: -14, minWidth: 21, height: 21, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 12.5, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{p.count}</span>}
+            style={{ position: 'absolute', left: `calc(50% + ${ox}px)`, top: `calc(50% + ${oy}px)`, transform: `translate(-50%, -100%) scale(${isSel ? 1.18 : 1})`, cursor: 'pointer', transition: 'transform .15s', zIndex: isSel ? 4 : car || p.count > 0 ? 3 : 1, opacity: dim ? 0.8 : 1, filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.28))' }}>
+            {/* Épingle « teardrop » colorée à la marque */}
+            <svg width="34" height="44" viewBox="0 0 34 44" style={{ display: 'block' }}>
+              <path d="M17 0C7.6 0 0 7.5 0 16.8 0 29 17 44 17 44s17-15 17-27.2C34 7.5 26.4 0 17 0z" fill={col} />
+              <circle cx="17" cy="16.5" r="12" fill="#fff" />
+            </svg>
+            <span style={{ position: 'absolute', left: '50%', top: 16.5, transform: 'translate(-50%,-50%)', color: col, fontSize: inner.length > 2 ? 9.5 : 12, fontWeight: 900, letterSpacing: 0.2 }}>{inner}</span>
+            {/* Pastille « nombre de colis » en coin si c'est une marque */}
+            {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
           </div>
         );
       })}
-      <span style={{ position: 'absolute', right: 4, bottom: 2, fontSize: 8, color: '#555', background: 'rgba(255,255,255,0.75)', padding: '1px 4px', borderRadius: 3 }}>© OpenStreetMap</span>
+      <span style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6b7280', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>© OpenStreetMap · CARTO</span>
     </div>
   );
 }
@@ -5601,6 +5641,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           // Groupes : points enregistrés d'abord, colis rattachés par nom.
           const groups={};
           savedPoints.forEach(sp=>{ groups[sp.nom]={colis:[],lat:sp.lat,lon:sp.lon,saved:true}; });
+          savedPoints.forEach(sp=>{ if(groups[sp.nom]) groups[sp.nom].carrier=sp.carrier; });
           avail.forEach(t=>{
             // Nom PROPRE du point (nettoyé du bruit) : regroupe tous les colis
             // au même relais, et rattache à un point enregistré du même nom.
@@ -5610,9 +5651,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             const gk=sp?sp.nom:key;
             if(!groups[gk]) groups[gk]={colis:[],saved:false};
             groups[gk].colis.push(t);
+            if(!groups[gk].carrier) groups[gk].carrier=t.carrier;
           });
           Object.entries(groups).forEach(([k,g])=>{ if(!g.lat&&geo[k]&&geo[k].lat){g.lat=geo[k].lat;g.lon=geo[k].lon;} });
-          const pins=Object.entries(groups).filter(([,g])=>g.lat).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length}));
+          const pins=Object.entries(groups).filter(([,g])=>g.lat).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier}));
           const withColis=Object.entries(groups).filter(([,g])=>g.colis.length>0);
           const singlePoint=withColis.length===1;
           const selGroup=openPoint?groups[openPoint]:null;
@@ -5658,8 +5700,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                       <span style={{position:'absolute',top:-6,right:-10,minWidth:20,height:20,borderRadius:999,background:C.danger,color:'#fff',fontSize:12,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 1px 4px rgba(0,0,0,0.25)'}}>{colis.length}</span>
                     </span>
                     <span style={{flex:1,minWidth:0}}>
-                      <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
-                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700}}>{colis.length} colis à retirer{singlePoint?'':(isOpen?' · replier':' · voir les colis')}</span>
+                      <span style={{display:'flex',alignItems:'center',gap:6}}>
+                        {g.carrier&&<CarrierBadge carrier={g.carrier} size={20}/>}
+                        <span style={{fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
+                      </span>
+                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700,marginTop:1}}>{colis.length} colis à retirer{singlePoint?'':(isOpen?' · replier':' · voir les colis')}</span>
                     </span>
                     {!g.saved&&<span onClick={async(ev)=>{
                       ev.stopPropagation();
@@ -6083,11 +6128,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:13.5,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <button onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:13,fontWeight:800,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
               </div>
-              <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
-                <span style={{fontSize:11,color:C.muted,alignSelf:'center'}}>Transporteur :</span>
-                {['Mondial Relay','Chronopost','Vinted Go','Relais Colis'].map(c=>(
-                  <button key={c} onClick={()=>setRelayPicker(p=>({...p,carrier:p.carrier===c?'':c}))} style={{padding:'3px 10px',borderRadius:999,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',background:relayPicker.carrier===c?C.accent:'transparent',color:relayPicker.carrier===c?'#fff':C.muted,border:`1.5px solid ${relayPicker.carrier===c?C.accent:C.border}`}}>{c}</button>
-                ))}
+              <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
+                <span style={{fontSize:11,color:C.muted}}>Transporteur :</span>
+                {Object.entries(CARRIERS).map(([k,c])=>{ const on=relayPicker.carrier===c.name; return (
+                  <button key={k} onClick={()=>setRelayPicker(p=>({...p,carrier:on?'':c.name}))} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px 3px 4px',borderRadius:999,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',background:on?`${c.bg}18`:'transparent',color:on?c.bg:C.muted,border:`1.5px solid ${on?c.bg:C.border}`}}>
+                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:18,height:18,padding:'0 4px',borderRadius:5,background:c.bg,color:c.fg,fontSize:9,fontWeight:900}}>{c.short}</span>
+                    {c.name}
+                  </button>
+                ); })}
               </div>
             </div>
             {relayPicker.loading && <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13}}>⏳ Recherche…</div>}
