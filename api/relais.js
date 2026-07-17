@@ -49,7 +49,21 @@ const typeLabel = (t) => t.amenity === 'parcel_locker' ? 'Casier à colis'
   : t.shop === 'tobacco' ? 'Tabac'
   : t.shop === 'newsagent' ? 'Presse'
   : t.shop === 'supermarket' ? 'Supermarché'
-  : 'Supérette';
+  : 'Point relais';
+
+// Transporteur déduit des étiquettes OSM (operator / brand / network / name).
+function carrierFromTags(t) {
+  const s = `${t.operator || ''} ${t.brand || ''} ${t.network || ''} ${t.name || ''}`.toLowerCase();
+  if (/mondial\s*relay/.test(s)) return 'mondialrelay';
+  if (/chronopost/.test(s)) return 'chronopost';
+  if (/\bups\b/.test(s)) return 'ups';
+  if (/vinted/.test(s)) return 'vinted';
+  if (/relais\s*colis/.test(s)) return 'relaiscolis';
+  if (/pickup|dpd/.test(s)) return 'chronopost'; // réseau Pickup = Chronopost/DPD
+  if (/coliss|la\s*poste/.test(s)) return 'colissimo';
+  if (/amazon/.test(s)) return 'amazon';
+  return null;
+}
 
 export default async function handler(req, res) {
   let city = (req.query && req.query.city ? String(req.query.city) : '').trim();
@@ -61,25 +75,38 @@ export default async function handler(req, res) {
     const g = await geocodeCity(city);
     if (!g) { res.status(200).json({ city, points: [], error: 'ville_introuvable' }); return; }
     const bb = g.boundingbox; const [S, N, W, E] = [bb[0], bb[1], bb[2], bb[3]];
+    const bbox = `${S},${W},${N},${E}`;
+    // Priorité aux CASIERS (leur operator dit le transporteur) et aux points
+    // de MARQUE (brand/operator = Mondial Relay/Chronopost/Vinted…). Complété
+    // par les commerces de retrait classiques (tabac-presse, supérettes…).
     const q = `[out:json][timeout:25];(` +
-      `node["amenity"="parcel_locker"](${S},${W},${N},${E});` +
-      `node["shop"="tobacco"](${S},${W},${N},${E});` +
-      `node["shop"="newsagent"](${S},${W},${N},${E});` +
-      `node["shop"="convenience"](${S},${W},${N},${E});` +
-      `node["shop"="supermarket"](${S},${W},${N},${E});` +
-      `node["amenity"="post_office"](${S},${W},${N},${E});` +
-      `);out center 120;`;
+      `node["amenity"="parcel_locker"](${bbox});` +
+      `node["brand"~"Mondial Relay|Chronopost|Relais Colis|Pickup|Vinted|UPS",i](${bbox});` +
+      `node["operator"~"Mondial Relay|Chronopost|Relais Colis|Pickup|Vinted|UPS",i](${bbox});` +
+      `node["shop"="tobacco"](${bbox});` +
+      `node["shop"="newsagent"](${bbox});` +
+      `node["shop"="convenience"](${bbox});` +
+      `node["shop"="supermarket"](${bbox});` +
+      `node["amenity"="post_office"](${bbox});` +
+      `);out center 150;`;
     const oj = await overpass(q);
     if (!oj) { res.status(200).json({ city, center: { lat: +g.lat, lon: +g.lon }, points: [], error: 'overpass_indisponible' }); return; }
     const seen = new Set();
     const points = (oj.elements || []).map(e => {
       const lat = e.lat ?? (e.center && e.center.lat), lon = e.lon ?? (e.center && e.center.lon);
       const t = e.tags || {};
-      if (!lat || !lon || !t.name) return null;
-      const key = t.name.toLowerCase() + '|' + lat.toFixed(4);
+      if (!lat || !lon) return null;
+      const carrier = carrierFromTags(t);
+      const isLocker = t.amenity === 'parcel_locker';
+      // Un casier sans nom devient « Casier <Transporteur> ».
+      const nom = t.name || (carrier ? `Casier ${({ mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', ups: 'UPS', colissimo: 'La Poste', amazon: 'Amazon', relaiscolis: 'Relais Colis' })[carrier] || ''}`.trim() : (isLocker ? 'Casier à colis' : null));
+      if (!nom) return null;
+      const key = nom.toLowerCase() + '|' + lat.toFixed(4);
       if (seen.has(key)) return null; seen.add(key);
-      return { nom: t.name, type: typeLabel(t), lat: +lat, lon: +lon };
-    }).filter(Boolean).sort((a, b) => a.nom.localeCompare(b.nom));
+      return { nom, type: isLocker ? 'Casier à colis' : typeLabel(t), carrier: carrier || undefined, locker: isLocker, lat: +lat, lon: +lon };
+    }).filter(Boolean)
+      // Casiers/points de transporteur d'abord (les plus pertinents), puis alpha.
+      .sort((a, b) => (b.carrier ? 1 : 0) - (a.carrier ? 1 : 0) || a.nom.localeCompare(b.nom));
     // Cache CDN 24h : la liste des commerces d'une ville bouge très peu.
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     res.status(200).json({ city, center: { lat: +g.lat, lon: +g.lon }, points });

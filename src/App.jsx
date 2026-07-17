@@ -247,7 +247,8 @@ const CARRIERS = {
   ups:          { name: 'UPS',           short: 'UPS', bg: '#3C2415', fg: '#FFB500' },
   vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff' },
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#E30613', fg: '#fff' },
-  colissimo:    { name: 'Colissimo',     short: 'LP', bg: '#FFCD00', fg: '#111' },
+  colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111' },
+  amazon:       { name: 'Amazon',        short: 'AZ', bg: '#232F3E', fg: '#FF9900' },
 };
 const carrierKey = (raw) => {
   const s = String(raw || '').toLowerCase();
@@ -5693,7 +5694,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           // Tous les points relais de la ville (affichés d'office), sauf ceux
           // que tu as masqués (ils reviennent si un colis y arrive).
           if(villeCache.city && norm(villeCache.city)===norm(ville)){
-            villeCache.pts.forEach(pt=>{ if(!groups[pt.nom] && !hiddenPts.has(norm2(pt.nom))) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type}; });
+            villeCache.pts.forEach(pt=>{ if(!groups[pt.nom] && !hiddenPts.has(norm2(pt.nom))) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type,carrier:pt.carrier}; });
           }
           avail.forEach(t=>{
             const c=cleanLieu(t.lieu);
