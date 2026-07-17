@@ -4530,20 +4530,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const fetchVillePoints = async (city) => {
     setVilleLoading(true);
     try {
-      const gr = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(city + ', France')}`);
-      const gj = await gr.json();
-      if (!gj || !gj[0]) { setVilleLoading(false); alert('Ville introuvable — vérifie l\'orthographe.'); return; }
-      const bb = gj[0].boundingbox, [S, N, W, E] = [bb[0], bb[1], bb[2], bb[3]];
-      const q = `[out:json][timeout:25];(node["amenity"="parcel_locker"](${S},${W},${N},${E});node["shop"="tobacco"](${S},${W},${N},${E});node["shop"="newsagent"](${S},${W},${N},${E});node["shop"="convenience"](${S},${W},${N},${E});node["shop"="supermarket"](${S},${W},${N},${E});node["amenity"="post_office"](${S},${W},${N},${E}););out center 100;`;
-      const mirrors = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
-      let oj = null;
-      for (const m of mirrors) { try { const r = await fetch(m, { method: 'POST', body: 'data=' + encodeURIComponent(q) }); if (r.ok) { oj = await r.json(); if (oj && oj.elements) break; } } catch (_) {} }
-      if (!oj) { setVilleLoading(false); alert('Service de carte momentanément indisponible, réessaie.'); return; }
-      const typeLabel = (t) => t.amenity === 'parcel_locker' ? 'Casier à colis' : t.amenity === 'post_office' ? 'Bureau de poste' : t.shop === 'tobacco' ? 'Tabac' : t.shop === 'newsagent' ? 'Presse' : t.shop === 'supermarket' ? 'Supermarché' : 'Supérette';
-      const pts = (oj.elements || []).map(e => { const la = e.lat ?? (e.center && e.center.lat), lo = e.lon ?? (e.center && e.center.lon); const t = e.tags || {}; return (la && lo && t.name) ? { nom: t.name, type: typeLabel(t), lat: +la, lon: +lo } : null; }).filter(Boolean).sort((a, b) => a.nom.localeCompare(b.nom));
+      // Recherche faite CÔTÉ SERVEUR (api/relais) → fiable, pas de blocage réseau.
+      const r = await fetch(`/api/relais?city=${encodeURIComponent(city)}`);
+      const j = await r.json();
+      if (j && j.error === 'ville_introuvable') { setVilleLoading(false); alert('Ville introuvable — vérifie l\'orthographe.'); return; }
+      const pts = (j && Array.isArray(j.points)) ? j.points : [];
+      if (!pts.length && j && j.error) { setVilleLoading(false); alert('Service de carte momentanément indisponible, réessaie dans un instant.'); return; }
       const cache = { city, pts };
       setVilleCache(cache); save('vrm_ville_points', cache);
       setVille(city); save('vrm_ville', city);
+      setVilleInput(city);
     } catch (_) { alert('Recherche indisponible, réessaie.'); }
     setVilleLoading(false);
   };
