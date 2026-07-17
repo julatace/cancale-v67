@@ -4528,6 +4528,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [villeCache, setVilleCache] = useState(() => load('vrm_ville_points', { city: '', pts: [] }));
   const [villeLoading, setVilleLoading] = useState(false);
   const [villeInput, setVilleInput] = useState(() => load('vrm_ville', ''));
+  const [carriersOnly, setCarriersOnly] = useState(() => load('vrm_relais_carriers_only', true)); // casiers/transporteurs seulement
   const fetchVillePoints = async (city) => {
     setVilleLoading(true);
     try {
@@ -5694,7 +5695,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           // Tous les points relais de la ville (affichés d'office), sauf ceux
           // que tu as masqués (ils reviennent si un colis y arrive).
           if(villeCache.city && norm(villeCache.city)===norm(ville)){
-            villeCache.pts.forEach(pt=>{ if(!groups[pt.nom] && !hiddenPts.has(norm2(pt.nom))) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type,carrier:pt.carrier}; });
+            villeCache.pts.forEach(pt=>{
+              // Filtre « casiers & transporteurs seulement » : on ne garde que
+              // les points dont le transporteur est identifié (ou les casiers).
+              if(carriersOnly && !pt.carrier && !pt.locker) return;
+              if(!groups[pt.nom] && !hiddenPts.has(norm2(pt.nom))) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type,carrier:pt.carrier};
+            });
           }
           avail.forEach(t=>{
             const c=cleanLieu(t.lieu);
@@ -5830,11 +5836,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               {/* Autres points relais de la ville (sans colis en attente) */}
               {autres.length>0&&(
                 <div style={{border:`1px solid ${C.border}`,borderRadius:12,background:C.card,overflow:'hidden'}}>
-                  <div style={{fontSize:11,fontWeight:800,color:C.muted,padding:'9px 12px',borderBottom:`1px solid ${C.border}`}}>Autres points relais{ville?` à ${ville}`:''} ({autres.length})</div>
-                  <div style={{maxHeight:220,overflowY:'auto'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderBottom:`1px solid ${C.border}`}}>
+                    <span style={{flex:1,fontSize:11,fontWeight:800,color:C.muted}}>Points relais{ville?` à ${ville}`:''} ({autres.length})</span>
+                    <button onClick={()=>{ const v=!carriersOnly; setCarriersOnly(v); save('vrm_relais_carriers_only',v); }} style={{border:`1px solid ${carriersOnly?C.accent:C.border}`,borderRadius:999,background:carriersOnly?`${C.accent}12`:'transparent',color:carriersOnly?C.accent:C.muted,fontSize:10.5,fontWeight:800,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>{carriersOnly?'📦 Casiers & transporteurs':'Tous les commerces'}</button>
+                  </div>
+                  <div style={{maxHeight:240,overflowY:'auto'}}>
                     {autres.map(([lieu,g])=>(
                       <div key={lieu} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 12px',borderTop:`1px solid ${C.border}55`}}>
-                        <span style={{fontSize:15,flexShrink:0}}>📍</span>
+                        {g.carrier?<CarrierBadge carrier={g.carrier} size={22}/>:<span style={{fontSize:15,flexShrink:0}}>📍</span>}
                         <span style={{flex:1,minWidth:0}}>
                           <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
                           {g.type&&<span style={{display:'block',fontSize:10,color:C.muted}}>{g.type}</span>}
