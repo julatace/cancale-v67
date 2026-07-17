@@ -5716,12 +5716,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           return (
             <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
               {/* Champ VILLE : tous les points relais de la ville s'affichent d'office */}
-              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
                 <input value={villeInput} onChange={e=>setVilleInput(e.target.value)}
                   onKeyDown={e=>{ if(e.key==='Enter'&&(villeInput||'').trim()) fetchVillePoints(villeInput.trim()); }}
-                  placeholder="🏙️ Ta ville (ex : Cancale) → tous les points relais"
-                  style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button onClick={()=>{ const v=(villeInput||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'0 14px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
+                  placeholder="🏙️ Ta ville → tous les points relais"
+                  style={{flex:'1 1 150px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                <button onClick={()=>{ const v=(villeInput||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'9px 16px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
+                <button onClick={()=>{
+                  if(!navigator.geolocation){ alert('Position non disponible sur cet appareil.'); return; }
+                  setVilleLoading(true);
+                  navigator.geolocation.getCurrentPosition(async pos=>{
+                    try{
+                      const r=await fetch(`/api/relais?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+                      const j=await r.json();
+                      const pts=(j&&Array.isArray(j.points))?j.points:[];
+                      if(j&&j.city){ const cache={city:j.city,pts}; setVilleCache(cache); save('vrm_ville_points',cache); setVille(j.city); save('vrm_ville',j.city); setVilleInput(j.city); }
+                      else alert('Ville non trouvée depuis ta position.');
+                    }catch(_){ alert('Recherche indisponible, réessaie.'); }
+                    setVilleLoading(false);
+                  }, ()=>{ setVilleLoading(false); alert('Autorise la localisation pour utiliser ta position.'); }, {timeout:8000});
+                }} disabled={villeLoading} title="Utiliser ma position" style={{border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,fontSize:12.5,fontWeight:800,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit'}}>📍</button>
               </div>
               {/* LA carte : toutes les épingles de la ville, badges = colis en attente */}
               {pins.length>0&&(

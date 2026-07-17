@@ -280,6 +280,26 @@ async function createProInvoice(sale, acc, cfg, now) {
 
 // Journal des emails traités (30 derniers, même les « ignorés ») : permet de
 // vérifier qu'un email a bien atteint le serveur et comment il a été classé.
+// Anti-doublon des notifications : mémorise les clés déjà notifiées (ligne
+// Supabase push_dedup, 300 dernières). Renvoie true si c'est un NOUVEL envoi
+// (à faire), false si déjà notifié (à ignorer). Évite les notifs en double
+// quand un même email arrive deux fois (transféré via plusieurs boîtes…).
+async function shouldNotify(key) {
+  if (!key) return true;
+  try {
+    const cur = (await supabaseGetRow('push_dedup')) || { keys: [] };
+    const keys = Array.isArray(cur.keys) ? cur.keys : [];
+    if (keys.includes(key)) return false;
+    const next = [key, ...keys].slice(0, 300);
+    await supabaseUpsert([{ id: 'push_dedup', data: { keys: next } }]);
+    return true;
+  } catch (_) { return true; }
+}
+// Envoie une notification UNE seule fois (clé = son tag, déjà unique).
+async function pushOnce(payload) {
+  try { if (await shouldNotify(payload && payload.tag)) await sendPushToAll(payload); } catch (_) {}
+}
+
 async function logEmail(entry) {
   try {
     const cur = (await supabaseGetRow('email_journal')) || { entries: [] };
@@ -427,7 +447,7 @@ export default async function handler(req, res) {
       // Notif push selon l'étape du colis.
       const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦' };
       const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis' };
-      try { await sendPushToAll({
+      try { await pushOnce({
         title: `${icons[track.status]} ${titles[track.status]}`,
         body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : carrier === 'chronopost' ? 'Chronopost' : 'Vinted'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.${track.status === 'available' && track.code ? ` Code de retrait : ${track.code}` : ''}`,
         tag: `track-${track.suivi || rowId}`, url: '/?tab=cat_achats',
@@ -467,7 +487,7 @@ export default async function handler(req, res) {
       };
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
-      try { await sendPushToAll({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }); } catch (_) {}
+      try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }); } catch (_) {}
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
       res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
@@ -487,7 +507,7 @@ export default async function handler(req, res) {
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]);
       // Notif push : l'argent arrive dans le porte-monnaie.
-      try { await sendPushToAll({
+      try { await pushOnce({
         title: '💰 Argent reçu',
         body: `${montant ? montant + ' € viré sur ton compte Vinted' : 'Transaction finalisée'}${article ? ' — ' + article.slice(0, 50) : ''}${acc.login ? ` (${acc.login})` : ''}.`,
         tag: `final-${key}`, url: '/?tab=cat_ventes',
@@ -515,7 +535,7 @@ export default async function handler(req, res) {
         pdfB64: pdfA ? pdfA.contentB64 : null, filename: pdfA ? pdfA.filename : null,
         receivedAt: now,
       } }]);
-      try { await sendPushToAll({
+      try { await pushOnce({
         title: '🛍 Achat confirmé',
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
         tag: `achat-${key}`, url: '/?tab=cat_achats',
@@ -532,7 +552,7 @@ export default async function handler(req, res) {
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await sendPushToAll({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }); } catch (_) {}
+      try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }); } catch (_) {}
       // Facturation Pro : ne se déclenche que si activée dans l'app ET que
       // l'email contient l'adresse email de l'acheteur (comptes Pro).
       let facture = null;
@@ -541,7 +561,7 @@ export default async function handler(req, res) {
           const cfg = await supabaseGetRow('vrm_pro_facture');
           if (cfg && cfg.actif) {
             facture = await createProInvoice(data, acc, cfg, now);
-            try { await sendPushToAll({
+            try { await pushOnce({
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
               body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
               tag: `inv-${facture.number}`, url: '/?tab=invoices',
@@ -578,7 +598,7 @@ export default async function handler(req, res) {
       const qui = (textAll.match(/(\S+)\s+t['']a\s+(?:fait|envoyé)\s+une\s+offre/i) || [])[1] || '';
       const article = (textAll.match(/offre\s+(?:de\s+[\d,.]+\s*€\s+)?pour\s+[«"“']?([^«»"”'\n]{3,60})/i) || [])[1] || '';
       const key = shortHash(subject + (mail.text || '').slice(0, 200));
-      try { await sendPushToAll({
+      try { await pushOnce({
         title: `💰 Offre reçue${montant ? ' : ' + montant + ' €' : ''} !`,
         body: `${qui || 'Un acheteur'} propose ${montant ? montant + ' €' : 'un prix'}${article ? ` pour « ${article.trim().slice(0, 40)} »` : ''}${acc.login ? ` (${acc.login})` : ''} — expire en 24h.`,
         tag: `offer-${key}`, url: '/?tab=cat_msg',
@@ -593,7 +613,7 @@ export default async function handler(req, res) {
       const qui = (textAll.match(/(?:message de|de la part de)\s+(\S+)/i) || textAll.match(/(\S+)\s+t['']a envoyé/i) || [])[1] || '';
       const extrait = extractAfter(/envoy[ée] un message|nouveau message|message de/i);
       const key = shortHash(subject + (mail.text || '').slice(0, 200));
-      try { await sendPushToAll({
+      try { await pushOnce({
         title: `💬 ${qui || 'Message Vinted'}${acc.login ? ` → ${acc.login}` : ''}`,
         body: extrait ? `« ${extrait} »` : 'Nouveau message — ouvre Vinted pour répondre.',
         tag: `msg-${key}`, url: '/?tab=cat_msg',
@@ -610,7 +630,7 @@ export default async function handler(req, res) {
       const article = (m && m[2]) || '';
       const prix = (textAll.match(/(\d+[,.]\d{2})\s*€/) || [])[1] || '';
       const key = shortHash(subject + (mail.text || '').slice(0, 200));
-      try { await sendPushToAll({
+      try { await pushOnce({
         title: '❤️ Nouveau favori !',
         body: `${qui || 'Quelqu\'un'} craque sur « ${(article || 'ton article').slice(0, 45)} »${prix ? ` (${prix} €)` : ''}${acc.login ? ` (${acc.login})` : ''} — fais-lui une offre !`,
         tag: `fav-${key}`, url: '/?tab=cat_annonces',

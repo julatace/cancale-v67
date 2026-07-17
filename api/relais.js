@@ -17,6 +17,18 @@ async function geocodeCity(city) {
   return (j && j[0]) ? j[0] : null;
 }
 
+// Position (lat/lon) → nom de ville, puis on géocode la ville pour sa bbox.
+async function cityFromLatLon(lat, lon) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12`, { headers: UA });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const a = j && j.address;
+    const city = a && (a.village || a.town || a.city || a.municipality);
+    return city || null;
+  } catch (_) { return null; }
+}
+
 async function overpass(query) {
   const mirrors = [
     'https://overpass-api.de/api/interpreter',
@@ -40,9 +52,12 @@ const typeLabel = (t) => t.amenity === 'parcel_locker' ? 'Casier à colis'
   : 'Supérette';
 
 export default async function handler(req, res) {
-  const city = (req.query && req.query.city ? String(req.query.city) : '').trim();
-  if (!city) { res.status(400).json({ error: 'city requis' }); return; }
+  let city = (req.query && req.query.city ? String(req.query.city) : '').trim();
+  const lat = req.query && req.query.lat, lon = req.query && req.query.lon;
   try {
+    // Depuis la position : on retrouve d'abord le nom de la ville.
+    if (!city && lat && lon) { city = (await cityFromLatLon(lat, lon)) || ''; }
+    if (!city) { res.status(200).json({ city: '', points: [], error: 'ville_introuvable' }); return; }
     const g = await geocodeCity(city);
     if (!g) { res.status(200).json({ city, points: [], error: 'ville_introuvable' }); return; }
     const bb = g.boundingbox; const [S, N, W, E] = [bb[0], bb[1], bb[2], bb[3]];

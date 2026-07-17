@@ -1,7 +1,7 @@
 // Service worker : (1) rend l'app installable + consultable hors-ligne (PWA) ;
 // (2) sert les PDFs bordereaux via une vraie URL HTTPS pour AirPrint.
 
-const CACHE = 'cancale-shell-v1';
+const CACHE = 'vrm-shell-v2';
 const pdfStore = {};
 
 self.addEventListener('install', () => self.skipWaiting());
