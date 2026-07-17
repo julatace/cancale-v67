@@ -33,7 +33,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
   'vinted_sale_overrides',
 ];
@@ -4498,6 +4498,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
   const [savedPoints, setSavedPoints] = useState(() => load('vrm_points_relais', []));
   const persistPoints = (u) => { setSavedPoints(u); save('vrm_points_relais', u); };
+  // TA VILLE : une fois renseignée, tous les points relais de la ville
+  // s'affichent d'office sur la carte ; le nombre de colis apparaît sur ceux
+  // où tu en as. Synchronisé. La liste des points est mise en cache.
+  const [ville, setVille] = useState(() => load('vrm_ville', ''));
+  const [villeCache, setVilleCache] = useState(() => load('vrm_ville_points', { city: '', pts: [] }));
+  const [villeLoading, setVilleLoading] = useState(false);
+  const [villeInput, setVilleInput] = useState('');
+  const fetchVillePoints = async (city) => {
+    setVilleLoading(true);
+    try {
+      const gr = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(city + ', France')}`);
+      const gj = await gr.json();
+      if (!gj || !gj[0]) { setVilleLoading(false); alert('Ville introuvable — vérifie l\'orthographe.'); return; }
+      const bb = gj[0].boundingbox, [S, N, W, E] = [bb[0], bb[1], bb[2], bb[3]];
+      const q = `[out:json][timeout:25];(node["amenity"="parcel_locker"](${S},${W},${N},${E});node["shop"="tobacco"](${S},${W},${N},${E});node["shop"="newsagent"](${S},${W},${N},${E});node["shop"="convenience"](${S},${W},${N},${E});node["shop"="supermarket"](${S},${W},${N},${E});node["amenity"="post_office"](${S},${W},${N},${E}););out center 100;`;
+      const mirrors = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+      let oj = null;
+      for (const m of mirrors) { try { const r = await fetch(m, { method: 'POST', body: 'data=' + encodeURIComponent(q) }); if (r.ok) { oj = await r.json(); if (oj && oj.elements) break; } } catch (_) {} }
+      if (!oj) { setVilleLoading(false); alert('Service de carte momentanément indisponible, réessaie.'); return; }
+      const typeLabel = (t) => t.amenity === 'parcel_locker' ? 'Casier à colis' : t.amenity === 'post_office' ? 'Bureau de poste' : t.shop === 'tobacco' ? 'Tabac' : t.shop === 'newsagent' ? 'Presse' : t.shop === 'supermarket' ? 'Supermarché' : 'Supérette';
+      const pts = (oj.elements || []).map(e => { const la = e.lat ?? (e.center && e.center.lat), lo = e.lon ?? (e.center && e.center.lon); const t = e.tags || {}; return (la && lo && t.name) ? { nom: t.name, type: typeLabel(t), lat: +la, lon: +lo } : null; }).filter(Boolean).sort((a, b) => a.nom.localeCompare(b.nom));
+      const cache = { city, pts };
+      setVilleCache(cache); save('vrm_ville_points', cache);
+      setVille(city); save('vrm_ville', city);
+    } catch (_) { alert('Recherche indisponible, réessaie.'); }
+    setVilleLoading(false);
+  };
   // Géocode une adresse précise via l'API Adresse du gouvernement français
   // (data.gouv, gratuite, fiable) ; repli Nominatim. Renvoie {lat,lon} ou null.
   const geocode = async (q) => {
@@ -5636,55 +5663,64 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             Les badges rouges apparaissent quand des colis y attendent. */}
         {(()=>{
           const avail=(tracking||[]).filter(t=>t.status==='available');
-          if(!avail.length && !savedPoints.length) return null;
           const norm=s=>String(s||'').toLowerCase();
-          // Groupes : points enregistrés d'abord, colis rattachés par nom.
+          // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
           const groups={};
-          savedPoints.forEach(sp=>{ groups[sp.nom]={colis:[],lat:sp.lat,lon:sp.lon,saved:true}; });
-          savedPoints.forEach(sp=>{ if(groups[sp.nom]) groups[sp.nom].carrier=sp.carrier; });
+          savedPoints.forEach(sp=>{ groups[sp.nom]={colis:[],lat:sp.lat,lon:sp.lon,saved:true,carrier:sp.carrier}; });
+          // Tous les points relais de la ville (affichés d'office).
+          if(villeCache.city && norm(villeCache.city)===norm(ville)){
+            villeCache.pts.forEach(pt=>{ if(!groups[pt.nom]) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type}; });
+          }
           avail.forEach(t=>{
-            // Nom PROPRE du point (nettoyé du bruit) : regroupe tous les colis
-            // au même relais, et rattache à un point enregistré du même nom.
             const c=cleanLieu(t.lieu);
             const key=c.nom||(/mondial/i.test(t.carrier)?'Point Mondial Relay':/chrono/i.test(t.carrier)?'Point Chronopost':'Point de retrait Vinted');
-            const sp=savedPoints.find(sp2=>norm(sp2.nom)===norm(key));
-            const gk=sp?sp.nom:key;
+            // Rattache le colis au point du même nom (enregistré OU de la ville).
+            const match=Object.keys(groups).find(k=>norm(k)===norm(key)||norm(k).includes(norm(key))||norm(key).includes(norm(k)));
+            const gk=match||key;
             if(!groups[gk]) groups[gk]={colis:[],saved:false};
             groups[gk].colis.push(t);
             if(!groups[gk].carrier) groups[gk].carrier=t.carrier;
           });
           Object.entries(groups).forEach(([k,g])=>{ if(!g.lat&&geo[k]&&geo[k].lat){g.lat=geo[k].lat;g.lon=geo[k].lon;} });
           const pins=Object.entries(groups).filter(([,g])=>g.lat).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier}));
-          const withColis=Object.entries(groups).filter(([,g])=>g.colis.length>0);
+          // Liste : d'abord les points avec colis, puis le reste (points de la ville).
+          const entriesSorted=Object.entries(groups).sort((a,b)=>(b[1].colis.length-a[1].colis.length)||a[0].localeCompare(b[0]));
+          const withColis=entriesSorted.filter(([,g])=>g.colis.length>0);
+          const autres=entriesSorted.filter(([,g])=>g.colis.length===0);
           const singlePoint=withColis.length===1;
           const selGroup=openPoint?groups[openPoint]:null;
           return (
             <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
-              {/* LA carte de la ville : toutes tes épingles, badges = colis en attente */}
+              {/* Champ VILLE : tous les points relais de la ville s'affichent d'office */}
+              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                <input value={villeInput||ville} onChange={e=>setVilleInput(e.target.value)}
+                  onKeyDown={e=>{ if(e.key==='Enter'&&(villeInput||'').trim()) fetchVillePoints(villeInput.trim()); }}
+                  placeholder="🏙️ Ta ville (ex : Cancale) → tous les points relais"
+                  style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                <button onClick={()=>{ const v=(villeInput||ville||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'0 14px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
+              </div>
+              {/* LA carte : toutes les épingles de la ville, badges = colis en attente */}
               {pins.length>0&&(
                 <div style={{border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.07)'}}>
                   <OsmMap points={pins} selected={openPoint} onSelect={k=>setOpenPoint(openPoint===k?null:k)}/>
                   <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderTop:`1px solid ${C.border}`,background:C.card}}>
                     <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:700}}>
-                      {avail.length>0?`📦 ${avail.length} colis à retirer`:"Aucun colis en attente — les badges s'allumeront à l'arrivée"}
+                      {avail.length>0?`📦 ${avail.length} colis à retirer`:`${pins.length} point${pins.length>1?'s':''} relais${ville?' à '+ville:''}`}
                     </span>
-                    <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:999,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter un point</button>
+                    <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:999,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter</button>
                   </div>
                 </div>
               )}
               {pins.length===0&&(
-                <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,padding:'14px 16px',display:'flex',flexDirection:'column',gap:10}}>
-                  <div style={{fontSize:12.5,color:C.text,fontWeight:700,lineHeight:1.5}}>🗺 Ajoute tes points relais habituels (Super U, Chronopost…), ou laisse la carte se remplir toute seule à l'arrivée de tes colis.</div>
-                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                    <button onClick={openRelayPicker} style={{border:'none',borderRadius:999,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'8px 15px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter un point relais</button>
-                  </div>
+                <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,padding:'14px 16px',fontSize:12.5,color:C.text,fontWeight:700,lineHeight:1.5}}>
+                  🗺 Entre ta ville ci-dessus pour afficher tous ses points relais. Ceux où tu as un colis afficheront le nombre.
                 </div>
               )}
               {/* Point sélectionné sans colis en attente */}
               {selGroup&&selGroup.colis.length===0&&(
                 <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
                   <span style={{fontSize:18}}>📍</span>
-                  <span style={{flex:1,fontSize:12,color:C.text,fontWeight:700}}>{openPoint} <span style={{color:C.muted,fontWeight:600}}>— aucun colis en attente ici</span></span>
+                  <span style={{flex:1,fontSize:12,color:C.text,fontWeight:700}}>{openPoint} <span style={{color:C.muted,fontWeight:600}}>— aucun colis ici{selGroup.type?' · '+selGroup.type:''}</span></span>
                   {selGroup.saved&&<button onClick={()=>removeSavedPoint(openPoint)} style={{border:`1px solid ${C.danger}66`,borderRadius:8,background:'transparent',color:C.danger,fontSize:11,fontWeight:800,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>✕ Retirer</button>}
                 </div>
               )}
@@ -5750,6 +5786,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 </div>
                 );
               })}
+              {/* Autres points relais de la ville (sans colis en attente) */}
+              {autres.length>0&&(
+                <div style={{border:`1px solid ${C.border}`,borderRadius:12,background:C.card,overflow:'hidden'}}>
+                  <div style={{fontSize:11,fontWeight:800,color:C.muted,padding:'9px 12px',borderBottom:`1px solid ${C.border}`}}>Autres points relais{ville?` à ${ville}`:''} ({autres.length})</div>
+                  <div style={{maxHeight:220,overflowY:'auto'}}>
+                    {autres.map(([lieu,g])=>(
+                      <div key={lieu} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 12px',borderTop:`1px solid ${C.border}55`}}>
+                        <span style={{fontSize:15,flexShrink:0}}>📍</span>
+                        <span style={{flex:1,minWidth:0}}>
+                          <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
+                          {g.type&&<span style={{display:'block',fontSize:10,color:C.muted}}>{g.type}</span>}
+                        </span>
+                        {g.saved&&<button onClick={()=>removeSavedPoint(lieu)} title="Retirer" style={{border:'none',background:'transparent',color:C.muted,fontSize:14,cursor:'pointer',flexShrink:0}}>✕</button>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
