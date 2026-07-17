@@ -300,9 +300,25 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
           <img key={i} src={tileUrl(t.x, t.y)} onError={(e)=>{ if(e.target.dataset.f!=='1'){e.target.dataset.f='1'; e.target.src=`https://tile.openstreetmap.org/${z}/${t.x}/${t.y}.png`;} }} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256 }} />
         ))}
       </div>
-      {pts.map(p => {
-        const t = proj(p.lat, p.lon, z);
-        const ox = (t.x - c.x) * 256, oy = (t.y - c.y) * 256;
+      {(() => {
+        // Anti-chevauchement : on écarte les épingles trop proches en spirale.
+        const placed = [];
+        const R = 30; // distance mini entre 2 épingles (px)
+        const prio = [...pts].sort((a, b) => (b.count || 0) - (a.count || 0)); // colis d'abord, jamais bougés
+        prio.forEach(p => {
+          const t = proj(p.lat, p.lon, z);
+          let ox = (t.x - c.x) * 256, oy = (t.y - c.y) * 256;
+          let tries = 0;
+          while (placed.some(q => Math.hypot(q.ox - ox, q.oy - oy) < R) && tries < 40) {
+            const ang = tries * 2.399, rad = R * (1 + tries * 0.14);
+            ox = (t.x - c.x) * 256 + Math.cos(ang) * rad;
+            oy = (t.y - c.y) * 256 + Math.sin(ang) * rad;
+            tries++;
+          }
+          placed.push({ p, ox, oy });
+        });
+        return placed;
+      })().map(({ p, ox, oy }) => {
         const isSel = selected === p.key;
         const car = CARRIERS[carrierKey(p.carrier)];
         const col = car ? car.bg : (p.picked ? '#2e9e5b' : p.count > 0 ? '#e5484d' : '#8a94a6');
@@ -4498,6 +4514,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
   const [savedPoints, setSavedPoints] = useState(() => load('vrm_points_relais', []));
   const persistPoints = (u) => { setSavedPoints(u); save('vrm_points_relais', u); };
+  // Points masqués (par nom) : ceux que tu ne veux pas voir (supérette inutile…).
+  // Un point masqué réapparaît si un colis y arrive.
+  const [hiddenPts, setHiddenPts] = useState(() => new Set(load('vrm_points_hidden', [])));
+  const hidePoint = (nom) => { setHiddenPts(prev => { const n = new Set(prev); n.add(norm2(nom)); save('vrm_points_hidden', [...n]); return n; }); setOpenPoint(null); };
+  const unhideAll = () => { setHiddenPts(new Set()); save('vrm_points_hidden', []); };
+  const norm2 = (s) => String(s || '').toLowerCase().trim();
   // TA VILLE : une fois renseignée, tous les points relais de la ville
   // s'affichent d'office sur la carte ; le nombre de colis apparaît sur ceux
   // où tu en as. Synchronisé. La liste des points est mise en cache.
@@ -5667,9 +5689,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
           const groups={};
           savedPoints.forEach(sp=>{ groups[sp.nom]={colis:[],lat:sp.lat,lon:sp.lon,saved:true,carrier:sp.carrier}; });
-          // Tous les points relais de la ville (affichés d'office).
+          // Tous les points relais de la ville (affichés d'office), sauf ceux
+          // que tu as masqués (ils reviennent si un colis y arrive).
           if(villeCache.city && norm(villeCache.city)===norm(ville)){
-            villeCache.pts.forEach(pt=>{ if(!groups[pt.nom]) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type}; });
+            villeCache.pts.forEach(pt=>{ if(!groups[pt.nom] && !hiddenPts.has(norm2(pt.nom))) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type}; });
           }
           avail.forEach(t=>{
             const c=cleanLieu(t.lieu);
@@ -5707,6 +5730,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:700}}>
                       {avail.length>0?`📦 ${avail.length} colis à retirer`:`${pins.length} point${pins.length>1?'s':''} relais${ville?' à '+ville:''}`}
                     </span>
+                    {hiddenPts.size>0&&<button onClick={unhideAll} title="Réafficher les points masqués" style={{border:'none',background:'transparent',color:C.muted,fontSize:10.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>↺ {hiddenPts.size} masqué{hiddenPts.size>1?'s':''}</button>}
                     <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:999,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter</button>
                   </div>
                 </div>
@@ -5721,7 +5745,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
                   <span style={{fontSize:18}}>📍</span>
                   <span style={{flex:1,fontSize:12,color:C.text,fontWeight:700}}>{openPoint} <span style={{color:C.muted,fontWeight:600}}>— aucun colis ici{selGroup.type?' · '+selGroup.type:''}</span></span>
-                  {selGroup.saved&&<button onClick={()=>removeSavedPoint(openPoint)} style={{border:`1px solid ${C.danger}66`,borderRadius:8,background:'transparent',color:C.danger,fontSize:11,fontWeight:800,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>✕ Retirer</button>}
+                  <button onClick={()=>{ if(selGroup.saved) removeSavedPoint(openPoint); else hidePoint(openPoint); }} style={{border:`1px solid ${C.danger}66`,borderRadius:8,background:'transparent',color:C.danger,fontSize:11,fontWeight:800,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>✕ Retirer</button>
                 </div>
               )}
               {withColis.map(([lieu,g])=>{
@@ -5798,7 +5822,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                           <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
                           {g.type&&<span style={{display:'block',fontSize:10,color:C.muted}}>{g.type}</span>}
                         </span>
-                        {g.saved&&<button onClick={()=>removeSavedPoint(lieu)} title="Retirer" style={{border:'none',background:'transparent',color:C.muted,fontSize:14,cursor:'pointer',flexShrink:0}}>✕</button>}
+                        <button onClick={()=>{ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); }} title="Retirer ce point de la carte" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',flexShrink:0,padding:'2px 6px'}}>✕</button>
                       </div>
                     ))}
                   </div>
