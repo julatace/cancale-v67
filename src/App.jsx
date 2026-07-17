@@ -4526,7 +4526,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [ville, setVille] = useState(() => load('vrm_ville', ''));
   const [villeCache, setVilleCache] = useState(() => load('vrm_ville_points', { city: '', pts: [] }));
   const [villeLoading, setVilleLoading] = useState(false);
-  const [villeInput, setVilleInput] = useState('');
+  const [villeInput, setVilleInput] = useState(() => load('vrm_ville', ''));
   const fetchVillePoints = async (city) => {
     setVilleLoading(true);
     try {
@@ -4932,6 +4932,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
+  // Ta ville est connue mais la liste de ses points n'est pas encore chargée
+  // (ou date d'une autre ville) → on la récupère AUTOMATIQUEMENT.
+  useEffect(() => {
+    if (curSub==='achats' && ville && norm2(villeCache.city)!==norm2(ville) && !villeLoading) fetchVillePoints(ville);
+  /* eslint-disable-next-line */ }, [sub, ville]);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
   useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
@@ -5716,11 +5721,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
               {/* Champ VILLE : tous les points relais de la ville s'affichent d'office */}
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                <input value={villeInput||ville} onChange={e=>setVilleInput(e.target.value)}
+                <input value={villeInput} onChange={e=>setVilleInput(e.target.value)}
                   onKeyDown={e=>{ if(e.key==='Enter'&&(villeInput||'').trim()) fetchVillePoints(villeInput.trim()); }}
                   placeholder="🏙️ Ta ville (ex : Cancale) → tous les points relais"
                   style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button onClick={()=>{ const v=(villeInput||ville||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'0 14px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
+                <button onClick={()=>{ const v=(villeInput||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'0 14px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
               </div>
               {/* LA carte : toutes les épingles de la ville, badges = colis en attente */}
               {pins.length>0&&(
@@ -5782,9 +5787,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                       }
                       fetchEmailTracking().then(setTracking);
                     }} title="Renommer ce point relais (permet de le localiser sur la carte)" style={{flexShrink:0,fontSize:14,color:C.muted,padding:'4px 6px'}}>✎</span>}
+                    <span onClick={(ev)=>{ ev.stopPropagation(); if(window.confirm(`Retirer « ${lieu} » de la carte ?`)){ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); } }} title="Retirer ce point" style={{flexShrink:0,fontSize:15,color:C.muted,padding:'4px 6px'}}>✕</span>
                   </button>
-                  {/* Les colis qui attendent à ce point */}
-                  {isOpen&&<div style={{borderTop:`1px solid ${C.accent}33`}}>
+                  {/* Les colis qui attendent à ce point (défilables si nombreux) */}
+                  {isOpen&&<div style={{borderTop:`1px solid ${C.accent}33`,maxHeight:300,overflowY:'auto'}}>
                     {colis.map((t,i)=>{
                       const buy=buyForTrack(t);
                       return (
