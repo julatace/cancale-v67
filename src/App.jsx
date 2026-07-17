@@ -33,7 +33,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
   'vinted_sale_overrides',
 ];
@@ -4502,6 +4502,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
+  // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
+  const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
+  const colisKey = (t) => String(t.suivi || t.subject || '').trim();
+  const markCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.add(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); };
+  const isCollected = (t) => collected.has(colisKey(t));
   // Reçu authentique correspondant à un achat : par n° de transaction, sinon titre.
   const receiptFor = (o) => (achEmails || []).find(a =>
     (a.transaction && String(a.transaction) === String(o.transaction_id)) ||
@@ -4608,7 +4613,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // géocodé (adresse exacte) et ENREGISTRÉ en permanence. La carte se construit
   // ainsi toute seule à partir de tes vrais points, même après retrait du colis.
   useEffect(() => { (async () => {
-    const avail = (tracking || []).filter(t => t.status === 'available');
+    const avail = (tracking || []).filter(t => t.status === 'available' && !isCollected(t));
     // Regroupe par NOM propre du point (plusieurs colis au même relais → 1 point)
     const parPoint = {};
     avail.forEach(t => { const c = cleanLieu(t.lieu); if (c.nom) parPoint[c.nom] = c; });
@@ -5687,7 +5692,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {/* Points relais façon Vinted : carte PERMANENTE de tes points habituels.
             Les badges rouges apparaissent quand des colis y attendent. */}
         {(()=>{
-          const avail=(tracking||[]).filter(t=>t.status==='available');
+          const avail=(tracking||[]).filter(t=>t.status==='available' && !isCollected(t));
           const norm=s=>String(s||'').toLowerCase();
           // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
           const groups={};
@@ -5826,6 +5831,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                             </div>
                           )}
                           {t.qrB64&&<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:44,height:44,objectFit:'contain',background:'#fff',borderRadius:6,border:`1px solid ${C.border}`,flexShrink:0}}/>}
+                          <button onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'6px 9px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Retiré</button>
                         </div>
                       );
                     })}
