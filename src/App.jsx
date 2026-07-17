@@ -4489,6 +4489,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     persistPoints([...byName.values()]);
   };
   const removeSavedPoint = (nom) => { persistPoints(savedPoints.filter(sp => sp.nom !== nom)); setOpenPoint(null); };
+  // Sélecteur « tous les points de ma ville » : Nominatim (bbox) + Overpass
+  // (commerces de retrait = où sont hébergés les points relais en France).
+  const [relayPicker, setRelayPicker] = useState(null); // {city, loading, found:[], picked:Set, error}
+  const openRelayPicker = async () => {
+    const city = window.prompt('Ta ville : je te propose tous les commerces de retrait (points relais) qui s\'y trouvent.', '');
+    if (!city || !city.trim()) return;
+    setRelayPicker({ city: city.trim(), loading: true, found: [], picked: new Set(), error: null });
+    try {
+      const gr = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(city.trim() + ', France')}`);
+      const gj = await gr.json();
+      if (!gj || !gj[0]) { setRelayPicker(p => p ? { ...p, loading: false, error: 'Ville introuvable — vérifie l\'orthographe.' } : p); return; }
+      const bb = gj[0].boundingbox; const [S, N, W, E] = [bb[0], bb[1], bb[2], bb[3]];
+      const q = `[out:json][timeout:25];(node["amenity"="parcel_locker"](${S},${W},${N},${E});node["shop"="tobacco"](${S},${W},${N},${E});node["shop"="newsagent"](${S},${W},${N},${E});node["shop"="convenience"](${S},${W},${N},${E});node["shop"="supermarket"](${S},${W},${N},${E});node["amenity"="post_office"](${S},${W},${N},${E}););out center 80;`;
+      // Plusieurs serveurs Overpass (le principal sature parfois) : on essaie
+      // chacun jusqu'à réponse valide.
+      const mirrors = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+      let oj = null;
+      for (const m of mirrors) {
+        try { const r = await fetch(m, { method: 'POST', body: 'data=' + encodeURIComponent(q) }); if (r.ok) { oj = await r.json(); if (oj && oj.elements) break; } } catch (_) {}
+      }
+      if (!oj) { setRelayPicker(p => p ? { ...p, loading: false, error: 'Service momentanément indisponible, réessaie dans un instant.' } : p); return; }
+      const typeLabel = (t) => t.amenity === 'parcel_locker' ? 'Casier à colis' : t.amenity === 'post_office' ? 'Bureau de poste' : t.shop === 'tobacco' ? 'Tabac' : t.shop === 'newsagent' ? 'Presse' : t.shop === 'supermarket' ? 'Supermarché' : 'Supérette';
+      const found = (oj.elements || []).map(e => {
+        const la = e.lat ?? (e.center && e.center.lat), lo = e.lon ?? (e.center && e.center.lon);
+        const t = e.tags || {};
+        return (la && lo && t.name) ? { id: String(e.id), nom: t.name, type: typeLabel(t), lat: +la, lon: +lo } : null;
+      }).filter(Boolean).sort((a, b) => a.nom.localeCompare(b.nom));
+      // Pré-coche ceux déjà enregistrés (confirmés par tes emails)
+      const savedN = new Set(savedPoints.map(s => s.nom.toLowerCase()));
+      const picked = new Set(found.filter(f => savedN.has(f.nom.toLowerCase())).map(f => f.id));
+      setRelayPicker(p => p ? { ...p, loading: false, found, picked } : p);
+    } catch (_) { setRelayPicker(p => p ? { ...p, loading: false, error: 'Recherche indisponible, réessaie dans un instant.' } : p); }
+  };
+  const togglePick = (id) => setRelayPicker(p => { if (!p) return p; const s = new Set(p.picked); s.has(id) ? s.delete(id) : s.add(id); return { ...p, picked: s }; });
+  const saveRelayPicks = () => {
+    if (!relayPicker) return;
+    const chosen = relayPicker.found.filter(f => relayPicker.picked.has(f.id));
+    const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
+    chosen.forEach(f => byName.set(f.nom.toLowerCase(), { nom: f.nom, full: `${f.nom}, ${relayPicker.city}`, lat: f.lat, lon: f.lon, type: f.type }));
+    persistPoints([...byName.values()]);
+    setRelayPicker(null);
+  };
   // AUTO : chaque point relais réel qui apparaît dans un email de colis est
   // géocodé (adresse exacte) et ENREGISTRÉ en permanence. La carte se construit
   // ainsi toute seule à partir de tes vrais points, même après retrait du colis.
@@ -5598,14 +5640,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:700}}>
                       {avail.length>0?`📦 ${avail.length} colis à retirer`:"Aucun colis en attente — les badges s'allumeront à l'arrivée"}
                     </span>
-                    <button onClick={addPointByAddress} style={{border:`1px solid ${C.border}`,borderRadius:999,background:'transparent',color:C.text,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter</button>
+                    <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:999,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>🗺 Ma ville</button>
+                    <button onClick={addPointByAddress} style={{border:`1px solid ${C.border}`,borderRadius:999,background:'transparent',color:C.text,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Adresse</button>
                   </div>
                 </div>
               )}
               {pins.length===0&&(
-                <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,padding:'14px 16px',display:'flex',flexDirection:'column',gap:8}}>
-                  <div style={{fontSize:12.5,color:C.text,fontWeight:700,lineHeight:1.5}}>🗺 Ta carte des points relais se remplit toute seule : dès qu'un colis arrive, son point relais réel (celui de l'email) apparaît ici.</div>
-                  <button onClick={addPointByAddress} style={{alignSelf:'flex-start',border:`1px solid ${C.accent}`,borderRadius:999,background:'transparent',color:C.accent,fontSize:12,fontWeight:800,padding:'6px 13px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter un point par adresse</button>
+                <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,padding:'14px 16px',display:'flex',flexDirection:'column',gap:10}}>
+                  <div style={{fontSize:12.5,color:C.text,fontWeight:700,lineHeight:1.5}}>🗺 Affiche les points relais de ta ville, ou laisse la carte se remplir toute seule à l'arrivée de tes colis.</div>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                    <button onClick={openRelayPicker} style={{border:'none',borderRadius:999,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'8px 15px',cursor:'pointer',fontFamily:'inherit'}}>🗺 Points relais de ma ville</button>
+                    <button onClick={addPointByAddress} style={{border:`1px solid ${C.accent}`,borderRadius:999,background:'transparent',color:C.accent,fontSize:12,fontWeight:800,padding:'8px 13px',cursor:'pointer',fontFamily:'inherit'}}>➕ Par adresse</button>
+                  </div>
                 </div>
               )}
               {/* Point sélectionné sans colis en attente */}
@@ -6033,6 +6079,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
+
+      {/* Points relais de la ville : carte + liste à cocher */}
+      {relayPicker && (
+        <div onClick={()=>setRelayPicker(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1200,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>🗺 Points relais — {relayPicker.city}</div>
+                <div style={{fontSize:11,color:C.muted}}>{relayPicker.loading?'Recherche…':`${relayPicker.found.length} commerce${relayPicker.found.length>1?'s':''} de retrait · coche ceux que tu utilises`}</div>
+              </div>
+              <button type="button" onClick={()=>setRelayPicker(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+            </div>
+            {relayPicker.loading && <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13}}>⏳ Recherche des points relais…</div>}
+            {!relayPicker.loading && relayPicker.error && <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.danger,fontSize:13,textAlign:'center',padding:20}}>{relayPicker.error}</div>}
+            {!relayPicker.loading && !relayPicker.error && (<>
+              {relayPicker.found.length>0 && <OsmMap points={relayPicker.found.map(f=>({key:f.id,lat:f.lat,lon:f.lon,picked:relayPicker.picked.has(f.id)}))} selected={null} onSelect={togglePick}/>}
+              <div style={{flex:1,overflow:'auto',padding:'8px 12px'}}>
+                {relayPicker.found.length===0 && <div style={{color:C.muted,fontSize:13,textAlign:'center',padding:'28px 12px',lineHeight:1.5}}>Aucun commerce de retrait détecté ici. Essaie une ville plus grande à proximité, ou ajoute ton point par adresse.</div>}
+                {relayPicker.found.map(f=>{ const on=relayPicker.picked.has(f.id); return (
+                  <button key={f.id} onClick={()=>togglePick(f.id)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 10px',border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}12`:C.card,borderRadius:10,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                    <span style={{width:22,height:22,borderRadius:6,border:`1.5px solid ${on?C.accent:C.border}`,background:on?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:13,fontWeight:900}}>{on?'✓':''}</span>
+                    <span style={{flex:1,minWidth:0}}>
+                      <span style={{display:'block',fontSize:13,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.nom}</span>
+                      <span style={{display:'block',fontSize:10.5,color:C.muted}}>{f.type}</span>
+                    </span>
+                  </button>
+                ); })}
+              </div>
+              <div style={{padding:'10px 14px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
+                <div style={{fontSize:10,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ces commerces hébergent les points relais Mondial Relay / Chronopost. Tes points confirmés par email restent affichés même si tu ne les coches pas.</div>
+                <button onClick={saveRelayPicks} disabled={relayPicker.picked.size===0} style={{width:'100%',padding:'12px 16px',borderRadius:12,border:'none',background:relayPicker.picked.size?C.accent:C.border,color:'#fff',fontSize:14,fontWeight:800,cursor:relayPicker.picked.size?'pointer':'default',fontFamily:'inherit'}}>
+                  {relayPicker.picked.size?`Afficher ${relayPicker.picked.size} point${relayPicker.picked.size>1?'s':''} sur ma carte`:'Coche au moins un point'}
+                </button>
+              </div>
+            </>)}
+          </div>
+        </div>
+      )}
 
       {bordResult && (
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
