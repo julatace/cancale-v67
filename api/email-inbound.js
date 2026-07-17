@@ -354,10 +354,12 @@ function parseCarrierEmail(mail, carrier) {
       for (let i = idx + 1; i < lines.length && parts.length < 3; i++) {
         const l = lines[i];
         if (!l) { if (parts.length) break; else continue; }
-        if (/horaires|ouvert|lundi|mardi|retrouve|suivez|https?:|désabonn|code|colis/i.test(l)) break;
+        if (/horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis/i.test(l)) break;
         parts.push(l.replace(/\s+/g, ' '));
       }
-      if (parts.length) lieu = parts.join(', ');
+      if (parts.length) {
+        lieu = parts.join(', ').replace(/®|™|©/g, '').replace(/\s+(super\s*pratique|retrouvez).*$/i, '').replace(/\s{2,}/g, ' ').trim();
+      }
     }
   }
   if (!lieu) for (const pat of [
