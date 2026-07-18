@@ -3581,14 +3581,37 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
         const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
         sp.scale.set(2.4, 0.6, 1); return sp;
       };
-      // Petit COLIS numéroté (carton) — rendu dans les cases, empilés.
-      const makeColis = (num, size) => {
-        const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
-        x.fillStyle = '#d9b877'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(120,90,40,0.55)'; x.lineWidth = 3; x.strokeRect(3, 3, 58, 58);
-        x.fillStyle = '#3a2a12'; x.font = 'bold 30px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), 32, 35);
+      // CARTON numéroté (boîte à chaussures) — le NUMÉRO est imprimé EN GROS
+      // sur la face avant, le dessus et les côtés → lisible directement dans la
+      // vue 3D, sans cliquer, même quand les cartons sont empilés (jusqu'à ~18).
+      // Textures & matériaux mis en cache par numéro (un seul carton = 4 textures
+      // sinon, ça saturerait avec de grandes piles).
+      const colisCache = new Map();
+      const colisFaceTex = (num, wide) => {
+        const c = document.createElement('canvas'); c.width = 256; c.height = wide ? 150 : 256; const x = c.getContext('2d'); const W = c.width, H = c.height;
+        x.fillStyle = '#cba869'; x.fillRect(0, 0, W, H);                       // carton kraft
+        x.strokeStyle = 'rgba(120,90,40,0.5)'; x.lineWidth = 5; x.strokeRect(4, 4, W - 8, H - 8);
+        x.fillStyle = 'rgba(150,115,60,0.5)'; x.fillRect(0, H * 0.46, W, H * 0.08); // ruban adhésif
+        const by = H * 0.16, bh = H * 0.68;                                    // étiquette blanche
+        x.fillStyle = '#fff'; x.fillRect(16, by, W - 32, bh);
+        x.strokeStyle = '#b3893f'; x.lineWidth = 4; x.strokeRect(16, by, W - 32, bh);
+        x.fillStyle = '#16161c'; x.font = `900 ${Math.round(bh * 0.7)}px system-ui,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(String(num).slice(0, 5), W / 2, by + bh / 2);
         const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
-        const b = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), new THREE.MeshStandardMaterial({ map: t, roughness: 0.82 }));
-        b.castShadow = true; return b;
+        t.anisotropy = 4; return t;
+      };
+      const makeColis = (num, bw, bh, bd) => {
+        let cc = colisCache.get(num);
+        if (!cc) {
+          const sideMat = new THREE.MeshStandardMaterial({ map: colisFaceTex(num, true), roughness: 0.9 });
+          const topMat = new THREE.MeshStandardMaterial({ map: colisFaceTex(num, false), roughness: 0.9 });
+          const plain = new THREE.MeshStandardMaterial({ color: '#bd9857', roughness: 0.95 });
+          // ordre BoxGeometry : +X, -X, +Y(dessus), -Y(dessous), +Z(avant), -Z
+          cc = [sideMat, sideMat, topMat, plain, sideMat, sideMat];
+          colisCache.set(num, cc);
+        }
+        const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), cc);
+        b.castShadow = true; b.receiveShadow = true; return b;
       };
       // ── Constructeurs de MEUBLES détaillés (groupes de volumes) ──
       const box = (w, h, d, mat) => shadowize(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat));
@@ -3683,8 +3706,10 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
       };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
+      const disposeMat = (mat) => { if (!mat) return; (Array.isArray(mat) ? mat : [mat]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); if (mm && mm.dispose) mm.dispose(); }); };
       const buildFurniture = () => {
-        while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
+        colisCache.clear(); // textures des cartons régénérées à chaque reconstruction
+        while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); disposeMat(m.material); }); }
         (dataRef.current.items || []).forEach(it => {
           const ht = Math.max(0.35, h3dOf(it) * HSCALE), w = it.w * 0.92, d = it.h * 0.92, base = colorOf(it);
           const shape = (FURN_TYPES[it.type] || {}).build || 'generic';
@@ -3707,16 +3732,19 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
           g.userData = { itemId: it.id, w: it.w, h: it.h };
           const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
           lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
-          // COLIS numérotés rangés dans les cases (grille rows×cols), empilés.
+          // CARTONS numérotés rangés dans les cases (grille rows×cols) et EMPILÉS
+          // comme dans la vraie vie (jusqu'à ~18). Le numéro est imprimé en gros
+          // sur chaque carton → on lit la pile directement, sans cliquer. Une
+          // grande pile peut dépasser du meuble (c'est voulu : ça reflète le réel).
           const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
-          const cellW = w / cols, cellH = ht / rows, cube = Math.min(cellW, cellH, 0.55) * 0.62;
+          const cellW = w / cols, cellH = ht / rows;
+          const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145; // format boîte à chaussures
           let total = 0;
           for (const key in (it.slots || {})) {
             const parts = String(key).split('_'); const r = +parts[0], c = +parts[1]; const arr = it.slots[key] || [];
             if (isNaN(r) || isNaN(c)) continue;
-            const cx = -w / 2 + (c + 0.5) * cellW, cyBottom = ht - (r + 1) * cellH + cube * 0.6;
-            const step = Math.max(cube * 0.5, Math.min(cube * 0.98, (cellH - cube) / Math.max(1, arr.length)));
-            arr.forEach((num, i) => { if (total++ > 70) return; const m = makeColis(num, cube); m.position.set(cx, cyBottom + i * step, d / 2 - cube * 0.62); g.add(m); });
+            const cx = -w / 2 + (c + 0.5) * cellW, baseY = Math.max(0, ht - (r + 1) * cellH); // bas de la case
+            arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.position.set(cx, baseY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
           }
           furnGroup.add(g);
         });
