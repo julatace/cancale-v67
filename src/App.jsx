@@ -1616,7 +1616,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
     const ventes=encaissees.filter(v=>{const d=parseDt(v.receiveDate);return d&&d>=lastMon&&d<=lastSun;});
     const ca=ventes.reduce((s,v)=>s+ +v.sellPrice,0);
     const profit=ventes.reduce((s,v)=>s+(+v.sellPrice-+v.buyPrice),0);
-    return{count:ventes.length,ca,profit,from:lastMon.toLocaleDateString('fr-FR'),to:lastSun.toLocaleDateString('fr-FR')};
+    // Semaine ENCORE avant (pour la comparaison ▲/▼).
+    const prevMon=new Date(lastMon);prevMon.setDate(prevMon.getDate()-7);
+    const prevSun=new Date(lastSun);prevSun.setDate(prevSun.getDate()-7);
+    const prevV=encaissees.filter(v=>{const d=parseDt(v.receiveDate);return d&&d>=prevMon&&d<=prevSun;});
+    const prevCa=prevV.reduce((s,v)=>s+ +v.sellPrice,0);
+    return{count:ventes.length,ca,profit,prevCa,prevCount:prevV.length,from:lastMon.toLocaleDateString('fr-FR'),to:lastSun.toLocaleDateString('fr-FR')};
   },[encaissees]);
 
   const monthlyRecapData=useMemo(()=>{
@@ -2080,6 +2085,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>encaissé</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
               </div>
+              {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
+                <div style={{fontSize:11,color:up?C.accent:C.danger,fontWeight:800,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} encaissés</span></div>
+              ); })()}
             </div>
             <button type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:C.muted,fontSize:16,lineHeight:1,padding:'2px 4px'}}>✕</button>
@@ -3989,6 +3997,7 @@ function VintedAccounts({ accounts, setAccounts }) {
   // iCloud ou classique). Sert au serveur pour attribuer chaque email de vente/
   // bordereau au bon compte. Synchronisé (vinted_account_emails).
   const [acctEmails, setAcctEmails] = useState(() => load('vinted_account_emails', {}));
+  const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
   const setAcctEmail = (uid, val) => {
     const u = { ...acctEmails, [String(uid)]: val.trim() };
     if (!u[String(uid)]) delete u[String(uid)];
@@ -4004,6 +4013,18 @@ function VintedAccounts({ accounts, setAccounts }) {
       });
       if (!res.ok) return;
       const rows = await res.json();
+      // Note vendeur (feedback_reputation 0..1) + nb d'avis, si Vinted les fournit.
+      const rep = {};
+      rows.forEach(r => {
+        const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
+        const usr = r.data && r.data.payload && r.data.payload.user;
+        if (uid && usr) {
+          const rating = typeof usr.feedback_reputation === 'number' ? usr.feedback_reputation : null;
+          const count = Number.isFinite(usr.feedback_count) ? usr.feedback_count : null;
+          if (rating != null || count != null) rep[uid] = { rating, count, pos: usr.positive_feedback_count, neg: usr.negative_feedback_count };
+        }
+      });
+      if (Object.keys(rep).length) setReput(rep);
       setAcctEmails(prev => {
         const u = { ...prev }; let changed = false;
         rows.forEach(r => {
@@ -4120,6 +4141,14 @@ function VintedAccounts({ accounts, setAccounts }) {
                       {acc.login && acc.login !== accountName(acc) ? `@${acc.login} · ` : ''}
                       maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}
                     </div>
+                    {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
+                      <div style={{fontSize:11.5,marginTop:3,fontWeight:800,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
+                        {stars!=null?<>⭐ {stars.toFixed(2)}/5</>:''}
+                        {stars!=null&&r.count!=null?' · ':''}
+                        {r.count!=null?<span style={{color:C.muted,fontWeight:700}}>{r.count} avis</span>:''}
+                        {r.neg>0?<span style={{color:C.danger,fontWeight:700}}> · {r.neg} négatif{r.neg>1?'s':''}</span>:''}
+                      </div>
+                    ); })()}
                     <input
                       value={acctEmails[String(acc.vinted_user_id)] || ''}
                       onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
@@ -5512,6 +5541,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     return { top, total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, hiddenSales, hiddenAccts]);
+  // ── Ventes à perte : finalisées où vente − achat − boost < 0. Souvent une
+  // erreur de saisie (prix d'achat trop haut) ou un prix cassé → à vérifier.
+  const pertes = useMemo(() => {
+    const list = [];
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) !== 'completed') continue;
+      const sell = o.price?.amount != null ? Number(o.price.amount) : null;
+      const e = effEntry(o);
+      const buy = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? parseFloat(String(e.buyPrice).replace(',', '.')) : null;
+      if (sell == null || buy == null || isNaN(buy)) continue;
+      const net = sell - buy - feesOf(e);
+      if (net < -0.005) list.push({ o, sell, buy, net, num: e?.numero, title: o.title });
+    }
+    list.sort((a, b) => a.net - b.net);
+    return list;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
   // ── Litiges / annulations : combien de ventes annulées et le manque à gagner ─
   const litiges = useMemo(() => {
     let nb = 0, montant = 0;
@@ -5962,6 +6009,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <span style={{fontSize:12,fontWeight:800,color:C.text}}>📈 Tes meilleurs mois de vente : </span>
             <span style={{fontSize:12,fontWeight:900,color:C.accent}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
             <span style={{fontSize:10.5,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes. Achète un peu avant ces mois pour avoir le stock au bon moment.</span>
+          </div>
+        )}
+        {/* Ventes à perte : alerte + détail (erreur de saisie ou prix cassé) */}
+        {pertes.length>0 && (
+          <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:12,padding:'10px 13px',marginBottom:8}}>
+            <div style={{fontSize:12.5,fontWeight:900,color:C.danger}}>🔻 {pertes.length} vente{pertes.length>1?'s':''} à perte · {fmtE(pertes.reduce((s,p)=>s+p.net,0))}</div>
+            <div style={{fontSize:11,color:C.text,marginTop:4,lineHeight:1.5}}>
+              {pertes.slice(0,4).map((p,i)=>(<div key={i}>{p.num?`N°${p.num} · `:''}{p.title} — vendu {fmtE(p.sell)}, achat {fmtE(p.buy)} → <b style={{color:C.danger}}>{fmtE(p.net)}</b></div>))}
+              {pertes.length>4 && <div style={{color:C.muted}}>+ {pertes.length-4} autre{pertes.length-4>1?'s':''}…</div>}
+            </div>
+            <div style={{fontSize:9.5,color:C.muted,marginTop:5}}>Vérifie le prix d'achat saisi (souvent une erreur) ou évite de casser autant le prix la prochaine fois.</div>
           </div>
         )}
         {/* Litiges / annulations : manque à gagner */}
