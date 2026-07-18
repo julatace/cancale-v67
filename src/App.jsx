@@ -4701,6 +4701,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
   const [annSort, setAnnSort] = useState('oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
+  const [showReprice, setShowReprice] = useState(true); // panneau repricing déplié
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
   const [pickerFor, setPickerFor] = useState(null);
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
@@ -4908,6 +4909,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const age = listedAgeDays(it); if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
     }
     return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, numeros]);
+  // ── Assistant de repricing : quoi baisser, de combien, pourquoi ────────────
+  // Règles : plus une paire dort, plus la baisse conseillée est forte ; une paire
+  // très vue sans favori a un prix perçu trop haut. On ne conseille JAMAIS sous
+  // le prix d'achat connu (pas de vente à perte). L'action reste un lien vers
+  // l'annonce (sûr, ton rythme) — aucune écriture automatique côté Vinted.
+  const repriceList = useMemo(() => {
+    const out = [];
+    for (const it of (listings.items || [])) {
+      const price = it.price != null ? Number(it.price) : 0;
+      if (!price || price <= 1) continue;
+      const age = listedAgeDays(it);
+      const views = it.views ?? null, favs = it.favourites ?? null;
+      let drop = 0; const why = [];
+      if (age != null && age >= SLEEP_DAYS) { drop = Math.max(drop, age >= 90 ? 0.30 : age >= 60 ? 0.20 : 0.12); why.push(`dort ${age} j`); }
+      if (views != null && views >= 30 && (favs ?? 0) <= 1) { drop = Math.max(drop, 0.12); why.push(`${views} vues · ${favs ?? 0} ❤️`); }
+      else if (views != null && views >= 60 && favs != null && favs >= 1 && favs / views < 0.03) { drop = Math.max(drop, 0.10); why.push(`${views} vues pour ${favs} ❤️`); }
+      if (drop <= 0) continue;
+      let sugg = Math.round(price * (1 - drop));
+      const buy = numeros[it.id]?.buyPrice != null && numeros[it.id].buyPrice !== '' ? Number(numeros[it.id].buyPrice) : null;
+      let atFloor = false;
+      if (buy != null && !isNaN(buy) && sugg < buy) { sugg = Math.ceil(buy); atFloor = true; }
+      sugg = Math.max(1, sugg);
+      if (sugg >= price) continue; // déjà au plancher : rien à conseiller
+      out.push({ it, price, sugg, saving: price - sugg, age, views, favs, why, atFloor, score: (views ?? 0) + (age ?? 0) * 2 });
+    }
+    out.sort((a, b) => b.score - a.score);
+    return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, numeros]);
 
@@ -6028,6 +6058,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
               😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
+            </div>
+          )}
+          {/* ── Assistant de repricing : liste consolidée à baisser ── */}
+          {repriceList.length>0 && (
+            <div style={{marginBottom:12,border:`1px solid ${C.warn}66`,background:`${C.warn}0e`,borderRadius:14,overflow:'hidden'}}>
+              <button onClick={()=>setShowReprice(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                <span style={{fontSize:18}}>🏷️</span>
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text}}>Repricing — {repriceList.length} paire{repriceList.length>1?'s':''} à baisser</span>
+                  <span style={{display:'block',fontSize:11,color:C.muted,fontWeight:700}}>Très vues sans acheteur ou qui dorment · jamais sous ton prix d'achat</span>
+                </span>
+                <span style={{fontSize:13,color:C.muted}}>{showReprice?'▲':'▼'}</span>
+              </button>
+              {showReprice && (
+                <div style={{borderTop:`1px solid ${C.warn}33`}}>
+                  {repriceList.slice(0,30).map(({it,price,sugg,age,views,favs,why,atFloor})=>{
+                    const num = numeros[it.id]?.numero;
+                    return (
+                      <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.warn}22`}}>
+                        <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
+                          <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{why.join(' · ')}</div>
+                        </div>
+                        <div style={{flexShrink:0,textAlign:'right'}}>
+                          <div style={{fontSize:12,fontWeight:800,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
+                          {atFloor && <div style={{fontSize:9,color:C.muted}}>= prix d'achat (plancher)</div>}
+                        </div>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 11px',borderRadius:8}}>🏷️ Baisser</a>
+                      </div>
+                    );
+                  })}
+                  {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {repriceList.length-30} autres paires à baisser…</div>}
+                </div>
+              )}
             </div>
           )}
           {/* Recherche + tri */}
