@@ -413,6 +413,23 @@ const extractBoosts = (payload) => {
   try { visit(payload, 0); } catch (_) {}
   return out;
 };
+// Où est rangée une paire dans le garage ? Cherche le numéro dans la grille et
+// renvoie sa position lisible (colonne / place). null si pas rangée.
+const garageCellOf = (grid, num) => {
+  if (grid == null || num == null || String(num).trim() === '') return null;
+  const target = String(num).trim().toLowerCase();
+  for (const key in grid) {
+    const arr = grid[key];
+    if (!Array.isArray(arr)) continue;
+    const si = arr.findIndex(v => v != null && String(v).trim().toLowerCase() === target);
+    if (si >= 0) {
+      const ci = parseInt(String(key).split('_').pop(), 10);
+      return { key, si, col: isNaN(ci) ? null : ci + 1, slot: si + 1 };
+    }
+  }
+  return null;
+};
+const garageCellLabel = (cell) => cell ? (cell.col != null ? `colonne ${cell.col}, place ${cell.slot}` : `place ${cell.slot}`) : null;
 // Distance approximative en mètres entre deux coordonnées (haversine).
 const distMeters = (aLat, aLon, bLat, bLon) => {
   const R = 6371000, toR = Math.PI / 180;
@@ -6007,6 +6024,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span>
                     {o.status && <span style={{color:C.muted,fontStyle:'italic',opacity:0.8}} title="Statut exact renvoyé par Vinted">« {o.status} »</span>}
                     {needsBordereau(o.status) && <span style={{color:C.accent,fontWeight:800}}>· à expédier</span>}
+                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:800,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:700}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
                     {st==='cancelled' && num && <span style={{color:C.warn,fontWeight:800,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'1px 8px'}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>}
                     {!num && st!=='cancelled' && <span style={{color:C.warn,fontWeight:800}} title="Paire pas encore identifiée automatiquement (photo non reconnue). Ajoute son N° et son prix d'achat dans les champs ci-dessous.">⚠️ à identifier</span>}
                   </div>
@@ -7449,6 +7467,8 @@ export default function App() {
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
+  const [notifItems,setNotifItems]=useState([]); // centre de notifications (actions du jour)
+  const [notifOpen,setNotifOpen]=useState(false);
   const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     companyName:'Shop Cancale35',
@@ -7778,12 +7798,13 @@ export default function App() {
       const seenConvs = load('vinted_notif_seen_convs', {});
       const firstMsgRun = localStorage.getItem('vinted_notif_seen_convs')===null;
       const nextSeen = {}; // reconstruit à chaque passage -> se purge tout seul
-      let newMsgs=0, salesCount=0;
+      let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0;
       for(const a of vintedAccounts){
         const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
         if(inbox && Array.isArray(inbox.conversations)){
           for(const c of inbox.conversations){
             if(!c.unread) continue;
+            unreadTotal+=1;
             const cid=String(c.id);
             const stamp=String(c.updated_at||'1');
             if(!firstMsgRun && seenConvs[cid]!==stamp) newMsgs+=1;
@@ -7791,9 +7812,21 @@ export default function App() {
           }
         }
         const sold=await fetchHarvestOrders(a.vinted_user_id,'sold');
-        if(sold && Array.isArray(sold.my_orders)) salesCount += sold.my_orders.filter(o=>classifyOrderStatus(o.status)!=='cancelled').length;
+        if(sold && Array.isArray(sold.my_orders)){
+          salesCount += sold.my_orders.filter(o=>classifyOrderStatus(o.status)!=='cancelled').length;
+          toShipCount += sold.my_orders.filter(o=>needsBordereau(o.status)).length;
+        }
       }
+      // Colis à retirer (emails transporteurs) : source légère, module-level.
+      let colisCount=0;
+      try{ const tr=await fetchEmailTracking(); colisCount=(tr||[]).filter(t=>t.status==='available').length; }catch(_){}
       if(cancelled) return;
+      // ── Centre de notifications : ce qui demande une action, ici et maintenant.
+      const items=[];
+      if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
+      if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_ventes'});
+      if(unreadTotal>0)  items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}`, n:unreadTotal, tab:'cat_msg'});
+      setNotifItems(items);
       save('vinted_notif_seen_convs',nextSeen);
       const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);
       const newSales = prevS<0 ? 0 : Math.max(0, salesCount-prevS);
@@ -7872,6 +7905,11 @@ export default function App() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>}
+            <button type="button" onClick={()=>setNotifOpen(o=>!o)} title="Notifications" aria-label="Notifications"
+              style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifOpen?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
+              🔔
+              {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:C.danger,color:'#fff',fontSize:10,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
+            </button>
             <button type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
               style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               ⚙️
@@ -7879,6 +7917,24 @@ export default function App() {
           </div>
         </div>
       </header>
+      {/* Centre de notifications : les actions du moment, chacune ouvre le bon onglet. */}
+      {notifOpen && (
+        <div onClick={()=>setNotifOpen(false)} style={{position:'fixed',inset:0,zIndex:60}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:62,right:12,width:'min(330px,92vw)',background:C.card,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:'0 10px 34px rgba(0,0,0,0.28)',overflow:'hidden'}}>
+            <div style={{padding:'11px 14px',borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:900,color:C.text,display:'flex',alignItems:'center',gap:6}}>🔔 Notifications</div>
+            {notifItems.length===0 ? (
+              <div style={{padding:'22px 16px',fontSize:12.5,color:C.muted,textAlign:'center',lineHeight:1.5}}>Rien qui presse pour l'instant ✨<br/><span style={{fontSize:11}}>Colis à retirer, ventes à expédier et messages non lus s'afficheront ici.</span></div>
+            ) : notifItems.map((it,i)=>(
+              <button key={i} onClick={()=>{ setTab(it.tab); setNotifOpen(false); }}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',background:'transparent',border:'none',borderTop:i>0?`1px solid ${C.border}`:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                <span style={{fontSize:19}}>{it.icon}</span>
+                <span style={{flex:1,fontSize:13,fontWeight:800,color:C.text}}>{it.text}</span>
+                <span style={{fontSize:16,color:C.muted}}>›</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Bandeau de notification in-app */}
       {notifBanner&&(notifBanner.ventes>0||notifBanner.factures>0)&&(
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 16px',background:C.accent,color:C.onAccent,fontSize:13,fontWeight:700}}>
