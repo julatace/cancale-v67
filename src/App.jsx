@@ -5259,6 +5259,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
+  // ── Rappel d'expédition : ventes à expédier, triées par urgence ────────────
+  // Vinted laisse ~5 jours pour expédier après la vente ; expédier en retard
+  // abîme la note vendeur et le classement des annonces. my_orders ne donne pas
+  // la deadline exacte → on l'estime à (date de vente + 5 j).
+  const SHIP_DAYS = 5;
+  const toShip = useMemo(() => {
+    const out = [];
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (!needsBordereau(o.status)) continue;
+      const d = o.date ? new Date(o.date) : null;
+      if (!d || isNaN(d)) { out.push({ o, daysLeft: null, shipBy: null }); continue; }
+      const shipBy = new Date(d.getTime() + SHIP_DAYS * 86400000);
+      const daysLeft = Math.ceil((shipBy - Date.now()) / 86400000);
+      out.push({ o, daysLeft, shipBy });
+    }
+    out.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts]);
+
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
   // modèle précis (nb, prix moyen, temps de vente, bénéf) + verdict achat.
@@ -5604,6 +5625,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       )}
 
       {curSub==='ventes' && (<>
+        {/* Rappel d'expédition : alerte les ventes à expédier, les plus urgentes
+            d'abord (échéance estimée à +5 j). Protège la note vendeur. */}
+        {toShip.length>0 && (()=>{
+          const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
+          const urgent = toShip.filter(t=>t.daysLeft!=null && t.daysLeft>=0 && t.daysLeft<=1).length;
+          const col = late>0 ? C.danger : urgent>0 ? C.warn : C.accent;
+          const s = toShip[0];
+          const when = (t)=> t.daysLeft==null ? '' : t.daysLeft<0 ? `en retard de ${-t.daysLeft} j` : t.daysLeft===0 ? "à expédier aujourd'hui" : `avant le ${t.shipBy.toLocaleDateString('fr-FR')} (${t.daysLeft} j)`;
+          return (
+            <div style={{border:`1.5px solid ${col}`,background:`${col}12`,borderRadius:12,padding:'10px 13px',marginBottom:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:9}}>
+                <span style={{fontSize:19}}>⏰</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:900,color:col}}>{toShip.length} colis à expédier{late>0?` · ${late} en retard`:urgent>0?` · ${urgent} urgent${urgent>1?'s':''}`:''}</div>
+                  {s.shipBy && <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Le plus pressé : <b>{s.o.title||'vente'}</b> — {when(s)}</div>}
+                </div>
+              </div>
+              <div style={{fontSize:10,color:C.muted,marginTop:6,lineHeight:1.4}}>Vinted laisse ~{SHIP_DAYS} j après la vente pour expédier ; à temps = note vendeur préservée. Échéance estimée. Génère le bordereau plus bas (bouton 📄) ou dans l'onglet Bordereaux.</div>
+            </div>
+          );
+        })()}
         {/* Ventes déduites des bordereaux, pas encore dans la synchro Vinted */}
         {(()=>{
           const pending=(emailBords||[]).filter(b=>{
