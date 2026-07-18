@@ -29,6 +29,11 @@
     // quand tu ouvres ton porte-monnaie / ta facturation → l'app calcule ton
     // bénéfice NET tout seul. Motif large (plusieurs noms selon la version).
     { re: /\/(wallet|invoices?|billing|bumps?|item_bumps|push_ups?|dressing_spotlight|vas_entries|payments?)/i, type: 'billing' },
+    // Points relais que Vinted te propose quand tu choisis un relais (achat) :
+    // c'est SA liste officielle, complète, autour de l'adresse de livraison. On
+    // la capte passivement pour l'afficher sur la carte. Motif large (Vinted a
+    // plusieurs noms d'endpoint selon le transporteur / la version).
+    { re: /pickup[_-]?points?|pudo|drop[_-]?off[_-]?points?|shipping[_-]?points?|parcel[_-]?shops?|point[_-]?of[_-]?delivery|delivery[_-]?points?/i, type: 'pickup_points' },
   ];
   const matchHarvest = (url) => {
     for (const h of HARVEST) {

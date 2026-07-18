@@ -413,6 +413,63 @@ const extractBoosts = (payload) => {
   try { visit(payload, 0); } catch (_) {}
   return out;
 };
+// Distance approximative en mètres entre deux coordonnées (haversine).
+const distMeters = (aLat, aLon, bLat, bLon) => {
+  const R = 6371000, toR = Math.PI / 180;
+  const dLat = (bLat - aLat) * toR, dLon = (bLon - aLon) * toR;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * toR) * Math.cos(bLat * toR) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+};
+// Extrait des points relais depuis une réponse Vinted moissonnée, quel que soit
+// le format (Vinted a plusieurs formes selon le transporteur/version). Parcours
+// récursif : on retient tout nœud portant des coordonnées valides.
+const extractPickupPoints = (payload) => {
+  const out = []; const seen = new Set();
+  const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
+  const pick = (o, keys) => { for (const k of keys) { if (o[k] != null) return o[k]; } return null; };
+  const visit = (node, depth) => {
+    if (!node || typeof node !== 'object' || depth > 8) return;
+    if (Array.isArray(node)) { node.forEach(n => visit(n, depth + 1)); return; }
+    const coord = node.coordinates || node.location || node.geo || node;
+    const lat = num(pick(node, ['latitude', 'lat']) != null ? pick(node, ['latitude', 'lat']) : (coord && pick(coord, ['latitude', 'lat'])));
+    const lon = num(pick(node, ['longitude', 'lon', 'lng']) != null ? pick(node, ['longitude', 'lon', 'lng']) : (coord && pick(coord, ['longitude', 'lon', 'lng'])));
+    if (lat != null && lon != null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && (lat !== 0 || lon !== 0)) {
+      const nom = pick(node, ['name', 'title', 'label', 'shop_name']) || (node.carrier && node.carrier.name) || 'Point relais';
+      const carrierRaw = String((node.carrier && (node.carrier.code || node.carrier.name)) || pick(node, ['carrier_name', 'carrier_code', 'shipping_provider', 'provider']) || '').toLowerCase();
+      let carrier = null;
+      if (/mondial/.test(carrierRaw)) carrier = 'mondialrelay'; else if (/chrono|pickup|dpd/.test(carrierRaw)) carrier = 'chronopost';
+      else if (/relais\s*colis/.test(carrierRaw)) carrier = 'relaiscolis'; else if (/\bups\b/.test(carrierRaw)) carrier = 'ups';
+      else if (/coliss|poste/.test(carrierRaw)) carrier = 'colissimo'; else if (/vinted/.test(carrierRaw)) carrier = 'vinted';
+      // Dédup par COORDONNÉES (pas par nom) : un nœud qui porte ses coordonnées
+      // dans un enfant (location/geo) serait sinon ré-extrait en doublon anonyme
+      // au même endroit. Le parent nommé est traité en premier → l'enfant est
+      // ignoré (mêmes coordonnées déjà vues).
+      const key = lat.toFixed(4) + ',' + lon.toFixed(4);
+      if (!seen.has(key)) { seen.add(key); out.push({ nom: String(nom).slice(0, 60), lat, lon, carrier, locker: /locker|casier|automat/i.test(carrierRaw + ' ' + nom) || undefined }); }
+    }
+    for (const k in node) { const v = node[k]; if (v && typeof v === 'object') visit(v, depth + 1); }
+  };
+  try { visit(payload, 0); } catch (_) {}
+  return out;
+};
+// Lit les points relais OFFICIELS captés par l'extension quand Vinted les charge
+// (lignes harvest_{uid}_pickup_points). C'est LA liste que Vinted utilise, autour
+// de l'adresse de livraison. Fusionne tous les comptes, sans doublon.
+const fetchHarvestPickupPoints = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    const all = []; const seen = new Set();
+    for (const r of rows) for (const p of extractPickupPoints(r.data && r.data.payload)) {
+      const key = p.lat.toFixed(4) + ',' + p.lon.toFixed(4);
+      if (!seen.has(key)) { seen.add(key); all.push(p); }
+    }
+    return all;
+  } catch (_) { return []; }
+};
 // Lit les boosts captés par l'extension (lignes harvest_{uid}_billing) et les
 // fusionne, sans doublon. Lecture seule : n'écrase jamais tes saisies manuelles.
 const fetchHarvestBoosts = async () => {
@@ -4621,6 +4678,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
   const [savedPoints, setSavedPoints] = useState(() => load('vrm_points_relais', []));
   const persistPoints = (u) => { setSavedPoints(u); save('vrm_points_relais', u); };
+  // Points relais OFFICIELS de Vinted, captés par l'extension (source complète,
+  // pas OpenStreetMap). S'affichent d'office sur la carte, sans taper de ville.
+  const [vintedPoints, setVintedPoints] = useState(null);
   // Points masqués (par nom) : ceux que tu ne veux pas voir (supérette inutile…).
   // Un point masqué réapparaît si un colis y arrive.
   const [hiddenPts, setHiddenPts] = useState(() => new Set(load('vrm_points_hidden', [])));
@@ -5100,6 +5160,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if (curSub==='achats' && vintedPoints===null) fetchHarvestPickupPoints().then(setVintedPoints); /* eslint-disable-next-line */ }, [sub]);
   // Ta ville est connue mais la liste de ses points n'est pas encore chargée
   // (ou date d'une autre ville) → on la récupère AUTOMATIQUEMENT.
   useEffect(() => {
@@ -6003,6 +6064,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               if(!groups[pt.nom] && !hiddenPts.has(norm2(pt.nom))) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type,carrier:pt.carrier};
             });
           }
+          // Points relais OFFICIELS de Vinted (captés par l'extension) : la source
+          // complète et exacte. Affichés d'office, sans doublon avec un point déjà
+          // présent (même nom OU très proche, <60 m).
+          (vintedPoints||[]).forEach(pt=>{
+            if(carriersOnly && !pt.carrier && !pt.locker) return;
+            if(hiddenPts.has(norm2(pt.nom))) return;
+            const dup=Object.values(groups).some(g=>g.lat&&distMeters(g.lat,g.lon,pt.lat,pt.lon)<60);
+            if(!groups[pt.nom] && !dup) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,vinted:true,carrier:pt.carrier};
+          });
           avail.forEach(t=>{
             const c=cleanLieu(t.lieu);
             const key=c.nom||(/mondial/i.test(t.carrier)?'Point Mondial Relay':/chrono/i.test(t.carrier)?'Point Chronopost':'Point de retrait Vinted');
@@ -6060,7 +6130,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               )}
               {pins.length===0&&(
                 <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:14,background:`${C.accent}08`,padding:'14px 16px',fontSize:12.5,color:C.text,fontWeight:700,lineHeight:1.5}}>
-                  🗺 Entre ta ville ci-dessus pour afficher tous ses points relais. Ceux où tu as un colis afficheront le nombre.
+                  🗺 Les points relais que <b>Vinted</b> utilise apparaissent ici tout seuls : sur Vinted (extension active), fais un achat et ouvre <b>une fois</b> la carte de choix du point relais → l'app importe la liste officielle complète. Tu peux aussi taper ta ville ci-dessus. Les points où tu as un colis afficheront le nombre.
                 </div>
               )}
               {/* Point sélectionné sans colis en attente */}
