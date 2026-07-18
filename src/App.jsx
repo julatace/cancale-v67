@@ -3496,6 +3496,61 @@ const FURN_TYPES = {
   autre:   { label: 'Meuble',  emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0 },
 };
 const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98'];
+// Vue en perspective « on entre dans la pièce ». Vraie projection : largeur,
+// hauteur ET espacement en profondeur passent tous par le MÊME facteur S/Z
+// (distance) → les proportions sont justes (un meuble proche est grand, un
+// meuble au fond petit, dans le bon rapport). Viewport mesuré pour du px exact.
+function RoomPerspective({ items, room, hi, sel, onOpen, colorOf, emojiOf, h3dOf, storedCount }) {
+  const ref = React.useRef(null);
+  const [cw, setCw] = useState(360);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const measure = () => setCw(el.clientWidth || 360); measure();
+    let ro; try { ro = new ResizeObserver(measure); ro.observe(el); } catch (_) { window.addEventListener('resize', measure); }
+    return () => { try { ro && ro.disconnect(); } catch (_) {} window.removeEventListener('resize', measure); };
+  }, []);
+  const ch = Math.min(440, Math.max(240, cw * 0.64));
+  const Znear = 0.9, HSCALE = 2.6;                  // HSCALE : h3d (0.5–1.8) → cellules de hauteur
+  const kx = 0.96 * Znear / room.w, S = kx * cw;    // S/Z = pixels par unité-monde à la profondeur Z
+  const horizonPx = ch * 0.14;
+  const camEye = (ch * 0.72) * Znear / S;           // hauteur caméra → sol proche à ~0.86·hauteur
+  const Zof = (gyFrac) => Znear + (1 - gyFrac) * room.h;
+  const floorY = (Z) => horizonPx + camEye * S / Z;
+  const halfW = room.w / 2, Zfar = Zof(0);
+  const flx = (Z) => cw / 2 - halfW * S / Z, frx = (Z) => cw / 2 + halfW * S / Z;
+  const farY = floorY(Zfar), nearY = floorY(Znear);
+  const list = [...items].sort((a, b) => ((a.y + a.h / 2) / room.h) - ((b.y + b.h / 2) / room.h)); // fond → proche
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%', height: ch, borderRadius: 14, overflow: 'hidden', background: 'linear-gradient(180deg,#eef2f6 0%,#e4e9ef 46%,#d3dae2 100%)', border: `1px solid ${C.border}` }}>
+      {/* mur du fond */}
+      <div style={{ position: 'absolute', left: flx(Zfar), width: frx(Zfar) - flx(Zfar), top: 0, height: farY, background: 'linear-gradient(180deg,#dde3ea,#e9edf2)', borderBottom: '2px solid rgba(0,0,0,0.12)' }} />
+      {/* sol en perspective */}
+      <div style={{ position: 'absolute', inset: 0, clipPath: `polygon(${flx(Zfar)}px ${farY}px, ${frx(Zfar)}px ${farY}px, ${frx(Znear)}px ${nearY}px, ${flx(Znear)}px ${nearY}px)`, background: '#c9b79a' }} />
+      {/* lignes de profondeur (repère visuel) */}
+      {Array.from({ length: Math.max(2, Math.min(9, Math.round(room.h))) }).map((_, i, arr) => { const gy = 1 - (i + 1) / (arr.length + 1); const Z = Zof(gy); const y = floorY(Z); return <div key={i} style={{ position: 'absolute', left: flx(Z), width: frx(Z) - flx(Z), top: y, height: 1, background: 'rgba(0,0,0,0.06)' }} />; })}
+      {items.length === 0 && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 12.5, textAlign: 'center', padding: 20 }}>Ajoute des meubles en mode « ✏️ Éditer », puis reviens ici pour entrer dans ta pièce.</div>}
+      {list.map(it => {
+        const gyF = Math.min(1, (it.y + it.h) / room.h), Z = Zof(gyF);
+        const Xc = (it.x + it.w / 2) - halfW;
+        const baseX = cw / 2 + Xc * S / Z, baseY = floorY(Z);
+        const wpx = Math.max(10, it.w * S / Z), hpx = Math.max(12, h3dOf(it) * HSCALE * S / Z);
+        const isHi = hi && hi.itemId === it.id, isSel = sel === it.id, col = colorOf(it);
+        return (
+          <div key={it.id} onClick={() => onOpen(it.id)} style={{ position: 'absolute', left: baseX - wpx / 2, top: baseY - hpx, width: wpx, height: hpx, zIndex: Math.round(gyF * 100) + (isHi ? 300 : 0), cursor: 'pointer' }}>
+            <div style={{ position: 'absolute', left: '7%', right: '7%', top: -Math.min(12, hpx * 0.16), height: Math.min(12, hpx * 0.16), background: col, filter: 'brightness(1.3)', transform: 'skewX(-34deg)', borderRadius: '3px 3px 0 0', opacity: 0.92 }} />
+            <div style={{ width: '100%', height: '100%', background: `linear-gradient(180deg, ${col}, ${col} 62%, rgba(0,0,0,0.22))`, border: `2px solid ${isHi ? '#e5484d' : isSel ? '#fff' : 'rgba(0,0,0,0.28)'}`, borderRadius: 3, boxShadow: isHi ? '0 0 0 4px rgba(229,72,77,0.4)' : '0 5px 10px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', overflow: 'hidden' }}>
+              <span style={{ fontSize: Math.max(11, Math.min(26, hpx * 0.42)), lineHeight: 1 }}>{emojiOf(it)}</span>
+              {hpx > 40 && <span style={{ fontSize: 9, fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: '96%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>}
+              {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 9, fontWeight: 900, padding: '1px 5px' }}>{storedCount(it)}</span>}
+            </div>
+            {isHi && <div style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', background: '#e5484d', color: '#fff', fontSize: 10, fontWeight: 900, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap', zIndex: 400 }}>ici 📍</div>}
+          </div>
+        );
+      })}
+      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.42)', fontWeight: 700 }}>👣 Vue depuis l'entrée · touche un meuble</span>
+    </div>
+  );
+}
 function RoomPlan({ locate, onLocateConsumed }) {
   const DEFAULT = { room: { w: 10, h: 8 }, items: [] };
   const [plan, setPlan] = useState(() => load('vrm_room_plan', DEFAULT) || DEFAULT);
@@ -3645,42 +3700,8 @@ function RoomPlan({ locate, onLocateConsumed }) {
       <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Glisse un meuble pour le placer. Touche-le → couleur, hauteur, taille, et « 📂 Ranger dedans ». La bordure épaisse = les murs. Puis passe en « 👣 Entrer » pour voir ta pièce en perspective.</div>
       </>)}
 
-      {/* 👣 VUE EN PERSPECTIVE — comme si tu entrais dans la pièce */}
-      {mode === '3d' && (
-        <div style={{ position: 'relative', width: '100%', height: 340, borderRadius: 14, overflow: 'hidden', background: 'linear-gradient(180deg,#e9edf2 0%, #dfe5ec 52%, #cfd6de 100%)', border: `1px solid ${C.border}` }}>
-          {(() => {
-            const HT = 20, HB = 96;                 // % vertical du sol (haut = fond, bas = proche)
-            const WS = (fy) => 0.42 + 0.62 * fy;    // largeur relative selon la profondeur
-            const farL = 50 - 50 * WS(0), farR = 50 + 50 * WS(0), nearL = 50 - 50 * WS(1), nearR = 50 + 50 * WS(1);
-            const list = [...items].sort((a, b) => ((a.y + a.h / 2) / room.h) - ((b.y + b.h / 2) / room.h));
-            return (<>
-              {/* sol en perspective */}
-              <div style={{ position: 'absolute', inset: 0, clipPath: `polygon(${farL}% ${HT}%, ${farR}% ${HT}%, ${nearR}% ${HB}%, ${nearL}% ${HB}%)`, background: `repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0 1px, transparent 1px 26px), #c9b79a` }} />
-              {/* plinthe du mur du fond */}
-              <div style={{ position: 'absolute', left: `${farL}%`, width: `${farR - farL}%`, top: `${HT}%`, height: 3, background: 'rgba(0,0,0,0.12)' }} />
-              {items.length === 0 && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 12.5, textAlign: 'center', padding: 20 }}>Ajoute des meubles en mode « ✏️ Éditer », puis reviens ici pour entrer dans ta pièce.</div>}
-              {list.map(it => {
-                const fx = (it.x + it.w / 2) / room.w, fy = (it.y + it.h / 2) / room.h, ws = WS(fy);
-                const cx = 50 + (fx - 0.5) * 100 * ws, by = HT + fy * (HB - HT);
-                const wPct = (it.w / room.w) * 100 * ws * 0.92, hPx = Math.max(16, h3dOf(it) * 68 * ws);
-                const isHi = hi && hi.itemId === it.id, isSel = sel === it.id, col = colorOf(it);
-                return (
-                  <div key={it.id} onClick={() => { setSel(it.id); setOpenItem(it.id); }} style={{ position: 'absolute', left: `${cx}%`, top: `${by}%`, width: `${wPct}%`, height: hPx, transform: 'translate(-50%,-100%)', zIndex: Math.round(fy * 100) + (isHi ? 300 : 0), cursor: 'pointer' }}>
-                    <div style={{ position: 'absolute', left: '6%', right: '6%', top: -Math.min(11, hPx * 0.2), height: Math.min(11, hPx * 0.2), background: col, filter: 'brightness(1.28)', transform: 'skewX(-32deg)', borderRadius: '3px 3px 0 0', opacity: 0.92 }} />
-                    <div style={{ width: '100%', height: '100%', background: `linear-gradient(180deg, ${col} 0%, ${col} 58%, rgba(0,0,0,0.22) 100%)`, border: `2px solid ${isHi ? '#e5484d' : isSel ? '#fff' : 'rgba(0,0,0,0.28)'}`, borderRadius: 3, boxShadow: isHi ? '0 0 0 4px rgba(229,72,77,0.4)' : '0 6px 11px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', overflow: 'hidden' }}>
-                      <span style={{ fontSize: Math.min(22, hPx * 0.5), lineHeight: 1 }}>{emojiOf(it)}</span>
-                      {hPx > 36 && <span style={{ fontSize: 9, fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 3px' }}>{it.name}</span>}
-                      {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 9, fontWeight: 900, padding: '1px 5px' }}>{storedCount(it)}</span>}
-                    </div>
-                    {isHi && <div style={{ position: 'absolute', top: -17, left: '50%', transform: 'translateX(-50%)', background: '#e5484d', color: '#fff', fontSize: 10, fontWeight: 900, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap' }}>ici 📍</div>}
-                  </div>
-                );
-              })}
-            </>);
-          })()}
-          <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.42)', fontWeight: 700 }}>👣 Vue depuis l'entrée · touche un meuble pour l'ouvrir</span>
-        </div>
-      )}
+      {/* 👣 VUE EN PERSPECTIVE — projection correcte (proportions justes) */}
+      {mode === '3d' && <RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => { setSel(id); setOpenItem(id); }} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />}
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
