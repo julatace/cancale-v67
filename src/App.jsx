@@ -4504,6 +4504,17 @@ function BordPlacer({ place, onConfirm, onCancel }) {
   );
 }
 
+// Réponses rapides prêtes à l'emploi : un clic REMPLIT la zone de texte (tu peux
+// l'ajuster), puis TU envoies. Aucun envoi automatique → aucun risque de blocage.
+const QUICK_REPLIES = [
+  { e:'👋', t:'Bonjour ! Merci pour ton message 🙂' },
+  { e:'✅', t:"Bonjour, oui c'est toujours disponible 😊" },
+  { e:'📏', t:'La taille chausse normalement (celle indiquée sur l\'annonce).' },
+  { e:'🤝', t:'Je peux faire un petit geste sur le prix, ça te convient ?' },
+  { e:'📦', t:'Un lot est possible, je te fais un prix groupé 👍' },
+  { e:'🚀', t:"Merci pour ton achat ! J'expédie très vite 📦" },
+  { e:'⭐', t:"Bonne réception ! N'hésite pas à laisser un avis 🙂" },
+];
 // Cache partagé entre les onglets (évite de recharger à chaque changement
 // d'onglet) : moins de requêtes, navigation instantanée. TTL court.
 const _acctCache = {};
@@ -6804,6 +6815,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             {!openConv.loading && !openConv.error && openConv.convId && (
               <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
                 {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
+                {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
+                <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
+                  {QUICK_REPLIES.map((q,i)=>(
+                    <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
+                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:999,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
+                    </button>
+                  ))}
+                </div>
                 <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
                   <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
                   <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()} style={{flexShrink:0,border:'none',borderRadius:12,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:800,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
