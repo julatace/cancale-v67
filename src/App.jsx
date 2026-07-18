@@ -3487,15 +3487,22 @@ const loadRoomPlan = async () => {
 const saveRoomPlan = async (data) => {
   try { await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 'vrm_room', data }) }); } catch (_) {}
 };
+// Catalogue de rangements — volontairement large pour convenir à TOUTE méthode.
+// `build` = quel constructeur 3D utiliser (plusieurs types partagent une forme).
 const FURN_TYPES = {
-  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0 },
-  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8 },
-  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6 },
-  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f', h3d: 0.7 },
-  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5 },
-  autre:   { label: 'Meuble',  emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0 },
+  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode' },
+  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere' },
+  casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere' },
+  armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire' },
+  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie' },
+  portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie' },
+  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f', h3d: 0.7, build: 'table' },
+  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites' },
+  bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate' },
+  malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle' },
+  autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
 };
-const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98'];
+const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
 // VRAIE 3D (Three.js, chargé dynamiquement pour ne pas alourdir le bundle) :
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
@@ -3603,19 +3610,43 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
         for (let i = 0; i < n; i++) { const off = (i % 2 ? 0.06 : -0.05) * w; const b = box(w * 0.9, bh * 0.9, d * 0.9, flatMat(base, 0.85)); b.position.set(off, (i + 0.5) * bh, off * 0.4); g.add(b); const tape = box(w * 0.9, bh * 0.12, 0.02, flatMat(shade(base, 26), 0.8)); tape.position.set(off, (i + 0.5) * bh, d * 0.45 + off * 0.4); g.add(tape); }
         return g;
       };
+      const buildArmoire = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base); const body = box(w, ht, d, m); body.position.y = ht / 2; g.add(body);
+        const dm = woodMat(shade(base, -12));
+        [-1, 1].forEach(s => { const door = box(w * 0.47, ht * 0.94, 0.05, dm); door.position.set(s * w * 0.24, ht / 2, d / 2 + 0.026); g.add(door); const knob = shadowize(new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), metalMat)); knob.position.set(s * w * 0.04, ht / 2, d / 2 + 0.07); g.add(knob); });
+        return g;
+      };
+      const buildCrate = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = flatMat(base, 0.8), t = 0.06;
+        const bottom = box(w, t, d, m); bottom.position.y = t / 2; g.add(bottom);
+        const wall = (ww, dd, x, z) => { const p = box(ww, ht, dd, m); p.position.set(x, ht / 2, z); g.add(p); };
+        wall(w, t, 0, -d / 2 + t / 2); wall(w, t, 0, d / 2 - t / 2); wall(t, d, -w / 2 + t / 2, 0); wall(t, d, w / 2 - t / 2, 0);
+        return g;
+      };
+      const buildMalle = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base); const bodyH = ht * 0.7; const body = box(w, bodyH, d, m); body.position.y = bodyH / 2; g.add(body);
+        const lid = box(w * 1.02, ht * 0.32, d * 1.02, woodMat(shade(base, -10))); lid.position.y = bodyH + ht * 0.14; g.add(lid);
+        [-1, 1].forEach(s => { const band = box(0.06, ht * 0.9, d * 1.03, metalMat); band.position.set(s * w * 0.3, ht * 0.45, 0); g.add(band); });
+        const lock = box(0.16, 0.14, 0.05, metalMat); lock.position.set(0, bodyH, d / 2 + 0.02); g.add(lock);
+        return g;
+      };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const buildFurniture = () => {
         while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
         items.forEach(it => {
           const ht = Math.max(0.35, h3dOf(it) * HSCALE), w = it.w * 0.92, d = it.h * 0.92, base = colorOf(it);
+          const shape = (FURN_TYPES[it.type] || {}).build || 'generic';
           let g;
-          switch (it.type) {
+          switch (shape) {
             case 'commode': g = buildCommode(w, d, ht, base, it.rows); break;
             case 'etagere': g = buildEtagere(w, d, ht, base, it.rows); break;
+            case 'armoire': g = buildArmoire(w, d, ht, base); break;
             case 'penderie': g = buildPenderie(w, d, ht, base); break;
             case 'table': g = buildTable(w, d, ht, base); break;
             case 'boites': g = buildBoites(w, d, ht, base); break;
+            case 'crate': g = buildCrate(w, d, ht, base); break;
+            case 'malle': g = buildMalle(w, d, ht, base); break;
             default: g = buildGeneric(w, d, ht, base);
           }
           g.position.set((it.x + it.w / 2) - room.w / 2, 0, (it.y + it.h / 2) - room.h / 2);
@@ -3770,6 +3801,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const setRoom = (dw, dh) => persist({ ...plan, room: { w: Math.max(4, Math.min(20, room.w + dw)), h: Math.max(4, Math.min(20, room.h + dh)) } });
   const updateItem = (id, patch) => persist({ ...plan, items: items.map(it => it.id === id ? { ...it, ...patch } : it) });
   const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; persist({ ...plan, items: items.filter(it => it.id !== id) }); setSel(null); setOpenItem(null); };
+  const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; persist({ ...plan, items: [...items, copy] }); setSel(id); };
 
   const onDown = (e, it) => { e.stopPropagation(); setSel(it.id); const p = e.touches ? e.touches[0] : e; drag.current = { id: it.id, sx: p.clientX, sy: p.clientY, ox: it.x, oy: it.y, moved: false }; };
   const onMove = (e) => {
@@ -3862,6 +3894,10 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
             {FURN_COLORS.map(c => (<button key={c} onClick={() => updateItem(selItem.id, { color: c })} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: colorOf(selItem) === c ? `2px solid ${C.text}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />))}
+            <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
+              <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
+            </label>
+            <button onClick={() => { const e = (window.prompt('Emoji du meuble :', emojiOf(selItem)) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>
             <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
             {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
           </div>
@@ -3872,6 +3908,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
           <button onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
           <button onClick={() => { const n = window.prompt('Nom du meuble :', selItem.name); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>✎</button>
+          <button onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
