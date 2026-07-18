@@ -3501,6 +3501,8 @@ const FURN_TYPES = {
   boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites' },
   bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate' },
   malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle' },
+  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 1, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true },
+  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 2, h: 1, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true },
   autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
 };
 const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
@@ -3656,6 +3658,29 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
         for (let c = 1; c < nc; c++) { const sv = box(t, ht, d, m); sv.position.set(-w / 2 + (c / nc) * w, ht / 2, 0); g.add(sv); }
         return g;
       };
+      const buildPorte = (w, d, ht, base) => {
+        const g = new THREE.Group(); const frameM = woodMat(shade(base, -12)), leafM = woodMat(base), t = 0.08, dd = Math.max(0.12, d);
+        [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const p = box(t, ht, dd, frameM); p.position.set(px, ht / 2, 0); g.add(p); });
+        const lintel = box(w, t, dd, frameM); lintel.position.set(0, ht - t / 2, 0); g.add(lintel);
+        const leaf = box(w - 2 * t, ht - t, dd * 0.45, leafM); leaf.position.set(0, (ht - t) / 2, 0); g.add(leaf);
+        // 2 panneaux moulurés + poignée
+        [[-1, 0.72], [1, 0.72], [-1, 0.28], [1, 0.28]].forEach(([sx, fy]) => { const pn = box((w - 2 * t) * 0.36, (ht - t) * 0.32, 0.02, woodMat(shade(base, -6))); pn.position.set(sx * (w - 2 * t) * 0.21, (ht - t) * fy, dd * 0.24); g.add(pn); });
+        const knob = shadowize(new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), metalMat)); knob.position.set(w / 2 - t - 0.11, ht * 0.48, dd * 0.26); g.add(knob);
+        return g;
+      };
+      const buildFenetre = (w, d, ht, base) => {
+        const g = new THREE.Group(); const frameM = flatMat(shade(base, -22), 0.55), t = 0.08, dd = Math.max(0.1, d);
+        const y0 = ht * 0.75, y1 = y0 + ht, cy = (y0 + y1) / 2; // rebord en hauteur
+        [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const p = box(t, ht, dd, frameM); p.position.set(px, cy, 0); g.add(p); });
+        const topB = box(w, t, dd, frameM); topB.position.set(0, y1 - t / 2, 0); g.add(topB);
+        const botB = box(w, t, dd, frameM); botB.position.set(0, y0 + t / 2, 0); g.add(botB);
+        const sill = box(w * 1.08, t * 0.9, dd * 1.7, frameM); sill.position.set(0, y0, dd * 0.2); g.add(sill); // appui
+        const midV = box(t * 0.6, ht, dd * 0.8, frameM); midV.position.set(0, cy, 0); g.add(midV);
+        const midH = box(w, t * 0.6, dd * 0.8, frameM); midH.position.set(0, cy, 0); g.add(midH);
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(w - t * 1.2, ht - t * 1.2, dd * 0.3), new THREE.MeshStandardMaterial({ color: '#bcd6ea', transparent: true, opacity: 0.42, roughness: 0.08, metalness: 0.15 }));
+        glass.position.set(0, cy, 0); g.add(glass);
+        return g;
+      };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const buildFurniture = () => {
@@ -3674,6 +3699,8 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
             case 'crate': g = buildCrate(w, d, ht, base); break;
             case 'malle': g = buildMalle(w, d, ht, base); break;
             case 'grille': g = buildGrille(w, d, ht, base, it.rows, it.cols); break;
+            case 'porte': g = buildPorte(w, d, ht, base); break;
+            case 'fenetre': g = buildFenetre(w, d, ht, base); break;
             default: g = buildGeneric(w, d, ht, base);
           }
           g.position.set((it.x + it.w / 2) - room.w / 2, 0, (it.y + it.h / 2) - room.h / 2);
@@ -3829,19 +3856,32 @@ function RoomPerspective({ items, room, hi, sel, onOpen, colorOf, emojiOf, h3dOf
     </div>
   );
 }
+// Un plan peut contenir PLUSIEURS pièces. On normalise l'ancien format
+// mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
+const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#e4e8ee' };
+function normalizePlan(p) {
+  const mk = (r) => ({ id: r.id || 'r' + Math.random().toString(36).slice(2, 8), name: r.name || 'Pièce', room: { ...ROOM_DEFAULT, ...(r.room || {}) }, items: Array.isArray(r.items) ? r.items : [] });
+  if (p && Array.isArray(p.rooms) && p.rooms.length) {
+    const rooms = p.rooms.map(mk);
+    const active = p.active && rooms.some(r => r.id === p.active) ? p.active : rooms[0].id;
+    return { rooms, active };
+  }
+  // ancien format (une seule pièce) → on l'enveloppe
+  const only = mk({ id: 'r1', name: 'Ma pièce', room: (p && p.room) || ROOM_DEFAULT, items: (p && p.items) || [] });
+  return { rooms: [only], active: only.id };
+}
+
 function RoomPlan({ locate, onLocateConsumed }) {
-  const DEFAULT = { room: { w: 10, h: 8 }, items: [] };
-  const [plan, setPlan] = useState(() => load('vrm_room_plan', DEFAULT) || DEFAULT);
+  const [plan, setPlan] = useState(() => normalizePlan(load('vrm_room_plan', null)));
   const [sel, setSel] = useState(null);
   const [openItem, setOpenItem] = useState(null);
   const [search, setSearch] = useState('');
   const [hi, setHi] = useState(null); // { itemId, cell } | { notFound:true }
-  const [mode, setMode] = useState('edit'); // 'edit' (dessus) | '3d' (perspective)
   const [moveMode, setMoveMode] = useState(false); // meubles déplaçables SEULEMENT si activé
   const roomRef = React.useRef(null);
   const drag = React.useRef(null);
 
-  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud && Array.isArray(cloud.items)) { setPlan(cloud); save('vrm_room_plan', cloud); } })(); }, []);
+  useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); setPlan(np); save('vrm_room_plan', np); } })(); }, []);
   // Écriture locale immédiate (fluide au drag) ; envoi cloud DÉBOUNCÉ (800 ms
   // après le dernier changement) → un glissement = un seul upload, pas 50.
   const saveTimer = React.useRef(null);
@@ -3850,8 +3890,27 @@ function RoomPlan({ locate, onLocateConsumed }) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => saveRoomPlan(next), 800);
   };
-  const items = plan.items || [];
-  const room = plan.room || DEFAULT.room;
+  const activeRoom = plan.rooms.find(r => r.id === plan.active) || plan.rooms[0];
+  const items = activeRoom.items || [];
+  const room = activeRoom.room || ROOM_DEFAULT;
+  // Modifie la pièce active (patch = objet fusionné, ou fonction (room)=>patch).
+  const patchRoom = (patch) => persist({ ...plan, rooms: plan.rooms.map(r => r.id === activeRoom.id ? { ...r, ...(typeof patch === 'function' ? patch(r) : patch) } : r) });
+  const setItems = (updater) => patchRoom(r => ({ items: typeof updater === 'function' ? updater(r.items || []) : updater }));
+
+  // ── Gestion des pièces ──
+  const addRoom = () => {
+    const id = 'r' + Date.now(); const name = 'Pièce ' + (plan.rooms.length + 1);
+    persist({ ...plan, rooms: [...plan.rooms, { id, name, room: { ...ROOM_DEFAULT }, items: [] }], active: id });
+    setSel(null); setOpenItem(null); setHi(null); setSearch('');
+  };
+  const switchRoom = (id) => { if (id === plan.active) return; persist({ ...plan, active: id }); setSel(null); setOpenItem(null); setHi(null); setSearch(''); };
+  const renameRoom = () => { const n = window.prompt('Nom de la pièce :', activeRoom.name); if (n != null && n.trim()) patchRoom({ name: n.trim() }); };
+  const removeRoom = () => {
+    if (plan.rooms.length <= 1) { window.alert('Il faut garder au moins une pièce.'); return; }
+    if (!window.confirm('Supprimer la pièce « ' + activeRoom.name + ' » et tout son contenu ?')) return;
+    const rooms = plan.rooms.filter(r => r.id !== activeRoom.id);
+    persist({ ...plan, rooms, active: rooms[0].id }); setSel(null); setOpenItem(null); setHi(null); setSearch('');
+  };
 
   const addFurn = (type) => {
     const t = FURN_TYPES[type]; const id = 'f' + Date.now();
@@ -3862,16 +3921,16 @@ function RoomPlan({ locate, onLocateConsumed }) {
       const e = (window.prompt('Un emoji pour le représenter (facultatif) :', '🪑') || '').trim();
       if (e) emoji = e;
     }
-    persist({ ...plan, items: [...items, { id, type, name, emoji, color: t.color, h3d: t.h3d, x: Math.max(0, Math.min(1, room.w - t.w)), y: Math.max(0, Math.min(1, room.h - t.h)), w: t.w, h: t.h, rows: t.rows, cols: t.cols, slots: {} }] });
+    setItems(list => [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, x: Math.max(0, Math.min(1, room.w - t.w)), y: Math.max(0, Math.min(1, room.h - t.h)), w: t.w, h: t.h, rows: t.rows, cols: t.cols, slots: {} }]);
     setSel(id);
   };
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
   const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
-  const setRoom = (dw, dh) => persist({ ...plan, room: { w: Math.max(4, Math.min(20, room.w + dw)), h: Math.max(4, Math.min(20, room.h + dh)) } });
-  const updateItem = (id, patch) => persist({ ...plan, items: items.map(it => it.id === id ? { ...it, ...patch } : it) });
-  const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; persist({ ...plan, items: items.filter(it => it.id !== id) }); setSel(null); setOpenItem(null); };
-  const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; persist({ ...plan, items: [...items, copy] }); setSel(id); };
+  const setRoom = (dw, dh) => patchRoom(r => ({ room: { ...r.room, w: Math.max(4, Math.min(20, r.room.w + dw)), h: Math.max(4, Math.min(20, r.room.h + dh)) } }));
+  const updateItem = (id, patch) => setItems(list => list.map(it => it.id === id ? { ...it, ...patch } : it));
+  const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
+  const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; setItems(list => [...list, copy]); setSel(id); };
 
   const onDown = (e, it) => { e.stopPropagation(); setSel(it.id); const p = e.touches ? e.touches[0] : e; drag.current = { id: it.id, sx: p.clientX, sy: p.clientY, ox: it.x, oy: it.y, moved: false }; };
   const onMove = (e) => {
@@ -3889,7 +3948,11 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
   const doSearch = (q) => {
     const t = String(q).trim().toLowerCase(); if (!t) { setHi(null); return; }
-    for (const it of items) for (const cell in (it.slots || {})) if ((it.slots[cell] || []).some(n => String(n).trim().toLowerCase() === t)) { setHi({ itemId: it.id, cell }); setOpenItem(it.id); setSel(it.id); return; }
+    // On cherche dans TOUTES les pièces : si le N° est ailleurs, on bascule dessus.
+    for (const rm of plan.rooms) for (const it of (rm.items || [])) for (const cell in (it.slots || {})) if ((it.slots[cell] || []).some(n => String(n).trim().toLowerCase() === t)) {
+      if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
+      setHi({ itemId: it.id, cell, roomId: rm.id, roomName: rm.name }); setOpenItem(it.id); setSel(it.id); return;
+    }
     setHi({ notFound: true });
   };
   useEffect(() => { if (locate != null && String(locate).trim() !== '') { setSearch(String(locate)); doSearch(String(locate)); onLocateConsumed && onLocateConsumed(); } /* eslint-disable-next-line */ }, [locate, items.length]);
@@ -3906,13 +3969,28 @@ function RoomPlan({ locate, onLocateConsumed }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
+      {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>🏠 Pièces :</span>
+        {plan.rooms.map(r => {
+          const on = r.id === activeRoom.id;
+          return (
+            <button key={r.id} onClick={() => switchRoom(r.id)} style={{ border: `1.5px solid ${on ? C.accent : C.border}`, borderRadius: 999, background: on ? C.accent : C.card, color: on ? '#fff' : C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              {r.name}{r.items && r.items.length ? ` · ${r.items.length}` : ''}
+            </button>
+          );
+        })}
+        <button onClick={addRoom} title="Ajouter une pièce" style={{ border: `1px dashed ${C.border}`, borderRadius: 999, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>＋ Pièce</button>
+        <button onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}>✎</button>
+        {plan.rooms.length > 1 && <button onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}>🗑</button>}
+      </div>
       {/* Recherche */}
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="🔎 Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
         {search && <button onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}>✕</button>}
       </div>
       {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
-      {hi && hi.itemId && (()=>{ const it=items.find(x=>x.id===hi.itemId); return it ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{search} → <b>{it.name}</b> (meuble surligné)</div> : null; })()}
+      {hi && hi.itemId && (()=>{ const it=items.find(x=>x.id===hi.itemId); return it ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null} (meuble surligné)</div> : null; })()}
 
       {/* Palette de meubles */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -3929,14 +4007,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <button onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
         <button onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
         <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
-        <button onClick={() => persist({ ...plan, room: { ...room, wallH: Math.min(6, Math.round(((room.wallH || 3.4) + 0.4) * 10) / 10) } })} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
-        <button onClick={() => persist({ ...plan, room: { ...room, wallH: Math.max(2.4, Math.round(((room.wallH || 3.4) - 0.4) * 10) / 10) } })} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+        <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
+        <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
         <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
         {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
-          <button key={c} onClick={() => persist({ ...plan, room: { ...room, wallColor: c } })} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
+          <button key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
         ))}
         <label title="Couleur libre des murs" style={{ width: 20, height: 20, borderRadius: 4, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
-          <input type="color" value={room.wallColor || '#e4e8ee'} onChange={e => persist({ ...plan, room: { ...room, wallColor: e.target.value } })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
+          <input type="color" value={room.wallColor || '#e4e8ee'} onChange={e => patchRoom(r => ({ room: { ...r.room, wallColor: e.target.value } }))} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
         </label>
       </div>
 
@@ -3949,7 +4027,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       </div>
 
       {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
-      <Room3D key={`${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
