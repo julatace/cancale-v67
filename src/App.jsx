@@ -3501,8 +3501,8 @@ const FURN_TYPES = {
   boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites' },
   bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate' },
   malle:   { label: 'Malle',   emoji: '🧳', w: 2, h: 1, rows: 1, cols: 2, color: '#8a6f57', h3d: 0.6, build: 'malle' },
-  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 1, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true },
-  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 2, h: 1, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true },
+  porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true },
+  fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true },
   autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
 };
 const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
@@ -4016,7 +4016,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
     }
     // Pour une grille, le footprint (w/h) découle de la taille de case × nb de cases.
     const cell = t.cell, w = cell ? +(t.cols * cell).toFixed(2) : t.w, h = cell ? cell : t.h;
-    setItems(list => [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x: Math.max(0, Math.min(1, room.w - w)), y: Math.max(0, Math.min(1, room.h - h)), w, h, rows: t.rows, cols: t.cols, slots: {} }]);
+    setItems(list => {
+      // On répartit chaque nouveau meuble sur une petite grille pour qu'il
+      // n'apparaisse PAS empilé au même endroit (sinon il semble « disparaître »
+      // derrière un meuble déjà là — c'était le cas de la porte).
+      const n = list.length, gx = 0.6 + (n % 4) * 1.5, gy = 0.6 + (Math.floor(n / 4) % 4) * 1.5;
+      const x = Math.max(0, Math.min(room.w - w, +gx.toFixed(1))), y = Math.max(0, Math.min(room.h - h, +gy.toFixed(1)));
+      return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x, y, w, h, rows: t.rows, cols: t.cols, slots: {} }];
+    });
     setSel(id);
   };
   // Contrôles de la GRILLE personnalisable : nb de colonnes, de rangées, taille
