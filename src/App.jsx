@@ -34,7 +34,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
-  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum',
+  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides',
 ];
 
@@ -412,6 +412,36 @@ const extractBoosts = (payload) => {
   };
   try { visit(payload, 0); } catch (_) {}
   return out;
+};
+// Prochaine échéance de déclaration URSSAF (micro-entrepreneur), selon la
+// fréquence choisie. Mensuel : la déclaration d'un mois est due le dernier jour
+// du mois suivant. Trimestriel : échéances fixes 30/04, 31/07, 31/10, 31/01.
+// Renvoie { dueDate, periodStart, periodEnd, label, daysLeft } ou null.
+const _startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+const nextUrssafDeadline = (freq, now = new Date()) => {
+  const today = _startOfDay(now);
+  const Y = now.getFullYear();
+  const MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  const mk = (dueDate, periodStart, periodEnd, label) => ({ dueDate, periodStart, periodEnd, label, daysLeft: Math.round((_startOfDay(dueDate) - today) / 86400000) });
+  if (freq === 'mensuel') {
+    for (let m = -2; m <= 2; m++) {
+      const ps = new Date(Y, now.getMonth() + m, 1);
+      const pe = new Date(ps.getFullYear(), ps.getMonth() + 1, 0);
+      const due = new Date(ps.getFullYear(), ps.getMonth() + 2, 0); // dernier jour de M+1
+      if (_startOfDay(due) >= today) return mk(due, ps, pe, `${MOIS[ps.getMonth()]} ${ps.getFullYear()}`);
+    }
+    return null;
+  }
+  // Trimestriel
+  const cands = [
+    mk(new Date(Y, 0, 31), new Date(Y-1, 9, 1), new Date(Y-1, 11, 31), `T4 ${Y-1}`),
+    mk(new Date(Y, 3, 30), new Date(Y, 0, 1),  new Date(Y, 2, 31),  `T1 ${Y}`),
+    mk(new Date(Y, 6, 31), new Date(Y, 3, 1),  new Date(Y, 5, 30),  `T2 ${Y}`),
+    mk(new Date(Y, 9, 31), new Date(Y, 6, 1),  new Date(Y, 8, 30),  `T3 ${Y}`),
+    mk(new Date(Y+1, 0, 31), new Date(Y, 9, 1), new Date(Y, 11, 31), `T4 ${Y}`),
+  ];
+  for (const c of cands) if (_startOfDay(c.dueDate) >= today) return c;
+  return null;
 };
 // Où est rangée une paire dans le garage ? Cherche le numéro dans la grille et
 // renvoie sa position lisible (colonne / place). null si pas rangée.
@@ -1646,6 +1676,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
   const TAUX_URSSAF=0.135;
   const urssafEstime=moisCourant.ca*TAUX_URSSAF;
   const netApresUrssaf=moisCourant.ca-urssafEstime;
+  // Échéance de déclaration URSSAF (fréquence réglable) + CA encaissé de la
+  // période concernée → somme estimée à déclarer/payer à cette date.
+  const [urssafFreq,setUrssafFreq]=useState(()=>load('vinted_urssaf_freq','trimestriel'));
+  const urssafDue=useMemo(()=>nextUrssafDeadline(urssafFreq),[urssafFreq]);
+  const urssafPeriodCA=useMemo(()=>{
+    if(!urssafDue) return 0;
+    return encaissees.filter(v=>{
+      const p=(v.receiveDate||'').trim().split('/'); if(p.length!==3) return false;
+      const d=new Date(+p[2],+p[1]-1,+p[0]); if(isNaN(d)) return false;
+      return d>=urssafDue.periodStart && d<=urssafDue.periodEnd;
+    }).reduce((s,v)=>s+ +v.sellPrice,0);
+  },[encaissees,urssafDue]);
 
   const bestDayCA=useMemo(()=>[...days].sort((a,b)=>b[1].ca-a[1].ca)[0],[days]);
   const bestDayProfit=useMemo(()=>[...days].sort((a,b)=>b[1].profit-a[1].profit)[0],[days]);
@@ -1829,6 +1871,31 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
         </div>
         <div style={{fontSize:10,color:C.muted,marginTop:10,lineHeight:1.5}}>
           Calculé sur le CA encaissé de {moisCourant.nom} ({fmt(moisCourant.ca)}). C'est la somme à verser à la fin du mois (versement libératoire). Vérifie ton taux sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
+        </div>
+        {/* Prochaine échéance de DÉCLARATION (rappel) */}
+        <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,flex:1}}>📅 Prochaine déclaration URSSAF</span>
+            <div style={{display:'flex',gap:4,background:C.surface,borderRadius:999,padding:2,border:`1px solid ${C.border}`}}>
+              {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
+                <button key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:999,padding:'3px 10px',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {urssafDue ? (()=>{
+            const late=urssafDue.daysLeft<0, soon=urssafDue.daysLeft>=0&&urssafDue.daysLeft<=14;
+            const col=late?C.danger:soon?C.warn:C.accent;
+            return (
+              <div style={{border:`1px solid ${col}55`,background:`${col}0e`,borderRadius:12,padding:'11px 13px'}}>
+                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+                  <span style={{fontSize:15,fontWeight:900,color:col}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
+                  <span style={{fontSize:12,fontWeight:800,color:col}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
+                </div>
+                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA encaissé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(urssafPeriodCA*TAUX_URSSAF)}</b></div>
+                <div style={{fontSize:9.5,color:C.muted,marginTop:5}}>Estimation (13,5 %). La vraie déclaration se fait sur autoentrepreneur.urssaf.fr.</div>
+              </div>
+            );
+          })() : <div style={{fontSize:11,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
       </Card>
 
@@ -7826,6 +7893,14 @@ export default function App() {
       if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
       if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_ventes'});
       if(unreadTotal>0)  items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}`, n:unreadTotal, tab:'cat_msg'});
+      // Rappel URSSAF si l'échéance de déclaration approche (≤ 14 j) ou est passée.
+      try{
+        const due=nextUrssafDeadline(load('vinted_urssaf_freq','trimestriel'));
+        if(due && due.daysLeft<=14){
+          const when=due.daysLeft<0?`en retard (${due.dueDate.toLocaleDateString('fr-FR')})`:due.daysLeft===0?"aujourd'hui":`avant le ${due.dueDate.toLocaleDateString('fr-FR')}`;
+          items.push({icon:'🧾', text:`Déclaration URSSAF ${when}`, n:1, tab:'dashboard'});
+        }
+      }catch(_){}
       setNotifItems(items);
       save('vinted_notif_seen_convs',nextSeen);
       const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);
