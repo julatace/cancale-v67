@@ -3753,33 +3753,60 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.target.set(0, 0.6, 0); controls.enableDamping = true; controls.dampingFactor = 0.1;
       controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 2.5; controls.maxDistance = Math.max(room.w, room.h) * 2.6; controls.update();
-      // Interaction : GLISSER un meuble = le déplacer (sur le sol) ; TOUCHER = ouvrir.
+      // Rotation/zoom de la caméra pilotés par les BOUTONS de l'overlay (fiable
+      // sur mobile, indépendant du geste tactile). rotateView = tourner autour de
+      // la pièce (gauche/droite) ; zoomView = avancer/reculer.
+      const rotateView = (deg) => {
+        const a = deg * Math.PI / 180, ox = camera.position.x - controls.target.x, oz = camera.position.z - controls.target.z;
+        const cos = Math.cos(a), sin = Math.sin(a);
+        camera.position.x = controls.target.x + ox * cos - oz * sin;
+        camera.position.z = controls.target.z + ox * sin + oz * cos;
+        controls.update();
+      };
+      const zoomView = (factor) => {
+        const ox = camera.position.x - controls.target.x, oy = camera.position.y - controls.target.y, oz = camera.position.z - controls.target.z;
+        const dist = Math.hypot(ox, oy, oz), nd = dist * factor;
+        if (nd < controls.minDistance || nd > controls.maxDistance) return;
+        camera.position.set(controls.target.x + ox * factor, controls.target.y + oy * factor, controls.target.z + oz * factor);
+        controls.update();
+      };
+      // Interaction directe : en MODE DÉPLACEMENT, glisser un meuble le déplace ;
+      // sinon glisser = tourner la vue (OrbitControls) et un tap = sélectionner.
       const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
       const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
       let drag = null;
       const setPtr = (e) => { const r = renderer.domElement.getBoundingClientRect(); ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1; ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1; };
+      // pd est posé sur EL (le conteneur) en phase de CAPTURE → il s'exécute AVANT
+      // OrbitControls (posé sur le canvas). Si on saisit un meuble à déplacer, on
+      // coupe l'événement (stopPropagation) pour que la caméra ne bouge pas ; sinon
+      // on laisse filer vers OrbitControls qui tourne la vue.
       const pd = (e) => {
         setPtr(e); ray.setFromCamera(ptr, camera);
         const hits = ray.intersectObjects(furnGroup.children, true);
-        if (!hits.length) return; // sol/vide → OrbitControls tourne la caméra
-        let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) return; // remonte jusqu'au GROUPE meuble
+        if (!hits.length) { drag = null; return; } // vide → OrbitControls tourne
+        let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) { drag = null; return; }
         const canDrag = !!moveRef.current;
         const gp = ray.ray.intersectPlane(ground, hitPt);
         drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
-        if (canDrag) controls.enabled = false; // mode déplacer : on fige la caméra pendant qu'on tient le meuble
+        if (canDrag) { // on garde la main : OrbitControls NE reçoit PAS ce geste
+          controls.enabled = false;
+          try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) {}
+          e.stopPropagation(); if (e.cancelable) e.preventDefault();
+        }
       };
       const pm = (e) => {
         if (!drag) return;
         if (!drag.moved && Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 6) drag.moved = true;
-        if (!drag.canDrag || !drag.moved) return; // hors mode déplacer : la caméra tourne (OrbitControls), on ne bouge PAS le meuble
+        if (!drag.canDrag || !drag.moved) return; // hors mode déplacer : la caméra tourne, on ne bouge PAS le meuble
         setPtr(e); ray.setFromCamera(ptr, camera); if (!ray.ray.intersectPlane(ground, hitPt)) return;
         const hw = drag.w / 2, hh = drag.h / 2;
         drag.grp.position.x = Math.max(-room.w / 2 + hw, Math.min(room.w / 2 - hw, hitPt.x + drag.offX));
         drag.grp.position.z = Math.max(-room.h / 2 + hh, Math.min(room.h / 2 - hh, hitPt.z + drag.offZ));
         if (e.cancelable) e.preventDefault();
       };
-      const pu = () => {
-        if (!drag) return; const d = drag; drag = null; if (d.canDrag) controls.enabled = true;
+      const pu = (e) => {
+        if (!drag) return; const d = drag; drag = null;
+        if (d.canDrag) { controls.enabled = true; try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) {} }
         if (d.canDrag && d.moved) {
           const nx = Math.max(0, Math.min(room.w - d.w, Math.round((d.grp.position.x + room.w / 2 - d.w / 2) * 2) / 2));
           const ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
@@ -3787,16 +3814,16 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
           onMove && onMove(d.id, nx, ny);
         } else if (!d.moved) { (onSelect || onOpen) && (onSelect || onOpen)(d.id); } // tap simple = sélectionner
       };
-      renderer.domElement.addEventListener('pointerdown', pd);
+      el.addEventListener('pointerdown', pd, true); // CAPTURE : avant OrbitControls
       window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
       let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
-      st.current = { THREE, furnGroup, buildFurniture };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
-        renderer.domElement.removeEventListener('pointerdown', pd);
+        el.removeEventListener('pointerdown', pd, true);
         window.removeEventListener('pointermove', pm); window.removeEventListener('pointerup', pu);
         try { ro && ro.disconnect(); } catch (_) {} window.removeEventListener('resize', onResize);
         try { controls.dispose(); } catch (_) {} renderer.dispose(); try { el.removeChild(renderer.domElement); } catch (_) {}
@@ -3825,7 +3852,25 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
     <div data-noswipe="1" style={{ position: 'relative', width: '100%', height: 420, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
       {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
-      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none' }}>✋ Glisse un MEUBLE pour le déplacer · glisse le vide pour tourner · touche pour ouvrir</span>
+      {/* Contrôles de vue : tourner à gauche/droite + zoom (fiables sur mobile) */}
+      {!loading && (() => {
+        const btn = { width: 38, height: 38, borderRadius: 10, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.9)', color: '#1c1c22', fontSize: 17, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none' };
+        const stop = (e) => { e.stopPropagation(); };
+        const call = (fn, ...a) => { const s = st.current || {}; if (s[fn]) s[fn](...a); };
+        return (
+          <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onPointerDown={stop} onClick={() => call('zoomView', 0.85)} title="Zoom avant" style={btn} aria-label="Zoom avant">＋</button>
+              <button onPointerDown={stop} onClick={() => call('zoomView', 1.18)} title="Zoom arrière" style={btn} aria-label="Zoom arrière">−</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onPointerDown={stop} onClick={() => call('rotateView', -22)} title="Tourner à gauche" style={btn} aria-label="Tourner la vue à gauche">◀</button>
+              <button onPointerDown={stop} onClick={() => call('rotateView', 22)} title="Tourner à droite" style={btn} aria-label="Tourner la vue à droite">▶</button>
+            </div>
+          </div>
+        );
+      })()}
+      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none' }}>◀▶ tourne la vue · glisse le vide pour pivoter{' '}· en mode déplacement, glisse un meuble</span>
     </div>
   );
 }
