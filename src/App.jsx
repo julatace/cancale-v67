@@ -5336,6 +5336,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
+  // ── Saisonnalité : tes meilleurs mois de vente (pour acheter au bon moment) ─
+  const seasonality = useMemo(() => {
+    const names = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+    const mois = Array.from({length:12}, () => ({ nb:0, ca:0 }));
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) !== 'completed' || !o.date) continue;
+      const d = new Date(o.date); if (isNaN(d)) continue;
+      mois[d.getMonth()].nb += 1; mois[d.getMonth()].ca += (o.price?.amount != null ? Number(o.price.amount) : 0);
+    }
+    const total = mois.reduce((s, m) => s + m.nb, 0);
+    if (total < 8) return null; // pas assez d'historique pour une tendance fiable
+    const top = mois.map((m, i) => ({ m: names[i], nb: m.nb, ca: m.ca })).filter(x => x.nb > 0).sort((a, b) => b.nb - a.nb).slice(0, 3);
+    return { top, total };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts]);
+  // ── Litiges / annulations : combien de ventes annulées et le manque à gagner ─
+  const litiges = useMemo(() => {
+    let nb = 0, montant = 0;
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) !== 'cancelled') continue;
+      nb += 1; montant += (o.price?.amount != null ? Number(o.price.amount) : 0);
+    }
+    return { nb, montant };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts]);
   // ── Rappel d'expédition : ventes à expédier, triées par urgence ────────────
   // Vinted laisse ~5 jours pour expédier après la vente ; expédier en retard
   // abîme la note vendeur et le classement des annonces. my_orders ne donne pas
@@ -5767,6 +5794,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
             {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
             {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} color={INV_STATUS.online.color} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
+          </div>
+        )}
+        {/* Saisonnalité : meilleurs mois de vente → acheter avant les pics */}
+        {seasonality && seasonality.top.length>0 && (
+          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'9px 13px',marginBottom:8}}>
+            <span style={{fontSize:12,fontWeight:800,color:C.text}}>📈 Tes meilleurs mois de vente : </span>
+            <span style={{fontSize:12,fontWeight:900,color:C.accent}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
+            <span style={{fontSize:10.5,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes. Achète un peu avant ces mois pour avoir le stock au bon moment.</span>
+          </div>
+        )}
+        {/* Litiges / annulations : manque à gagner */}
+        {litiges.nb>0 && (
+          <div style={{border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:12,padding:'9px 13px',marginBottom:8}}>
+            <span style={{fontSize:12,fontWeight:800,color:C.danger}}>⚖️ {litiges.nb} vente{litiges.nb>1?'s':''} annulée{litiges.nb>1?'s':''}</span>
+            <span style={{fontSize:12,color:C.text,fontWeight:700}}> · {fmtE(litiges.montant)} de manque à gagner</span>
+            <span style={{fontSize:10.5,color:C.muted,display:'block',marginTop:3}}>Filtre « Annulées » ci-dessous pour le détail. Un taux d'annulation élevé peut venir de prix/photos à revoir.</span>
           </div>
         )}
         {/* Objectif de CA mensuel */}
