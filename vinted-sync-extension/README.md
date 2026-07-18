@@ -5,6 +5,8 @@ Cette extension tourne **dans ton navigateur** (jamais sur un serveur). Elle fai
 1. **Capture tes comptes** : elle lit les cookies de session Vinted (jamais ton mot de passe) et les envoie dans ta base Supabase, pour que l'app sache quels comptes sont liés.
 2. **Capture passive de tes données** : pendant que tu navigues normalement sur Vinted (ta boutique, tes ventes, tes messages), elle **range les données que Vinted envoie déjà à ton navigateur** dans ta base. **Aucune requête supplémentaire n'est envoyée à Vinted** — c'est ce qui la rend invisible.
 
+> **v3.5 — Boosts.** Quand tu ouvres ton **porte-monnaie / ta facturation** sur Vinted, l'extension capte tes dépenses de boost (remontées d'annonce, mise en avant) et l'app affiche le total dans l'onglet Ventes (bénéfice net plus juste). Pense à **recharger l'extension** (`chrome://extensions` → ⟳) après mise à jour.
+
 ## Pourquoi c'est plus sûr que l'ancienne méthode
 Avant, l'app interrogeait Vinted depuis un serveur (IP de datacenter) — visible et suspect. Maintenant, tout part de **ton navigateur, ton IP maison, ta vraie session** : c'est indistinguable de toi qui utilises Vinted.
 

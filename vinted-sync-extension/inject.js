@@ -24,6 +24,11 @@
     { re: /\/api\/v2\/inbox/,                   type: 'inbox'    },
     { re: /\/api\/v2\/conversations\/(\d+)/,    type: 'conversation' },
     { re: /\/api\/v2\/users\/current/,          type: 'profile'  },
+    // Facturation / porte-monnaie : c'est là que Vinted liste tes dépenses de
+    // BOOST (remontées d'annonce, mise en avant du dressing). Capté passivement
+    // quand tu ouvres ton porte-monnaie / ta facturation → l'app calcule ton
+    // bénéfice NET tout seul. Motif large (plusieurs noms selon la version).
+    { re: /\/(wallet|invoices?|billing|bumps?|item_bumps|push_ups?|dressing_spotlight|vas_entries|payments?)/i, type: 'billing' },
   ];
   const matchHarvest = (url) => {
     for (const h of HARVEST) {

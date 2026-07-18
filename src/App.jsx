@@ -389,6 +389,47 @@ const b64ToArrayBuffer = (b64) => {
   for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
   return bytes.buffer;
 };
+// Extrait les dépenses de BOOST (remontée d'annonce, mise en avant) d'une réponse
+// facturation Vinted moissonnée, quel que soit le format exact. Parcours récursif :
+// on retient tout nœud dont le libellé évoque un boost ET qui porte un montant > 0.
+const extractBoosts = (payload) => {
+  const out = []; const seen = new Set();
+  const num = (v) => { if (v == null) return null; if (typeof v === 'object') return num(v.amount != null ? v.amount : v.value); const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
+  const isBoostText = (s) => /bump|push[_ -]?up|spotlight|mise en avant|remont|boost|highlight|\bvas\b/i.test(String(s || ''));
+  const visit = (node, depth) => {
+    if (!node || typeof node !== 'object' || depth > 8) return;
+    if (Array.isArray(node)) { node.forEach(n => visit(n, depth + 1)); return; }
+    const label = node.entity_type || node.type || node.subject || node.title || node.name || node.description || '';
+    const amt = num(node.amount != null ? node.amount : node.price != null ? node.price : node.total != null ? node.total : node.debit != null ? node.debit : node.value);
+    if (isBoostText(label) && amt != null && amt > 0 && amt < 1000) {
+      const itemId = node.item_id != null ? String(node.item_id) : (node.item && node.item.id != null ? String(node.item.id) : null);
+      const title = (node.item && node.item.title) || node.item_title || null;
+      const date = node.created_at || node.date || node.time || null;
+      const key = (itemId || title || label) + '@' + amt + '@' + (date || '');
+      if (!seen.has(key)) { seen.add(key); out.push({ amount: amt, itemId, title, label: String(label).slice(0, 40), date }); }
+    }
+    for (const k in node) { const v = node[k]; if (v && typeof v === 'object') visit(v, depth + 1); }
+  };
+  try { visit(payload, 0); } catch (_) {}
+  return out;
+};
+// Lit les boosts captés par l'extension (lignes harvest_{uid}_billing) et les
+// fusionne, sans doublon. Lecture seule : n'écrase jamais tes saisies manuelles.
+const fetchHarvestBoosts = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    const all = []; const seen = new Set();
+    for (const r of rows) for (const b of extractBoosts(r.data && r.data.payload)) {
+      const key = (b.itemId || b.title || b.label) + '@' + b.amount + '@' + (b.date || '');
+      if (!seen.has(key)) { seen.add(key); all.push(b); }
+    }
+    return all;
+  } catch (_) { return []; }
+};
 // Detail d'une conversation moissonnee (ligne harvest_{uid}_conv_{convId}).
 const fetchHarvestConversation = async (uid, convId) => {
   if (!uid || !convId) return null;
@@ -5043,6 +5084,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
   // Ta ville est connue mais la liste de ses points n'est pas encore chargée
   // (ou date d'une autre ville) → on la récupère AUTOMATIQUEMENT.
   useEffect(() => {
@@ -5261,6 +5303,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // nb vendues, bénéfice moyen/paire (si prix d'achat connu), temps de vente moyen.
   // But : savoir quoi racheter en priorité.
   const [showSourcing, setShowSourcing] = useState(false);
+  const [boostsDetected, setBoostsDetected] = useState(null); // boosts captés (facturation Vinted)
   const sourcing = useMemo(() => {
     const items = sales.items || [];
     const mk = () => ({ nb:0, ca:0, benef:0, benefNb:0, daysSum:0, daysNb:0 });
@@ -5706,6 +5749,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <StatBox label="Bénéfice net" value={fmtE(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût')}/>
           </div>
         )}
+        {/* Boosts détectés automatiquement (facturation Vinted captée par
+            l'extension). LECTURE SEULE : n'écrase jamais tes saisies « 💡 boost »
+            par annonce — c'est un repère pour vérifier/compléter à la main. */}
+        {Array.isArray(boostsDetected) && boostsDetected.length>0 && (()=>{
+          const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
+          return (
+            <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
+              <div style={{fontSize:12.5,fontWeight:900,color:C.text}}>💡 {tot.toFixed(2)} € de boosts détectés sur Vinted <span style={{color:C.muted,fontWeight:700}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span></div>
+              <div style={{fontSize:10.5,color:C.muted,marginTop:4,lineHeight:1.4}}>Capté automatiquement depuis ta facturation Vinted (via l'extension). Reporte ces montants dans le champ « 💡 boost » de chaque annonce concernée pour un bénéfice net exact — l'app ne les inscrit pas toute seule pour ne pas écraser tes saisies.</div>
+            </div>
+          );
+        })()}
         {/* Analyse de perf : temps de vente, écoulement, meilleure marque */}
         {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
