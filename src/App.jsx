@@ -780,11 +780,10 @@ const smartDefaultBordPos = (w, h) => ({ xr: 0.05, yr: 0.02 });
 // `pos` = { xr, yr } position (ratio 0..1, coin haut-gauche du tampon, yr depuis
 // le HAUT) choisie par l'utilisateur pour CE format. Si absent -> bandeau en bas
 // (comportement historique).
-const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
-  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
-  const pdf = await PDFDocument.load(pdfArrayBuffer);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+// Dessine le tampon (N° + titre) sur la 1re page d'un PDF déjà chargé (pdf-lib),
+// à la position `pos` mémorisée pour ce format. Partagé par le téléchargement
+// unitaire ET le regroupement « à la suite ».
+const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
   const first = pdf.getPages()[0];
   const { width, height } = first.getSize();
   const hasNum = numero != null && String(numero).trim() !== '';
@@ -819,6 +818,14 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
       first.drawText(t, { x:18, y:bandH-46, size:20, font:bold, color:rgb(0.08,0.08,0.08) });
     }
   }
+  return hasNum;
+};
+const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+  const pdf = await PDFDocument.load(pdfArrayBuffer);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const hasNum = drawBordereauStamp(pdf, rgb, bold, reg, numero, title, pos);
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
@@ -834,6 +841,43 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
     document.body.appendChild(a); a.click(); a.remove();
   }
   return { url, filename };
+};
+// Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
+// suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
+// [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
+// tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
+const mergeAndDownloadBordereaux = async (items, resolvePos) => {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+  const out = await PDFDocument.create();
+  let count = 0;
+  for (const it of items) {
+    try {
+      const src = await PDFDocument.load(it.pdfBuf);
+      const first = src.getPages()[0];
+      const { width, height } = first.getSize();
+      const pos = resolvePos ? resolvePos(width, height) : null;
+      // On tamponne dans le PDF source (avec des polices embarquées dans out via
+      // copyPages : pdf-lib ré-embarque les ressources à la copie).
+      const sBold = await src.embedFont(StandardFonts.HelveticaBold);
+      const sReg = await src.embedFont(StandardFonts.Helvetica);
+      drawBordereauStamp(src, rgb, sBold, sReg, it.numero, it.title, pos);
+      const pages = await out.copyPages(src, src.getPageIndices());
+      pages.forEach(p => out.addPage(p));
+      count++;
+    } catch (_) {}
+  }
+  if (!count) throw new Error('Aucun bordereau exploitable.');
+  const bytes = await out.save();
+  const blob = new Blob([bytes], { type:'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const filename = `bordereaux-${count}-a-la-suite.pdf`;
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  if (!isIOS) {
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  return { url, filename, count };
 };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
@@ -5404,15 +5448,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Routeur commun : lit le format du bordereau, tamponne à l'emplacement connu
   // pour ce format (ou au défaut intelligent = haut de page, jamais sur le
   // code-barres). On stocke tout pour permettre de DÉPLACER ensuite.
+  // Position mémorisée du tampon pour un format (WxH). Si le format est inédit,
+  // on retient l'emplacement intelligent par défaut → une fois que tu déplaces
+  // le N° une fois (bouton « déplacer »), TOUS les prochains bordereaux de ce
+  // format le mettent au même endroit. `mut` = autorise l'enregistrement (on le
+  // coupe pendant un lot pour ne pas empiler les setState).
+  const posForFormat = (w, h, mut = true) => {
+    const key = bordereauFormatKey(w, h);
+    let pos = bordFormats[key];
+    if (!pos) { pos = smartDefaultBordPos(w, h); if (mut) { const next = { ...bordFormats, [key]: pos }; setBordFormats(next); save('vinted_bordereau_formats', next); } }
+    return pos;
+  };
   const processBordereau = async (numero, title, pdfBuf) => {
     try {
       const { width, height } = await readPdfFirstPageSize(pdfBuf);
       const key = bordereauFormatKey(width, height);
-      let pos = bordFormats[key];
-      if (!pos) { pos = smartDefaultBordPos(width, height); const next = { ...bordFormats, [key]: pos }; setBordFormats(next); save('vinted_bordereau_formats', next); }
+      const pos = posForFormat(width, height);
       const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
     } catch(err){ alert('Impossible de lire ce PDF : '+String(err)); }
+  };
+  // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
+  // titre dans les annonces numérotées (si le titre n'est pas ambigu).
+  const numForBord = (b) => {
+    let num = b.numero || '';
+    const title = b.modele || b.article || '';
+    if (!num && title && !titleAmbiguous(title)) { const e2 = entryByTitle(title); if (e2 && e2.numero) num = String(e2.numero); }
+    return num;
+  };
+  // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
+  // les regroupe dans UN seul PDF (une page chacun) → une seule impression.
+  const [batchBusy, setBatchBusy] = useState(false);
+  const batchBordereaux = async () => {
+    if (batchBusy) return;
+    const pending = (emailBords || []).filter(b => b.pdfB64 && !isBordPrinted(b));
+    if (!pending.length) { alert('Aucun bordereau à imprimer (tous sont déjà marqués imprimés).'); return; }
+    setBatchBusy(true);
+    try {
+      const items = pending.map(b => ({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: b64ToBytes(b.pdfB64) })).filter(it => it.pdfBuf);
+      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false));
+      setBordResult({ ...r, batch: true });
+    } catch(err){ alert('Erreur : ' + String(err)); }
+    setBatchBusy(false);
   };
   // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
   const adjustBordPlacement = () => {
@@ -6116,7 +6193,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {/* Bordereaux reçus AUTOMATIQUEMENT par email (pipeline usevrm) */}
         {Array.isArray(emailBords) && emailBords.length>0 && (
           <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,fontWeight:800,color:C.text,margin:'0 0 8px'}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
+            <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
+              <div style={{fontSize:12,fontWeight:800,color:C.text,flex:1}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
+            </div>
+            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordPrinted(b)).length; return nPending>=2 ? (
+              <button type="button" onClick={batchBordereaux} disabled={batchBusy}
+                title="Tamponne tous les bordereaux non imprimés et les met à la suite dans un seul PDF à imprimer d'un coup"
+                style={{width:'100%',border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'12px',cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:800,marginBottom:10,opacity:batchBusy?0.6:1}}>
+                {batchBusy?'Préparation…':`🖨 Tout imprimer à la suite (${nPending})`}
+              </button>
+            ) : null; })()}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[...emailBords].sort((a,b2)=>(isBordPrinted(a)?1:0)-(isBordPrinted(b2)?1:0)).map((b,i)=>(
                 <div key={i} data-bord-card style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordPrinted(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
@@ -6138,9 +6224,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     const title=b.modele||b.article||'';
                     // N° absent de l'email ? On le retrouve dans les annonces
                     // numérotées par le titre (sauf si le titre est ambigu).
-                    let num=b.numero||'';
-                    if(!num && title && !titleAmbiguous(title)){ const e2=entryByTitle(title); if(e2&&e2.numero) num=String(e2.numero); }
-                    processBordereau(num, title, bytes);
+                    processBordereau(numForBord(b), title, bytes);
                   }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>🖨 Imprimer</button>
                   <button type="button" onClick={()=>toggleBordPrinted(b)}
                     title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé (grise la carte en attendant l\'expédition)'}
@@ -6278,11 +6362,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
             <div style={{fontSize:34,marginBottom:6}}>✅</div>
-            <div style={{fontSize:16,fontWeight:900,color:C.text,marginBottom:4}}>Bordereau prêt</div>
-            <div style={{fontSize:12.5,color:C.muted,lineHeight:1.45,marginBottom:16}}>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</div>
+            <div style={{fontSize:16,fontWeight:900,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:'Bordereau prêt'}</div>
+            <div style={{fontSize:12.5,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>:<>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
-              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:800,textDecoration:'none',marginBottom:8}}>📄 Ouvrir le bordereau</a>
-            {bordResult.pdfBuf && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:700,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:800,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':'Ouvrir le bordereau'}</a>
+            {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:700,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            {bordResult.batch && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
             <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:700,padding:'8px'}}>Fermer</button>
           </div>
         </div>
