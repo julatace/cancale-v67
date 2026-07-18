@@ -3488,12 +3488,14 @@ const saveRoomPlan = async (data) => {
   try { await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 'vrm_room', data }) }); } catch (_) {}
 };
 const FURN_TYPES = {
-  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f' },
-  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a' },
-  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0' },
-  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f' },
-  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b' },
+  commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0 },
+  etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8 },
+  penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6 },
+  table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f', h3d: 0.7 },
+  boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5 },
+  autre:   { label: 'Meuble',  emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0 },
 };
+const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98'];
 function RoomPlan({ locate, onLocateConsumed }) {
   const DEFAULT = { room: { w: 10, h: 8 }, items: [] };
   const [plan, setPlan] = useState(() => load('vrm_room_plan', DEFAULT) || DEFAULT);
@@ -3501,6 +3503,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const [openItem, setOpenItem] = useState(null);
   const [search, setSearch] = useState('');
   const [hi, setHi] = useState(null); // { itemId, cell } | { notFound:true }
+  const [mode, setMode] = useState('edit'); // 'edit' (dessus) | '3d' (perspective)
   const roomRef = React.useRef(null);
   const drag = React.useRef(null);
 
@@ -3518,9 +3521,20 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
   const addFurn = (type) => {
     const t = FURN_TYPES[type]; const id = 'f' + Date.now();
-    persist({ ...plan, items: [...items, { id, type, name: t.label, x: Math.min(1, room.w - t.w), y: Math.min(1, room.h - t.h), w: t.w, h: t.h, rows: t.rows, cols: t.cols, slots: {} }] });
+    let name = t.label, emoji = t.emoji;
+    if (type === 'autre') {
+      const n = (window.prompt('Nom de ton meuble (ex : Armoire, Bac à chaussures) :', '') || '').trim();
+      if (n) name = n;
+      const e = (window.prompt('Un emoji pour le représenter (facultatif) :', '🪑') || '').trim();
+      if (e) emoji = e;
+    }
+    persist({ ...plan, items: [...items, { id, type, name, emoji, color: t.color, h3d: t.h3d, x: Math.max(0, Math.min(1, room.w - t.w)), y: Math.max(0, Math.min(1, room.h - t.h)), w: t.w, h: t.h, rows: t.rows, cols: t.cols, slots: {} }] });
     setSel(id);
   };
+  const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
+  const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
+  const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
+  const setRoom = (dw, dh) => persist({ ...plan, room: { w: Math.max(4, Math.min(20, room.w + dw)), h: Math.max(4, Math.min(20, room.h + dh)) } });
   const updateItem = (id, patch) => persist({ ...plan, items: items.map(it => it.id === id ? { ...it, ...patch } : it) });
   const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; persist({ ...plan, items: items.filter(it => it.id !== id) }); setSel(null); setOpenItem(null); };
 
@@ -3563,14 +3577,30 @@ function RoomPlan({ locate, onLocateConsumed }) {
         {search && <button onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}>✕</button>}
       </div>
       {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
-      {hi && hi.itemId && (()=>{ const it=items.find(x=>x.id===hi.itemId); return it ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{search} → <b>{it.name}</b> (meuble surligné, case ouverte)</div> : null; })()}
+      {hi && hi.itemId && (()=>{ const it=items.find(x=>x.id===hi.itemId); return it ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{search} → <b>{it.name}</b> (meuble surligné)</div> : null; })()}
 
+      {/* Bascule : éditer le plan (dessus) / entrer dans la pièce (3D) */}
+      <div style={{ display: 'flex', gap: 6, background: C.surface, borderRadius: 999, padding: 3, border: `1px solid ${C.border}`, alignSelf: 'flex-start' }}>
+        {[['edit', '✏️ Éditer'], ['3d', '👣 Entrer']].map(([v, l]) => (
+          <button key={v} onClick={() => setMode(v)} style={{ border: 'none', borderRadius: 999, padding: '6px 15px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', background: mode === v ? C.accent : 'transparent', color: mode === v ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
+        ))}
+      </div>
+
+      {mode === 'edit' && (<>
       {/* Palette de meubles */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>Ajouter :</span>
         {Object.entries(FURN_TYPES).map(([k, t]) => (
-          <button key={k} onClick={() => addFurn(k)} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 700, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {t.label}</button>
+          <button key={k} onClick={() => addFurn(k)} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 700, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
         ))}
+      </div>
+      {/* Taille de la pièce */}
+      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
+        <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
+        <button onClick={() => setRoom(1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>largeur +</button>
+        <button onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+        <button onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
+        <button onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
       </div>
 
       {/* La pièce vue de dessus (les murs = la bordure épaisse) */}
@@ -3578,13 +3608,12 @@ function RoomPlan({ locate, onLocateConsumed }) {
         style={{ position: 'relative', width: '100%', aspectRatio: `${room.w} / ${room.h}`, background: `repeating-linear-gradient(0deg, ${C.surface}, ${C.surface} 1px, transparent 1px, transparent 10%), repeating-linear-gradient(90deg, ${C.surface}, ${C.surface} 1px, transparent 1px, transparent 10%)`, backgroundColor: C.bg, border: `7px solid ${C.muted}`, borderRadius: 6, overflow: 'hidden', touchAction: 'none' }}>
         {items.length === 0 && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 12.5, textAlign: 'center', padding: 20 }}>Ta pièce est vide. Ajoute des meubles ci-dessus, puis fais-les glisser à leur vraie place.</div>}
         {items.map(it => {
-          const t = FURN_TYPES[it.type] || FURN_TYPES.boites;
           const isSel = sel === it.id, isHi = hi && hi.itemId === it.id;
           return (
             <div key={it.id} onMouseDown={e => onDown(e, it)} onTouchStart={e => onDown(e, it)}
               onClick={e => { e.stopPropagation(); if (!drag.current || !drag.current.moved) { setSel(it.id); } }}
-              style={{ position: 'absolute', left: `${it.x / room.w * 100}%`, top: `${it.y / room.h * 100}%`, width: `${it.w / room.w * 100}%`, height: `${it.h / room.h * 100}%`, background: t.color, border: `2px solid ${isSel || isHi ? '#fff' : 'rgba(0,0,0,0.25)'}`, outline: isSel ? `2px solid ${C.accent}` : isHi ? `3px solid #e5484d` : 'none', borderRadius: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'move', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', overflow: 'hidden', animation: isHi ? 'vrmpulse2 1.1s ease-in-out 3' : 'none', userSelect: 'none' }}>
-              <span style={{ fontSize: 'min(5vw,22px)', lineHeight: 1 }}>{t.emoji}</span>
+              style={{ position: 'absolute', left: `${it.x / room.w * 100}%`, top: `${it.y / room.h * 100}%`, width: `${it.w / room.w * 100}%`, height: `${it.h / room.h * 100}%`, background: colorOf(it), border: `2px solid ${isSel || isHi ? '#fff' : 'rgba(0,0,0,0.25)'}`, outline: isSel ? `2px solid ${C.accent}` : isHi ? `3px solid #e5484d` : 'none', borderRadius: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'move', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', overflow: 'hidden', animation: isHi ? 'vrmpulse2 1.1s ease-in-out 3' : 'none', userSelect: 'none' }}>
+              <span style={{ fontSize: 'min(5vw,22px)', lineHeight: 1 }}>{emojiOf(it)}</span>
               <span style={{ fontSize: 9, fontWeight: 800, textAlign: 'center', padding: '0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{it.name}</span>
               {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 9, fontWeight: 900, padding: '1px 5px' }}>{storedCount(it)}</span>}
             </div>
@@ -3595,7 +3624,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
       {/* Barre du meuble sélectionné */}
       {selItem && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
-          <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{(FURN_TYPES[selItem.type] || {}).emoji} {selItem.name}</span>
+          <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}</span>
+          {/* Personnalisation : couleur + hauteur */}
+          <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+            <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
+            {FURN_COLORS.map(c => (<button key={c} onClick={() => updateItem(selItem.id, { color: c })} style={{ width: 20, height: 20, borderRadius: 5, background: c, border: colorOf(selItem) === c ? `2px solid ${C.text}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />))}
+            <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
+            {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
+          </div>
           <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>
           <button onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
           <button onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
@@ -3606,14 +3642,52 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Glisse un meuble pour le placer. Touche-le puis « 📂 Ranger dedans » pour voir ses tiroirs/rayons et y poser tes N° (plusieurs par case = empilés). La bordure épaisse = les murs.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Glisse un meuble pour le placer. Touche-le → couleur, hauteur, taille, et « 📂 Ranger dedans ». La bordure épaisse = les murs. Puis passe en « 👣 Entrer » pour voir ta pièce en perspective.</div>
+      </>)}
+
+      {/* 👣 VUE EN PERSPECTIVE — comme si tu entrais dans la pièce */}
+      {mode === '3d' && (
+        <div style={{ position: 'relative', width: '100%', height: 340, borderRadius: 14, overflow: 'hidden', background: 'linear-gradient(180deg,#e9edf2 0%, #dfe5ec 52%, #cfd6de 100%)', border: `1px solid ${C.border}` }}>
+          {(() => {
+            const HT = 20, HB = 96;                 // % vertical du sol (haut = fond, bas = proche)
+            const WS = (fy) => 0.42 + 0.62 * fy;    // largeur relative selon la profondeur
+            const farL = 50 - 50 * WS(0), farR = 50 + 50 * WS(0), nearL = 50 - 50 * WS(1), nearR = 50 + 50 * WS(1);
+            const list = [...items].sort((a, b) => ((a.y + a.h / 2) / room.h) - ((b.y + b.h / 2) / room.h));
+            return (<>
+              {/* sol en perspective */}
+              <div style={{ position: 'absolute', inset: 0, clipPath: `polygon(${farL}% ${HT}%, ${farR}% ${HT}%, ${nearR}% ${HB}%, ${nearL}% ${HB}%)`, background: `repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0 1px, transparent 1px 26px), #c9b79a` }} />
+              {/* plinthe du mur du fond */}
+              <div style={{ position: 'absolute', left: `${farL}%`, width: `${farR - farL}%`, top: `${HT}%`, height: 3, background: 'rgba(0,0,0,0.12)' }} />
+              {items.length === 0 && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 12.5, textAlign: 'center', padding: 20 }}>Ajoute des meubles en mode « ✏️ Éditer », puis reviens ici pour entrer dans ta pièce.</div>}
+              {list.map(it => {
+                const fx = (it.x + it.w / 2) / room.w, fy = (it.y + it.h / 2) / room.h, ws = WS(fy);
+                const cx = 50 + (fx - 0.5) * 100 * ws, by = HT + fy * (HB - HT);
+                const wPct = (it.w / room.w) * 100 * ws * 0.92, hPx = Math.max(16, h3dOf(it) * 68 * ws);
+                const isHi = hi && hi.itemId === it.id, isSel = sel === it.id, col = colorOf(it);
+                return (
+                  <div key={it.id} onClick={() => { setSel(it.id); setOpenItem(it.id); }} style={{ position: 'absolute', left: `${cx}%`, top: `${by}%`, width: `${wPct}%`, height: hPx, transform: 'translate(-50%,-100%)', zIndex: Math.round(fy * 100) + (isHi ? 300 : 0), cursor: 'pointer' }}>
+                    <div style={{ position: 'absolute', left: '6%', right: '6%', top: -Math.min(11, hPx * 0.2), height: Math.min(11, hPx * 0.2), background: col, filter: 'brightness(1.28)', transform: 'skewX(-32deg)', borderRadius: '3px 3px 0 0', opacity: 0.92 }} />
+                    <div style={{ width: '100%', height: '100%', background: `linear-gradient(180deg, ${col} 0%, ${col} 58%, rgba(0,0,0,0.22) 100%)`, border: `2px solid ${isHi ? '#e5484d' : isSel ? '#fff' : 'rgba(0,0,0,0.28)'}`, borderRadius: 3, boxShadow: isHi ? '0 0 0 4px rgba(229,72,77,0.4)' : '0 6px 11px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', overflow: 'hidden' }}>
+                      <span style={{ fontSize: Math.min(22, hPx * 0.5), lineHeight: 1 }}>{emojiOf(it)}</span>
+                      {hPx > 36 && <span style={{ fontSize: 9, fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 3px' }}>{it.name}</span>}
+                      {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 9, fontWeight: 900, padding: '1px 5px' }}>{storedCount(it)}</span>}
+                    </div>
+                    {isHi && <div style={{ position: 'absolute', top: -17, left: '50%', transform: 'translateX(-50%)', background: '#e5484d', color: '#fff', fontSize: 10, fontWeight: 900, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap' }}>ici 📍</div>}
+                  </div>
+                );
+              })}
+            </>);
+          })()}
+          <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.42)', fontWeight: 700 }}>👣 Vue depuis l'entrée · touche un meuble pour l'ouvrir</span>
+        </div>
+      )}
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
         <div onClick={() => setOpenItem(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 16, maxWidth: 460, width: '100%', maxHeight: '92vh', overflow: 'auto', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 15, fontWeight: 900, color: C.text, flex: 1 }}>{(FURN_TYPES[opened.type] || {}).emoji} {opened.name}</span>
+              <span style={{ fontSize: 15, fontWeight: 900, color: C.text, flex: 1 }}>{emojiOf(opened)} {opened.name}</span>
               <button onClick={() => setOpenItem(null)} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
             <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10 }}>Vue de face — touche une case pour y ranger un N° (empilable).
@@ -3622,7 +3696,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                 <button onClick={() => setGrid(opened, opened.rows, opened.cols + 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer' }}>+ colonne</button>
               </span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: (FURN_TYPES[opened.type] || {}).color + '22', border: `2px solid ${(FURN_TYPES[opened.type] || {}).color}`, borderRadius: 8, padding: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: colorOf(opened) + '22', border: `2px solid ${colorOf(opened)}`, borderRadius: 8, padding: 8 }}>
               {Array.from({ length: opened.rows }).map((_, r) => (
                 <div key={r} style={{ display: 'flex', gap: 6 }}>
                   {Array.from({ length: opened.cols }).map((_, c) => {
