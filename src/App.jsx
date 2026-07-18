@@ -3510,11 +3510,12 @@ const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0'
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
-function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
+function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
   const moveRef = React.useRef(canMove); moveRef.current = canMove; // lu en direct par les handlers
+  const cbRef = React.useRef({}); cbRef.current = { onCellTap, onSelect, onOpen, onMove }; // callbacks à jour
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(true);
   const HSCALE = 1.5;
@@ -3681,9 +3682,12 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
         const back = box(w, ht, t, structM); back.position.set(0, ht / 2, -dep / 2); g.add(back);
         for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
           const cx = -w / 2 + (c + 0.5) * cw, cy = ht - (r + 0.5) * chh; // r=0 en haut
-          const arr = (slots && slots[r + '_' + c]) || [];
-          if (arr.length) { const bx = makeColis(arr[0], cw * 0.9, chh * 0.9, dep * 0.86); bx.position.set(cx, cy, dep * 0.05); g.add(bx); }
-          else { const e = box(cw * 0.9, chh * 0.9, t, emptyM); e.position.set(cx, cy, -dep * 0.3); g.add(e); }
+          const key = r + '_' + c, arr = (slots && slots[key]) || [];
+          let cellMesh;
+          if (arr.length) { cellMesh = makeColis(arr[0], cw * 0.9, chh * 0.9, dep * 0.86); cellMesh.position.set(cx, cy, dep * 0.05); }
+          else { cellMesh = box(cw * 0.9, chh * 0.9, t, emptyM); cellMesh.position.set(cx, cy, -dep * 0.3); }
+          cellMesh.userData = { cell: key }; // pour remplir la case au clic
+          g.add(cellMesh);
         }
         // séparateurs + cadre (quadrillage visible)
         for (let r = 1; r < nr; r++) { const sh = box(w, t, dep, structM); sh.position.set(0, ht - r * chh, 0); g.add(sh); }
@@ -3748,7 +3752,8 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
             default: g = buildGeneric(w, d, ht, base);
           }
           g.position.set((it.x + it.w / 2) - room.w / 2, 0, (it.y + it.h / 2) - room.h / 2);
-          g.userData = { itemId: it.id, w: it.w, h: it.h };
+          g.rotation.y = it.rot || 0; // orientation (collé au mur)
+          g.userData = { itemId: it.id, w: it.w, h: it.h, type: it.type };
           const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
           lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
           // La grille peint elle-même ses cartons (un par case) → on saute
@@ -3800,14 +3805,33 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
       // OrbitControls (posé sur le canvas). Si on saisit un meuble à déplacer, on
       // coupe l'événement (stopPropagation) pour que la caméra ne bouge pas ; sinon
       // on laisse filer vers OrbitControls qui tourne la vue.
+      // Meubles « de mur » : ils se collent au mur le plus proche quand on les lâche.
+      const WALL_TYPES = { grille: 1, porte: 1, fenetre: 1 };
+      const SNAP = 1.7;
+      const snapWall = (cx, cz, w, h) => {
+        const hW = room.w / 2, hH = room.h / 2;
+        const dN = cz + hH, dS = hH - cz, dW = cx + hW, dE = hW - cx, m = Math.min(dN, dS, dW, dE);
+        if (m > SNAP) return null; // trop loin d'un mur → on laisse libre
+        const rot = m === dN ? 0 : m === dS ? Math.PI : m === dW ? Math.PI / 2 : -Math.PI / 2;
+        const odd = Math.abs(Math.sin(rot)) > 0.5; const effW = odd ? h : w, effH = odd ? w : h;
+        let ncx = cx, ncz = cz;
+        if (m === dN) ncz = -hH + effH / 2; else if (m === dS) ncz = hH - effH / 2;
+        else if (m === dW) ncx = -hW + effW / 2; else ncx = hW - effW / 2;
+        ncx = Math.max(-hW + effW / 2, Math.min(hW - effW / 2, ncx));
+        ncz = Math.max(-hH + effH / 2, Math.min(hH - effH / 2, ncz));
+        return { x: Math.round((ncx + hW - w / 2) * 2) / 2, y: Math.round((ncz + hH - h / 2) * 2) / 2, rot };
+      };
       const pd = (e) => {
         setPtr(e); ray.setFromCamera(ptr, camera);
         const hits = ray.intersectObjects(furnGroup.children, true);
         if (!hits.length) { drag = null; return; } // vide → OrbitControls tourne
+        // case de grille touchée (pour la remplir au clic)
+        let cellKey = null, probe = hits[0].object;
+        while (probe && cellKey == null) { if (probe.userData && probe.userData.cell != null) cellKey = probe.userData.cell; probe = probe.parent; }
         let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) { drag = null; return; }
         const canDrag = !!moveRef.current;
         const gp = ray.ray.intersectPlane(ground, hitPt);
-        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
+        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, type: o.userData.type, cell: cellKey, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
         if (canDrag) { // on garde la main : OrbitControls NE reçoit PAS ce geste
           controls.enabled = false;
           try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) {}
@@ -3827,12 +3851,22 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
       const pu = (e) => {
         if (!drag) return; const d = drag; drag = null;
         if (d.canDrag) { controls.enabled = true; try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) {} }
+        const cb = cbRef.current || {};
         if (d.canDrag && d.moved) {
-          const nx = Math.max(0, Math.min(room.w - d.w, Math.round((d.grp.position.x + room.w / 2 - d.w / 2) * 2) / 2));
-          const ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
-          d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2;
-          onMove && onMove(d.id, nx, ny);
-        } else if (!d.moved) { (onSelect || onOpen) && (onSelect || onOpen)(d.id); } // tap simple = sélectionner
+          let nx = Math.max(0, Math.min(room.w - d.w, Math.round((d.grp.position.x + room.w / 2 - d.w / 2) * 2) / 2));
+          let ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
+          let rot = d.grp.rotation.y || 0;
+          if (WALL_TYPES[d.type]) { // collage automatique au mur le plus proche
+            const cx = nx + d.w / 2 - room.w / 2, cz = ny + d.h / 2 - room.h / 2, s = snapWall(cx, cz, d.w, d.h);
+            if (s) { nx = s.x; ny = s.y; rot = s.rot; } else rot = 0; // loin des murs → face à la pièce
+          }
+          d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2; d.grp.rotation.y = rot;
+          cb.onMove && cb.onMove(d.id, nx, ny, rot);
+        } else if (!d.moved) {
+          // tap sur une CASE de grille → la remplir directement ; sinon sélectionner
+          if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell);
+          else (cb.onSelect || cb.onOpen) && (cb.onSelect || cb.onOpen)(d.id);
+        }
       };
       el.addEventListener('pointerdown', pd, true); // CAPTURE : avant OrbitControls
       window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
@@ -4036,6 +4070,17 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const gridCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(16, (it.cols || 4) + d)) });
   const gridRows = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(16, (it.rows || 3) + d)) });
   const gridCell = (it, d) => gridSet(it, { cell: Math.max(0.28, Math.min(1.2, +(((it.cell || 0.5) + d)).toFixed(2))) });
+  // Clic direct sur une case (grille) en 3D → on saisit / change / efface son N°.
+  const fillCell = (itemId, cellKey) => {
+    setSel(itemId);
+    const it = items.find(x => x.id === itemId); if (!it) return;
+    const cur = ((it.slots || {})[cellKey] || [])[0] || '';
+    const n = window.prompt('N° de la boîte pour cette case (laisse vide pour effacer) :', cur);
+    if (n == null) return; // annulé
+    const v = String(n).trim(); const slots = { ...(it.slots || {}) };
+    if (v) slots[cellKey] = [v]; else delete slots[cellKey];
+    updateItem(itemId, { slots });
+  };
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
   const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
@@ -4139,7 +4184,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       </div>
 
       {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
-      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onCellTap={fillCell} onMove={(id, x, y, rot) => updateItem(id, { x, y, rot })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
@@ -4186,7 +4231,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Glisse un meuble</b> = le déplacer · <b>touche-le</b> = le sélectionner (couleur, hauteur, taille, pivoter, ranger) · <b>glisse le vide</b> = tourner la caméra. Les <b>colis numérotés</b> apparaissent empilés dans les cases.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Touche une case de la grille</b> = y mettre / changer le N° de la boîte · <b>touche un meuble</b> = le sélectionner · en <b>mode déplacement</b>, glisse un meuble (la grille, la porte et la fenêtre se <b>collent au mur</b> le plus proche) · <b>◀▶</b> tourne la vue.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
