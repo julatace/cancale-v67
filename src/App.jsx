@@ -3507,9 +3507,10 @@ const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0'
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
-function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
+function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
+  const dataRef = React.useRef({ items });
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(true);
   const HSCALE = 1.5;
@@ -3562,7 +3563,7 @@ function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, stor
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 }));
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
       // murs (orientés vers l'intérieur → les murs proches ne bouchent pas la vue)
-      const wallH = 3.4, wallMat = new THREE.MeshStandardMaterial({ color: '#e4e8ee', roughness: 0.95, side: THREE.FrontSide });
+      const wallH = Math.max(2.4, room.wallH || 3.4), wallMat = new THREE.MeshStandardMaterial({ color: '#e4e8ee', roughness: 0.95, side: THREE.FrontSide });
       const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); };
       mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
       mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
@@ -3574,6 +3575,15 @@ function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, stor
         x.fillText(String(text).slice(0, 20), 128, 33);
         const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
         sp.scale.set(2.4, 0.6, 1); return sp;
+      };
+      // Petit COLIS numéroté (carton) — rendu dans les cases, empilés.
+      const makeColis = (num, size) => {
+        const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+        x.fillStyle = '#d9b877'; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(120,90,40,0.55)'; x.lineWidth = 3; x.strokeRect(3, 3, 58, 58);
+        x.fillStyle = '#3a2a12'; x.font = 'bold 30px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), 32, 35);
+        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
+        const b = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), new THREE.MeshStandardMaterial({ map: t, roughness: 0.82 }));
+        b.castShadow = true; return b;
       };
       // ── Constructeurs de MEUBLES détaillés (groupes de volumes) ──
       const box = (w, h, d, mat) => shadowize(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat));
@@ -3634,7 +3644,7 @@ function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, stor
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const buildFurniture = () => {
         while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
-        items.forEach(it => {
+        (dataRef.current.items || []).forEach(it => {
           const ht = Math.max(0.35, h3dOf(it) * HSCALE), w = it.w * 0.92, d = it.h * 0.92, base = colorOf(it);
           const shape = (FURN_TYPES[it.type] || {}).build || 'generic';
           let g;
@@ -3653,6 +3663,17 @@ function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, stor
           g.userData = { itemId: it.id, w: it.w, h: it.h };
           const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
           lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
+          // COLIS numérotés rangés dans les cases (grille rows×cols), empilés.
+          const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
+          const cellW = w / cols, cellH = ht / rows, cube = Math.min(cellW, cellH, 0.55) * 0.62;
+          let total = 0;
+          for (const key in (it.slots || {})) {
+            const parts = String(key).split('_'); const r = +parts[0], c = +parts[1]; const arr = it.slots[key] || [];
+            if (isNaN(r) || isNaN(c)) continue;
+            const cx = -w / 2 + (c + 0.5) * cellW, cyBottom = ht - (r + 1) * cellH + cube * 0.6;
+            const step = Math.max(cube * 0.5, Math.min(cube * 0.98, (cellH - cube) / Math.max(1, arr.length)));
+            arr.forEach((num, i) => { if (total++ > 70) return; const m = makeColis(num, cube); m.position.set(cx, cyBottom + i * step, d / 2 - cube * 0.62); g.add(m); });
+          }
           furnGroup.add(g);
         });
       };
@@ -3691,14 +3712,14 @@ function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, stor
           const ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
           d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2;
           onMove && onMove(d.id, nx, ny);
-        } else onOpen(d.id);
+        } else { (onSelect || onOpen) && (onSelect || onOpen)(d.id); }
       };
       renderer.domElement.addEventListener('pointerdown', pd);
       window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
       let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
-      st.current = { THREE, furnGroup };
+      st.current = { THREE, furnGroup, buildFurniture };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
@@ -3712,19 +3733,23 @@ function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, stor
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Surlignage du meuble cherché (émissif rouge) — traverse le groupe du meuble.
+  // Reconstruit les meubles quand les données changent (couleur, taille, hauteur,
+  // ajout/suppression, N° rangés…) — SANS bouger la caméra (rebuild du groupe seul).
+  useEffect(() => { dataRef.current.items = items; if (st.current.buildFurniture) { try { st.current.buildFurniture(); } catch (_) {} } }, [items]);
+  // Surlignage : rouge = N° cherché, bleu = meuble sélectionné (édition).
   useEffect(() => {
     const g = st.current.furnGroup; if (!g) return;
     g.children.forEach(grp => {
       if (!grp.userData || !grp.userData.itemId) return;
-      const on = hi && hi.itemId === grp.userData.itemId;
-      grp.traverse(m => { if (m.isMesh && m.material && m.material.emissive) { m.material.emissive.set(on ? '#e5484d' : '#000000'); m.material.emissiveIntensity = on ? 0.55 : 0; } });
+      const isHi = hi && hi.itemId === grp.userData.itemId, isSel = sel && sel === grp.userData.itemId;
+      const col = isHi ? '#e5484d' : isSel ? '#2f7ae5' : '#000000', inten = isHi ? 0.55 : isSel ? 0.4 : 0;
+      grp.traverse(m => { if (m.isMesh && m.material && m.material.emissive) { m.material.emissive.set(col); m.material.emissiveIntensity = inten; } });
     });
-  }, [hi, loading]);
+  }, [hi, sel, loading, items]);
 
   if (err) return fallback || <div style={{ fontSize: 12, color: C.muted, padding: 16 }}>3D indisponible sur cet appareil.</div>;
   return (
-    <div style={{ position: 'relative', width: '100%', height: 380, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2' }}>
+    <div data-noswipe="1" style={{ position: 'relative', width: '100%', height: 420, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
       {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
       <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none' }}>✋ Glisse un MEUBLE pour le déplacer · glisse le vide pour tourner · touche pour ouvrir</span>
@@ -3756,7 +3781,7 @@ function RoomPerspective({ items, room, hi, sel, onOpen, colorOf, emojiOf, h3dOf
   const farY = floorY(Zfar), nearY = floorY(Znear);
   const list = [...items].sort((a, b) => ((a.y + a.h / 2) / room.h) - ((b.y + b.h / 2) / room.h)); // fond → proche
   return (
-    <div ref={ref} style={{ position: 'relative', width: '100%', height: ch, borderRadius: 14, overflow: 'hidden', background: 'linear-gradient(180deg,#eef2f6 0%,#e4e9ef 46%,#d3dae2 100%)', border: `1px solid ${C.border}` }}>
+    <div ref={ref} data-noswipe="1" style={{ position: 'relative', width: '100%', height: ch, borderRadius: 14, overflow: 'hidden', background: 'linear-gradient(180deg,#eef2f6 0%,#e4e9ef 46%,#d3dae2 100%)', border: `1px solid ${C.border}` }}>
       {/* mur du fond */}
       <div style={{ position: 'absolute', left: flx(Zfar), width: frx(Zfar) - flx(Zfar), top: 0, height: farY, background: 'linear-gradient(180deg,#dde3ea,#e9edf2)', borderBottom: '2px solid rgba(0,0,0,0.12)' }} />
       {/* sol en perspective */}
@@ -3870,14 +3895,6 @@ function RoomPlan({ locate, onLocateConsumed }) {
       {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
       {hi && hi.itemId && (()=>{ const it=items.find(x=>x.id===hi.itemId); return it ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{search} → <b>{it.name}</b> (meuble surligné)</div> : null; })()}
 
-      {/* Bascule : éditer le plan (dessus) / entrer dans la pièce (3D) */}
-      <div style={{ display: 'flex', gap: 6, background: C.surface, borderRadius: 999, padding: 3, border: `1px solid ${C.border}`, alignSelf: 'flex-start' }}>
-        {[['edit', '✏️ Éditer'], ['3d', '👣 Entrer']].map(([v, l]) => (
-          <button key={v} onClick={() => setMode(v)} style={{ border: 'none', borderRadius: 999, padding: '6px 15px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', background: mode === v ? C.accent : 'transparent', color: mode === v ? (C.onAccent || '#fff') : C.muted }}>{l}</button>
-        ))}
-      </div>
-
-      {mode === 'edit' && (<>
       {/* Palette de meubles */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>Ajouter :</span>
@@ -3892,25 +3909,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <button onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
         <button onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
         <button onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+        <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
+        <button onClick={() => persist({ ...plan, room: { ...room, wallH: Math.min(6, Math.round(((room.wallH || 3.4) + 0.4) * 10) / 10) } })} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
+        <button onClick={() => persist({ ...plan, room: { ...room, wallH: Math.max(2.4, Math.round(((room.wallH || 3.4) - 0.4) * 10) / 10) } })} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
       </div>
 
-      {/* La pièce vue de dessus (les murs = la bordure épaisse) */}
-      <div ref={roomRef} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp} onTouchMove={onMove} onTouchEnd={onUp} onClick={() => setSel(null)}
-        style={{ position: 'relative', width: '100%', aspectRatio: `${room.w} / ${room.h}`, background: `repeating-linear-gradient(0deg, ${C.surface}, ${C.surface} 1px, transparent 1px, transparent 10%), repeating-linear-gradient(90deg, ${C.surface}, ${C.surface} 1px, transparent 1px, transparent 10%)`, backgroundColor: C.bg, border: `7px solid ${C.muted}`, borderRadius: 6, overflow: 'hidden', touchAction: 'none' }}>
-        {items.length === 0 && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 12.5, textAlign: 'center', padding: 20 }}>Ta pièce est vide. Ajoute des meubles ci-dessus, puis fais-les glisser à leur vraie place.</div>}
-        {items.map(it => {
-          const isSel = sel === it.id, isHi = hi && hi.itemId === it.id;
-          return (
-            <div key={it.id} onMouseDown={e => onDown(e, it)} onTouchStart={e => onDown(e, it)}
-              onClick={e => { e.stopPropagation(); if (!drag.current || !drag.current.moved) { setSel(it.id); } }}
-              style={{ position: 'absolute', left: `${it.x / room.w * 100}%`, top: `${it.y / room.h * 100}%`, width: `${it.w / room.w * 100}%`, height: `${it.h / room.h * 100}%`, background: colorOf(it), border: `2px solid ${isSel || isHi ? '#fff' : 'rgba(0,0,0,0.25)'}`, outline: isSel ? `2px solid ${C.accent}` : isHi ? `3px solid #e5484d` : 'none', borderRadius: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'move', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', overflow: 'hidden', animation: isHi ? 'vrmpulse2 1.1s ease-in-out 3' : 'none', userSelect: 'none' }}>
-              <span style={{ fontSize: 'min(5vw,22px)', lineHeight: 1 }}>{emojiOf(it)}</span>
-              <span style={{ fontSize: 9, fontWeight: 800, textAlign: 'center', padding: '0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{it.name}</span>
-              {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 9, fontWeight: 900, padding: '1px 5px' }}>{storedCount(it)}</span>}
-            </div>
-          );
-        })}
-      </div>
+      {/* 👣 LA pièce en 3D — tout se fait ici : glisser = déplacer, toucher = sélectionner */}
+      <Room3D key={`${room.w}-${room.h}-${room.wallH || 3.4}`} items={items} room={room} hi={hi} sel={sel} onSelect={(id) => setSel(id)} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+        fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
       {selItem && (
@@ -3938,12 +3944,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Glisse un meuble pour le placer. Touche-le → couleur, hauteur, taille, et « 📂 Ranger dedans ». La bordure épaisse = les murs. Puis passe en « 👣 Entrer » pour voir ta pièce en perspective.</div>
-      </>)}
-
-      {/* 👣 VRAIE 3D (Three.js) — repli 2.5D si WebGL indisponible */}
-      {mode === '3d' && <Room3D items={items} room={room} hi={hi} onOpen={(id) => { setSel(id); setOpenItem(id); }} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
-        fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => { setSel(id); setOpenItem(id); }} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />}
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Glisse un meuble</b> = le déplacer · <b>touche-le</b> = le sélectionner (couleur, hauteur, taille, pivoter, ranger) · <b>glisse le vide</b> = tourner la caméra. Les <b>colis numérotés</b> apparaissent empilés dans les cases.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
@@ -8796,7 +8797,7 @@ export default function App() {
           // surface flottante (modale, ajustement du tampon, carte...) :
           // sinon glisser le tampon changeait d'onglet et perdait le réglage !
           let n=e.target, overlay=false;
-          while(n && n!==document.body){ try{ if(getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
+          while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
           if(overlay){ swipeStart.current=null; return; }
           const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
         }}
