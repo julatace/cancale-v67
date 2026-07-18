@@ -6052,7 +6052,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 <div style={{height:'100%',width:`${pct}%`,background:pct>=100?INV_STATUS.online.color:C.accent,borderRadius:999,transition:'width .4s'}}/>
               </div>
             )}
-            {goal>0 && <div style={{fontSize:11,color:C.muted,marginTop:5}}>{pct>=100?'🎉 Objectif atteint !':`${(goal-perf.caMois).toFixed(0)} € restants ce mois-ci`}</div>}
+            {goal>0 && (()=>{
+              if(pct>=100) return <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:800,marginTop:5}}>🎉 Objectif atteint !</div>;
+              const reste=goal-perf.caMois;
+              const avg=totals.nb>0?totals.ca/totals.nb:null; // prix de vente moyen finalisé
+              const nb=avg&&avg>0?Math.ceil(reste/avg):null;
+              return <div style={{fontSize:11,color:C.muted,marginTop:5}}><b style={{color:C.text}}>{reste.toFixed(0)} €</b> restants ce mois-ci{nb!=null?<> — soit <b style={{color:C.accent}}>~{nb} paire{nb>1?'s':''}</b> à {avg.toFixed(0)} € (ton prix moyen)</>:''}</div>;
+            })()}
           </div>
         ); })()}
         {/* Graphique de tendance 6 mois : CA + bénéfice net */}
