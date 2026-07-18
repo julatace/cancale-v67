@@ -3493,6 +3493,7 @@ const FURN_TYPES = {
   commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode' },
   etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere' },
   casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere' },
+  grille:  { label: 'Grille',  emoji: '🔳', w: 2, h: 1, rows: 3, cols: 4, color: '#9298a2', h3d: 1.4, build: 'grille' },
   armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire' },
   penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie' },
   portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie' },
@@ -3507,10 +3508,11 @@ const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0'
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
-function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
+function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
+  const moveRef = React.useRef(canMove); moveRef.current = canMove; // lu en direct par les handlers
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(true);
   const HSCALE = 1.5;
@@ -3533,8 +3535,9 @@ function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emoji
       try { renderer.outputColorSpace = THREE.SRGBColorSpace; } catch (_) {}
       el.appendChild(renderer.domElement);
       const scene = new THREE.Scene(); scene.background = new THREE.Color('#eef1f6');
-      const camera = new THREE.PerspectiveCamera(52, W / H, 0.1, 1000);
-      camera.position.set(room.w * 0.12, Math.max(room.w, room.h) * 0.82, room.h * 0.95);
+      const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 1000);
+      // Vue plus basse / immersive (proche de la hauteur des yeux, depuis l'entrée).
+      camera.position.set(room.w * 0.1, Math.max(2.2, Math.max(room.w, room.h) * 0.5), room.h * 1.05);
       // lumières douces + une directionnelle qui porte les ombres
       scene.add(new THREE.HemisphereLight(0xffffff, 0x8a929e, 0.85));
       scene.add(new THREE.AmbientLight(0xffffff, 0.25));
@@ -3563,7 +3566,7 @@ function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emoji
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 }));
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
       // murs (orientés vers l'intérieur → les murs proches ne bouchent pas la vue)
-      const wallH = Math.max(2.4, room.wallH || 3.4), wallMat = new THREE.MeshStandardMaterial({ color: '#e4e8ee', roughness: 0.95, side: THREE.FrontSide });
+      const wallH = Math.max(2.4, room.wallH || 3.4), wallMat = new THREE.MeshStandardMaterial({ color: room.wallColor || '#e4e8ee', roughness: 0.95, side: THREE.FrontSide });
       const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); };
       mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
       mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
@@ -3640,6 +3643,19 @@ function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emoji
         const lock = box(0.16, 0.14, 0.05, metalMat); lock.position.set(0, bodyH, d / 2 + 0.02); g.add(lock);
         return g;
       };
+      const buildGrille = (w, d, ht, base, rows, cols) => {
+        const g = new THREE.Group(); const m = flatMat(base, 0.7), t = 0.05;
+        const nr = Math.max(1, rows || 3), nc = Math.max(1, cols || 4);
+        // cadre + fond
+        const back = box(w, ht, t, m); back.position.set(0, ht / 2, -d / 2 + t / 2); g.add(back);
+        [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const s = box(t, ht, d, m); s.position.set(px, ht / 2, 0); g.add(s); });
+        const top = box(w, t, d, m); top.position.set(0, ht - t / 2, 0); g.add(top);
+        const bot = box(w, t, d, m); bot.position.set(0, t / 2, 0); g.add(bot);
+        // séparateurs horizontaux (rangées) et verticaux (colonnes) → cases visibles
+        for (let r = 1; r < nr; r++) { const sh = box(w, t, d, m); sh.position.set(0, (r / nr) * ht, 0); g.add(sh); }
+        for (let c = 1; c < nc; c++) { const sv = box(t, ht, d, m); sv.position.set(-w / 2 + (c / nc) * w, ht / 2, 0); g.add(sv); }
+        return g;
+      };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const buildFurniture = () => {
@@ -3657,6 +3673,7 @@ function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emoji
             case 'boites': g = buildBoites(w, d, ht, base); break;
             case 'crate': g = buildCrate(w, d, ht, base); break;
             case 'malle': g = buildMalle(w, d, ht, base); break;
+            case 'grille': g = buildGrille(w, d, ht, base, it.rows, it.cols); break;
             default: g = buildGeneric(w, d, ht, base);
           }
           g.position.set((it.x + it.w / 2) - room.w / 2, 0, (it.y + it.h / 2) - room.h / 2);
@@ -3690,15 +3707,16 @@ function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emoji
         setPtr(e); ray.setFromCamera(ptr, camera);
         const hits = ray.intersectObjects(furnGroup.children, true);
         if (!hits.length) return; // sol/vide → OrbitControls tourne la caméra
-        let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) return; // remonte jusqu'au GROUPE meuble (qui porte w/h)
+        let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) return; // remonte jusqu'au GROUPE meuble
+        const canDrag = !!moveRef.current;
         const gp = ray.ray.intersectPlane(ground, hitPt);
-        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false };
-        controls.enabled = false; // on ne tourne pas la caméra pendant qu'on tient un meuble
+        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
+        if (canDrag) controls.enabled = false; // mode déplacer : on fige la caméra pendant qu'on tient le meuble
       };
       const pm = (e) => {
         if (!drag) return;
         if (!drag.moved && Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 6) drag.moved = true;
-        if (!drag.moved) return;
+        if (!drag.canDrag || !drag.moved) return; // hors mode déplacer : la caméra tourne (OrbitControls), on ne bouge PAS le meuble
         setPtr(e); ray.setFromCamera(ptr, camera); if (!ray.ray.intersectPlane(ground, hitPt)) return;
         const hw = drag.w / 2, hh = drag.h / 2;
         drag.grp.position.x = Math.max(-room.w / 2 + hw, Math.min(room.w / 2 - hw, hitPt.x + drag.offX));
@@ -3706,13 +3724,13 @@ function Room3D({ items, room, hi, sel, onOpen, onSelect, onMove, colorOf, emoji
         if (e.cancelable) e.preventDefault();
       };
       const pu = () => {
-        if (!drag) return; const d = drag; drag = null; controls.enabled = true;
-        if (d.moved) {
+        if (!drag) return; const d = drag; drag = null; if (d.canDrag) controls.enabled = true;
+        if (d.canDrag && d.moved) {
           const nx = Math.max(0, Math.min(room.w - d.w, Math.round((d.grp.position.x + room.w / 2 - d.w / 2) * 2) / 2));
           const ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
           d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2;
           onMove && onMove(d.id, nx, ny);
-        } else { (onSelect || onOpen) && (onSelect || onOpen)(d.id); }
+        } else if (!d.moved) { (onSelect || onOpen) && (onSelect || onOpen)(d.id); } // tap simple = sélectionner
       };
       renderer.domElement.addEventListener('pointerdown', pd);
       window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
@@ -3819,6 +3837,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const [search, setSearch] = useState('');
   const [hi, setHi] = useState(null); // { itemId, cell } | { notFound:true }
   const [mode, setMode] = useState('edit'); // 'edit' (dessus) | '3d' (perspective)
+  const [moveMode, setMoveMode] = useState(false); // meubles déplaçables SEULEMENT si activé
   const roomRef = React.useRef(null);
   const drag = React.useRef(null);
 
@@ -3912,10 +3931,25 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
         <button onClick={() => persist({ ...plan, room: { ...room, wallH: Math.min(6, Math.round(((room.wallH || 3.4) + 0.4) * 10) / 10) } })} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
         <button onClick={() => persist({ ...plan, room: { ...room, wallH: Math.max(2.4, Math.round(((room.wallH || 3.4) - 0.4) * 10) / 10) } })} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+        <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
+        {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
+          <button key={c} onClick={() => persist({ ...plan, room: { ...room, wallColor: c } })} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
+        ))}
+        <label title="Couleur libre des murs" style={{ width: 20, height: 20, borderRadius: 4, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
+          <input type="color" value={room.wallColor || '#e4e8ee'} onChange={e => persist({ ...plan, room: { ...room, wallColor: e.target.value } })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
+        </label>
       </div>
 
-      {/* 👣 LA pièce en 3D — tout se fait ici : glisser = déplacer, toucher = sélectionner */}
-      <Room3D key={`${room.w}-${room.h}-${room.wallH || 3.4}`} items={items} room={room} hi={hi} sel={sel} onSelect={(id) => setSel(id)} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      {/* Mode déplacement — les meubles ne bougent QUE si ce mode est activé */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          {moveMode ? '✋ Mode déplacement ACTIVÉ' : '🔒 Déplacer les meubles'}
+        </button>
+        <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
+      </div>
+
+      {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
+      <Room3D key={`${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
