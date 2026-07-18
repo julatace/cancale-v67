@@ -3496,6 +3496,111 @@ const FURN_TYPES = {
   autre:   { label: 'Meuble',  emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0 },
 };
 const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98'];
+// VRAIE 3D (Three.js, chargé dynamiquement pour ne pas alourdir le bundle) :
+// pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
+// doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
+// cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
+function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
+  const mountRef = React.useRef(null);
+  const st = React.useRef({});
+  const [err, setErr] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const HSCALE = 1.5;
+
+  useEffect(() => {
+    let cancelled = false; let cleanup = () => {};
+    (async () => {
+      let THREE, OrbitControls;
+      try {
+        THREE = await import('three');
+        ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+      } catch (e) { if (!cancelled) { setErr(true); setLoading(false); } return; }
+      const el = mountRef.current; if (cancelled || !el) return;
+      let renderer;
+      try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false }); }
+      catch (e) { setErr(true); setLoading(false); return; }
+      const W = el.clientWidth || 360, H = el.clientHeight || 380;
+      renderer.setSize(W, H); renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      el.appendChild(renderer.domElement);
+      const scene = new THREE.Scene(); scene.background = new THREE.Color('#e9edf2');
+      const camera = new THREE.PerspectiveCamera(52, W / H, 0.1, 1000);
+      camera.position.set(room.w * 0.12, Math.max(room.w, room.h) * 0.82, room.h * 0.95);
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x707a88, 1.0));
+      const dir = new THREE.DirectionalLight(0xffffff, 0.65); dir.position.set(room.w, Math.max(room.w, room.h) * 1.4, room.h * 0.6); scene.add(dir);
+      // sol
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), new THREE.MeshStandardMaterial({ color: '#c9b79a' }));
+      floor.rotation.x = -Math.PI / 2; scene.add(floor);
+      // murs (orientés vers l'intérieur → les murs proches ne bouchent pas la vue)
+      const wallH = 3.4, wallMat = new THREE.MeshStandardMaterial({ color: '#dee3ea', side: THREE.FrontSide });
+      const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; scene.add(m); };
+      mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
+      mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
+      // étiquette (sprite texte)
+      const makeLabel = (text) => {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
+        x.fillStyle = 'rgba(0,0,0,0.62)'; x.beginPath(); x.roundRect ? x.roundRect(4, 12, 248, 40, 10) : x.rect(4, 12, 248, 40); x.fill();
+        x.fillStyle = '#fff'; x.font = 'bold 26px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(String(text).slice(0, 20), 128, 33);
+        const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+        sp.scale.set(2.4, 0.6, 1); return sp;
+      };
+      const furnGroup = new THREE.Group(); scene.add(furnGroup);
+      const buildFurniture = () => {
+        while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.geometry && o.geometry.dispose(); o.material && (o.material.map && o.material.map.dispose(), o.material.dispose()); }
+        items.forEach(it => {
+          const ht = Math.max(0.3, h3dOf(it) * HSCALE);
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(it.w * 0.92, ht, it.h * 0.92), new THREE.MeshStandardMaterial({ color: colorOf(it) }));
+          mesh.position.set((it.x + it.w / 2) - room.w / 2, ht / 2, (it.y + it.h / 2) - room.h / 2);
+          mesh.userData.itemId = it.id; furnGroup.add(mesh);
+          const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
+          lab.position.set(mesh.position.x, ht + 0.55, mesh.position.z); lab.userData.itemId = it.id; furnGroup.add(lab);
+        });
+      };
+      buildFurniture();
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 0.6, 0); controls.enableDamping = true; controls.dampingFactor = 0.1;
+      controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 2.5; controls.maxDistance = Math.max(room.w, room.h) * 2.6; controls.update();
+      // tap → ouvrir
+      const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null;
+      const pd = (e) => { down = { x: e.clientX, y: e.clientY }; };
+      const pu = (e) => {
+        if (!down) return; const moved = Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y); down = null; if (moved > 7) return;
+        const r = renderer.domElement.getBoundingClientRect(); ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1; ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+        ray.setFromCamera(ptr, camera); const hits = ray.intersectObjects(furnGroup.children, true);
+        if (hits.length) { let o = hits[0].object; while (o && !o.userData.itemId) o = o.parent; if (o && o.userData.itemId) onOpen(o.userData.itemId); }
+      };
+      renderer.domElement.addEventListener('pointerdown', pd); renderer.domElement.addEventListener('pointerup', pu);
+      let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
+      const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+      let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
+      st.current = { THREE, furnGroup };
+      setLoading(false);
+      cleanup = () => {
+        cancelAnimationFrame(raf);
+        renderer.domElement.removeEventListener('pointerdown', pd); renderer.domElement.removeEventListener('pointerup', pu);
+        try { ro && ro.disconnect(); } catch (_) {} window.removeEventListener('resize', onResize);
+        try { controls.dispose(); } catch (_) {} renderer.dispose(); try { el.removeChild(renderer.domElement); } catch (_) {}
+      };
+    })();
+    return () => { cancelled = true; cleanup(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Surlignage du meuble cherché (émissif rouge).
+  useEffect(() => {
+    const g = st.current.furnGroup; if (!g) return;
+    g.children.forEach(o => { if (o.isMesh && o.material && o.material.emissive) { const on = hi && hi.itemId === o.userData.itemId; o.material.emissive.set(on ? '#e5484d' : '#000000'); o.material.emissiveIntensity = on ? 0.7 : 0; } });
+  }, [hi, loading]);
+
+  if (err) return fallback || <div style={{ fontSize: 12, color: C.muted, padding: 16 }}>3D indisponible sur cet appareil.</div>;
+  return (
+    <div style={{ position: 'relative', width: '100%', height: 380, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2' }}>
+      <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
+      {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
+      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none' }}>🖐 Glisse pour tourner · pince pour zoomer · touche un meuble</span>
+    </div>
+  );
+}
 // Vue en perspective « on entre dans la pièce ». Vraie projection : largeur,
 // hauteur ET espacement en profondeur passent tous par le MÊME facteur S/Z
 // (distance) → les proportions sont justes (un meuble proche est grand, un
@@ -3700,8 +3805,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
       <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 Glisse un meuble pour le placer. Touche-le → couleur, hauteur, taille, et « 📂 Ranger dedans ». La bordure épaisse = les murs. Puis passe en « 👣 Entrer » pour voir ta pièce en perspective.</div>
       </>)}
 
-      {/* 👣 VUE EN PERSPECTIVE — projection correcte (proportions justes) */}
-      {mode === '3d' && <RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => { setSel(id); setOpenItem(id); }} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />}
+      {/* 👣 VRAIE 3D (Three.js) — repli 2.5D si WebGL indisponible */}
+      {mode === '3d' && <Room3D items={items} room={room} hi={hi} onOpen={(id) => { setSel(id); setOpenItem(id); }} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+        fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => { setSel(id); setOpenItem(id); }} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />}
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
