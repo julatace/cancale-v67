@@ -3493,7 +3493,7 @@ const FURN_TYPES = {
   commode: { label: 'Commode', emoji: '🗄️', w: 2, h: 1, rows: 3, cols: 1, color: '#c8935f', h3d: 1.0, build: 'commode' },
   etagere: { label: 'Étagère', emoji: '📚', w: 3, h: 1, rows: 4, cols: 3, color: '#7aa27a', h3d: 1.8, build: 'etagere' },
   casier:  { label: 'Casiers', emoji: '🔲', w: 2, h: 1, rows: 3, cols: 3, color: '#8a8f98', h3d: 1.6, build: 'etagere' },
-  grille:  { label: 'Grille',  emoji: '🔳', w: 2, h: 1, rows: 3, cols: 4, color: '#9298a2', h3d: 1.4, build: 'grille' },
+  grille:  { label: 'Grille de boîtes', emoji: '🔳', w: 2, h: 0.5, rows: 3, cols: 4, cell: 0.5, color: '#c9a24b', h3d: 1.5, build: 'grille' },
   armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire' },
   penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie' },
   portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie' },
@@ -3668,17 +3668,29 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
         const lock = box(0.16, 0.14, 0.05, metalMat); lock.position.set(0, bodyH, d / 2 + 0.02); g.add(lock);
         return g;
       };
-      const buildGrille = (w, d, ht, base, rows, cols) => {
-        const g = new THREE.Group(); const m = flatMat(base, 0.7), t = 0.05;
+      // GRILLE DE BOÎTES : un quadrillage rows×cols où CHAQUE case est un carton.
+      // Case remplie → carton kraft avec le N° imprimé en gros ; case vide → fond
+      // clair. Très léger : matériaux partagés (structure/vide) + textures de N°
+      // en cache. Une seule boîte par case (pas d'empilage) = grille bien lisible.
+      const buildGrille = (w, d, ht, base, rows, cols, slots) => {
+        const g = new THREE.Group();
         const nr = Math.max(1, rows || 3), nc = Math.max(1, cols || 4);
-        // cadre + fond
-        const back = box(w, ht, t, m); back.position.set(0, ht / 2, -d / 2 + t / 2); g.add(back);
-        [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const s = box(t, ht, d, m); s.position.set(px, ht / 2, 0); g.add(s); });
-        const top = box(w, t, d, m); top.position.set(0, ht - t / 2, 0); g.add(top);
-        const bot = box(w, t, d, m); bot.position.set(0, t / 2, 0); g.add(bot);
-        // séparateurs horizontaux (rangées) et verticaux (colonnes) → cases visibles
-        for (let r = 1; r < nr; r++) { const sh = box(w, t, d, m); sh.position.set(0, (r / nr) * ht, 0); g.add(sh); }
-        for (let c = 1; c < nc; c++) { const sv = box(t, ht, d, m); sv.position.set(-w / 2 + (c / nc) * w, ht / 2, 0); g.add(sv); }
+        const cw = w / nc, chh = ht / nr, dep = Math.max(0.16, Math.min(d, cw * 0.95, 0.55));
+        const t = Math.max(0.014, Math.min(cw, chh) * 0.05);
+        const structM = flatMat(shade(base, -14), 0.85), emptyM = flatMat(shade(base, 16), 0.93);
+        const back = box(w, ht, t, structM); back.position.set(0, ht / 2, -dep / 2); g.add(back);
+        for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
+          const cx = -w / 2 + (c + 0.5) * cw, cy = ht - (r + 0.5) * chh; // r=0 en haut
+          const arr = (slots && slots[r + '_' + c]) || [];
+          if (arr.length) { const bx = makeColis(arr[0], cw * 0.9, chh * 0.9, dep * 0.86); bx.position.set(cx, cy, dep * 0.05); g.add(bx); }
+          else { const e = box(cw * 0.9, chh * 0.9, t, emptyM); e.position.set(cx, cy, -dep * 0.3); g.add(e); }
+        }
+        // séparateurs + cadre (quadrillage visible)
+        for (let r = 1; r < nr; r++) { const sh = box(w, t, dep, structM); sh.position.set(0, ht - r * chh, 0); g.add(sh); }
+        for (let c = 1; c < nc; c++) { const sv = box(t, ht, dep, structM); sv.position.set(-w / 2 + c * cw, ht / 2, 0); g.add(sv); }
+        const top = box(w, t, dep, structM); top.position.set(0, ht - t / 2, 0); g.add(top);
+        const bot = box(w, t, dep, structM); bot.position.set(0, t / 2, 0); g.add(bot);
+        [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const s = box(t, ht, dep, structM); s.position.set(px, ht / 2, 0); g.add(s); });
         return g;
       };
       const buildPorte = (w, d, ht, base) => {
@@ -3711,8 +3723,15 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
         colisCache.clear(); // textures des cartons régénérées à chaque reconstruction
         while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); disposeMat(m.material); }); }
         (dataRef.current.items || []).forEach(it => {
-          const ht = Math.max(0.35, h3dOf(it) * HSCALE), w = it.w * 0.92, d = it.h * 0.92, base = colorOf(it);
           const shape = (FURN_TYPES[it.type] || {}).build || 'generic';
+          // Pour la GRILLE, les dimensions viennent de la taille de case + du nombre
+          // de cases (rows×cols) → chaque case fait exactement `cell` de côté.
+          const isGrid = shape === 'grille';
+          const cellSize = it.cell || 0.5, nc = Math.max(1, it.cols || 4), nr = Math.max(1, it.rows || 3);
+          const ht = isGrid ? nr * cellSize : Math.max(0.35, h3dOf(it) * HSCALE);
+          const w = isGrid ? nc * cellSize : it.w * 0.92;
+          const d = isGrid ? Math.max(0.16, Math.min(it.h, cellSize)) : it.h * 0.92;
+          const base = colorOf(it);
           let g;
           switch (shape) {
             case 'commode': g = buildCommode(w, d, ht, base, it.rows); break;
@@ -3723,7 +3742,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
             case 'boites': g = buildBoites(w, d, ht, base); break;
             case 'crate': g = buildCrate(w, d, ht, base); break;
             case 'malle': g = buildMalle(w, d, ht, base); break;
-            case 'grille': g = buildGrille(w, d, ht, base, it.rows, it.cols); break;
+            case 'grille': g = buildGrille(w, d, ht, base, nr, nc, it.slots); break;
             case 'porte': g = buildPorte(w, d, ht, base); break;
             case 'fenetre': g = buildFenetre(w, d, ht, base); break;
             default: g = buildGeneric(w, d, ht, base);
@@ -3732,19 +3751,20 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onMove, color
           g.userData = { itemId: it.id, w: it.w, h: it.h };
           const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
           lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
-          // CARTONS numérotés rangés dans les cases (grille rows×cols) et EMPILÉS
-          // comme dans la vraie vie (jusqu'à ~18). Le numéro est imprimé en gros
-          // sur chaque carton → on lit la pile directement, sans cliquer. Une
-          // grande pile peut dépasser du meuble (c'est voulu : ça reflète le réel).
-          const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
-          const cellW = w / cols, cellH = ht / rows;
-          const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145; // format boîte à chaussures
-          let total = 0;
-          for (const key in (it.slots || {})) {
-            const parts = String(key).split('_'); const r = +parts[0], c = +parts[1]; const arr = it.slots[key] || [];
-            if (isNaN(r) || isNaN(c)) continue;
-            const cx = -w / 2 + (c + 0.5) * cellW, baseY = Math.max(0, ht - (r + 1) * cellH); // bas de la case
-            arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.position.set(cx, baseY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
+          // La grille peint elle-même ses cartons (un par case) → on saute
+          // l'empilage générique. Les autres meubles empilent les cartons dans
+          // leurs cases (jusqu'à ~18), N° imprimé en gros, lisible sans cliquer.
+          if (!isGrid) {
+            const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
+            const cellW = w / cols, cellH = ht / rows;
+            const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145; // format boîte à chaussures
+            let total = 0;
+            for (const key in (it.slots || {})) {
+              const parts = String(key).split('_'); const r = +parts[0], c = +parts[1]; const arr = it.slots[key] || [];
+              if (isNaN(r) || isNaN(c)) continue;
+              const cx = -w / 2 + (c + 0.5) * cellW, baseY = Math.max(0, ht - (r + 1) * cellH); // bas de la case
+              arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.position.set(cx, baseY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
+            }
           }
           furnGroup.add(g);
         });
@@ -3994,9 +4014,21 @@ function RoomPlan({ locate, onLocateConsumed }) {
       const e = (window.prompt('Un emoji pour le représenter (facultatif) :', '🪑') || '').trim();
       if (e) emoji = e;
     }
-    setItems(list => [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, x: Math.max(0, Math.min(1, room.w - t.w)), y: Math.max(0, Math.min(1, room.h - t.h)), w: t.w, h: t.h, rows: t.rows, cols: t.cols, slots: {} }]);
+    // Pour une grille, le footprint (w/h) découle de la taille de case × nb de cases.
+    const cell = t.cell, w = cell ? +(t.cols * cell).toFixed(2) : t.w, h = cell ? cell : t.h;
+    setItems(list => [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, x: Math.max(0, Math.min(1, room.w - w)), y: Math.max(0, Math.min(1, room.h - h)), w, h, rows: t.rows, cols: t.cols, slots: {} }]);
     setSel(id);
   };
+  // Contrôles de la GRILLE personnalisable : nb de colonnes, de rangées, taille
+  // des cases. Le footprint (w/h) reste synchronisé pour que le glisser colle.
+  const gridSet = (it, patch) => {
+    const cols = patch.cols != null ? patch.cols : (it.cols || 4);
+    const cell = patch.cell != null ? patch.cell : (it.cell || 0.5);
+    updateItem(it.id, { ...patch, w: +(cols * cell).toFixed(2), h: cell });
+  };
+  const gridCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(16, (it.cols || 4) + d)) });
+  const gridRows = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(16, (it.rows || 3) + d)) });
+  const gridCell = (it, d) => gridSet(it, { cell: Math.max(0.28, Math.min(1.2, +(((it.cell || 0.5) + d)).toFixed(2))) });
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
   const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
@@ -4115,15 +4147,33 @@ function RoomPlan({ locate, onLocateConsumed }) {
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
             <button onClick={() => { const e = (window.prompt('Emoji du meuble :', emojiOf(selItem)) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>
-            <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
-            {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
+            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && <>
+              <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
+              {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
+            </>}
           </div>
+          {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
+          {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (() => {
+            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+            const cellCm = Math.round((selItem.cell || 0.5) * 100);
+            return (
+              <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>🔳 Grille</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Colonnes</span><button onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{selItem.cols || 4}</b><button onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Rangées</span><button onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{selItem.rows || 3}</b><button onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
+                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} boîtes</span>
+              </div>
+            );
+          })()}
           <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>
-          <button onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
-          <button onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
-          <button onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
-          <button onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
-          <button onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+          {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && <>
+            <button onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
+            <button onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
+            <button onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
+            <button onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
+            <button onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
+          </>}
           <button onClick={() => { const n = window.prompt('Nom du meuble :', selItem.name); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>✎</button>
           <button onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
