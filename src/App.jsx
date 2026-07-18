@@ -4760,6 +4760,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [annSort, setAnnSort] = useState('oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   const [showReprice, setShowReprice] = useState(true); // panneau repricing déplié
   const [showQuality, setShowQuality] = useState(false); // panneau qualité d'annonce
+  const [showLikers, setShowLikers] = useState(false); // panneau relance des likers
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
   const [pickerFor, setPickerFor] = useState(null);
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
@@ -5012,6 +5013,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       if (issues.length) out.push({ it, issues, n: issues.length });
     }
     out.sort((a, b) => b.n - a.n);
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items]);
+  // ── Relance des « likers » : annonces mises en favori mais pas vendues. Ce sont
+  // des acheteurs quasi décidés → leur envoyer une petite offre convertit fort.
+  // BAN-SAFE : on liste + on donne un lien vers l'annonce ; TU envoies l'offre
+  // toi-même sur Vinted (bouton natif « offre aux personnes intéressées »).
+  // Aucun envoi automatique, aucune écriture Vinted côté app.
+  const likedList = useMemo(() => {
+    const out = [];
+    for (const it of (listings.items || [])) {
+      if (it.favourites != null && it.favourites >= 2) out.push(it);
+    }
+    out.sort((a, b) => (b.favourites ?? 0) - (a.favourites ?? 0));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items]);
@@ -6300,6 +6315,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     );
                   })}
                   {qualityList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {qualityList.length-30} autres…</div>}
+                </div>
+              )}
+            </div>
+          )}
+          {/* ── Relance des likers : annonces likées à convertir (ban-safe) ── */}
+          {likedList.length>0 && (
+            <div style={{marginBottom:12,border:`1px solid ${INV_STATUS.online.color}55`,background:`${INV_STATUS.online.color}0c`,borderRadius:14,overflow:'hidden'}}>
+              <button onClick={()=>setShowLikers(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                <span style={{fontSize:18}}>💌</span>
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text}}>Relancer les intéressés — {likedList.length} annonce{likedList.length>1?'s':''} likée{likedList.length>1?'s':''}</span>
+                  <span style={{display:'block',fontSize:11,color:C.muted,fontWeight:700}}>Envoie-leur une petite offre sur Vinted · tu confirmes, rien d'automatique</span>
+                </span>
+                <span style={{fontSize:13,color:C.muted}}>{showLikers?'▲':'▼'}</span>
+              </button>
+              {showLikers && (
+                <div style={{borderTop:`1px solid ${INV_STATUS.online.color}33`}}>
+                  {likedList.slice(0,30).map(it=>{
+                    const num = numeros[it.id]?.numero;
+                    return (
+                      <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${INV_STATUS.online.color}22`}}>
+                        <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
+                          <div style={{fontSize:10.5,color:C.muted}}>❤️ {it.favourites} intéressé{it.favourites>1?'s':''}{it.views!=null?` · 👁 ${it.views}`:''}{it.price!=null?` · ${it.price} ${cur(it.currency)}`:''}</div>
+                        </div>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour proposer une offre aux personnes intéressées" style={{flexShrink:0,textDecoration:'none',background:INV_STATUS.online.color,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 11px',borderRadius:8}}>💌 Relancer</a>
+                      </div>
+                    );
+                  })}
+                  {likedList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {likedList.length-30} autres annonces likées…</div>}
                 </div>
               )}
             </div>
