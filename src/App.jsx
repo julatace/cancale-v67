@@ -714,6 +714,11 @@ const mapWardrobeItem = (it) => ({
   // Timestamp de mise en ligne (secondes epoch) si Vinted le fournit -> "âge".
   createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts
            : (it.photo?.high_resolution?.timestamp && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null),
+  // Qualité d'annonce (défensif : selon ce que la penderie renvoie). Nb de photos
+  // et longueur de description — null si Vinted ne le fournit pas (on ne signale
+  // alors rien, pour éviter les faux positifs).
+  photoCount: Array.isArray(it.photos) ? it.photos.length : (it.photo ? 1 : null),
+  descLen: typeof it.description === 'string' ? it.description.trim().length : null,
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
@@ -4702,6 +4707,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
   const [annSort, setAnnSort] = useState('oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   const [showReprice, setShowReprice] = useState(true); // panneau repricing déplié
+  const [showQuality, setShowQuality] = useState(false); // panneau qualité d'annonce
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
   const [pickerFor, setPickerFor] = useState(null);
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
@@ -4940,6 +4946,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, numeros]);
+  // ── Qualité d'annonce : ce qui plombe la conversion (photos, marque, taille,
+  // description). On ne signale QUE ce que Vinted nous confirme (champ présent)
+  // → pas de faux positif. But : dire quoi améliorer pour vendre plus.
+  const qualityList = useMemo(() => {
+    const out = [];
+    for (const it of (listings.items || [])) {
+      const issues = [];
+      if (it.photoCount != null && it.photoCount < 3) issues.push(it.photoCount <= 1 ? '1 seule photo' : `${it.photoCount} photos`);
+      if (!it.brand) issues.push('marque manquante');
+      if (!it.size) issues.push('taille manquante');
+      if (it.descLen != null && it.descLen < 20) issues.push(it.descLen === 0 ? 'pas de description' : 'description très courte');
+      if (issues.length) out.push({ it, issues, n: issues.length });
+    }
+    out.sort((a, b) => b.n - a.n);
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items]);
 
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
   const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; };
@@ -6135,6 +6158,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     );
                   })}
                   {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {repriceList.length-30} autres paires à baisser…</div>}
+                </div>
+              )}
+            </div>
+          )}
+          {/* ── Qualité d'annonce : ce qui plombe la conversion ── */}
+          {qualityList.length>0 && (
+            <div style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:14,overflow:'hidden'}}>
+              <button onClick={()=>setShowQuality(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                <span style={{fontSize:18}}>🖼️</span>
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text}}>Qualité d'annonce — {qualityList.length} à améliorer</span>
+                  <span style={{display:'block',fontSize:11,color:C.muted,fontWeight:700}}>Photos, marque, taille, description manquantes → moins de ventes</span>
+                </span>
+                <span style={{fontSize:13,color:C.muted}}>{showQuality?'▲':'▼'}</span>
+              </button>
+              {showQuality && (
+                <div style={{borderTop:`1px solid ${C.border}`}}>
+                  {qualityList.slice(0,30).map(({it,issues})=>{
+                    const num = numeros[it.id]?.numero;
+                    return (
+                      <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.border}`}}>
+                        <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
+                          <div style={{fontSize:10.5,color:C.warn,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>⚠ {issues.join(' · ')}</div>
+                        </div>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour l'améliorer" style={{flexShrink:0,textDecoration:'none',background:C.accent,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 11px',borderRadius:8}}>✏️ Améliorer</a>
+                      </div>
+                    );
+                  })}
+                  {qualityList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {qualityList.length-30} autres…</div>}
                 </div>
               )}
             </div>
