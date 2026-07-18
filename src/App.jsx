@@ -3521,18 +3521,42 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
       catch (e) { setErr(true); setLoading(false); return; }
       const W = el.clientWidth || 360, H = el.clientHeight || 380;
       renderer.setSize(W, H); renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      try { renderer.outputColorSpace = THREE.SRGBColorSpace; } catch (_) {}
       el.appendChild(renderer.domElement);
-      const scene = new THREE.Scene(); scene.background = new THREE.Color('#e9edf2');
+      const scene = new THREE.Scene(); scene.background = new THREE.Color('#eef1f6');
       const camera = new THREE.PerspectiveCamera(52, W / H, 0.1, 1000);
       camera.position.set(room.w * 0.12, Math.max(room.w, room.h) * 0.82, room.h * 0.95);
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x707a88, 1.0));
-      const dir = new THREE.DirectionalLight(0xffffff, 0.65); dir.position.set(room.w, Math.max(room.w, room.h) * 1.4, room.h * 0.6); scene.add(dir);
-      // sol
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), new THREE.MeshStandardMaterial({ color: '#c9b79a' }));
-      floor.rotation.x = -Math.PI / 2; scene.add(floor);
+      // lumières douces + une directionnelle qui porte les ombres
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x8a929e, 0.85));
+      scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+      const dir = new THREE.DirectionalLight(0xffffff, 0.85);
+      dir.position.set(room.w * 0.6, Math.max(room.w, room.h) * 1.5, room.h * 0.5);
+      dir.castShadow = true; dir.shadow.mapSize.set(1024, 1024);
+      const sc = Math.max(room.w, room.h);
+      dir.shadow.camera.left = -sc; dir.shadow.camera.right = sc; dir.shadow.camera.top = sc; dir.shadow.camera.bottom = -sc;
+      dir.shadow.camera.near = 0.5; dir.shadow.camera.far = sc * 4.5; dir.shadow.bias = -0.0006;
+      scene.add(dir);
+      // ── Textures & matières procédurales (aucun fichier externe) ──
+      const clamp255 = (v) => Math.max(0, Math.min(255, v | 0));
+      const shade = (hex, amt) => { const h = String(hex).replace('#', ''); const r = clamp255(parseInt(h.slice(0, 2), 16) + amt), g = clamp255(parseInt(h.slice(2, 4), 16) + amt), b = clamp255(parseInt(h.slice(4, 6), 16) + amt); return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join(''); };
+      const makeWood = (base) => {
+        const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+        x.fillStyle = base; x.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 24; i++) { x.strokeStyle = `rgba(50,32,16,${0.04 + Math.random() * 0.06})`; x.lineWidth = 1 + Math.random() * 1.5; x.beginPath(); const y = Math.random() * 128; x.moveTo(0, y); x.bezierCurveTo(42, y + (Math.random() * 10 - 5), 90, y + (Math.random() * 10 - 5), 128, y + (Math.random() * 8 - 4)); x.stroke(); }
+        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+      };
+      const woodMat = (base) => new THREE.MeshStandardMaterial({ map: makeWood(base), color: 0xffffff, roughness: 0.72, metalness: 0.02 });
+      const flatMat = (base, rough) => new THREE.MeshStandardMaterial({ color: base, roughness: rough == null ? 0.7 : rough, metalness: 0.02 });
+      const metalMat = new THREE.MeshStandardMaterial({ color: '#33343a', metalness: 0.75, roughness: 0.35 });
+      const shadowize = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
+      // sol : parquet clair
+      const floorTex = makeWood('#cbb089'); floorTex.repeat.set(Math.max(2, room.w / 1.4), Math.max(2, room.h / 1.4));
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 }));
+      floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
       // murs (orientés vers l'intérieur → les murs proches ne bouchent pas la vue)
-      const wallH = 3.4, wallMat = new THREE.MeshStandardMaterial({ color: '#dee3ea', side: THREE.FrontSide });
-      const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; scene.add(m); };
+      const wallH = 3.4, wallMat = new THREE.MeshStandardMaterial({ color: '#e4e8ee', roughness: 0.95, side: THREE.FrontSide });
+      const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); };
       mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
       mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
       // étiquette (sprite texte)
@@ -3544,16 +3568,61 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
         const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
         sp.scale.set(2.4, 0.6, 1); return sp;
       };
+      // ── Constructeurs de MEUBLES détaillés (groupes de volumes) ──
+      const box = (w, h, d, mat) => shadowize(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat));
+      const buildCommode = (w, d, ht, base, rows) => {
+        const g = new THREE.Group(); const body = box(w, ht, d, woodMat(base)); body.position.y = ht / 2; g.add(body);
+        const n = Math.max(2, Math.min(5, rows || 3)), dh = ht / n, fm = woodMat(shade(base, -14));
+        for (let i = 0; i < n; i++) { const fy = (i + 0.5) * dh; const front = box(w * 0.86, dh * 0.8, 0.05, fm); front.position.set(0, fy, d / 2 + 0.026); g.add(front); const hd = box(w * 0.24, 0.05, 0.06, metalMat); hd.position.set(0, fy, d / 2 + 0.06); g.add(hd); }
+        return g;
+      };
+      const buildEtagere = (w, d, ht, base, rows) => {
+        const g = new THREE.Group(); const m = woodMat(base), t = 0.06;
+        [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const s = box(t, ht, d, m); s.position.set(px, ht / 2, 0); g.add(s); });
+        const back = box(w, ht, t * 0.6, woodMat(shade(base, -8))); back.position.set(0, ht / 2, -d / 2 + t * 0.3); g.add(back);
+        const n = Math.max(2, Math.min(6, rows || 4));
+        for (let i = 0; i <= n; i++) { const yy = Math.min(ht - t / 2, Math.max(t / 2, (i / n) * ht)); const sh = box(w - t, t, d - t, m); sh.position.set(0, yy, 0); g.add(sh); }
+        return g;
+      };
+      const buildPenderie = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base), t = 0.07;
+        [-w / 2 + t, w / 2 - t].forEach(px => { const p = box(t, ht, t, m); p.position.set(px, ht / 2, 0); g.add(p); });
+        const bar = shadowize(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, w - 2 * t, 10), metalMat)); bar.rotation.z = Math.PI / 2; bar.position.set(0, ht * 0.86, 0); g.add(bar);
+        const top = box(w, t, d, m); top.position.set(0, ht - t / 2, 0); g.add(top);
+        const cols = ['#c94f4f', '#4f6fc9', '#4fae8f', '#d4a24b', '#8a5fb0', '#c96f9f'], cn = Math.max(3, Math.round(w * 1.6));
+        for (let i = 0; i < cn; i++) { const cx = -w / 2 + t + (i + 0.5) * ((w - 2 * t) / cn); const ch = ht * 0.5 * (0.8 + ((i * 7) % 5) / 10); const cl = box((w - 2 * t) / cn * 0.72, ch, d * 0.5, flatMat(cols[i % cols.length], 0.9)); cl.position.set(cx, ht * 0.86 - ch / 2, 0); g.add(cl); }
+        return g;
+      };
+      const buildTable = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base); const top = box(w, 0.08, d, m); top.position.y = ht; g.add(top);
+        const lg = 0.09; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const l = box(lg, ht, lg, m); l.position.set(sx * (w / 2 - lg), ht / 2, sz * (d / 2 - lg)); g.add(l); });
+        return g;
+      };
+      const buildBoites = (w, d, ht, base) => {
+        const g = new THREE.Group(); const n = Math.max(1, Math.min(4, Math.round(ht / 0.5))), bh = ht / n;
+        for (let i = 0; i < n; i++) { const off = (i % 2 ? 0.06 : -0.05) * w; const b = box(w * 0.9, bh * 0.9, d * 0.9, flatMat(base, 0.85)); b.position.set(off, (i + 0.5) * bh, off * 0.4); g.add(b); const tape = box(w * 0.9, bh * 0.12, 0.02, flatMat(shade(base, 26), 0.8)); tape.position.set(off, (i + 0.5) * bh, d * 0.45 + off * 0.4); g.add(tape); }
+        return g;
+      };
+      const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const buildFurniture = () => {
-        while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.geometry && o.geometry.dispose(); o.material && (o.material.map && o.material.map.dispose(), o.material.dispose()); }
+        while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
         items.forEach(it => {
-          const ht = Math.max(0.3, h3dOf(it) * HSCALE);
-          const mesh = new THREE.Mesh(new THREE.BoxGeometry(it.w * 0.92, ht, it.h * 0.92), new THREE.MeshStandardMaterial({ color: colorOf(it) }));
-          mesh.position.set((it.x + it.w / 2) - room.w / 2, ht / 2, (it.y + it.h / 2) - room.h / 2);
-          mesh.userData.itemId = it.id; furnGroup.add(mesh);
+          const ht = Math.max(0.35, h3dOf(it) * HSCALE), w = it.w * 0.92, d = it.h * 0.92, base = colorOf(it);
+          let g;
+          switch (it.type) {
+            case 'commode': g = buildCommode(w, d, ht, base, it.rows); break;
+            case 'etagere': g = buildEtagere(w, d, ht, base, it.rows); break;
+            case 'penderie': g = buildPenderie(w, d, ht, base); break;
+            case 'table': g = buildTable(w, d, ht, base); break;
+            case 'boites': g = buildBoites(w, d, ht, base); break;
+            default: g = buildGeneric(w, d, ht, base);
+          }
+          g.position.set((it.x + it.w / 2) - room.w / 2, 0, (it.y + it.h / 2) - room.h / 2);
+          g.userData.itemId = it.id;
           const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
-          lab.position.set(mesh.position.x, ht + 0.55, mesh.position.z); lab.userData.itemId = it.id; furnGroup.add(lab);
+          lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
+          furnGroup.add(g);
         });
       };
       buildFurniture();
@@ -3586,10 +3655,14 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Surlignage du meuble cherché (émissif rouge).
+  // Surlignage du meuble cherché (émissif rouge) — traverse le groupe du meuble.
   useEffect(() => {
     const g = st.current.furnGroup; if (!g) return;
-    g.children.forEach(o => { if (o.isMesh && o.material && o.material.emissive) { const on = hi && hi.itemId === o.userData.itemId; o.material.emissive.set(on ? '#e5484d' : '#000000'); o.material.emissiveIntensity = on ? 0.7 : 0; } });
+    g.children.forEach(grp => {
+      if (!grp.userData || !grp.userData.itemId) return;
+      const on = hi && hi.itemId === grp.userData.itemId;
+      grp.traverse(m => { if (m.isMesh && m.material && m.material.emissive) { m.material.emissive.set(on ? '#e5484d' : '#000000'); m.material.emissiveIntensity = on ? 0.55 : 0; } });
+    });
   }, [hi, loading]);
 
   if (err) return fallback || <div style={{ fontSize: 12, color: C.muted, padding: 16 }}>3D indisponible sur cet appareil.</div>;
