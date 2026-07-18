@@ -3507,7 +3507,7 @@ const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0'
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
-function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
+function Room3D({ items, room, hi, onOpen, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const [err, setErr] = useState(false);
@@ -3650,7 +3650,7 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
             default: g = buildGeneric(w, d, ht, base);
           }
           g.position.set((it.x + it.w / 2) - room.w / 2, 0, (it.y + it.h / 2) - room.h / 2);
-          g.userData.itemId = it.id;
+          g.userData = { itemId: it.id, w: it.w, h: it.h };
           const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
           lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
           furnGroup.add(g);
@@ -3660,16 +3660,41 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.target.set(0, 0.6, 0); controls.enableDamping = true; controls.dampingFactor = 0.1;
       controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 2.5; controls.maxDistance = Math.max(room.w, room.h) * 2.6; controls.update();
-      // tap → ouvrir
-      const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null;
-      const pd = (e) => { down = { x: e.clientX, y: e.clientY }; };
-      const pu = (e) => {
-        if (!down) return; const moved = Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y); down = null; if (moved > 7) return;
-        const r = renderer.domElement.getBoundingClientRect(); ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1; ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
-        ray.setFromCamera(ptr, camera); const hits = ray.intersectObjects(furnGroup.children, true);
-        if (hits.length) { let o = hits[0].object; while (o && !o.userData.itemId) o = o.parent; if (o && o.userData.itemId) onOpen(o.userData.itemId); }
+      // Interaction : GLISSER un meuble = le déplacer (sur le sol) ; TOUCHER = ouvrir.
+      const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+      const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
+      let drag = null;
+      const setPtr = (e) => { const r = renderer.domElement.getBoundingClientRect(); ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1; ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1; };
+      const pd = (e) => {
+        setPtr(e); ray.setFromCamera(ptr, camera);
+        const hits = ray.intersectObjects(furnGroup.children, true);
+        if (!hits.length) return; // sol/vide → OrbitControls tourne la caméra
+        let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) return; // remonte jusqu'au GROUPE meuble (qui porte w/h)
+        const gp = ray.ray.intersectPlane(ground, hitPt);
+        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false };
+        controls.enabled = false; // on ne tourne pas la caméra pendant qu'on tient un meuble
       };
-      renderer.domElement.addEventListener('pointerdown', pd); renderer.domElement.addEventListener('pointerup', pu);
+      const pm = (e) => {
+        if (!drag) return;
+        if (!drag.moved && Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 6) drag.moved = true;
+        if (!drag.moved) return;
+        setPtr(e); ray.setFromCamera(ptr, camera); if (!ray.ray.intersectPlane(ground, hitPt)) return;
+        const hw = drag.w / 2, hh = drag.h / 2;
+        drag.grp.position.x = Math.max(-room.w / 2 + hw, Math.min(room.w / 2 - hw, hitPt.x + drag.offX));
+        drag.grp.position.z = Math.max(-room.h / 2 + hh, Math.min(room.h / 2 - hh, hitPt.z + drag.offZ));
+        if (e.cancelable) e.preventDefault();
+      };
+      const pu = () => {
+        if (!drag) return; const d = drag; drag = null; controls.enabled = true;
+        if (d.moved) {
+          const nx = Math.max(0, Math.min(room.w - d.w, Math.round((d.grp.position.x + room.w / 2 - d.w / 2) * 2) / 2));
+          const ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
+          d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2;
+          onMove && onMove(d.id, nx, ny);
+        } else onOpen(d.id);
+      };
+      renderer.domElement.addEventListener('pointerdown', pd);
+      window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
       let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
@@ -3677,7 +3702,8 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
-        renderer.domElement.removeEventListener('pointerdown', pd); renderer.domElement.removeEventListener('pointerup', pu);
+        renderer.domElement.removeEventListener('pointerdown', pd);
+        window.removeEventListener('pointermove', pm); window.removeEventListener('pointerup', pu);
         try { ro && ro.disconnect(); } catch (_) {} window.removeEventListener('resize', onResize);
         try { controls.dispose(); } catch (_) {} renderer.dispose(); try { el.removeChild(renderer.domElement); } catch (_) {}
       };
@@ -3701,7 +3727,7 @@ function Room3D({ items, room, hi, onOpen, colorOf, emojiOf, h3dOf, storedCount,
     <div style={{ position: 'relative', width: '100%', height: 380, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
       {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
-      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none' }}>🖐 Glisse pour tourner · pince pour zoomer · touche un meuble</span>
+      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none' }}>✋ Glisse un MEUBLE pour le déplacer · glisse le vide pour tourner · touche pour ouvrir</span>
     </div>
   );
 }
@@ -3916,7 +3942,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       </>)}
 
       {/* 👣 VRAIE 3D (Three.js) — repli 2.5D si WebGL indisponible */}
-      {mode === '3d' && <Room3D items={items} room={room} hi={hi} onOpen={(id) => { setSel(id); setOpenItem(id); }} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      {mode === '3d' && <Room3D items={items} room={room} hi={hi} onOpen={(id) => { setSel(id); setOpenItem(id); }} onMove={(id, x, y) => updateItem(id, { x, y })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => { setSel(id); setOpenItem(id); }} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />}
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
