@@ -3598,27 +3598,38 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // Textures & matériaux mis en cache par numéro (un seul carton = 4 textures
       // sinon, ça saturerait avec de grandes piles).
       const colisCache = new Map();
-      const colisFaceTex = (num, wide) => {
-        const c = document.createElement('canvas'); c.width = 256; c.height = wide ? 150 : 256; const x = c.getContext('2d'); const W = c.width, H = c.height;
-        x.fillStyle = '#cba869'; x.fillRect(0, 0, W, H);                       // carton kraft
-        x.strokeStyle = 'rgba(120,90,40,0.5)'; x.lineWidth = 5; x.strokeRect(4, 4, W - 8, H - 8);
-        x.fillStyle = 'rgba(150,115,60,0.5)'; x.fillRect(0, H * 0.46, W, H * 0.08); // ruban adhésif
-        const by = H * 0.16, bh = H * 0.68;                                    // étiquette blanche
-        x.fillStyle = '#fff'; x.fillRect(16, by, W - 32, bh);
-        x.strokeStyle = '#b3893f'; x.lineWidth = 4; x.strokeRect(16, by, W - 32, bh);
-        x.fillStyle = '#16161c'; x.font = `900 ${Math.round(bh * 0.7)}px system-ui,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText(String(num).slice(0, 5), W / 2, by + bh / 2);
-        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
-        t.anisotropy = 4; return t;
+      // Matière kraft unie partagée pour les CÔTÉS des cartons (naturel, pas de
+      // numéro miroir sur les côtés). Recréée à chaque reconstruction (cache vidé).
+      const kraftMat = () => { let k = colisCache.get('__kraft'); if (!k) { k = new THREE.MeshStandardMaterial({ color: '#c6a267', roughness: 0.94 }); colisCache.set('__kraft', k); } return k; };
+      // Face AVANT : boîte à chaussures kraft, couvercle + étiquette blanche nette.
+      const colisFrontTex = (num) => {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 176; const x = c.getContext('2d'); const W = c.width, H = c.height;
+        const gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#d2ad6f'); gr.addColorStop(1, '#bd9856'); x.fillStyle = gr; x.fillRect(0, 0, W, H);
+        x.strokeStyle = 'rgba(90,66,30,0.4)'; x.lineWidth = 3; x.beginPath(); x.moveTo(0, H * 0.3); x.lineTo(W, H * 0.3); x.stroke(); // ligne du couvercle
+        const lx = 22, ly = H * 0.4, lw = W - 44, lh = H * 0.5;                 // étiquette blanche
+        x.fillStyle = '#fff'; x.fillRect(lx, ly, lw, lh);
+        x.strokeStyle = '#a9812f'; x.lineWidth = 3; x.strokeRect(lx, ly, lw, lh);
+        x.fillStyle = '#16161c'; x.font = `900 ${Math.round(lh * 0.64)}px system-ui,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText('N°' + String(num).slice(0, 5), W / 2, ly + lh / 2);
+        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.anisotropy = 4; return t;
+      };
+      // Dessus : rabats du carton + ruban + petit numéro (lisible vu de dessus).
+      const colisTopTex = (num) => {
+        const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const S = 128;
+        x.fillStyle = '#c6a267'; x.fillRect(0, 0, S, S);
+        x.strokeStyle = 'rgba(90,66,30,0.32)'; x.lineWidth = 2; x.beginPath(); x.moveTo(0, 0); x.lineTo(S, S); x.moveTo(S, 0); x.lineTo(0, S); x.stroke();
+        x.strokeStyle = 'rgba(120,90,40,0.5)'; x.lineWidth = 9; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.stroke();
+        x.fillStyle = '#3a2c12'; x.font = '900 34px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), S / 2, S / 2);
+        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} return t;
       };
       const makeColis = (num, bw, bh, bd) => {
         let cc = colisCache.get(num);
         if (!cc) {
-          const sideMat = new THREE.MeshStandardMaterial({ map: colisFaceTex(num, true), roughness: 0.9 });
-          const topMat = new THREE.MeshStandardMaterial({ map: colisFaceTex(num, false), roughness: 0.9 });
-          const plain = new THREE.MeshStandardMaterial({ color: '#bd9857', roughness: 0.95 });
-          // ordre BoxGeometry : +X, -X, +Y(dessus), -Y(dessous), +Z(avant), -Z
-          cc = [sideMat, sideMat, topMat, plain, sideMat, sideMat];
+          const frontMat = new THREE.MeshStandardMaterial({ map: colisFrontTex(num), roughness: 0.9 });
+          const topMat = new THREE.MeshStandardMaterial({ map: colisTopTex(num), roughness: 0.92 });
+          const kraft = kraftMat();
+          // ordre BoxGeometry : +X, -X, +Y(dessus), -Y, +Z(avant), -Z → n° avant + dessus, kraft uni ailleurs
+          cc = [kraft, kraft, topMat, kraft, frontMat, kraft];
           colisCache.set(num, cc);
         }
         const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), cc);
@@ -4117,9 +4128,12 @@ function RoomPlan({ locate, onLocateConsumed }) {
     const x = Math.round((cx + room.w / 2 - it.w / 2) * 2) / 2, y = Math.round((cz + room.h / 2 - it.h / 2) * 2) / 2;
     updateItem(it.id, { x, y, rot, wall: next });
   };
-  // Clic direct sur une case (grille) en 3D → on saisit / change / efface son N°.
+  // Clic sur une grille en 3D. 1er tap = la SÉLECTIONNER (fait apparaître les
+  // réglages : nb de boîtes en largeur/hauteur, taille…). Tap suivant sur une
+  // case = y saisir / changer / effacer le N°. Ça évite le prompt intempestif
+  // et rend les réglages faciles à trouver.
   const fillCell = (itemId, cellKey) => {
-    setSel(itemId);
+    if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
     const it = items.find(x => x.id === itemId); if (!it) return;
     const cur = ((it.slots || {})[cellKey] || [])[0] || '';
     const n = window.prompt('N° de la boîte pour cette case (laisse vide pour effacer) :', cur);
@@ -4258,8 +4272,8 @@ function RoomPlan({ locate, onLocateConsumed }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>🔳 Grille</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Colonnes</span><button onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{selItem.cols || 4}</b><button onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Rangées</span><button onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{selItem.rows || 3}</b><button onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} boîtes</span>
                 <button onClick={() => fillGridSeries(selItem)} title="Remplir les cases vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
@@ -4281,7 +4295,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Touche une case de la grille</b> = y mettre / changer le N° de la boîte · <b>touche un meuble</b> = le sélectionner · en <b>mode déplacement</b>, glisse un meuble (la grille, la porte et la fenêtre se <b>collent au mur</b> le plus proche) · <b>◀▶</b> tourne la vue.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Touche la grille</b> = la sélectionner (règle alors ↔ boîtes en largeur / ↕ en hauteur / taille juste en dessous) · <b>touche une case</b> une fois sélectionnée = y mettre / changer le N° · bouton <b>🔢 Remplir en série</b> pour tout numéroter d'un coup · <b>📌 Coller au mur</b> · <b>◀▶</b> tourne la vue.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
