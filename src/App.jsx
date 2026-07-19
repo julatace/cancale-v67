@@ -3507,7 +3507,8 @@ const FURN_TYPES = {
   armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire' },
   penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie' },
   portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie' },
-  carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true },
+  pile:    { label: 'Pile de boîtes', emoji: '📦', w: 0.5, h: 0.5, rows: 5, cols: 1, cell: 0.5, start: 1, color: '#c9a24b', h3d: 0.34, build: 'pile', pile: true },
+  carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true, hidden: true },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f', h3d: 0.7, build: 'table' },
   boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites' },
   bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate' },
@@ -3757,6 +3758,19 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // BOÎTE seule à empiler : un carton avec son N°, posé sur le sol ou sur la
       // boîte du dessous (le niveau `lvl` est géré par le placement).
       const buildCarton = (w, d, ht, base, num) => { const g = new THREE.Group(); const b = makeColis(num != null && num !== '' ? num : '?', w, ht, d); b.position.y = ht / 2; g.add(b); return g; };
+      // PILE DE BOÎTES : cols colonnes × rows boîtes, empilées et NUMÉROTÉES tout
+      // seules à partir de `start` (bas→haut, colonne par colonne). L'utilisateur
+      // pose la pile et choisit juste le nombre de boîtes.
+      const buildPile = (cols, rows, cell, start) => {
+        const g = new THREE.Group(); const gap = cell * 0.04, s = cell - gap;
+        let n = parseInt(start, 10); if (isNaN(n)) n = 1;
+        for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) { // r=0 = en bas
+          const bx = makeColis(String(n), s, s, s);
+          bx.position.set(-((cols - 1) / 2) * cell + c * cell, r * cell + s / 2, 0);
+          g.add(bx); n++;
+        }
+        return g;
+      };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const disposeMat = (mat) => { if (!mat) return; (Array.isArray(mat) ? mat : [mat]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); if (mm && mm.dispose) mm.dispose(); }); };
@@ -3767,11 +3781,11 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           const shape = (FURN_TYPES[it.type] || {}).build || 'generic';
           // Pour la GRILLE, les dimensions viennent de la taille de case + du nombre
           // de cases (rows×cols) → chaque case fait exactement `cell` de côté.
-          const isGrid = shape === 'grille', isBox = !!(FURN_TYPES[it.type] || {}).box;
+          const isGrid = shape === 'grille', isBox = !!(FURN_TYPES[it.type] || {}).box, isPile = shape === 'pile';
           const cellSize = it.cell || 0.5, nc = Math.max(1, it.cols || 4), nr = Math.max(1, it.rows || 3);
-          const ht = isGrid ? nr * cellSize : Math.max(0.35, h3dOf(it) * HSCALE);
-          const w = isGrid ? nc * cellSize : it.w * 0.92;
-          const d = isGrid ? Math.max(0.16, Math.min(it.h, cellSize)) : it.h * 0.92;
+          const ht = (isGrid || isPile) ? nr * cellSize : Math.max(0.35, h3dOf(it) * HSCALE);
+          const w = (isGrid || isPile) ? nc * cellSize : it.w * 0.92;
+          const d = (isGrid || isPile) ? Math.max(0.16, Math.min(it.h, cellSize)) : it.h * 0.92;
           const base = colorOf(it);
           let g;
           switch (shape) {
@@ -3787,6 +3801,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             case 'porte': g = buildPorte(w, d, ht, base); break;
             case 'fenetre': g = buildFenetre(w, d, ht, base); break;
             case 'carton': g = buildCarton(w, d, ht, base, it.num); break;
+            case 'pile': g = buildPile(nc, nr, cellSize, it.start || 1); break;
             default: g = buildGeneric(w, d, ht, base);
           }
           // Une boîte à empiler se pose à la hauteur de son niveau (lvl) : posée
@@ -4097,6 +4112,21 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const addFurn = (type) => {
     const t = FURN_TYPES[type]; const id = 'f' + Date.now();
     let name = t.label, emoji = t.emoji;
+    // PILE DE BOÎTES : on demande juste COMBIEN de boîtes ; elles s'empilent et se
+    // numérotent toutes seules. L'utilisateur déplace ensuite la pile où il veut.
+    if (t.pile) {
+      const cntStr = window.prompt('Combien de boîtes dans la pile ?', '5');
+      if (cntStr == null) return;
+      const count = Math.max(1, Math.min(40, parseInt(cntStr, 10) || 5));
+      // Numéro de départ = à la suite des piles déjà posées (jamais de doublon).
+      let mx = 0; items.forEach(o => { if ((FURN_TYPES[o.type] || {}).pile) { const c = Math.max(1, o.cols || 1) * Math.max(1, o.rows || 1); const last = (parseInt(o.start, 10) || 1) + c - 1; if (last > mx) mx = last; } });
+      const cell = t.cell;
+      setItems(list => {
+        const n = list.length, gx = 0.7 + (n % 5) * 1.1, gy = 0.7 + (Math.floor(n / 5) % 5) * 1.1;
+        return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, cols: 1, rows: count, start: mx + 1, x: Math.min(room.w - cell, gx), y: Math.min(room.h - cell, gy), w: cell, h: cell, slots: {} }];
+      });
+      setSel(id); return;
+    }
     // BOÎTE à empiler : on demande le numéro et on la pose (sur le sol) à un
     // endroit libre ; l'utilisateur l'empile ensuite en la glissant sur une autre.
     if (t.box) {
@@ -4142,6 +4172,10 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const gridCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(16, (it.cols || 4) + d)) });
   const gridRows = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(40, (it.rows || 3) + d)) });
   const gridCell = (it, d) => gridSet(it, { cell: Math.max(0.28, Math.min(1.2, +(((it.cell || 0.5) + d)).toFixed(2))) });
+  // Pile : nombre de boîtes (rows), colonnes, numéro de départ.
+  const pileCount = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(40, (it.rows || 5) + d)) });
+  const pileCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(12, (it.cols || 1) + d)) });
+  const pileStart = (it) => { const s = window.prompt('Numéro de la 1re boîte (celle du bas) :', String(it.start || 1)); if (s == null) return; const n = parseInt(s, 10); if (!isNaN(n)) updateItem(it.id, { start: n }); };
   // Remplir la grille EN SÉRIE : un numéro de départ → toutes les cases vides se
   // remplissent en croissant (gauche→droite, haut→bas). Gain de temps énorme.
   const fillGridSeries = (it) => {
@@ -4365,7 +4399,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       {/* Palette de meubles */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>Ajouter :</span>
-        {Object.entries(FURN_TYPES).map(([k, t]) => (
+        {Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden).map(([k, t]) => (
           <button key={k} onClick={() => addFurn(k)} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 700, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
         ))}
       </div>
@@ -4450,9 +4484,23 @@ function RoomPlan({ locate, onLocateConsumed }) {
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
+          {/* PILE de boîtes : nombre de boîtes + colonnes + numéro de départ */}
+          {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (() => {
+            const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
+            const total = (selItem.cols || 1) * (selItem.rows || 5), st = selItem.start || 1;
+            return (
+              <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
+                <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button onClick={() => pileCount(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 20, textAlign: 'center' }}>{selItem.rows || 5}</b><button onClick={() => pileCount(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Colonnes</span><button onClick={() => pileCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{selItem.cols || 1}</b><button onClick={() => pileCols(selItem, 1)} style={stepBtn}>+</button></span>
+                <button onClick={() => pileStart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 N° de départ ({st})</button>
+                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {total} boîtes (N°{st} → {st + total - 1})</span>
+              </div>
+            );
+          })()}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
           {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
-          {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
+          {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
             <button onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
             <button onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
             <button onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
@@ -4464,7 +4512,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Empiler des boîtes (facile) :</b> ajoute des <b>📦 Boîte à empiler</b>, touche-en une, appuie sur <b>⬆️ Poser sur une autre boîte</b>, puis touche la boîte du dessous → elle monte dessus, alignée. <b>⬇️ Au sol</b> la redescend. (Ou, en <b>✋ mode déplacement</b>, glisse une boîte sur une autre.)</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Le plus simple :</b> ajoute une <b>📦 Pile de boîtes</b> → indique <b>combien de boîtes</b> → elles s'empilent et se numérotent toutes seules. Touche la pile pour régler le <b>nombre de boîtes</b>, les <b>colonnes</b> et le <b>N° de départ</b>. En <b>✋ mode déplacement</b>, glisse la pile où tu veux.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
