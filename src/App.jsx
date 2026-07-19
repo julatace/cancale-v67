@@ -4115,15 +4115,21 @@ function RoomPlan({ locate, onLocateConsumed }) {
     // PILE DE BOÎTES : on demande juste COMBIEN de boîtes ; elles s'empilent et se
     // numérotent toutes seules. L'utilisateur déplace ensuite la pile où il veut.
     if (t.pile) {
-      const cntStr = window.prompt('Combien de boîtes dans la pile ?', '5');
-      if (cntStr == null) return;
-      const count = Math.max(1, Math.min(40, parseInt(cntStr, 10) || 5));
-      // Numéro de départ = à la suite des piles déjà posées (jamais de doublon).
+      const colsStr = window.prompt('Combien de COLONNES (piles côte à côte) ?', '1');
+      if (colsStr == null) return;
+      const cols = Math.max(1, Math.min(12, parseInt(colsStr, 10) || 1));
+      const rowsStr = window.prompt('Combien de boîtes de HAUT (par colonne) ?', '5');
+      if (rowsStr == null) return;
+      const rows = Math.max(1, Math.min(40, parseInt(rowsStr, 10) || 5));
+      // Numéro de départ proposé = à la suite des piles déjà posées (jamais de doublon).
       let mx = 0; items.forEach(o => { if ((FURN_TYPES[o.type] || {}).pile) { const c = Math.max(1, o.cols || 1) * Math.max(1, o.rows || 1); const last = (parseInt(o.start, 10) || 1) + c - 1; if (last > mx) mx = last; } });
-      const cell = t.cell;
+      const startStr = window.prompt('Numéro de la 1re boîte (en bas de la 1re colonne) ?', String(mx + 1));
+      if (startStr == null) return;
+      const start = Math.max(1, parseInt(startStr, 10) || (mx + 1));
+      const cell = t.cell, w = +(cols * cell).toFixed(2);
       setItems(list => {
         const n = list.length, gx = 0.7 + (n % 5) * 1.1, gy = 0.7 + (Math.floor(n / 5) % 5) * 1.1;
-        return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, cols: 1, rows: count, start: mx + 1, x: Math.min(room.w - cell, gx), y: Math.min(room.h - cell, gy), w: cell, h: cell, slots: {} }];
+        return [...list, { id, type, name, emoji, color: t.color, h3d: t.h3d, cell, cols, rows, start, x: Math.min(room.w - w, gx), y: Math.min(room.h - cell, gy), w, h: cell, slots: {} }];
       });
       setSel(id); return;
     }
