@@ -3690,39 +3690,29 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         const lock = box(0.16, 0.14, 0.05, metalMat); lock.position.set(0, bodyH, d / 2 + 0.02); g.add(lock);
         return g;
       };
-      // GRILLE DE BOÎTES : un quadrillage rows×cols où CHAQUE case est un carton.
-      // Case remplie → carton kraft avec le N° imprimé en gros ; case vide → fond
-      // clair. Très léger : matériaux partagés (structure/vide) + textures de N°
-      // en cache. Une seule boîte par case (pas d'empilage) = grille bien lisible.
+      // GRILLE = MUR DE BOÎTES EMPILÉES : nc boîtes en largeur × nr en hauteur.
+      // Chaque boîte REMPLIT sa case et TOUCHE ses voisines → les colonnes se
+      // lisent comme de vraies piles alignées. Une case vide = boîte « fantôme »
+      // translucide (on voit où ranger). Aucun cadre : ce sont les boîtes qui
+      // font la structure, comme dans la vraie vie.
       const buildGrille = (w, d, ht, base, rows, cols, slots) => {
         const g = new THREE.Group();
         const nr = Math.max(1, rows || 3), nc = Math.max(1, cols || 4);
         const cw = w / nc, chh = ht / nr;
-        const dep = Math.max(0.26, Math.min(cw * 1.1, chh * 1.1, 0.46)); // cases PROFONDES → vrais cartons en volume
-        const t = Math.max(0.014, Math.min(cw, chh) * 0.05);
-        const structM = flatMat(shade(base, -12), 0.82), emptyM = flatMat(shade(base, -34), 0.96); // vide = renfoncement sombre
-        const back = box(w, ht, t, structM); back.position.set(0, ht / 2, -dep / 2); g.add(back);
+        const dep = Math.max(0.28, Math.min(cw * 1.15, chh * 1.15, 0.5));
+        const gap = Math.min(cw, chh) * 0.03;                 // interstice fin pour distinguer les boîtes
+        const bw = cw - gap, bh = chh - gap, bd = dep - gap;
+        const ghostM = new THREE.MeshStandardMaterial({ color: shade(base, 18), roughness: 0.95, transparent: true, opacity: 0.22, depthWrite: false });
         for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
-          const cx = -w / 2 + (c + 0.5) * cw, cy = ht - (r + 0.5) * chh; // r=0 en haut
+          const cx = -w / 2 + (c + 0.5) * cw, cy = ht - (r + 0.5) * chh; // r=0 en haut, boîtes qui se touchent
           const key = r + '_' + c, arr = (slots && slots[key]) || [];
           let cellMesh;
-          if (arr.length) {
-            const bd = dep * 0.84; // vrai carton qui remplit la case en profondeur
-            cellMesh = makeColis(arr[0], cw * 0.87, chh * 0.85, bd);
-            cellMesh.position.set(cx, cy, dep / 2 - bd / 2 - 0.008); // avancé vers l'ouverture
-          } else {
-            cellMesh = box(cw * 0.94, chh * 0.94, t, emptyM); // fond sombre = casier vide ouvert
-            cellMesh.position.set(cx, cy, -dep / 2 + t * 1.5);
-          }
+          if (arr.length) { cellMesh = makeColis(arr[0], bw, bh, bd); }
+          else { cellMesh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); cellMesh.receiveShadow = true; } // emplacement vide visible
+          cellMesh.position.set(cx, cy, 0);
           cellMesh.userData = { cell: key }; // pour remplir la case au clic
           g.add(cellMesh);
         }
-        // séparateurs + cadre (quadrillage visible)
-        for (let r = 1; r < nr; r++) { const sh = box(w, t, dep, structM); sh.position.set(0, ht - r * chh, 0); g.add(sh); }
-        for (let c = 1; c < nc; c++) { const sv = box(t, ht, dep, structM); sv.position.set(-w / 2 + c * cw, ht / 2, 0); g.add(sv); }
-        const top = box(w, t, dep, structM); top.position.set(0, ht - t / 2, 0); g.add(top);
-        const bot = box(w, t, dep, structM); bot.position.set(0, t / 2, 0); g.add(bot);
-        [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const s = box(t, ht, dep, structM); s.position.set(px, ht / 2, 0); g.add(s); });
         return g;
       };
       const buildPorte = (w, d, ht, base) => {
