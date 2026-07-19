@@ -3497,6 +3497,7 @@ const FURN_TYPES = {
   armoire: { label: 'Armoire', emoji: '🚪', w: 2, h: 1, rows: 2, cols: 2, color: '#b08a5f', h3d: 1.9, build: 'armoire' },
   penderie:{ label: 'Penderie', emoji: '👕', w: 2, h: 1, rows: 1, cols: 4, color: '#6f8fb0', h3d: 1.6, build: 'penderie' },
   portant: { label: 'Portant', emoji: '👗', w: 2, h: 1, rows: 1, cols: 5, color: '#9a9aa2', h3d: 1.6, build: 'penderie' },
+  carton:  { label: 'Boîte à empiler', emoji: '📦', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#c9a24b', h3d: 0.34, build: 'carton', box: true },
   table:   { label: 'Table',   emoji: '🪵', w: 2, h: 2, rows: 1, cols: 1, color: '#b0916f', h3d: 0.7, build: 'table' },
   boites:  { label: 'Boîtes',  emoji: '📦', w: 1, h: 1, rows: 2, cols: 2, color: '#c9a24b', h3d: 0.5, build: 'boites' },
   bac:     { label: 'Bac',     emoji: '🧺', w: 1, h: 1, rows: 1, cols: 2, color: '#5fb0a3', h3d: 0.5, build: 'crate' },
@@ -3743,6 +3744,9 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         glass.position.set(0, cy, 0); g.add(glass);
         return g;
       };
+      // BOÎTE seule à empiler : un carton avec son N°, posé sur le sol ou sur la
+      // boîte du dessous (le niveau `lvl` est géré par le placement).
+      const buildCarton = (w, d, ht, base, num) => { const g = new THREE.Group(); const b = makeColis(num != null && num !== '' ? num : '?', w, ht, d); b.position.y = ht / 2; g.add(b); return g; };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const disposeMat = (mat) => { if (!mat) return; (Array.isArray(mat) ? mat : [mat]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); if (mm && mm.dispose) mm.dispose(); }); };
@@ -3753,7 +3757,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           const shape = (FURN_TYPES[it.type] || {}).build || 'generic';
           // Pour la GRILLE, les dimensions viennent de la taille de case + du nombre
           // de cases (rows×cols) → chaque case fait exactement `cell` de côté.
-          const isGrid = shape === 'grille';
+          const isGrid = shape === 'grille', isBox = !!(FURN_TYPES[it.type] || {}).box;
           const cellSize = it.cell || 0.5, nc = Math.max(1, it.cols || 4), nr = Math.max(1, it.rows || 3);
           const ht = isGrid ? nr * cellSize : Math.max(0.35, h3dOf(it) * HSCALE);
           const w = isGrid ? nc * cellSize : it.w * 0.92;
@@ -3772,17 +3776,24 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             case 'grille': g = buildGrille(w, d, ht, base, nr, nc, it.slots); break;
             case 'porte': g = buildPorte(w, d, ht, base); break;
             case 'fenetre': g = buildFenetre(w, d, ht, base); break;
+            case 'carton': g = buildCarton(w, d, ht, base, it.num); break;
             default: g = buildGeneric(w, d, ht, base);
           }
-          g.position.set((it.x + it.w / 2) - room.w / 2, 0, (it.y + it.h / 2) - room.h / 2);
+          // Une boîte à empiler se pose à la hauteur de son niveau (lvl) : posée
+          // sur le sol (lvl 0) ou sur les boîtes en dessous. Un léger interstice
+          // (ht*0.02) évite le z-fighting entre boîtes empilées.
+          const baseY = isBox ? (it.lvl || 0) * ht * 1.02 : 0;
+          g.position.set((it.x + it.w / 2) - room.w / 2, baseY, (it.y + it.h / 2) - room.h / 2);
           g.rotation.y = it.rot || 0; // orientation (collé au mur)
           g.userData = { itemId: it.id, w: it.w, h: it.h, type: it.type };
-          const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
-          lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
+          if (!isBox) { // les boîtes portent déjà leur N° imprimé → pas d'étiquette flottante
+            const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
+            lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
+          }
           // La grille peint elle-même ses cartons (un par case) → on saute
           // l'empilage générique. Les autres meubles empilent les cartons dans
           // leurs cases (jusqu'à ~18), N° imprimé en gros, lisible sans cliquer.
-          if (!isGrid) {
+          if (!isGrid && !isBox) {
             const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
             const cellW = w / cols, cellH = ht / rows;
             const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145; // format boîte à chaussures
@@ -4062,9 +4073,26 @@ function RoomPlan({ locate, onLocateConsumed }) {
     persist({ ...plan, rooms, active: rooms[0].id }); setSel(null); setOpenItem(null); setHi(null); setSearch('');
   };
 
+  // Pas de la grille-sol pour poser/empiler les boîtes (0,5 m).
+  const BOX_S = 0.5;
   const addFurn = (type) => {
     const t = FURN_TYPES[type]; const id = 'f' + Date.now();
     let name = t.label, emoji = t.emoji;
+    // BOÎTE à empiler : on demande le numéro et on la pose (sur le sol) à un
+    // endroit libre ; l'utilisateur l'empile ensuite en la glissant sur une autre.
+    if (t.box) {
+      let mx = 0; items.forEach(o => { if ((FURN_TYPES[o.type] || {}).box) { const v = parseInt(o.num, 10); if (!isNaN(v) && v > mx) mx = v; } });
+      const num = (window.prompt('Numéro de la boîte :', mx > 0 ? String(mx + 1) : '') || '').trim();
+      if (!num) return;
+      setItems(list => {
+        // pose sur une colonne au sol pas encore occupée (empilage ensuite à la main)
+        const used = new Set(list.filter(o => (FURN_TYPES[o.type] || {}).box).map(o => Math.round(o.x / BOX_S) + ',' + Math.round(o.y / BOX_S)));
+        let gx = 1, gy = 1;
+        for (let k = 0; k < 400; k++) { const cc = Math.round(gx / BOX_S) + ',' + Math.round(gy / BOX_S); if (!used.has(cc)) break; gx += BOX_S; if (gx > room.w - BOX_S) { gx = 1; gy += BOX_S; } }
+        return [...list, { id, type, name, emoji, num, color: t.color, h3d: t.h3d, x: Math.min(room.w - t.w, gx), y: Math.min(room.h - t.h, gy), w: t.w, h: t.h, lvl: 0, slots: {} }];
+      });
+      setSel(id); return;
+    }
     if (type === 'autre') {
       const n = (window.prompt('Nom de ton meuble (ex : Armoire, Bac à chaussures) :', '') || '').trim();
       if (n) name = n;
@@ -4167,6 +4195,29 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
   const setRoom = (dw, dh) => patchRoom(r => ({ room: { ...r.room, w: Math.max(4, Math.min(20, r.room.w + dw)), h: Math.max(4, Math.min(20, r.room.h + dh)) } }));
   const updateItem = (id, patch) => setItems(list => list.map(it => it.id === id ? { ...it, ...patch } : it));
+  // Déplacement d'un élément depuis la 3D. Une BOÎTE se cale sur la grille-sol
+  // (0,5 m) et s'EMPILE : son niveau = nb de boîtes déjà présentes sur cette
+  // colonne (donc lâchée sur une pile, elle se pose dessus). Les autres meubles
+  // gardent x/y/rotation tels quels.
+  const moveItem = (id, x, y, rot) => {
+    setItems(list => {
+      const it = list.find(o => o.id === id); if (!it) return list;
+      if (!(FURN_TYPES[it.type] || {}).box) return list.map(o => o.id === id ? { ...o, x, y, rot } : o);
+      const sx = Math.round(x / BOX_S) * BOX_S, sy = Math.round(y / BOX_S) * BOX_S;
+      const colKey = (o) => Math.round(o.x / BOX_S) + ',' + Math.round(o.y / BOX_S);
+      const updated = list.map(o => o.id === id ? { ...o, x: sx, y: sy } : o);
+      // Recompacte chaque colonne : niveaux 0..n contigus ; la boîte déplacée
+      // passe au SOMMET de sa colonne cible (lâchée sur la pile → dessus).
+      const byCol = {};
+      updated.forEach(o => { if ((FURN_TYPES[o.type] || {}).box) { const k = colKey(o); (byCol[k] = byCol[k] || []).push(o); } });
+      const lvlOf = {};
+      Object.values(byCol).forEach(arr => {
+        arr.sort((a, b) => (a.id === id ? 1 : b.id === id ? -1 : (a.lvl || 0) - (b.lvl || 0)));
+        arr.forEach((o, i) => { lvlOf[o.id] = i; });
+      });
+      return updated.map(o => (FURN_TYPES[o.type] || {}).box ? { ...o, lvl: lvlOf[o.id] != null ? lvlOf[o.id] : (o.lvl || 0) } : o);
+    });
+  };
   const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
   const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; setItems(list => [...list, copy]); setSel(id); };
 
@@ -4187,9 +4238,18 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const doSearch = (q) => {
     const t = String(q).trim().toLowerCase(); if (!t) { setHi(null); return; }
     // On cherche dans TOUTES les pièces : si le N° est ailleurs, on bascule dessus.
-    for (const rm of plan.rooms) for (const it of (rm.items || [])) for (const cell in (it.slots || {})) if ((it.slots[cell] || []).some(n => String(n).trim().toLowerCase() === t)) {
-      if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
-      setHi({ itemId: it.id, cell, roomId: rm.id, roomName: rm.name }); setOpenItem(it.id); setSel(it.id); return;
+    for (const rm of plan.rooms) {
+      for (const it of (rm.items || [])) {
+        // Boîte seule : son numéro est sur it.num.
+        if ((FURN_TYPES[it.type] || {}).box && String(it.num || '').trim().toLowerCase() === t) {
+          if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
+          setHi({ itemId: it.id, roomId: rm.id, roomName: rm.name }); setSel(it.id); return;
+        }
+        for (const cell in (it.slots || {})) if ((it.slots[cell] || []).some(n => String(n).trim().toLowerCase() === t)) {
+          if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
+          setHi({ itemId: it.id, cell, roomId: rm.id, roomName: rm.name }); setOpenItem(it.id); setSel(it.id); return;
+        }
+      }
     }
     setHi({ notFound: true });
   };
@@ -4270,13 +4330,17 @@ function RoomPlan({ locate, onLocateConsumed }) {
       </div>
 
       {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
-      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onCellTap={fillCell} onMove={(id, x, y, rot) => updateItem(id, { x, y, rot })} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onCellTap={fillCell} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
       {selItem && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
-          <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}</span>
+          <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
+          {/* Boîte à empiler : bouton pour changer son numéro */}
+          {(FURN_TYPES[selItem.type] || {}).box && (
+            <button onClick={() => { const n = (window.prompt('Numéro de cette boîte :', selItem.num || '') || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '1 1 100%', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '8px 12px', cursor: 'pointer', marginBottom: 4 }}>✏️ Changer le numéro (N°{selItem.num || '?'})</button>
+          )}
           {/* Personnalisation : couleur + hauteur */}
           <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Couleur</span>
@@ -4284,8 +4348,8 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
-            <button onClick={() => { const e = (window.prompt('Emoji du meuble :', emojiOf(selItem)) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>
-            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && <>
+            {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={() => { const e = (window.prompt('Emoji du meuble :', emojiOf(selItem)) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
+            {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
               {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
             </>}
@@ -4307,9 +4371,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
               </div>
             );
           })()}
-          <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>
-          <button onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>
-          {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && <>
+          {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>}
+          {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
             <button onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
             <button onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
             <button onClick={() => updateItem(selItem.id, { w: Math.max(1, selItem.w - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️−</button>
@@ -4321,7 +4385,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Touche la grille</b> = la sélectionner, puis <b>➕ Ajouter une boîte</b> : elle s'<b>empile</b> toute seule à la <b style={{ color: '#3a9bff' }}>prochaine place (repère bleu)</b> — de bas en haut jusqu'au plafond, puis la colonne suivante. <b>⬆️ Plafond</b> monte la pile au plafond, <b>↔</b> ajoute des colonnes. <b>🔢 Remplir en série</b> numérote tout d'un coup.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Boîte à empiler</b> : ajoute une boîte (elle demande son N°), puis en <b>mode déplacement ✋</b> glisse-la où tu veux — <b>lâche-la SUR une autre boîte pour l'empiler</b> dessus (elle se pose au-dessus toute seule, bien alignée). Touche une boîte pour changer son N°. Tu peux aussi utiliser la <b>🔳 Grille</b> pour un mur de cases régulier.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
