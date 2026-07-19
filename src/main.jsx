@@ -44,6 +44,17 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     check();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    // pageshow (persisted) = page « gelée » restaurée (iOS installé) → on revérifie.
+    window.addEventListener('pageshow', (e) => { if (e.persisted) check(); });
+    window.addEventListener('focus', () => check());
     setInterval(check, 60 * 1000);
   });
 })();
+
+// Mise à jour MANUELLE forcée : vide tous les caches, désenregistre le service
+// worker, puis recharge. Bouton « Forcer la mise à jour » dans le garage.
+window.__vrmForceUpdate = async () => {
+  try { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); } catch (_) {}
+  try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map((r) => r.unregister())); } catch (_) {}
+  location.reload();
+};

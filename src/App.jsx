@@ -4177,6 +4177,11 @@ function RoomPlan({ locate, onLocateConsumed }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
+      {/* Version + mise à jour manuelle (diagnostic « ça n'a rien changé ») */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', fontSize: 10.5, color: C.muted }}>
+        <span>Version : <b>{typeof __BUILD__ !== 'undefined' ? __BUILD__ : '—'}</b></span>
+        <button onClick={() => { if (window.__vrmForceUpdate) window.__vrmForceUpdate(); else window.location.reload(); }} title="Vide le cache et recharge la dernière version" style={{ border: `1px solid ${C.accent}`, borderRadius: 999, background: `${C.accent}14`, color: C.text, fontSize: 10.5, fontWeight: 800, padding: '4px 10px', cursor: 'pointer' }}>🔄 Forcer la mise à jour</button>
+      </div>
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>🏠 Pièces :</span>
