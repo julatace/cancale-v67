@@ -4361,13 +4361,30 @@ function RoomPlan({ locate, onLocateConsumed }) {
       return recompactBoxes(updated, null, it.id); // seule sur sa colonne → niveau 0
     });
   };
-  // Sélection depuis la 3D, en tenant compte du mode « empiler par toucher ».
+  // Hauteur du DESSUS d'un meuble (pour poser une pile dessus), cohérente avec la 3D.
+  const furnTop = (o) => { const b = (FURN_TYPES[o.type] || {}).build || 'generic'; if (b === 'grille' || b === 'pile') return Math.max(1, o.rows || 3) * (o.cell || 0.5); return Math.max(0.35, h3dOf(o) * 1.5); };
+  const isSurface = (o) => { const ft = FURN_TYPES[o.type] || {}; return !ft.pile && !ft.box && !ft.deco && ft.build !== 'grille'; }; // meuble sur lequel on peut poser
+  // « Poser une pile sur un meuble » par TOUCHER (fiable, sans viser en 3D) :
+  // on choisit une pile, on touche le meuble → la pile se pose CENTRÉE dessus.
+  const [putOnSrc, setPutOnSrc] = useState(null);
+  const putPileOn = (srcId, tgtId) => {
+    const src = items.find(o => o.id === srcId), tgt = items.find(o => o.id === tgtId);
+    if (!src || !tgt) return;
+    const nx = Math.max(0, Math.min(room.w - src.w, +(tgt.x + tgt.w / 2 - src.w / 2).toFixed(2)));
+    const ny = Math.max(0, Math.min(room.h - src.h, +(tgt.y + tgt.h / 2 - src.h / 2).toFixed(2)));
+    updateItem(srcId, { x: nx, y: ny, lift: furnTop(tgt) });
+  };
+  // Sélection depuis la 3D, en tenant compte des modes « empiler » / « poser sur ».
   const selectItem = (id) => {
+    if (putOnSrc && id && id !== putOnSrc) {
+      const tgt = items.find(o => o.id === id);
+      if (tgt && isSurface(tgt)) { putPileOn(putOnSrc, id); const s = putOnSrc; setPutOnSrc(null); setSel(s); return; }
+    }
     if (stackSrc && id && id !== stackSrc) {
       const tgt = items.find(o => o.id === id);
       if (tgt && (FURN_TYPES[tgt.type] || {}).box) { stackOnto(stackSrc, id); const s = stackSrc; setStackSrc(null); setSel(s); return; }
     }
-    setStackSrc(null); setSel(id);
+    setStackSrc(null); setPutOnSrc(null); setSel(id);
   };
   const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
   const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; setItems(list => [...list, copy]); setSel(id); };
@@ -4480,6 +4497,13 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
       </div>
 
+      {/* Bandeau « poser une pile sur un meuble » actif */}
+      {putOnSrc && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
+          <button onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+        </div>
+      )}
       {/* Bandeau « empiler par toucher » actif */}
       {stackSrc && (() => { const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
@@ -4544,6 +4568,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
                 <button onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
+                <button onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
                 {(selItem.lift || 0) > 0 && <button onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
               </div>
@@ -4563,7 +4588,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Pile de boîtes</b> : colonnes + hauteur → auto-empilée. <b>Touche la pile</b> pour la sélectionner, puis <b>touche une boîte pour changer SON numéro</b> (mets ce que tu veux, même dans le désordre) — laisse vide pour la retirer. En <b>✋ mode déplacement</b>, glisse la pile où tu veux : <b>lâche-la sur une table / commode pour la poser DESSUS</b>, ou au sol.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Pile de boîtes</b> : colonnes + hauteur → auto-empilée. <b>Touche la pile</b> puis <b>🪑 Poser sur un meuble</b> → touche la table/commode : la pile se pose DESSUS, centrée (fiable). <b>⬇️ Au sol</b> la redescend. Touche une boîte pour changer SON N° (même dans le désordre) ou la retirer (vide). En <b>✋ mode déplacement</b>, glisse la pile pour la positionner.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
