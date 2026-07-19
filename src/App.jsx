@@ -3945,7 +3945,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             const others = furnGroup.children.filter(g => g !== d.grp);
             const hits = ray.intersectObjects(others, true);
             let liftItem = null, liftPt = null;
-            for (const h of hits) { let o = h.object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (o && o.userData.itemId !== d.id) { const t = (dataRef.current.items || []).find(i => i.id === o.userData.itemId); if (t) { liftItem = t; liftPt = h.point; break; } } }
+            for (const h of hits) { let o = h.object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (o && o.userData.itemId !== d.id) { const t = (dataRef.current.items || []).find(i => i.id === o.userData.itemId); const ft = t ? (FURN_TYPES[t.type] || {}) : null; if (t && ft && !ft.pile && !ft.box && !ft.deco && ft.build !== 'grille') { liftItem = t; liftPt = h.point; break; } } } // uniquement de VRAIS meubles (pas une autre pile/boîte/mur)
             if (liftItem) {
               lift = topOf(liftItem);
               if (liftPt) { nx = Math.max(0, Math.min(room.w - d.w, Math.round((liftPt.x + room.w / 2 - d.w / 2) * 2) / 2)); ny = Math.max(0, Math.min(room.h - d.h, Math.round((liftPt.z + room.h / 2 - d.h / 2) * 2) / 2)); }
@@ -4544,6 +4544,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
                 <button onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
+                {(selItem.lift || 0) > 0 && <button onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
               </div>
             );
