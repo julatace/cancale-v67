@@ -3541,16 +3541,21 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 1000);
       // Vue plus basse / immersive (proche de la hauteur des yeux, depuis l'entrée).
       camera.position.set(room.w * 0.1, Math.max(2.2, Math.max(room.w, room.h) * 0.5), room.h * 1.05);
-      // lumières douces + une directionnelle qui porte les ombres
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x8a929e, 0.85));
-      scene.add(new THREE.AmbientLight(0xffffff, 0.25));
-      const dir = new THREE.DirectionalLight(0xffffff, 0.85);
-      dir.position.set(room.w * 0.6, Math.max(room.w, room.h) * 1.5, room.h * 0.5);
-      dir.castShadow = true; dir.shadow.mapSize.set(1024, 1024);
+      // Éclairage d'intérieur : lumière du ciel douce + soleil chaud (ombres nettes)
+      // + une lumière d'appoint froide pour déboucher les ombres → rendu réaliste.
+      try { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12; } catch (_) {}
+      scene.add(new THREE.HemisphereLight(0xfff3e0, 0xa6a290, 0.92)); // ciel chaud, sol neutre
+      scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+      const dir = new THREE.DirectionalLight(0xfff1dc, 1.05); // soleil chaud
+      dir.position.set(room.w * 0.55, Math.max(room.w, room.h) * 1.6, room.h * 0.6);
+      dir.castShadow = true; dir.shadow.mapSize.set(2048, 2048); dir.shadow.radius = 3;
       const sc = Math.max(room.w, room.h);
       dir.shadow.camera.left = -sc; dir.shadow.camera.right = sc; dir.shadow.camera.top = sc; dir.shadow.camera.bottom = -sc;
-      dir.shadow.camera.near = 0.5; dir.shadow.camera.far = sc * 4.5; dir.shadow.bias = -0.0006;
+      dir.shadow.camera.near = 0.5; dir.shadow.camera.far = sc * 4.5; dir.shadow.bias = -0.0004; dir.shadow.normalBias = 0.02;
       scene.add(dir);
+      const fill = new THREE.DirectionalLight(0xdfe8ff, 0.32); // appoint froid, sans ombre
+      fill.position.set(-room.w * 0.6, Math.max(room.w, room.h) * 0.9, -room.h * 0.4);
+      scene.add(fill);
       // ── Textures & matières procédurales (aucun fichier externe) ──
       const clamp255 = (v) => Math.max(0, Math.min(255, v | 0));
       const shade = (hex, amt) => { const h = String(hex).replace('#', ''); const r = clamp255(parseInt(h.slice(0, 2), 16) + amt), g = clamp255(parseInt(h.slice(2, 4), 16) + amt), b = clamp255(parseInt(h.slice(4, 6), 16) + amt); return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join(''); };
@@ -3573,6 +3578,11 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); };
       mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
       mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
+      // Plinthes (bas des murs) → touche « vraie pièce ».
+      const skirtMat = new THREE.MeshStandardMaterial({ color: '#f4f5f7', roughness: 0.6 });
+      const mkSkirt = (len, x, z, horiz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : 0.05, 0.14, horiz ? 0.05 : len), skirtMat); m.position.set(x, 0.07, z); m.receiveShadow = true; scene.add(m); };
+      mkSkirt(room.w, 0, -room.h / 2 + 0.025, true); mkSkirt(room.w, 0, room.h / 2 - 0.025, true);
+      mkSkirt(room.h, -room.w / 2 + 0.025, 0, false); mkSkirt(room.h, room.w / 2 - 0.025, 0, false);
       // étiquette (sprite texte)
       const makeLabel = (text) => {
         const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
@@ -4070,6 +4080,23 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const gridCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(16, (it.cols || 4) + d)) });
   const gridRows = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(16, (it.rows || 3) + d)) });
   const gridCell = (it, d) => gridSet(it, { cell: Math.max(0.28, Math.min(1.2, +(((it.cell || 0.5) + d)).toFixed(2))) });
+  // « Coller au mur » : place le meuble à plat contre le prochain mur (N→E→S→O),
+  // orienté face à la pièce. Un tap suffit (plus fiable que glisser sur mobile).
+  const stickToWall = (it) => {
+    const order = ['N', 'E', 'S', 'O'];
+    const cur = order.indexOf(it.wall); const next = order[(cur + 1) % 4];
+    const rotMap = { N: 0, S: Math.PI, O: Math.PI / 2, E: -Math.PI / 2 };
+    const rot = rotMap[next], odd = next === 'E' || next === 'O';
+    const effW = odd ? it.h : it.w, effH = odd ? it.w : it.h;
+    const curCx = (it.x + it.w / 2) - room.w / 2, curCz = (it.y + it.h / 2) - room.h / 2;
+    let cx = curCx, cz = curCz;
+    if (next === 'N') cz = -room.h / 2 + effH / 2; else if (next === 'S') cz = room.h / 2 - effH / 2;
+    else if (next === 'O') cx = -room.w / 2 + effW / 2; else cx = room.w / 2 - effW / 2;
+    cx = Math.max(-room.w / 2 + effW / 2, Math.min(room.w / 2 - effW / 2, cx));
+    cz = Math.max(-room.h / 2 + effH / 2, Math.min(room.h / 2 - effH / 2, cz));
+    const x = Math.round((cx + room.w / 2 - it.w / 2) * 2) / 2, y = Math.round((cz + room.h / 2 - it.h / 2) * 2) / 2;
+    updateItem(it.id, { x, y, rot, wall: next });
+  };
   // Clic direct sur une case (grille) en 3D → on saisit / change / efface son N°.
   const fillCell = (itemId, cellKey) => {
     setSel(itemId);
@@ -4219,6 +4246,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             );
           })()}
           <button onClick={() => setOpenItem(selItem.id)} style={{ border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>📂 Ranger dedans ({storedCount(selItem)})</button>
+          <button onClick={() => stickToWall(selItem)} title="Coller au mur suivant" style={{ border: `1px solid ${C.accent}`, borderRadius: 8, background: `${C.accent}14`, color: C.text, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>📌 Coller au mur</button>
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && <>
             <button onClick={() => updateItem(selItem.id, { w: selItem.h, h: selItem.w })} title="Pivoter" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>🔄</button>
             <button onClick={() => updateItem(selItem.id, { w: Math.min(room.w, selItem.w + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↔️+</button>
