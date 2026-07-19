@@ -4246,6 +4246,45 @@ function RoomPlan({ locate, onLocateConsumed }) {
       return updated.map(o => (FURN_TYPES[o.type] || {}).box ? { ...o, lvl: lvlOf[o.id] != null ? lvlOf[o.id] : (o.lvl || 0) } : o);
     });
   };
+  // Recompacte les niveaux d'une liste de boîtes par colonne (la boîte `topId`
+  // finit en haut de sa colonne, `bottomId` en bas).
+  const recompactBoxes = (list, topId, bottomId) => {
+    const colKey = (o) => Math.round(o.x / BOX_S) + ',' + Math.round(o.y / BOX_S);
+    const byCol = {}; list.forEach(o => { if ((FURN_TYPES[o.type] || {}).box) { const k = colKey(o); (byCol[k] = byCol[k] || []).push(o); } });
+    const lvlOf = {};
+    Object.values(byCol).forEach(arr => { arr.sort((a, b) => (a.id === topId ? 1 : b.id === topId ? -1 : a.id === bottomId ? -1 : b.id === bottomId ? 1 : (a.lvl || 0) - (b.lvl || 0))); arr.forEach((o, i) => { lvlOf[o.id] = i; }); });
+    return list.map(o => (FURN_TYPES[o.type] || {}).box ? { ...o, lvl: lvlOf[o.id] != null ? lvlOf[o.id] : (o.lvl || 0) } : o);
+  };
+  // EMPILER par TOUCHER (fiable, sans glisser précis) : on choisit une boîte,
+  // puis on touche celle sur laquelle la poser → elle monte au sommet de sa pile.
+  const [stackSrc, setStackSrc] = useState(null);
+  const stackOnto = (srcId, tgtId) => {
+    setItems(list => {
+      const src = list.find(o => o.id === srcId), tgt = list.find(o => o.id === tgtId);
+      if (!src || !tgt || !(FURN_TYPES[src.type] || {}).box || !(FURN_TYPES[tgt.type] || {}).box) return list;
+      const updated = list.map(o => o.id === srcId ? { ...o, x: tgt.x, y: tgt.y } : o);
+      return recompactBoxes(updated, srcId, null); // src au sommet de la colonne cible
+    });
+  };
+  // Reposer une boîte AU SOL, sur une colonne libre.
+  const boxToFloor = (it) => {
+    setItems(list => {
+      const used = new Set(list.filter(o => (FURN_TYPES[o.type] || {}).box && o.id !== it.id).map(o => Math.round(o.x / BOX_S) + ',' + Math.round(o.y / BOX_S)));
+      let gx = 1, gy = 1;
+      for (let k = 0; k < 800; k++) { const cc = Math.round(gx / BOX_S) + ',' + Math.round(gy / BOX_S); if (!used.has(cc)) break; gx += BOX_S; if (gx > room.w - BOX_S) { gx = 1; gy += BOX_S; } }
+      const sx = Math.min(room.w - it.w, gx), sy = Math.min(room.h - it.h, gy);
+      const updated = list.map(o => o.id === it.id ? { ...o, x: sx, y: sy } : o);
+      return recompactBoxes(updated, null, it.id); // seule sur sa colonne → niveau 0
+    });
+  };
+  // Sélection depuis la 3D, en tenant compte du mode « empiler par toucher ».
+  const selectItem = (id) => {
+    if (stackSrc && id && id !== stackSrc) {
+      const tgt = items.find(o => o.id === id);
+      if (tgt && (FURN_TYPES[tgt.type] || {}).box) { stackOnto(stackSrc, id); const s = stackSrc; setStackSrc(null); setSel(s); return; }
+    }
+    setStackSrc(null); setSel(id);
+  };
   const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
   const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; setItems(list => [...list, copy]); setSel(id); };
 
@@ -4357,17 +4396,29 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
       </div>
 
+      {/* Bandeau « empiler par toucher » actif */}
+      {stackSrc && (() => { const s = items.find(o => o.id === stackSrc); return (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
+          <button onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
+        </div>
+      ); })()}
+
       {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
-      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={(id) => setSel(id)} onCellTap={fillCell} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
       {selItem && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
           <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
-          {/* Boîte à empiler : bouton pour changer son numéro */}
+          {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
           {(FURN_TYPES[selItem.type] || {}).box && (
-            <button onClick={() => { const n = (window.prompt('Numéro de cette boîte :', selItem.num || '') || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '1 1 100%', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '8px 12px', cursor: 'pointer', marginBottom: 4 }}>✏️ Changer le numéro (N°{selItem.num || '?'})</button>
+            <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+              <button onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
+              {(selItem.lvl || 0) > 0 && <button onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
+              <button onClick={() => { const n = (window.prompt('Numéro de cette boîte :', selItem.num || '') || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+            </div>
           )}
           {/* Personnalisation : couleur + hauteur */}
           <div style={{ flex: '1 1 100%', display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
@@ -4413,7 +4464,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Empiler des boîtes :</b> 1) ajoute des <b>📦 Boîte à empiler</b> · 2) active le <b>✋ mode déplacement</b> · 3) <b>glisse une boîte pile SUR une autre et lâche</b> → elle se pose dessus, alignée (la pile monte). Re-glisse-la ailleurs pour la sortir de la pile. Touche une boîte pour changer son N°.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Empiler des boîtes (facile) :</b> ajoute des <b>📦 Boîte à empiler</b>, touche-en une, appuie sur <b>⬆️ Poser sur une autre boîte</b>, puis touche la boîte du dessous → elle monte dessus, alignée. <b>⬇️ Au sol</b> la redescend. (Ou, en <b>✋ mode déplacement</b>, glisse une boîte sur une autre.)</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
