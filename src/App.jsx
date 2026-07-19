@@ -3522,12 +3522,12 @@ const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0'
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
-function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
+function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
   const moveRef = React.useRef(canMove); moveRef.current = canMove; // lu en direct par les handlers
-  const cbRef = React.useRef({}); cbRef.current = { onCellTap, onSelect, onOpen, onMove }; // callbacks à jour
+  const cbRef = React.useRef({}); cbRef.current = { onCellTap, onPileTap, onSelect, onOpen, onMove }; // callbacks à jour
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(true);
   const HSCALE = 1.5;
@@ -3612,26 +3612,27 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const colisCache = new Map();
       // Matière kraft unie partagée pour les CÔTÉS des cartons (naturel, pas de
       // numéro miroir sur les côtés). Recréée à chaque reconstruction (cache vidé).
-      const kraftMat = () => { let k = colisCache.get('__kraft'); if (!k) { k = new THREE.MeshStandardMaterial({ color: '#c6a267', roughness: 0.94 }); colisCache.set('__kraft', k); } return k; };
-      // Face AVANT : boîte à chaussures kraft, couvercle + étiquette blanche nette.
+      const kraftMat = () => { let k = colisCache.get('__kraft'); if (!k) { k = new THREE.MeshStandardMaterial({ color: '#c19a5f', roughness: 0.96 }); colisCache.set('__kraft', k); } return k; };
+      // Face AVANT : simple carton kraft (grain léger + rabat central) avec le
+      // NUMÉRO écrit directement dessus au marqueur — pas d'étiquette « produit ».
+      const KRAFT = '#c19a5f';
       const colisFrontTex = (num) => {
-        const c = document.createElement('canvas'); c.width = 256; c.height = 176; const x = c.getContext('2d'); const W = c.width, H = c.height;
-        const gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#d2ad6f'); gr.addColorStop(1, '#bd9856'); x.fillStyle = gr; x.fillRect(0, 0, W, H);
-        x.strokeStyle = 'rgba(90,66,30,0.4)'; x.lineWidth = 3; x.beginPath(); x.moveTo(0, H * 0.3); x.lineTo(W, H * 0.3); x.stroke(); // ligne du couvercle
-        const lx = 22, ly = H * 0.4, lw = W - 44, lh = H * 0.5;                 // étiquette blanche
-        x.fillStyle = '#fff'; x.fillRect(lx, ly, lw, lh);
-        x.strokeStyle = '#a9812f'; x.lineWidth = 3; x.strokeRect(lx, ly, lw, lh);
-        x.fillStyle = '#16161c'; x.font = `900 ${Math.round(lh * 0.64)}px system-ui,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText('N°' + String(num).slice(0, 5), W / 2, ly + lh / 2);
+        const c = document.createElement('canvas'); c.width = 200; c.height = 200; const x = c.getContext('2d'); const W = c.width, H = c.height;
+        x.fillStyle = KRAFT; x.fillRect(0, 0, W, H);
+        for (let i = 0; i < 46; i++) { x.fillStyle = `rgba(90,60,25,${0.02 + Math.random() * 0.035})`; x.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 26, 1 + Math.random() * 2); } // grain carton
+        x.strokeStyle = 'rgba(80,55,25,0.35)'; x.lineWidth = 2; x.beginPath(); x.moveTo(W / 2, 0); x.lineTo(W / 2, H); x.stroke(); // rabat central
+        x.fillStyle = 'rgba(208,188,150,0.5)'; x.fillRect(0, H * 0.44, W, H * 0.14);                                             // ruban adhésif
+        x.fillStyle = '#2a2018'; x.font = `800 ${Math.round(H * 0.4)}px "Marker Felt","Comic Sans MS",system-ui,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(String(num).slice(0, 4), W / 2, H * 0.51);                                                                   // numéro au marqueur
         const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.anisotropy = 4; return t;
       };
-      // Dessus : rabats du carton + ruban + petit numéro (lisible vu de dessus).
+      // Dessus : rabats du carton (croix) + ruban + petit numéro.
       const colisTopTex = (num) => {
         const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const S = 128;
-        x.fillStyle = '#c6a267'; x.fillRect(0, 0, S, S);
-        x.strokeStyle = 'rgba(90,66,30,0.32)'; x.lineWidth = 2; x.beginPath(); x.moveTo(0, 0); x.lineTo(S, S); x.moveTo(S, 0); x.lineTo(0, S); x.stroke();
-        x.strokeStyle = 'rgba(120,90,40,0.5)'; x.lineWidth = 9; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.stroke();
-        x.fillStyle = '#3a2c12'; x.font = '900 34px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), S / 2, S / 2);
+        x.fillStyle = KRAFT; x.fillRect(0, 0, S, S);
+        x.strokeStyle = 'rgba(80,55,25,0.4)'; x.lineWidth = 3; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.moveTo(0, S / 2); x.lineTo(S, S / 2); x.stroke(); // rabats
+        x.fillStyle = 'rgba(208,188,150,0.5)'; x.fillRect(S * 0.42, 0, S * 0.16, S); // ruban
+        x.fillStyle = '#3a2c12'; x.font = '800 30px "Marker Felt","Comic Sans MS",system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), S / 2, S / 2);
         const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} return t;
       };
       const makeColis = (num, bw, bh, bd) => {
@@ -3758,16 +3759,19 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // BOÎTE seule à empiler : un carton avec son N°, posé sur le sol ou sur la
       // boîte du dessous (le niveau `lvl` est géré par le placement).
       const buildCarton = (w, d, ht, base, num) => { const g = new THREE.Group(); const b = makeColis(num != null && num !== '' ? num : '?', w, ht, d); b.position.y = ht / 2; g.add(b); return g; };
-      // PILE DE BOÎTES : cols colonnes × rows boîtes, empilées et NUMÉROTÉES tout
-      // seules à partir de `start` (bas→haut, colonne par colonne). L'utilisateur
-      // pose la pile et choisit juste le nombre de boîtes.
-      const buildPile = (cols, rows, cell, start) => {
+      // PILE DE BOÎTES : on rend la LISTE de numéros `nums` (dans l'ordre), remplie
+      // colonne par colonne, de bas en haut, `rows` boîtes par colonne. Retirer une
+      // boîte = retirer un élément de la liste → tout ce qui est au-dessus DESCEND.
+      // Chaque boîte porte son index (userData.pileIdx) pour la retirer au toucher.
+      const buildPile = (nums, rows, cell) => {
         const g = new THREE.Group(); const gap = cell * 0.04, s = cell - gap;
-        let n = parseInt(start, 10); if (isNaN(n)) n = 1;
-        for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) { // r=0 = en bas
-          const bx = makeColis(String(n), s, s, s);
-          bx.position.set(-((cols - 1) / 2) * cell + c * cell, r * cell + s / 2, 0);
-          g.add(bx); n++;
+        const cols = Math.max(1, Math.ceil(nums.length / rows));
+        for (let i = 0; i < nums.length; i++) {
+          const cc = Math.floor(i / rows), rr = i % rows; // cc = colonne, rr = niveau (0=bas)
+          const bx = makeColis(String(nums[i]), s, s, s);
+          bx.position.set(-((cols - 1) / 2) * cell + cc * cell, rr * cell + s / 2, 0);
+          bx.userData = { pileIdx: i };
+          g.add(bx);
         }
         return g;
       };
@@ -3783,8 +3787,14 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           // de cases (rows×cols) → chaque case fait exactement `cell` de côté.
           const isGrid = shape === 'grille', isBox = !!(FURN_TYPES[it.type] || {}).box, isPile = shape === 'pile';
           const cellSize = it.cell || 0.5, nc = Math.max(1, it.cols || 4), nr = Math.max(1, it.rows || 3);
+          // Pile : liste de numéros (nums) → colonnes déduites du nombre de boîtes.
+          let pileNumsArr = null, pileCols = nc;
+          if (isPile) {
+            pileNumsArr = (Array.isArray(it.nums) && it.nums.length) ? it.nums : Array.from({ length: nc * nr }, (_, i) => String((parseInt(it.start, 10) || 1) + i));
+            pileCols = Math.max(1, Math.ceil(pileNumsArr.length / nr));
+          }
           const ht = (isGrid || isPile) ? nr * cellSize : Math.max(0.35, h3dOf(it) * HSCALE);
-          const w = (isGrid || isPile) ? nc * cellSize : it.w * 0.92;
+          const w = isGrid ? nc * cellSize : isPile ? pileCols * cellSize : it.w * 0.92;
           const d = (isGrid || isPile) ? Math.max(0.16, Math.min(it.h, cellSize)) : it.h * 0.92;
           const base = colorOf(it);
           let g;
@@ -3801,7 +3811,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             case 'porte': g = buildPorte(w, d, ht, base); break;
             case 'fenetre': g = buildFenetre(w, d, ht, base); break;
             case 'carton': g = buildCarton(w, d, ht, base, it.num); break;
-            case 'pile': g = buildPile(nc, nr, cellSize, it.start || 1); break;
+            case 'pile': g = buildPile(pileNumsArr, nr, cellSize); break;
             default: g = buildGeneric(w, d, ht, base);
           }
           // Une boîte à empiler se pose à la hauteur de son niveau (lvl) : posée
@@ -3884,13 +3894,13 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         setPtr(e); ray.setFromCamera(ptr, camera);
         const hits = ray.intersectObjects(furnGroup.children, true);
         if (!hits.length) { drag = null; return; } // vide → OrbitControls tourne
-        // case de grille touchée (pour la remplir au clic)
-        let cellKey = null, probe = hits[0].object;
-        while (probe && cellKey == null) { if (probe.userData && probe.userData.cell != null) cellKey = probe.userData.cell; probe = probe.parent; }
+        // case de grille (remplir au clic) ou boîte de pile (retirer au clic)
+        let cellKey = null, pileIdx = null, probe = hits[0].object;
+        while (probe && cellKey == null && pileIdx == null) { if (probe.userData && probe.userData.cell != null) cellKey = probe.userData.cell; else if (probe.userData && probe.userData.pileIdx != null) pileIdx = probe.userData.pileIdx; probe = probe.parent; }
         let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (!o) { drag = null; return; }
         const canDrag = !!moveRef.current;
         const gp = ray.ray.intersectPlane(ground, hitPt);
-        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, type: o.userData.type, cell: cellKey, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
+        drag = { grp: o, id: o.userData.itemId, w: o.userData.w, h: o.userData.h, type: o.userData.type, cell: cellKey, pileIdx, offX: gp ? o.position.x - hitPt.x : 0, offZ: gp ? o.position.z - hitPt.z : 0, sx: e.clientX, sy: e.clientY, moved: false, canDrag };
         if (canDrag) { // on garde la main : OrbitControls NE reçoit PAS ce geste
           controls.enabled = false;
           try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) {}
@@ -3931,8 +3941,9 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2; d.grp.rotation.y = rot;
           cb.onMove && cb.onMove(d.id, nx, ny, rot, stackOn);
         } else if (!d.moved) {
-          // tap sur une CASE de grille → la remplir directement ; sinon sélectionner
+          // tap : case de grille → remplir · boîte de pile → retirer · sinon sélectionner
           if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell);
+          else if (d.pileIdx != null && cb.onPileTap) cb.onPileTap(d.id, d.pileIdx);
           else (cb.onSelect || cb.onOpen) && (cb.onSelect || cb.onOpen)(d.id);
         }
       };
@@ -4178,10 +4189,16 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const gridCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(16, (it.cols || 4) + d)) });
   const gridRows = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(40, (it.rows || 3) + d)) });
   const gridCell = (it, d) => gridSet(it, { cell: Math.max(0.28, Math.min(1.2, +(((it.cell || 0.5) + d)).toFixed(2))) });
-  // Pile : nombre de boîtes (rows), colonnes, numéro de départ.
-  const pileCount = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(40, (it.rows || 5) + d)) });
-  const pileCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(12, (it.cols || 1) + d)) });
-  const pileStart = (it) => { const s = window.prompt('Numéro de la 1re boîte (celle du bas) :', String(it.start || 1)); if (s == null) return; const n = parseInt(s, 10); if (!isNaN(n)) updateItem(it.id, { start: n }); };
+  // Pile : liste de numéros (nums, remplie colonne par colonne, bas→haut). Retirer
+  // un numéro décale toute la suite → les boîtes du dessus DESCENDENT.
+  const pileNums = (it) => (Array.isArray(it.nums) && it.nums.length) ? it.nums : Array.from({ length: Math.max(1, it.cols || 1) * Math.max(1, it.rows || 5) }, (_, i) => String((parseInt(it.start, 10) || 1) + i));
+  const pileSet = (it, nums) => { const rows = Math.max(1, it.rows || 5); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { nums, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
+  const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = pileNums(it); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
+  const pileAdd = (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; nums.push(String(nextN)); pileSet(it, nums); };
+  const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (nums.length <= 1) return; nums.pop(); pileSet(it, nums); };
+  const pileRestart = (it) => { const s = window.prompt('Renuméroter toute la pile à partir de :', String(it.start || (pileNums(it)[0]) || 1)); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; const nums = pileNums(it).map((_, i) => String(st + i)); updateItem(it.id, { nums, start: st }); };
+  const removePileBox = (itemId, idx) => { const it = items.find(o => o.id === itemId); if (!it) return; const nums = pileNums(it).slice(); if (idx < 0 || idx >= nums.length) return; if (!window.confirm(`Retirer la boîte N°${nums[idx]} ? Les boîtes du dessus descendent.`)) return; nums.splice(idx, 1); pileSet(it, nums); };
+  const pileTap = (itemId, idx) => { if (sel !== itemId) { setSel(itemId); return; } removePileBox(itemId, idx); };
   // Remplir la grille EN SÉRIE : un numéro de départ → toutes les cases vides se
   // remplissent en croissant (gauche→droite, haut→bas). Gain de temps énorme.
   const fillGridSeries = (it) => {
@@ -4445,7 +4462,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       ); })()}
 
       {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
-      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
@@ -4490,17 +4507,17 @@ function RoomPlan({ locate, onLocateConsumed }) {
               </div>
             );
           })()}
-          {/* PILE de boîtes : nombre de boîtes + colonnes + numéro de départ */}
+          {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
           {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (() => {
             const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
-            const total = (selItem.cols || 1) * (selItem.rows || 5), st = selItem.start || 1;
+            const nums = pileNums(selItem), total = nums.length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(total / rows));
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button onClick={() => pileCount(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 20, textAlign: 'center' }}>{selItem.rows || 5}</b><button onClick={() => pileCount(selItem, 1)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Colonnes</span><button onClick={() => pileCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{selItem.cols || 1}</b><button onClick={() => pileCols(selItem, 1)} style={stepBtn}>+</button></span>
-                <button onClick={() => pileStart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 N° de départ ({st})</button>
-                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {total} boîtes (N°{st} → {st + total - 1})</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+                <button onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
+                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour la retirer 🗑</span>
               </div>
             );
           })()}
@@ -4518,7 +4535,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Le plus simple :</b> ajoute une <b>📦 Pile de boîtes</b> → indique <b>combien de boîtes</b> → elles s'empilent et se numérotent toutes seules. Touche la pile pour régler le <b>nombre de boîtes</b>, les <b>colonnes</b> et le <b>N° de départ</b>. En <b>✋ mode déplacement</b>, glisse la pile où tu veux.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Pile de boîtes</b> : indique colonnes + hauteur → elles s'empilent et se numérotent seules. <b>Touche la pile</b> pour la sélectionner, puis <b>touche une boîte pour la retirer</b> (celles du dessus descendent). Règle le <b>nombre de boîtes</b> et la <b>hauteur</b>, ou <b>🔢 Renuméroter</b>. En <b>✋ mode déplacement</b>, glisse la pile entière où tu veux.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
