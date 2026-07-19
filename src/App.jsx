@@ -3703,12 +3703,16 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         const gap = Math.min(cw, chh) * 0.03;                 // interstice fin pour distinguer les boîtes
         const bw = cw - gap, bh = chh - gap, bd = dep - gap;
         const ghostM = new THREE.MeshStandardMaterial({ color: shade(base, 18), roughness: 0.95, transparent: true, opacity: 0.22, depthWrite: false });
+        const nextM = new THREE.MeshStandardMaterial({ color: '#3a9bff', roughness: 0.6, transparent: true, opacity: 0.42, depthWrite: false }); // prochaine place conseillée
+        // 1re case vide en ordre de lecture = la prochaine place où poser une boîte.
+        let firstEmpty = null;
+        for (let r = 0; r < nr && firstEmpty == null; r++) for (let c = 0; c < nc && firstEmpty == null; c++) { if (!((slots && slots[r + '_' + c]) || []).length) firstEmpty = r + '_' + c; }
         for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
           const cx = -w / 2 + (c + 0.5) * cw, cy = ht - (r + 0.5) * chh; // r=0 en haut, boîtes qui se touchent
           const key = r + '_' + c, arr = (slots && slots[key]) || [];
           let cellMesh;
           if (arr.length) { cellMesh = makeColis(arr[0], bw, bh, bd); }
-          else { cellMesh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); cellMesh.receiveShadow = true; } // emplacement vide visible
+          else { cellMesh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), key === firstEmpty ? nextM : ghostM); cellMesh.receiveShadow = true; } // emplacement vide (bleu = prochaine place)
           cellMesh.position.set(cx, cy, 0);
           cellMesh.userData = { cell: key }; // pour remplir la case au clic
           g.add(cellMesh);
@@ -4101,6 +4105,18 @@ function RoomPlan({ locate, onLocateConsumed }) {
     updateItem(it.id, { slots });
   };
   const clearGrid = (it) => { if (!window.confirm('Vider toutes les cases de cette grille ?')) return; updateItem(it.id, { slots: {} }); };
+  // Poser une boîte à la PROCHAINE place libre (celle en surbrillance bleue) →
+  // toujours bien aligné, dans l'ordre. On propose le numéro suivant.
+  const addBoxToGrid = (it) => {
+    const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
+    let target = null;
+    for (let r = 0; r < nr && !target; r++) for (let c = 0; c < nc && !target; c++) { const k = r + '_' + c; if (!((it.slots && it.slots[k]) || []).length) target = k; }
+    if (!target) { window.alert('La grille est pleine. Augmente « ↕ Boîtes en hauteur » ou « ↔ en largeur » pour ajouter des places.'); return; }
+    let mx = 0; for (const k in (it.slots || {})) { const v = parseInt(((it.slots[k] || [])[0]) || '', 10); if (!isNaN(v) && v > mx) mx = v; }
+    const n = window.prompt('Numéro de la boîte (elle se pose automatiquement à la prochaine place libre, bien alignée) :', mx > 0 ? String(mx + 1) : '');
+    if (n == null) return; const v = String(n).trim(); if (!v) return;
+    updateItem(it.id, { slots: { ...(it.slots || {}), [target]: [v] } });
+  };
   // « Coller au mur » : place le meuble à plat contre le prochain mur (N→E→S→O),
   // orienté face à la pièce. Un tap suffit (plus fiable que glisser sur mobile).
   const stickToWall = (it) => {
@@ -4270,8 +4286,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
-                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} boîtes</span>
-                <button onClick={() => fillGridSeries(selItem)} title="Remplir les cases vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
+                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
+                <button onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11.5, fontWeight: 900, padding: '6px 11px', cursor: 'pointer' }}>➕ Ajouter une boîte</button>
+                <button onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
                 <button onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
               </div>
             );
@@ -4290,7 +4307,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Touche la grille</b> = la sélectionner (règle alors ↔ boîtes en largeur / ↕ en hauteur / taille juste en dessous) · <b>touche une case</b> une fois sélectionnée = y mettre / changer le N° · bouton <b>🔢 Remplir en série</b> pour tout numéroter d'un coup · <b>📌 Coller au mur</b> · <b>◀▶</b> tourne la vue.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Touche la grille</b> = la sélectionner, puis <b>➕ Ajouter une boîte</b> : elle se pose toute seule à la <b style={{ color: '#3a9bff' }}>prochaine place libre (repère bleu)</b>, toujours bien alignée. La place bleue = là où ira la prochaine boîte. <b>🔢 Remplir en série</b> les numérote toutes d'un coup. Touche une case pour corriger un N°.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
