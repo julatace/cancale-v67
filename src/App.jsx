@@ -43,6 +43,16 @@ let _syncListeners = [];
 const onSyncChange = (fn) => { _syncListeners.push(fn); return () => { _syncListeners = _syncListeners.filter(f=>f!==fn); }; };
 const _emitSync = (status) => { _syncListeners.forEach(fn=>{ try{fn(status);}catch(_){}}); };
 
+// Signal « chargement initial du cloud terminé ». CRUCIAL pour la numérotation :
+// tant que le cloud n'est pas chargé, un composant ne doit PAS numéroter (sinon
+// il repart de zéro sur un localStorage vide et ÉCRASE les numéros du cloud —
+// c'est ce qui faisait « changer » les numéros entre deux connexions).
+let _cloudReady = false;
+let _cloudReadyListeners = [];
+const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
+const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
+const isCloudReady = () => _cloudReady;
+
 // Lecture locale (instantanee)
 const load = (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } };
 
@@ -5869,6 +5879,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
+  // Le cloud est-il chargé ? Tant qu'il ne l'est pas, on NE numérote PAS (sinon on
+  // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
+  // le localStorage (que le cloud vient de remplir) → les numéros restent stables.
+  const [cloudReady, setCloudReady] = useState(() => isCloudReady());
+  useEffect(() => onCloudReady(() => {
+    setNumeros(load('vinted_annonce_numeros', {}));
+    setUsedNumeros(load('vinted_used_numeros', []));
+    setCloudReady(true);
+  }), []);
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
@@ -6462,7 +6481,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   //  • Un numéro n'est jamais réattribué à une autre paire (vinted_used_numeros).
   // Modifiable à la main ensuite (le champ N° reste éditable), et désactivable.
   useEffect(() => {
-    if (!autoNum) return;
+    if (!autoNum || !cloudReady) return; // ⛔ pas de numérotation avant que le cloud soit chargé
     const items = listings.items || [];
     if (!items.length) return;
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
@@ -6503,7 +6522,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const ua = [...nextUsed]; setUsedNumeros(ua); save('vinted_used_numeros', ua);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, autoNum]);
+  }, [listings.items, autoNum, cloudReady]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
@@ -8856,12 +8875,14 @@ export default function App() {
       const cloud = await cloudLoad();
       if (stop) return;
       if (cloud && Object.keys(cloud).length > 0) {
-        // Applique les données du cloud à l'app + au localStorage
+        // 1) On restaure D'ABORD TOUTES les clés synchronisées dans le localStorage,
+        //    y compris la NUMÉROTATION des paires (vinted_annonce_numeros /
+        //    vinted_used_numeros) : sinon le composant qui les lit au montage
+        //    repartirait de zéro et écraserait le cloud (numéros qui « changent »).
+        SYNC_KEYS.forEach(k => { if (cloud[k] !== undefined && cloud[k] !== null) { try { localStorage.setItem(k, JSON.stringify(cloud[k])); } catch (_) {} } });
+        // 2) Puis on met à jour les états React des données gérées à la racine.
         const apply = (key, setter) => {
-          if (cloud[key] !== undefined && cloud[key] !== null) {
-            try { localStorage.setItem(key, JSON.stringify(cloud[key])); } catch(_){}
-            setter(cloud[key]);
-          }
+          if (cloud[key] !== undefined && cloud[key] !== null) { setter(cloud[key]); }
         };
         apply('vinted_catalog', setCatalog);
         apply('vinted_sales', setSales);
@@ -8880,6 +8901,7 @@ export default function App() {
         cloudPush();
       }
       setSynced(true);
+      markCloudReady(); // débloque la numérotation (le cloud est chargé)
     })();
     return () => { stop = true; off(); };
   }, []);
