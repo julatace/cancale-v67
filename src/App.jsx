@@ -3817,7 +3817,9 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           // Une boîte à empiler se pose à la hauteur de son niveau (lvl) : posée
           // sur le sol (lvl 0) ou sur les boîtes en dessous. Un léger interstice
           // (ht*0.02) évite le z-fighting entre boîtes empilées.
-          const baseY = isBox ? (it.lvl || 0) * ht * 1.02 : 0;
+          // `lift` = posé en hauteur (sur une table, une commode…). Une boîte a en
+          // plus son niveau d'empilage.
+          const baseY = (it.lift || 0) + (isBox ? (it.lvl || 0) * ht * 1.02 : 0);
           g.position.set((it.x + it.w / 2) - room.w / 2, baseY, (it.y + it.h / 2) - room.h / 2);
           g.rotation.y = it.rot || 0; // orientation (collé au mur)
           g.userData = { itemId: it.id, w: it.w, h: it.h, type: it.type };
@@ -3924,8 +3926,10 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         if (d.canDrag && d.moved) {
           let nx = Math.max(0, Math.min(room.w - d.w, Math.round((d.grp.position.x + room.w / 2 - d.w / 2) * 2) / 2));
           let ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
-          let rot = d.grp.rotation.y || 0, stackOn = null;
-          const isBox = !!(FURN_TYPES[d.type] || {}).box;
+          let rot = d.grp.rotation.y || 0, stackOn = null, lift;
+          const isBox = !!(FURN_TYPES[d.type] || {}).box, isPile = (FURN_TYPES[d.type] || {}).build === 'pile';
+          // Hauteur du DESSUS d'un meuble (pour poser une pile dessus).
+          const topOf = (it) => { const sh = (FURN_TYPES[it.type] || {}).build || 'generic'; if (sh === 'grille' || sh === 'pile') return Math.max(1, it.rows || 3) * (it.cell || 0.5); return Math.max(0.35, h3dOf(it) * HSCALE); };
           if (isBox) {
             // On regarde ce qui est SOUS LE DOIGT au moment du lâcher : si c'est une
             // autre boîte, on empile dessus (fiable même sur une haute pile, car on
@@ -3934,12 +3938,24 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             const others = furnGroup.children.filter(g => g !== d.grp);
             const hits = ray.intersectObjects(others, true);
             for (const h of hits) { let o = h.object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (o && (FURN_TYPES[o.userData.type] || {}).box) { stackOn = o.userData.itemId; break; } }
+          } else if (isPile) {
+            // Lâchée SUR un meuble (table, commode…) → la pile se pose DESSUS, à
+            // l'endroit visé ; sur le sol → au sol.
+            setPtr(e); ray.setFromCamera(ptr, camera);
+            const others = furnGroup.children.filter(g => g !== d.grp);
+            const hits = ray.intersectObjects(others, true);
+            let liftItem = null, liftPt = null;
+            for (const h of hits) { let o = h.object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (o && o.userData.itemId !== d.id) { const t = (dataRef.current.items || []).find(i => i.id === o.userData.itemId); if (t) { liftItem = t; liftPt = h.point; break; } } }
+            if (liftItem) {
+              lift = topOf(liftItem);
+              if (liftPt) { nx = Math.max(0, Math.min(room.w - d.w, Math.round((liftPt.x + room.w / 2 - d.w / 2) * 2) / 2)); ny = Math.max(0, Math.min(room.h - d.h, Math.round((liftPt.z + room.h / 2 - d.h / 2) * 2) / 2)); }
+            } else lift = 0;
           } else if (WALL_TYPES[d.type]) { // collage automatique au mur le plus proche
             const cx = nx + d.w / 2 - room.w / 2, cz = ny + d.h / 2 - room.h / 2, s = snapWall(cx, cz, d.w, d.h);
             if (s) { nx = s.x; ny = s.y; rot = s.rot; } else rot = 0; // loin des murs → face à la pièce
           }
-          d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2; d.grp.rotation.y = rot;
-          cb.onMove && cb.onMove(d.id, nx, ny, rot, stackOn);
+          d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2; d.grp.rotation.y = rot; if (lift != null) d.grp.position.y = lift;
+          cb.onMove && cb.onMove(d.id, nx, ny, rot, stackOn, lift);
         } else if (!d.moved) {
           // tap : case de grille → remplir · boîte de pile → retirer · sinon sélectionner
           if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell);
@@ -4194,11 +4210,22 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const pileNums = (it) => (Array.isArray(it.nums) && it.nums.length) ? it.nums : Array.from({ length: Math.max(1, it.cols || 1) * Math.max(1, it.rows || 5) }, (_, i) => String((parseInt(it.start, 10) || 1) + i));
   const pileSet = (it, nums) => { const rows = Math.max(1, it.rows || 5); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { nums, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
   const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = pileNums(it); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
-  const pileAdd = (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; nums.push(String(nextN)); pileSet(it, nums); };
+  const pileAdd = (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = window.prompt('Numéro de la nouvelle boîte (au-dessus) :', String(nextN)); if (v == null) return; const t = String(v).trim(); if (!t) return; nums.push(t); pileSet(it, nums); };
   const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (nums.length <= 1) return; nums.pop(); pileSet(it, nums); };
-  const pileRestart = (it) => { const s = window.prompt('Renuméroter toute la pile à partir de :', String(it.start || (pileNums(it)[0]) || 1)); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; const nums = pileNums(it).map((_, i) => String(st + i)); updateItem(it.id, { nums, start: st }); };
-  const removePileBox = (itemId, idx) => { const it = items.find(o => o.id === itemId); if (!it) return; const nums = pileNums(it).slice(); if (idx < 0 || idx >= nums.length) return; if (!window.confirm(`Retirer la boîte N°${nums[idx]} ? Les boîtes du dessus descendent.`)) return; nums.splice(idx, 1); pileSet(it, nums); };
-  const pileTap = (itemId, idx) => { if (sel !== itemId) { setSel(itemId); return; } removePileBox(itemId, idx); };
+  const pileRestart = (it) => { const s = window.prompt('Renuméroter toute la pile à partir de (dans l\'ordre) :', String(it.start || (pileNums(it)[0]) || 1)); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; const nums = pileNums(it).map((_, i) => String(st + i)); updateItem(it.id, { nums, start: st }); };
+  // Toucher une boîte de la pile (pile déjà sélectionnée) → changer SON numéro
+  // (on peut mettre n'importe quel numéro, pas forcément dans l'ordre), ou la
+  // retirer si on laisse vide (les boîtes du dessus descendent).
+  const pileTap = (itemId, idx) => {
+    if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne la pile
+    const it = items.find(o => o.id === itemId); if (!it) return;
+    const nums = pileNums(it).slice(); if (idx < 0 || idx >= nums.length) return;
+    const v = window.prompt('Numéro de cette boîte (laisse VIDE pour la retirer, les autres descendent) :', nums[idx]);
+    if (v == null) return;
+    const t = String(v).trim();
+    if (!t) { nums.splice(idx, 1); pileSet(it, nums); return; }
+    nums[idx] = t; updateItem(itemId, { nums });
+  };
   // Remplir la grille EN SÉRIE : un numéro de départ → toutes les cases vides se
   // remplissent en croissant (gauche→droite, haut→bas). Gain de temps énorme.
   const fillGridSeries = (it) => {
@@ -4275,10 +4302,10 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // (0,5 m) et s'EMPILE : son niveau = nb de boîtes déjà présentes sur cette
   // colonne (donc lâchée sur une pile, elle se pose dessus). Les autres meubles
   // gardent x/y/rotation tels quels.
-  const moveItem = (id, x, y, rot, stackOn) => {
+  const moveItem = (id, x, y, rot, stackOn, lift) => {
     setItems(list => {
       const it = list.find(o => o.id === id); if (!it) return list;
-      if (!(FURN_TYPES[it.type] || {}).box) return list.map(o => o.id === id ? { ...o, x, y, rot } : o);
+      if (!(FURN_TYPES[it.type] || {}).box) return list.map(o => o.id === id ? { ...o, x, y, rot, lift: lift != null ? lift : o.lift } : o);
       let sx, sy;
       const tgt = stackOn ? list.find(o => o.id === stackOn && (FURN_TYPES[o.type] || {}).box) : null;
       if (tgt) { sx = tgt.x; sy = tgt.y; } // lâchée SUR une boîte → sa colonne (empilage)
@@ -4517,7 +4544,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
                 <button onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
-                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour la retirer 🗑</span>
+                <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° ✏️ (ou la retirer)</span>
               </div>
             );
           })()}
@@ -4535,7 +4562,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Pile de boîtes</b> : indique colonnes + hauteur → elles s'empilent et se numérotent seules. <b>Touche la pile</b> pour la sélectionner, puis <b>touche une boîte pour la retirer</b> (celles du dessus descendent). Règle le <b>nombre de boîtes</b> et la <b>hauteur</b>, ou <b>🔢 Renuméroter</b>. En <b>✋ mode déplacement</b>, glisse la pile entière où tu veux.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Pile de boîtes</b> : colonnes + hauteur → auto-empilée. <b>Touche la pile</b> pour la sélectionner, puis <b>touche une boîte pour changer SON numéro</b> (mets ce que tu veux, même dans le désordre) — laisse vide pour la retirer. En <b>✋ mode déplacement</b>, glisse la pile où tu veux : <b>lâche-la sur une table / commode pour la poser DESSUS</b>, ou au sol.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
