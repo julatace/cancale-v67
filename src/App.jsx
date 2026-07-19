@@ -3899,13 +3899,22 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         if (d.canDrag && d.moved) {
           let nx = Math.max(0, Math.min(room.w - d.w, Math.round((d.grp.position.x + room.w / 2 - d.w / 2) * 2) / 2));
           let ny = Math.max(0, Math.min(room.h - d.h, Math.round((d.grp.position.z + room.h / 2 - d.h / 2) * 2) / 2));
-          let rot = d.grp.rotation.y || 0;
-          if (WALL_TYPES[d.type]) { // collage automatique au mur le plus proche
+          let rot = d.grp.rotation.y || 0, stackOn = null;
+          const isBox = !!(FURN_TYPES[d.type] || {}).box;
+          if (isBox) {
+            // On regarde ce qui est SOUS LE DOIGT au moment du lâcher : si c'est une
+            // autre boîte, on empile dessus (fiable même sur une haute pile, car on
+            // vise l'écran et non le sol qui est décalé par l'angle de caméra).
+            setPtr(e); ray.setFromCamera(ptr, camera);
+            const others = furnGroup.children.filter(g => g !== d.grp);
+            const hits = ray.intersectObjects(others, true);
+            for (const h of hits) { let o = h.object; while (o && (!o.userData || o.userData.w == null)) o = o.parent; if (o && (FURN_TYPES[o.userData.type] || {}).box) { stackOn = o.userData.itemId; break; } }
+          } else if (WALL_TYPES[d.type]) { // collage automatique au mur le plus proche
             const cx = nx + d.w / 2 - room.w / 2, cz = ny + d.h / 2 - room.h / 2, s = snapWall(cx, cz, d.w, d.h);
             if (s) { nx = s.x; ny = s.y; rot = s.rot; } else rot = 0; // loin des murs → face à la pièce
           }
           d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2; d.grp.rotation.y = rot;
-          cb.onMove && cb.onMove(d.id, nx, ny, rot);
+          cb.onMove && cb.onMove(d.id, nx, ny, rot, stackOn);
         } else if (!d.moved) {
           // tap sur une CASE de grille → la remplir directement ; sinon sélectionner
           if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell);
@@ -4209,11 +4218,20 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // (0,5 m) et s'EMPILE : son niveau = nb de boîtes déjà présentes sur cette
   // colonne (donc lâchée sur une pile, elle se pose dessus). Les autres meubles
   // gardent x/y/rotation tels quels.
-  const moveItem = (id, x, y, rot) => {
+  const moveItem = (id, x, y, rot, stackOn) => {
     setItems(list => {
       const it = list.find(o => o.id === id); if (!it) return list;
       if (!(FURN_TYPES[it.type] || {}).box) return list.map(o => o.id === id ? { ...o, x, y, rot } : o);
-      const sx = Math.round(x / BOX_S) * BOX_S, sy = Math.round(y / BOX_S) * BOX_S;
+      let sx, sy;
+      const tgt = stackOn ? list.find(o => o.id === stackOn && (FURN_TYPES[o.type] || {}).box) : null;
+      if (tgt) { sx = tgt.x; sy = tgt.y; } // lâchée SUR une boîte → sa colonne (empilage)
+      else {
+        // Tolérance : sinon, si on lâche PRÈS d'une boîte, on s'empile dessus.
+        let best = null, bd = Infinity;
+        list.forEach(o => { if (o.id === id || !(FURN_TYPES[o.type] || {}).box) return; const dx = o.x - x, dy = o.y - y, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; best = o; } });
+        if (best && bd <= 0.55 * 0.55) { sx = best.x; sy = best.y; }
+        else { sx = Math.round(x / BOX_S) * BOX_S; sy = Math.round(y / BOX_S) * BOX_S; } // sinon, pose au sol
+      }
       const colKey = (o) => Math.round(o.x / BOX_S) + ',' + Math.round(o.y / BOX_S);
       const updated = list.map(o => o.id === id ? { ...o, x: sx, y: sy } : o);
       // Recompacte chaque colonne : niveaux 0..n contigus ; la boîte déplacée
@@ -4395,7 +4413,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Boîte à empiler</b> : ajoute une boîte (elle demande son N°), puis en <b>mode déplacement ✋</b> glisse-la où tu veux — <b>lâche-la SUR une autre boîte pour l'empiler</b> dessus (elle se pose au-dessus toute seule, bien alignée). Touche une boîte pour changer son N°. Tu peux aussi utiliser la <b>🔳 Grille</b> pour un mur de cases régulier.</div>
+      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>Empiler des boîtes :</b> 1) ajoute des <b>📦 Boîte à empiler</b> · 2) active le <b>✋ mode déplacement</b> · 3) <b>glisse une boîte pile SUR une autre et lâche</b> → elle se pose dessus, alignée (la pile monte). Re-glisse-la ailleurs pour la sortir de la pile. Touche une boîte pour changer son N°.</div>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
