@@ -3686,16 +3686,23 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const buildGrille = (w, d, ht, base, rows, cols, slots) => {
         const g = new THREE.Group();
         const nr = Math.max(1, rows || 3), nc = Math.max(1, cols || 4);
-        const cw = w / nc, chh = ht / nr, dep = Math.max(0.16, Math.min(d, cw * 0.95, 0.55));
+        const cw = w / nc, chh = ht / nr;
+        const dep = Math.max(0.26, Math.min(cw * 1.1, chh * 1.1, 0.46)); // cases PROFONDES → vrais cartons en volume
         const t = Math.max(0.014, Math.min(cw, chh) * 0.05);
-        const structM = flatMat(shade(base, -14), 0.85), emptyM = flatMat(shade(base, 16), 0.93);
+        const structM = flatMat(shade(base, -12), 0.82), emptyM = flatMat(shade(base, -34), 0.96); // vide = renfoncement sombre
         const back = box(w, ht, t, structM); back.position.set(0, ht / 2, -dep / 2); g.add(back);
         for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
           const cx = -w / 2 + (c + 0.5) * cw, cy = ht - (r + 0.5) * chh; // r=0 en haut
           const key = r + '_' + c, arr = (slots && slots[key]) || [];
           let cellMesh;
-          if (arr.length) { cellMesh = makeColis(arr[0], cw * 0.9, chh * 0.9, dep * 0.86); cellMesh.position.set(cx, cy, dep * 0.05); }
-          else { cellMesh = box(cw * 0.9, chh * 0.9, t, emptyM); cellMesh.position.set(cx, cy, -dep * 0.3); }
+          if (arr.length) {
+            const bd = dep * 0.84; // vrai carton qui remplit la case en profondeur
+            cellMesh = makeColis(arr[0], cw * 0.87, chh * 0.85, bd);
+            cellMesh.position.set(cx, cy, dep / 2 - bd / 2 - 0.008); // avancé vers l'ouverture
+          } else {
+            cellMesh = box(cw * 0.94, chh * 0.94, t, emptyM); // fond sombre = casier vide ouvert
+            cellMesh.position.set(cx, cy, -dep / 2 + t * 1.5);
+          }
           cellMesh.userData = { cell: key }; // pour remplir la case au clic
           g.add(cellMesh);
         }
@@ -4080,6 +4087,19 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const gridCols = (it, d) => gridSet(it, { cols: Math.max(1, Math.min(16, (it.cols || 4) + d)) });
   const gridRows = (it, d) => gridSet(it, { rows: Math.max(1, Math.min(16, (it.rows || 3) + d)) });
   const gridCell = (it, d) => gridSet(it, { cell: Math.max(0.28, Math.min(1.2, +(((it.cell || 0.5) + d)).toFixed(2))) });
+  // Remplir la grille EN SÉRIE : un numéro de départ → toutes les cases vides se
+  // remplissent en croissant (gauche→droite, haut→bas). Gain de temps énorme.
+  const fillGridSeries = (it) => {
+    const start = window.prompt('Remplir en série — numéro de départ (les cases vides se remplissent en croissant) :', '');
+    if (start == null) return;
+    let n = parseInt(String(start).trim(), 10);
+    if (isNaN(n)) { window.alert('Entre un numéro (ex : 40).'); return; }
+    const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
+    const slots = { ...(it.slots || {}) };
+    for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) { const key = r + '_' + c; if (!slots[key] || !slots[key].length) { slots[key] = [String(n)]; n++; } }
+    updateItem(it.id, { slots });
+  };
+  const clearGrid = (it) => { if (!window.confirm('Vider toutes les cases de cette grille ?')) return; updateItem(it.id, { slots: {} }); };
   // « Coller au mur » : place le meuble à plat contre le prochain mur (N→E→S→O),
   // orienté face à la pièce. Un tap suffit (plus fiable que glisser sur mobile).
   const stickToWall = (it) => {
@@ -4242,6 +4262,8 @@ function RoomPlan({ locate, onLocateConsumed }) {
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Rangées</span><button onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{selItem.rows || 3}</b><button onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button></span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Taille case</span><button onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} boîtes</span>
+                <button onClick={() => fillGridSeries(selItem)} title="Remplir les cases vides en croissant" style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Remplir en série</button>
+                <button onClick={() => clearGrid(selItem)} title="Vider toutes les cases" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.muted, fontSize: 11, fontWeight: 700, padding: '5px 9px', cursor: 'pointer' }}>🧹 Vider</button>
               </div>
             );
           })()}
