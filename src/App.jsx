@@ -5376,7 +5376,26 @@ const cleanLieu = (raw) => {
 // Le JETON identifie LA photo de l'article, identique sur l'annonce et sur la
 // vente. Permet de relier une VENTE à sa paire numérotée PAR LA PHOTO — même sans
 // numéro dans le titre, et même si le titre est en double.
-const photoKey = (url) => { const m = String(url || '').match(/\/t\/([^/?]+)/); return m ? m[1] : null; };
+// Identifiant STABLE et UNIQUE d'une photo Vinted, pour reconnaître qu'une
+// annonce correspond à une paire déjà numérotée (retour, republication, nouvel
+// appareil…) et lui redonner SON numéro. On ignore ce qui varie d'une requête à
+// l'autre : l'hôte du CDN (images1/2/3…), la signature « ?s=… », et surtout le
+// répertoire de TAILLE (f800, f200, 310x430…) qui change selon l'affichage. On
+// garde les parties stables : le sous-dossier unique de la photo + le nom de
+// fichier (l'identifiant de l'image), ce qui est le même quelle que soit la taille.
+const photoKey = (url) => {
+  const raw = String(url || '').split('?')[0].split('#')[0];
+  if (!raw) return null;
+  const path = raw.replace(/^https?:\/\/[^/]+/i, '');            // enlève l'hôte
+  const segs = path.split('/').filter(Boolean)
+    .filter(seg => !/^(f\d{2,4}|\d{2,4}x\d{2,4}|thumbnails?)$/i.test(seg)); // enlève le répertoire de taille
+  if (!segs.length) return null;
+  const key = segs.slice(-2).join('/').replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase();
+  return key || null;
+};
+// Clé photo d'une entrée numéro : on privilégie la clé MÉMORISÉE (photoK) au
+// moment de la numérotation → reste valable même si le format d'URL évolue.
+const entryPhotoKey = (e) => (e && e.photoK) || (e ? photoKey(e.photo) : null);
 function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLocate }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all'); // all | online | sold | stock
@@ -6096,7 +6115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const updatePair = (item, patch) => {
     setNumeros(prev => {
       const u = { ...prev }; const c = u[item.id] || {};
-      const next = { ...c, ...patch, title:item.title, photo:item.photo||null, price:item.price??null, accountId:item._acc?.vinted_user_id };
+      const next = { ...c, ...patch, title:item.title, photo:item.photo||null, photoK: photoKey(item.photo) || c.photoK || null, price:item.price??null, accountId:item._acc?.vinted_user_id };
       const emptyNum = !String(next.numero||'').trim();
       const emptyBuy = next.buyPrice==null || String(next.buyPrice).trim()==='';
       if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
@@ -6165,7 +6184,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const numerosByPhoto = useMemo(() => {
     const m = {}; const dup = new Set();
     for (const k in numeros) {
-      const pk = photoKey(numeros[k].photo);
+      const pk = entryPhotoKey(numeros[k]);
       if (!pk) continue;
       // Ambigu seulement si deux entrées ont un NUMÉRO DIFFÉRENT pour la même photo.
       // (Une paire renvoyée puis republiée réutilise son numéro → non ambigu.)
@@ -6500,7 +6519,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const byPhoto = {};
     for (const k in numeros) {
       const e = numeros[k]; if (!e || !String(e.numero || '').trim()) continue;
-      const pk = photoKey(e.photo); if (pk && !byPhoto[pk]) byPhoto[pk] = String(e.numero);
+      const pk = entryPhotoKey(e); if (pk && !byPhoto[pk]) byPhoto[pk] = String(e.numero);
     }
     const nextNum = { ...numeros };
     const nextUsed = new Set(usedNumeros.map(x => parseInt(String(x), 10)).filter(n => !isNaN(n)));
@@ -6508,11 +6527,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const sorted = [...items].sort((a, b) => (a.createdTs || 0) - (b.createdTs || 0));
     for (const it of sorted) {
       const cur = nextNum[it.id];
-      if (cur && String(cur.numero || '').trim()) continue; // déjà numérotée
       const pk = photoKey(it.photo);
+      if (cur && String(cur.numero || '').trim()) { // déjà numérotée → on complète juste la clé photo mémorisée si absente
+        if (pk && !cur.photoK) { nextNum[it.id] = { ...cur, photoK: pk }; changed = true; }
+        continue;
+      }
       let num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
       if (!num) { do { base += 1; } while (taken.has(base)); num = String(base); taken.add(base); } // prochain numéro VRAIMENT libre
-      nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, price: it.price ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
+      nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       nextUsed.add(parseInt(num, 10));
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
       changed = true;
