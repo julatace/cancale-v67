@@ -4401,16 +4401,18 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const putPileOn = (srcId, tgtId) => {
     const src = items.find(o => o.id === srcId), tgt = items.find(o => o.id === tgtId);
     if (!src || !tgt) return;
-    // Par défaut centrée sur le meuble ; MAIS si le meuble est contre un mur, on
-    // colle la pile côté mur (au fond) pour qu'elle soit flush au mur, pas au milieu.
-    let nx = tgt.x + tgt.w / 2 - src.w / 2, ny = tgt.y + tgt.h / 2 - src.h / 2;
-    const eps = 0.35;
-    if (tgt.y <= eps) ny = tgt.y;                                    // meuble contre le mur du fond
-    else if (tgt.y + tgt.h >= room.h - eps) ny = tgt.y + tgt.h - src.h; // contre le mur avant
-    if (tgt.x <= eps) nx = tgt.x;                                    // contre le mur gauche
-    else if (tgt.x + tgt.w >= room.w - eps) nx = tgt.x + tgt.w - src.w; // contre le mur droit
-    nx = Math.max(0, Math.min(room.w - src.w, +nx.toFixed(2)));
-    ny = Math.max(0, Math.min(room.h - src.h, +ny.toFixed(2)));
+    // On veut la pile COLLÉE au mur le plus proche, mais qui reste POSÉE sur le
+    // meuble. Méthode robuste (marche même si le meuble est tourné) :
+    // 1) on colle le centre de la pile au mur le plus proche,
+    // 2) on le ramène dans l'empreinte effective du meuble (donc sur le meuble).
+    let px = tgt.x + tgt.w / 2, py = tgt.y + tgt.h / 2; // centre = centre du meuble au départ
+    const dW = px, dE = room.w - px, dN = py, dS = room.h - py, m = Math.min(dW, dE, dN, dS);
+    if (m <= 2.2) { if (m === dN) py = src.h / 2; else if (m === dS) py = room.h - src.h / 2; else if (m === dW) px = src.w / 2; else px = room.w - src.w / 2; }
+    const ef = effFoot(tgt.w, tgt.h, tgt.rot); const tcx = tgt.x + tgt.w / 2, tcy = tgt.y + tgt.h / 2;
+    px = Math.max(tcx - ef.w / 2 + src.w / 2, Math.min(tcx + ef.w / 2 - src.w / 2, px)); // rester sur le meuble
+    py = Math.max(tcy - ef.h / 2 + src.h / 2, Math.min(tcy + ef.h / 2 - src.h / 2, py));
+    const nx = Math.max(0, Math.min(room.w - src.w, +(px - src.w / 2).toFixed(2)));
+    const ny = Math.max(0, Math.min(room.h - src.h, +(py - src.h / 2).toFixed(2)));
     updateItem(srcId, { x: nx, y: ny, lift: furnTop(tgt) });
   };
   // Sélection depuis la 3D, en tenant compte des modes « empiler » / « poser sur ».
