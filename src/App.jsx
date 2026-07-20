@@ -4401,8 +4401,16 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const putPileOn = (srcId, tgtId) => {
     const src = items.find(o => o.id === srcId), tgt = items.find(o => o.id === tgtId);
     if (!src || !tgt) return;
-    const nx = Math.max(0, Math.min(room.w - src.w, +(tgt.x + tgt.w / 2 - src.w / 2).toFixed(2)));
-    const ny = Math.max(0, Math.min(room.h - src.h, +(tgt.y + tgt.h / 2 - src.h / 2).toFixed(2)));
+    // Par défaut centrée sur le meuble ; MAIS si le meuble est contre un mur, on
+    // colle la pile côté mur (au fond) pour qu'elle soit flush au mur, pas au milieu.
+    let nx = tgt.x + tgt.w / 2 - src.w / 2, ny = tgt.y + tgt.h / 2 - src.h / 2;
+    const eps = 0.35;
+    if (tgt.y <= eps) ny = tgt.y;                                    // meuble contre le mur du fond
+    else if (tgt.y + tgt.h >= room.h - eps) ny = tgt.y + tgt.h - src.h; // contre le mur avant
+    if (tgt.x <= eps) nx = tgt.x;                                    // contre le mur gauche
+    else if (tgt.x + tgt.w >= room.w - eps) nx = tgt.x + tgt.w - src.w; // contre le mur droit
+    nx = Math.max(0, Math.min(room.w - src.w, +nx.toFixed(2)));
+    ny = Math.max(0, Math.min(room.h - src.h, +ny.toFixed(2)));
     updateItem(srcId, { x: nx, y: ny, lift: furnTop(tgt) });
   };
   // Sélection depuis la 3D, en tenant compte des modes « empiler » / « poser sur ».
