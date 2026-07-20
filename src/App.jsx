@@ -3949,10 +3949,14 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             if (liftItem) {
               lift = topOf(liftItem);
               if (liftPt) { nx = Math.max(0, Math.min(room.w - d.w, Math.round((liftPt.x + room.w / 2 - d.w / 2) * 2) / 2)); ny = Math.max(0, Math.min(room.h - d.h, Math.round((liftPt.z + room.h / 2 - d.h / 2) * 2) / 2)); }
-            } else lift = 0;
-          } else if (WALL_TYPES[d.type]) { // collage automatique au mur le plus proche
+            } else { // pas sur un meuble → au sol, et on tente le collage au mur le plus proche
+              lift = 0;
+              const cx = nx + d.w / 2 - room.w / 2, cz = ny + d.h / 2 - room.h / 2, s = snapWall(cx, cz, d.w, d.h);
+              if (s) { nx = s.x; ny = s.y; rot = s.rot; }
+            }
+          } else { // TOUT MEUBLE : se colle au mur le plus proche quand on le lâche près d'un mur
             const cx = nx + d.w / 2 - room.w / 2, cz = ny + d.h / 2 - room.h / 2, s = snapWall(cx, cz, d.w, d.h);
-            if (s) { nx = s.x; ny = s.y; rot = s.rot; } else rot = 0; // loin des murs → face à la pièce
+            if (s) { nx = s.x; ny = s.y; rot = s.rot; } else if (WALL_TYPES[d.type]) rot = 0; // les déco reviennent face pièce si loin
           }
           d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2; d.grp.rotation.y = rot; if (lift != null) d.grp.position.y = lift;
           cb.onMove && cb.onMove(d.id, nx, ny, rot, stackOn, lift);
