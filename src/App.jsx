@@ -3888,6 +3888,9 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         let ncx = cx, ncz = cz;
         if (m === dN) ncz = -hH + effH / 2; else if (m === dS) ncz = hH - effH / 2;
         else if (m === dW) ncx = -hW + effW / 2; else ncx = hW - effW / 2;
+        // COIN : si un mur perpendiculaire est aussi proche, on cale l'autre axe → aimant vers les coins.
+        if (m === dN || m === dS) { if (dW <= SNAP) ncx = -hW + effW / 2; else if (dE <= SNAP) ncx = hW - effW / 2; }
+        else { if (dN <= SNAP) ncz = -hH + effH / 2; else if (dS <= SNAP) ncz = hH - effH / 2; }
         ncx = Math.max(-hW + effW / 2, Math.min(hW - effW / 2, ncx));
         ncz = Math.max(-hH + effH / 2, Math.min(hH - effH / 2, ncz));
         return { x: Math.round((ncx + hW - w / 2) * 2) / 2, y: Math.round((ncz + hH - h / 2) * 2) / 2, rot };
@@ -4306,10 +4309,34 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // (0,5 m) et s'EMPILE : son niveau = nb de boîtes déjà présentes sur cette
   // colonne (donc lâchée sur une pile, elle se pose dessus). Les autres meubles
   // gardent x/y/rotation tels quels.
+  // Empreinte au sol effective (largeur/profondeur) selon la rotation du meuble.
+  const effFoot = (w, h, rot) => { const odd = Math.abs(Math.round((rot || 0) / (Math.PI / 2))) % 2 === 1; return { w: odd ? h : w, h: odd ? w : h }; };
   const moveItem = (id, x, y, rot, stackOn, lift) => {
     setItems(list => {
       const it = list.find(o => o.id === id); if (!it) return list;
-      if (!(FURN_TYPES[it.type] || {}).box) return list.map(o => o.id === id ? { ...o, x, y, rot, lift: lift != null ? lift : o.lift } : o);
+      if (!(FURN_TYPES[it.type] || {}).box) {
+        const build = (FURN_TYPES[it.type] || {}).build;
+        if (build === 'pile') return list.map(o => o.id === id ? { ...o, x, y, rot, lift: lift != null ? lift : o.lift } : o);
+        // MEUBLE : anti-chevauchement — s'il retombe sur un autre meuble, on le POUSSE
+        // au plus court jusqu'à ne plus se chevaucher (arrangement naturel).
+        const ef = effFoot(it.w, it.h, rot);
+        let cx = x + it.w / 2, cy = y + it.h / 2;
+        const obstacles = list.filter(o => o.id !== id && !(FURN_TYPES[o.type] || {}).box && (FURN_TYPES[o.type] || {}).build !== 'pile' && !(o.lift > 0)).map(o => { const of = effFoot(o.w, o.h, o.rot); return { cx: o.x + o.w / 2, cy: o.y + o.h / 2, w: of.w, h: of.h }; });
+        for (let iter = 0; iter < 12; iter++) {
+          let bumped = false;
+          for (const s of obstacles) {
+            const ox = (ef.w + s.w) / 2 - Math.abs(cx - s.cx), oy = (ef.h + s.h) / 2 - Math.abs(cy - s.cy);
+            if (ox > 0.003 && oy > 0.003) { // chevauchement → pousser selon l'axe le plus court
+              if (ox < oy) cx += (cx < s.cx ? -ox : ox); else cy += (cy < s.cy ? -oy : oy);
+              bumped = true;
+            }
+          }
+          if (!bumped) break;
+        }
+        cx = Math.max(ef.w / 2, Math.min(room.w - ef.w / 2, cx)); cy = Math.max(ef.h / 2, Math.min(room.h - ef.h / 2, cy));
+        const fx = +(cx - it.w / 2).toFixed(2), fy = +(cy - it.h / 2).toFixed(2);
+        return list.map(o => o.id === id ? { ...o, x: fx, y: fy, rot, lift: lift != null ? lift : o.lift } : o);
+      }
       let sx, sy;
       const tgt = stackOn ? list.find(o => o.id === stackOn && (FURN_TYPES[o.type] || {}).box) : null;
       if (tgt) { sx = tgt.x; sy = tgt.y; } // lâchée SUR une boîte → sa colonne (empilage)
