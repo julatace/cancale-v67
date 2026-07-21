@@ -66,12 +66,27 @@ export default async function handler(req, res) {
       return (Date.now() - d.getTime()) / 86400000 <= 14;
     }).length;
 
-    // Encaissé + ventes du mois : SOURCE EMAIL (fiable 24/7, arrive même sans
-    // toi sur Vinted). Encaissé = somme des emails « argent viré » ; ventes =
-    // nombre de ventes du mois. On ne dépend PLUS de l'extension Vinted ici.
+    // Encaissé + ventes du mois : SOURCE = les FACTURES (pipeline emails de vente
+    // → vinted_invoices), la même chose que l'onglet Factures de l'app. Fiable,
+    // complet, 24/7, sans dépendre de l'extension Vinted.
+    const invMonth = (s) => {
+      const t = String(s || '').trim();
+      let mm = t.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (mm) return `${mm[3]}-${mm[2]}`;
+      mm = t.match(/(\d{4})-(\d{2})-(\d{2})/); if (mm) return `${mm[1]}-${mm[2]}`;
+      const d = new Date(t); return isNaN(d) ? null : d.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7);
+    };
     let moneyMonth = 0, salesMonth = 0;
-    for (const f of finals) { const d = String(f.receivedAt || '').slice(0, 7); if (d === ym) { const n = parseFloat(String(f.montant || '').replace(',', '.')); if (!isNaN(n)) moneyMonth += n; } }
-    for (const s of sales) { if (String(s.receivedAt || '').slice(0, 7) === ym) salesMonth += 1; }
+    const invoices = Array.isArray(m.vinted_invoices) ? m.vinted_invoices : [];
+    for (const inv of invoices) {
+      if (invMonth(inv.saleDate) !== ym) continue;
+      const p = parseFloat(String(inv.sellPrice != null ? inv.sellPrice : (inv.prix != null ? inv.prix : '')).replace(',', '.'));
+      if (!isNaN(p)) { moneyMonth += p; salesMonth += 1; }
+    }
+    // Repli si aucune facture (pipeline Factures non configuré) : emails « argent viré ».
+    if (salesMonth === 0) {
+      for (const f of finals) { if (String(f.receivedAt || '').slice(0, 7) === ym) { const n = parseFloat(String(f.montant || '').replace(',', '.')); if (!isNaN(n)) moneyMonth += n; } }
+      for (const s of sales) { if (String(s.receivedAt || '').slice(0, 7) === ym) salesMonth += 1; }
+    }
 
     res.status(200).json({
       ship: { total: shipTotal, overdue: shipOverdue, today: shipToday, tomorrow: shipTomorrow },
