@@ -310,10 +310,11 @@ async function logEmail(entry) {
 
 // Retrouve le N° d'une paire par le titre de l'annonce (annonces numérotées
 // de l'app, synchronisées). Refuse de deviner si deux annonces ont le même titre.
-async function findNumeroByTitle(title) {
+async function findNumeroByTitle(title, size) {
   if (!title) return '';
   try {
     const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const normSz = s => String(s == null ? '' : s).toLowerCase().replace(',', '.').replace(/[^0-9.]/g, '').replace(/\.0+$/, '').trim();
     const t = norm(title);
     if (!t) return '';
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`, {
@@ -322,10 +323,21 @@ async function findNumeroByTitle(title) {
     if (!res.ok) return '';
     const rows = await res.json();
     const map = (rows[0] && rows[0].vinted_annonce_numeros) || {};
-    const nums = [...new Set(Object.values(map)
-      .filter(e => e && e.numero && norm(e.title) === t)
-      .map(e => String(e.numero)))];
-    return nums.length === 1 ? nums[0] : '';
+    // Une entrée par numéro, titre identique.
+    const byNum = new Map();
+    for (const e of Object.values(map)) { if (e && e.numero != null && norm(e.title) === t) byNum.set(String(e.numero), e); }
+    let cands = [...byNum.values()];
+    if (cands.length === 1) return String(cands[0].numero);
+    // Plusieurs paires même titre → on départage par la TAILLE si le bordereau
+    // la donne (on garde tailles égales OU inconnues ; exacte prioritaire).
+    const tgt = normSz(size);
+    if (cands.length > 1 && tgt) {
+      const exactSz = cands.filter(e => normSz(e.size) === tgt);
+      if (exactSz.length === 1) return String(exactSz[0].numero);
+      const compat = cands.filter(e => { const es = normSz(e.size); return !es || es === tgt; });
+      if (compat.length === 1) return String(compat[0].numero);
+    }
+    return '';
   } catch (_) { return ''; }
 }
 
@@ -580,7 +592,7 @@ export default async function handler(req, res) {
       const pdf = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
       // N° absent du titre de l'annonce ? On le retrouve dans les annonces
       // numérotées de l'app (correspondance de titre, jamais si ambigu).
-      if (!data.numero) data.numero = await findNumeroByTitle(data.modele || data.article);
+      if (!data.numero) data.numero = await findNumeroByTitle(data.modele || data.article, data.taille);
       // Tamponnage AUTOMATIQUE : N° + titre imprimés sur le PDF à l'emplacement
       // mémorisé pour ce format d'étiquette (réglé une fois dans l'app).
       let pdfTamponneB64 = null, posKnown = false;

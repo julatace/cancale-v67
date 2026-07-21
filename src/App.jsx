@@ -6202,7 +6202,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const bordPhoto = (b) => {
     if (b.numero) { for (const k in numeros) { const e2 = numeros[k]; if (e2 && String(e2.numero) === String(b.numero) && e2.photo) return e2.photo; } }
     const title = b.modele || b.article || '';
-    if (title) { const e2 = entryByTitleLoose(title); if (e2 && e2.photo) return e2.photo; } // paire numérotée (match tolérant)
+    if (title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.photo) return e2.photo; } // paire numérotée (match tolérant + départage par taille)
     const n = normTitle(title);
     if (n) {
       const hit = (listings.items || []).find(o => normTitle(o.title) === n || normTitle(o.title).includes(n) || n.includes(normTitle(o.title))) || (sales.items || []).find(o => normTitle(o.title) === n || normTitle(o.title).includes(n) || n.includes(normTitle(o.title)));
@@ -6407,7 +6407,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const updatePair = (item, patch) => {
     setNumeros(prev => {
       const u = { ...prev }; const c = u[item.id] || {};
-      const next = { ...c, ...patch, title:item.title, photo:item.photo||null, photoK: photoKey(item.photo) || c.photoK || null, price:item.price??null, accountId:item._acc?.vinted_user_id };
+      const next = { ...c, ...patch, title:item.title, photo:item.photo||null, photoK: photoKey(item.photo) || c.photoK || null, price:item.price??null, size:item.size ?? c.size ?? null, accountId:item._acc?.vinted_user_id };
       const emptyNum = !String(next.numero||'').trim();
       const emptyBuy = next.buyPrice==null || String(next.buyPrice).trim()==='';
       if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
@@ -6466,14 +6466,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Version TOLÉRANTE (pour les bordereaux reçus par email dont le titre est
   // souvent plus court/différent) : exact d'abord, puis « contient » ; on ne
   // renvoie une paire QUE si le résultat n'est PAS ambigu (numéros différents).
-  const entryByTitleLoose = (title) => {
+  // Normalise une taille pour comparaison : « T 36,5 », « 36.5 EU », « 36,5 » → « 36.5 ».
+  const normSize = (s) => String(s == null ? '' : s).toLowerCase().replace(',', '.').replace(/[^0-9.]/g, '').replace(/\.0+$/, '').replace(/^\.+|\.+$/g, '').trim();
+  // Retrouve la paire numérotée d'après le titre de l'annonce/bordereau. Si
+  // PLUSIEURS paires portent le MÊME titre (ex. deux « Adidas Spezial » en tailles
+  // différentes), on départage par la TAILLE quand elle est fournie (le bordereau
+  // la contient) : on écarte les paires dont la taille CONNUE diffère, et on garde
+  // celles dont la taille correspond OU est inconnue. Sans taille exploitable, on
+  // reste prudent (null) plutôt que d'attribuer la mauvaise paire.
+  const entryByTitleLoose = (title, size) => {
     const n = normTitle(title); if (!n) return null;
-    let exact = null;
-    for (const k in numeros) { if (normTitle(numeros[k].title) === n) { if (exact && String(exact.numero) !== String(numeros[k].numero)) return null; exact = numeros[k]; } }
-    if (exact) return exact;
-    let cand = null;
-    for (const k in numeros) { const t = normTitle(numeros[k].title); if (!t) continue; if (t.includes(n) || n.includes(t)) { if (cand && String(cand.numero) !== String(numeros[k].numero)) return null; cand = numeros[k]; } }
-    return cand;
+    const collect = (pred) => {
+      const byNum = new Map();
+      for (const k in numeros) { const e = numeros[k]; if (e && e.numero != null && pred(normTitle(e.title))) byNum.set(String(e.numero), e); }
+      return [...byNum.values()];
+    };
+    const pick = (cands) => {
+      if (cands.length <= 1) return cands[0] || null;
+      const target = normSize(size);
+      if (target) {
+        const exactSz = cands.filter(e => normSize(e.size) === target);
+        if (exactSz.length === 1) return exactSz[0];
+        const compat = cands.filter(e => { const es = normSize(e.size); return !es || es === target; });
+        if (compat.length === 1) return compat[0];
+      }
+      return null; // toujours ambigu → on n'attribue rien
+    };
+    const exact = collect(t => t === n);
+    if (exact.length) return pick(exact);                 // des titres exacts existent → on décide parmi eux
+    return pick(collect(t => t && (t.includes(n) || n.includes(t))));
   };
   // Lien VENTE↔PAIRE verrouillé par n° de transaction (robuste, permanent, gère
   // les titres en double une fois établi). L'app le remplit AUTOMATIQUEMENT quand
@@ -6838,7 +6859,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       }
       let num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
       if (!num) { do { base += 1; } while (taken.has(base)); num = String(base); taken.add(base); } // prochain numéro VRAIMENT libre
-      nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
+      nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       nextUsed.add(parseInt(num, 10));
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
       changed = true;
@@ -7315,7 +7336,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const numForBord = (b) => {
     let num = b.numero || '';
     const title = b.modele || b.article || '';
-    if (!num && title) { const e2 = entryByTitleLoose(title); if (e2 && e2.numero) num = String(e2.numero); } // match tolérant → retrouve le N° même si le titre email diffère un peu
+    if (!num && title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.numero) num = String(e2.numero); } // match tolérant + départage par taille → retrouve le N° même si le titre email diffère / est en double
     return num;
   };
   // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
