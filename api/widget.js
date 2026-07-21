@@ -22,6 +22,24 @@ async function rows(like) {
     return r.ok ? (await r.json()).map(x => x.data).filter(Boolean) : [];
   } catch (_) { return []; }
 }
+// Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
+// source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.
+async function harvestOrders(kind) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_${kind}&select=data`, { headers: HEADERS });
+    if (!r.ok) return [];
+    const out = {};
+    for (const row of await r.json()) {
+      const items = (row.data && row.data.payload && row.data.payload.my_orders) || [];
+      for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
+    }
+    return Object.values(out);
+  } catch (_) { return []; }
+}
+// À expédier : la vente attend que TU postes le colis.
+const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+// À retirer : l'achat est déposé au point relais, en attente que tu le récupères.
+const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
 async function main() {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data`, { headers: HEADERS });
@@ -43,28 +61,27 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const [bords, tracks, finals, sales, m, snap] = await Promise.all([
-      rows('email_bord_*'), rows('email_track_*'), rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
+    const [bords, sold, purchased, finals, sales, m, snap] = await Promise.all([
+      rows('email_bord_*'), harvestOrders('sold'), harvestOrders('purchased'), rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
     ]);
-    const printed = m.vinted_bords_printed || {};
-    const collected = new Set(Array.isArray(m.vrm_colis_collected) ? m.vrm_colis_collected : []);
-    const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
-    const cKey = (t) => String(t.suivi || t.subject || '').trim();
-
     const today = parisDate(0), tomorrow = parisDate(1), ym = today.slice(0, 7);
-    let shipOverdue = 0, shipToday = 0, shipTomorrow = 0, shipTotal = 0;
+
+    // À expédier + à retirer = STATUT VINTED (automatique, à jour). Fini les
+    // emails imprécis : Vinted sait quand c'est expédié / récupéré.
+    const toShip = sold.filter(o => awaitingShip(o.status));
+    const shipTotal = toShip.length;
+    const pickup = purchased.filter(o => atRelay(o.status)).length;
+    // Urgence d'expédition : on croise avec les bordereaux (date limite) pour les
+    // ventes réellement en attente d'envoi.
+    const shipTxns = new Set(toShip.map(o => String(o.transaction_id)));
+    const printed = m.vinted_bords_printed || {};
+    const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+    let shipOverdue = 0, shipToday = 0, shipTomorrow = 0;
     for (const b of bords) {
-      if (printed[bKey(b)]) continue; shipTotal += 1;
+      if (printed[bKey(b)] || (b.transaction && !shipTxns.has(String(b.transaction)))) continue;
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) shipOverdue += 1; else if (iso === today) shipToday += 1; else if (iso === tomorrow) shipTomorrow += 1;
     }
-    // Colis à retirer ENCORE actifs : disponible, non retiré, et arrivé depuis
-    // ≤ 14 j (au-delà, un point relais l'a forcément déjà rendu/récupéré).
-    const pickup = tracks.filter(t => {
-      if (t.status !== 'available' || collected.has(cKey(t))) return false;
-      const d = new Date(t.receivedAt); if (isNaN(d)) return true;
-      return (Date.now() - d.getTime()) / 86400000 <= 14;
-    }).length;
 
     // CA + ventes du mois : SOURCE = les emails de VENTE (« X a acheté ton
     // article »), un par vente AVEC le prix. Source complète, fiable, 24/7, tous
