@@ -6170,10 +6170,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const bordPhoto = (b) => {
     if (b.numero) { for (const k in numeros) { const e2 = numeros[k]; if (e2 && String(e2.numero) === String(b.numero) && e2.photo) return e2.photo; } }
     const title = b.modele || b.article || '';
-    if (title && !titleAmbiguous(title)) { const e2 = entryByTitle(title); if (e2 && e2.photo) return e2.photo; }
+    if (title) { const e2 = entryByTitleLoose(title); if (e2 && e2.photo) return e2.photo; } // paire numérotée (match tolérant)
     const n = normTitle(title);
     if (n) {
-      const hit = (listings.items || []).find(o => normTitle(o.title) === n) || (sales.items || []).find(o => normTitle(o.title) === n);
+      const hit = (listings.items || []).find(o => normTitle(o.title) === n || normTitle(o.title).includes(n) || n.includes(normTitle(o.title))) || (sales.items || []).find(o => normTitle(o.title) === n || normTitle(o.title).includes(n) || n.includes(normTitle(o.title)));
       if (hit) return hit.photo || hit.photo_url || null;
     }
     return null;
@@ -6405,6 +6405,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
   const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
   const entryKeyByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return k; } return null; };
+  // Version TOLÉRANTE (pour les bordereaux reçus par email dont le titre est
+  // souvent plus court/différent) : exact d'abord, puis « contient » ; on ne
+  // renvoie une paire QUE si le résultat n'est PAS ambigu (numéros différents).
+  const entryByTitleLoose = (title) => {
+    const n = normTitle(title); if (!n) return null;
+    let exact = null;
+    for (const k in numeros) { if (normTitle(numeros[k].title) === n) { if (exact && String(exact.numero) !== String(numeros[k].numero)) return null; exact = numeros[k]; } }
+    if (exact) return exact;
+    let cand = null;
+    for (const k in numeros) { const t = normTitle(numeros[k].title); if (!t) continue; if (t.includes(n) || n.includes(t)) { if (cand && String(cand.numero) !== String(numeros[k].numero)) return null; cand = numeros[k]; } }
+    return cand;
+  };
   // Lien VENTE↔PAIRE verrouillé par n° de transaction (robuste, permanent, gère
   // les titres en double une fois établi). L'app le remplit AUTOMATIQUEMENT quand
   // le titre d'une vente correspond à une SEULE annonce numérotée (cas non
@@ -7245,7 +7257,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const numForBord = (b) => {
     let num = b.numero || '';
     const title = b.modele || b.article || '';
-    if (!num && title && !titleAmbiguous(title)) { const e2 = entryByTitle(title); if (e2 && e2.numero) num = String(e2.numero); }
+    if (!num && title) { const e2 = entryByTitleLoose(title); if (e2 && e2.numero) num = String(e2.numero); } // match tolérant → retrouve le N° même si le titre email diffère un peu
     return num;
   };
   // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
