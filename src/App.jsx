@@ -35,7 +35,7 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
-  'vinted_sale_overrides',
+  'vinted_sale_overrides','vinted_bord_links',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -6178,6 +6178,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
   const bordKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+  // Liens MANUELS bordereau → paire numérotée (quand l'app ne retrouve pas seule
+  // la paire : titre en double même taille, ou paire jamais numérotée). Clé = clé
+  // du bordereau, valeur = { numero }. Synchronisé (vinted_bord_links). Prioritaire
+  // sur la déduction automatique.
+  const [bordLinks, setBordLinks] = useState(() => load('vinted_bord_links', {}));
+  const [linkPickFor, setLinkPickFor] = useState(null); // bordereau en cours de liaison manuelle
+  const [linkSearch, setLinkSearch] = useState('');
+  const setBordLink = (b, numero) => {
+    const k = bordKey(b); if (!k) return;
+    setBordLinks(prev => { const u = { ...prev }; if (numero) u[k] = { numero: String(numero) }; else delete u[k]; save('vinted_bord_links', u); return u; });
+  };
+  // Entrée numérotée liée manuellement à ce bordereau (si l'utilisateur en a choisi une).
+  const manualEntry = (b) => {
+    const lk = bordLinks[bordKey(b)]; if (!lk || !lk.numero) return null;
+    for (const key in numeros) { if (numeros[key] && String(numeros[key].numero) === String(lk.numero)) return numeros[key]; }
+    return { numero: lk.numero }; // au moins le N°, même si l'annonce n'existe plus
+  };
   const isBordPrinted = (b) => !!bordsPrinted[bordKey(b)];
   const toggleBordPrinted = (b) => {
     const k = bordKey(b); if (!k) return;
@@ -6200,6 +6217,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Photo de la paire d'un bordereau : par N° (annonces numérotées, fiable),
   // sinon par titre non ambigu, sinon dans les annonces/ventes chargées.
   const bordPhoto = (b) => {
+    const man = manualEntry(b); if (man && man.photo) return man.photo; // lien manuel prioritaire
     if (b.numero) { for (const k in numeros) { const e2 = numeros[k]; if (e2 && String(e2.numero) === String(b.numero) && e2.photo) return e2.photo; } }
     const title = b.modele || b.article || '';
     if (title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.photo) return e2.photo; } // paire numérotée (match tolérant + départage par taille)
@@ -7334,10 +7352,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
   // titre dans les annonces numérotées (si le titre n'est pas ambigu).
   const numForBord = (b) => {
+    const man = manualEntry(b); if (man && man.numero) return String(man.numero); // lien manuel prioritaire
     let num = b.numero || '';
     const title = b.modele || b.article || '';
     if (!num && title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.numero) num = String(e2.numero); } // match tolérant + départage par taille → retrouve le N° même si le titre email diffère / est en double
     return num;
+  };
+  // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
+  // met en avant, en rouge si c'est aujourd'hui/demain ou dépassé, orange à 2 j.
+  const bordDeadline = (b) => {
+    const s = String(b.dateLimite || '').trim(); if (!s) return null;
+    const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (!m) return { text: s, level: 'muted', days: null };
+    const d = new Date(+m[3], +m[2] - 1, +m[1], 23, 59, 59);
+    const days = Math.floor((d - new Date()) / 86400000);
+    const level = days <= 1 ? 'danger' : days <= 2 ? 'warn' : 'muted';
+    return { text: s, level, days };
   };
   // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
   // les regroupe dans UN seul PDF (une page chacun) → une seule impression.
@@ -8247,9 +8276,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     </div>
                   ); })()}
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.numero?`N°${b.numero} · `:''}{b.modele||b.article||'Bordereau'}</div>
+                    <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(()=>{ const nn=numForBord(b); return nn?`N°${nn} · `:''; })()}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
+                    {(()=>{ const dl=bordDeadline(b); return dl && !isBordPrinted(b) ? <div style={{fontSize:10.5,fontWeight:800,marginTop:2,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}}>📮 À expédier avant le {dl.text}{dl.days!=null&&dl.days<0?' · en retard !':dl.days===0?" · aujourd'hui":dl.days===1?' · demain':''}</div> : null; })()}
                   </div>
+                  {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{flexShrink:0,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🔗 Relier</button>}
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
                   <button type="button" onClick={()=>{
                     // Tamponnage LOCAL systématique : utilise toujours
@@ -8693,6 +8724,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           </div>
         </div>
       )}
+
+      {/* ── Relier un bordereau à une paire numérotée (à la main) ── */}
+      {linkPickFor && (()=>{
+        const byNum = new Map();
+        for (const k in numeros) { const e = numeros[k]; if (e && e.numero != null) byNum.set(String(e.numero), e); }
+        const q = linkSearch.trim().toLowerCase();
+        const list = [...byNum.entries()]
+          .map(([num, e]) => ({ num, ...e }))
+          .filter(e => !q || String(e.num).includes(q) || (e.title||'').toLowerCase().includes(q) || (e.size!=null && String(e.size).toLowerCase().includes(q)))
+          .sort((a,b)=>(parseInt(a.num,10)||0)-(parseInt(b.num,10)||0));
+        const already = bordLinks[bordKey(linkPickFor)];
+        return (
+        <div onClick={()=>setLinkPickFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'82vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:800,color:C.text}}>Relier à une paire numérotée</div>
+                  <div style={{fontSize:11.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{linkPickFor.modele||linkPickFor.article||'Bordereau'}{linkPickFor.taille?` · T${linkPickFor.taille}`:''}</div>
+                </div>
+                <button type="button" onClick={()=>setLinkPickFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              </div>
+              <input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="Chercher par N°, titre ou taille…" style={{marginTop:10,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
+              {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire numérotée{q?' pour cette recherche':''}.</div>}
+              {list.map(e=>(
+                <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
+                  style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:10,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                  <div style={{width:42,height:42,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    {e.photo?<img src={e.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>👟</span>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:900,color:C.text}}>N°{e.num}{e.size!=null&&String(e.size).trim()!==''?` · T${e.size}`:''}</div>
+                    <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{e.title||''}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
 
       {/* ── QR de retrait en PLEIN ÉCRAN (pour scanner au point relais) ── */}
       {qrView && (
