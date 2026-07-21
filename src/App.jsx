@@ -6190,6 +6190,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [bordLinks, setBordLinks] = useState(() => load('vinted_bord_links', {}));
   const [linkPickFor, setLinkPickFor] = useState(null); // bordereau en cours de liaison manuelle
   const [linkSearch, setLinkSearch] = useState('');
+  const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
+  // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
+  const garageSpotOf = (num) => {
+    const t = String(num||'').trim().toLowerCase(); if (!t) return null;
+    try {
+      const plan = normalizePlan(load('vrm_room_plan', null));
+      for (const rm of (plan.rooms||[])) for (const it of (rm.items||[])) {
+        const label = (FURN_TYPES[it.type]||{}).label || 'rangement';
+        if (it.num!=null && String(it.num).trim().toLowerCase()===t) return { room: rm.name, kind: label };
+        if (Array.isArray(it.nums) && it.nums.some(n=>String(n).trim().toLowerCase()===t)) return { room: rm.name, kind: label };
+        for (const cell in (it.slots||{})) if ((it.slots[cell]||[]).some(n=>String(n).trim().toLowerCase()===t)) return { room: rm.name, kind: label };
+      }
+    } catch(_) {}
+    return null;
+  };
+  // Construit la frise « passeport » d'une paire à partir de tout ce qu'on sait :
+  // achat → numérotation → rangement garage → mise en ligne → vente → expédition.
+  const buildPassport = (it, e, num) => {
+    const steps = [];
+    const eur2 = v => (v!=null && String(v).trim()!=='') ? `${eur(v).toFixed(2).replace('.',',')} €` : null;
+    // 1) Achat
+    const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? eur2(e.buyPrice) : null;
+    let buyDate = null;
+    if (e && e.buyFromId) { const o = (buys.items||[]).find(b=>String(b.transaction_id)===String(e.buyFromId)); if (o && o.date) buyDate = new Date(o.date); }
+    if (buy || buyDate) steps.push({ icon:'🛒', label:'Achetée', detail:[buy?`payée ${buy}`:null, buyDate?`le ${buyDate.toLocaleDateString('fr-FR')}`:null].filter(Boolean).join(' '), done:true });
+    // 2) Numérotation
+    if (num) steps.push({ icon:'🔢', label:`Numérotée N°${num}`, detail: e && e.numberedAt ? `le ${new Date(e.numberedAt).toLocaleDateString('fr-FR')}` : '', done:true });
+    // 3) Garage
+    const spot = garageSpotOf(num); const atG = inGarage(num) || !!spot;
+    steps.push({ icon:'🏠', label: atG?'Rangée au garage':'Pas encore rangée', detail: spot?`${spot.room} · ${spot.kind}`:(atG?'':'à ranger'), done:atG });
+    // 4) En ligne
+    if (it) { const age = listedAgeDays(it); steps.push({ icon:'🟢', label:'En ligne', detail:[it.price!=null?`${it.price} ${cur(it.currency)}`:null, age!=null?`depuis ${age} j`:null, it.views!=null?`👁 ${it.views}`:null, it.favourites!=null?`❤️ ${it.favourites}`:null].filter(Boolean).join(' · '), done:true }); }
+    // 5) Vente
+    const sold = (sales.items||[]).find(o=>{ const ee=effEntry(o); return ee && num && String(ee.numero)===String(num); });
+    if (sold) { const st=classifyOrderStatus(sold.status); const sp=sold.price?.amount!=null?Number(sold.price.amount):null; steps.push({ icon: st==='cancelled'?'✖️':'💸', label: st==='cancelled'?'Vente annulée':(st==='completed'?'Vendue':'Vente en cours'), detail:[sp!=null?`${sp.toFixed(0)} €`:null, sold.date?`le ${new Date(sold.date).toLocaleDateString('fr-FR')}`:null].filter(Boolean).join(' '), done:st==='completed' }); }
+    // 6) Bordereau / expédition
+    const bord = bordForItem(it?it.title:(e?e.title:''), num);
+    if (bord) steps.push({ icon:'📮', label:'Bordereau reçu — à expédier', detail: bord.dateLimite?`avant le ${bord.dateLimite}`:'', done:true });
+    return steps;
+  };
   const setBordLink = (b, numero) => {
     const k = bordKey(b); if (!k) return;
     setBordLinks(prev => { const u = { ...prev }; if (numero) u[k] = { numero: String(numero) }; else delete u[k]; save('vinted_bord_links', u); return u; });
@@ -8187,6 +8227,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
                     {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
+                    <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire (toute sa vie)" aria-label="Passeport de la paire" style={{marginLeft:'auto',border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:14}}>📖</button>
                     {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
                 </div>
@@ -8807,6 +8848,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ── Passeport de la paire : toute la vie d'une paire sur une frise ── */}
+      {passportFor && (()=>{
+        const { it, e, num } = passportFor;
+        const steps = buildPassport(it, e, num);
+        const photo = (it && it.photo) || (e && e.photo) || null;
+        const title = (it && (it.title||it.brand)) || (e && e.title) || 'Paire';
+        return (
+        <div onClick={()=>setPassportFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{width:52,height:52,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {photo?<img src={photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>📖 Passeport {num?`· N°${num}`:''}</div>
+                <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{title}{e&&e.size?` · T${e.size}`:(it&&it.size?` · T${it.size}`:'')}</div>
+              </div>
+              <button type="button" onClick={()=>setPassportFor(null)} style={{border:'none',background:'transparent',fontSize:24,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'16px 18px'}}>
+              {steps.length===0 ? <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Pas encore d'historique pour cette paire.</div> : (
+                <div style={{position:'relative',paddingLeft:8}}>
+                  {steps.map((s,i)=>(
+                    <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',position:'relative',paddingBottom:i<steps.length-1?16:0}}>
+                      {i<steps.length-1 && <div style={{position:'absolute',left:15,top:30,bottom:0,width:2,background:C.border}}/>}
+                      <div style={{width:32,height:32,borderRadius:999,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,background:s.done?`${INV_STATUS.online.color}1a`:C.card,border:`1.5px solid ${s.done?INV_STATUS.online.color:C.border}`,zIndex:1}}>{s.icon}</div>
+                      <div style={{flex:1,minWidth:0,paddingTop:4}}>
+                        <div style={{fontSize:13.5,fontWeight:800,color:C.text}}>{s.label}</div>
+                        {s.detail && <div style={{fontSize:12,color:C.muted,marginTop:1}}>{s.detail}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
