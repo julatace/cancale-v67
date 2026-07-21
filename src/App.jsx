@@ -6192,6 +6192,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [linkSearch, setLinkSearch] = useState('');
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
+  const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
   // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
   const garageSpotOf = (num) => {
     const t = String(num||'').trim().toLowerCase(); if (!t) return null;
@@ -7876,6 +7877,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       </>)}
 
       {curSub==='achats' && (<>
+        {(()=>{ const n=(tracking||[]).filter(t=>t.status==='available' && !isCollected(t)).length; return n>0 ? (
+          <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Ma tournée — {n} colis à retirer</button>
+        ) : null; })()}
         {/* Points relais façon Vinted : carte PERMANENTE de tes points habituels.
             Les badges rouges apparaissent quand des colis y attendent. */}
         {(()=>{
@@ -9034,6 +9038,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 )}
                 <div style={{textAlign:'center',color:'rgba(255,255,255,0.8)',fontSize:11,marginTop:14,fontWeight:700}}>Continue comme ça 🚀</div>
               </>)}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ── Planificateur de tournée : colis à retirer groupés par point relais ── */}
+      {tourneeOpen && (()=>{
+        const avail=(tracking||[]).filter(t=>t.status==='available' && !isCollected(t));
+        const groups={};
+        avail.forEach(t=>{ const c=cleanLieu(t.lieu); const key=c.nom || carrierName(t.carrier); if(!groups[key]) groups[key]={colis:[],carrier:t.carrier,adresse:c.adresse||'',geo:geo[c.nom]||null}; groups[key].colis.push(t); if(!groups[key].carrier) groups[key].carrier=t.carrier; });
+        const points=Object.entries(groups).map(([nom,g])=>({nom,...g})).sort((a,b)=>b.colis.length-a.colis.length || a.nom.localeCompare(b.nom));
+        const mapsUrl=(p)=> p.geo&&p.geo.lat ? `https://www.google.com/maps/search/?api=1&query=${p.geo.lat},${p.geo.lon}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.nom+(p.adresse?' '+p.adresse:''))}`;
+        return (
+        <div onClick={()=>setTourneeOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:900,color:C.text}}>🗺️ Ma tournée</div><div style={{fontSize:11.5,color:C.muted}}>{avail.length} colis · {points.length} point{points.length>1?'s':''} relais — le plus chargé en premier.</div></div>
+              <button type="button" onClick={()=>setTourneeOpen(false)} style={{border:'none',background:'transparent',fontSize:24,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
+              {points.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px'}}>Aucun colis à retirer. 👌</div>}
+              {points.map((p,i)=>(
+                <div key={p.nom} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:14,overflow:'hidden'}}>
+                  <div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
+                    <div style={{width:26,height:26,borderRadius:999,background:C.accent,color:'#fff',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900}}>{i+1}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:900,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.carrier&&<CarrierBadge carrier={p.carrier} size={18}/>}<span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nom}</span></div>
+                      {p.adresse && <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.adresse}</div>}
+                    </div>
+                    <span style={{flexShrink:0,fontSize:12,fontWeight:900,color:C.danger,background:`${C.danger}14`,borderRadius:999,padding:'3px 9px'}}>{p.colis.length}</span>
+                    <a href={mapsUrl(p)} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',fontSize:12,fontWeight:800,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:8,padding:'5px 8px'}}>🧭</a>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column'}}>
+                    {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
+                      <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
+                        <div style={{width:32,height:32,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&buy.photo_url?<img src={buy.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
+                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{t.code&&<div style={{fontSize:10,color:C.muted}}>code {t.code}</div>}</div>
+                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                      </div>
+                    ); })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
