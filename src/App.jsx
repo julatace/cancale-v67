@@ -6284,6 +6284,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const colisKey = (t) => String(t.suivi || t.subject || '').trim();
   const markCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.add(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(t); };
   const unmarkCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.delete(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(null); };
+  // Tout marquer retiré en un tap (les transporteurs n'envoient pas d'email « récupéré »).
+  const markAllCollected = (list) => { setCollected(prev => { const n = new Set(prev); (list || []).forEach(t => n.add(colisKey(t))); save('vrm_colis_collected', [...n]); return n; }); };
   const isCollected = (t) => collected.has(colisKey(t));
   // Un colis « à retirer » (available) qui traîne depuis > 14 j est forcément
   // déjà récupéré (un point relais ne garde pas un colis plus longtemps) : on
@@ -9065,6 +9067,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:900,color:C.text}}>🗺️ Ma tournée</div><div style={{fontSize:11.5,color:C.muted}}>{avail.length} colis · {points.length} point{points.length>1?'s':''} relais — le plus chargé en premier.</div></div>
+              {avail.length>0 && <button type="button" onClick={()=>{ if(window.confirm('Marquer TOUS ces colis comme récupérés ?')){ markAllCollected(avail); setTourneeOpen(false); } }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:999,padding:'6px 12px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
               <button type="button" onClick={()=>setTourneeOpen(false)} style={{border:'none',background:'transparent',fontSize:24,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
@@ -10022,7 +10025,7 @@ export default function App() {
       try{
         const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
         const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
-        if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue; vm++; const p=parseFloat(String(d.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; ok=true; } }
+        if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue; vm++; const p=parseFloat(String(d.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; } }
       }catch(_){}
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});

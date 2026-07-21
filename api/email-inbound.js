@@ -361,6 +361,10 @@ function parseCarrierEmail(mail, carrier) {
   let status = 'info', label = 'Mise à jour';
   if (/livr[ée]|bien re[çc]u|remis(?:\s+au\s+destinataire)?|a\s+bien\s+[ée]t[ée]\s+retir[ée]|a\s+[ée]t[ée]\s+retir[ée]|retir[ée]\s+(?:le|avec)|bien\s+retir[ée]|r[ée]cup[ée]r[ée]|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
   else if (/disponible|à retirer|arriv[ée] (?:dans|en|au) point|pr[êe]t.*retrait/.test(t)) { status = 'available'; label = 'Arrivé au point de retrait'; }
+  // Anti-faux-colis : un vrai « colis disponible » a TOUJOURS un n° de suivi.
+  // Sans suivi (emails pub « ton compte évolue », newsletters…), on ne compte
+  // PAS comme un colis à retirer.
+  if (status === 'available' && !suivi) { status = 'info'; label = 'Info'; }
   else if (/acheminement|en transit|exp[ée]di[ée]|pris en charge|d[ée]pos[ée]|enregistr[ée]|en cours de livraison/.test(t)) { status = 'transit'; label = 'En transit'; }
 
   // Code de retrait (PIN) : « code de retrait : 123456 », « PIN : 1234 »...
