@@ -359,7 +359,7 @@ function parseCarrierEmail(mail, carrier) {
   // Étape du colis (du plus avancé au moins avancé)
   const t = all.toLowerCase();
   let status = 'info', label = 'Mise à jour';
-  if (/livr[ée]|remis au destinataire|a bien [ée]t[ée] retir[ée]|r[ée]ceptionn[ée]/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
+  if (/livr[ée]|bien re[çc]u|remis(?:\s+au\s+destinataire)?|a\s+bien\s+[ée]t[ée]\s+retir[ée]|a\s+[ée]t[ée]\s+retir[ée]|retir[ée]\s+(?:le|avec)|bien\s+retir[ée]|r[ée]cup[ée]r[ée]|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
   else if (/disponible|à retirer|arriv[ée] (?:dans|en|au) point|pr[êe]t.*retrait/.test(t)) { status = 'available'; label = 'Arrivé au point de retrait'; }
   else if (/acheminement|en transit|exp[ée]di[ée]|pris en charge|d[ée]pos[ée]|enregistr[ée]|en cours de livraison/.test(t)) { status = 'transit'; label = 'En transit'; }
 

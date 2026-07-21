@@ -6285,6 +6285,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const markCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.add(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(t); };
   const unmarkCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.delete(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(null); };
   const isCollected = (t) => collected.has(colisKey(t));
+  // Un colis « à retirer » (available) qui traîne depuis > 14 j est forcément
+  // déjà récupéré (un point relais ne garde pas un colis plus longtemps) : on
+  // arrête de le compter, même si aucun email « retiré » n'est arrivé.
+  const PICKUP_MAX_DAYS = 14;
+  const isPickupActive = (t) => {
+    if (!t || t.status !== 'available' || isCollected(t)) return false;
+    const d = new Date(t.receivedAt); if (isNaN(d)) return true;
+    return (Date.now() - d.getTime()) / 86400000 <= PICKUP_MAX_DAYS;
+  };
   // Ouvre la vue « scan » en grand : QR authentique de Vinted (qrB64) si présent,
   // sinon on génère un QR à partir du code de retrait ou du n° de suivi.
   const openQrView = async (t) => {
@@ -6420,7 +6429,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // géocodé (adresse exacte) et ENREGISTRÉ en permanence. La carte se construit
   // ainsi toute seule à partir de tes vrais points, même après retrait du colis.
   useEffect(() => { (async () => {
-    const avail = (tracking || []).filter(t => t.status === 'available' && !isCollected(t));
+    const avail = (tracking || []).filter(isPickupActive);
     // Regroupe par NOM propre du point (plusieurs colis au même relais → 1 point)
     const parPoint = {};
     avail.forEach(t => { const c = cleanLieu(t.lieu); if (c.nom) parPoint[c.nom] = c; });
@@ -7877,13 +7886,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       </>)}
 
       {curSub==='achats' && (<>
-        {(()=>{ const n=(tracking||[]).filter(t=>t.status==='available' && !isCollected(t)).length; return n>0 ? (
+        {(()=>{ const n=(tracking||[]).filter(isPickupActive).length; return n>0 ? (
           <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Ma tournée — {n} colis à retirer</button>
         ) : null; })()}
         {/* Points relais façon Vinted : carte PERMANENTE de tes points habituels.
             Les badges rouges apparaissent quand des colis y attendent. */}
         {(()=>{
-          const avail=(tracking||[]).filter(t=>t.status==='available' && !isCollected(t));
+          const avail=(tracking||[]).filter(isPickupActive);
           const norm=s=>String(s||'').toLowerCase();
           // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
           const groups={};
@@ -9046,7 +9055,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* ── Planificateur de tournée : colis à retirer groupés par point relais ── */}
       {tourneeOpen && (()=>{
-        const avail=(tracking||[]).filter(t=>t.status==='available' && !isCollected(t));
+        const avail=(tracking||[]).filter(isPickupActive);
         const groups={};
         avail.forEach(t=>{ const c=cleanLieu(t.lieu); const key=c.nom || carrierName(t.carrier); if(!groups[key]) groups[key]={colis:[],carrier:t.carrier,adresse:c.adresse||'',geo:geo[c.nom]||null}; groups[key].colis.push(t); if(!groups[key].carrier) groups[key].carrier=t.carrier; });
         const points=Object.entries(groups).map(([nom,g])=>({nom,...g})).sort((a,b)=>b.colis.length-a.colis.length || a.nom.localeCompare(b.nom));

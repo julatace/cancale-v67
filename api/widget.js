@@ -58,7 +58,13 @@ export default async function handler(req, res) {
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) shipOverdue += 1; else if (iso === today) shipToday += 1; else if (iso === tomorrow) shipTomorrow += 1;
     }
-    const pickup = tracks.filter(t => t.status === 'available' && !collected.has(cKey(t))).length;
+    // Colis à retirer ENCORE actifs : disponible, non retiré, et arrivé depuis
+    // ≤ 14 j (au-delà, un point relais l'a forcément déjà rendu/récupéré).
+    const pickup = tracks.filter(t => {
+      if (t.status !== 'available' || collected.has(cKey(t))) return false;
+      const d = new Date(t.receivedAt); if (isNaN(d)) return true;
+      return (Date.now() - d.getTime()) / 86400000 <= 14;
+    }).length;
 
     // Encaissé + ventes du mois : on privilégie la PHOTO publiée par l'app
     // (mêmes chiffres qu'à l'écran) ; à défaut, on retombe sur le calcul email.
