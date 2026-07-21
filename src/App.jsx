@@ -6191,6 +6191,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [linkPickFor, setLinkPickFor] = useState(null); // bordereau en cours de liaison manuelle
   const [linkSearch, setLinkSearch] = useState('');
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
+  const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
   const garageSpotOf = (num) => {
     const t = String(num||'').trim().toLowerCase(); if (!t) return null;
@@ -8217,6 +8218,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             </select>
             <button type="button" onClick={()=>{ const v=!autoNum; setAutoNum(v); save('vinted_autonum', v); }} title="Numéroter automatiquement chaque annonce (réutilise le numéro d'une paire renvoyée/republiée)" style={{border:`1px solid ${autoNum?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:autoNum?`${INV_STATUS.online.color}14`:'transparent',color:autoNum?INV_STATUS.online.color:C.text,cursor:'pointer'}}>{autoNum?'🔢 Auto N° ✓':'🔢 Auto N°'}</button>
             <button type="button" onClick={()=>{ setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }} title="Répartir le prix d'un achat groupé (lot) sur plusieurs paires" style={{border:`1px solid ${C.accent}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:`${C.accent}12`,color:C.accent,cursor:'pointer'}}>🧮 Répartir un lot</button>
+            <button type="button" onClick={()=>setAuditOpen(true)} title="Audit d'inventaire : retrouve les paires perdues ou mal rangées" style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:'transparent',color:C.text,cursor:'pointer'}}>🔎 Audit stock</button>
           </div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>{autoNum?<>Les numéros se mettent <b>automatiquement</b> (modifiables à la main). Une paire renvoyée puis republiée <b>garde son numéro</b>. Prochain libre : <b>{nextNumero}</b>.</>:<>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</>}</div>
         </>)}
@@ -8877,6 +8879,62 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ── Audit d'inventaire : réconcilie numéros / garage / en ligne / vendu ── */}
+      {auditOpen && (()=>{
+        const onlineNums = new Set(); (listings.items||[]).forEach(it=>{ const nn=numeros[it.id]?.numero; if(nn) onlineNums.add(String(nn)); });
+        const soldNums = new Set(); (sales.items||[]).forEach(o=>{ if(classifyOrderStatus(o.status)==='completed'){ const e=effEntry(o); if(e&&e.numero) soldNums.add(String(e.numero)); } });
+        const byNum = new Map(); Object.values(numeros).forEach(e=>{ if(e&&e.numero!=null) byNum.set(String(e.numero), e); });
+        // Tous les numéros présents au garage (grille 2D + pièces 3D).
+        const garageAll = new Set(garageNums);
+        try { const plan=normalizePlan(load('vrm_room_plan',null)); for(const rm of (plan.rooms||[])) for(const it of (rm.items||[])){ if(it.num!=null){const t=String(it.num).trim().toLowerCase(); if(t)garageAll.add(t);} if(Array.isArray(it.nums)) it.nums.forEach(n=>{const t=String(n).trim().toLowerCase(); if(t)garageAll.add(t);}); for(const c in (it.slots||{})) (it.slots[c]||[]).forEach(n=>{const t=String(n).trim().toLowerCase(); if(t)garageAll.add(t);}); } } catch(_){}
+        const atG = (num) => garageAll.has(String(num).trim().toLowerCase());
+        const ghosts=[], soldStored=[], notStored=[];
+        for (const [num,e] of byNum) { const on=onlineNums.has(num), so=soldNums.has(num), g=atG(num);
+          if(!on && !so && !g) ghosts.push({num,e});
+          else if(so && g) soldStored.push({num,e});
+          else if(on && !g) notStored.push({num,e});
+        }
+        const unknownAtGarage = [...garageAll].filter(t=>t && ![...byNum.keys()].some(k=>k.toLowerCase()===t)).sort((a,b)=>(+a||0)-(+b||0));
+        ghosts.sort((a,b)=>(+a.num||0)-(+b.num||0)); soldStored.sort((a,b)=>(+a.num||0)-(+b.num||0)); notStored.sort((a,b)=>(+a.num||0)-(+b.num||0));
+        const Section = ({icon,color,title,desc,items,render}) => items.length===0 ? null : (
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:900,color}}>{icon} {title} ({items.length})</div>
+            <div style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>{desc}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>{items.slice(0,60).map(render)}</div>
+          </div>
+        );
+        const Row = ({num,e}) => (
+          <div key={num} style={{display:'flex',gap:8,alignItems:'center',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'5px 8px'}}>
+            <div style={{width:30,height:30,borderRadius:6,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<img src={e.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}>👟</span>}</div>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:800,color:C.text}}>N°{num}{e&&e.size?` · T${e.size}`:''}</div><div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(e&&e.title)||''}</div></div>
+          </div>
+        );
+        const nothing = ghosts.length===0 && soldStored.length===0 && notStored.length===0 && unknownAtGarage.length===0;
+        return (
+        <div onClick={()=>setAuditOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:900,color:C.text}}>🔎 Audit d'inventaire</div><div style={{fontSize:11.5,color:C.muted}}>Réconcilie tes numéros avec le garage, les annonces et les ventes.</div></div>
+              <button type="button" onClick={()=>setAuditOpen(false)} style={{border:'none',background:'transparent',fontSize:24,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
+              {nothing && <div style={{fontSize:13,color:INV_STATUS.online.color,fontWeight:800,textAlign:'center',padding:'24px 0'}}>✓ Tout est cohérent, rien à signaler !</div>}
+              <Section icon="👻" color={C.danger} title="Paires perdues" desc="Numérotées mais ni en ligne, ni vendues, ni au garage → probablement égarées." items={ghosts} render={Row}/>
+              <Section icon="📦" color={C.warn} title="Vendues mais encore au garage" desc="À sortir du garage : elles sont vendues mais toujours rangées." items={soldStored} render={Row}/>
+              <Section icon="🏠" color={C.blue||C.accent} title="En ligne, pas encore rangées" desc="En vente mais introuvables au garage → range-les pour les retrouver vite." items={notStored} render={Row}/>
+              {unknownAtGarage.length>0 && (
+                <div style={{marginBottom:4}}>
+                  <div style={{fontSize:13,fontWeight:900,color:C.muted}}>❓ Au garage, numéro inconnu ({unknownAtGarage.length})</div>
+                  <div style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucune paire numérotée ne correspond (ancien numéro / faute de frappe).</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{unknownAtGarage.slice(0,80).map(t=><span key={t} style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 9px'}}>N°{t}</span>)}</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
