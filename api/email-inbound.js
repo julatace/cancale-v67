@@ -395,6 +395,43 @@ function parseCarrierEmail(mail, carrier) {
   return { suivi, status, label, code, artTitle, lieu };
 }
 
+// Extrait le QR / code-barres de RETRAIT d'un email de colis. Vinted et les
+// transporteurs n'envoient quasiment JAMAIS ce QR en pièce jointe joliment
+// nommée « qr.png » : le plus souvent il est EMBARQUÉ dans le HTML sous forme
+// d'image « data:…;base64 », ou joint sans nom parlant. L'ancienne version ne
+// regardait que le nom des pièces jointes → elle ne trouvait presque jamais le
+// QR. On tente donc, dans l'ordre :
+//   1. pièce jointe image nommée qr / barcode / retrait / scan…
+//   2. image « data:base64 » du HTML précédée d'un mot-clé de retrait/scan
+//   3. s'il s'agit d'un email « colis à retirer » (status available) avec une
+//      SEULE image jointe → c'est très probablement le QR.
+// (On ne capte pas les QR servis par une URL http distante : ils exigent souvent
+//  une session et s'afficheraient cassés ; l'app sait de toute façon en générer
+//  un depuis le code de retrait quand aucun QR n'a été capté.)
+function extractPickupQr(mail, status) {
+  const imgs = (mail.attachments || []).filter(a => /image\//i.test(a.contentType || '') && a.contentB64);
+  // 1) Pièce jointe explicitement nommée.
+  const named = imgs.find(a => /qr|barre|barcode|retrait|pickup|scan/i.test(a.filename || ''));
+  if (named) return { qrB64: named.contentB64, qrType: named.contentType || 'image/png' };
+  // 2) Image inline data:base64 du HTML, proche d'un mot-clé de retrait.
+  const html = mail.html || '';
+  if (html) {
+    const re = /data:(image\/(?:png|gif|jpe?g));base64,([A-Za-z0-9+/=\s]{80,})/gi;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      const ctx = html.slice(Math.max(0, m.index - 260), m.index).toLowerCase();
+      if (/qr|à scanner|a scanner|scanne|retrait|pr[ée]sente|pickup|code[- ]?barre/.test(ctx)) {
+        return { qrB64: m[2].replace(/\s+/g, ''), qrType: m[1] };
+      }
+    }
+  }
+  // 3) Email « colis prêt à retirer » avec une seule image jointe.
+  if (status === 'available' && imgs.length === 1) {
+    return { qrB64: imgs[0].contentB64, qrType: imgs[0].contentType || 'image/png' };
+  }
+  return { qrB64: null, qrType: null };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
@@ -433,15 +470,27 @@ export default async function handler(req, res) {
     if (isBordereauSubject) carrier = null; // un bordereau n'est pas un suivi
     if (carrier) {
       const track = parseCarrierEmail(mail, carrier);
-      // QR / code-barres de retrait éventuellement joint à l'email
-      const qr = (mail.attachments || []).find(a =>
-        /image\//i.test(a.contentType || '') && /qr|barre|barcode|code|retrait|pickup/i.test(a.filename || ''));
+      // QR / code-barres de retrait : cherché dans les pièces jointes ET dans le
+      // HTML embarqué (là où Vinted / Mondial Relay le mettent le plus souvent).
+      const qr = extractPickupQr(mail, track.status);
       const rowId = `email_track_${carrier}_${track.suivi || shortHash(subject)}`;
+      // Le même colis passe par plusieurs emails (transit → à retirer → livré).
+      // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
+      // email plus tardif (sans ces infos) réécrit la même ligne.
+      if (!qr.qrB64 || !track.code || !track.lieu || !track.artTitle) {
+        const prev = await supabaseGetRow(rowId);
+        if (prev) {
+          if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
+          if (!track.code && prev.code) track.code = prev.code;
+          if (!track.lieu && prev.lieu) track.lieu = prev.lieu;
+          if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
+        }
+      }
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
         code: track.code || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
-        qrB64: qr ? qr.contentB64 : null, qrType: qr ? qr.contentType : null,
+        qrB64: qr.qrB64, qrType: qr.qrType,
         account: acc.login || '',
       } }]);
       // Notif push selon l'étape du colis.
