@@ -625,10 +625,17 @@ export default async function handler(req, res) {
     // Formes réelles : « Transaction finalisée », « La transaction est
     // finalisée », corps « Viré sur ton compte Vinted : 41,00 € ».
     const finText = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 1500)}`;
-    if (/transaction\s+(?:est\s+)?finalis/i.test(finText) || /vir[ée]\s+sur\s+ton\s+compte/i.test(finText)) {
+    if (/transaction\s+(?:est\s+)?finalis/i.test(finText) || /vir[ée]\s+sur\s+ton\s+compte/i.test(finText) || /ajout[ée]s?\s+(?:à|dans)\s+ton\s+porte-monnaie/i.test(finText) || /disponibles?\s+(?:dans|sur)\s+ton\s+porte-monnaie/i.test(finText)) {
       const key = shortHash(subject + '|' + (mail.text || '').slice(0, 400));
       const article = ((finText.match(/la vente de\s+(.+?)\s+a été réalis/i) || [])[1] || '').trim();
-      const montant = (finText.match(/vir[ée]\s+sur\s+ton\s+compte(?:\s+vinted)?\s*:?\s*(\d+[,.]\d{2})\s*€/i) || [])[1] || '';
+      // Montant crédité : on tente plusieurs formulations, puis en dernier
+      // recours le plus gros montant € de l'email (le crédit) — avant ce
+      // correctif, beaucoup d'emails de finalisation ressortaient à 0 € et
+      // faussaient le total « encaissé ».
+      let montant = (finText.match(/vir[ée]\s+sur\s+ton\s+compte(?:\s+vinted)?\s*:?\s*(\d+[,.]\d{2})\s*€/i) || [])[1] || '';
+      if (!montant) montant = (finText.match(/(\d+[,.]\d{2})\s*€\s*(?:ont|a)?\s*(?:[ée]t[ée]\s+)?(?:vir[ée]s?|ajout[ée]s?|cr[ée]dit[ée]s?|re[çc]us?)/i) || [])[1] || '';
+      if (!montant) montant = (finText.match(/(?:re[çc]u|ajout[ée]s?|cr[ée]dit[ée]s?|porte-monnaie|solde|gagn[ée])[^€\d]{0,40}(\d+[,.]\d{2})\s*€/i) || [])[1] || '';
+      if (!montant) { const all = [...finText.matchAll(/(\d+[,.]\d{2})\s*€/g)].map(x => parseFloat(x[1].replace(',', '.'))).filter(v => v > 0); if (all.length) montant = String(Math.max(...all).toFixed(2)).replace('.', ','); }
       const numero = (article.match(/\bn[°º]?\s*(\d{2,6})\b/i) || [])[1] || '';
       await supabaseUpsert([{ id: `email_final_${key}`, data: {
         type: 'finalisation', subject, article, montant, numero,

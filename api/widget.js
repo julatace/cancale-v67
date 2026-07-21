@@ -66,13 +66,12 @@ export default async function handler(req, res) {
       return (Date.now() - d.getTime()) / 86400000 <= 14;
     }).length;
 
-    // Encaissé + ventes du mois : on privilégie la PHOTO publiée par l'app
-    // (mêmes chiffres qu'à l'écran) ; à défaut, on retombe sur le calcul email.
+    // Encaissé + ventes du mois : SOURCE EMAIL (fiable 24/7, arrive même sans
+    // toi sur Vinted). Encaissé = somme des emails « argent viré » ; ventes =
+    // nombre de ventes du mois. On ne dépend PLUS de l'extension Vinted ici.
     let moneyMonth = 0, salesMonth = 0;
     for (const f of finals) { const d = String(f.receivedAt || '').slice(0, 7); if (d === ym) { const n = parseFloat(String(f.montant || '').replace(',', '.')); if (!isNaN(n)) moneyMonth += n; } }
     for (const s of sales) { if (String(s.receivedAt || '').slice(0, 7) === ym) salesMonth += 1; }
-    if (snap && snap.caMois != null) moneyMonth = snap.caMois;
-    if (snap && snap.ventesMois != null) salesMonth = snap.ventesMois;
 
     res.status(200).json({
       ship: { total: shipTotal, overdue: shipOverdue, today: shipToday, tomorrow: shipTomorrow },
