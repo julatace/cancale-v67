@@ -66,33 +66,27 @@ export default async function handler(req, res) {
       return (Date.now() - d.getTime()) / 86400000 <= 14;
     }).length;
 
-    // Encaissé + ventes du mois : SOURCE = les FACTURES (pipeline emails de vente
-    // → vinted_invoices), la même chose que l'onglet Factures de l'app. Fiable,
-    // complet, 24/7, sans dépendre de l'extension Vinted.
-    const invMonth = (s) => {
-      const t = String(s || '').trim();
-      let mm = t.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (mm) return `${mm[3]}-${mm[2]}`;
-      mm = t.match(/(\d{4})-(\d{2})-(\d{2})/); if (mm) return `${mm[1]}-${mm[2]}`;
-      const d = new Date(t); return isNaN(d) ? null : d.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7);
-    };
+    // CA + ventes du mois : SOURCE = les emails de VENTE (« X a acheté ton
+    // article »), un par vente AVEC le prix. Source complète, fiable, 24/7, tous
+    // comptes, sans dépendre de l'extension Vinted. (Les emails « argent viré »
+    // sont trop rares/incomplets pour servir de base.)
     let moneyMonth = 0, salesMonth = 0;
-    const invoices = Array.isArray(m.vinted_invoices) ? m.vinted_invoices : [];
-    for (const inv of invoices) {
-      if (invMonth(inv.saleDate) !== ym) continue;
-      const p = parseFloat(String(inv.sellPrice != null ? inv.sellPrice : (inv.prix != null ? inv.prix : '')).replace(',', '.'));
-      if (!isNaN(p)) { moneyMonth += p; salesMonth += 1; }
+    for (const s of sales) {
+      if (String(s.receivedAt || '').slice(0, 7) !== ym) continue;
+      salesMonth += 1;
+      const p = parseFloat(String(s.prix || '').replace(',', '.'));
+      if (!isNaN(p) && p > 0) moneyMonth += p;
     }
-    // Repli si aucune facture (pipeline Factures non configuré) : emails « argent viré ».
-    if (salesMonth === 0) {
-      for (const f of finals) { if (String(f.receivedAt || '').slice(0, 7) === ym) { const n = parseFloat(String(f.montant || '').replace(',', '.')); if (!isNaN(n)) moneyMonth += n; } }
-      for (const s of sales) { if (String(s.receivedAt || '').slice(0, 7) === ym) salesMonth += 1; }
-    }
+    // Argent réellement viré ce mois (emails de finalisation) — info secondaire.
+    let receivedMonth = 0;
+    for (const f of finals) { if (String(f.receivedAt || '').slice(0, 7) === ym) { const n = parseFloat(String(f.montant || '').replace(',', '.')); if (!isNaN(n)) receivedMonth += n; } }
 
     res.status(200).json({
       ship: { total: shipTotal, overdue: shipOverdue, today: shipToday, tomorrow: shipTomorrow },
       pickup,
       moneyMonth: Math.round(moneyMonth),
       salesMonth,
+      received: Math.round(receivedMonth),
       pending: snap && snap.enAttente != null ? snap.enAttente : null,
       online: snap && snap.online != null ? snap.online : null,
       unread: snap && snap.unread != null ? snap.unread : null,

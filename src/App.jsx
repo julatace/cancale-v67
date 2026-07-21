@@ -10016,6 +10016,14 @@ export default function App() {
         }
         pairesStock=seen.size;
       }catch(_){/* plan illisible → 0 */}
+      // CA + ventes du mois basés sur les EMAILS DE VENTE (source complète, la
+      // même que le widget) → app et widget affichent le même chiffre. On écrase
+      // le calcul « harvest » (extension) qui pouvait être partiel/incohérent.
+      try{
+        const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
+        if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue; vm++; const p=parseFloat(String(d.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; ok=true; } }
+      }catch(_){}
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
