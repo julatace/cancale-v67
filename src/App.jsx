@@ -1838,12 +1838,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
         </div>
       )}
 
-      {/* Stats principales */}
+      {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
+          Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
+          Σ prix d'achat des annonces en ligne · CA encaissé = finalisé tous comptes.
+          Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-        <StatCard icon="📦" label="Stock garage" value={stockCount} color={C.accent} sub={`${freeSlots} places libres`}/>
-        <StatCard icon="💰" label="Valeur stock" value={fmt(stockValue)} color={C.warn} sub="prix d'achat total"/>
+        <StatCard icon="📦" label="Paires en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.accent} sub="numéros au garage"/>
+        <StatCard icon="💰" label="Valeur stock" value={fmt(liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue)} color={C.warn} sub="prix d'achat des annonces en ligne"/>
         <StatCard icon="✅" label="Vendues" value={totalSold} color={C.danger}/>
-        <StatCard icon="💸" label="CA encaissé" value={fmt(ca)} color={C.text} sub={`${encaissees.length} ventes reçues`}/>
+        <StatCard icon="💸" label="CA encaissé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="finalisé, tous comptes"/>
         <StatCard icon="📈" label="Bénéfice net" value={fmt(profit)} color={profit>=0?C.accent:C.danger} sub="argent reçu uniquement"/>
         <StatCard icon="🎯" label="Taux marge" value={`${avgMargin}%`} color={C.blue} sub="bénéf / CA"/>
       </div>
@@ -9321,18 +9324,43 @@ export default function App() {
     let stop=false;
     (async()=>{
       const now=new Date(); const ym=now.getFullYear()*100+now.getMonth();
-      let caMois=0, enCours=0, online=0, unread=0, ok=false;
+      // Prix d'achat par annonce (clé = id d'annonce wardrobe) pour la valeur du stock.
+      const numeros=load('vinted_annonce_numeros',{})||{};
+      // caMois = CA finalisé du mois en cours · caEncaisse = CA finalisé TOUS mois
+      // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
+      // annonces réellement en ligne. online = nb d'annonces en ligne.
+      let caMois=0, caEncaisse=0, enCours=0, online=0, unread=0, stockValue=0, ok=false;
       for(const a of vintedAccounts){
         const sold=await fetchVintedOrders(a,'sold',1,'all');
         if(sold.ok){ ok=true; for(const o of sold.items){
           const st=classifyOrderStatus(o.status);
           if(st==='pending') enCours++;
-          if(st==='completed' && o.date){ const d=new Date(o.date); if(!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym) caMois+=(o.price?.amount!=null?Number(o.price.amount):0); }
+          if(st==='completed'){
+            const amt=(o.price?.amount!=null?Number(o.price.amount):0);
+            caEncaisse+=amt;
+            if(o.date){ const d=new Date(o.date); if(!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym) caMois+=amt; }
+          }
         }}
-        const list=await fetchVintedListings(a,1); if(list.ok){ ok=true; online+=list.items.length; }
+        const list=await fetchVintedListings(a,1); if(list.ok){ ok=true; online+=list.items.length;
+          for(const it of list.items){ const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0; } }
         const conv=await fetchVintedConversations(a,1); if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
       }
-      if(!stop && ok) setLiveStats({caMois,enCours,online,unread});
+      // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
+      // Un numéro peut être posé sur une boîte seule (it.num), dans une case de
+      // grille (it.slots) ou dans une pile (it.nums).
+      let pairesStock=0;
+      try{
+        const plan=normalizePlan(load('vrm_room_plan',null));
+        const seen=new Set();
+        for(const rm of (plan.rooms||[])) for(const it of (rm.items||[])){
+          const add=v=>{ const t=String(v||'').trim(); if(t) seen.add(t.toLowerCase()); };
+          if(it.num) add(it.num);
+          if(Array.isArray(it.nums)) it.nums.forEach(add);
+          for(const cell in (it.slots||{})) (it.slots[cell]||[]).forEach(add);
+        }
+        pairesStock=seen.size;
+      }catch(_){/* plan illisible → 0 */}
+      if(!stop && ok) setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
