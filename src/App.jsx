@@ -7087,6 +7087,57 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
+  // Courbes de PRIX DE VENTE MOYEN par marque, sur 12 mois → voir l'évolution
+  // (marché + tes propres prix). Par mois : moyenne des prix de vente finalisés.
+  const [showBrandCurves, setShowBrandCurves] = useState(false);
+  const [curveBrand, setCurveBrand] = useState('');
+  const brandCurves = useMemo(() => {
+    const now = new Date(); const months = [];
+    for (let i=11;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+    const idx = {}; months.forEach((ym,i)=>{ idx[ym]=i; });
+    const data = {}; // marque -> { sums:[], counts:[], total }
+    const ensure = b => { if(!data[b]) data[b] = { sums:Array(12).fill(0), counts:Array(12).fill(0), total:0 }; return data[b]; };
+    for (const o of (sales.items||[])){
+      if (isHidden(o) || classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
+      const d=new Date(o.date); if(isNaN(d)) continue;
+      const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; const i=idx[ym]; if(i==null) continue;
+      const sell=o.price?.amount!=null?Number(o.price.amount):0; if(!(sell>0)) continue;
+      const b = extractBrand(o.title) || 'Autres';
+      const D=ensure(b); D.sums[i]+=sell; D.counts[i]+=1; D.total+=1;
+      const A=ensure('__ALL__'); A.sums[i]+=sell; A.counts[i]+=1; A.total+=1;
+    }
+    const series = b => { const D=data[b]; if(!D) return { pts:[], total:0 }; return { total:D.total, pts: months.map((ym,i)=> D.counts[i]>0 ? { i, avg:D.sums[i]/D.counts[i], n:D.counts[i] } : null ).filter(Boolean) }; };
+    const brandList = Object.keys(data).filter(b=>b!=='__ALL__').sort((a,b)=>data[b].total-data[a].total);
+    return { months, series, brandList, hasData: brandList.length>0 };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+
+  // ── Wrapped du vendeur : rétrospective annuelle façon Spotify Wrapped ──
+  const [showWrapped, setShowWrapped] = useState(false);
+  const [wrappedYear, setWrappedYear] = useState(() => new Date().getFullYear());
+  const wrapped = useMemo(() => {
+    const yr = wrappedYear;
+    const items = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='completed' && o.date && new Date(o.date).getFullYear()===yr);
+    let ca=0, benef=0, benefNb=0; const brands={}; const monthsCA=Array(12).fill(0); const dates=new Set();
+    let fastest=null, slowest=null, bestPair=null;
+    for (const o of items) {
+      const sell=o.price?.amount!=null?Number(o.price.amount):0; ca+=sell;
+      const e=effEntry(o); const buy=e&&e.buyPrice!=null&&String(e.buyPrice).trim()!==''?parseFloat(String(e.buyPrice).replace(',','.')):null;
+      const d=new Date(o.date); monthsCA[d.getMonth()]+=sell; dates.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+      const b=extractBrand(o.title)||'Autres'; brands[b]=(brands[b]||0)+1;
+      if(buy!=null&&!isNaN(buy)){ const m=sell-buy-feesOf(e); benef+=m; benefNb++; if(!bestPair||m>bestPair.m) bestPair={m, title:o.title, num:e&&e.numero, photo:e&&e.photo}; }
+      if(e&&e.numberedAt){ const j=(d-new Date(e.numberedAt))/86400000; if(j>=0&&j<3650){ if(!fastest||j<fastest.j) fastest={j:Math.round(j),title:o.title,num:e&&e.numero}; if(!slowest||j>slowest.j) slowest={j:Math.round(j),title:o.title,num:e&&e.numero}; } }
+    }
+    const topBrand = Object.entries(brands).sort((a,b)=>b[1]-a[1])[0] || null;
+    const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    let bestMonth=null; monthsCA.forEach((v,i)=>{ if(v>0 && (!bestMonth||v>bestMonth.v)) bestMonth={i,v}; });
+    const dayNums=[...dates].map(s=>{ const [Y,M,D]=s.split('-').map(Number); return Math.floor(new Date(Y,M,D).getTime()/86400000); }).sort((a,b)=>a-b);
+    let streak=dayNums.length?1:0, run=1; for(let i=1;i<dayNums.length;i++){ if(dayNums[i]===dayNums[i-1]+1){ run++; streak=Math.max(streak,run);} else if(dayNums[i]!==dayNums[i-1]) run=1; }
+    const years=[...new Set((sales.items||[]).filter(o=>o.date&&classifyOrderStatus(o.status)==='completed').map(o=>new Date(o.date).getFullYear()))].sort((a,b)=>b-a);
+    return { yr, nb:items.length, ca, benef, benefNb, bestPair, topBrand, bestMonth:bestMonth?{nom:moisNoms[bestMonth.i],v:bestMonth.v}:null, fastest, slowest, avg: items.length?ca/items.length:0, streak, years };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, wrappedYear, numeros, saleOv, hiddenSales, hiddenAccts]);
+
   // ── Stats de sourcing : quelles marques / tailles rapportent le plus ──
   // Agrège les ventes finalisées (hors masquées) par marque et par taille :
   // nb vendues, bénéfice moyen/paire (si prix d'achat connu), temps de vente moyen.
@@ -7444,10 +7495,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const bordDeadline = (b) => {
     const s = String(b.dateLimite || '').trim(); if (!s) return null;
     const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (!m) return { text: s, level: 'muted', days: null };
+    // Date SEULE (sans l'heure) → texte court qui ne part pas en colonne.
+    const text = `${m[1]}/${m[2]}/${m[3]}`;
     const d = new Date(+m[3], +m[2] - 1, +m[1], 23, 59, 59);
     const days = Math.floor((d - new Date()) / 86400000);
     const level = days <= 1 ? 'danger' : days <= 2 ? 'warn' : 'muted';
-    return { text: s, level, days };
+    return { text, level, days };
   };
   // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
   // les regroupe dans UN seul PDF (une page chacun) → une seule impression.
@@ -7732,6 +7785,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           )}
           {accounts.length>0 && (
             <button onClick={openAnnual} title="Bilan annuel (12 mois)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📅 Bilan</button>
+          )}
+          {sales.items && sales.items.length>0 && (
+            <button onClick={()=>{ if(!curveBrand && brandCurves.brandList[0]) setCurveBrand(brandCurves.brandList[0]); setShowBrandCurves(true); }} title="Évolution du prix de vente moyen par marque" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📈 Prix/marque</button>
+          )}
+          {sales.items && sales.items.length>0 && (
+            <button onClick={()=>setShowWrapped(true)} title="Ta rétrospective de revendeur" style={{padding:'5px 12px',borderRadius:999,border:`1px solid #7a5cff`,background:'#7a5cff14',color:'#7a5cff',fontSize:12,fontWeight:800,cursor:'pointer'}}>🎉 Wrapped</button>
           )}
           {sales.items && sales.items.length>0 && (
             <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
@@ -8394,7 +8453,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(()=>{ const nn=numForBord(b); return nn?`N°${nn} · `:''; })()}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
-                    {(()=>{ const dl=bordDeadline(b); return dl && !isBordPrinted(b) ? <div style={{fontSize:10.5,fontWeight:800,marginTop:2,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}}>📮 À expédier avant le {dl.text}{dl.days!=null&&dl.days<0?' · en retard !':dl.days===0?" · aujourd'hui":dl.days===1?' · demain':''}</div> : null; })()}
+                    {(()=>{ const dl=bordDeadline(b); return dl && !isBordPrinted(b) ? <div style={{fontSize:10.5,fontWeight:800,marginTop:2,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"Auj.":dl.days===1?'Demain':'Avant'} {dl.text}</div> : null; })()}
                   </div>
                   {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{flexShrink:0,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🔗 Relier</button>}
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
@@ -8879,6 +8938,102 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ── Courbes de prix de vente moyen par marque (12 mois) ── */}
+      {showBrandCurves && (()=>{
+        const effBrand = (curveBrand && (curveBrand==='__ALL__' || brandCurves.brandList.includes(curveBrand))) ? curveBrand : (brandCurves.brandList[0] || '__ALL__');
+        const s = brandCurves.series(effBrand);
+        const W=340, H=180, padL=34, padR=14, padT=16, padB=28;
+        const xs = i => padL + (i/11)*(W-padL-padR);
+        const avgs = s.pts.map(p=>p.avg); const mn=avgs.length?Math.min(...avgs):0, mx=avgs.length?Math.max(...avgs):1;
+        const lo=Math.floor(mn/5)*5, hi=Math.max(lo+5, Math.ceil(mx/5)*5);
+        const ys = v => padT + (1-(v-lo)/((hi-lo)||1))*(H-padT-padB);
+        const monLabel = ym => { const [Y,M]=ym.split('-').map(Number); return new Date(Y,M-1,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''); };
+        return (
+        <div onClick={()=>setShowBrandCurves(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:900,color:C.text}}>📈 Prix de vente par marque</div><div style={{fontSize:11.5,color:C.muted}}>Prix de vente moyen mois par mois (12 derniers mois).</div></div>
+              <button type="button" onClick={()=>setShowBrandCurves(false)} style={{border:'none',background:'transparent',fontSize:24,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{padding:'12px 16px',flexShrink:0}}>
+              <select value={effBrand} onChange={e=>setCurveBrand(e.target.value)} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,fontWeight:700,cursor:'pointer'}}>
+                <option value="__ALL__">Toutes marques confondues</option>
+                {brandCurves.brandList.map(b=><option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'0 12px 16px'}}>
+              {s.pts.length<1 ? <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'30px 0'}}>Pas assez de ventes pour cette marque.</div> : (
+                <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto'}}>
+                  {[lo,(lo+hi)/2,hi].map((v,i)=>(<g key={i}><line x1={padL} y1={ys(v)} x2={W-padR} y2={ys(v)} stroke={C.border} strokeWidth="1"/><text x={padL-5} y={ys(v)+3} textAnchor="end" fontSize="9" fill={C.muted}>{Math.round(v)}€</text></g>))}
+                  {brandCurves.months.map((ym,i)=> i%2===0 ? <text key={ym} x={xs(i)} y={H-10} textAnchor="middle" fontSize="8.5" fill={C.muted}>{monLabel(ym)}</text> : null)}
+                  <polyline fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" points={s.pts.map(p=>`${xs(p.i)},${ys(p.avg)}`).join(' ')}/>
+                  {s.pts.map(p=>(<g key={p.i}><circle cx={xs(p.i)} cy={ys(p.avg)} r="3.5" fill={C.accent}/><text x={xs(p.i)} y={ys(p.avg)-7} textAnchor="middle" fontSize="8.5" fontWeight="800" fill={C.text}>{Math.round(p.avg)}</text></g>))}
+                </svg>
+              )}
+              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des paires <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Une pente qui monte = tu vends plus cher (marché porteur ou meilleures paires).</div>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ── Wrapped du vendeur : rétrospective annuelle ── */}
+      {showWrapped && (()=>{
+        const w = wrapped; const eur0 = n => `${Math.round(n)} €`;
+        const Tile = ({emoji,big,label,sub}) => (
+          <div style={{background:'rgba(255,255,255,0.12)',borderRadius:16,padding:'14px 14px',display:'flex',flexDirection:'column',gap:2}}>
+            <div style={{fontSize:20}}>{emoji}</div>
+            <div style={{fontSize:22,fontWeight:900,color:'#fff',lineHeight:1.1,letterSpacing:-0.5}}>{big}</div>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.85)',fontWeight:700}}>{label}</div>
+            {sub && <div style={{fontSize:10,color:'rgba(255,255,255,0.7)'}}>{sub}</div>}
+          </div>
+        );
+        return (
+        <div onClick={()=>setShowWrapped(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1360,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:520,maxHeight:'90vh',borderRadius:'20px 20px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',background:'linear-gradient(160deg,#7a5cff 0%,#b14cff 55%,#ff5ca8 100%)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,padding:'16px 18px',flexShrink:0}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:18,fontWeight:900,color:'#fff',letterSpacing:-0.5}}>🎉 Ton année {w.yr}</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,0.85)',fontWeight:700}}>Shop Cancale35 · rétrospective</div>
+              </div>
+              {w.years.length>1 && (
+                <select value={w.yr} onChange={e=>setWrappedYear(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'6px 10px',fontSize:12,fontWeight:800,background:'rgba(255,255,255,0.2)',color:'#fff',cursor:'pointer'}}>
+                  {w.years.map(y=><option key={y} value={y} style={{color:'#111'}}>{y}</option>)}
+                </select>
+              )}
+              <button type="button" onClick={()=>setShowWrapped(false)} style={{border:'none',background:'rgba(255,255,255,0.2)',color:'#fff',width:32,height:32,borderRadius:999,fontSize:20,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'0 16px 20px'}}>
+              {w.nb===0 ? <div style={{color:'#fff',textAlign:'center',padding:'40px 0',fontSize:14,fontWeight:700}}>Aucune vente finalisée en {w.yr}.</div> : (<>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+                  <Tile emoji="👟" big={w.nb} label="paires vendues"/>
+                  <Tile emoji="💰" big={eur0(w.ca)} label="chiffre d'affaires"/>
+                  {w.benefNb>0 && <Tile emoji="📈" big={eur0(w.benef)} label="bénéfice net" sub={`sur ${w.benefNb} paires chiffrées`}/>}
+                  <Tile emoji="🏷️" big={eur0(w.avg)} label="prix de vente moyen"/>
+                  {w.topBrand && <Tile emoji="⭐" big={w.topBrand[0]} label="marque star" sub={`${w.topBrand[1]} vendues`}/>}
+                  {w.bestMonth && <Tile emoji="📅" big={w.bestMonth.nom} label="mois record" sub={eur0(w.bestMonth.v)}/>}
+                  {w.streak>1 && <Tile emoji="🔥" big={`${w.streak} j`} label="plus longue série" sub="jours d'affilée avec une vente"/>}
+                  {w.fastest && <Tile emoji="⚡" big={`${w.fastest.j} j`} label="vente la plus rapide" sub={w.fastest.num?`N°${w.fastest.num}`:''}/>}
+                  {w.slowest && <Tile emoji="🐌" big={`${w.slowest.j} j`} label="la plus patiente" sub={w.slowest.num?`N°${w.slowest.num}`:''}/>}
+                </div>
+                {w.bestPair && (
+                  <div style={{background:'rgba(255,255,255,0.16)',borderRadius:16,padding:14,display:'flex',gap:12,alignItems:'center'}}>
+                    <div style={{width:52,height:52,borderRadius:12,overflow:'hidden',background:'rgba(0,0,0,0.2)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:24}}>👑</span>}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,0.85)',fontWeight:800,textTransform:'uppercase',letterSpacing:1}}>👑 Paire de l'année</div>
+                      <div style={{fontSize:14,fontWeight:900,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
+                      <div style={{fontSize:12,color:'#fff',fontWeight:800}}>+{eur0(w.bestPair.m)} de bénéfice</div>
+                    </div>
+                  </div>
+                )}
+                <div style={{textAlign:'center',color:'rgba(255,255,255,0.8)',fontSize:11,marginTop:14,fontWeight:700}}>Continue comme ça 🚀</div>
+              </>)}
             </div>
           </div>
         </div>
