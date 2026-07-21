@@ -4486,6 +4486,11 @@ function RoomPlan({ locate, onLocateConsumed }) {
           if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
           setHi({ itemId: it.id, roomId: rm.id, roomName: rm.name }); setSel(it.id); return;
         }
+        // Pile de boîtes : les numéros sont dans it.nums (n'était PAS cherché avant).
+        if (Array.isArray(it.nums) && it.nums.some(n => String(n).trim().toLowerCase() === t)) {
+          if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
+          setHi({ itemId: it.id, roomId: rm.id, roomName: rm.name }); setSel(it.id); return;
+        }
         for (const cell in (it.slots || {})) if ((it.slots[cell] || []).some(n => String(n).trim().toLowerCase() === t)) {
           if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
           setHi({ itemId: it.id, cell, roomId: rm.id, roomName: rm.name }); setOpenItem(it.id); setSel(it.id); return;
@@ -6250,6 +6255,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     const img = await makeQrDataUrl(t.code || t.suivi);
     setQrView(v => (v && v._t === t) ? { ...v, img } : v);
   };
+  // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
+  useEffect(() => { if (!lastCollected) return; const id = setTimeout(() => setLastCollected(null), 6000); return () => clearTimeout(id); }, [lastCollected]);
   // Reçu authentique (facture d'achat reçue par email Vinted) correspondant à un
   // achat. On privilégie TOUJOURS ce vrai reçu au justificatif généré par l'app.
   // Recherche par ordre de fiabilité : (1) n° de transaction, (2) titre exact,
@@ -8268,7 +8275,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               </button>
             ) : null; })()}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {[...emailBords].sort((a,b2)=>(isBordPrinted(a)?1:0)-(isBordPrinted(b2)?1:0)).map((b,i)=>(
+              {[...emailBords].sort((a,b2)=>{
+                // Non imprimés d'abord, puis par date limite d'expédition (plus
+                // urgent en haut), puis les plus récents.
+                const pa=isBordPrinted(a)?1:0, pb=isBordPrinted(b2)?1:0; if(pa!==pb) return pa-pb;
+                const da=bordDeadline(a), db=bordDeadline(b2);
+                const va=da&&da.days!=null?da.days:Infinity, vb=db&&db.days!=null?db.days:Infinity; if(va!==vb) return va-vb;
+                return new Date(b2.receivedAt||0)-new Date(a.receivedAt||0);
+              }).map((b,i)=>(
                 <div key={i} data-bord-card style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordPrinted(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
                   {(()=>{ const ph=bordPhoto(b); return (
                     <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
