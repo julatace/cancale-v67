@@ -395,41 +395,84 @@ function parseCarrierEmail(mail, carrier) {
   return { suivi, status, label, code, artTitle, lieu };
 }
 
-// Extrait le QR / code-barres de RETRAIT d'un email de colis. Vinted et les
-// transporteurs n'envoient quasiment JAMAIS ce QR en pièce jointe joliment
-// nommée « qr.png » : le plus souvent il est EMBARQUÉ dans le HTML sous forme
-// d'image « data:…;base64 », ou joint sans nom parlant. L'ancienne version ne
-// regardait que le nom des pièces jointes → elle ne trouvait presque jamais le
-// QR. On tente donc, dans l'ordre :
-//   1. pièce jointe image nommée qr / barcode / retrait / scan…
-//   2. image « data:base64 » du HTML précédée d'un mot-clé de retrait/scan
-//   3. s'il s'agit d'un email « colis à retirer » (status available) avec une
-//      SEULE image jointe → c'est très probablement le QR.
-// (On ne capte pas les QR servis par une URL http distante : ils exigent souvent
-//  une session et s'afficheraient cassés ; l'app sait de toute façon en générer
-//  un depuis le code de retrait quand aucun QR n'a été capté.)
+// Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
+// Sert à reconnaître un QR : c'est un CARRÉ. Marche pour TOUS les transporteurs
+// sans avoir vu leur email à l'avance.
+function imgDims(b64) {
+  try {
+    const bin = Buffer.from(String(b64).slice(0, 64), 'base64');
+    if (bin.length >= 24 && bin[0] === 0x89 && bin[1] === 0x50 && bin[2] === 0x4e && bin[3] === 0x47) {
+      return { w: bin.readUInt32BE(16), h: bin.readUInt32BE(20) }; // PNG (IHDR)
+    }
+    if (bin.length >= 10 && bin[0] === 0x47 && bin[1] === 0x49 && bin[2] === 0x46) {
+      return { w: bin[6] | (bin[7] << 8), h: bin[8] | (bin[9] << 8) }; // GIF (écran logique)
+    }
+  } catch (_) {}
+  return null;
+}
+const isSquareish = (d) => d && d.w >= 60 && d.h >= 60 && Math.abs(d.w - d.h) <= 0.18 * Math.max(d.w, d.h);
+
+// Extrait le QR / code-barres de RETRAIT d'un email de colis — pensé pour
+// FONCTIONNER AVEC TOUS LES TRANSPORTEURS, sans exemple préalable. Les QR
+// arrivent de façons très variées : pièce jointe nommée, image « data:base64 »
+// dans le HTML, image carrée jointe sans nom parlant, ou URL d'image hébergée.
+// On les couvre toutes, dans l'ordre du plus fiable au plus prudent :
+//   1. pièce jointe nommée qr / barcode / retrait / scan
+//   2. image « data:base64 » du HTML près d'un mot-clé de retrait/scan
+//   3. balise <img src="https://…"> hébergée près d'un mot-clé (→ qrUrl)
+//   4. pièce jointe CARRÉE (heuristique QR) si l'email parle de scan/retrait
+//   5. email « à retirer » avec une seule image jointe
 function extractPickupQr(mail, status) {
   const imgs = (mail.attachments || []).filter(a => /image\//i.test(a.contentType || '') && a.contentB64);
+  const html = mail.html || '';
+  const hint = /qr|à scanner|a scanner|scanne|code[- ]?barre|pr[ée]sente (?:ce|le) code|pickup|retrait/i
+    .test(`${mail.subject || ''}\n${mail.text || ''}\n${html}`);
+  const none = { qrB64: null, qrType: null, qrUrl: null };
+
   // 1) Pièce jointe explicitement nommée.
   const named = imgs.find(a => /qr|barre|barcode|retrait|pickup|scan/i.test(a.filename || ''));
-  if (named) return { qrB64: named.contentB64, qrType: named.contentType || 'image/png' };
+  if (named) return { qrB64: named.contentB64, qrType: named.contentType || 'image/png', qrUrl: null };
+
   // 2) Image inline data:base64 du HTML, proche d'un mot-clé de retrait.
-  const html = mail.html || '';
   if (html) {
     const re = /data:(image\/(?:png|gif|jpe?g));base64,([A-Za-z0-9+/=\s]{80,})/gi;
     let m;
     while ((m = re.exec(html)) !== null) {
-      const ctx = html.slice(Math.max(0, m.index - 260), m.index).toLowerCase();
+      const ctx = html.slice(Math.max(0, m.index - 300), m.index).toLowerCase();
       if (/qr|à scanner|a scanner|scanne|retrait|pr[ée]sente|pickup|code[- ]?barre/.test(ctx)) {
-        return { qrB64: m[2].replace(/\s+/g, ''), qrType: m[1] };
+        return { qrB64: m[2].replace(/\s+/g, ''), qrType: m[1], qrUrl: null };
       }
     }
   }
-  // 3) Email « colis prêt à retirer » avec une seule image jointe.
-  if (status === 'available' && imgs.length === 1) {
-    return { qrB64: imgs[0].contentB64, qrType: imgs[0].contentType || 'image/png' };
+
+  // 3) Image hébergée (URL) près d'un mot-clé de retrait/scan.
+  if (html) {
+    const re = /<img[^>]+src=["'](https?:\/\/[^"']+)["'][^>]*>/gi;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      const ctx = (html.slice(Math.max(0, m.index - 300), m.index) + ' ' + m[1]).toLowerCase();
+      if (/qr|scanne|à scanner|a scanner|retrait|pickup|barcode|code[- ]?barre/.test(ctx)) {
+        return { qrB64: null, qrType: null, qrUrl: m[1] };
+      }
+    }
   }
-  return { qrB64: null, qrType: null };
+
+  // 4) Pièce jointe CARRÉE = QR (marche pour tout transporteur). Prudent : on
+  //    exige que l'email parle de scan/retrait ET qu'il n'y ait qu'un seul carré
+  //    candidat (sinon on ne devine pas → l'app génère un QR depuis le code).
+  if (hint) {
+    const squares = imgs.filter(a => isSquareish(imgDims(a.contentB64)));
+    if (squares.length === 1) {
+      return { qrB64: squares[0].contentB64, qrType: squares[0].contentType || 'image/png', qrUrl: null };
+    }
+  }
+
+  // 5) Email « colis prêt à retirer » avec une seule image jointe.
+  if (status === 'available' && imgs.length === 1) {
+    return { qrB64: imgs[0].contentB64, qrType: imgs[0].contentType || 'image/png', qrUrl: null };
+  }
+
+  return none;
 }
 
 export default async function handler(req, res) {
@@ -461,12 +504,35 @@ export default async function handler(req, res) {
     const isBordereauSubject = /Bordereau\s+d['’]envoi/i.test(subject);
     const fromVinted = /vinted/i.test(mail.from);
     const isVintedShipping = /shipping@|relay\.vinted/i.test(mail.from);
-    const carrierSrc = (fromVinted && !isVintedShipping)
+    const carrierSrc = ((fromVinted && !isVintedShipping)
       ? mail.from
-      : `${mail.from} ${subject} ${(mail.text || '').slice(0, 800)}`;
-    let carrier = /mondial\s*relay|mondialrelay/i.test(carrierSrc) ? 'mondialrelay'
-                : /chronopost/i.test(carrierSrc) ? 'chronopost' : null;
+      : `${mail.from} ${subject} ${(mail.text || '').slice(0, 1200)}`).toLowerCase();
+    // Détection élargie : TOUS les transporteurs courants (pas seulement Mondial
+    // Relay / Chronopost). L'ordre n'a pas d'importance, chaque test est distinct.
+    let carrier =
+        /mondial\s*relay|mondialrelay/.test(carrierSrc) ? 'mondialrelay'
+      : /chronopost/.test(carrierSrc) ? 'chronopost'
+      : /relais\s*colis|relaiscolis/.test(carrierSrc) ? 'relaiscolis'
+      : /colissimo|\bla\s*poste\b|laposte/.test(carrierSrc) ? 'colissimo'
+      : /shop\s*2\s*shop|shop2shop/.test(carrierSrc) ? 'shop2shop'
+      : /inpost/.test(carrierSrc) ? 'inpost'
+      : /\bups\b/.test(carrierSrc) ? 'ups'
+      : /\bdpd\b/.test(carrierSrc) ? 'dpd'
+      : /\bgls\b/.test(carrierSrc) ? 'gls'
+      : /\bdhl\b/.test(carrierSrc) ? 'dhl'
+      : /\bfedex\b/.test(carrierSrc) ? 'fedex'
+      : null;
     if (!carrier && isVintedShipping) carrier = 'vinted'; // suivi Vinted (Vinted Go...)
+    // Filet générique : un email de colis d'un transporteur NON listé (point
+    // relais / à retirer / suivi) est quand même traité comme un suivi, pour
+    // capter QR / code / lieu. On exige un signal fort « colis/retrait » et que
+    // ce ne soit pas un email de vente/offre/message Vinted (fromVinted exclu).
+    if (!carrier && !fromVinted) {
+      const t = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 1200)}`.toLowerCase();
+      if (/point\s+relais|à\s*retirer|a\s*retirer|code\s+de\s+retrait|pr[êe]t.*retrait|colis.*(retrait|disponible|arriv|livr)|pickup/.test(t)) {
+        carrier = 'autre';
+      }
+    }
     if (isBordereauSubject) carrier = null; // un bordereau n'est pas un suivi
     if (carrier) {
       const track = parseCarrierEmail(mail, carrier);
@@ -477,10 +543,11 @@ export default async function handler(req, res) {
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
-      if (!qr.qrB64 || !track.code || !track.lieu || !track.artTitle) {
+      if (!qr.qrB64 || !qr.qrUrl || !track.code || !track.lieu || !track.artTitle) {
         const prev = await supabaseGetRow(rowId);
         if (prev) {
           if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
+          if (!qr.qrUrl && prev.qrUrl) qr.qrUrl = prev.qrUrl;
           if (!track.code && prev.code) track.code = prev.code;
           if (!track.lieu && prev.lieu) track.lieu = prev.lieu;
           if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
@@ -490,7 +557,7 @@ export default async function handler(req, res) {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
         code: track.code || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
-        qrB64: qr.qrB64, qrType: qr.qrType,
+        qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         account: acc.login || '',
       } }]);
       // Notif push selon l'étape du colis.

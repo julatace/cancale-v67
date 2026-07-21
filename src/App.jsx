@@ -273,6 +273,12 @@ const CARRIERS = {
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#E30613', fg: '#fff' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111' },
   amazon:       { name: 'Amazon',        short: 'AZ', bg: '#232F3E', fg: '#FF9900' },
+  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#00B2A9', fg: '#fff' },
+  inpost:       { name: 'InPost',        short: 'IP', bg: '#FFCD00', fg: '#111' },
+  dpd:          { name: 'DPD',           short: 'DPD', bg: '#DC0032', fg: '#fff' },
+  gls:          { name: 'GLS',           short: 'GLS', bg: '#0A5B9A', fg: '#FFD200' },
+  dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#D40511' },
+  fedex:        { name: 'FedEx',         short: 'FX', bg: '#4D148C', fg: '#FF6600' },
 };
 const carrierKey = (raw) => {
   const s = String(raw || '').toLowerCase();
@@ -280,10 +286,19 @@ const carrierKey = (raw) => {
   if (/chrono/.test(s)) return 'chronopost';
   if (/\bups\b/.test(s)) return 'ups';
   if (/vinted/.test(s)) return 'vinted';
-  if (/relais\s*colis/.test(s)) return 'relaiscolis';
-  if (/coliss|la poste/.test(s)) return 'colissimo';
+  if (/relais\s*colis|relaiscolis/.test(s)) return 'relaiscolis';
+  if (/coliss|la\s*poste|laposte/.test(s)) return 'colissimo';
+  if (/shop\s*2\s*shop|shop2shop/.test(s)) return 'shop2shop';
+  if (/inpost/.test(s)) return 'inpost';
+  if (/\bdpd\b/.test(s)) return 'dpd';
+  if (/\bgls\b/.test(s)) return 'gls';
+  if (/\bdhl\b/.test(s)) return 'dhl';
+  if (/\bfedex\b/.test(s)) return 'fedex';
+  if (/amazon/.test(s)) return 'amazon';
   return null;
 };
+// Nom lisible d'un transporteur (repli « Transporteur » si inconnu).
+const carrierName = (raw) => { const c = CARRIERS[carrierKey(raw)]; return c ? c.name : 'Transporteur'; };
 // Badge de transporteur (pastille de marque).
 function CarrierBadge({ carrier, size = 22 }) {
   const c = CARRIERS[carrierKey(carrier)] || null;
@@ -6208,11 +6223,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // Ouvre la vue « scan » en grand : QR authentique de Vinted (qrB64) si présent,
   // sinon on génère un QR à partir du code de retrait ou du n° de suivi.
   const openQrView = async (t) => {
-    const base = { title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '', carrier: t.carrier || '' };
+    const base = { title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '', carrier: t.carrier || '', _t: t };
+    // QR authentique capté par email : image intégrée (qrB64) ou hébergée (qrUrl).
     if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
+    if (t.qrUrl) { setQrView({ ...base, img: t.qrUrl, real: true, hosted: true }); return; }
+    // Sinon on en génère un depuis le code de retrait / n° de suivi.
     setQrView({ ...base, img: null, real: false });
     const img = await makeQrDataUrl(t.code || t.suivi);
-    setQrView(v => (v && colisKey({ suivi: v.suivi, subject: v.title }) === colisKey(t)) || (v && v.title === base.title) ? { ...v, img } : v);
+    setQrView(v => (v && v._t === t) ? { ...v, img } : v);
   };
   // Reçu authentique (facture d'achat reçue par email Vinted) correspondant à un
   // achat. On privilégie TOUJOURS ce vrai reçu au justificatif généré par l'app.
@@ -7686,7 +7704,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           });
           avail.forEach(t=>{
             const c=cleanLieu(t.lieu);
-            const key=c.nom||(/mondial/i.test(t.carrier)?'Point Mondial Relay':/chrono/i.test(t.carrier)?'Point Chronopost':'Point de retrait Vinted');
+            const key=c.nom||`Point ${carrierName(t.carrier)}`;
             // Rattache le colis au point du même nom (enregistré OU de la ville).
             const match=Object.keys(groups).find(k=>norm(k)===norm(key)||norm(k).includes(norm(key))||norm(key).includes(norm(k)));
             const gk=match||key;
@@ -7799,7 +7817,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
-                            <div style={{fontSize:10,color:C.muted}}>{/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · ${t.suivi}`:''}{t.account?` · ${t.account}`:''}</div>
+                            <div style={{fontSize:10,color:C.muted}}>{carrierName(t.carrier)}{t.suivi?` · ${t.suivi}`:''}{t.account?` · ${t.account}`:''}</div>
                           </div>
                           {t.code&&(
                             <button type="button" onClick={()=>openQrView(t)} title="Afficher en grand pour scanner" style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:8,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>
@@ -7809,10 +7827,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                           )}
                           {/* QR de retrait : le vrai de Vinted (qrB64) si capté, sinon on en
                               génère un depuis le code/suivi. Tap = plein écran pour scanner. */}
-                          {(t.qrB64||t.code||t.suivi)&&(
+                          {(t.qrB64||t.qrUrl||t.code||t.suivi)&&(
                             <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
                               style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:8,padding:0,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                              {t.qrB64?<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
+                              {t.qrB64?<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:t.qrUrl?<img src={t.qrUrl} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
                             </button>
                           )}
                           <button onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'6px 9px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Retiré</button>
@@ -7863,7 +7881,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12.5,fontWeight:800,color:col}}>{t.statusLabel||'Mise à jour'}</div>
                       <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · n°${t.suivi}`:''}{t.artTitle?` · ${t.artTitle}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
+                        {carrierName(t.carrier)}{t.suivi?` · n°${t.suivi}`:''}{t.artTitle?` · ${t.artTitle}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
                       </div>
                     </div>
                     {t.suivi && <a href={trackUrl(t.carrier,t.suivi)} target="_blank" rel="noreferrer" style={{flexShrink:0,padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}
@@ -8661,7 +8679,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:20,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
             <div style={{fontSize:15,fontWeight:900,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
             {qrView.img
-              ? <img src={qrView.img} alt="QR de retrait" style={{width:'86%',maxWidth:300,aspectRatio:'1',objectFit:'contain',imageRendering:'pixelated'}}/>
+              ? <img src={qrView.img} alt="QR de retrait"
+                  onError={qrView.hosted ? (async()=>{ const img=await makeQrDataUrl(qrView.code||qrView.suivi); setQrView(v=>v?{...v,img,real:false,hosted:false}:v); }) : undefined}
+                  style={{width:'86%',maxWidth:300,aspectRatio:'1',objectFit:'contain',imageRendering:'pixelated'}}/>
               : <div style={{width:'86%',maxWidth:300,aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',color:'#888',fontSize:13}}>Génération du QR…</div>}
             {qrView.code && (
               <div style={{textAlign:'center'}}>
@@ -8669,7 +8689,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 <div style={{fontSize:30,fontWeight:900,color:'#111',fontFamily:'monospace',letterSpacing:3}}>{qrView.code}</div>
               </div>
             )}
-            {qrView.suivi && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${/mondial/i.test(qrView.carrier)?'Mondial Relay':/chrono/i.test(qrView.carrier)?'Chronopost':'Vinted'} · `:''}n° {qrView.suivi}</div>}
+            {qrView.suivi && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
             <div style={{fontSize:10.5,color:'#999',textAlign:'center',lineHeight:1.4}}>
               {qrView.real
                 ? 'QR officiel Vinted — présente-le au point relais.'
