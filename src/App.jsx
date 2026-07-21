@@ -6461,6 +6461,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   const [annSearch, setAnnSearch] = useState(''); // recherche annonces (titre/marque/N°)
   const [annSort, setAnnSort] = useState('oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
+  // Répartiteur de lot : ventile le prix d'un achat groupé sur plusieurs paires.
+  const [lotOpen, setLotOpen] = useState(false);
+  const [lotTotal, setLotTotal] = useState('');
+  const [lotSel, setLotSel] = useState(() => new Set());
+  const [lotSearch, setLotSearch] = useState('');
+  const [lotMode, setLotMode] = useState('equal'); // 'equal' (à parts égales) | 'price' (au prorata du prix de vente)
+  // Calcule la part de chaque paire du lot (somme = total exact, le dernier
+  // absorbe l'arrondi). Renvoie { itemId: partArrondie }.
+  const lotShares = () => {
+    const items = [...lotSel].map(id => (listings.items||[]).find(x=>x.id===id)).filter(Boolean);
+    const total = eur(lotTotal); const n = items.length;
+    if (!n || total<=0) return {};
+    const out = {}; let acc = 0;
+    const sumPrice = items.reduce((s,x)=>s+(Number(x.price)||0),0);
+    const usePrice = lotMode==='price' && sumPrice>0;
+    items.forEach((x,i)=>{
+      let sh = i===n-1 ? +(total-acc).toFixed(2)
+             : usePrice ? +((total*(Number(x.price)||0)/sumPrice)).toFixed(2)
+             : Math.floor((total/n)*100)/100;
+      acc = +(acc+sh).toFixed(2); out[x.id] = sh;
+    });
+    return out;
+  };
+  const applyLot = () => {
+    const sh = lotShares();
+    Object.entries(sh).forEach(([id,val])=>{ const x=(listings.items||[]).find(y=>y.id===id); if(x) updatePair({id:x.id,title:x.title,photo:x.photo,price:x.price,_acc:x._acc},{buyPrice:String(val).replace('.',','),buyFromId:null}); });
+    setLotOpen(false);
+  };
   const [showReprice, setShowReprice] = useState(true); // panneau repricing déplié
   const [showQuality, setShowQuality] = useState(false); // panneau qualité d'annonce
   const [showLikers, setShowLikers] = useState(false); // panneau relance des likers
@@ -8188,6 +8216,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               <option value="nonum">Sans numéro</option>
             </select>
             <button type="button" onClick={()=>{ const v=!autoNum; setAutoNum(v); save('vinted_autonum', v); }} title="Numéroter automatiquement chaque annonce (réutilise le numéro d'une paire renvoyée/republiée)" style={{border:`1px solid ${autoNum?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:autoNum?`${INV_STATUS.online.color}14`:'transparent',color:autoNum?INV_STATUS.online.color:C.text,cursor:'pointer'}}>{autoNum?'🔢 Auto N° ✓':'🔢 Auto N°'}</button>
+            <button type="button" onClick={()=>{ setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }} title="Répartir le prix d'un achat groupé (lot) sur plusieurs paires" style={{border:`1px solid ${C.accent}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:`${C.accent}12`,color:C.accent,cursor:'pointer'}}>🧮 Répartir un lot</button>
           </div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>{autoNum?<>Les numéros se mettent <b>automatiquement</b> (modifiables à la main). Une paire renvoyée puis republiée <b>garde son numéro</b>. Prochain libre : <b>{nextNumero}</b>.</>:<>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</>}</div>
         </>)}
@@ -8848,6 +8877,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ── Répartiteur de lot : ventile le prix d'un achat groupé sur N paires ── */}
+      {lotOpen && (()=>{
+        const q = lotSearch.trim().toLowerCase();
+        const list = (listings.items||[]).filter(it=>{ if(!q) return true; const num=numeros[it.id]?.numero||''; return String(num).includes(q) || (it.title||'').toLowerCase().includes(q) || (it.brand||'').toLowerCase().includes(q); });
+        const shares = lotShares();
+        const nSel = lotSel.size; const total = eur(lotTotal);
+        return (
+        <div onClick={()=>setLotOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{flex:1}}><div style={{fontSize:15,fontWeight:900,color:C.text}}>🧮 Répartir un lot</div><div style={{fontSize:11.5,color:C.muted}}>Prix d'un achat groupé ventilé sur les paires choisies → marge juste sur chacune.</div></div>
+                <button type="button" onClick={()=>setLotOpen(false)} style={{border:'none',background:'transparent',fontSize:24,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              </div>
+              <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
+                <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 10px',background:C.card}}>
+                  <span style={{fontSize:11,color:C.muted,fontWeight:700}}>Prix du lot</span>
+                  <input autoFocus value={lotTotal} onChange={e=>setLotTotal(e.target.value)} placeholder="0" inputMode="decimal" style={{width:70,border:'none',background:'transparent',color:C.text,fontSize:14,fontWeight:800,outline:'none'}}/>
+                  <span style={{fontSize:11,color:C.muted}}>€</span>
+                </div>
+                {[['equal','À parts égales'],['price','Au prorata du prix']].map(([id,lb])=>(
+                  <button key={id} type="button" onClick={()=>setLotMode(id)} style={{border:`1px solid ${lotMode===id?C.accent:C.border}`,background:lotMode===id?C.accent:'transparent',color:lotMode===id?'#fff':C.text,borderRadius:999,padding:'6px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer'}}>{lb}</button>
+                ))}
+              </div>
+              <div style={{fontSize:11.5,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:800,marginTop:8}}>{nSel} paire{nSel>1?'s':''} sélectionnée{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')} € en moyenne`:''}</div>
+              <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Chercher une annonce (N°, titre, marque)…" style={{marginTop:8,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px'}}>Aucune annonce.</div>}
+              {list.map(it=>{ const sel=lotSel.has(it.id); const num=numeros[it.id]?.numero; const sh=shares[it.id];
+                return (
+                <button key={it.id} type="button" onClick={()=>setLotSel(prev=>{ const n=new Set(prev); if(n.has(it.id))n.delete(it.id); else n.add(it.id); return n; })}
+                  style={{display:'flex',gap:10,alignItems:'center',border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?`${C.accent}0e`:C.card,borderRadius:10,padding:'7px 9px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                  <div style={{width:20,height:20,borderRadius:6,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900}}>{sel?'✓':''}</div>
+                  <div style={{width:38,height:38,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}</div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:10.5,color:C.muted}}>{[it.size,it.price!=null?`${it.price} ${cur(it.currency)}`:null].filter(Boolean).join(' · ')}</div></div>
+                  {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:900,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')} €</div>}
+                </button>
+                );
+              })}
+            </div>
+            <div style={{flexShrink:0,padding:'12px 16px',borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center'}}>
+              <div style={{flex:1,fontSize:11.5,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')} €`:'Renseigne le prix du lot et coche les paires.'}</div>
+              <button type="button" disabled={!(nSel>0&&total>0)} onClick={applyLot} style={{border:'none',borderRadius:12,padding:'11px 18px',background:(nSel>0&&total>0)?C.accent:C.border,color:'#fff',fontSize:14,fontWeight:800,cursor:(nSel>0&&total>0)?'pointer':'default',fontFamily:'inherit'}}>Appliquer</button>
             </div>
           </div>
         </div>
