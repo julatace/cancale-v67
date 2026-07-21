@@ -29,13 +29,22 @@ async function main() {
     const j = await r.json(); return (j[0] && j[0].data) || {};
   } catch (_) { return {}; }
 }
+// Photo des chiffres publiée par l'app elle-même (ligne widget_stats) → source
+// PRIORITAIRE pour l'encaissé/ventes du mois, pour coller EXACTEMENT à l'app.
+async function snapshot() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.widget_stats&select=data`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const j = await r.json(); return (j[0] && j[0].data) || null;
+  } catch (_) { return null; }
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const [bords, tracks, finals, sales, m] = await Promise.all([
-      rows('email_bord_*'), rows('email_track_*'), rows('email_final_*'), rows('email_sale_*'), main(),
+    const [bords, tracks, finals, sales, m, snap] = await Promise.all([
+      rows('email_bord_*'), rows('email_track_*'), rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
     ]);
     const printed = m.vinted_bords_printed || {};
     const collected = new Set(Array.isArray(m.vrm_colis_collected) ? m.vrm_colis_collected : []);
@@ -51,15 +60,23 @@ export default async function handler(req, res) {
     }
     const pickup = tracks.filter(t => t.status === 'available' && !collected.has(cKey(t))).length;
 
+    // Encaissé + ventes du mois : on privilégie la PHOTO publiée par l'app
+    // (mêmes chiffres qu'à l'écran) ; à défaut, on retombe sur le calcul email.
     let moneyMonth = 0, salesMonth = 0;
     for (const f of finals) { const d = String(f.receivedAt || '').slice(0, 7); if (d === ym) { const n = parseFloat(String(f.montant || '').replace(',', '.')); if (!isNaN(n)) moneyMonth += n; } }
     for (const s of sales) { if (String(s.receivedAt || '').slice(0, 7) === ym) salesMonth += 1; }
+    if (snap && snap.caMois != null) moneyMonth = snap.caMois;
+    if (snap && snap.ventesMois != null) salesMonth = snap.ventesMois;
 
     res.status(200).json({
       ship: { total: shipTotal, overdue: shipOverdue, today: shipToday, tomorrow: shipTomorrow },
       pickup,
       moneyMonth: Math.round(moneyMonth),
       salesMonth,
+      pending: snap && snap.enAttente != null ? snap.enAttente : null,
+      online: snap && snap.online != null ? snap.online : null,
+      unread: snap && snap.unread != null ? snap.unread : null,
+      appSyncedAt: snap ? snap.updatedAt : null,
       updatedAt: new Date().toISOString(),
     });
   } catch (e) {

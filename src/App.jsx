@@ -9976,16 +9976,16 @@ export default function App() {
       // caMois = CA finalisé du mois en cours · caEncaisse = CA finalisé TOUS mois
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
-      let caMois=0, caEncaisse=0, enCours=0, online=0, unread=0, stockValue=0, ok=false;
+      let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, ok=false;
       for(const a of vintedAccounts){
         const sold=await fetchVintedOrders(a,'sold',1,'all');
         if(sold.ok){ ok=true; for(const o of sold.items){
           const st=classifyOrderStatus(o.status);
-          if(st==='pending') enCours++;
+          const amt0=(o.price?.amount!=null?Number(o.price.amount):0);
+          if(st==='pending'){ enCours++; enAttente+=amt0; }
           if(st==='completed'){
-            const amt=(o.price?.amount!=null?Number(o.price.amount):0);
-            caEncaisse+=amt;
-            if(o.date){ const d=new Date(o.date); if(!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym) caMois+=amt; }
+            caEncaisse+=amt0;
+            if(o.date){ const d=new Date(o.date); if(!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym){ caMois+=amt0; ventesMois++; } }
           }
         }}
         const list=await fetchVintedListings(a,1); if(list.ok){ ok=true; online+=list.items.length;
@@ -10007,7 +10007,19 @@ export default function App() {
         }
         pairesStock=seen.size;
       }catch(_){/* plan illisible → 0 */}
-      if(!stop && ok) setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});
+      if(!stop && ok){
+        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});
+        // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
+        // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
+        // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
+        try{
+          await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`,{
+            method:'POST',
+            headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
+            body:JSON.stringify([{id:'widget_stats',data:{caMois:Math.round(caMois),ventesMois,enAttente:Math.round(enAttente),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock,updatedAt:new Date().toISOString()}}]),
+          });
+        }catch(_){}
+      }
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
