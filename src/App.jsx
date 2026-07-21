@@ -6588,6 +6588,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
     return merged;
   };
+  // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
+  const buyOf = (o) => { const e = effEntry(o); const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null; return (b!=null && !isNaN(b)) ? b : null; };
+  // Vente finalisée SANS prix d'achat renseigné → fausse le bénéfice (comptée
+  // comme 100 % de marge tant que le coût n'est pas saisi).
+  const isSaleNoBuy = (o) => classifyOrderStatus(o.status)==='completed' && buyOf(o)==null;
   // Montant d'un champ € (prix d'achat, frais/boost) -> nombre ou 0.
   const eur = (v) => { if (v==null || String(v).trim()==='') return 0; const n = parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; };
   const feesOf = (e) => e ? eur(e.fees) : 0;
@@ -6940,7 +6945,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
@@ -7635,8 +7640,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
+        {/* Ventes sans prix d'achat : le bénéfice est faux tant qu'on ne le saisit
+            pas (la vente compte comme 100 % de marge). Bouton → filtre dédié. */}
+        {totals.sansCout>0 && (
+          <div style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:8,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12.5,fontWeight:900,color:C.warn}}>💸 {totals.sansCout} vente{totals.sansCout>1?'s':''} finalisée{totals.sansCout>1?'s':''} sans prix d'achat</div>
+              <div style={{fontSize:10.5,color:C.text,marginTop:2,lineHeight:1.4}}>Ton bénéfice net et ton rapport comptable sont <b>sous-estimés</b> tant que tu ne renseignes pas leur coût. Saisis-le dans le champ « achat » de chaque vente.</div>
+            </div>
+            <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Les compléter →</button>
+          </div>
+        )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
-          {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes']].map(([id,label])=>(
+          {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
           ))}
           {accounts.length>0 && (
@@ -7666,7 +7682,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           </div>
         ) : null; })()}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; return true; }).filter(o=>matchOrd(o)).map(o=>{
+          {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; if(vFilter==='sanscout')return isSaleNoBuy(o); return true; }).filter(o=>matchOrd(o)).map(o=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
             const e = effEntry(o); const num = e?.numero;
@@ -8255,6 +8271,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
+        {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
+        {Array.isArray(emailBords) && (()=>{
+          let overdue=0, today=0, tomorrow=0;
+          for (const b of emailBords) { if (isBordPrinted(b)) continue; const dl=bordDeadline(b); if(!dl||dl.days==null) continue; if(dl.days<0) overdue++; else if(dl.days===0) today++; else if(dl.days===1) tomorrow++; }
+          const total=overdue+today+tomorrow; if(!total) return null;
+          const danger = overdue>0 || today>0;
+          const parts=[]; if(overdue) parts.push(`${overdue} en retard`); if(today) parts.push(`${today} aujourd'hui`); if(tomorrow) parts.push(`${tomorrow} demain`);
+          return (
+            <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
+              <div style={{fontSize:12.5,fontWeight:900,color:danger?C.danger:C.warn}}>📮 {total} colis à expédier {overdue?'· du retard !':''}</div>
+              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — imprime les bordereaux ci-dessous, les plus urgents sont en haut.</div>
+            </div>
+          );
+        })()}
         {/* Import direct : marche toujours, même si la vente n'apparaît pas / iPhone */}
         <button type="button" onClick={()=>{ bordCtx.current = { standalone:true }; bordRef.current?.click(); }}
           style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'12px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:6}}>
