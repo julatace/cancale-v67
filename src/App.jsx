@@ -239,6 +239,20 @@ const openReceipt = (a) => {
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${(a.subject || 'Reçu Vinted').replace(/</g, '&lt;')}</title></head><body style="font-family:-apple-system,Arial,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;white-space:pre-wrap;line-height:1.5;color:#222"><h3>${(a.subject || '').replace(/</g, '&lt;')}</h3>${(a.texte || '').replace(/</g, '&lt;')}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
   w.document.close();
 };
+// Génère un QR code (data URL GIF) à partir d'un texte — code de retrait ou n° de
+// suivi. Import dynamique de qrcode-generator (léger, hors du bundle principal).
+// Sert de repli quand Vinted n'a pas fourni son propre QR (qrB64) dans l'email.
+let _qrLib = null;
+const makeQrDataUrl = async (text) => {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  try {
+    if (!_qrLib) { const m = await import('qrcode-generator'); _qrLib = m.default || m; }
+    const qr = _qrLib(0, 'M'); // version auto, correction moyenne
+    qr.addData(t); qr.make();
+    return qr.createDataURL(8, 4); // pixels par module, marge
+  } catch (_) { return null; }
+};
 // Page de suivi officielle du transporteur, n° pré-rempli.
 const trackUrl = (carrier, suivi) => {
   const s = encodeURIComponent(String(suivi || '').trim());
@@ -6185,9 +6199,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
+  const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
+  const [qrView, setQrView] = useState(null); // colis affiché en grand pour le scan { title, code, suivi, carrier, img }
   const colisKey = (t) => String(t.suivi || t.subject || '').trim();
-  const markCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.add(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); };
+  const markCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.add(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(t); };
+  const unmarkCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.delete(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(null); };
   const isCollected = (t) => collected.has(colisKey(t));
+  // Ouvre la vue « scan » en grand : QR authentique de Vinted (qrB64) si présent,
+  // sinon on génère un QR à partir du code de retrait ou du n° de suivi.
+  const openQrView = async (t) => {
+    const base = { title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '', carrier: t.carrier || '' };
+    if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
+    setQrView({ ...base, img: null, real: false });
+    const img = await makeQrDataUrl(t.code || t.suivi);
+    setQrView(v => (v && colisKey({ suivi: v.suivi, subject: v.title }) === colisKey(t)) || (v && v.title === base.title) ? { ...v, img } : v);
+  };
   // Reçu authentique (facture d'achat reçue par email Vinted) correspondant à un
   // achat. On privilégie TOUJOURS ce vrai reçu au justificatif généré par l'app.
   // Recherche par ordre de fiabilité : (1) n° de transaction, (2) titre exact,
@@ -7776,12 +7802,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                             <div style={{fontSize:10,color:C.muted}}>{/mondial/i.test(t.carrier)?'Mondial Relay':/chrono/i.test(t.carrier)?'Chronopost':'Vinted'}{t.suivi?` · ${t.suivi}`:''}{t.account?` · ${t.account}`:''}</div>
                           </div>
                           {t.code&&(
-                            <div style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:8,padding:'3px 10px'}}>
+                            <button type="button" onClick={()=>openQrView(t)} title="Afficher en grand pour scanner" style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:8,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                               <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>Code</div>
                               <div style={{fontSize:15,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:1.5}}>{t.code}</div>
-                            </div>
+                            </button>
                           )}
-                          {t.qrB64&&<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:44,height:44,objectFit:'contain',background:'#fff',borderRadius:6,border:`1px solid ${C.border}`,flexShrink:0}}/>}
+                          {/* QR de retrait : le vrai de Vinted (qrB64) si capté, sinon on en
+                              génère un depuis le code/suivi. Tap = plein écran pour scanner. */}
+                          {(t.qrB64||t.code||t.suivi)&&(
+                            <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
+                              style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:8,padding:0,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                              {t.qrB64?<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
+                            </button>
+                          )}
                           <button onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'6px 9px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Retiré</button>
                         </div>
                       );
@@ -8618,6 +8651,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:700,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── QR de retrait en PLEIN ÉCRAN (pour scanner au point relais) ── */}
+      {qrView && (
+        <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:20,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+            <div style={{fontSize:15,fontWeight:900,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
+            {qrView.img
+              ? <img src={qrView.img} alt="QR de retrait" style={{width:'86%',maxWidth:300,aspectRatio:'1',objectFit:'contain',imageRendering:'pixelated'}}/>
+              : <div style={{width:'86%',maxWidth:300,aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',color:'#888',fontSize:13}}>Génération du QR…</div>}
+            {qrView.code && (
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:9,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:800}}>Code de retrait</div>
+                <div style={{fontSize:30,fontWeight:900,color:'#111',fontFamily:'monospace',letterSpacing:3}}>{qrView.code}</div>
+              </div>
+            )}
+            {qrView.suivi && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${/mondial/i.test(qrView.carrier)?'Mondial Relay':/chrono/i.test(qrView.carrier)?'Chronopost':'Vinted'} · `:''}n° {qrView.suivi}</div>}
+            <div style={{fontSize:10.5,color:'#999',textAlign:'center',lineHeight:1.4}}>
+              {qrView.real
+                ? 'QR officiel Vinted — présente-le au point relais.'
+                : 'QR généré depuis ton code de retrait. Si le comptoir ne le scanne pas, donne le code ci-dessus.'}
+            </div>
+            <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:12,background:'#111',color:'#fff',fontSize:14,fontWeight:800,padding:'11px 22px',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bandeau « Annuler » après avoir retiré un colis (mise à jour immédiate) ── */}
+      {lastCollected && (
+        <div style={{position:'fixed',left:16,right:16,bottom:'calc(90px + env(safe-area-inset-bottom))',zIndex:1300,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
+          <div style={{pointerEvents:'auto',display:'flex',alignItems:'center',gap:12,background:'#111',color:'#fff',borderRadius:999,padding:'10px 12px 10px 16px',boxShadow:'0 6px 20px rgba(0,0,0,0.3)',maxWidth:420,width:'100%'}}>
+            <span style={{flex:1,fontSize:12.5,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>✓ Colis retiré</span>
+            <button type="button" onClick={()=>unmarkCollected(lastCollected)} style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:'transparent',color:INV_STATUS.online.color,borderRadius:999,padding:'5px 14px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+            <button type="button" onClick={()=>setLastCollected(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:'#aaa',fontSize:18,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>×</button>
           </div>
         </div>
       )}
