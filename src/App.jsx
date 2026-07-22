@@ -6193,7 +6193,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
-  const [showRelayMap, setShowRelayMap] = useState(false); // carte des points relais repliée par défaut
   // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
   const garageSpotOf = (num) => {
     const t = String(num||'').trim().toLowerCase(); if (!t) return null;
@@ -7938,10 +7937,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {vintedToPickup.length===0 && (tracking||[]).some(isPickupActive) && (
           <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Points relais & QR de retrait</button>
         )}
-        {/* Carte des points relais : repliée par défaut (secondaire depuis que
-            « à retirer » vient du statut Vinted). Bouton pour l'afficher. */}
-        <button type="button" onClick={()=>setShowRelayMap(v=>!v)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:700,cursor:'pointer',marginBottom:10,fontFamily:'inherit'}}>{showRelayMap?'▲ Masquer la carte des relais':'🗺️ Carte des points relais'}</button>
-        {showRelayMap && (()=>{
+        {/* Carte des points relais : où retirer tes colis + codes/QR de retrait. */}
+        {(()=>{
           const avail=(tracking||[]).filter(isPickupActive);
           const norm=s=>String(s||'').toLowerCase();
           // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
@@ -7977,11 +7974,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             if(!groups[gk].carrier) groups[gk].carrier=t.carrier;
           });
           Object.entries(groups).forEach(([k,g])=>{ if(!g.lat&&geo[k]&&geo[k].lat){g.lat=geo[k].lat;g.lon=geo[k].lon;} });
-          const pins=Object.entries(groups).filter(([,g])=>g.lat).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier}));
+          // Carte ÉPURÉE : on n'affiche que TES points utiles — ceux avec un colis à
+          // retirer + tes points enregistrés. Les dizaines de relais de la ville
+          // n'apparaissent QUE si tu n'as aucun colis (pour t'aider à en trouver un).
+          const anyColis=avail.length>0;
+          const pins=Object.entries(groups).filter(([,g])=>g.lat && (g.colis.length>0 || g.saved || !anyColis)).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier}));
           // Liste : d'abord les points avec colis, puis le reste (points de la ville).
           const entriesSorted=Object.entries(groups).sort((a,b)=>(b[1].colis.length-a[1].colis.length)||a[0].localeCompare(b[0]));
           const withColis=entriesSorted.filter(([,g])=>g.colis.length>0);
-          const autres=entriesSorted.filter(([,g])=>g.colis.length===0);
+          const autres=entriesSorted.filter(([,g])=>g.colis.length===0 && g.saved);
           const singlePoint=withColis.length===1;
           const selGroup=openPoint?groups[openPoint]:null;
           return (
