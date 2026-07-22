@@ -197,3 +197,34 @@ Depuis l'environnement Cowork (celui qui a produit ce document), il n'y a :
 - aucun connecteur GitHub disponible dans le registre de connecteurs Cowork.
 
 D'où le report vers **Claude Code**, qui tourne directement sur la machine de l'utilisateur avec un accès terminal complet (git, `gh`, `vercel`). Ce document sert à ce que ce transfert se fasse sans perte de contexte.
+
+---
+
+## 10. Session juillet 2026 (Claude Code) — Widget + « à retirer / à expédier » automatiques + cohérence des chiffres
+
+**Contexte** : gros travail de fiabilisation des chiffres (ils étaient incohérents entre app et emails). Points clés à NE PAS casser :
+
+### Sources de vérité (crucial)
+- **CA + ventes du mois** = les emails de VENTE `email_sale_*` (Supabase), un par vente avec `prix`. C'est complet et fiable 24/7 (arrive même sans être sur Vinted). **PAS** les emails « argent viré » `email_final_*` (rares + montant souvent vide → donnait un faux 41 €). Côté app : l'effet racine `liveStats` recalcule `caMois`/`ventesMois` depuis `email_sale_*` (écrase le calcul harvest). Côté widget : idem.
+- **« À retirer » (achats) + « À expédier » (ventes)** = **STATUT VINTED** moissonné (`harvest_*_orders_purchased` / `_sold`, champ `status` texte). C'est la seule source qui se met à jour toute seule quand tu récupères/expédies.
+  - à retirer = achat `status` ~ « déposé en point relais / bureau de poste » (`isAtRelayStatus`).
+  - à expédier = vente `status` ~ « Bordereau envoyé au vendeur » ou « paiement validé » (`isAwaitingShipStatus`).
+  - ⚠️ Les emails `email_track_*` (« colis dispo » Mondial Relay) sont **imprécis** (aucun email quand tu récupères → ils restent « dispo » pour toujours) et ne servent plus qu'à afficher la **carte relais + les codes/QR de retrait**, pas à compter.
+- **Bordereaux** : `bordShipped(b)` = la vente liée (par `transaction`) a un statut Vinted au-delà de « bordereau envoyé » → le bordereau est auto-marqué expédié (`isBordDone = isBordPrinted || bordShipped`). Bouton **✕** pour masquer un bordereau (`vinted_bords_hidden`). « Relier » (`vinted_bord_links`) pour un bordereau dont la paire n'est pas retrouvée (départage aussi par la taille, cf. `entryByTitleLoose(title, size)`).
+
+### Widget écran d'accueil (iPhone)
+- App **Scriptable** + endpoint **`api/widget.js`** (JSON, lecture Supabase seule, zéro appel Vinted). Domaine : `https://vrm.center/api/widget`.
+- Renvoie : `ship{total,overdue,today,tomorrow}`, `pickup`, `moneyMonth` (CA du mois = somme `email_sale.prix`), `salesMonth`, `received` (argent viré `email_final`), `pending`/`online`/`unread` (via la ligne `widget_stats`).
+- **`widget_stats`** = photo publiée par l'app (effet `liveStats`) pour les chiffres harvest (en attente, en ligne, non lus). « Synchroniser le widget » = ouvrir l'app.
+- `vinted_pickup_done` (synchronisé) = colis marqués récupérés à la main (bouton ✓) → soustrait du compteur à retirer, app ET widget.
+
+### Autres endpoints ajoutés
+- **`api/ship-reminders.js`** + `vercel.json` (cron quotidien 08:00 UTC) : push « X colis à expédier aujourd'hui/demain/en retard ».
+- **`api/email-inbound.js`** amélioré : capture QR de retrait (pièce jointe / `data:base64` / URL / image carrée), détecte plus de transporteurs, statut « livré/retiré » élargi, montant « argent viré » robuste, anti-faux-colis (exige un n° de suivi pour « disponible »).
+
+### Features ajoutées cette session (toutes dans `Comptabilite`)
+Passeport de la paire (📖), Répartiteur de lot (🧮), Audit stock fantôme (🔎), Courbes de prix par marque (📈), Wrapped vendeur (🎉), Planificateur de tournée (🗺️), garde-fou ventes sans prix d'achat, dépendance `qrcode-generator` (QR généré à la volée).
+
+### RESTE À FAIRE / discuté, pas fait
+- **Multi-utilisateurs** : l'app est **mono-utilisateur** (une seule ligne Supabase `main` partagée). Pour ouvrir à d'autres vendeurs → vrai chantier : login + isolation des données par utilisateur. À scoper avec Julien avant de coder (ne pas bricoler une auth à moitié).
+- Carte des relais : encore perfectible selon les retours de Julien.
