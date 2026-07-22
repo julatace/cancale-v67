@@ -6844,12 +6844,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const likedList = useMemo(() => {
     const out = [];
     for (const it of (listings.items || [])) {
-      if (it.favourites != null && it.favourites >= 2) out.push(it);
+      if (it.favourites != null && it.favourites >= 2) {
+        // Prix d'offre suggéré : −10 % du prix actuel (le geste qui déclenche
+        // l'achat des personnes déjà intéressées), jamais sous ton plancher de
+        // marge. Tu envoies l'offre toi-même sur Vinted.
+        const price = it.price != null ? Number(it.price) : null;
+        const buy = numeros[it.id]?.buyPrice != null && numeros[it.id].buyPrice !== '' ? Number(numeros[it.id].buyPrice) : null;
+        let offer = null, atFloor = false;
+        if (price != null && price > 1) {
+          offer = Math.round(price * 0.9);
+          const floor = (buy != null && !isNaN(buy)) ? Math.ceil(buy + 3) : 1;
+          if (offer < floor) { offer = floor; atFloor = true; }
+          if (offer >= price) offer = null; // déjà au plancher : pas de marge pour offrir
+        }
+        out.push({ ...it, _offer: offer, _atFloor: atFloor });
+      }
     }
     out.sort((a, b) => (b.favourites ?? 0) - (a.favourites ?? 0));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items]);
+  }, [listings.items, numeros]);
 
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
   const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; };
@@ -7755,6 +7769,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             </div>
           );
         })()}
+        {/* 💶 Argent en route : ventes en cours (pas encore validées par
+            l'acheteur) → l'argent que Vinted va te verser bientôt. Visibilité
+            trésorerie sans ouvrir Vinted. Source = statut des ventes. */}
+        {(()=>{
+          const inRoute=(sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
+          if(!inRoute.length) return null;
+          let sum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) sum+=v; }
+          if(sum<=0) return null;
+          return (
+            <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}10`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:11}}>
+                <span style={{fontSize:22}}>💶</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:'uppercase',letterSpacing:0.4}}>Argent en route</div>
+                  <div style={{fontSize:22,fontWeight:900,color:C.accent,lineHeight:1.1}}>≈ {sum.toFixed(0)} €</div>
+                </div>
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <div style={{fontSize:18,fontWeight:900,color:C.text}}>{inRoute.length}</div>
+                  <div style={{fontSize:10,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
+                </div>
+              </div>
+              <div style={{fontSize:10,color:C.muted,marginTop:6,lineHeight:1.4}}>Ventes pas encore finalisées par l'acheteur — Vinted te verse l'argent une fois le colis reçu et validé. Estimation d'après tes ventes en cours.</div>
+            </div>
+          );
+        })()}
         {/* Ventes déduites des bordereaux, pas encore dans la synchro Vinted */}
         {(()=>{
           const pending=(emailBords||[]).filter(b=>{
@@ -8425,6 +8464,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
                           <div style={{fontSize:10.5,color:C.muted}}>❤️ {it.favourites} intéressé{it.favourites>1?'s':''}{it.views!=null?` · 👁 ${it.views}`:''}{it.price!=null?` · ${it.price} ${cur(it.currency)}`:''}</div>
+                          {it._offer!=null && <div style={{fontSize:11,fontWeight:800,color:INV_STATUS.online.color,marginTop:2}}>→ propose {it._offer} €{it._atFloor?<span style={{color:C.warn,fontWeight:700}}> (ton mini)</span>:it.price!=null?<span style={{color:C.muted,fontWeight:600}}> au lieu de {it.price} €</span>:''}</div>}
                         </div>
                         <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour proposer une offre aux personnes intéressées" style={{flexShrink:0,textDecoration:'none',background:INV_STATUS.online.color,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 11px',borderRadius:8}}>💌 Relancer</a>
                       </div>
