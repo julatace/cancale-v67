@@ -6550,8 +6550,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
     return 'pending';
   };
+  // Statut Vinted PRÉCIS = source de vérité automatique (Vinted le met à jour tout
+  // seul quand tu expédies / récupères). Utilisé pour « à retirer » et « à expédier ».
+  const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');       // achat prêt à retirer
+  const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || ''); // vente à expédier
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
+  // Listes AUTOMATIQUES (statut Vinted, pas les emails) : à retirer / à expédier.
+  const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status)), [buys.items]);
+  const vintedToShip = useMemo(() => (sales.items || []).filter(o => isAwaitingShipStatus(o.status)), [sales.items]);
+  const soldByTxn = useMemo(() => { const m = {}; (sales.items || []).forEach(o => { if (o.transaction_id != null) m[String(o.transaction_id)] = o; }); return m; }, [sales.items]);
+  // Un bordereau est « expédié » (donc à retirer de la liste à imprimer) dès que
+  // Vinted a fait avancer la vente au-delà de « bordereau envoyé » (pris en charge,
+  // en transit, déposé, livré, finalisé) → automatique, sans que tu marques rien.
+  const bordShipped = (b) => { const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null; return !!o && /exp[ée]di|achemin|livr[ée]|finalis|d[ée]pos[ée]|termin/i.test(o.status || ''); };
+  // « Terminé » pour la liste des bordereaux = déjà imprimé À LA MAIN, ou expédié
+  // d'après Vinted (automatique).
+  const isBordDone = (b) => isBordPrinted(b) || bordShipped(b);
   const [listings, setListings] = useState({ loading:false, items:null });
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
@@ -7519,7 +7534,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [batchBusy, setBatchBusy] = useState(false);
   const batchBordereaux = async () => {
     if (batchBusy) return;
-    const pending = (emailBords || []).filter(b => b.pdfB64 && !isBordPrinted(b));
+    const pending = (emailBords || []).filter(b => b.pdfB64 && !isBordDone(b));
     if (!pending.length) { alert('Aucun bordereau à imprimer (tous sont déjà marqués imprimés).'); return; }
     setBatchBusy(true);
     try {
@@ -7888,9 +7903,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
       </>)}
 
       {curSub==='achats' && (<>
-        {(()=>{ const n=(tracking||[]).filter(isPickupActive).length; return n>0 ? (
-          <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Ma tournée — {n} colis à retirer</button>
-        ) : null; })()}
+        {/* À RETIRER : source = statut Vinted (automatique, se met à jour seul). */}
+        {vintedToPickup.length>0 && (
+          <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:14,padding:'11px 13px',marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <div style={{flex:1,fontSize:13.5,fontWeight:900,color:C.text}}>📦 {vintedToPickup.length} colis à retirer</div>
+              {(tracking||[]).some(isPickupActive) && <button type="button" onClick={()=>setTourneeOpen(true)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:999,padding:'5px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🗺️ Relais & QR</button>}
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:7}}>
+              {vintedToPickup.slice(0,25).map(o=>(
+                <div key={o.transaction_id} style={{display:'flex',gap:9,alignItems:'center'}}>
+                  <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div><div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · au point relais</div></div>
+                  {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize:10.5,color:C.muted,marginTop:7,lineHeight:1.4}}>D'après Vinted — se met à jour <b>tout seul</b> quand tu récupères un colis. Le bouton « Relais & QR » ouvre où aller + les codes de retrait.</div>
+          </div>
+        )}
+        {vintedToPickup.length===0 && (tracking||[]).some(isPickupActive) && (
+          <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Points relais & QR de retrait</button>
+        )}
         {/* Points relais façon Vinted : carte PERMANENTE de tes points habituels.
             Les badges rouges apparaissent quand des colis y attendent. */}
         {(()=>{
@@ -7966,7 +8000,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <OsmMap points={pins} selected={openPoint} onSelect={k=>setOpenPoint(openPoint===k?null:k)}/>
                   <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderTop:`1px solid ${C.border}`,background:C.card}}>
                     <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:700}}>
-                      {avail.length>0?`📦 ${avail.length} colis à retirer`:`${pins.length} point${pins.length>1?'s':''} relais${ville?' à '+ville:''}`}
+                      {avail.length>0?`🎫 ${avail.length} code${avail.length>1?'s':''} de retrait`:`${pins.length} point${pins.length>1?'s':''} relais${ville?' à '+ville:''}`}
                     </span>
                     {hiddenPts.size>0&&<button onClick={unhideAll} title="Réafficher les points masqués" style={{border:'none',background:'transparent',color:C.muted,fontSize:10.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>↺ {hiddenPts.size} masqué{hiddenPts.size>1?'s':''}</button>}
                     <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:999,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:800,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter</button>
@@ -8002,7 +8036,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                         {g.carrier&&<CarrierBadge carrier={g.carrier} size={20}/>}
                         <span style={{fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
                       </span>
-                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700,marginTop:1}}>{colis.length} colis à retirer{singlePoint?'':(isOpen?' · replier':' · voir les colis')}</span>
+                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700,marginTop:1}}>{colis.length} code{colis.length>1?'s':''} de retrait{singlePoint?'':(isOpen?' · replier':' · voir')}</span>
                     </span>
                     {!g.saved&&<span onClick={async(ev)=>{
                       ev.stopPropagation();
@@ -8420,7 +8454,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
         {Array.isArray(emailBords) && (()=>{
           let overdue=0, today=0, tomorrow=0;
-          for (const b of emailBords) { if (isBordPrinted(b)) continue; const dl=bordDeadline(b); if(!dl||dl.days==null) continue; if(dl.days<0) overdue++; else if(dl.days===0) today++; else if(dl.days===1) tomorrow++; }
+          for (const b of emailBords) { if (isBordDone(b)) continue; const dl=bordDeadline(b); if(!dl||dl.days==null) continue; if(dl.days<0) overdue++; else if(dl.days===0) today++; else if(dl.days===1) tomorrow++; }
           const total=overdue+today+tomorrow; if(!total) return null;
           const danger = overdue>0 || today>0;
           const parts=[]; if(overdue) parts.push(`${overdue} en retard`); if(today) parts.push(`${today} aujourd'hui`); if(tomorrow) parts.push(`${tomorrow} demain`);
@@ -8443,7 +8477,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
               <div style={{fontSize:12,fontWeight:800,color:C.text,flex:1}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
             </div>
-            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordPrinted(b)).length; return nPending>=2 ? (
+            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordDone(b)).length; return nPending>=2 ? (
               <button type="button" onClick={batchBordereaux} disabled={batchBusy}
                 title="Tamponne tous les bordereaux non imprimés et les met à la suite dans un seul PDF à imprimer d'un coup"
                 style={{width:'100%',border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'12px',cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:800,marginBottom:10,opacity:batchBusy?0.6:1}}>
@@ -8454,12 +8488,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               {[...emailBords].sort((a,b2)=>{
                 // Non imprimés d'abord, puis par date limite d'expédition (plus
                 // urgent en haut), puis les plus récents.
-                const pa=isBordPrinted(a)?1:0, pb=isBordPrinted(b2)?1:0; if(pa!==pb) return pa-pb;
+                const pa=isBordDone(a)?1:0, pb=isBordDone(b2)?1:0; if(pa!==pb) return pa-pb;
                 const da=bordDeadline(a), db=bordDeadline(b2);
                 const va=da&&da.days!=null?da.days:Infinity, vb=db&&db.days!=null?db.days:Infinity; if(va!==vb) return va-vb;
                 return new Date(b2.receivedAt||0)-new Date(a.receivedAt||0);
               }).map((b,i)=>(
-                <div key={i} data-bord-card style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordPrinted(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
+                <div key={i} data-bord-card style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordDone(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
                   {(()=>{ const ph=bordPhoto(b); return (
                     <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                       {ph?<img src={ph} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>📄</span>}
@@ -8468,7 +8502,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(()=>{ const nn=numForBord(b); return nn?`N°${nn} · `:''; })()}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
-                    {(()=>{ const dl=bordDeadline(b); return dl && !isBordPrinted(b) ? <div style={{fontSize:10.5,fontWeight:800,marginTop:2,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"Auj.":dl.days===1?'Demain':'Avant'} {dl.text}</div> : null; })()}
+                    {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{fontSize:10.5,fontWeight:800,marginTop:2,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"Auj.":dl.days===1?'Demain':'Avant'} {dl.text}</div> : null; })()}
+                    {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:10,fontWeight:800,marginTop:2,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
                   </div>
                   {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{flexShrink:0,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🔗 Relier</button>}
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
