@@ -341,6 +341,29 @@ async function findNumeroByTitle(title, size) {
   } catch (_) { return ''; }
 }
 
+// Prix d'achat d'une paire d'après le titre de l'annonce (pour le Copilote
+// d'offres). Renvoie un nombre, ou null si introuvable / titre ambigu (plusieurs
+// paires même titre avec des prix d'achat différents).
+async function findBuyPriceByTitle(title) {
+  if (!title) return null;
+  try {
+    const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const t = norm(title); if (!t) return null;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const map = (rows[0] && rows[0].vinted_annonce_numeros) || {};
+    const matches = Object.values(map).filter(e => e && norm(e.title) === t && e.buyPrice != null && String(e.buyPrice).trim() !== '');
+    if (!matches.length) return null;
+    const distinct = [...new Set(matches.map(e => String(e.buyPrice)))];
+    if (distinct.length > 1) return null; // ambigu → on ne devine pas
+    const b = parseFloat(String(matches[0].buyPrice).replace(',', '.'));
+    return isNaN(b) ? null : b;
+  } catch (_) { return null; }
+}
+
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
 function parseCarrierEmail(mail, carrier) {
   const txt = mail.text || htmlToText(mail.html) || '';
@@ -737,13 +760,29 @@ export default async function handler(req, res) {
       const qui = (textAll.match(/(\S+)\s+t['']a\s+(?:fait|envoyé)\s+une\s+offre/i) || [])[1] || '';
       const article = (textAll.match(/offre\s+(?:de\s+[\d,.]+\s*€\s+)?pour\s+[«"“']?([^«»"”'\n]{3,60})/i) || [])[1] || '';
       const key = shortHash(subject + (mail.text || '').slice(0, 200));
+      // ── COPILOTE D'OFFRES : conseil chiffré instantané ─────────────────────
+      // On retrouve le prix d'achat de la paire → on dit s'il faut accepter et
+      // combien il reste net, ou refuser (offre sous le coût).
+      const buy = await findBuyPriceByTitle(article);
+      const offerAmt = parseFloat(String(montant).replace(',', '.'));
+      let advice = '', net = null;
+      if (buy != null && !isNaN(offerAmt)) {
+        net = Math.round((offerAmt - buy) * 100) / 100;
+        advice = net > 0 ? ` → ✅ Accepte : +${Math.round(net)} € net (achat ${Math.round(buy)} €)`
+                          : ` → ⚠️ Refuse : sous ton coût (${Math.round(buy)} €)`;
+      }
       try { await pushOnce({
-        title: `💰 Offre reçue${montant ? ' : ' + montant + ' €' : ''} !`,
-        body: `${qui || 'Un acheteur'} propose ${montant ? montant + ' €' : 'un prix'}${article ? ` pour « ${article.trim().slice(0, 40)} »` : ''}${acc.login ? ` (${acc.login})` : ''} — expire en 24h.`,
+        title: `💰 Offre ${montant ? montant + ' €' : ''}${qui ? ' de ' + qui : ''}`,
+        body: `${article ? `« ${article.trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${acc.login ? ` (${acc.login})` : ''}${advice || ' — expire en 24h.'}`,
         tag: `offer-${key}`, url: '/?tab=cat_msg',
       }); } catch (_) {}
-      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, account: acc.login || '' });
-      res.status(200).json({ ok: true, type: 'offre', montant, de: qui, article });
+      // Archive l'offre + le conseil pour le panneau « Copilote d'offres » de l'app.
+      try { await supabaseUpsert([{ id: `email_offer_${key}`, data: {
+        type: 'offre', qui, article, montant, buy, net,
+        account: acc.login || '', uid: acc.uid || '', receivedAt: now,
+      } }]); } catch (_) {}
+      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net });
+      res.status(200).json({ ok: true, type: 'offre', montant, de: qui, article, net });
       return;
     }
 

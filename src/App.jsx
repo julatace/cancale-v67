@@ -229,6 +229,18 @@ const fetchEmailAchats = async () => {
     return rows.map(r => r.data).filter(Boolean);
   } catch (_) { return []; }
 };
+// Offres reçues (Copilote d'offres) : lignes email_offer_* = { qui, article,
+// montant, buy, net, receivedAt }. Le serveur y met déjà le conseil chiffré.
+const fetchEmailOffers = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_offer_*&select=id,data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.map(r => r.data).filter(Boolean).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+  } catch (_) { return []; }
+};
 // Ouvre le reçu authentique : PDF joint si présent, sinon l'email imprimable.
 const openReceipt = (a) => {
   if (a.pdfB64) {
@@ -6277,6 +6289,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
+  const [offers, setOffers] = useState(null); // offres reçues (Copilote d'offres)
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
   const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
@@ -6903,6 +6916,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   };
   useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (curSub==='messages' && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
@@ -8463,6 +8477,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
+        {/* ── COPILOTE D'OFFRES : chaque offre reçue par email, avec le conseil
+             chiffré (accepter/refuser + net) calculé côté serveur. Marche même
+             app fermée / iPhone déconnecté de Vinted (source = emails). ── */}
+        {Array.isArray(offers) && (()=>{
+          const recent = offers.filter(o=>{ const d=o.receivedAt?new Date(o.receivedAt):null; return !d || (Date.now()-d.getTime())<14*86400000; });
+          if(!recent.length) return null;
+          return (
+            <div style={{border:`1px solid ${C.accent}55`,background:`${C.accent}0c`,borderRadius:14,padding:'12px 13px',marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:900,color:C.text,marginBottom:2}}>🤝 Copilote d'offres <span style={{fontSize:11,color:C.muted,fontWeight:700}}>· {recent.length}</span></div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.4}}>Chaque offre reçue, avec le bénéfice net si tu acceptes — décide en un coup d'œil.</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {recent.map((o,i)=>{
+                  const amt = parseFloat(String(o.montant||'').replace(',','.'));
+                  const hasNet = o.net!=null && !isNaN(o.net);
+                  const good = hasNet && o.net>0;
+                  return (
+                    <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'10px 11px',borderRadius:11,border:`1px solid ${hasNet?(good?C.accent:C.danger)+'55':C.border}`,background:C.card}}>
+                      <div style={{fontSize:20,lineHeight:1,flexShrink:0}}>{hasNet?(good?'✅':'⚠️'):'💰'}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>{isNaN(amt)?'Offre':`${Math.round(amt)} €`}{o.qui?<span style={{color:C.muted,fontWeight:600}}> · {o.qui}</span>:''}</div>
+                        {o.article && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>« {o.article} »</div>}
+                        <div style={{marginTop:5}}>
+                          {hasNet ? (
+                            <span style={{fontSize:11.5,fontWeight:800,color:good?C.accent:C.danger}}>
+                              {good?`✅ Accepte : +${Math.round(o.net)} € net`:`⚠️ Refuse : sous ton coût`}
+                              {o.buy!=null&&!isNaN(parseFloat(o.buy))?<span style={{color:C.muted,fontWeight:600}}> (achat {Math.round(parseFloat(o.buy))} €)</span>:''}
+                            </span>
+                          ) : (
+                            <span style={{fontSize:11,color:C.muted}}>Prix d'achat inconnu — à toi de voir.</span>
+                          )}
+                        </div>
+                        <div style={{marginTop:6,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                          <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{fontSize:11,fontWeight:800,color:C.accent,textDecoration:'none',border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 9px'}}>Répondre sur Vinted →</a>
+                          {o.receivedAt && <span style={{fontSize:10,color:C.muted}}>{new Date(o.receivedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</span>}
+                          {o.account && <span style={{fontSize:10,color:C.muted}}>· {o.account}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
           <button onClick={()=>setMsgAcc('all')} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc==='all'?C.accent:C.border}`,background:msgAcc==='all'?C.accent:'transparent',color:msgAcc==='all'?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>Tous</button>
           {accounts.map(acc=>(
