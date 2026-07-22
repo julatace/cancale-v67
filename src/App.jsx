@@ -7258,6 +7258,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     return { nb, montant };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, hiddenSales, hiddenAccts]);
+  // ── Registre LITIGES & REMBOURSEMENTS : l'argent perdu (ventes annulées /
+  // remboursées) et l'argent récupéré (achats remboursés) — invisible ailleurs.
+  const [showDisputes, setShowDisputes] = useState(false);
+  const disputes = useMemo(() => {
+    const isRefund = (s) => /rembours|annul|refus|litige|retour/i.test(s || '');
+    const salesLost = [], buysBack = [];
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status)==='cancelled' || isRefund(o.status))
+        salesLost.push({ title:o.title||'Vente', amount:o.price?.amount!=null?Number(o.price.amount):0, date:o.date, status:o.status, acc:o._acc });
+    }
+    for (const o of (buys.items || [])) {
+      if (isRefund(o.status))
+        buysBack.push({ title:o.title||'Achat', amount:o.price?.amount!=null?Number(o.price.amount):0, date:o.date, status:o.status, acc:o._acc });
+    }
+    const byDate = (a,b)=> new Date(b.date||0)-new Date(a.date||0);
+    salesLost.sort(byDate); buysBack.sort(byDate);
+    return {
+      salesLost, buysBack,
+      totalLost: salesLost.reduce((s,x)=>s+x.amount,0),
+      totalBack: buysBack.reduce((s,x)=>s+x.amount,0),
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, buys.items, hiddenSales, hiddenAccts]);
   // ── Rappel d'expédition : ventes à expédier, triées par urgence ────────────
   // Vinted laisse ~5 jours pour expédier après la vente ; expédier en retard
   // abîme la note vendeur et le classement des annonces. my_orders ne donne pas
@@ -7828,6 +7852,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
           )}
           {sales.items && sales.items.length>0 && (
             <button onClick={()=>setShowWrapped(true)} title="Ta rétrospective de revendeur" style={{padding:'5px 12px',borderRadius:999,border:`1px solid #7a5cff`,background:'#7a5cff14',color:'#7a5cff',fontSize:12,fontWeight:800,cursor:'pointer'}}>🎉 Wrapped</button>
+          )}
+          {(disputes.salesLost.length>0||disputes.buysBack.length>0) && (
+            <button onClick={()=>setShowDisputes(true)} title="Litiges, annulations et remboursements — l'argent perdu/récupéré" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.danger}`,background:`${C.danger}12`,color:C.danger,fontSize:12,fontWeight:800,cursor:'pointer'}}>⚖️ Litiges{disputes.totalLost>0?` · −${Math.round(disputes.totalLost)} €`:''}</button>
           )}
           {sales.items && sales.items.length>0 && (
             <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
@@ -9161,6 +9188,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         </div>
         );
       })()}
+
+      {/* ── Registre LITIGES & REMBOURSEMENTS ── */}
+      {showDisputes && (
+        <div onClick={()=>setShowDisputes(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1}}><div style={{fontSize:15,fontWeight:900,color:C.text}}>⚖️ Litiges & remboursements</div><div style={{fontSize:11.5,color:C.muted}}>L'argent perdu (ventes annulées/remboursées) et récupéré (achats remboursés).</div></div>
+              <button type="button" onClick={()=>setShowDisputes(false)} style={{border:'none',background:'transparent',fontSize:24,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{display:'flex',gap:10,padding:'12px 16px',flexShrink:0}}>
+              <div style={{flex:1,border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:12,padding:'10px 12px'}}>
+                <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>Manque à gagner</div>
+                <div style={{fontSize:22,fontWeight:900,color:C.danger}}>−{Math.round(disputes.totalLost)} €</div>
+                <div style={{fontSize:10.5,color:C.muted}}>{disputes.salesLost.length} vente{disputes.salesLost.length>1?'s':''} perdue{disputes.salesLost.length>1?'s':''}</div>
+              </div>
+              <div style={{flex:1,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`,borderRadius:12,padding:'10px 12px'}}>
+                <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700}}>Récupéré (achats)</div>
+                <div style={{fontSize:22,fontWeight:900,color:INV_STATUS.online.color}}>+{Math.round(disputes.totalBack)} €</div>
+                <div style={{fontSize:10.5,color:C.muted}}>{disputes.buysBack.length} achat{disputes.buysBack.length>1?'s':''} remboursé{disputes.buysBack.length>1?'s':''}</div>
+              </div>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'0 16px 16px'}}>
+              {disputes.salesLost.length>0 && <div style={{fontSize:12,fontWeight:900,color:C.danger,margin:'6px 0 6px'}}>💸 Ventes annulées / remboursées</div>}
+              {disputes.salesLost.map((x,i)=>(
+                <div key={'s'+i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:10,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
+                  <div style={{flexShrink:0,fontSize:13,fontWeight:900,color:C.danger}}>−{Math.round(x.amount)} €</div>
+                </div>
+              ))}
+              {disputes.buysBack.length>0 && <div style={{fontSize:12,fontWeight:900,color:INV_STATUS.online.color,margin:'14px 0 6px'}}>↩️ Achats remboursés</div>}
+              {disputes.buysBack.map((x,i)=>(
+                <div key={'b'+i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:10,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
+                  <div style={{flexShrink:0,fontSize:13,fontWeight:900,color:INV_STATUS.online.color}}>+{Math.round(x.amount)} €</div>
+                </div>
+              ))}
+              {disputes.salesLost.length===0 && disputes.buysBack.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 0'}}>Aucun litige — nickel ! 👌</div>}
+              <div style={{fontSize:10.5,color:C.muted,marginTop:12,lineHeight:1.4}}>Basé sur le statut Vinted (« Remboursement validé/effectué », « Retour initié », annulations). Se met à jour tout seul.</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Audit d'inventaire : réconcilie numéros / garage / en ligne / vendu ── */}
       {auditOpen && (()=>{
