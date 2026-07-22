@@ -35,7 +35,7 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
-  'vinted_sale_overrides','vinted_bord_links',
+  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -6193,6 +6193,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
+  const [showRelayMap, setShowRelayMap] = useState(false); // carte des points relais repliée par défaut
   // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
   const garageSpotOf = (num) => {
     const t = String(num||'').trim().toLowerCase(); if (!t) return null;
@@ -6556,8 +6557,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || ''); // vente à expédier
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
+  // Colis marqués « récupéré » À LA MAIN (par transaction) : disparaissent de « à
+  // retirer » sans attendre que Vinted mette à jour. Synchronisé.
+  const [pickupDone, setPickupDone] = useState(() => load('vinted_pickup_done', {}));
+  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev,[k]:new Date().toISOString()}; save('vinted_pickup_done',u); return u; }); };
+  const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
+  // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
+  const [bordsHidden, setBordsHidden] = useState(() => load('vinted_bords_hidden', {}));
+  const hideBord = (b) => { const k=bordKey(b); if(!k) return; setBordsHidden(prev=>{ const u={...prev,[k]:1}; save('vinted_bords_hidden',u); return u; }); };
+  const isBordHidden = (b) => !!bordsHidden[bordKey(b)];
   // Listes AUTOMATIQUES (statut Vinted, pas les emails) : à retirer / à expédier.
-  const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status)), [buys.items]);
+  // « à retirer » exclut ce que tu as déjà coché récupéré à la main.
+  const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buys.items, pickupDone]);
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => isAwaitingShipStatus(o.status)), [sales.items]);
   const soldByTxn = useMemo(() => { const m = {}; (sales.items || []).forEach(o => { if (o.transaction_id != null) m[String(o.transaction_id)] = o; }); return m; }, [sales.items]);
   // Un bordereau est « expédié » (donc à retirer de la liste à imprimer) dès que
@@ -7906,9 +7917,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
         {/* À RETIRER : source = statut Vinted (automatique, se met à jour seul). */}
         {vintedToPickup.length>0 && (
           <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:14,padding:'11px 13px',marginBottom:10}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
               <div style={{flex:1,fontSize:13.5,fontWeight:900,color:C.text}}>📦 {vintedToPickup.length} colis à retirer</div>
               {(tracking||[]).some(isPickupActive) && <button type="button" onClick={()=>setTourneeOpen(true)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:999,padding:'5px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🗺️ Relais & QR</button>}
+              <button type="button" onClick={()=>{ if(window.confirm('Marquer TOUS ces colis comme récupérés ?')) markAllPickupDone(vintedToPickup); }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:999,padding:'5px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:7}}>
               {vintedToPickup.slice(0,25).map(o=>(
@@ -7916,18 +7928,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div><div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · au point relais</div></div>
                   {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                  <button type="button" onClick={()=>markPickupDone(o)} title="J'ai récupéré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                 </div>
               ))}
             </div>
-            <div style={{fontSize:10.5,color:C.muted,marginTop:7,lineHeight:1.4}}>D'après Vinted — se met à jour <b>tout seul</b> quand tu récupères un colis. Le bouton « Relais & QR » ouvre où aller + les codes de retrait.</div>
+            <div style={{fontSize:10.5,color:C.muted,marginTop:7,lineHeight:1.4}}>Se met à jour <b>tout seul</b> quand Vinted enregistre le retrait — ou coche <b>✓</b> pour le retirer tout de suite.</div>
           </div>
         )}
         {vintedToPickup.length===0 && (tracking||[]).some(isPickupActive) && (
           <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Points relais & QR de retrait</button>
         )}
-        {/* Points relais façon Vinted : carte PERMANENTE de tes points habituels.
-            Les badges rouges apparaissent quand des colis y attendent. */}
-        {(()=>{
+        {/* Carte des points relais : repliée par défaut (secondaire depuis que
+            « à retirer » vient du statut Vinted). Bouton pour l'afficher. */}
+        <button type="button" onClick={()=>setShowRelayMap(v=>!v)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:700,cursor:'pointer',marginBottom:10,fontFamily:'inherit'}}>{showRelayMap?'▲ Masquer la carte des relais':'🗺️ Carte des points relais'}</button>
+        {showRelayMap && (()=>{
           const avail=(tracking||[]).filter(isPickupActive);
           const norm=s=>String(s||'').toLowerCase();
           // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
@@ -8485,7 +8499,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
               </button>
             ) : null; })()}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {[...emailBords].sort((a,b2)=>{
+              {[...emailBords].filter(b=>!isBordHidden(b)).sort((a,b2)=>{
                 // Non imprimés d'abord, puis par date limite d'expédition (plus
                 // urgent en haut), puis les plus récents.
                 const pa=isBordDone(a)?1:0, pb=isBordDone(b2)?1:0; if(pa!==pb) return pa-pb;
@@ -8505,6 +8519,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                     {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{fontSize:10.5,fontWeight:800,marginTop:2,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"Auj.":dl.days===1?'Demain':'Avant'} {dl.text}</div> : null; })()}
                     {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:10,fontWeight:800,marginTop:2,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
                   </div>
+                  <button type="button" onClick={()=>{ if(window.confirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }} title="Masquer ce bordereau" aria-label="Masquer ce bordereau" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 5px',fontFamily:'inherit'}}>✕</button>
                   {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{flexShrink:0,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🔗 Relier</button>}
                   {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
                   <button type="button" onClick={()=>{

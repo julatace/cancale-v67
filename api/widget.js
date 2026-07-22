@@ -68,9 +68,10 @@ export default async function handler(req, res) {
 
     // À expédier + à retirer = STATUT VINTED (automatique, à jour). Fini les
     // emails imprécis : Vinted sait quand c'est expédié / récupéré.
+    const pickupDone = m.vinted_pickup_done || {};
     const toShip = sold.filter(o => awaitingShip(o.status));
     const shipTotal = toShip.length;
-    const pickup = purchased.filter(o => atRelay(o.status)).length;
+    const pickup = purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)]).length;
     // Urgence d'expédition : on croise avec les bordereaux (date limite) pour les
     // ventes réellement en attente d'envoi.
     const shipTxns = new Set(toShip.map(o => String(o.transaction_id)));
