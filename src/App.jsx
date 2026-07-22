@@ -1341,6 +1341,7 @@ const TABS=[
 // Barre de navigation du bas (façon Vinted) : un onglet dédié par catégorie.
 // Défilable horizontalement (plus de 5 entrées).
 const BOTTOM_TABS=[
+  {id:'journee',      icon:'☀️',label:'Ma journée'},
   {id:'dashboard',    icon:'📊',label:'Stats'},
   {id:'cat_annonces', icon:'🟢',label:'Annonces'},
   {id:'cat_ventes',   icon:'💸',label:'Ventes'},
@@ -6177,7 +6178,7 @@ const QUICK_REPLIES = [
 // d'onglet) : moins de requêtes, navigation instantanée. TTL court.
 const _acctCache = {};
 const _CACHE_TTL = 180000; // 3 min
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
@@ -6885,7 +6886,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     setter({ loading:false, items: out, error, failed });
   };
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
-  useEffect(() => { if (curSub==='achats' && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -6928,10 +6929,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
     if (!error) putCache('convs', out);
     setConvs({ loading:false, items: out, error });
   };
-  useEffect(() => { if (curSub==='annonces' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if (curSub==='messages' && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
@@ -7736,8 +7737,86 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   return (
     <div style={{padding:'16px 14px 40px'}}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
-      <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 14px'}}>{only?({ventes:'💸 Ventes',achats:'🛍️ Achats',annonces:'🟢 Annonces',bordereaux:'📄 Bordereaux',messages:'💬 Messages'}[only]||'Comptabilité'):'💸 Comptabilité'}</h2>
-      {accounts.length===0 && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
+      {only!=='journee' && <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:'0 0 14px'}}>{only?({ventes:'💸 Ventes',achats:'🛍️ Achats',annonces:'🟢 Annonces',bordereaux:'📄 Bordereaux',messages:'💬 Messages'}[only]||'Comptabilité'):'💸 Comptabilité'}</h2>}
+      {accounts.length===0 && only!=='journee' && <div style={{fontSize:13,color:C.muted}}>Aucun compte Vinted lié.</div>}
+
+      {/* ═══════════════ ☀️ MA JOURNÉE ═══════════════════════════════════════
+          L'écran d'accueil ACTIF : au lieu d'un tableau de stats à lire, une
+          liste priorisée de ce qui te fait gagner de l'argent AUJOURD'HUI, chaque
+          ligne = une action d'un tap. L'app pilote ta journée. Tout est calculé
+          en local (aucun appel Vinted en plus). */}
+      {curSub==='journee' && (()=>{
+        const h = new Date().getHours();
+        const hello = h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
+        const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+        const unread = (convs.items||[]).filter(c=>c.unread).length;
+        const offersToSend = likedList.filter(x=>x._offer!=null).length || likedList.length;
+        const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
+        const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
+        let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
+        const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
+        const jobs=[];
+        if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Imprime les bordereaux et poste',tab:'cat_bord',prio:late>0?0:1});
+        if(vintedToPickup.length) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${vintedToPickup.length} colis`,sub:'Déposés en point relais — va les chercher',tab:'cat_achats',prio:2});
+        if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
+        if(offersToSend) jobs.push({icon:'💌',color:INV_STATUS.online.color,title:`Relancer ${offersToSend} intéressé${offersToSend>1?'s':''}`,sub:'Envoie une offre aux gens qui ont liké → ça convertit',tab:'cat_annonces',prio:4});
+        if(repriceList.length) jobs.push({icon:'🏷️',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
+        jobs.sort((a,b)=>a.prio-b.prio);
+        return (
+          <div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,color:C.muted,fontWeight:700,textTransform:'capitalize'}}>{dateStr}</div>
+              <div style={{fontSize:22,fontWeight:900,color:C.text,marginTop:2}}>☀️ {hello} Julien</div>
+              {!loading && (
+                <div style={{fontSize:13,color:C.muted,marginTop:3}}>
+                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> qui te font avancer aujourd'hui.</> : <>Rien d'urgent — ta boutique tourne. 👌</>}
+                </div>
+              )}
+            </div>
+
+            {loading && <Skeleton variant="card" count={4}/>}
+
+            {!loading && jobs.length===0 && (
+              <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:16,background:C.card}}>
+                <div style={{fontSize:44,lineHeight:1}}>🎉</div>
+                <div style={{fontSize:16,fontWeight:900,color:C.text,marginTop:10}}>Tout est à jour !</div>
+                <div style={{fontSize:12.5,color:C.muted,marginTop:5,lineHeight:1.5}}>Rien à expédier, rien à retirer, aucun message en attente.<br/>Profite — ou va sourcer de nouvelles paires. 👟</div>
+              </div>
+            )}
+
+            {!loading && jobs.length>0 && (
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {jobs.map((j,i)=>(
+                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:15,border:`1px solid ${j.color}44`,background:`${j.color}0e`,cursor:'pointer',textAlign:'left',width:'100%',fontFamily:'inherit'}}>
+                    <div style={{width:46,height:46,borderRadius:12,background:`${j.color}1c`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>{j.icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:15,fontWeight:900,color:C.text}}>{j.title}</div>
+                      <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
+                    </div>
+                    <div style={{fontSize:22,color:j.color,fontWeight:900,flexShrink:0}}>›</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Trésorerie : l'argent qui arrive (motivation, non-action). */}
+            {!loading && inRouteSum>0 && (
+              <div style={{marginTop:16,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:15,border:`1px solid ${C.accent}33`,background:`${C.accent}0c`}}>
+                <div style={{fontSize:26}}>💶</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:'uppercase',letterSpacing:0.4}}>Argent en route</div>
+                  <div style={{fontSize:19,fontWeight:900,color:C.accent}}>≈ {inRouteSum.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:700}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
+                </div>
+                <button type="button" onClick={()=>onNav && onNav('cat_ventes')} style={{border:'none',background:'transparent',color:C.accent,fontSize:22,fontWeight:900,cursor:'pointer'}}>›</button>
+              </div>
+            )}
+
+            {accounts.length===0 && (
+              <div style={{marginTop:16,fontSize:12.5,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
+            )}
+          </div>
+        );
+      })()}
 
       {!only && (
         <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
@@ -9995,7 +10074,7 @@ function RegimeSetting() {
 }
 
 export default function App() {
-  const [tab,setTab]=useState('dashboard');
+  const [tab,setTab]=useState('journee');
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
@@ -10625,6 +10704,7 @@ export default function App() {
           onExport={()=>{ try{ const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()}; const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);}catch(err){alert('Erreur export : '+err.message);} }}
           onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;} let msg='Importer ce fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES.'; if(!window.confirm(msg))return; if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);} if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);} if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);} alert('✓ Import réussi !'); }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
           dark={dark} toggleDark={toggleDark}/>}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&<Onboarding setTab={setTab}/>}
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
