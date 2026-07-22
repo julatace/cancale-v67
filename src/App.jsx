@@ -8009,6 +8009,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                   }, ()=>{ setVilleLoading(false); alert('Autorise la localisation pour utiliser ta position.'); }, {timeout:8000});
                 }} disabled={villeLoading} title="Utiliser ma position" style={{border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,fontSize:12.5,fontWeight:800,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit'}}>📍</button>
               </div>
+              {/* Accès direct aux CODES/QR de retrait — un tap = QR plein écran à scanner. */}
+              {avail.length>0 && (
+                <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:2,WebkitOverflowScrolling:'touch'}}>
+                  {avail.map((t,i)=>(
+                    <button key={i} type="button" onClick={()=>openQrView(t)} title="Afficher le QR/code en grand" style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:3,border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'7px 9px',cursor:'pointer',fontFamily:'inherit',minWidth:70}}>
+                      <div style={{width:44,height:44,borderRadius:6,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{t.qrB64?<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:t.qrUrl?<img src={t.qrUrl} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:20}}>🎫</span>}</div>
+                      <span style={{fontSize:9,color:C.text,fontWeight:800,whiteSpace:'nowrap'}}>{t.code?t.code:(t.suivi?'n°'+String(t.suivi).slice(-5):'Retrait')}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               {/* LA carte : toutes les épingles de la ville, badges = colis en attente */}
               {pins.length>0&&(
                 <div style={{border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.07)'}}>
