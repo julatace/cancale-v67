@@ -7350,6 +7350,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [srcQuery, srcPrice, sales.items, listings.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
+  // ── Assistant de MISE EN VENTE : tu viens d'acheter une paire, tu la mets en
+  // ligne. Tape le modèle → prix conseillé (basé sur TES ventes réelles de la
+  // même paire), titre optimisé + description prêts à coller. But : lister vite,
+  // au bon prix, pour vendre plus. (Complète le Vérificateur d'ACHAT du Sourcing.)
+  const [showLister, setShowLister] = useState(false);
+  const [listQ, setListQ] = useState('');
+  const [listSize, setListSize] = useState('');
+  const [listBuy, setListBuy] = useState('');
+  const [copied, setCopied] = useState('');
+  const median = (a)=>{ if(!a.length) return null; const s=[...a].sort((x,y)=>x-y); const m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; };
+  const lister = useMemo(() => {
+    const q = normTitle(listQ);
+    if (!q || q.length < 2) return null;
+    const words = q.split(' ').filter(w => w.length >= 2);
+    if (!words.length) return null;
+    const match = (t) => { const n = normTitle(t); return words.every(w => n.includes(w)); };
+    const sold=[]; let daysSum=0, daysNb=0, lastDate=null;
+    for (const o of (sales.items||[])) {
+      if (isHidden(o) || classifyOrderStatus(o.status)!=='completed' || !match(o.title)) continue;
+      const sell = o.price?.amount!=null ? Number(o.price.amount) : 0; if (sell>0) sold.push(sell);
+      if (o.date) { const d=new Date(o.date); if(!isNaN(d) && (!lastDate||d>lastDate)) lastDate=d; }
+      const e = effEntry(o);
+      if (e && e.numberedAt && o.date) { const j=(new Date(o.date)-new Date(e.numberedAt))/86400000; if(j>=0&&j<3650){daysSum+=j;daysNb+=1;} }
+    }
+    const onlinePrices = (listings.items||[]).filter(it=>match(it.title) && it.price!=null).map(it=>Number(it.price)).filter(v=>v>0);
+    const buy = parseFloat(String(listBuy).replace(',','.')); const buyOk = !isNaN(buy) && buy>0;
+    const soldMed = median(sold), onlineMed = median(onlinePrices);
+    // Prix conseillé : d'abord ce à quoi TES paires identiques se sont vendues,
+    // sinon le prix de tes annonces en ligne, sinon rien. Jamais sous un plancher
+    // de marge si le prix d'achat est fourni.
+    let reco = soldMed!=null ? soldMed : (onlineMed!=null ? onlineMed : null);
+    const floor = buyOk ? Math.max(buy + 5, buy * 1.4) : null; // marge mini visée
+    let bumped = false;
+    if (reco!=null && floor!=null && reco < floor) { reco = floor; bumped = true; }
+    if (reco==null && floor!=null) reco = floor;
+    const round = (v)=> v==null?null:Math.max(1, Math.round(v));
+    reco = round(reco);
+    const lo = sold.length ? round(Math.min(...sold)) : (onlinePrices.length?round(Math.min(...onlinePrices)):null);
+    const hi = sold.length ? round(Math.max(...sold)) : (onlinePrices.length?round(Math.max(...onlinePrices)):null);
+    // Titre optimisé : marque + modèle saisi + pointure.
+    const brand = extractBrand(listQ);
+    const clean = listQ.trim().replace(/\s+/g,' ');
+    const withBrand = brand && !normTitle(clean).includes(normTitle(brand)) ? `${brand} ${clean}` : clean;
+    const sz = String(listSize).trim();
+    const title = (withBrand.charAt(0).toUpperCase()+withBrand.slice(1)) + (sz?` — Pointure ${sz}`:'');
+    const desc = [
+      title,
+      sz?`Pointure : ${sz}`:null,
+      'État : très bon état, voir photos 👟',
+      'Modèle authentique. Envoi rapide et soigné 📦',
+      'Offres bienvenues, n\'hésitez pas à me contacter 😊',
+    ].filter(Boolean).join('\n');
+    const margin = (reco!=null && buyOk) ? reco - buy : null;
+    return { soldNb:sold.length, soldMed:round(soldMed), onlineNb:onlinePrices.length, onlineMed:round(onlineMed),
+             reco, lo, hi, bumped, floor:round(floor), buyOk, margin, joursMoy:daysNb?daysSum/daysNb:null, lastDate, title, desc };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listQ, listSize, listBuy, sales.items, listings.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  const copyText = (txt, key) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(()=>setCopied(''),1500); } catch(_){} };
+
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
@@ -8266,6 +8325,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
             {annStats.hasView && <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>👁 {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:800,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:800,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:999,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
+            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{marginLeft:'auto',fontSize:12,fontWeight:800,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
@@ -8857,6 +8917,74 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore }) {
                 <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12.5,fontWeight:800,cursor:'pointer'}}>📄 PDF</button>
               </div>
               <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showLister && (
+        <div onClick={()=>setShowLister(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>🪄 Aide à la vente</div>
+                <div style={{fontSize:11,color:C.muted}}>Prix conseillé d'après TES ventes + titre & description prêts à coller</div>
+              </div>
+              <button type="button" onClick={()=>setShowLister(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:16}}>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+                <input value={listQ} onChange={e=>setListQ(e.target.value)} placeholder="Modèle (ex : Nike Air Max 90, gel-lyte…)" autoFocus
+                  style={{flex:'2 1 200px',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:14,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                <input value={listSize} onChange={e=>setListSize(e.target.value)} placeholder="Pointure" inputMode="decimal"
+                  style={{flex:'1 1 80px',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:14,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                <input value={listBuy} onChange={e=>setListBuy(e.target.value)} placeholder="Prix d'achat €" inputMode="decimal"
+                  style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:14,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+              </div>
+              {!lister ? (
+                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de la paire que tu mets en vente.<br/><span style={{fontSize:11.5}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
+              ) : (<>
+                {/* Prix conseillé */}
+                <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:14,padding:'13px 15px',marginBottom:14}}>
+                  {lister.reco!=null ? (<>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:'uppercase',letterSpacing:0.4}}>Prix conseillé</div>
+                    <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+                      <div style={{fontSize:30,fontWeight:900,color:C.accent,lineHeight:1.1}}>{lister.reco} €</div>
+                      {lister.lo!=null && lister.hi!=null && lister.hi!==lister.lo && <div style={{fontSize:12,color:C.muted}}>fourchette {lister.lo}–{lister.hi} €</div>}
+                    </div>
+                    <div style={{fontSize:11,color:C.muted,marginTop:5,lineHeight:1.45}}>
+                      {lister.soldNb>0
+                        ? <>Basé sur <b>{lister.soldNb}</b> vente{lister.soldNb>1?'s':''} identique{lister.soldNb>1?'s':''} chez toi (médiane {lister.soldMed} €){lister.joursMoy!=null?<> · vendues en <b>{lister.joursMoy.toFixed(0)} j</b> en moyenne</>:''}.</>
+                        : lister.onlineNb>0
+                          ? <>Aucune vente passée : basé sur <b>{lister.onlineNb}</b> de tes annonces en ligne (médiane {lister.onlineMed} €).</>
+                          : <>Pas d'historique pour ce modèle — prix calé sur ta marge minimale.</>}
+                      {lister.bumped && <> <span style={{color:C.warn,fontWeight:700}}>Relevé à ton plancher de marge ({lister.floor} €).</span></>}
+                    </div>
+                    {lister.margin!=null && (
+                      <div style={{marginTop:8,fontSize:12.5,fontWeight:800,color:lister.margin>0?C.accent:C.danger}}>
+                        {lister.margin>0?`≈ +${Math.round(lister.margin)} € de marge brute`:`⚠️ ${Math.round(lister.margin)} € : sous ton prix d'achat`}
+                        <span style={{color:C.muted,fontWeight:600}}> (achat {Math.round(parseFloat(String(listBuy).replace(',','.')))} €, hors boost)</span>
+                      </div>
+                    )}
+                  </>) : (
+                    <div style={{fontSize:13,color:C.muted}}>Pas encore assez d'infos pour un prix. Renseigne un prix d'achat, ou tape un modèle plus courant.</div>
+                  )}
+                </div>
+                {/* Titre optimisé */}
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:5}}>TITRE OPTIMISÉ</div>
+                  <div style={{display:'flex',gap:8,alignItems:'stretch'}}>
+                    <div style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'9px 12px',fontSize:13.5,fontWeight:700,color:C.text}}>{lister.title}</div>
+                    <button onClick={()=>copyText(lister.title,'title')} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:copied==='title'?C.accent:`${C.accent}12`,color:copied==='title'?'#fff':C.accent,borderRadius:10,padding:'0 14px',fontSize:12.5,fontWeight:800,cursor:'pointer'}}>{copied==='title'?'✓ Copié':'Copier'}</button>
+                  </div>
+                </div>
+                {/* Description prête */}
+                <div style={{marginBottom:6}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:5}}>DESCRIPTION PRÊTE À COLLER</div>
+                  <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',fontSize:12.5,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{lister.desc}</div>
+                  <button onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:10,padding:'10px',fontSize:13,fontWeight:800,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
+                </div>
+                <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:12}}>Le prix vient de tes ventes finalisées du même modèle (recherche par mots). Colle le titre et la description sur Vinted, ajoute tes photos, et fixe le prix conseillé.</div>
+              </>)}
             </div>
           </div>
         </div>
