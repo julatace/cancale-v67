@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v23/07 · 23h30';
+const BUILD_ID = 'v24/07 · 0h';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7074,6 +7074,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
         || items.find(o => normTitle(o.title).includes(n) || n.includes(normTitle(o.title)))
         || null;
   };
+  // Suivi (email transporteur) correspondant à un achat, par titre d'article.
+  const trackForBuy = (o) => {
+    const items = tracking || []; const n = normTitle(o && o.title); if (!n) return null;
+    return items.find(t => t.artTitle && (normTitle(t.artTitle) === n || normTitle(t.artTitle).includes(n) || n.includes(normTitle(t.artTitle)))) || null;
+  };
+  // Étape de suivi d'un achat (payé → expédié → au relais → reçu) à partir du
+  // statut Vinted + de l'email transporteur. step: 1=payé 2=transit 3=relais 4=reçu.
+  const achatStage = (o, tk) => {
+    const s = o.status || '';
+    if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
+    if (/finalis|livr|remis|r[ée]ception/i.test(s) || purchasePhase(s) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+    if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
+    if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
+    if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
+    return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
+  };
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
 
@@ -8527,33 +8543,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
         {buys.items && !buys.error && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucun achat pour l'instant.<br/><span style={{fontSize:11.5}}>Tes achats Vinted apparaîtront ici automatiquement.</span></div>}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o)).map(o=>(
-            <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,opacity:classifyOrderStatus(o.status)==='cancelled'?0.6:1}}>
-              <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
-                <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                  <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                  <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                  {(() => { const s=purchasePhase(o.status); return <span style={{color:s==='completed'?INV_STATUS.online.color:s==='cancelled'?C.danger:C.warn,fontWeight:700}}>{s==='completed'?'reçu':s==='cancelled'?'annulé':'en attente'}</span>; })()}
+          {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
+            .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
+            .sort((a,b)=>{ const pr=x=> x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4; const d=pr(a)-pr(b); return d!==0?d:(new Date(b.o.date||0)-new Date(a.o.date||0)); })
+            .map(({o,tk,st})=>{
+            const cancelled = st.step===0;
+            const suivi = tk && tk.suivi ? String(tk.suivi) : '';
+            return (
+            <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,opacity:cancelled?0.55:1,padding:'9px 10px'}}>
+              <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
+                  <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                    <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
+                    <span style={{fontWeight:900,color:st.color,background:`${st.color}18`,borderRadius:999,padding:'1px 8px'}}>{st.step===3?'📦 ':st.step===2?'🚚 ':st.step===4?'✅ ':''}{st.label}</span>
+                    {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
+                  </div>
+                </div>
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <div style={{fontSize:14,fontWeight:900,color:C.text}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
                 </div>
               </div>
-              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
-                <div style={{fontSize:14,fontWeight:900,color:C.text}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
-                {(()=>{ const rc=receiptFor(o); return rc ? (
-                  <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
-                    title="Reçu Vinted authentique (email archivé)" aria-label="Reçu d'achat Vinted"
-                    style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:800,padding:'3px 9px'}}>📄 Reçu</button>
-                ) : (
-                  <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
-                    title="Télécharger un justificatif d'achat (PDF)" aria-label="Justificatif d'achat PDF"
-                    style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:700,padding:'3px 9px'}}>📄 Justif.</button>
-                ); })()}
+              {/* Barre de suivi : Payé · Expédié · Au relais · Reçu */}
+              {!cancelled && (
+                <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}>
+                  {[['Payé',1],['Expédié',2],['Au relais',3],['Reçu',4]].map(([lbl,idx])=>{
+                    const done=st.step>=idx; const cur2=st.step===idx;
+                    return (
+                      <div key={idx} style={{flex:1,textAlign:'center'}}>
+                        <div style={{height:4,borderRadius:999,background:done?st.color:C.border}}/>
+                        <div style={{fontSize:8.5,marginTop:3,fontWeight:cur2?900:600,color:done?st.color:C.muted,whiteSpace:'nowrap'}}>{lbl}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Actions : Suivre le colis + reçu/justif */}
+              <div style={{display:'flex',gap:6,alignItems:'center',marginTop:9,flexWrap:'wrap'}}>
+                {suivi && (st.step===2||st.step===3) && (
+                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:800}}>🔍 Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
+                )}
+                {st.step===3 && tk && (tk.qrB64||tk.qrUrl||tk.code) && (
+                  <button type="button" onClick={()=>openQrView(tk)} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🎫 Code de retrait</button>
+                )}
+                <div style={{marginLeft:'auto'}}>
+                  {(()=>{ const rc=receiptFor(o); return rc ? (
+                    <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
+                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:800,padding:'5px 10px'}}>📄 Reçu</button>
+                  ) : (
+                    <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
+                      title="Télécharger un justificatif d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:700,padding:'5px 10px'}}>📄 Justif.</button>
+                  ); })()}
+                </div>
               </div>
             </div>
-          ))}
+          );})}
         </div>
       </>)}
 
