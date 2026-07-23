@@ -10131,6 +10131,20 @@ function RegimeSetting() {
 
 export default function App() {
   const [tab,setTab]=useState('journee');
+  // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
+  const navHistRef = React.useRef([]);
+  const prevTabRef = React.useRef('journee');
+  const backingRef = React.useRef(false);
+  const [canBack,setCanBack]=useState(false);
+  React.useEffect(()=>{
+    if(prevTabRef.current!==tab){
+      if(!backingRef.current){ navHistRef.current.push(prevTabRef.current); if(navHistRef.current.length>30) navHistRef.current.shift(); }
+      backingRef.current=false;
+      prevTabRef.current=tab;
+      setCanBack(navHistRef.current.length>0);
+    }
+  },[tab]);
+  const goBack=()=>{ if(!navHistRef.current.length) return; const dest=navHistRef.current.pop(); backingRef.current=true; setTab(dest); setCanBack(navHistRef.current.length>0); };
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
@@ -10612,6 +10626,8 @@ export default function App() {
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {canBack && <button type="button" onClick={goBack} title="Retour" aria-label="Retour"
+            style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:999,border:`1px solid ${C.border}`,background:C.bg,color:C.text,cursor:'pointer',fontSize:19,fontWeight:800,fontFamily:'inherit',lineHeight:1}}>‹</button>}
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div
