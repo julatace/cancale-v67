@@ -26,7 +26,18 @@ if ('serviceWorker' in navigator) {
 // nouveau déploiement est détecté, on recharge tout seul. La requête porte un
 // paramètre anti-cache pour contourner le service worker.
 (function autoUpdate() {
-  let current = null;
+  // Empreinte du build RÉELLEMENT chargé dans cette page (le <script> du bundle).
+  // C'est la référence : si le serveur en a une autre, la page tourne en vieux.
+  const loadedFingerprint = () => {
+    try {
+      const s = document.querySelector('script[src*="assets/index-"]');
+      const src = s && (s.getAttribute('src') || '');
+      const m = src && src.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
+      return m ? m[0] : null;
+    } catch (_) { return null; }
+  };
+  let current = loadedFingerprint();
+  let reloading = false;
   const fingerprint = async () => {
     try {
       const r = await fetch('/?_v=' + Date.now(), { cache: 'no-store' });
@@ -36,10 +47,11 @@ if ('serviceWorker' in navigator) {
     } catch (_) { return null; }
   };
   const check = async () => {
+    if (reloading) return;
     const fp = await fingerprint();
     if (!fp) return;
-    if (current == null) { current = fp; return; }
-    if (fp !== current) { current = fp; window.location.reload(); }
+    if (current == null) { current = fp; return; } // page sans empreinte connue : on s'aligne
+    if (fp !== current) { reloading = true; window.location.reload(); }
   };
   window.addEventListener('load', () => {
     check();
