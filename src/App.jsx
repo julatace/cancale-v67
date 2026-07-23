@@ -35,7 +35,7 @@ const SYNC_KEYS = [
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
-  'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros',
+  'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden',
@@ -6242,6 +6242,11 @@ const _CACHE_TTL = 180000; // 3 min
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
+  // Annonces marquées VENDUES à la main (id d'annonce) : retirées des Annonces
+  // tout de suite, sans attendre que Vinted/l'extension rescanne le compte.
+  const [soldManual, setSoldManual] = useState(() => new Set(load('vinted_annonces_vendues', [])));
+  const markSold = (id) => setSoldManual(prev => { const n=new Set(prev); n.add(String(id)); save('vinted_annonces_vendues',[...n]); return n; });
+  const unmarkSold = (id) => setSoldManual(prev => { const n=new Set(prev); n.delete(String(id)); save('vinted_annonces_vendues',[...n]); return n; });
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
   // Le cloud est-il chargé ? Tant qu'il ne l'est pas, on NE numérote PAS (sinon on
   // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
@@ -6822,7 +6827,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
   // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
   const annShown = useMemo(() => {
-    let arr = [...(listings.items || [])];
+    let arr = [...(listings.items || [])].filter(it => !soldManual.has(String(it.id)));
     const q = annSearch.trim().toLowerCase();
     if (q) arr = arr.filter(it => {
       const num = String(numeros[it.id]?.numero || '');
@@ -6853,7 +6858,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, annSearch, annSort, numeros]);
+  }, [listings.items, annSearch, annSort, numeros, soldManual]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
   const annStats = useMemo(() => {
     const arr = listings.items || [];
@@ -8534,6 +8539,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
             <button onClick={()=>loadListings(true)} disabled={listings.loading} title="Va chercher tes annonces EN DIRECT sur Vinted (tous comptes) — enlève les paires vendues qui traînent encore" style={{marginLeft:'auto',fontSize:12,fontWeight:800,color:'#fff',background:C.accent,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:listings.loading?'default':'pointer',opacity:listings.loading?0.6:1}}>{listings.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
             <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:800,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
+          {soldManual.size>0 && (()=>{ const hidden=(listings.items||[]).filter(it=>soldManual.has(String(it.id))); if(!hidden.length) return null; return (
+            <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:10,padding:'7px 11px'}}>
+              <span style={{color:C.warn,fontWeight:800}}>✓ {hidden.length} annonce{hidden.length>1?'s':''} marquée{hidden.length>1?'s':''} vendue{hidden.length>1?'s':''}</span>
+              <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hidden.map(it=>it.title).join(' · ')}</span>
+              <button onClick={()=>{ if(window.confirm('Réafficher toutes les annonces marquées vendues ?')) hidden.forEach(it=>unmarkSold(it.id)); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',fontSize:11.5,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
+            </div>
+          ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
               😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
@@ -8701,7 +8713,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
                     {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:700,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
-                    <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire (toute sa vie)" aria-label="Passeport de la paire" style={{marginLeft:'auto',border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:14}}>📖</button>
+                    <button type="button" onClick={()=>{ if(window.confirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:8,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:800,fontFamily:'inherit'}}>✓ Vendue</button>
+                    <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire (toute sa vie)" aria-label="Passeport de la paire" style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:14}}>📖</button>
                     {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
                 </div>
