@@ -735,7 +735,10 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
 // attente au lieu d'etre a part - d'ou la confusion remontee par l'utilisateur.
 const classifyOrderStatus = (status) => {
   const s = status || '';
-  if (/annul|cancel|refus|rembours/i.test(s)) return 'cancelled';
+  // Retour / remboursement / suspension = PAS une vente aboutie (l'article revient
+  // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
+  // capté redevient « finalisée » et la vente se reclasse automatiquement.
+  if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
   if (/finalis/i.test(s)) return 'completed';
   return 'pending';
 };
@@ -747,7 +750,7 @@ const classifyOrderStatus = (status) => {
 const needsBordereau = (status) => {
   const s = (status || '').toLowerCase();
   if (!s) return true;
-  if (/annul|refus|rembours|cancel/.test(s)) return false;
+  if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
   if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
   if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
   return true;                                                              // à expédier
