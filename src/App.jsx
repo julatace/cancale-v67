@@ -241,17 +241,10 @@ const fetchEmailOffers = async () => {
     return rows.map(r => r.data).filter(Boolean).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
 };
-// Ouvre le reçu d'achat : PDF joint si présent, sinon un reçu PROPRE reconstruit
-// à partir de l'email (montant, détail, vendeur, date, transaction) — plus le
-// texte brut de Vinted avec ses URLs de tracking illisibles.
-const openReceipt = (a) => {
-  if (a.pdfB64) {
-    const bytes = b64ToBytes(a.pdfB64);
-    if (bytes) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); window.open(url, '_blank'); return; }
-  }
-  const w = window.open('', '_blank'); if (!w) return;
-  const esc = (s) => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-  // On retire les astérisques de mise en forme Vinted pour parser proprement.
+// Extrait les champs propres d'un reçu d'achat depuis l'email Vinted (montant,
+// détail, vendeur, date, transaction). Sert à la fois à la modale in-app et à
+// l'impression PDF. On retire les astérisques de mise en forme de Vinted.
+const parseReceiptFields = (a) => {
   const txt = String(a.texte || '').replace(/\*/g, ' ');
   const grab = (re) => { const m = txt.match(re); return m ? m[1].trim().replace(/\s{2,}/g, ' ') : ''; };
   const eur = (re) => { const m = txt.match(re); return m ? m[1].replace('.', ',') + ' €' : ''; };
@@ -265,16 +258,26 @@ const openReceipt = (a) => {
   const datePaie = grab(/date\s+du\s+paiement\s*:?\s*([^\n]+)/i) || (a.receivedAt ? new Date(a.receivedAt).toLocaleString('fr-FR') : '');
   const trans = a.transaction || grab(/transaction\s*:?\s*(\d+)/i);
   const compte = a.account || '';
-  const line = (label, val, strong) => val ? `<tr><td style="padding:9px 0;color:#667;font-size:14px">${esc(label)}</td><td style="padding:9px 0;text-align:right;font-size:14px;${strong ? 'font-weight:800;color:#111' : 'color:#111'}">${esc(val)}</td></tr>` : '';
-  const breakdown = [line('Article', artPrice), line('Frais de port', port), line('Protection acheteurs', protection)].join('');
-  const meta = [line('Vendeur', vendeur), line('Mode de paiement', mode), line('Date du paiement', datePaie), line('N° de transaction', trans), line('Compte', compte)].join('');
-  // Repli : texte de l'email nettoyé (URLs de tracking + pied de page retirés).
   const cleaned = txt
     .replace(/<https?:\/\/[^>]+>/g, '').replace(/https?:\/\/links\.vinted\.com\/\S+/gi, '')
     .split('\n').map(l => l.trim())
     .filter(l => l && !/nous sommes tenus|d[ée]sabonner|politique de confidentialit|termes et conditions|pour conna[îi]tre vos droits|l['’]équipe vinted/i.test(l))
     .join('\n');
-  const hasStructured = !!(paid || breakdown || meta);
+  return { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured: !!(paid || artPrice || port || protection || vendeur || mode || trans) };
+};
+// Ouvre le reçu pour IMPRESSION / PDF (nouvel onglet). L'affichage à l'écran
+// passe par la modale in-app (openReceipt n'est utilisé que pour imprimer).
+const openReceipt = (a) => {
+  if (a.pdfB64) {
+    const bytes = b64ToBytes(a.pdfB64);
+    if (bytes) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); window.open(url, '_blank'); return; }
+  }
+  const w = window.open('', '_blank'); if (!w) return;
+  const esc = (s) => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  const { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured } = parseReceiptFields(a);
+  const line = (label, val, strong) => val ? `<tr><td style="padding:9px 0;color:#667;font-size:14px">${esc(label)}</td><td style="padding:9px 0;text-align:right;font-size:14px;${strong ? 'font-weight:800;color:#111' : 'color:#111'}">${esc(val)}</td></tr>` : '';
+  const breakdown = [line('Article', artPrice), line('Frais de port', port), line('Protection acheteurs', protection)].join('');
+  const meta = [line('Vendeur', vendeur), line('Mode de paiement', mode), line('Date du paiement', datePaie), line('N° de transaction', trans), line('Compte', compte)].join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
   <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#f4f6f5;color:#111;-webkit-print-color-adjust:exact">
     <div class="topbar" style="position:sticky;top:0;z-index:10;background:#f4f6f5;padding:12px 16px 8px;display:flex;align-items:center;gap:10px">
@@ -6344,6 +6347,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
+  const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [offers, setOffers] = useState(null); // offres reçues (Copilote d'offres)
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
@@ -8472,7 +8476,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
                 <div style={{fontSize:14,fontWeight:900,color:C.text}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
                 {(()=>{ const rc=receiptFor(o); return rc ? (
-                  <button type="button" onClick={()=>openReceipt(rc)}
+                  <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
                     title="Reçu Vinted authentique (email archivé)" aria-label="Reçu d'achat Vinted"
                     style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:800,padding:'3px 9px'}}>📄 Reçu</button>
                 ) : (
@@ -9168,6 +9172,52 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
           </div>
         </div>
       )}
+      {/* Reçu d'achat DANS l'app (pas de nouvel onglet à fermer) */}
+      {receiptView && (()=>{ const r=parseReceiptFields(receiptView); const Row=({label,val,strong})=> val ? (
+          <div style={{display:'flex',justifyContent:'space-between',gap:12,padding:'9px 0',borderBottom:`1px solid ${C.border}`}}>
+            <span style={{fontSize:13.5,color:C.muted,fontWeight:600}}>{label}</span>
+            <span style={{fontSize:13.5,color:C.text,fontWeight:strong?800:600,textAlign:'right'}}>{val}</span>
+          </div>) : null;
+        return (
+        <div onClick={()=>setReceiptView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <button type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:999,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:19,fontWeight:800,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
+              <div style={{flex:1,fontSize:15,fontWeight:900,color:C.text}}>Reçu d'achat</div>
+              <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:9,padding:'7px 11px',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🖨 PDF</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:16}}>
+              <div style={{background:C.card,borderRadius:16,overflow:'hidden',border:`1px solid ${C.border}`}}>
+                <div style={{background:'#007782',color:'#fff',padding:'16px 18px'}}>
+                  <div style={{fontSize:11,opacity:0.85,fontWeight:700,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>
+                  <div style={{fontSize:18,fontWeight:800,marginTop:3}}>{r.article}</div>
+                </div>
+                {r.hasStructured ? (
+                  <div style={{padding:'16px 18px'}}>
+                    {r.paid && (
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:4}}>
+                        <span style={{fontSize:13.5,color:C.muted,fontWeight:700}}>Montant payé</span>
+                        <span style={{fontSize:25,fontWeight:900,color:'#007782'}}>{r.paid}</span>
+                      </div>
+                    )}
+                    <Row label="Article" val={r.artPrice}/>
+                    <Row label="Frais de port" val={r.port}/>
+                    <Row label="Protection acheteurs" val={r.protection}/>
+                    <div style={{height:8}}/>
+                    <Row label="Vendeur" val={r.vendeur}/>
+                    <Row label="Mode de paiement" val={r.mode}/>
+                    <Row label="Date du paiement" val={r.datePaie}/>
+                    <Row label="N° de transaction" val={r.trans}/>
+                    <Row label="Compte" val={r.compte}/>
+                  </div>
+                ) : (
+                  <div style={{padding:'16px 18px',whiteSpace:'pre-wrap',lineHeight:1.6,fontSize:13.5,color:C.text}}>{r.cleaned}</div>
+                )}
+              </div>
+              <div style={{textAlign:'center',color:C.muted,fontSize:11,marginTop:12,lineHeight:1.5}}>Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
+            </div>
+          </div>
+        </div>); })()}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
