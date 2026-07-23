@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 0h30';
+const BUILD_ID = 'v24/07 · 1h';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -458,6 +458,10 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
             <span style={{ position: 'absolute', left: '50%', top: 16.5, transform: 'translate(-50%,-50%)', color: col, fontSize: inner.length > 2 ? 9.5 : 12, fontWeight: 900, letterSpacing: 0.2 }}>{inner}</span>
             {/* Pastille « nombre de colis » en coin si c'est une marque */}
             {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
+            {/* Étiquette NOM du point (rend chaque relais distinct d'un coup d'œil) */}
+            {(pts.length <= 14 || isSel || p.count > 0) && p.key && (
+              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 9.5, fontWeight: 800, color: p.count > 0 ? '#b3261e' : '#26303a', background: 'rgba(255,255,255,0.92)', borderRadius: 5, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(p.key).length > 16 ? String(p.key).slice(0, 15) + '…' : p.key}</span>
+            )}
           </div>
         );
       })}
@@ -8429,6 +8433,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                       </span>
                       <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700,marginTop:1}}>{colis.length} code{colis.length>1?'s':''} de retrait{singlePoint?'':(isOpen?' · replier':' · voir')}</span>
                     </span>
+                    {g.lat && <a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" onClick={(ev)=>ev.stopPropagation()} title="Itinéraire vers ce point relais" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'5px 9px',fontSize:11,fontWeight:800}}>🧭 Y aller</a>}
                     {!g.saved&&<span onClick={async(ev)=>{
                       ev.stopPropagation();
                       const nom=window.prompt('Nom du point relais (ex : Maison de la Presse, Cancale) :', colis[0].lieu||'');
