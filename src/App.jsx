@@ -277,7 +277,11 @@ const openReceipt = (a) => {
   const hasStructured = !!(paid || breakdown || meta);
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
   <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#f4f6f5;color:#111;-webkit-print-color-adjust:exact">
-    <div style="max-width:520px;margin:0 auto;padding:20px 16px 40px">
+    <div class="topbar" style="position:sticky;top:0;z-index:10;background:#f4f6f5;padding:12px 16px 8px;display:flex;align-items:center;gap:10px">
+      <button onclick="try{window.close()}catch(e){}; setTimeout(function(){history.length>1?history.back():(location.href='/?tab=cat_achats')},120)" style="border:none;border-radius:12px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12);padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;color:#111">‹ Fermer</button>
+      <span style="font-size:12px;color:#99a">Retour à VRM</span>
+    </div>
+    <div style="max-width:520px;margin:0 auto;padding:4px 16px 40px">
       <div style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.07)">
         <div style="background:#007782;color:#fff;padding:18px 20px">
           <div style="font-size:12px;opacity:.85;font-weight:700;letter-spacing:.4px;text-transform:uppercase">Reçu d'achat Vinted</div>
