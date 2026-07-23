@@ -101,9 +101,12 @@ export default async function handler(req, res) {
       // Un casier sans nom devient « Casier <Transporteur> ».
       const nom = t.name || (carrier ? `Casier ${({ mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', ups: 'UPS', colissimo: 'La Poste', amazon: 'Amazon', relaiscolis: 'Relais Colis' })[carrier] || ''}`.trim() : (isLocker ? 'Casier à colis' : null));
       if (!nom) return null;
+      // Rue (depuis les tags OSM) : sert à DISTINGUER deux points de même nom
+      // (ex. plusieurs « Casier Mondial Relay »).
+      const rue = [t['addr:housenumber'], t['addr:street'] || t['addr:place']].filter(Boolean).join(' ').trim() || undefined;
       const key = nom.toLowerCase() + '|' + lat.toFixed(4);
       if (seen.has(key)) return null; seen.add(key);
-      return { nom, type: isLocker ? 'Casier à colis' : typeLabel(t), carrier: carrier || undefined, locker: isLocker, lat: +lat, lon: +lon };
+      return { nom, rue, type: isLocker ? 'Casier à colis' : typeLabel(t), carrier: carrier || undefined, locker: isLocker, lat: +lat, lon: +lon };
     }).filter(Boolean)
       // Casiers/points de transporteur d'abord (les plus pertinents), puis alpha.
       .sort((a, b) => (b.carrier ? 1 : 0) - (a.carrier ? 1 : 0) || a.nom.localeCompare(b.nom));

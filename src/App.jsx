@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 1h';
+const BUILD_ID = 'v24/07 · 1h30';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -459,9 +459,9 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
             {/* Pastille « nombre de colis » en coin si c'est une marque */}
             {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
             {/* Étiquette NOM du point (rend chaque relais distinct d'un coup d'œil) */}
-            {(pts.length <= 14 || isSel || p.count > 0) && p.key && (
-              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 9.5, fontWeight: 800, color: p.count > 0 ? '#b3261e' : '#26303a', background: 'rgba(255,255,255,0.92)', borderRadius: 5, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(p.key).length > 16 ? String(p.key).slice(0, 15) + '…' : p.key}</span>
-            )}
+            {(() => { const lbl = p.label || p.key; return (pts.length <= 14 || isSel || p.count > 0) && lbl && (
+              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 9.5, fontWeight: 800, color: p.count > 0 ? '#b3261e' : '#26303a', background: 'rgba(255,255,255,0.92)', borderRadius: 5, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(lbl).length > 20 ? String(lbl).slice(0, 19) + '…' : lbl}</span>
+            ); })()}
           </div>
         );
       })}
@@ -8320,7 +8320,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
               // Filtre « casiers & transporteurs seulement » : on ne garde que
               // les points dont le transporteur est identifié (ou les casiers).
               if(carriersOnly && !pt.carrier && !pt.locker) return;
-              if(!groups[pt.nom] && !hiddenPts.has(norm2(pt.nom))) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type,carrier:pt.carrier};
+              if(hiddenPts.has(norm2(pt.nom))) return;
+              // Deux points de MÊME nom (ex. plusieurs « Casier Mondial Relay ») →
+              // on les distingue par la rue pour ne pas les fusionner.
+              let gk = pt.nom;
+              if(groups[gk] && pt.rue) gk = `${pt.nom} — ${pt.rue}`;
+              if(!groups[gk]) groups[gk]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type,carrier:pt.carrier,rue:pt.rue,nom:pt.nom};
             });
           }
           // Points relais OFFICIELS de Vinted (captés par l'extension) : la source
@@ -8347,7 +8352,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
           // retirer + tes points enregistrés. Les dizaines de relais de la ville
           // n'apparaissent QUE si tu n'as aucun colis (pour t'aider à en trouver un).
           const anyColis=avail.length>0;
-          const pins=Object.entries(groups).filter(([,g])=>g.lat && (g.colis.length>0 || g.saved || !anyColis)).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier}));
+          const pins=Object.entries(groups).filter(([,g])=>g.lat && (g.colis.length>0 || g.saved || !anyColis)).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier,label:(g.rue && /casier|point relais|^point /i.test(g.nom||k))?g.rue:(g.nom||k)}));
           // Liste : d'abord les points avec colis, puis le reste (points de la ville).
           const entriesSorted=Object.entries(groups).sort((a,b)=>(b[1].colis.length-a[1].colis.length)||a[0].localeCompare(b[0]));
           const withColis=entriesSorted.filter(([,g])=>g.colis.length>0);
@@ -8429,8 +8434,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                     <span style={{flex:1,minWidth:0}}>
                       <span style={{display:'flex',alignItems:'center',gap:6}}>
                         {g.carrier&&<CarrierBadge carrier={g.carrier} size={20}/>}
-                        <span style={{fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
+                        <span style={{fontSize:13.5,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nom||lieu}</span>
                       </span>
+                      {g.rue&&<span style={{display:'block',fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.rue}</span>}
                       <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:700,marginTop:1}}>{colis.length} code{colis.length>1?'s':''} de retrait{singlePoint?'':(isOpen?' · replier':' · voir')}</span>
                     </span>
                     {g.lat && <a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" onClick={(ev)=>ev.stopPropagation()} title="Itinéraire vers ce point relais" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'5px 9px',fontSize:11,fontWeight:800}}>🧭 Y aller</a>}
@@ -8499,9 +8505,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                       <div key={lieu} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 12px',borderTop:`1px solid ${C.border}55`}}>
                         {g.carrier?<CarrierBadge carrier={g.carrier} size={22}/>:<span style={{fontSize:15,flexShrink:0}}>📍</span>}
                         <span style={{flex:1,minWidth:0}}>
-                          <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lieu}</span>
-                          {g.type&&<span style={{display:'block',fontSize:10,color:C.muted}}>{g.type}</span>}
+                          <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nom||lieu}</span>
+                          <span style={{display:'block',fontSize:10,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.rue,g.type].filter(Boolean).join(' · ')||' '}</span>
                         </span>
+                        {g.lat&&<a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.blue||C.accent,fontSize:13,padding:'4px 7px'}}>🧭</a>}
                         <button onClick={()=>{ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); }} title="Retirer ce point de la carte" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',flexShrink:0,padding:'2px 6px'}}>✕</button>
                       </div>
                     ))}
