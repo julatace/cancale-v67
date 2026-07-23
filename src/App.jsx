@@ -1,5 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 
+// Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
+// si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
+const BUILD_ID = 'v23/07 · 22h';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -10719,6 +10722,7 @@ export default function App() {
           </div>
           <div>
             <div style={{fontWeight:900,fontSize:21,color:C.accent,letterSpacing:-0.3,lineHeight:1}}>VRM</div>
+            <div style={{fontSize:8.5,color:C.muted,fontWeight:700,letterSpacing:0.2,marginTop:1}}>{BUILD_ID}</div>
           </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:14}}>
