@@ -241,14 +241,62 @@ const fetchEmailOffers = async () => {
     return rows.map(r => r.data).filter(Boolean).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
 };
-// Ouvre le reçu authentique : PDF joint si présent, sinon l'email imprimable.
+// Ouvre le reçu d'achat : PDF joint si présent, sinon un reçu PROPRE reconstruit
+// à partir de l'email (montant, détail, vendeur, date, transaction) — plus le
+// texte brut de Vinted avec ses URLs de tracking illisibles.
 const openReceipt = (a) => {
   if (a.pdfB64) {
     const bytes = b64ToBytes(a.pdfB64);
     if (bytes) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); window.open(url, '_blank'); return; }
   }
   const w = window.open('', '_blank'); if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${(a.subject || 'Reçu Vinted').replace(/</g, '&lt;')}</title></head><body style="font-family:-apple-system,Arial,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;white-space:pre-wrap;line-height:1.5;color:#222"><h3>${(a.subject || '').replace(/</g, '&lt;')}</h3>${(a.texte || '').replace(/</g, '&lt;')}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`);
+  const esc = (s) => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  // On retire les astérisques de mise en forme Vinted pour parser proprement.
+  const txt = String(a.texte || '').replace(/\*/g, ' ');
+  const grab = (re) => { const m = txt.match(re); return m ? m[1].trim().replace(/\s{2,}/g, ' ') : ''; };
+  const eur = (re) => { const m = txt.match(re); return m ? m[1].replace('.', ',') + ' €' : ''; };
+  const article = a.article || grab(/commande\s*[«"“]\s*([^»"”\n]+)/i) || 'Article';
+  const vendeur = grab(/vendeur\s*:?\s*([^\n]+)/i);
+  const paid = a.prix ? (String(a.prix).replace('.', ',') + ' €') : eur(/montant\s*pay[ée]s?\s*:?\s*([\d.,]+)\s*€/i);
+  const artPrice = eur(/(?:^|\n)\s*article\s+([\d.,]+)\s*€/i);
+  const port = eur(/frais\s+de\s+port\s+([\d.,]+)\s*€/i);
+  const protection = eur(/protection\s+acheteurs?\s+([\d.,]+)\s*€/i);
+  const mode = grab(/mode\s+de\s+paiement\s*:?\s*([^\n]+)/i);
+  const datePaie = grab(/date\s+du\s+paiement\s*:?\s*([^\n]+)/i) || (a.receivedAt ? new Date(a.receivedAt).toLocaleString('fr-FR') : '');
+  const trans = a.transaction || grab(/transaction\s*:?\s*(\d+)/i);
+  const compte = a.account || '';
+  const line = (label, val, strong) => val ? `<tr><td style="padding:9px 0;color:#667;font-size:14px">${esc(label)}</td><td style="padding:9px 0;text-align:right;font-size:14px;${strong ? 'font-weight:800;color:#111' : 'color:#111'}">${esc(val)}</td></tr>` : '';
+  const breakdown = [line('Article', artPrice), line('Frais de port', port), line('Protection acheteurs', protection)].join('');
+  const meta = [line('Vendeur', vendeur), line('Mode de paiement', mode), line('Date du paiement', datePaie), line('N° de transaction', trans), line('Compte', compte)].join('');
+  // Repli : texte de l'email nettoyé (URLs de tracking + pied de page retirés).
+  const cleaned = txt
+    .replace(/<https?:\/\/[^>]+>/g, '').replace(/https?:\/\/links\.vinted\.com\/\S+/gi, '')
+    .split('\n').map(l => l.trim())
+    .filter(l => l && !/nous sommes tenus|d[ée]sabonner|politique de confidentialit|termes et conditions|pour conna[îi]tre vos droits|l['’]équipe vinted/i.test(l))
+    .join('\n');
+  const hasStructured = !!(paid || breakdown || meta);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#f4f6f5;color:#111;-webkit-print-color-adjust:exact">
+    <div style="max-width:520px;margin:0 auto;padding:20px 16px 40px">
+      <div style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.07)">
+        <div style="background:#007782;color:#fff;padding:18px 20px">
+          <div style="font-size:12px;opacity:.85;font-weight:700;letter-spacing:.4px;text-transform:uppercase">Reçu d'achat Vinted</div>
+          <div style="font-size:19px;font-weight:800;margin-top:3px">${esc(article)}</div>
+        </div>
+        ${hasStructured ? `
+        <div style="padding:18px 20px">
+          ${paid ? `<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #eef1f0;margin-bottom:6px">
+            <span style="font-size:14px;color:#667;font-weight:700">Montant payé</span>
+            <span style="font-size:26px;font-weight:900;color:#007782">${esc(paid)}</span></div>` : ''}
+          ${breakdown ? `<table style="width:100%;border-collapse:collapse">${breakdown}</table>` : ''}
+          ${meta ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;border-top:1px solid #eef1f0">${meta}</table>` : ''}
+        </div>` : `
+        <div style="padding:18px 20px;white-space:pre-wrap;line-height:1.6;font-size:14px;color:#333">${esc(cleaned)}</div>`}
+      </div>
+      <button onclick="window.print()" style="display:block;width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;background:#111;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🖨 Imprimer / Enregistrer en PDF</button>
+      <div style="text-align:center;color:#99a;font-size:11px;margin-top:12px">Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
+    </div>
+  </body></html>`);
   w.document.close();
 };
 // Génère un QR code (data URL GIF) à partir d'un texte — code de retrait ou n° de
