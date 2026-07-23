@@ -6728,14 +6728,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   const entryKeyByPhoto = (o) => { const pk = o ? photoKey(o.photo_url || (o.photo && o.photo.url)) : null; return pk ? (numerosByPhoto[pk] || null) : null; };
   const resolvedEntry = (o) => {
     const linked = o && o.transaction_id != null ? txnLink[String(o.transaction_id)] : null;
-    if (linked && numeros[linked]) return numeros[linked];
+    if (linked && numeros[linked]) {
+      const e = numeros[linked];
+      // Garde-fou : si un ANCIEN verrouillage (par titre) a relié une vente à une
+      // paire d'une AUTRE pointure, le lien est faux → on l'ignore et on ré-évalue
+      // par la photo / le titre+taille ci-dessous.
+      const saleSz = normSize(extractSize(o && o.title)), eSz = normSize(e.size);
+      if (!(saleSz && eSz && saleSz !== eSz)) return e;
+    }
     // 1) Par la PHOTO (fiable, gère les titres en double, sans N° dans le titre).
     const pk = entryKeyByPhoto(o);
     if (pk && numeros[pk]) return numeros[pk];
-    // 2) Sinon par le titre exact (si non ambigu).
-    if (o && !titleAmbiguous(o.title)) return entryByTitle(o.title);
+    // 2) Sinon par le titre en départageant par la POINTURE : deux mêmes titres
+    //    en tailles différentes → on prend la bonne ; vraiment identiques → rien
+    //    (on ne devine pas, la vente reste « à relier » à la main).
+    if (o) { const e = entryByTitleLoose(o.title, extractSize(o.title)); if (e) return e; }
     return null;
   };
+  // Clé (id d'annonce) d'une entrée numéro, par référence — pour le verrouillage.
+  const keyOfEntry = (e) => { if (!e) return null; for (const k in numeros) { if (numeros[k] === e) return k; } return null; };
   // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
@@ -6961,8 +6972,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
       const tid = o.transaction_id != null ? String(o.transaction_id) : null;
       if (!tid || next[tid]) continue;
       // On verrouille d'abord par la photo (marche même si le titre est en double),
-      // sinon par le titre exact non ambigu.
-      const key = entryKeyByPhoto(o) || (titleAmbiguous(o.title) ? null : entryKeyByTitle(o.title));
+      // sinon par le titre départagé par la POINTURE (jamais si vraiment ambigu).
+      const key = entryKeyByPhoto(o) || keyOfEntry(entryByTitleLoose(o.title, extractSize(o.title)));
       if (key) { next[tid] = key; changed = true; }
     }
     if (changed) { setTxnLink(next); save('vinted_txn_link', next); }
