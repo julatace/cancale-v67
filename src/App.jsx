@@ -6278,6 +6278,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // sinon par titre non ambigu, sinon dans les annonces/ventes chargées.
   const bordPhoto = (b) => {
     const man = manualEntry(b); if (man && man.photo) return man.photo; // lien manuel prioritaire
+    // Le plus fiable : la VENTE liée par n° de transaction → vraie photo Vinted.
+    if (b.transaction) { const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction)); if (so && (so.photo_url || so.photo)) return so.photo_url || so.photo; }
     if (b.numero) { for (const k in numeros) { const e2 = numeros[k]; if (e2 && String(e2.numero) === String(b.numero) && e2.photo) return e2.photo; } }
     const title = b.modele || b.article || '';
     if (title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.photo) return e2.photo; } // paire numérotée (match tolérant + départage par taille)
@@ -7637,6 +7639,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     let num = b.numero || '';
     const title = b.modele || b.article || '';
     if (!num && title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.numero) num = String(e2.numero); } // match tolérant + départage par taille → retrouve le N° même si le titre email diffère / est en double
+    // Filet le plus fiable : la vente liée (par transaction) retrouve le N° via
+    // le lien verrouillé vente↔annonce, même si le titre de l'email diffère.
+    if (!num && b.transaction) { const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction)); if (so) { const e3 = effEntry(so); if (e3 && e3.numero) num = String(e3.numero); } }
     return num;
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
@@ -8783,39 +8788,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 const va=da&&da.days!=null?da.days:Infinity, vb=db&&db.days!=null?db.days:Infinity; if(va!==vb) return va-vb;
                 return new Date(b2.receivedAt||0)-new Date(a.receivedAt||0);
               }).map((b,i)=>(
-                <div key={i} data-bord-card style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${INV_STATUS.online.color}55`,...(isBordDone(b)?{opacity:0.4,filter:'grayscale(0.9)'}:{}),background:`${INV_STATUS.online.color}0e`,borderRadius:10}}>
-                  {(()=>{ const ph=bordPhoto(b); return (
-                    <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      {ph?<img src={ph} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>📄</span>}
+                <div key={i} data-bord-card style={{padding:'11px 12px',border:`1px solid ${INV_STATUS.online.color}44`,...(isBordDone(b)?{opacity:0.45,filter:'grayscale(0.85)'}:{}),background:C.card,borderRadius:14}}>
+                  {/* Ligne haute : photo + infos de la paire */}
+                  <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                    {(()=>{ const ph=bordPhoto(b); return (
+                      <div style={{width:58,height:58,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {ph?<img src={ph} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>📄</span>}
+                      </div>
+                    ); })()}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6}}>
+                        {(()=>{ const nn=numForBord(b); return nn?<span style={{fontSize:12,fontWeight:900,color:'#fff',background:INV_STATUS.online.color,borderRadius:7,padding:'2px 7px',flexShrink:0}}>N°{nn}</span>:null; })()}
+                        <span style={{fontSize:13.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.modele||b.article||'Bordereau'}</span>
+                      </div>
+                      <div style={{fontSize:11,color:C.muted,marginTop:3}}>{[b.taille?`Pointure ${b.taille}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
+                      {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{display:'inline-block',fontSize:11,fontWeight:800,marginTop:5,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,background:`${dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}14`,borderRadius:7,padding:'2px 8px'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"À poster aujourd'hui":dl.days===1?'À poster demain':'À poster avant'} {dl.text}</div> : null; })()}
+                      {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:11,fontWeight:800,marginTop:5,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
                     </div>
-                  ); })()}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(()=>{ const nn=numForBord(b); return nn?`N°${nn} · `:''; })()}{b.modele||b.article||'Bordereau'}</div>
-                    <div style={{fontSize:10.5,color:C.muted}}>{[b.taille?`T${b.taille}`:'', b.transaction?`transaction ${b.transaction}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
-                    {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{fontSize:10.5,fontWeight:800,marginTop:2,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"Auj.":dl.days===1?'Demain':'Avant'} {dl.text}</div> : null; })()}
-                    {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:10,fontWeight:800,marginTop:2,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
+                    <button type="button" onClick={()=>{ if(window.confirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }} title="Masquer ce bordereau" aria-label="Masquer ce bordereau" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:16,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}>✕</button>
                   </div>
-                  <button type="button" onClick={()=>{ if(window.confirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }} title="Masquer ce bordereau" aria-label="Masquer ce bordereau" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 5px',fontFamily:'inherit'}}>✕</button>
-                  {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{flexShrink:0,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🔗 Relier</button>}
-                  {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:800,textDecoration:'none'}}>🔍</a>}
-                  <button type="button" onClick={()=>{
-                    // Tamponnage LOCAL systématique : utilise toujours
-                    // l'emplacement mémorisé LE PLUS RÉCENT pour ce format
-                    // (le pré-tamponnage serveur peut dater d'avant un réglage).
-                    const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
-                    const title=b.modele||b.article||'';
-                    // N° absent de l'email ? On le retrouve dans les annonces
-                    // numérotées par le titre (sauf si le titre est ambigu).
-                    processBordereau(numForBord(b), title, bytes);
-                  }} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800}}>🖨 Imprimer</button>
-                  <button type="button" onClick={()=>toggleBordPrinted(b)}
-                    title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé (grise la carte en attendant l\'expédition)'}
-                    style={{flexShrink:0,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit',
-                      border:`1.5px solid ${isBordPrinted(b)?C.accent:C.border}`,
-                      background:isBordPrinted(b)?C.accent:'transparent',
-                      color:isBordPrinted(b)?'#fff':C.muted}}>
-                    {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
-                  </button>
+                  {/* Ligne basse : actions, alignées, sans surcharge */}
+                  <div style={{display:'flex',gap:8,alignItems:'center',marginTop:11}}>
+                    <button type="button" onClick={()=>{
+                      const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
+                      processBordereau(numForBord(b), b.modele||b.article||'', bytes);
+                    }} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit'}}>🖨 Imprimer</button>
+                    {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{flexShrink:0,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit'}}>🔗 Relier</button>}
+                    {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}
+                    <button type="button" onClick={()=>toggleBordPrinted(b)}
+                      title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
+                      style={{flexShrink:0,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit',
+                        border:`1.5px solid ${isBordPrinted(b)?C.accent:C.border}`,
+                        background:isBordPrinted(b)?C.accent:'transparent',
+                        color:isBordPrinted(b)?'#fff':C.muted}}>
+                      {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
