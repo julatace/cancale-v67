@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v23/07 · 23h';
+const BUILD_ID = 'v23/07 · 23h30';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -242,6 +242,18 @@ const fetchEmailOffers = async () => {
     if (!res.ok) return [];
     const rows = await res.json();
     return rows.map(r => r.data).filter(Boolean).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+  } catch (_) { return []; }
+};
+// Emails de VENTE (« X a acheté ton article ») : lignes email_sale_* =
+// { designation (titre), prix, account, receivedAt }. Source 24/7 sans appel
+// Vinted → sert à retirer AUTOMATIQUEMENT une annonce vendue.
+const fetchEmailSales = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return [];
+    return (await res.json()).map(r => r.data).filter(Boolean);
   } catch (_) { return []; }
 };
 // Extrait les champs propres d'un reçu d'achat depuis l'email Vinted (montant,
@@ -6247,6 +6259,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   const [soldManual, setSoldManual] = useState(() => new Set(load('vinted_annonces_vendues', [])));
   const markSold = (id) => setSoldManual(prev => { const n=new Set(prev); n.add(String(id)); save('vinted_annonces_vendues',[...n]); return n; });
   const unmarkSold = (id) => setSoldManual(prev => { const n=new Set(prev); n.delete(String(id)); save('vinted_annonces_vendues',[...n]); return n; });
+  const [emailSales, setEmailSales] = useState(null); // emails de vente (auto-retrait des annonces vendues)
+  const [showEmailSold, setShowEmailSold] = useState(false); // réafficher les annonces retirées auto
   const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
   // Le cloud est-il chargé ? Tant qu'il ne l'est pas, on NE numérote PAS (sinon on
   // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
@@ -6826,8 +6840,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
 
   // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
   // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
+  // Annonces à retirer AUTOMATIQUEMENT car une VENTE est confirmée par email.
+  // Règle PRUDENTE : on ne retire une paire que si le nombre d'emails de vente
+  // pour ce titre+taille est >= au nombre d'annonces en ligne du même titre+taille
+  // (donc on est sûr qu'il n'en reste aucune à vendre). Sinon on ne touche à rien
+  // (cas ambigu : plusieurs exemplaires dont un encore en vente).
+  const emailSoldIds = useMemo(() => {
+    const out = new Set();
+    if (!emailSales || !emailSales.length || !listings.items) return out;
+    const key = (t, z) => normTitle(t) + '|' + (z || '');
+    const onlineBy = {};
+    for (const it of listings.items) { const k = key(it.title, extractSize(it.title) || it.size); (onlineBy[k] = onlineBy[k] || []).push(it); }
+    const saleCount = {};
+    for (const s of emailSales) { const t = s.designation || s.article || ''; if (!t) continue; const k = key(t, extractSize(t)); saleCount[k] = (saleCount[k] || 0) + 1; }
+    for (const k in saleCount) {
+      const items = onlineBy[k]; if (!items || !items.length) continue;
+      if (saleCount[k] >= items.length) items.forEach(it => out.add(String(it.id))); // toutes vendues
+    }
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailSales, listings.items]);
   const annShown = useMemo(() => {
-    let arr = [...(listings.items || [])].filter(it => !soldManual.has(String(it.id)));
+    let arr = [...(listings.items || [])].filter(it => !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id))));
     const q = annSearch.trim().toLowerCase();
     if (q) arr = arr.filter(it => {
       const num = String(numeros[it.id]?.numero || '');
@@ -6858,7 +6892,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, annSearch, annSort, numeros, soldManual]);
+  }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
   const annStats = useMemo(() => {
     const arr = listings.items || [];
@@ -7014,6 +7048,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     setConvs({ loading:false, items: out, error });
   };
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
@@ -8539,6 +8574,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
             <button onClick={()=>loadListings(true)} disabled={listings.loading} title="Va chercher tes annonces EN DIRECT sur Vinted (tous comptes) — enlève les paires vendues qui traînent encore" style={{marginLeft:'auto',fontSize:12,fontWeight:800,color:'#fff',background:C.accent,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:listings.loading?'default':'pointer',opacity:listings.loading?0.6:1}}>{listings.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
             <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:800,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
+          {emailSoldIds.size>0 && (
+            <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
+              <span style={{color:INV_STATUS.online.color,fontWeight:800}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
+              <span style={{flex:1,minWidth:0}}>vente confirmée par email — plus besoin d'attendre la synchro.</span>
+              <button onClick={()=>setShowEmailSold(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',fontSize:11.5,padding:0,fontFamily:'inherit'}}>{showEmailSold?'masquer':'voir'}</button>
+            </div>
+          )}
           {soldManual.size>0 && (()=>{ const hidden=(listings.items||[]).filter(it=>soldManual.has(String(it.id))); if(!hidden.length) return null; return (
             <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:10,padding:'7px 11px'}}>
               <span style={{color:C.warn,fontWeight:800}}>✓ {hidden.length} annonce{hidden.length>1?'s':''} marquée{hidden.length>1?'s':''} vendue{hidden.length>1?'s':''}</span>
