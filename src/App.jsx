@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 0h';
+const BUILD_ID = 'v24/07 · 0h30';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6371,6 +6371,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     return null;
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
+  const [showRelais, setShowRelais] = useState(false); // carte des relais dépliée (repliée par défaut si rien à retirer)
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [offers, setOffers] = useState(null); // offres reçues (Copilote d'offres)
@@ -8296,8 +8297,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
         {vintedToPickup.length===0 && (tracking||[]).some(isPickupActive) && (
           <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Points relais & QR de retrait</button>
         )}
-        {/* Carte des points relais : où retirer tes colis + codes/QR de retrait. */}
-        {(()=>{
+        {/* Carte des points relais : où retirer tes colis + codes/QR de retrait.
+            Repliée par défaut quand il n'y a AUCUN colis à retirer (elle prenait
+            tout l'écran avant les achats). */}
+        {(()=>{ const hasPickup=(tracking||[]).some(isPickupActive)||vintedToPickup.length>0; return !hasPickup ? (
+          <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit',marginBottom:12}}>📍 Points relais {ville?`de ${ville}`:''} <span style={{color:C.muted}}>{showRelais?'▲ masquer':'▼ voir la carte'}</span></button>
+        ) : null; })()}
+        {(()=>{ const hasPickup=(tracking||[]).some(isPickupActive)||vintedToPickup.length>0; return (hasPickup || showRelais); })() && (()=>{
           const avail=(tracking||[]).filter(isPickupActive);
           const norm=s=>String(s||'').toLowerCase();
           // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
@@ -8500,33 +8506,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
             </div>
           );
         })()}
-        {/* Colis en route / livrés */}
-        {(()=>{
-          const rest=(tracking||[]).filter(t=>t.status!=='available');
-          if(!rest.length) return null;
-          return (
-          <div style={{marginBottom:14}}>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {rest.slice(0,8).map((t,i)=>{
-                const col = t.status==='delivered'?INV_STATUS.online.color:t.status==='transit'?C.warn:C.muted;
-                const icon = t.status==='delivered'?'✅':t.status==='transit'?'🚚':'📦';
-                return (
-                  <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:12}}>
-                    <span style={{fontSize:18}}>{icon}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12.5,fontWeight:800,color:col}}>{t.statusLabel||'Mise à jour'}</div>
-                      <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {carrierName(t.carrier)}{t.suivi?` · n°${t.suivi}`:''}{t.artTitle?` · ${t.artTitle}`:''}{t.receivedAt?` · ${new Date(t.receivedAt).toLocaleDateString('fr-FR')}`:''}
-                      </div>
-                    </div>
-                    {t.suivi && <a href={trackUrl(t.carrier,t.suivi)} target="_blank" rel="noreferrer" style={{flexShrink:0,padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:11.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          );
-        })()}
+        {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
+            chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
