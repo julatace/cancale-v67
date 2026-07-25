@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v25/07 · 🔍';
+const BUILD_ID = 'v25/07 · ⚡';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -1669,7 +1669,7 @@ function Onboarding({ setTab }) {
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -1935,6 +1935,30 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo}) {
         <h2 style={{margin:0,color:C.text,fontSize:24,fontWeight:800,letterSpacing:-0.5}}>Tableau de bord</h2>
         <div style={{fontSize:12,color:C.muted,marginTop:2}}>Vue d'ensemble de ton activité</div>
       </div>
+
+      {/* À FAIRE : ce qui demande une action, tout de suite, en haut de l'accueil.
+          Réutilise le centre de notifications (mêmes items). Rien = tout est à jour. */}
+      {Array.isArray(actions) && (
+        actions.length>0 ? (
+          <div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:8}}>À faire</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {actions.map((a,i)=>(
+                <button key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'12px 14px',cursor:'pointer'}}>
+                  <span style={{fontSize:22,flexShrink:0}}>{a.icon}</span>
+                  <span style={{flex:1,fontSize:14,fontWeight:800,color:C.text}}>{a.text}</span>
+                  <span style={{fontSize:18,color:C.muted}}>›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'12px 14px'}}>
+            <span style={{fontSize:20}}>✅</span>
+            <span style={{fontSize:13.5,fontWeight:700,color:C.text}}>Tout est à jour — rien qui presse ✨</span>
+          </div>
+        )
+      )}
 
       {/* Résumé Vinted EN DIRECT (cliquable) */}
       {liveStats && (
@@ -6041,7 +6065,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                       return (
                         <div key={listing.id} style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',background:C.bg,opacity:linked?0.6:1}}>
                           <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {listing.photo ? <img src={listing.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}>👟</span>}
+                            {listing.photo ? <img src={listing.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}>👟</span>}
                           </div>
                           <div style={{padding:8}}>
                             <div title={listing.title} style={{fontSize:11,fontWeight:600,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:28}}>{listing.title}</div>
@@ -6079,7 +6103,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           return (
             <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:10,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                {p.photo ? <img src={p.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}>👟</span>}
+                {p.photo ? <img src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}>👟</span>}
               </div>
               <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
                 <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>N°</div>
@@ -8285,7 +8309,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
               <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:8}}>
                <div style={{display:'flex',gap:10,alignItems:'center'}}>
                 <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
+                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
@@ -8359,7 +8383,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
             <div style={{display:'flex',flexDirection:'column',gap:7}}>
               {vintedToPickup.slice(0,25).map(o=>(
                 <div key={o.transaction_id} style={{display:'flex',gap:9,alignItems:'center'}}>
-                  <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
+                  <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div><div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · au point relais</div></div>
                   {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
                   <button type="button" onClick={()=>markPickupDone(o)} title="J'ai récupéré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
@@ -8536,7 +8560,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                       return (
                         <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 13px',borderTop:i>0?`1px solid ${C.accent}22`:'none'}}>
                           <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {buy&&buy.photo_url?<img src={buy.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📦</span>}
+                            {buy&&buy.photo_url?<img src={buy.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📦</span>}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
@@ -8617,7 +8641,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
             <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,opacity:cancelled?0.55:1,padding:'9px 10px'}}>
               <div style={{display:'flex',gap:10,alignItems:'center'}}>
                 <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
+                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
@@ -8723,7 +8747,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                     return (
                       <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.warn}22`}}>
                         <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                          {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
@@ -8760,7 +8784,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                     return (
                       <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.border}`}}>
                         <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                          {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
@@ -8793,7 +8817,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                     return (
                       <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${INV_STATUS.online.color}22`}}>
                         <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                          {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
@@ -8847,7 +8871,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
               <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:14,overflow:'hidden',background:C.card,border:`1.5px solid ${soldBord?C.warn:num?C.accent:C.border}`,...(soldBord?{opacity:0.8}:{}),display:'flex',flexDirection:'column'}}>
                 <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
                   <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:34}}>👟</span>}
+                    {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:34}}>👟</span>}
                   </div>
                   {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:900,padding:'4px 8px',borderRadius:8,textAlign:'center'}}>📦 VENDUE — bordereau reçu</div>}
                   {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'3px 9px',borderRadius:999}}>N°{num}</div>}
@@ -9051,7 +9075,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                   <div style={{display:'flex',gap:12,alignItems:'center'}}>
                     {(()=>{ const ph=bordPhoto(b); return (
                       <div style={{width:58,height:58,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {ph?<img src={ph} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>📄</span>}
+                        {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>📄</span>}
                       </div>
                     ); })()}
                     <div style={{flex:1,minWidth:0}}>
@@ -9108,7 +9132,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
               {list.map(o=>{ const num=effEntry(o)?.numero||''; const st=classifyOrderStatus(o.status);
                 return (
                   <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
-                    <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
+                    <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</div>
                       <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -9142,7 +9166,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat disponible.</div>;
                 return avail.map(p => (
                   <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
+                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title}</div>
                       <div style={{fontSize:10,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
@@ -9659,7 +9683,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:10,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:42,height:42,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {e.photo?<img src={e.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>👟</span>}
+                    {e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>👟</span>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:900,color:C.text}}>N°{e.num}{e.size!=null&&String(e.size).trim()!==''?` · T${e.size}`:''}</div>
@@ -9753,7 +9777,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 </div>
                 {w.bestPair && (
                   <div style={{background:'rgba(255,255,255,0.16)',borderRadius:16,padding:14,display:'flex',gap:12,alignItems:'center'}}>
-                    <div style={{width:52,height:52,borderRadius:12,overflow:'hidden',background:'rgba(0,0,0,0.2)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:24}}>👑</span>}</div>
+                    <div style={{width:52,height:52,borderRadius:12,overflow:'hidden',background:'rgba(0,0,0,0.2)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:24}}>👑</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:11,color:'rgba(255,255,255,0.85)',fontWeight:800,textTransform:'uppercase',letterSpacing:1}}>👑 Paire de l'année</div>
                       <div style={{fontSize:14,fontWeight:900,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
@@ -9800,7 +9824,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                   <div style={{display:'flex',flexDirection:'column'}}>
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
-                        <div style={{width:32,height:32,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&buy.photo_url?<img src={buy.photo_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
+                        <div style={{width:32,height:32,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&buy.photo_url?<img src={buy.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{t.code&&<div style={{fontSize:10,color:C.muted}}>code {t.code}</div>}</div>
                         <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
@@ -9882,7 +9906,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
         );
         const Row = ({num,e}) => (
           <div key={num} style={{display:'flex',gap:8,alignItems:'center',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'5px 8px'}}>
-            <div style={{width:30,height:30,borderRadius:6,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<img src={e.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}>👟</span>}</div>
+            <div style={{width:30,height:30,borderRadius:6,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}>👟</span>}</div>
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:800,color:C.text}}>N°{num}{e&&e.size?` · T${e.size}`:''}</div><div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(e&&e.title)||''}</div></div>
           </div>
         );
@@ -9946,7 +9970,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 <button key={it.id} type="button" onClick={()=>setLotSel(prev=>{ const n=new Set(prev); if(n.has(it.id))n.delete(it.id); else n.add(it.id); return n; })}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?`${C.accent}0e`:C.card,borderRadius:10,padding:'7px 9px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:20,height:20,borderRadius:6,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900}}>{sel?'✓':''}</div>
-                  <div style={{width:38,height:38,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}</div>
+                  <div style={{width:38,height:38,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}</div>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:10.5,color:C.muted}}>{[it.size,it.price!=null?`${it.price} ${cur(it.currency)}`:null].filter(Boolean).join(' · ')}</div></div>
                   {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:900,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')} €</div>}
                 </button>
@@ -9973,7 +9997,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
           <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{width:52,height:52,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {photo?<img src={photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
+                {photo?<img src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:900,color:C.text}}>📖 Passeport {num?`· N°${num}`:''}</div>
@@ -10835,7 +10859,9 @@ export default function App() {
       const seenConvs = load('vinted_notif_seen_convs', {});
       const firstMsgRun = localStorage.getItem('vinted_notif_seen_convs')===null;
       const nextSeen = {}; // reconstruit à chaque passage -> se purge tout seul
-      let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0;
+      const nums = load('vinted_annonce_numeros', {}); // pour repérer les annonces sans N°
+      const ageDays=(it)=>{ let ts=null; if(it.createdTs!=null) ts=it.createdTs<1e12?it.createdTs*1000:it.createdTs; else { const e=nums[it.id]; if(e&&e.numberedAt){ const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } } return ts!=null?Math.floor((Date.now()-ts)/86400000):null; };
+      let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
       for(const a of vintedAccounts){
         const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
         if(inbox && Array.isArray(inbox.conversations)){
@@ -10853,6 +10879,18 @@ export default function App() {
           salesCount += sold.my_orders.filter(o=>classifyOrderStatus(o.status)!=='cancelled').length;
           toShipCount += sold.my_orders.filter(o=>needsBordereau(o.status)).length;
         }
+        // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
+        // (≥30 j → baisser le prix, action GRATUITE) et celles SANS numéro.
+        const listH=await fetchHarvest(a.vinted_user_id,'listings');
+        if(listH && Array.isArray(listH.items)){
+          for(const raw of listH.items){
+            if(!isOnlineListing(raw)) continue;
+            const it=mapWardrobeItem(raw);
+            const age=ageDays(it);
+            if(age!=null && age>=30) sleepCount+=1;
+            if(!nums[it.id] || !nums[it.id].numero) noNumCount+=1;
+          }
+        }
       }
       // Colis à retirer (emails transporteurs) : source légère, module-level.
       let colisCount=0;
@@ -10863,6 +10901,9 @@ export default function App() {
       if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
       if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_ventes'});
       if(unreadTotal>0)  items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}`, n:unreadTotal, tab:'cat_msg'});
+      // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
+      if(noNumCount>0)   items.push({icon:'🔢', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
+      if(sleepCount>0)   items.push({icon:'😴', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui dort → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF si l'échéance de déclaration approche (≤ 14 j) ou est passée.
       try{
         const due=nextUrssafDeadline(load('vinted_urssaf_freq','trimestriel'));
@@ -10994,7 +11035,7 @@ export default function App() {
         const total = pairs.length+ventes.length+achats.length;
         const go=(tab)=>{ setGsOpen(false); setTab(tab); };
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:7,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
-        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<img src={src} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>{fb||'👟'}</span>}</div>;
+        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<img src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>{fb||'👟'}</span>}</div>;
         return (
         <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
@@ -11135,7 +11176,7 @@ export default function App() {
           dark={dark} toggleDark={toggleDark}/>}
         {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab}/>}
+        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab} actions={notifItems}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
