@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v25/07 · 🛡️';
+const BUILD_ID = 'v25/07 · 🌐';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -170,15 +170,34 @@ const fetchVintedLogin = async (account) => {
 // null si l'extension n'a pas encore capté cette donnee (= tu n'as pas encore
 // ouvert la page correspondante sur vinted.fr). Aucun appel a Vinted ici :
 // c'est le mode le plus discret, tout vient de ta navigation.
-const fetchHarvest = async (uid, type) => {
+// ⚠️ FRAÎCHEUR DE LA MOISSON (juillet 2026 — bug « paire vendue encore en
+// ligne »). L'extension ne capte QUE pendant que tu navigues sur vinted.fr. Si
+// tu n'y vas plus pendant 2 semaines, la moisson reste figée : l'app affichait
+// alors un instantané vieux de 18 jours en le croyant à jour (une paire vendue
+// depuis apparaissait encore « en ligne »). On considère donc une moisson
+// PÉRIMÉE au-delà de ce délai → l'app retombe sur un vrai appel (comme le
+// bouton « Synchroniser »). En dessous, on garde le mode discret (0 requête).
+const HARVEST_MAX_AGE_MS = 12 * 3600 * 1000; // 12 h
+// Âge de la dernière moisson lue, par uid+type → sert à AFFICHER la date des
+// données dans l'UI (« données du 7 juil. ») au lieu de laisser croire au direct.
+const _harvestSeen = {};
+const harvestAgeMs = (uid, type) => { const t = _harvestSeen[`${uid}_${type}`]; return t ? (Date.now() - t) : null; };
+const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data,updated_at`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return null;
     const rows = await res.json();
-    return rows[0]?.data?.payload || null;
+    const row = rows[0];
+    if (!row) return null;
+    const ts = row.updated_at ? new Date(row.updated_at).getTime() : NaN;
+    if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
+    // Trop vieille → on répond « rien capté », l'appelant ira chercher le direct.
+    const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
+    if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
+    return row.data?.payload || null;
   } catch (_) { return null; }
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
@@ -490,10 +509,10 @@ const b64ToBytes = (b64) => {
 // lignes sont nommées harvest_{uid}_orders_{type} où {type} est le param d'URL
 // capté par l'extension (sold/sell pour les ventes, bought/buy/purchased pour
 // les achats). On classe par le nom de la clé pour être robuste au libellé exact.
-const fetchHarvestOrders = async (uid, side) => {
+const fetchHarvestOrders = async (uid, side, opts = {}) => {
   if (!uid) return null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data,updated_at`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return null;
@@ -503,7 +522,14 @@ const fetchHarvestOrders = async (uid, side) => {
       const key = String(r.id).replace(`harvest_${uid}_orders_`, '');
       const isSold = /sold|sell/i.test(key);
       const isBought = /bought|buy|purchas/i.test(key);
-      if ((wantSold && isSold) || (!wantSold && isBought)) return r.data?.payload || null;
+      if ((wantSold && isSold) || (!wantSold && isBought)) {
+        // Même garde-fou de fraîcheur que fetchHarvest (voir son commentaire).
+        const ts = r.updated_at ? new Date(r.updated_at).getTime() : NaN;
+        if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
+        const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
+        if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
+        return r.data?.payload || null;
+      }
     }
     return null;
   } catch (_) { return null; }
@@ -8884,6 +8910,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
         {listings.items && !listings.error && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune annonce en ligne.<br/><span style={{fontSize:11.5}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici.</span></div>}
         {listings.items && listings.items.length>0 && (<>
+          {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
+              Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
+              affichait un instantané périmé en le faisant passer pour du direct
+              → une paire vendue restait « en ligne » indéfiniment). */}
+          {(()=>{
+            let oldest = null;
+            for (const a of accounts) { const ms = harvestAgeMs(a.vinted_user_id, 'listings'); if (ms != null && (oldest == null || ms > oldest)) oldest = ms; }
+            if (oldest == null || oldest < 2*86400000) return null; // < 2 j : rien à signaler
+            const j = Math.floor(oldest/86400000);
+            return (
+              <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'7px 11px'}}>
+                <span style={{color:C.warn,fontWeight:800}}>🌐 Lecture en direct</span>
+                <span style={{flex:1,minWidth:180}}>L'extension n'a rien capté depuis <b>{j} j</b> (tu n'es pas repassé sur vinted.fr) — l'app interroge donc Vinted directement pour ne pas t'afficher de vieilles annonces.</span>
+              </div>
+            );
+          })()}
           {/* Bandeau de stats façon outil pro */}
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
             <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>{annStats.n} en ligne</span>
