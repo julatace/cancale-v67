@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 2h15';
+const BUILD_ID = 'v24/07 · 3h';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7111,6 +7111,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
     return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
   };
+  // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
+  // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
+  // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
+  const venteStage = (o) => {
+    const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
+    if (classifyOrderStatus(o.status) === 'cancelled') return { label: 'Annulée', color: C.danger };
+    if (/finalis/i.test(s) || tus === 'completed') return { label: '✅ Vendue', color: INV_STATUS.online.color };
+    if (/livr|remis|r[ée]ception/i.test(s)) return { label: '📦 Livrée', color: C.blue || C.accent };
+    if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: '📦 Au relais', color: C.blue || C.accent };
+    if (/transit|achemin|exp[eé]di|envoy|en\s+route/i.test(s)) return { label: '🚚 En transit', color: C.blue || C.accent };
+    if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: '📮 À expédier', color: C.warn };
+    if (/pay|valid|pr[ée]par/i.test(s)) return { label: 'Payée', color: C.muted };
+    return { label: 'En cours', color: C.warn };
+  };
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
 
@@ -8250,9 +8264,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                   <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    <span style={{color:st==='completed'?INV_STATUS.online.color:st==='cancelled'?C.danger:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':st==='cancelled'?'annulée':'en cours'}</span>
+                    {(()=>{ const vs=venteStage(o); return <span style={{color:vs.color,fontWeight:900,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px'}}>{vs.label}</span>; })()}
                     {o.status && <span style={{color:C.muted,fontStyle:'italic',opacity:0.8}} title="Statut exact renvoyé par Vinted">« {o.status} »</span>}
-                    {needsBordereau(o.status) && <span style={{color:C.accent,fontWeight:800}}>· à expédier</span>}
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:800,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:700}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
                     {st==='cancelled' && num && <span style={{color:C.warn,fontWeight:800,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'1px 8px'}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>}
                     {!num && st!=='cancelled' && <span style={{color:C.warn,fontWeight:800}} title="Paire pas encore identifiée automatiquement (photo non reconnue). Ajoute son N° et son prix d'achat dans les champs ci-dessous.">⚠️ à identifier</span>}
