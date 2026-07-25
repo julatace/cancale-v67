@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 3h30';
+const BUILD_ID = 'v24/07 · 4h';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7946,6 +7946,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 </div>
               )}
             </div>
+
+            {/* 🗓️ Bilan de la semaine (7 derniers jours) — depuis les emails de
+                vente (fiable), + ce qu'il reste à expédier. */}
+            {(()=>{
+              const weekAgo = Date.now() - 7*86400000;
+              const ws = (emailSales||[]).filter(s=>{ const d=s.receivedAt?new Date(s.receivedAt).getTime():0; return d>=weekAgo; });
+              let wca=0; for(const s of ws){ const p=parseFloat(String(s.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) wca+=p; }
+              if(!ws.length && !toShip.length) return null;
+              return (
+                <div style={{marginBottom:14,border:`1px solid ${C.accent}33`,background:`${C.accent}0a`,borderRadius:15,padding:'13px 15px'}}>
+                  <div style={{fontSize:12,fontWeight:900,color:C.text,marginBottom:9}}>🗓️ Ta semaine</div>
+                  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                    <div style={{flex:'1 1 90px'}}>
+                      <div style={{fontSize:22,fontWeight:900,color:C.accent,lineHeight:1}}>{ws.length}</div>
+                      <div style={{fontSize:10.5,color:C.muted,fontWeight:700,marginTop:2}}>vente{ws.length>1?'s':''} · 7 j</div>
+                    </div>
+                    <div style={{flex:'1 1 90px'}}>
+                      <div style={{fontSize:22,fontWeight:900,color:C.text,lineHeight:1}}>{wca.toFixed(0)} €</div>
+                      <div style={{fontSize:10.5,color:C.muted,fontWeight:700,marginTop:2}}>encaissé (CA)</div>
+                    </div>
+                    <div style={{flex:'1 1 90px'}}>
+                      <div style={{fontSize:22,fontWeight:900,color:toShip.length?C.warn:C.muted,lineHeight:1}}>{toShip.length}</div>
+                      <div style={{fontSize:10.5,color:C.muted,fontWeight:700,marginTop:2}}>à expédier</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {loading && <Skeleton variant="card" count={4}/>}
 
