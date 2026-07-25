@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v25/07 · ⚡';
+const BUILD_ID = 'v25/07 · ⚡⚡';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6277,8 +6277,13 @@ const QUICK_REPLIES = [
 ];
 // Cache partagé entre les onglets (évite de recharger à chaque changement
 // d'onglet) : moins de requêtes, navigation instantanée. TTL court.
-const _acctCache = {};
 const _CACHE_TTL = 180000; // 3 min
+// Cache des données Vinted (annonces/ventes/achats/messages). Persisté en
+// sessionStorage : il survit aux rechargements fréquents (auto-mise à jour,
+// réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
+// reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
+const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
+const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
@@ -7029,7 +7034,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   }, [listings.items, numeros]);
 
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
-  const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; };
+  const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; _persistAcctCache(); };
 
   const loadOrders = async (type, setter, force) => {
     const cached = !force && fromCache(type);
