@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v25/07 · 📦';
+const BUILD_ID = 'v25/07 · 🔢';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7082,6 +7082,55 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros]);
 
+  // AUTO-NUMÉRO des ventes ORPHELINES (num introuvable). Pour une vente ACTIVE
+  // (en cours / à expédier, jamais annulée ni déjà finalisée) dont on ne
+  // retrouve pas le N° :
+  //   1) on regarde si la paire est DÉJÀ dans l'app (même photo/titre, même si
+  //      l'annonce est encore listée) → on réutilise CE numéro ;
+  //   2) sinon on lui attribue le prochain numéro libre (jamais réattribué).
+  // Résultat : plus aucune vente « à identifier » dans le Mode expédition — tu
+  // peux la retrouver, l'étiqueter et la ranger. Stocké comme override de vente
+  // (vinted_sale_overrides) → n'écrase rien, modifiable à la main. Limité aux
+  // ventes actives pour ne pas polluer l'historique de centaines de numéros.
+  useEffect(() => {
+    if (!autoNum) return;
+    if (!sales.items || !sales.items.length) return;
+    let maxN = 0;
+    usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>maxN)maxN=n;});
+    Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>maxN)maxN=n;});
+    Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n)&&n>maxN)maxN=n;});
+    const ovNext = { ...saleOv };
+    const usedNext = new Set(usedNumeros.map(x=>parseInt(String(x),10)).filter(n=>!isNaN(n)));
+    let changed = false;
+    for (const o of sales.items) {
+      const st = classifyOrderStatus(o.status);
+      if (st === 'cancelled' || st === 'completed') continue; // seulement les ventes ACTIVES
+      const tid = o.transaction_id != null ? String(o.transaction_id) : null;
+      if (!tid) continue;
+      const already = ovNext[tid];
+      if (already && already.numero != null && String(already.numero).trim() !== '') continue; // déjà un N°
+      if (resolvedEntry(o)) continue; // déjà retrouvée par la résolution normale
+      // Recherche LARGE (sans exclure les annonces en ligne) : la paire est-elle
+      // déjà numérotée quelque part dans l'app ?
+      const broadKey = entryKeyByPhoto(o) || keyOfEntry(entryByTitleLoose(o.title, extractSize(o.title)));
+      let num;
+      if (broadKey && numeros[broadKey] && numeros[broadKey].numero) {
+        num = parseInt(String(numeros[broadKey].numero),10); // 1) réutilise l'existant
+      } else {
+        maxN += 1; num = maxN; // 2) nouveau numéro libre
+      }
+      if (isNaN(num) || num <= 0) continue;
+      ovNext[tid] = { ...(ovNext[tid]||{}), numero: String(num), autoAssigned: true };
+      usedNext.add(num);
+      changed = true;
+    }
+    if (changed) {
+      setSaleOv(ovNext); save('vinted_sale_overrides', ovNext);
+      const ua = [...usedNext].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, autoNum]);
+
   const loadListings = async (force) => {
     const cached = !force && fromCache('listings');
     if (cached) { setListings({ loading:false, items:cached }); return; }
@@ -8430,6 +8479,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
               {pending.map(t=>{
                 const o=t.o; const e=effEntry(o); const num=e?.numero;
                 const cell = num ? garageCellOf(garageGrid,num) : null;
+                const autoNew = !!(saleOv[String(o.transaction_id)] && saleOv[String(o.transaction_id)].autoAssigned);
                 const sell = o.price?.amount!=null?Number(o.price.amount):null;
                 return (
                   <div key={o.transaction_id} style={{borderRadius:14,border:`1px solid ${t.daysLeft!=null&&t.daysLeft<0?C.danger+'66':C.border}`,background:C.card,padding:10,display:'flex',flexDirection:'column',gap:9}}>
@@ -8447,11 +8497,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                       {sell!=null && <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{sell.toFixed(0)} {cur(o.price?.currency_code)}</div>}
                     </div>
                     {/* Où est la paire */}
-                    <div style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:6}}>
+                    <div style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                       {num ? (cell
                         ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{border:`1px solid ${C.blue||C.accent}`,background:'transparent',color:C.blue||C.accent,borderRadius:9,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)} · voir</button>
                         : <span style={{color:C.muted,fontWeight:700}}>🏠 pas rangée au garage</span>)
                         : <span style={{color:C.warn,fontWeight:800}}>⚠️ paire à identifier (ajoute son N° dans Ventes)</span>}
+                      {autoNew && <span style={{color:INV_STATUS.online.color,fontWeight:800,background:`${INV_STATUS.online.color}18`,borderRadius:999,padding:'2px 8px'}} title="Cette paire n'avait pas de numéro : l'app lui en a attribué un tout neuf. Écris-le sur la boîte.">🆕 N°{num} attribué — étiquette la paire</span>}
                     </div>
                     {/* Actions : bordereau + coche posté */}
                     <div style={{display:'flex',gap:8}}>
