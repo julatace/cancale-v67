@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 1h30';
+const BUILD_ID = 'v24/07 · 2h';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -35,7 +35,7 @@ const SYNC_KEYS = [
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
-  'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues',
+  'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden',
@@ -6666,7 +6666,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
   const [bordsHidden, setBordsHidden] = useState(() => load('vinted_bords_hidden', {}));
   const hideBord = (b) => { const k=bordKey(b); if(!k) return; setBordsHidden(prev=>{ const u={...prev,[k]:1}; save('vinted_bords_hidden',u); return u; }); };
+  const unhideBord = (b) => { const k=bordKey(b); if(!k) return; setBordsHidden(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_hidden',u); return u; }); };
   const isBordHidden = (b) => !!bordsHidden[bordKey(b)];
+  const [showBordDone, setShowBordDone] = useState(false); // afficher les bordereaux déjà expédiés
   // Listes AUTOMATIQUES (statut Vinted, pas les emails) : à retirer / à expédier.
   // « à retirer » exclut ce que tu as déjà coché récupéré à la main.
   const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buys.items, pickupDone]);
@@ -6676,9 +6678,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // Vinted a fait avancer la vente au-delà de « bordereau envoyé » (pris en charge,
   // en transit, déposé, livré, finalisé) → automatique, sans que tu marques rien.
   const bordShipped = (b) => { const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null; return !!o && /exp[ée]di|achemin|livr[ée]|finalis|d[ée]pos[ée]|termin/i.test(o.status || ''); };
-  // « Terminé » pour la liste des bordereaux = déjà imprimé À LA MAIN, ou expédié
-  // d'après Vinted (automatique).
-  const isBordDone = (b) => isBordPrinted(b) || bordShipped(b);
+  // Expédié À LA MAIN (quand le statut Vinted est en retard, ex. tu as posté
+  // aujourd'hui mais Vinted dit encore « bordereau envoyé »).
+  const [bordsShipped, setBordsShipped] = useState(() => load('vinted_bords_shipped', {}));
+  const markBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev,[k]:1}; save('vinted_bords_shipped',u); return u; }); };
+  const unmarkBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_shipped',u); return u; }); };
+  const isBordShippedManual = (b) => !!bordsShipped[bordKey(b)];
+  // « Terminé » pour la liste des bordereaux = imprimé à la main, expédié d'après
+  // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
+  const isBordDone = (b) => isBordPrinted(b) || bordShipped(b) || isBordShippedManual(b);
   const [listings, setListings] = useState({ loading:false, items:null });
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
@@ -6852,19 +6860,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // (cas ambigu : plusieurs exemplaires dont un encore en vente).
   const emailSoldIds = useMemo(() => {
     const out = new Set();
-    if (!emailSales || !emailSales.length || !listings.items) return out;
+    if (!listings.items) return out;
     const key = (t, z) => normTitle(t) + '|' + (z || '');
     const onlineBy = {};
     for (const it of listings.items) { const k = key(it.title, extractSize(it.title) || it.size); (onlineBy[k] = onlineBy[k] || []).push(it); }
     const saleCount = {};
-    for (const s of emailSales) { const t = s.designation || s.article || ''; if (!t) continue; const k = key(t, extractSize(t)); saleCount[k] = (saleCount[k] || 0) + 1; }
+    for (const s of (emailSales || [])) { const t = s.designation || s.article || ''; if (!t) continue; const k = key(t, extractSize(t)); saleCount[k] = (saleCount[k] || 0) + 1; }
     for (const k in saleCount) {
       const items = onlineBy[k]; if (!items || !items.length) continue;
       if (saleCount[k] >= items.length) items.forEach(it => out.add(String(it.id))); // toutes vendues
     }
+    // Un BORDEREAU reçu ⟹ la paire est VENDUE (Vinted n'en émet que pour une
+    // vente). Signal fiable 24/7. Match par titre non ambigu / n° (bordForItem).
+    if (emailBords && emailBords.length) {
+      for (const it of listings.items) {
+        if (out.has(String(it.id))) continue;
+        if (bordForItem(it.title, numeros[it.id]?.numero)) out.add(String(it.id));
+      }
+    }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailSales, listings.items]);
+  }, [emailSales, emailBords, listings.items, numeros]);
   const annShown = useMemo(() => {
     let arr = [...(listings.items || [])].filter(it => !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id))));
     const q = annSearch.trim().toLowerCase();
@@ -8959,8 +8975,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 {batchBusy?'Préparation…':`🖨 Tout imprimer à la suite (${nPending})`}
               </button>
             ) : null; })()}
+            {(()=>{ const done=[...emailBords].filter(b=>!isBordHidden(b)&&isBordDone(b)); return done.length>0 ? (
+              <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
+                <span style={{color:INV_STATUS.online.color,fontWeight:800}}>✅ {done.length} bordereau{done.length>1?'x':''} expédié{done.length>1?'s':''}</span>
+                <span style={{flex:1,minWidth:0}}>retiré{done.length>1?'s':''} de la liste.</span>
+                <button onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',fontSize:11.5,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
+              </div>
+            ) : null; })()}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {[...emailBords].filter(b=>!isBordHidden(b)).sort((a,b2)=>{
+              {[...emailBords].filter(b=>!isBordHidden(b) && (showBordDone || !isBordDone(b))).sort((a,b2)=>{
                 // Non imprimés d'abord, puis par date limite d'expédition (plus
                 // urgent en haut), puis les plus récents.
                 const pa=isBordDone(a)?1:0, pb=isBordDone(b2)?1:0; if(pa!==pb) return pa-pb;
@@ -9002,6 +9025,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                         background:isBordPrinted(b)?C.accent:'transparent',
                         color:isBordPrinted(b)?'#fff':C.muted}}>
                       {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
+                    </button>
+                    <button type="button" onClick={()=>{ if(isBordShippedManual(b)) unmarkBordShipped(b); else markBordShipped(b); }}
+                      title={isBordShippedManual(b)?'Annuler « expédié »':'Marquer comme expédié → le retire de la liste'}
+                      style={{flexShrink:0,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit',
+                        border:`1.5px solid ${isBordShippedManual(b)?INV_STATUS.online.color:C.border}`,
+                        background:isBordShippedManual(b)?INV_STATUS.online.color:'transparent',
+                        color:isBordShippedManual(b)?'#fff':C.muted}}>
+                      {isBordShippedManual(b)?'↺ Pas expédié':'✓ Expédié'}
                     </button>
                   </div>
                 </div>
