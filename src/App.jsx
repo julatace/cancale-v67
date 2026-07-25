@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 3h';
+const BUILD_ID = 'v24/07 · 3h30';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7116,14 +7116,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
   const venteStage = (o) => {
     const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
-    if (classifyOrderStatus(o.status) === 'cancelled') return { label: 'Annulée', color: C.danger };
-    if (/finalis/i.test(s) || tus === 'completed') return { label: '✅ Vendue', color: INV_STATUS.online.color };
-    if (/livr|remis|r[ée]ception/i.test(s)) return { label: '📦 Livrée', color: C.blue || C.accent };
-    if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: '📦 Au relais', color: C.blue || C.accent };
-    if (/transit|achemin|exp[eé]di|envoy|en\s+route/i.test(s)) return { label: '🚚 En transit', color: C.blue || C.accent };
-    if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: '📮 À expédier', color: C.warn };
-    if (/pay|valid|pr[ée]par/i.test(s)) return { label: 'Payée', color: C.muted };
-    return { label: 'En cours', color: C.warn };
+    if (classifyOrderStatus(o.status) === 'cancelled') return { label: 'Annulée', color: C.danger, step: 0 };
+    if (/finalis/i.test(s) || tus === 'completed') return { label: '✅ Vendue', color: INV_STATUS.online.color, step: 4 };
+    if (/livr|remis|r[ée]ception/i.test(s)) return { label: '📦 Livrée', color: C.blue || C.accent, step: 3 };
+    if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: '📦 Au relais', color: C.blue || C.accent, step: 3 };
+    if (/transit|achemin|exp[eé]di|envoy|en\s+route/i.test(s)) return { label: '🚚 En transit', color: C.blue || C.accent, step: 2 };
+    if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: '📮 À expédier', color: C.warn, step: 1 };
+    if (/pay|valid|pr[ée]par/i.test(s)) return { label: 'Payée', color: C.muted, step: 1 };
+    return { label: 'En cours', color: C.warn, step: 1 };
   };
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
@@ -8285,6 +8285,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 )}
                 <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title={hidden?'Réintégrer à la compta':'Masquer de la compta'} aria-label={hidden?'Réafficher':'Masquer'} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:hidden?(C.blue||C.accent):C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>{hidden?'↩︎':'🚫'}</button>
                </div>
+               {/* Barre de progression de la vente : À expédier · Expédiée · Livrée · Encaissée */}
+               {!hidden && (()=>{ const vs=venteStage(o); if(vs.step<=0) return null; return (
+                 <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}>
+                   {[['À expédier',1],['Expédiée',2],['Livrée',3],['Encaissée',4]].map(([lbl,idx])=>{
+                     const done=vs.step>=idx, cur2=vs.step===idx;
+                     return (
+                       <div key={idx} style={{flex:1,textAlign:'center'}}>
+                         <div style={{height:4,borderRadius:999,background:done?vs.color:C.border}}/>
+                         <div style={{fontSize:8.5,marginTop:3,fontWeight:cur2?900:600,color:done?vs.color:C.muted,whiteSpace:'nowrap'}}>{lbl}</div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               ); })()}
                {/* Saisie manuelle par vente : N° et prix d'achat, même pour une paire jamais numérotée. */}
                {!hidden && (
                  <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center'}}>
