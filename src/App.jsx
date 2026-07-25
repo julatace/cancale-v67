@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v25/07 · ⚡⚡';
+const BUILD_ID = 'v25/07 · 📦';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -38,7 +38,7 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
-  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden',
+  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -6713,6 +6713,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   const markBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev,[k]:1}; save('vinted_bords_shipped',u); return u; }); };
   const unmarkBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_shipped',u); return u; }); };
   const isBordShippedManual = (b) => !!bordsShipped[bordKey(b)];
+  // Mode expédition : colis coché « posté » à la main (par n° de transaction).
+  // Synchronisé → suit d'un appareil à l'autre. Se résorbe tout seul quand le
+  // statut Vinted rattrape (la vente n'est alors plus « à expédier »).
+  const [shipDone, setShipDone] = useState(() => load('vinted_ship_done', {}));
+  const isShipDone = (o) => !!(o && shipDone[String(o.transaction_id)]);
+  const toggleShipDone = (o) => { const k = o && o.transaction_id!=null ? String(o.transaction_id) : null; if(!k) return; setShipDone(prev=>{ const u={...prev}; if(u[k]) delete u[k]; else u[k]=Date.now(); save('vinted_ship_done',u); return u; }); };
   // « Terminé » pour la liste des bordereaux = imprimé à la main, expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
   const isBordDone = (b) => isBordPrinted(b) || bordShipped(b) || isBordShippedManual(b);
@@ -7958,7 +7964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         const jobs=[];
-        if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Imprime les bordereaux et poste',tab:'cat_bord',prio:late>0?0:1});
+        if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_expedition',prio:late>0?0:1});
         if(vintedToPickup.length) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${vintedToPickup.length} colis`,sub:'Déposés en point relais — va les chercher',tab:'cat_achats',prio:2});
         if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(offersToSend) jobs.push({icon:'💌',color:INV_STATUS.online.color,title:`Relancer ${offersToSend} intéressé${offersToSend>1?'s':''}`,sub:'Envoie une offre aux gens qui ont liké → ça convertit',tab:'cat_annonces',prio:4});
@@ -8073,6 +8079,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                   <div style={{fontSize:12.5,fontWeight:900,color:col}}>{toShip.length} colis à expédier{late>0?` · ${late} en retard`:urgent>0?` · ${urgent} urgent${urgent>1?'s':''}`:''}</div>
                   {s.shipBy && <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Le plus pressé : <b>{s.o.title||'vente'}</b> — {when(s)}</div>}
                 </div>
+                {onNav && <button type="button" onClick={()=>onNav('cat_expedition')} style={{flexShrink:0,border:'none',background:col,color:'#fff',borderRadius:9,padding:'8px 11px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>📦 Expédier</button>}
               </div>
               <div style={{fontSize:10,color:C.muted,marginTop:6,lineHeight:1.4}}>Vinted laisse ~{SHIP_DAYS} j après la vente pour expédier ; à temps = note vendeur préservée. Échéance estimée. Génère le bordereau plus bas (bouton 📄) ou dans l'onglet Bordereaux.</div>
             </div>
@@ -8375,6 +8382,104 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
           })}
         </div>
       </>)}
+
+      {curSub==='expedition' && (()=>{
+        // MODE EXPÉDITION : tout ce qu'il faut pour poster tes colis d'un coup —
+        // liste triée par urgence, N° + case garage pour retrouver la paire,
+        // bouton bordereau, et une case « Posté » par colis.
+        const pending = toShip.filter(t=>!isShipDone(t.o));
+        const posted  = (sales.items||[]).filter(o=>needsBordereau(o.status)&&!isHidden(o)&&isShipDone(o));
+        const late = pending.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
+        const urgent = pending.filter(t=>t.daysLeft!=null && t.daysLeft>=0 && t.daysLeft<=1).length;
+        const urgencyChip=(t)=>{
+          if(t.daysLeft==null) return null;
+          const col = t.daysLeft<0?C.danger : t.daysLeft<=1?C.warn : C.muted;
+          const txt = t.daysLeft<0?`⚠️ ${-t.daysLeft}j de retard` : t.daysLeft===0?"à poster aujourd'hui" : t.daysLeft===1?'à poster demain' : `${t.daysLeft}j pour poster`;
+          return <span style={{color:col,fontWeight:900,background:`${col}18`,borderRadius:999,padding:'1px 8px'}}>{txt}</span>;
+        };
+        return (
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <div>
+            <h2 style={{margin:0,color:C.text,fontSize:22,fontWeight:800,letterSpacing:-0.4}}>📦 Mode expédition</h2>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>Prépare tous tes envois d'un coup : bordereau, paire au garage, coche par colis.</div>
+          </div>
+          {sales.items===null ? (
+            <Skeleton variant="row" count={3}/>
+          ) : pending.length===0 ? (
+            <div style={{textAlign:'center',padding:'40px 16px',background:C.card,border:`1px solid ${C.border}`,borderRadius:16}}>
+              <div style={{fontSize:40}}>🎉</div>
+              <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:6}}>Rien à expédier — tout est parti !</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:4}}>Les nouvelles ventes à poster s'afficheront ici automatiquement.</div>
+            </div>
+          ) : (<>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <div style={{flex:1,minWidth:90,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
+                <div style={{fontSize:22,fontWeight:900,color:C.warn,lineHeight:1}}>{pending.length}</div>
+                <div style={{fontSize:11,color:C.muted,fontWeight:700,marginTop:2}}>à expédier</div>
+              </div>
+              {late>0 && <div style={{flex:1,minWidth:90,background:`${C.danger}12`,border:`1px solid ${C.danger}55`,borderRadius:12,padding:'10px 12px'}}>
+                <div style={{fontSize:22,fontWeight:900,color:C.danger,lineHeight:1}}>{late}</div>
+                <div style={{fontSize:11,color:C.danger,fontWeight:700,marginTop:2}}>en retard</div>
+              </div>}
+              {urgent>0 && <div style={{flex:1,minWidth:90,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'10px 12px'}}>
+                <div style={{fontSize:22,fontWeight:900,color:C.warn,lineHeight:1}}>{urgent}</div>
+                <div style={{fontSize:11,color:C.warn,fontWeight:700,marginTop:2}}>aujourd'hui/demain</div>
+              </div>}
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {pending.map(t=>{
+                const o=t.o; const e=effEntry(o); const num=e?.numero;
+                const cell = num ? garageCellOf(garageGrid,num) : null;
+                const sell = o.price?.amount!=null?Number(o.price.amount):null;
+                return (
+                  <div key={o.transaction_id} style={{borderRadius:14,border:`1px solid ${t.daysLeft!=null&&t.daysLeft<0?C.danger+'66':C.border}`,background:C.card,padding:10,display:'flex',flexDirection:'column',gap:9}}>
+                    <div style={{display:'flex',gap:11,alignItems:'center'}}>
+                      <div style={{width:52,height:52,borderRadius:9,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
+                        <div style={{fontSize:10.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                          {urgencyChip(t)}
+                        </div>
+                      </div>
+                      {sell!=null && <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{sell.toFixed(0)} {cur(o.price?.currency_code)}</div>}
+                    </div>
+                    {/* Où est la paire */}
+                    <div style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:6}}>
+                      {num ? (cell
+                        ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{border:`1px solid ${C.blue||C.accent}`,background:'transparent',color:C.blue||C.accent,borderRadius:9,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)} · voir</button>
+                        : <span style={{color:C.muted,fontWeight:700}}>🏠 pas rangée au garage</span>)
+                        : <span style={{color:C.warn,fontWeight:800}}>⚠️ paire à identifier (ajoute son N° dans Ventes)</span>}
+                    </div>
+                    {/* Actions : bordereau + coche posté */}
+                    <div style={{display:'flex',gap:8}}>
+                      <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit'}}>📄 Bordereau</button>
+                      <button type="button" onClick={()=>toggleShipDone(o)} style={{flex:1,border:`1px solid ${INV_STATUS.online.color}`,background:'transparent',color:INV_STATUS.online.color,borderRadius:10,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit'}}>✓ Posté</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>)}
+          {posted.length>0 && (
+            <div>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,fontWeight:800,margin:'6px 2px 8px'}}>Déjà postés ({posted.length}) — en attente côté Vinted</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {posted.map(o=>{ const e=effEntry(o); const num=e?.numero; return (
+                  <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:C.card,border:`1px solid ${C.border}`,borderRadius:11,opacity:0.75}}>
+                    <span style={{fontSize:16}}>✅</span>
+                    <span style={{flex:1,fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</span>
+                    <button type="button" onClick={()=>toggleShipDone(o)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',cursor:'pointer',fontSize:11,fontWeight:700,fontFamily:'inherit'}}>↩︎ annuler</button>
+                  </div>
+                ); })}
+              </div>
+            </div>
+          )}
+        </div>
+        );
+      })()}
 
       {curSub==='achats' && (<>
         {/* À RETIRER : source = statut Vinted (automatique, se met à jour seul). */}
@@ -10441,7 +10546,7 @@ export default function App() {
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
-    const TABS_OK=['dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
+    const TABS_OK=['dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
     const goto=(search)=>{ try{ const t=new URLSearchParams(search).get('tab'); if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -10904,7 +11009,7 @@ export default function App() {
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
       const items=[];
       if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
-      if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_ventes'});
+      if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_expedition'});
       if(unreadTotal>0)  items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}`, n:unreadTotal, tab:'cat_msg'});
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       if(noNumCount>0)   items.push({icon:'🔢', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
@@ -11195,7 +11300,7 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'expedition'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
       </main>
       <BottomBar tab={tab} setTab={setTab}/>
