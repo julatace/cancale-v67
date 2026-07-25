@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 2h';
+const BUILD_ID = 'v24/07 · 2h15';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -8634,7 +8634,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
           {emailSoldIds.size>0 && (
             <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:800}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
-              <span style={{flex:1,minWidth:0}}>vente confirmée par email — plus besoin d'attendre la synchro.</span>
+              <span style={{flex:1,minWidth:0}}>email de vente ou bordereau reçu — plus besoin d'attendre la synchro.</span>
               <button onClick={()=>setShowEmailSold(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',fontSize:11.5,padding:0,fontFamily:'inherit'}}>{showEmailSold?'masquer':'voir'}</button>
             </div>
           )}
