@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v24/07 · 4h';
+const BUILD_ID = 'v25/07 · 🔍';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -10447,6 +10447,10 @@ export default function App() {
   const [inventory,setInventory]=useState(()=>load('vinted_inventory',[]));
   const [garageLocate,setGarageLocate]=useState(null); // numéro à localiser dans le garage
   const [garagePlace,setGaragePlace]=useState(null); // numéro à ranger dans une case du garage
+  // Recherche globale : trouve une paire par N°, titre ou marque dans TOUS les
+  // onglets (annonces en ligne, ventes, achats) + sa case au garage.
+  const [gsOpen,setGsOpen]=useState(false);
+  const [gsQ,setGsQ]=useState('');
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
@@ -10949,6 +10953,10 @@ export default function App() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>}
+            <button type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
+              style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:gsOpen?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
+              🔍
+            </button>
             <button type="button" onClick={()=>setNotifOpen(o=>!o)} title="Notifications" aria-label="Notifications"
               style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifOpen?C.onAccent:C.text,cursor:'pointer',fontSize:14,fontWeight:700,fontFamily:'inherit'}}>
               🔔
@@ -10961,6 +10969,90 @@ export default function App() {
           </div>
         </div>
       </header>
+      {/* Recherche globale : une paire par N°, titre ou marque, dans tous les onglets. */}
+      {gsOpen && (()=>{
+        const q = gsQ.trim().toLowerCase();
+        const numeros = load('vinted_annonce_numeros', {});
+        const listCache = (_acctCache['listings'] && _acctCache['listings'].items) || [];
+        const soldCache = (_acctCache['sold'] && _acctCache['sold'].items) || [];
+        const buyCache = (_acctCache['purchased'] && _acctCache['purchased'].items) || [];
+        const onlineIds = new Set(listCache.map(it=>String(it.id)));
+        const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
+        const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
+        let pairs=[], ventes=[], achats=[];
+        if(q){
+          // Paires numérotées (index principal : N°, titre, marque).
+          pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
+            .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
+            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); return {...e, box, online}; })
+            .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
+            .slice(0,40);
+          const numeredIds = new Set(pairs.map(p=>String(p.id)));
+          ventes = soldCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
+          achats = buyCache.filter(o=> (hit(o.title)||hit(extractBrand(o.title||''))) ).slice(0,25);
+        }
+        const total = pairs.length+ventes.length+achats.length;
+        const go=(tab)=>{ setGsOpen(false); setTab(tab); };
+        const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:7,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
+        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<img src={src} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>{fb||'👟'}</span>}</div>;
+        return (
+        <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
+            <span style={{fontSize:18}}>🔍</span>
+            <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
+              style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+            <button type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
+              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,width:38,height:38,color:C.text,cursor:'pointer',fontSize:16,fontWeight:800,fontFamily:'inherit',flexShrink:0}}>✕</button>
+          </div>
+          <div style={{flex:1,overflowY:'auto',padding:'8px 14px 40px',WebkitOverflowScrolling:'touch'}}>
+            {!q && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:11.5}}>Cherche dans les annonces en ligne, les ventes, les achats et le garage.</span></div>}
+            {q && total===0 && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:11.5}}>Les onglets non encore ouverts ne sont pas indexés — ouvre Ventes/Achats puis réessaie.</span></div>}
+            {pairs.length>0 && <div style={{fontSize:11,fontWeight:900,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
+            {pairs.map(p=>(
+              <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                {numBadge(p.numero)}
+                {thumb(p.photo)}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13.5,fontWeight:800,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title||'(sans titre)'}</div>
+                  <div style={{fontSize:11.5,color:C.muted,fontWeight:700,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                    <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
+                    {p.box!=null && <span style={{color:C.accent}}>🏠 Au garage</span>}
+                    {p.buyPrice && <span>achat {p.buyPrice}€</span>}
+                    {p.price && <span>· {p.price}€</span>}
+                  </div>
+                </div>
+                <span style={{fontSize:16,color:C.muted}}>›</span>
+              </button>
+            ))}
+            {ventes.length>0 && <div style={{fontSize:11,fontWeight:900,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Ventes ({ventes.length})</div>}
+            {ventes.map((o,i)=>(
+              <button key={'v'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_ventes')}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                {thumb(o.photo_url,'💸')}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13.5,fontWeight:800,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
+                  <div style={{fontSize:11.5,color:C.muted,fontWeight:700,marginTop:2}}>{o.status||'vente'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
+                </div>
+                <span style={{fontSize:16,color:C.muted}}>›</span>
+              </button>
+            ))}
+            {achats.length>0 && <div style={{fontSize:11,fontWeight:900,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Achats ({achats.length})</div>}
+            {achats.map((o,i)=>(
+              <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_achats')}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                {thumb(o.photo_url,'📦')}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13.5,fontWeight:800,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
+                  <div style={{fontSize:11.5,color:C.muted,fontWeight:700,marginTop:2}}>{o.status||'achat'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
+                </div>
+                <span style={{fontSize:16,color:C.muted}}>›</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        );
+      })()}
       {/* Centre de notifications : les actions du moment, chacune ouvre le bon onglet. */}
       {notifOpen && (
         <div onClick={()=>setNotifOpen(false)} style={{position:'fixed',inset:0,zIndex:60}}>
