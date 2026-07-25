@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v25/07 · 🔢';
+const BUILD_ID = 'v25/07 · 🛡️';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -73,14 +73,24 @@ const cloudLoad = async () => {
 };
 
 // Envoie TOUT le contenu local vers le cloud (groupe, differe)
+// ⚠️ SÉCURITÉ ANTI-EFFACEMENT (juillet 2026) : ce push écrase la ligne cloud
+// avec le contenu du localStorage. Si un appareil pousse AVANT d'avoir chargé le
+// cloud (navigateur neuf, cache vidé, réseau lent, PWA réinstallée), il envoie un
+// localStorage quasi vide et DÉTRUIT toutes les données. C'est arrivé en vrai.
+// Deux verrous : (1) aucun push tant que le cloud n'est pas chargé — la demande
+// est mise en attente et rejouée juste après ; (2) refus d'un payload vide.
 let _cloudTimer = null;
+let _pushPending = false;
 const cloudPush = () => {
+  if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
   _cloudTimer = setTimeout(async () => {
     try {
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { try { payload[k] = JSON.parse(v); } catch { payload[k] = v; } } });
+      // verrou 2 : ne JAMAIS écraser le cloud avec un état vide.
+      if (Object.keys(payload).length === 0) { _emitSync('error'); _cloudTimer = null; return; }
       const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, {
         method: 'PATCH',
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -91,6 +101,8 @@ const cloudPush = () => {
     _cloudTimer = null;
   }, 800);
 };
+// Dès que le cloud est chargé, on rejoue la sauvegarde mise en attente.
+onCloudReady(() => { if (_pushPending) { _pushPending = false; cloudPush(); } });
 
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
@@ -7257,6 +7269,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     const noteTaken = (x) => { const n = parseInt(String(x), 10); if (!isNaN(n)) { taken.add(n); if (n > base) base = n; } };
     usedNumeros.forEach(noteTaken);
     Object.values(numeros).forEach(e => noteTaken(e.numero));
+    // ⚠️ CRUCIAL : les numéros posés sur les VENTES (vinted_sale_overrides,
+    // manuels ou auto-attribués) comptent AUSSI comme pris. Sans ça, le
+    // numéroteur d'annonces réattribuait des numéros déjà utilisés par des
+    // ventes (ex. 37/38) → doublons + numéros qui « descendent ».
+    Object.values(saleOv).forEach(e => noteTaken(e && e.numero));
     // Index des paires déjà numérotées, UNIQUEMENT PAR PHOTO (fiable, unique par
     // paire). On NE réutilise PAS par titre : deux paires différentes (ex. sur deux
     // comptes) peuvent avoir le même titre → ça mélangerait leurs numéros.
@@ -7283,9 +7300,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
       changed = true;
     }
+    // Auto-réparation : on consigne dans « used » TOUS les numéros connus
+    // (annonces + ventes) pour qu'aucun ne soit jamais réattribué, même a
+    // posteriori. Converge (ne re-déclenche pas une fois « used » complet).
+    const beforeSize = nextUsed.size;
+    Object.values(saleOv).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) nextUsed.add(n); });
+    Object.values(nextNum).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) nextUsed.add(n); });
+    if (nextUsed.size !== beforeSize) changed = true;
     if (changed) {
       setNumeros(nextNum); save('vinted_annonce_numeros', nextNum);
-      const ua = [...nextUsed]; setUsedNumeros(ua); save('vinted_used_numeros', ua);
+      const ua = [...nextUsed].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, autoNum, cloudReady]);
