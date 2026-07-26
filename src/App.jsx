@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 🔁';
+const BUILD_ID = 'v26/07 · 📬';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -215,6 +215,20 @@ const fetchEmailBordereaux = async () => {
 };
 // Suivi colis reçu par EMAIL (Mondial Relay / Chronopost) : lignes email_track_*
 // = { carrier, suivi, status, statusLabel, subject, receivedAt }.
+// Un email de CONFIRMATION de retrait/livraison ⟹ le colis n'est plus « à
+// retirer ». On le redéduit ICI (côté app) à partir du SUJET, en plus du parseur
+// serveur : ainsi un « Votre colis a été retiré » compte comme récupéré même si
+// la ligne stockée était restée en « transit » (bug parseur historique) et sans
+// attendre le redéploiement de la fonction serverless. Le n° de suivi est la clé
+// (les lignes sont email_track_{carrier}_{suivi}) : la confirmation écrase la
+// ligne « disponible » du même suivi → le colis sort tout seul de la liste.
+const TRACK_DELIVERED_RE = /colis\s+a\s+[ée]t[ée]\s+retir[ée]|a\s+bien\s+[ée]t[ée]\s+retir[ée]|bien\s+retir[ée]|retir[ée]\s+(?:le|avec|par)|livr[ée]|remis(?:\s+au\s+destinataire)?|r[ée]cup[ée]r[ée]|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/i;
+const reclassifyTrack = (d) => {
+  if (!d || d.status === 'delivered') return d;
+  const s = `${d.subject || ''} ${d.statusLabel || ''}`;
+  if (TRACK_DELIVERED_RE.test(s)) return { ...d, status: 'delivered', statusLabel: 'Livré / retiré' };
+  return d;
+};
 const fetchEmailTracking = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_track_*&select=id,data`, {
@@ -222,7 +236,7 @@ const fetchEmailTracking = async () => {
     });
     if (!res.ok) return [];
     const rows = await res.json();
-    return rows.map(r => r.data).filter(Boolean)
+    return rows.map(r => reclassifyTrack(r.data)).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
 };
