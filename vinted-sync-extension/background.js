@@ -456,6 +456,61 @@ async function fetchAllOrdersCookie(domain, type, maxPages = 8) {
   }
   return { my_orders: all, pagination };
 }
+// ── FETCH ACTIF DANS LA PAGE (v3.8.2) ──────────────────────────────────────
+// Le cookie de session Vinted est SameSite : le navigateur ne l'attache PAS a
+// une requete lancee par l'extension (service worker). Il n'est valide que dans
+// le contexte de la PAGE vinted.fr (premiere partie). Donc : au lieu d'appeler
+// depuis le service worker, on INJECTE le fetch dans un onglet Vinted deja
+// ouvert et on l'y fait executer. La requete part alors de la page, avec ses
+// cookies, exactement comme si tu cliquais — et sans que tu recharges rien.
+async function pageActiveFetch() {
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*'] }); } catch (_) { return false; }
+  const tab = tabs.find((t) => t && t.id != null && !t.discarded && t.status === 'complete') || tabs.find((t) => t && t.id != null && !t.discarded);
+  if (!tab) return false; // aucun onglet Vinted exploitable
+  const domain = (() => { try { return new URL(tab.url).host; } catch (_) { return 'www.vinted.fr'; } })();
+  const csrf = lastCsrfByDomain[domain] || '';
+  let out = null;
+  try {
+    const res = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: 'MAIN',
+      args: [csrf],
+      func: async (csrfTok) => {
+        const get = async (p) => {
+          try {
+            const h = { accept: 'application/json' };
+            if (csrfTok) h['x-csrf-token'] = csrfTok;
+            const r = await fetch(p, { credentials: 'include', headers: h });
+            if (!r || !r.ok) return null;
+            return await r.json();
+          } catch (_) { return null; }
+        };
+        const who = await get('/api/v2/users/current');
+        const pid = who && who.user && who.user.id;
+        const listings = pid ? await get('/api/v2/wardrobe/' + pid + '/items?page=1&per_page=100') : null;
+        const sold = await get('/api/v2/my_orders?type=sold&page=1&per_page=100');
+        const bought = await get('/api/v2/my_orders?type=purchased&page=1&per_page=100');
+        const inbox = await get('/api/v2/inbox?page=1&per_page=30');
+        return { who: who || null, listings: listings || null, sold: sold || null, bought: bought || null, inbox: inbox || null };
+      },
+    });
+    out = res && res[0] && res[0].result;
+  } catch (_) { return false; }
+  if (!out) return false;
+  // On range sous l'uid du COMPTE ACTIF (decode du cookie de session).
+  const uid = await activeUidForDomain(domain);
+  if (!uid) return false;
+  let stored = false;
+  if (out.who) { await storeHarvestRow(uid, 'profile', out.who, domain); stored = true; }
+  if (out.listings) { await storeHarvestRow(uid, 'listings', out.listings, domain); stored = true; }
+  if (out.sold && Array.isArray(out.sold.my_orders)) { await storeHarvestRow(uid, 'orders_sold', out.sold, domain); stored = true; }
+  if (out.bought && Array.isArray(out.bought.my_orders)) { await storeHarvestRow(uid, 'orders_purchased', out.bought, domain); stored = true; }
+  if (out.inbox) { await storeHarvestRow(uid, 'inbox', out.inbox, domain); stored = true; }
+  if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
+  return stored;
+}
+
 let cookieFetchRunning = false;
 async function activeFetchActiveAccount() {
   if (cookieFetchRunning) return false;
@@ -492,7 +547,8 @@ async function activeFetchActiveAccount() {
 // Au demarrage / installation : on capte les comptes PUIS on rafraichit le
 // compte ACTIF par cookie (fiable). L'ancien fetch Bearer reste en secours pour
 // les autres comptes, mais il echoue tant que Vinted refuse le Bearer-sans-cookie.
-function fullSync() { captureAllAccounts().then(() => activeFetchActiveAccount().then((ok) => { if (!ok) activeFetchAll(); })); }
+async function runActive() { if (await pageActiveFetch()) return; if (await activeFetchActiveAccount()) return; await activeFetchAll(); }
+function fullSync() { captureAllAccounts().then(() => runActive()); }
 
 chrome.runtime.onInstalled.addListener(() => { fullSync(); });
 chrome.runtime.onStartup.addListener(() => { fullSync(); });
@@ -504,7 +560,7 @@ try {
   chrome.alarms.create('cancale-active', { periodInMinutes: 20 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === 'cancale-sync') captureAllAccounts();
-    else if (a.name === 'cancale-active') activeFetchActiveAccount().then((ok) => { if (!ok) activeFetchAll(); });
+    else if (a.name === 'cancale-active') runActive();
   });
 } catch (_) {}
 
@@ -520,6 +576,6 @@ try {
     clearTimeout(cookieTimer);
     // Changement de session (login / bascule de compte) : on recapte le compte
     // ET on rafraichit ses donnees par cookie dans la foulee.
-    cookieTimer = setTimeout(() => { captureDomain(dom).then(() => activeFetchActiveAccount()); }, 2000);
+    cookieTimer = setTimeout(() => { captureDomain(dom).then(() => runActive()); }, 2000);
   });
 } catch (_) {}

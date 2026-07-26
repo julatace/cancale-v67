@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "3.8.1",
+  "version": "3.8.2",
   "description": "Synchronise, depuis TON navigateur (ton IP), tes comptes et donnees Vinted (annonces, ventes, achats, messages) vers VRM. Fetch actif + capture passive + renouvellement auto du login + actions 1-clic (repondre, offre) executees depuis ton navigateur. Aucun appel via un serveur.",
-  "permissions": ["cookies", "storage", "alarms"],
+  "permissions": ["cookies", "storage", "alarms", "scripting", "tabs"],
   "host_permissions": [
     "https://*.vinted.fr/*",
     "https://*.vinted.com/*",
