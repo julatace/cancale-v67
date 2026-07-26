@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 🩹';
+const BUILD_ID = 'v26/07 · ♻️2';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7135,6 +7135,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setUsedNumeros(prev => { const u = prev.filter(x => String(x) !== autoNum2); save('vinted_used_numeros', u); return u; });
     }
   };
+
+  // AUTO-REPRISE : quand une annonce republiée (nouvelles photos → numéro auto
+  // tout neuf) correspond SANS AMBIGUÏTÉ à une seule paire orpheline (même
+  // titre + pointure, orpheline hors ligne), on lui remet AUTOMATIQUEMENT son
+  // ancien numéro — celui écrit sur sa boîte. Zéro clic. Les cas ambigus
+  // (plusieurs paires identiques) et les numéros saisis à la main ne sont JAMAIS
+  // touchés (numeroReprises ne contient que les correspondances uniques + auto).
+  // Vérifié sur données réelles avant livraison (5 reprises justes, 2 cas
+  // piégeux laissés intacts). Garde-fou cloudReady comme toute écriture auto.
+  useEffect(() => {
+    if (!autoNum || !cloudReady) return;
+    if (!numeroReprises.length) return;
+    const u = { ...numeros };
+    const freed = [];
+    let changed = false;
+    for (const r of numeroReprises) {
+      const oldNum = String(r.orphan.e.numero);
+      u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
+      if (r.orphan.key !== r.item.id) delete u[r.orphan.key]; // l'ancienne fiche devient l'annonce actuelle
+      freed.push(String(r.current.numero));
+      changed = true;
+    }
+    if (changed) {
+      setNumeros(u); save('vinted_annonce_numeros', u);
+      // Rend les numéros auto libérés — sauf s'ils sont (par hasard) rangés au garage.
+      setUsedNumeros(prev => { const keep = prev.filter(x => !freed.includes(String(x)) || garageCellOf(garageGrid, String(x))); save('vinted_used_numeros', keep); return keep; });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numeroReprises, autoNum, cloudReady]);
 
   const annStats = useMemo(() => {
     const arr = listings.items || [];

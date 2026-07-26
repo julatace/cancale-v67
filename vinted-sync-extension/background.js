@@ -429,6 +429,19 @@ async function activeUidForDomain(domain) {
   const p = jwtPayload(tok);
   return p && p.account_id ? String(p.account_id) : null;
 }
+// ID de PROFIL (≠ account_id) deja connu pour ce compte, lu dans la derniere
+// ligne harvest_{uid}_profile. Stable dans le temps → sert de repli fiable.
+async function lastProfileId(uid) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_profile&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    const u = rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.user;
+    return u && u.id ? u.id : null;
+  } catch (_) { return null; }
+}
 async function vintedGetCookie(domain, endpoint) {
   try {
     const res = await fetch(`https://${domain}${endpoint}`, {
@@ -470,13 +483,18 @@ async function pageActiveFetch() {
   if (!tab) return false; // aucun onglet Vinted exploitable
   const domain = (() => { try { return new URL(tab.url).host; } catch (_) { return 'www.vinted.fr'; } })();
   const csrf = lastCsrfByDomain[domain] || '';
+  // ID de profil connu (stable) du compte actif, lu dans la derniere moisson :
+  // sert de repli si /users/current echoue (c'est ce qui bloquait le dressing).
+  const activeUid0 = await activeUidForDomain(domain);
+  let knownPid = null;
+  if (activeUid0) { try { knownPid = await lastProfileId(activeUid0); } catch (_) {} }
   let out = null;
   try {
     const res = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       world: 'MAIN',
-      args: [csrf],
-      func: async (csrfTok) => {
+      args: [csrf, knownPid],
+      func: async (csrfTok, knownPidArg) => {
         const get = async (p) => {
           try {
             const h = { accept: 'application/json' };
@@ -487,7 +505,7 @@ async function pageActiveFetch() {
           } catch (_) { return null; }
         };
         const who = await get('/api/v2/users/current');
-        const pid = who && who.user && who.user.id;
+        const pid = (who && who.user && who.user.id) || knownPidArg; // repli sur l'id connu
         const listings = pid ? await get('/api/v2/wardrobe/' + pid + '/items?page=1&per_page=100') : null;
         const sold = await get('/api/v2/my_orders?type=sold&page=1&per_page=100');
         const bought = await get('/api/v2/my_orders?type=purchased&page=1&per_page=100');
