@@ -415,10 +415,84 @@ async function activeFetchAll() {
   } finally { activeFetchRunning = false; }
 }
 
+// ── FETCH ACTIF PAR COOKIE (v3.8.1) ────────────────────────────────────────
+// Vinted a durci son auth : un GET avec token Bearer SANS cookie (ci-dessus)
+// est desormais refuse -> plus rien depuis le 13/07. L'auth qui marche est
+// celle du navigateur : les COOKIES de session. On refait donc les appels avec
+// credentials:'include' (le navigateur envoie les cookies du compte ACTIF).
+// ⚠️ Comme les cookies sont ceux du compte actif, on ne rafraichit QUE ce
+// compte-la (sinon on rangerait ses donnees sous un autre uid). Les autres se
+// mettront a jour quand tu basculeras dessus. C'est aussi le plus discret.
+async function activeUidForDomain(domain) {
+  const tok = await getCookie(domain, 'access_token_web');
+  if (!tok) return null;
+  const p = jwtPayload(tok);
+  return p && p.account_id ? String(p.account_id) : null;
+}
+async function vintedGetCookie(domain, endpoint) {
+  try {
+    const res = await fetch(`https://${domain}${endpoint}`, {
+      method: 'GET',
+      credentials: 'include', // ← cookies du compte actif (host permission accordee)
+      headers: {
+        'x-csrf-token': lastCsrfByDomain[domain] || '',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+      },
+    });
+    let json = null; try { json = await res.json(); } catch (_) {}
+    return { status: res.status, ok: res.ok, json };
+  } catch (_) { return { status: 0, ok: false, json: null }; }
+}
+async function fetchAllOrdersCookie(domain, type, maxPages = 8) {
+  let all = []; let pagination = null;
+  for (let page = 1; page <= maxPages; page++) {
+    const r = await vintedGetCookie(domain, `/api/v2/my_orders?type=${type}&page=${page}&per_page=40`);
+    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) break;
+    all = all.concat(r.json.my_orders);
+    pagination = r.json.pagination || pagination;
+    if (r.json.my_orders.length < 40) break;
+    await wait(1200);
+  }
+  return { my_orders: all, pagination };
+}
+let cookieFetchRunning = false;
+async function activeFetchActiveAccount() {
+  if (cookieFetchRunning) return false;
+  cookieFetchRunning = true;
+  try {
+    const domain = 'www.vinted.fr';
+    const uid = await activeUidForDomain(domain);
+    if (!uid) return false; // aucun compte connecte dans le navigateur
+    const prof = await vintedGetCookie(domain, '/api/v2/users/current');
+    if (!prof.ok || !prof.json) return false; // pas connecte / endpoint change
+    await storeHarvestRow(uid, 'profile', prof.json, domain);
+    const profileId = prof.json.user && prof.json.user.id;
+    await wait(1200);
+    if (profileId) {
+      const w = await vintedGetCookie(domain, `/api/v2/wardrobe/${profileId}/items?page=1&per_page=100`);
+      if (w.ok && w.json) await storeHarvestRow(uid, 'listings', w.json, domain);
+      await wait(1200);
+    }
+    const sold = await fetchAllOrdersCookie(domain, 'sold');
+    if (sold && sold.my_orders.length) await storeHarvestRow(uid, 'orders_sold', sold, domain);
+    await wait(1200);
+    const bought = await fetchAllOrdersCookie(domain, 'purchased');
+    if (bought && bought.my_orders.length) await storeHarvestRow(uid, 'orders_purchased', bought, domain);
+    await wait(1200);
+    const inbox = await vintedGetCookie(domain, '/api/v2/inbox?page=1&per_page=30');
+    if (inbox.ok && inbox.json) await storeHarvestRow(uid, 'inbox', inbox.json, domain);
+    try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid }); } catch (_) {}
+    return true;
+  } finally { cookieFetchRunning = false; }
+}
+
 // --- Declencheurs ----------------------------------------------------------
 
-// Au demarrage / installation : on capte les comptes PUIS on rafraichit tout.
-function fullSync() { captureAllAccounts().then(() => activeFetchAll()); }
+// Au demarrage / installation : on capte les comptes PUIS on rafraichit le
+// compte ACTIF par cookie (fiable). L'ancien fetch Bearer reste en secours pour
+// les autres comptes, mais il echoue tant que Vinted refuse le Bearer-sans-cookie.
+function fullSync() { captureAllAccounts().then(() => activeFetchActiveAccount().then((ok) => { if (!ok) activeFetchAll(); })); }
 
 chrome.runtime.onInstalled.addListener(() => { fullSync(); });
 chrome.runtime.onStartup.addListener(() => { fullSync(); });
@@ -430,7 +504,7 @@ try {
   chrome.alarms.create('cancale-active', { periodInMinutes: 20 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === 'cancale-sync') captureAllAccounts();
-    else if (a.name === 'cancale-active') activeFetchAll();
+    else if (a.name === 'cancale-active') activeFetchActiveAccount().then((ok) => { if (!ok) activeFetchAll(); });
   });
 } catch (_) {}
 
@@ -444,6 +518,8 @@ try {
     if (!VINTED_DOMAINS.includes(dom)) return;
     if (name !== 'access_token_web' && name !== 'refresh_token_web') return;
     clearTimeout(cookieTimer);
-    cookieTimer = setTimeout(() => captureDomain(dom), 1500);
+    // Changement de session (login / bascule de compte) : on recapte le compte
+    // ET on rafraichit ses donnees par cookie dans la foulee.
+    cookieTimer = setTimeout(() => { captureDomain(dom).then(() => activeFetchActiveAccount()); }, 2000);
   });
 } catch (_) {}
