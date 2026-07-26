@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · ♻️2';
+const BUILD_ID = 'v26/07 · 🎯';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6937,10 +6937,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const key = (t, z) => normTitle(t) + '|' + (z || '');
     const onlineBy = {};
     for (const it of listings.items) { const k = key(it.title, extractSize(it.title) || it.size); (onlineBy[k] = onlineBy[k] || []).push(it); }
+    // Clés (titre+taille) portées par PLUSIEURS paires numérotées = ambiguës.
+    // Ex. deux « Onitsuka Mexico 66 » ou trois « spezial noir 35,5 » : un email
+    // de vente ne dit pas LAQUELLE est partie. Dans ce cas on n'auto-retire
+    // AUCUNE annonce en ligne de ce groupe — sinon on risque de masquer comme
+    // « vendue » une paire encore en stock (bug signalé par Julien). Le seul
+    // signal fiable qui tranche reste le NUMÉRO du bordereau (bordForItem).
+    const ambiguousKey = new Set();
+    { const c = {}; for (const kk in numeros) { const e = numeros[kk]; if (!e || !String(e.numero||'').trim()) continue; const k = key(e.title, extractSize(e.title) || e.size); c[k] = (c[k]||0)+1; if (c[k] > 1) ambiguousKey.add(k); } }
     const saleCount = {};
     for (const s of (emailSales || [])) { const t = s.designation || s.article || ''; if (!t) continue; const k = key(t, extractSize(t)); saleCount[k] = (saleCount[k] || 0) + 1; }
     for (const k in saleCount) {
       const items = onlineBy[k]; if (!items || !items.length) continue;
+      if (ambiguousKey.has(k)) continue; // titre+taille en double → jamais d'auto-retrait par email de vente
       if (saleCount[k] >= items.length) items.forEach(it => out.add(String(it.id))); // toutes vendues
     }
     // Un BORDEREAU reçu ⟹ la paire est VENDUE (Vinted n'en émet que pour une
