@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 🧮';
+const BUILD_ID = 'v26/07 · 💯';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -1035,6 +1035,23 @@ const mapWardrobeItem = (it) => ({
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
 // vendus/fermes (is_closed=true) : on ne veut garder que les actives.
 const isOnlineListing = (it) => it && !it.is_closed && !it.is_hidden && !it.is_draft;
+// LOT / BUNDLE : Vinted range le détail des articles d'un lot dans la
+// transaction. GET /api/v2/transactions/{id} → transaction.order.items = les
+// paires du lot. Renvoie [{ title, id, price }] ou [] si indisponible.
+const isLotTitle = (t) => /(^|\s)lot\b/i.test(String(t || '')) || /\d+\s*articles?/i.test(String(t || ''));
+const fetchLotItems = async (account, transactionId) => {
+  if (!account || transactionId == null) return [];
+  try {
+    const res = await vintedApiCall(account, `/api/v2/transactions/${transactionId}`);
+    const tx = res && res.data && (res.data.transaction || res.data);
+    const items = tx && tx.order && Array.isArray(tx.order.items) ? tx.order.items : [];
+    return items.map(it => ({
+      title: it.title || it.name || '',
+      id: it.id != null ? String(it.id) : null,
+      price: (it.price && (it.price.amount ?? it.price)) ?? null,
+    })).filter(x => x.title);
+  } catch (_) { return []; }
+};
 const fetchVintedListings = async (account, page = 1, opts = {}) => {
   // 1) Données moissonnées par l'extension (aucun appel Vinted). Tu dois avoir
   //    ouvert ta boutique/ton dressing sur vinted.fr pour qu'elles existent.
@@ -6445,6 +6462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showRelais, setShowRelais] = useState(false); // carte des relais dépliée (repliée par défaut si rien à retirer)
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
+  const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
   const [offers, setOffers] = useState(null); // offres reçues (Copilote d'offres)
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
@@ -8653,6 +8671,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {num && isPairLost(num) && (
                   <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:700,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
                 )}
+                {isLotTitle(o.title) && (
+                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📦</button>
+                )}
                 <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title={hidden?'Réintégrer à la compta':'Masquer de la compta'} aria-label={hidden?'Réafficher':'Masquer'} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:hidden?(C.blue||C.accent):C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>{hidden?'↩︎':'🚫'}</button>
                </div>
                {/* Barre de progression de la vente : À expédier · Expédiée · Livrée · Encaissée */}
@@ -9895,6 +9916,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
       {/* Reçu d'achat DANS l'app (pas de nouvel onglet à fermer) */}
+      {/* Détail d'un LOT : les paires vendues ensemble, avec leur N° si connu. */}
+      {lotView && (
+        <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px 28px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+              <div style={{fontSize:16,fontWeight:900,color:C.text}}>📦 Paires du lot</div>
+              <button type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:999,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:800,fontFamily:'inherit'}}>✕</button>
+            </div>
+            <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{lotView.order?.title||''}{lotView.order?.price?.amount!=null?` · ${Number(lotView.order.price.amount).toFixed(0)} ${cur(lotView.order.price?.currency_code)}`:''}{classifyOrderStatus(lotView.order?.status)==='cancelled'?' · ❌ remboursé (hors CA)':''}</div>
+            {lotView.loading ? (
+              <Skeleton variant="row" count={4}/>
+            ) : lotView.items.length===0 ? (
+              <div style={{textAlign:'center',padding:'26px 16px',color:C.muted,fontSize:13,lineHeight:1.5}}>Détail indisponible.<br/><span style={{fontSize:11.5}}>Vinted n'a pas renvoyé le contenu de ce lot (compte peut-être déconnecté).</span></div>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:7}}>
+                {lotView.items.map((it,i)=>{
+                  const e=effEntry({title:it.title})||entryByTitleLoose(it.title,extractSize(it.title));
+                  const num=e&&e.numero?String(e.numero):null;
+                  return (
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:11,padding:'9px 11px'}}>
+                      <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:8,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:900,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
+                      <span style={{flex:1,fontSize:13,fontWeight:700,color:C.text}}>{it.title}</span>
+                      {it.price!=null && <span style={{fontSize:12,fontWeight:800,color:C.muted}}>{Number(it.price).toFixed(0)}€</span>}
+                    </div>
+                  );
+                })}
+                <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>Vinted ne dit pas le prix payé pour chaque paire du lot — seul le total est connu. Le N° s'affiche quand le titre correspond à une de tes paires.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {receiptView && (()=>{ const r=parseReceiptFields(receiptView); const Row=({label,val,strong})=> val ? (
           <div style={{display:'flex',justifyContent:'space-between',gap:12,padding:'9px 0',borderBottom:`1px solid ${C.border}`}}>
             <span style={{fontSize:13.5,color:C.muted,fontWeight:600}}>{label}</span>
@@ -11291,6 +11344,10 @@ export default function App() {
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
       let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, ok=false;
+      // Ventes ANNULÉES / REMBOURSÉES du mois (statut Vinted frais) : servent à
+      // retirer du CA les emails de vente correspondants (une vente remboursée
+      // n'est plus du chiffre d'affaires — ex. un lot vendu puis remboursé).
+      const refunded=[];
       for(const a of vintedAccounts){
         const sold=await fetchVintedOrders(a,'sold',1,'all');
         if(sold.ok){ ok=true; for(const o of sold.items){
@@ -11301,6 +11358,7 @@ export default function App() {
             caEncaisse+=amt0;
             if(o.date){ const d=new Date(o.date); if(!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym){ caMois+=amt0; ventesMois++; } }
           }
+          if(st==='cancelled'){ let inMonth=true; if(o.date){ const d=new Date(o.date); inMonth=!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym; } if(inMonth) refunded.push({ acct:String(a.login||'').toLowerCase(), amount:amt0, title:normTitle(o.title||'') }); }
         }}
         const list=await fetchVintedListings(a,1); if(list.ok){ ok=true; online+=list.items.length;
           for(const it of list.items){ const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0; } }
@@ -11328,13 +11386,22 @@ export default function App() {
         const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
         const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
         if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue;
+          const acct=String(d.account||'').toLowerCase();
+          const desig=String(d.designation||d.article||'');
+          const p=parseFloat(String(d.prix||'').replace(',','.'));
+          // REMBOURSÉE ? Un email de vente dit qu'une vente a eu lieu, mais si
+          // Vinted l'a ensuite REMBOURSÉE, ce n'est plus du CA. On croise avec les
+          // ventes annulées (statut Vinted frais, plus haut) par compte + montant
+          // (ou titre), consommation 1:1 → jamais retiré deux fois.
+          const ri=refunded.findIndex(x=> x.acct===acct && ( (isFinite(p)&&Math.abs(x.amount-p)<0.5) || (x.title&&x.title===normTitle(desig)) ));
+          if(ri>=0){ refunded.splice(ri,1); continue; } // remboursée → hors CA / hors compteur
           // LOT / BUNDLE : « Lot 7 articles » = 7 paires vendues en une transaction.
           // Le CA garde le montant total (vrai encaissement), mais on compte le
           // NOMBRE D'ARTICLES pour les ventes → le prix de vente moyen n'est plus
           // faussé par un gros montant unique.
-          const desig=String(d.designation||d.article||''); const lm=/(\d+)\s*articles?/i.exec(desig);
+          const lm=/(\d+)\s*articles?/i.exec(desig);
           const nItems=(/lot/i.test(desig)&&lm)?Math.max(1,parseInt(lm[1],10)):1;
-          vm+=nItems; const p=parseFloat(String(d.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; } }
+          vm+=nItems; if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; } }
       }catch(_){}
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});
