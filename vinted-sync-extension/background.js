@@ -166,8 +166,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeLabel(domain, msg.url, msg.b64);
   } else if (msg.kind === 'writereq' && msg.url) {
     storeWriteReq(domain, msg.method, msg.url, msg.body);
+  } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
+    storeSeenUrls(domain, msg.paths);
   }
 });
+
+// Diagnostic : liste des CHEMINS d'API que le site appelle réellement (aucun
+// contenu, aucun paramètre). Sert à repérer tout de suite quand Vinted déplace
+// un endpoint — c'est ce qui avait rendu la moisson muette pendant 18 jours.
+async function storeSeenUrls(domain, paths) {
+  const uid = await activeAccountId(domain);
+  if (!uid) return;
+  const data = { uid, paths: paths.slice(0, 300), capturedAt: new Date().toISOString() };
+  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_seen_urls`, data }], 'id');
+}
 
 // Range une requete d'ECRITURE observee (baisser prix, message...) dans une
 // ligne dediee, une par type d'action (regroupee par chemin). Pure observation :

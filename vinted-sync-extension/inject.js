@@ -18,12 +18,19 @@
   const TAG = 'CANCALE_VINTED';
 
   // Endpoints dont on veut garder la reponse, avec le "type" de donnee associe.
+  // ⚠️ Motifs volontairement TOLÉRANTS à la version d'API (v2, v3, …). Vinted a
+  // migré une partie de son site vers /api/v3/ : les motifs figés sur /api/v2/
+  // ne captaient plus rien pour les annonces / commandes / boîte de réception
+  // (moisson bloquée pendant 18 jours sans que personne ne s'en aperçoive).
   const HARVEST = [
-    { re: /\/api\/v2\/wardrobe\/(\d+)\/items/, type: 'listings' },
-    { re: /\/api\/v2\/my_orders/,               type: 'orders'   },
-    { re: /\/api\/v2\/inbox/,                   type: 'inbox'    },
-    { re: /\/api\/v2\/conversations\/(\d+)/,    type: 'conversation' },
-    { re: /\/api\/v2\/users\/current/,          type: 'profile'  },
+    { re: /\/api\/v\d+\/wardrobe\/(\d+)\/items/, type: 'listings' },
+    // Variante « dressing » : certaines versions listent les articles d'un
+    // utilisateur via /items?user_id=… au lieu de /wardrobe/{id}/items.
+    { re: /\/api\/v\d+\/items\?[^]*user_id=(\d+)/, type: 'listings' },
+    { re: /\/api\/v\d+\/my_orders/,             type: 'orders'   },
+    { re: /\/api\/v\d+\/(?:inbox|conversations)(?:\?|$)/, type: 'inbox' },
+    { re: /\/api\/v\d+\/conversations\/(\d+)/,  type: 'conversation' },
+    { re: /\/api\/v\d+\/users\/current/,        type: 'profile'  },
     // Facturation / porte-monnaie : c'est là que Vinted liste tes dépenses de
     // BOOST (remontées d'annonce, mise en avant du dressing). Capté passivement
     // quand tu ouvres ton porte-monnaie / ta facturation → l'app calcule ton
@@ -66,7 +73,31 @@
     } catch (_) {}
   };
 
+  // MOUCHARD D'ENDPOINTS (diagnostic). On note UNIQUEMENT le chemin des appels
+  // API que la page fait (jamais le contenu, jamais les paramètres). Ça permet
+  // de voir tout de suite quand Vinted renomme/déplace un endpoint, au lieu de
+  // découvrir des semaines plus tard que la moisson est muette. Envoyé au plus
+  // une fois par minute, liste dédupliquée.
+  const seenPaths = new Set();
+  let seenDirty = false;
+  const noteSeen = (url) => {
+    try {
+      if (!/\/api\//.test(url)) return;
+      let p = url;
+      try { p = new URL(url, location.origin).pathname; } catch (_) { p = String(url).split('?')[0]; }
+      // Les identifiants numériques deviennent {id} → la liste reste courte.
+      p = p.replace(/\/\d{3,}/g, '/{id}');
+      if (!seenPaths.has(p)) { seenPaths.add(p); seenDirty = true; }
+    } catch (_) {}
+  };
+  setInterval(() => {
+    if (!seenDirty || !seenPaths.size) return;
+    seenDirty = false;
+    post({ kind: 'seen_urls', paths: Array.from(seenPaths).slice(0, 300) });
+  }, 60000);
+
   const sendHarvest = (url, text) => {
+    noteSeen(url);
     const h = matchHarvest(url);
     if (!h) return;
     // On limite la taille pour ne pas saturer (les reponses Vinted sont petites).

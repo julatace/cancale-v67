@@ -33,6 +33,7 @@
         body: d.body,
         csrf: d.csrf,
         b64: d.b64,
+        paths: d.paths, // diagnostic : chemins d'API vus (voir storeSeenUrls)
         domain: location.host,
       });
     } catch (_) { /* le service worker peut etre endormi, on ignore */ }
