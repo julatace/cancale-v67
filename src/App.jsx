@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 🎯';
+const BUILD_ID = 'v26/07 · 🧮';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -11327,7 +11327,14 @@ export default function App() {
       try{
         const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
         const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
-        if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue; vm++; const p=parseFloat(String(d.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; } }
+        if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue;
+          // LOT / BUNDLE : « Lot 7 articles » = 7 paires vendues en une transaction.
+          // Le CA garde le montant total (vrai encaissement), mais on compte le
+          // NOMBRE D'ARTICLES pour les ventes → le prix de vente moyen n'est plus
+          // faussé par un gros montant unique.
+          const desig=String(d.designation||d.article||''); const lm=/(\d+)\s*articles?/i.exec(desig);
+          const nItems=(/lot/i.test(desig)&&lm)?Math.max(1,parseInt(lm[1],10)):1;
+          vm+=nItems; const p=parseFloat(String(d.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; } }
       }catch(_){}
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});
