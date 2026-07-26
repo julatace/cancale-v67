@@ -172,6 +172,7 @@
         const method = (init && init.method) || (input && input.method) || 'GET';
         sendWriteReq(method, url, init && init.body);
         const p = origFetch.apply(this, arguments);
+        noteSeen(url); // diagnostic : TOUT appel API, pas seulement ceux qui matchent
         p.then((res) => {
           try {
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
@@ -208,6 +209,7 @@
       try {
         const url = this.__cancaleUrl || '';
         sendWriteReq(this.__cancaleMethod, url, bodyArg);
+        noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
         this.addEventListener('load', function () {
           try {
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
