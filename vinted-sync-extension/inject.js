@@ -62,14 +62,16 @@
     try { window.postMessage(Object.assign({ __tag: TAG }, payload), '*'); } catch (_) {}
   };
 
+  let lastCsrf = null; // dernier x-csrf-token vu (réutilisé pour la moisson active)
+  let lastAnon = null; // dernier x-anon-id vu
   const sendCsrf = (headers) => {
     try {
       let csrf = null;
-      if (headers instanceof Headers) csrf = headers.get('x-csrf-token');
+      if (headers instanceof Headers) { csrf = headers.get('x-csrf-token'); const a = headers.get('x-anon-id'); if (a) lastAnon = a; }
       else if (headers && typeof headers === 'object') {
-        for (const k in headers) { if (k.toLowerCase() === 'x-csrf-token') { csrf = headers[k]; break; } }
+        for (const k in headers) { const kl = k.toLowerCase(); if (kl === 'x-csrf-token') csrf = headers[k]; else if (kl === 'x-anon-id') lastAnon = headers[k]; }
       }
-      if (csrf) post({ kind: 'csrf', csrf });
+      if (csrf) { lastCsrf = csrf; post({ kind: 'csrf', csrf }); }
     } catch (_) {}
   };
 
@@ -208,6 +210,8 @@
     XHR.prototype.send = function (bodyArg) {
       try {
         const url = this.__cancaleUrl || '';
+        // Capte aussi le csrf/anon posé via setRequestHeader (déjà relayé plus
+        // haut) pour la moisson active.
         sendWriteReq(this.__cancaleMethod, url, bodyArg);
         noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
         this.addEventListener('load', function () {
@@ -225,4 +229,62 @@
       return origSend.apply(this, arguments);
     };
   }
+
+  // ── MOISSON ACTIVE (v3.8) ──────────────────────────────────────────────────
+  // Vinted construit désormais le dressing et les commandes CÔTÉ SERVEUR : la
+  // page ne fait plus l'appel /wardrobe/items ni /my_orders, donc il n'y a plus
+  // rien à intercepter passivement. On rétablit la moisson en faisant l'appel
+  // NOUS-MÊMES — mais depuis TON navigateur, TON IP, TA session (cookies inclus
+  // automatiquement). C'est exactement la requête que le site faisait avant :
+  // indistinguable de toi. C'était la piste prévue de longue date (porter les
+  // appels par l'extension plutôt que par l'IP serveur de Vercel).
+  // Garde-fous « profil humain » : au plus une fois toutes les 30 min, seulement
+  // quand l'onglet est visible, un léger délai aléatoire, un seul compte (celui
+  // connecté dans cet onglet). Se rabat en silence si un endpoint a disparu.
+  const ACTIVE_TTL = 30 * 60 * 1000;
+  const jitter = (min, max) => min + Math.random() * (max - min);
+  const apiGet = async (path) => {
+    try {
+      const h = { accept: 'application/json' };
+      if (lastCsrf) h['x-csrf-token'] = lastCsrf;
+      if (lastAnon) h['x-anon-id'] = lastAnon;
+      const r = await fetch(path, { credentials: 'include', headers: h });
+      if (!r || !r.ok) return null;
+      return await r.text();
+    } catch (_) { return null; }
+  };
+  const activeHarvest = async () => {
+    try {
+      if (!/(^|\.)vinted\./i.test(location.host)) return; // uniquement sur Vinted
+      if (document.hidden) return;                        // onglet au premier plan seulement
+      const KEY = '__cancale_active_ts';
+      let last = 0; try { last = +(localStorage.getItem(KEY) || 0); } catch (_) {}
+      if (Date.now() - last < ACTIVE_TTL) return;
+      try { localStorage.setItem(KEY, String(Date.now())); } catch (_) {}
+      // 1) profil (donne l'ID de dressing, ≠ id de compte).
+      const who = await apiGet('/api/v2/users/current');
+      let pid = null;
+      if (who) { sendHarvest('/api/v2/users/current', who); try { pid = JSON.parse(who).user.id; } catch (_) {} }
+      // 2) annonces en ligne (dressing).
+      if (pid) {
+        await new Promise(r => setTimeout(r, jitter(600, 1500)));
+        const w = await apiGet(`/api/v2/wardrobe/${pid}/items?page=1&per_page=200&order=relevance`);
+        if (w) sendHarvest(`/api/v2/wardrobe/${pid}/items`, w);
+      }
+      // 3) ventes + achats.
+      for (const t of ['sold', 'bought']) {
+        await new Promise(r => setTimeout(r, jitter(600, 1500)));
+        const o = await apiGet(`/api/v2/my_orders?type=${t}&page=1&per_page=100`);
+        if (o) sendHarvest(`/api/v2/my_orders?type=${t}`, o);
+      }
+      // 4) boîte de réception (au cas où la page ne l'a pas déjà chargée).
+      await new Promise(r => setTimeout(r, jitter(600, 1500)));
+      const inb = await apiGet('/api/v2/inbox?page=1&per_page=50');
+      if (inb) sendHarvest('/api/v2/inbox', inb);
+    } catch (_) {}
+  };
+  // Lancement différé (laisse la page s'installer et le csrf se capter), puis à
+  // chaque retour au premier plan (throttlé par ACTIVE_TTL).
+  setTimeout(activeHarvest, 6000);
+  try { document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(activeHarvest, 3000); }); } catch (_) {}
 })();
