@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 📦';
+const BUILD_ID = 'v26/07 · 🩹';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6988,6 +6988,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
+  // ── LITIGES / RETOURS : que devient le NUMÉRO de la paire ? ────────────────
+  // Statuts réellement renvoyés par Vinted dans ce cas : « Retour initié »,
+  // « Remboursement effectué », « Transaction suspendue - en attente de
+  // vérification ». Ils n'ont PAS les mêmes conséquences sur le stock :
+  //   • retour     → la paire te revient physiquement → elle GARDE son numéro,
+  //                  tu la remets en vente avec le même (compta continue).
+  //   • rembourse  → tu as rendu l'argent. Si la paire revient aussi, tu gardes
+  //                  le numéro ; si elle ne revient pas (expédiée + perdue),
+  //                  la paire n'existe plus → son numéro doit être libéré, et
+  //                  sa case au garage vidée, sinon tu comptes un stock fantôme.
+  //   • suspendue  → rien n'est tranché, on n'y touche pas.
+  // ⚠️ On ne SUPPRIME jamais tout seul : Vinted ne dit pas si le colis revient.
+  // L'app détecte, explique, et c'est TOI qui tranches en un clic.
+  const saleOutcome = (o) => {
+    const s = String(o && o.status || '');
+    if (/retour\s*initi|retour\s*en\s*cours/i.test(s)) return 'retour';
+    if (/rembours/i.test(s)) return 'rembourse';
+    if (/suspend|v[ée]rification/i.test(s)) return 'suspendue';
+    return null;
+  };
+  // Paires déclarées PERDUES à la suite d'un litige (numéro libéré).
+  const [pairsLost, setPairsLost] = useState(() => load('vinted_pairs_lost', {}));
+  const isPairLost = (num) => !!(num && pairsLost[String(num)]);
+  const markPairLost = (num, o) => {
+    const n = String(num || '').trim(); if (!n) return;
+    const cell = garageCellOf(garageGrid, n);
+    const ok = window.confirm(
+      `Déclarer la paire N°${n} PERDUE ?\n\n` +
+      `• Son numéro sera libéré (plus compté en stock).\n` +
+      (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
+      `• La vente reste dans ta compta comme perte.\n\n` +
+      `À ne faire que si la paire ne te revient pas.`
+    );
+    if (!ok) return;
+    setPairsLost(prev => { const u = { ...prev, [n]: { at: new Date().toISOString(), title: o && o.title || '', transaction: o && o.transaction_id != null ? String(o.transaction_id) : null } }; save('vinted_pairs_lost', u); return u; });
+    if (onFreeNum) onFreeNum(n); // vide la case au garage
+  };
+  const unmarkPairLost = (num) => {
+    const n = String(num || '').trim(); if (!n) return;
+    setPairsLost(prev => { const u = { ...prev }; delete u[n]; save('vinted_pairs_lost', u); return u; });
+  };
+
   // Retours que tu as PHYSIQUEMENT récupérés (coché à la main : Vinted ne dit
   // pas de façon fiable que le colis t'est revenu). Sert à séparer « en route »
   // de « en main, à republier ».
@@ -7361,47 +7403,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: '📮 À expédier', color: C.warn, step: 1 };
     if (/pay|valid|pr[ée]par/i.test(s)) return { label: 'Payée', color: C.muted, step: 1 };
     return { label: 'En cours', color: C.warn, step: 1 };
-  };
-  // ── LITIGES / RETOURS : que devient le NUMÉRO de la paire ? ────────────────
-  // Statuts réellement renvoyés par Vinted dans ce cas : « Retour initié »,
-  // « Remboursement effectué », « Transaction suspendue - en attente de
-  // vérification ». Ils n'ont PAS les mêmes conséquences sur le stock :
-  //   • retour     → la paire te revient physiquement → elle GARDE son numéro,
-  //                  tu la remets en vente avec le même (compta continue).
-  //   • rembourse  → tu as rendu l'argent. Si la paire revient aussi, tu gardes
-  //                  le numéro ; si elle ne revient pas (expédiée + perdue),
-  //                  la paire n'existe plus → son numéro doit être libéré, et
-  //                  sa case au garage vidée, sinon tu comptes un stock fantôme.
-  //   • suspendue  → rien n'est tranché, on n'y touche pas.
-  // ⚠️ On ne SUPPRIME jamais tout seul : Vinted ne dit pas si le colis revient.
-  // L'app détecte, explique, et c'est TOI qui tranches en un clic.
-  const saleOutcome = (o) => {
-    const s = String(o && o.status || '');
-    if (/retour\s*initi|retour\s*en\s*cours/i.test(s)) return 'retour';
-    if (/rembours/i.test(s)) return 'rembourse';
-    if (/suspend|v[ée]rification/i.test(s)) return 'suspendue';
-    return null;
-  };
-  // Paires déclarées PERDUES à la suite d'un litige (numéro libéré).
-  const [pairsLost, setPairsLost] = useState(() => load('vinted_pairs_lost', {}));
-  const isPairLost = (num) => !!(num && pairsLost[String(num)]);
-  const markPairLost = (num, o) => {
-    const n = String(num || '').trim(); if (!n) return;
-    const cell = garageCellOf(garageGrid, n);
-    const ok = window.confirm(
-      `Déclarer la paire N°${n} PERDUE ?\n\n` +
-      `• Son numéro sera libéré (plus compté en stock).\n` +
-      (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
-      `• La vente reste dans ta compta comme perte.\n\n` +
-      `À ne faire que si la paire ne te revient pas.`
-    );
-    if (!ok) return;
-    setPairsLost(prev => { const u = { ...prev, [n]: { at: new Date().toISOString(), title: o && o.title || '', transaction: o && o.transaction_id != null ? String(o.transaction_id) : null } }; save('vinted_pairs_lost', u); return u; });
-    if (onFreeNum) onFreeNum(n); // vide la case au garage
-  };
-  const unmarkPairLost = (num) => {
-    const n = String(num || '').trim(); if (!n) return;
-    setPairsLost(prev => { const u = { ...prev }; delete u[n]; save('vinted_pairs_lost', u); return u; });
   };
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
