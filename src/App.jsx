@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 📊';
+const BUILD_ID = 'v26/07 · 🎫';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -38,7 +38,7 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
-  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus',
+  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -7074,6 +7074,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const k = o && o.transaction_id != null ? String(o.transaction_id) : null; if (!k) return;
     setRetoursRecus(prev => { const u = { ...prev }; if (u[k]) delete u[k]; else u[k] = new Date().toISOString(); save('vinted_retours_recus', u); return u; });
   };
+  // Paires écartées à la main du panneau « qui reviennent » : quand tu as déjà
+  // republié (avec un nouveau numéro par ex.) ou que la ligne est en trop, tu la
+  // masques. Synchronisé entre appareils (vinted_retours_dismissed).
+  const [retoursDismissed, setRetoursDismissed] = useState(() => load('vinted_retours_dismissed', {}));
+  const dismissRetour = (o) => {
+    const k = o && o.transaction_id != null ? String(o.transaction_id) : null; if (!k) return;
+    setRetoursDismissed(prev => { const u = { ...prev, [k]: Date.now() }; save('vinted_retours_dismissed', u); return u; });
+  };
 
   // ── RETOURS ATTENDUS : les paires qui te reviennent, avec LEUR numéro ─────
   // Quand une vente part en retour / litige, la paire revient (ou pas) mais tu
@@ -7094,13 +7102,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const num = e && e.numero ? String(e.numero) : null;
       if (num && pairsLost[num]) continue;         // déjà déclarée perdue
       if (num && onlineNums.has(num)) continue; // ce numéro est déjà porté par une annonce en ligne → déjà republiée
+      if (o.transaction_id != null && retoursDismissed[String(o.transaction_id)]) continue; // masquée à la main
       out.push({ o, kind, num, title: o.title || '', cell: num ? garageCellOf(garageGrid, num) : null });
     }
     const rank = { retour: 0, rembourse: 1, suspendue: 2 };
     out.sort((a, b) => (rank[a.kind] - rank[b.kind]) || (new Date(b.o.date || 0) - new Date(a.o.date || 0)));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items]);
+  }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items, retoursDismissed]);
 
   const RETOUR_LABEL = { retour: { txt: '↩️ Retour en cours', col: () => INV_STATUS.online.color }, rembourse: { txt: '💸 Remboursé', col: () => C.warn }, suspendue: { txt: '⏸ Suspendue', col: () => C.muted } };
 
@@ -8827,15 +8836,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {(tracking||[]).some(isPickupActive) && <button type="button" onClick={()=>setTourneeOpen(true)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:999,padding:'5px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🗺️ Relais & QR</button>}
               <button type="button" onClick={()=>{ if(window.confirm('Marquer TOUS ces colis comme récupérés ?')) markAllPickupDone(vintedToPickup); }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:999,padding:'5px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>
             </div>
-            <div style={{display:'flex',flexDirection:'column',gap:7}}>
-              {vintedToPickup.slice(0,25).map(o=>(
-                <div key={o.transaction_id} style={{display:'flex',gap:9,alignItems:'center'}}>
-                  <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
-                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div><div style={{fontSize:10,color:C.muted}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''} · au point relais</div></div>
-                  {o._acc && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
-                  <button type="button" onClick={()=>markPickupDone(o)} title="J'ai récupéré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {vintedToPickup.slice(0,25).map(o=>{
+                const tk=trackForBuy(o);
+                const code=tk&&tk.code?String(tk.code):null;
+                const hasQr=tk&&(tk.qrB64||tk.qrUrl||tk.code||tk.suivi);
+                return (
+                <div key={o.transaction_id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:11,padding:'8px 10px'}}>
+                  <div style={{display:'flex',gap:9,alignItems:'center'}}>
+                    <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div><div style={{fontSize:10,color:C.muted}}>{tk&&tk.carrier?carrierName(tk.carrier):'point relais'}{tk&&tk.suivi?` · ${tk.suivi}`:''}{o._acc?` · ${accNameOf(o._acc)}`:''}</div></div>
+                    <button type="button" onClick={()=>markPickupDone(o)} title="J'ai récupéré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Récupéré</button>
+                  </div>
+                  {(code||hasQr)&&(
+                    <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
+                      {code&&(
+                        <button type="button" onClick={()=>openQrView(tk)} title="Afficher en grand pour scanner" style={{flex:1,textAlign:'left',background:`${C.accent}0e`,border:`1.5px dashed ${C.accent}`,borderRadius:9,padding:'6px 11px',cursor:'pointer',fontFamily:'inherit'}}>
+                          <div style={{fontSize:8.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:800}}>Code de retrait</div>
+                          <div style={{fontSize:19,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{code}</div>
+                        </button>
+                      )}
+                      {hasQr&&(
+                        <button type="button" onClick={()=>openQrView(tk)} title="QR de retrait — afficher en grand" aria-label="QR de retrait" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:9,padding:0,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                          {tk.qrB64?<img src={`data:${tk.qrType||'image/png'};base64,${tk.qrB64}`} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:tk.qrUrl?<img src={tk.qrUrl} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:24}}>🔳</span>}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!code&&!hasQr&&<div style={{fontSize:10,color:C.muted,marginTop:5,fontStyle:'italic'}}>Code de retrait pas encore reçu par email pour ce colis.</div>}
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div style={{fontSize:10.5,color:C.muted,marginTop:7,lineHeight:1.4}}>Se met à jour <b>tout seul</b> quand Vinted enregistre le retrait — ou coche <b>✓</b> pour le retirer tout de suite.</div>
           </div>
@@ -9190,6 +9221,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                       {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
                       <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:800,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
+                      <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:800,padding:'6px 8px',fontFamily:'inherit'}}>✕</button>
                     </div>
                   );
                 })}
