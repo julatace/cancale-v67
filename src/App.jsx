@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v25/07 · 🌐';
+const BUILD_ID = 'v26/07 · 🔒';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7132,7 +7132,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
   // ventes actives pour ne pas polluer l'historique de centaines de numéros.
   useEffect(() => {
     if (!autoNum) return;
+    // ⛔ GARDE-FOU VITAL (incident du 26/07) : ne JAMAIS numéroter avant que le
+    // cloud soit chargé. Sans ça, au démarrage `saleOv` est vide → toutes les
+    // ventes paraissent sans numéro → l'app leur en attribue de nouveaux et
+    // ÉCRASE les numéros saisis à la main (et leur prix d'achat). C'est ce qui
+    // a brûlé les numéros 43→74 et remplacé le N°56 par le N°87.
+    if (!cloudReady) return;
     if (!sales.items || !sales.items.length) return;
+    // Deuxième filet : si l'app ne connaît AUCUNE paire numérotée, c'est que les
+    // données ne sont pas (encore) là — on ne mint rien plutôt que de tout renuméroter.
+    if (!Object.keys(numeros).length) return;
     let maxN = 0;
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>maxN)maxN=n;});
     Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>maxN)maxN=n;});
