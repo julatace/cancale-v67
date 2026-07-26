@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 🔄';
+const BUILD_ID = 'v26/07 · 📦';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -38,7 +38,7 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
-  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost',
+  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -6988,6 +6988,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
+  // Retours que tu as PHYSIQUEMENT récupérés (coché à la main : Vinted ne dit
+  // pas de façon fiable que le colis t'est revenu). Sert à séparer « en route »
+  // de « en main, à republier ».
+  const [retoursRecus, setRetoursRecus] = useState(() => load('vinted_retours_recus', {}));
+  const isRetourRecu = (o) => !!(o && retoursRecus[String(o.transaction_id)]);
+  const toggleRetourRecu = (o) => {
+    const k = o && o.transaction_id != null ? String(o.transaction_id) : null; if (!k) return;
+    setRetoursRecus(prev => { const u = { ...prev }; if (u[k]) delete u[k]; else u[k] = new Date().toISOString(); save('vinted_retours_recus', u); return u; });
+  };
+
   // ── RETOURS ATTENDUS : les paires qui te reviennent, avec LEUR numéro ─────
   // Quand une vente part en retour / litige, la paire revient (ou pas) mais tu
   // devras la REPUBLIER. Avec de nouvelles photos, l'app ne la reconnaîtra pas.
@@ -9086,14 +9096,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           })()}
           {retoursAttendus.length > 0 && (
             <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'10px 12px'}}>
-              <div style={{fontSize:12.5,fontWeight:900,color:C.warn,marginBottom:2}}>🔄 {retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Retours et litiges en cours. <b>Garde leur numéro sous les yeux</b> : quand tu republies la paire avec de nouvelles photos, retape ce numéro dans le champ N° — celui écrit sur sa boîte.</div>
+              {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (<>
+                <div style={{fontSize:12.5,fontWeight:900,color:C.warn,marginBottom:2}}>🔄 {retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}{rec>0?` · ${rec} déjà reçue${rec>1?'s':''}`:''}</div>
+                <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier. <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</div>
+              </>); })()}
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {retoursAttendus.map((r,i)=>{
+                {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
                   const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
                   const col = lab.col();
+                  const recu = isRetourRecu(r.o);
                   return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 9px'}}>
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'7px 9px'}}>
                       <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
                       <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {r.o.photo_url?<img src={r.o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>👟</span>}
@@ -9101,13 +9114,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
                         <div style={{fontSize:10.5,fontWeight:700,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
-                          <span style={{color:col}}>{lab.txt}</span>
+                          <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'📦 Reçue — à republier':lab.txt}</span>
                           <AcctTag acc={r.o._acc} name={accNameOf(r.o._acc)}/>
                           {r.cell && <span style={{color:C.blue||C.accent}}>🏠 {garageCellLabel(r.cell)}</span>}
                           {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
                         </div>
                       </div>
                       {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
+                      <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:800,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
                     </div>
                   );
                 })}
