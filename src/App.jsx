@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 💯';
+const BUILD_ID = 'v26/07 · 📊';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -835,18 +835,26 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   // Mode "moisson seulement" : on n'interroge PAS Vinted, on renvoie du vide si
   // la page n'a pas encore été ouverte dans le navigateur.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, source: 'harvest' };
-  // 2) Repli : proxy.
-  const endpoint = statusFilter === 'completed'
-    ? `/api/v2/my_orders?type=${type}&status=completed&per_page=20&page=${page}`
-    : `/api/v2/my_orders?type=${type}&per_page=20&page=${page}`;
-  const res = await vintedApiCall(account, endpoint);
-  if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
-  const items = applyStatus(res.data?.my_orders || []);
-  return {
-    ok: true,
-    items,
-    pagination: res.data?.pagination || null,
-  };
+  // 2) Repli : proxy — on récupère TOUTES les pages. ⚠️ Avant, on ne prenait
+  //    que la 1re page de 20 commandes/compte → CA, « en attente » et coûts
+  //    d'achat étaient largement sous-comptés (ex. 71 ventes lues comme 20).
+  //    per_page=100 suffit en 1 appel pour la plupart des comptes ; on boucle
+  //    par sécurité pour les gros comptes (plafond pour rester raisonnable).
+  const perPage = 100; const maxPages = 12;
+  let all = []; let anyOk = false;
+  for (let pg = 1; pg <= maxPages; pg++) {
+    const endpoint = statusFilter === 'completed'
+      ? `/api/v2/my_orders?type=${type}&status=completed&per_page=${perPage}&page=${pg}`
+      : `/api/v2/my_orders?type=${type}&per_page=${perPage}&page=${pg}`;
+    const res = await vintedApiCall(account, endpoint);
+    if (!res.ok) { if (pg === 1) return { ok: false, error: res.status || res.error, items: [], pagination: null }; break; }
+    anyOk = true;
+    const batch = res.data?.my_orders || [];
+    all = all.concat(batch);
+    const totalPages = res.data?.pagination?.total_pages;
+    if (batch.length < perPage || (totalPages && pg >= totalPages)) break;
+  }
+  return { ok: anyOk, items: applyStatus(all), pagination: null };
 };
 
 // Recupere la liste des conversations (boite de reception).
