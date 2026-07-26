@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 🎫';
+const BUILD_ID = 'v26/07 · 🔁';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6971,19 +6971,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // signal fiable qui tranche reste le NUMÉRO du bordereau (bordForItem).
     const ambiguousKey = new Set();
     { const c = {}; for (const kk in numeros) { const e = numeros[kk]; if (!e || !String(e.numero||'').trim()) continue; const k = key(e.title, extractSize(e.title) || e.size); c[k] = (c[k]||0)+1; if (c[k] > 1) ambiguousKey.add(k); } }
-    const saleCount = {};
-    for (const s of (emailSales || [])) { const t = s.designation || s.article || ''; if (!t) continue; const k = key(t, extractSize(t)); saleCount[k] = (saleCount[k] || 0) + 1; }
+    // Une annonce (re)numérotée APRÈS une vente/bordereau donné est une paire
+    // REPUBLIÉE, de retour en stock (typiquement après annulation/remboursement) :
+    // il ne faut alors PAS la re-masquer sur la foi de cette ancienne vente. On
+    // compare la date de (re)numérotation de l'annonce (repriseAt/numberedAt) à
+    // la date de la vente/bordereau. Corrige le bug « paire postée qui disparaît ».
+    const entryTs = (it) => { const e = numeros[it.id]; if (!e) return 0; const d = new Date(e.repriseAt || e.numberedAt || 0).getTime(); return isNaN(d) ? 0 : d; };
+    const republishedAfter = (it, refTs) => { const t = entryTs(it); return !!(t && refTs && t > refTs); };
+
+    const saleCount = {}, saleTs = {};
+    for (const s of (emailSales || [])) { const t = s.designation || s.article || ''; if (!t) continue; const k = key(t, extractSize(t)); saleCount[k] = (saleCount[k] || 0) + 1; const d = new Date(s.receivedAt || 0).getTime(); if (!isNaN(d) && d > (saleTs[k] || 0)) saleTs[k] = d; }
     for (const k in saleCount) {
       const items = onlineBy[k]; if (!items || !items.length) continue;
       if (ambiguousKey.has(k)) continue; // titre+taille en double → jamais d'auto-retrait par email de vente
-      if (saleCount[k] >= items.length) items.forEach(it => out.add(String(it.id))); // toutes vendues
+      if (saleCount[k] >= items.length) items.forEach(it => { if (!republishedAfter(it, saleTs[k])) out.add(String(it.id)); }); // toutes vendues (sauf republiées depuis)
     }
     // Un BORDEREAU reçu ⟹ la paire est VENDUE (Vinted n'en émet que pour une
     // vente). Signal fiable 24/7. Match par titre non ambigu / n° (bordForItem).
+    // Sauf si l'annonce a été REPUBLIÉE après ce bordereau (retour en stock).
     if (emailBords && emailBords.length) {
       for (const it of listings.items) {
         if (out.has(String(it.id))) continue;
-        if (bordForItem(it.title, numeros[it.id]?.numero)) out.add(String(it.id));
+        const bord = bordForItem(it.title, numeros[it.id]?.numero);
+        if (!bord) continue;
+        const bordTs = new Date(bord.receivedAt || 0).getTime();
+        if (republishedAfter(it, isNaN(bordTs) ? 0 : bordTs)) continue;
+        out.add(String(it.id));
       }
     }
     return out;
