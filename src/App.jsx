@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · ♻️';
+const BUILD_ID = 'v26/07 · 🔄';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6988,6 +6988,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
+  // ── RETOURS ATTENDUS : les paires qui te reviennent, avec LEUR numéro ─────
+  // Quand une vente part en retour / litige, la paire revient (ou pas) mais tu
+  // devras la REPUBLIER. Avec de nouvelles photos, l'app ne la reconnaîtra pas.
+  // D'où cette liste : le numéro d'origine de chaque paire concernée, sous les
+  // yeux au moment de republier → tu le retapes et tout reste cohérent.
+  const retoursAttendus = useMemo(() => {
+    // Numéros actuellement portés par une annonce EN LIGNE → la paire est déjà
+    // de retour en vente, on ne la liste plus comme « attendue ».
+    const onlineNums = new Set();
+    for (const it of (listings.items || [])) { const e = numeros[it.id]; if (e && e.numero) onlineNums.add(String(e.numero)); }
+    const out = [];
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      const kind = saleOutcome(o);
+      if (!kind) continue;
+      const e = effEntry(o);
+      const num = e && e.numero ? String(e.numero) : null;
+      if (num && pairsLost[num]) continue;         // déjà déclarée perdue
+      if (num && onlineNums.has(num)) continue; // ce numéro est déjà porté par une annonce en ligne → déjà republiée
+      out.push({ o, kind, num, title: o.title || '', cell: num ? garageCellOf(garageGrid, num) : null });
+    }
+    const rank = { retour: 0, rembourse: 1, suspendue: 2 };
+    out.sort((a, b) => (rank[a.kind] - rank[b.kind]) || (new Date(b.o.date || 0) - new Date(a.o.date || 0)));
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items]);
+
+  const RETOUR_LABEL = { retour: { txt: '↩️ Retour en cours', col: () => INV_STATUS.online.color }, rembourse: { txt: '💸 Remboursé', col: () => C.warn }, suspendue: { txt: '⏸ Suspendue', col: () => C.muted } };
+
   // ── REPRISE DE NUMÉRO (paire republiée avec de NOUVELLES photos) ──────────
   // Cas réel : tu retires une annonce (annulation, litige, invendue), tu la
   // reprends en photo et tu la republies. L'app ne reconnaît plus rien (elle
@@ -9055,6 +9084,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             );
           })()}
+          {retoursAttendus.length > 0 && (
+            <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'10px 12px'}}>
+              <div style={{fontSize:12.5,fontWeight:900,color:C.warn,marginBottom:2}}>🔄 {retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Retours et litiges en cours. <b>Garde leur numéro sous les yeux</b> : quand tu republies la paire avec de nouvelles photos, retape ce numéro dans le champ N° — celui écrit sur sa boîte.</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {retoursAttendus.map((r,i)=>{
+                  const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
+                  const col = lab.col();
+                  return (
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 9px'}}>
+                      <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
+                      <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {r.o.photo_url?<img src={r.o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>👟</span>}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
+                        <div style={{fontSize:10.5,fontWeight:700,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
+                          <span style={{color:col}}>{lab.txt}</span>
+                          <AcctTag acc={r.o._acc} name={accNameOf(r.o._acc)}/>
+                          {r.cell && <span style={{color:C.blue||C.accent}}>🏠 {garageCellLabel(r.cell)}</span>}
+                          {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
+                        </div>
+                      </div>
+                      {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {numeroReprises.length > 0 && (
             <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:12,padding:'10px 12px'}}>
               <div style={{fontSize:12.5,fontWeight:900,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} annonce{numeroReprises.length>1?'s':''} republiée{numeroReprises.length>1?'s':''} ?</div>
