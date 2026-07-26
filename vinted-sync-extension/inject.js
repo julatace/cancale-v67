@@ -90,11 +90,20 @@
       if (!seenPaths.has(p)) { seenPaths.add(p); seenDirty = true; }
     } catch (_) {}
   };
-  setInterval(() => {
+  const flushSeen = () => {
     if (!seenDirty || !seenPaths.size) return;
     seenDirty = false;
     post({ kind: 'seen_urls', paths: Array.from(seenPaths).slice(0, 300) });
-  }, 60000);
+  };
+  // Envoi RAPIDE puis régulier : une page Vinted est souvent quittée avant 60 s,
+  // et le diagnostic ne partait alors jamais. On envoie à 5 s, puis toutes les
+  // 20 s, et aussi quand tu quittes/masques la page (dernière chance).
+  setTimeout(flushSeen, 5000);
+  setInterval(flushSeen, 20000);
+  try {
+    window.addEventListener('pagehide', flushSeen);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) flushSeen(); });
+  } catch (_) {}
 
   const sendHarvest = (url, text) => {
     noteSeen(url);
