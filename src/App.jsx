@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · ⚖️';
+const BUILD_ID = 'v26/07 · ♻️';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6988,6 +6988,73 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
+  // ── REPRISE DE NUMÉRO (paire republiée avec de NOUVELLES photos) ──────────
+  // Cas réel : tu retires une annonce (annulation, litige, invendue), tu la
+  // reprends en photo et tu la republies. L'app ne reconnaît plus rien (elle
+  // s'appuie sur la photo, volontairement, car deux paires peuvent porter le
+  // même titre) → elle attribue un numéro NEUF, alors que la paire porte déjà
+  // son ancien numéro écrit sur sa boîte. On se retrouve avec deux numéros pour
+  // une seule paire et un orphelin au garage.
+  // Ici on repère la situation et on TE la propose : un orphelin (paire
+  // numérotée, ni en ligne, ni vendue) qui correspond en titre+pointure à une
+  // annonce fraîchement numérotée automatiquement. Un clic remet l'ancien
+  // numéro. Jamais automatique : deux paires identiques existent vraiment.
+  const numeroReprises = useMemo(() => {
+    const online = listings.items || [];
+    if (!online.length || !Object.keys(numeros).length) return [];
+    const soldKeys = new Set(Object.values(txnLink || {}).map(String));
+    // Orphelins : numérotés, plus en ligne, pas vendus, pas déclarés perdus.
+    const orphans = [];
+    for (const k in numeros) {
+      const e = numeros[k];
+      if (!e || !String(e.numero || '').trim()) continue;
+      if (onlineAnnonceIds.has(String(k))) continue;
+      if (soldKeys.has(String(k))) continue;
+      if (pairsLost[String(e.numero)]) continue;
+      orphans.push({ key: k, e });
+    }
+    if (!orphans.length) return [];
+    const sizeOf = (t, fallback) => normSize(extractSize(t) || fallback || '');
+    const out = [];
+    for (const it of online) {
+      const cur = numeros[it.id];
+      // On ne propose que pour les annonces numérotées AUTOMATIQUEMENT (un
+      // numéro que tu as tapé toi-même n'est jamais remis en cause).
+      if (!cur || !cur.auto || !String(cur.numero || '').trim()) continue;
+      const t = normTitle(it.title), sz = sizeOf(it.title, it.size);
+      const cands = orphans.filter(o => {
+        if (String(o.e.numero) === String(cur.numero)) return false;
+        const ot = normTitle(o.e.title), osz = sizeOf(o.e.title, o.e.size);
+        if (!ot || ot !== t) return false;
+        if (sz && osz && sz !== osz) return false; // pointures connues et différentes → non
+        return true;
+      });
+      // Ambigu (plusieurs orphelins possibles) → on ne propose rien plutôt que
+      // de risquer d'attribuer le numéro d'une autre paire.
+      if (cands.length === 1) out.push({ item: it, current: cur, orphan: cands[0] });
+    }
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, numeros, onlineAnnonceIds, txnLink, pairsLost]);
+
+  // Applique la reprise : l'annonce en ligne récupère l'ancien numéro, et le
+  // numéro auto tout juste créé est rendu (il n'a jamais été écrit sur une boîte).
+  const applyReprise = (r) => {
+    const oldNum = String(r.orphan.e.numero), autoNum2 = String(r.current.numero);
+    if (!window.confirm(`Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, sera rendu.`)) return;
+    setNumeros(prev => {
+      const u = { ...prev };
+      u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
+      delete u[r.orphan.key]; // l'ancienne fiche devient l'annonce actuelle
+      save('vinted_annonce_numeros', u);
+      return u;
+    });
+    // Le numéro auto est rendu au pot SEULEMENT s'il n'est pas rangé au garage.
+    if (!garageCellOf(garageGrid, autoNum2)) {
+      setUsedNumeros(prev => { const u = prev.filter(x => String(x) !== autoNum2); save('vinted_used_numeros', u); return u; });
+    }
+  };
+
   const annStats = useMemo(() => {
     const arr = listings.items || [];
     let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0;
@@ -8988,6 +9055,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             );
           })()}
+          {numeroReprises.length > 0 && (
+            <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:12,padding:'10px 12px'}}>
+              <div style={{fontSize:12.5,fontWeight:900,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} annonce{numeroReprises.length>1?'s':''} republiée{numeroReprises.length>1?'s':''} ?</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Tu as repris ces paires en photo : l'app ne les a pas reconnues et leur a donné un numéro neuf. Si c'est bien la même paire, remets son numéro d'origine — celui écrit sur sa boîte.</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {numeroReprises.slice(0,8).map((r,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 9px'}}>
+                    <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      {r.item.photo?<img src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>👟</span>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
+                      <div style={{fontSize:10.5,color:C.muted,fontWeight:700,marginTop:1}}>N°{r.current.numero} (auto) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · 🏠 ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                    </div>
+                    <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:8,padding:'7px 10px',cursor:'pointer',fontSize:11.5,fontWeight:800,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Bandeau de stats façon outil pro */}
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
             <span style={{fontSize:12,fontWeight:800,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>{annStats.n} en ligne</span>
