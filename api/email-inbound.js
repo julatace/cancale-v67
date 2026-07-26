@@ -387,7 +387,7 @@ function parseCarrierEmail(mail, carrier) {
   // l'historique du trajet (« déposé », « pris en charge », « acheminement »)
   // était rétrogradé à « en transit » et le colis restait à retirer pour
   // toujours (bug réel : confirmations de retrait Chronopost bloquées en transit).
-  if (/livr[ée]|bien re[çc]u|remis(?:\s+au\s+destinataire)?|a\s+bien\s+[ée]t[ée]\s+retir[ée]|a\s+[ée]t[ée]\s+retir[ée]|retir[ée]\s+(?:le|avec)|bien\s+retir[ée]|colis\s+a\s+[ée]t[ée]\s+retir[ée]|r[ée]cup[ée]r[ée]|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
+  if (/livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinataire|en\s+mains?)|vous\s+a\s+[ée]t[ée]\s+(?:remis|livr[ée])|(?:colis\s+)?a\s+(?:bien\s+)?[ée]t[ée]\s+retir[ée]|bien\s+retir[ée]|retir[ée]\s+(?:le|avec|par)|colis\s+retir[ée]|(?:vous\s+)?avez\s+(?:bien\s+)?retir[ée]|merci\s+d[e']?\s*avoir\s+(?:bien\s+)?(?:retir[ée]|r[ée]cup[ée]r[ée])|(?:vous\s+)?avez\s+(?:bien\s+)?r[ée]cup[ée]r[ée]|bien\s+r[ée]cup[ée]r[ée]|r[ée]cup[ée]r[ée]\s+(?:le|votre|avec)|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
   else if (/disponible|à retirer|arriv[ée] (?:dans|en|au) point|pr[êe]t.*retrait/.test(t)) { status = 'available'; label = 'Arrivé au point de retrait'; }
   else if (/acheminement|en transit|exp[ée]di[ée]|pris en charge|d[ée]pos[ée]|enregistr[ée]|en cours de livraison/.test(t)) { status = 'transit'; label = 'En transit'; }
   // Anti-faux-colis : un vrai « colis disponible » a TOUJOURS un n° de suivi.

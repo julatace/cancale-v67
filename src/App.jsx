@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 📬';
+const BUILD_ID = 'v26/07 · 📭';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -222,7 +222,11 @@ const fetchEmailBordereaux = async () => {
 // attendre le redéploiement de la fonction serverless. Le n° de suivi est la clé
 // (les lignes sont email_track_{carrier}_{suivi}) : la confirmation écrase la
 // ligne « disponible » du même suivi → le colis sort tout seul de la liste.
-const TRACK_DELIVERED_RE = /colis\s+a\s+[ée]t[ée]\s+retir[ée]|a\s+bien\s+[ée]t[ée]\s+retir[ée]|bien\s+retir[ée]|retir[ée]\s+(?:le|avec|par)|livr[ée]|remis(?:\s+au\s+destinataire)?|r[ée]cup[ée]r[ée]|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/i;
+// Formulations de CONFIRMATION de retrait/livraison (⟹ colis récupéré). On
+// exige un participe passé « retiré/récupéré/livré » dans un contexte de retrait
+// EFFECTUÉ — jamais « à retirer » / « prêt à être retiré » / « peut récupérer »
+// (= encore à retirer). Validé sans faux positif sur les vrais sujets stockés.
+const TRACK_DELIVERED_RE = /livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinataire|en\s+mains?)|vous\s+a\s+[ée]t[ée]\s+(?:remis|livr[ée])|(?:colis\s+)?a\s+(?:bien\s+)?[ée]t[ée]\s+retir[ée]|bien\s+retir[ée]|retir[ée]\s+(?:le|avec|par)|colis\s+retir[ée]|(?:vous\s+)?avez\s+(?:bien\s+)?retir[ée]|merci\s+d[e']?\s*avoir\s+(?:bien\s+)?(?:retir[ée]|r[ée]cup[ée]r[ée])|(?:vous\s+)?avez\s+(?:bien\s+)?r[ée]cup[ée]r[ée]|bien\s+r[ée]cup[ée]r[ée]|r[ée]cup[ée]r[ée]\s+(?:le|votre|avec)|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/i;
 const reclassifyTrack = (d) => {
   if (!d || d.status === 'delivered') return d;
   const s = `${d.subject || ''} ${d.statusLabel || ''}`;
