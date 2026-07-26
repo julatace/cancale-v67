@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 🔒';
+const BUILD_ID = 'v26/07 · ⚖️';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -38,7 +38,7 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
-  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done',
+  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -6322,7 +6322,7 @@ const _CACHE_TTL = 180000; // 3 min
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
 const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   // Annonces marquées VENDUES à la main (id d'annonce) : retirées des Annonces
@@ -7255,6 +7255,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
     if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: '📮 À expédier', color: C.warn, step: 1 };
     if (/pay|valid|pr[ée]par/i.test(s)) return { label: 'Payée', color: C.muted, step: 1 };
     return { label: 'En cours', color: C.warn, step: 1 };
+  };
+  // ── LITIGES / RETOURS : que devient le NUMÉRO de la paire ? ────────────────
+  // Statuts réellement renvoyés par Vinted dans ce cas : « Retour initié »,
+  // « Remboursement effectué », « Transaction suspendue - en attente de
+  // vérification ». Ils n'ont PAS les mêmes conséquences sur le stock :
+  //   • retour     → la paire te revient physiquement → elle GARDE son numéro,
+  //                  tu la remets en vente avec le même (compta continue).
+  //   • rembourse  → tu as rendu l'argent. Si la paire revient aussi, tu gardes
+  //                  le numéro ; si elle ne revient pas (expédiée + perdue),
+  //                  la paire n'existe plus → son numéro doit être libéré, et
+  //                  sa case au garage vidée, sinon tu comptes un stock fantôme.
+  //   • suspendue  → rien n'est tranché, on n'y touche pas.
+  // ⚠️ On ne SUPPRIME jamais tout seul : Vinted ne dit pas si le colis revient.
+  // L'app détecte, explique, et c'est TOI qui tranches en un clic.
+  const saleOutcome = (o) => {
+    const s = String(o && o.status || '');
+    if (/retour\s*initi|retour\s*en\s*cours/i.test(s)) return 'retour';
+    if (/rembours/i.test(s)) return 'rembourse';
+    if (/suspend|v[ée]rification/i.test(s)) return 'suspendue';
+    return null;
+  };
+  // Paires déclarées PERDUES à la suite d'un litige (numéro libéré).
+  const [pairsLost, setPairsLost] = useState(() => load('vinted_pairs_lost', {}));
+  const isPairLost = (num) => !!(num && pairsLost[String(num)]);
+  const markPairLost = (num, o) => {
+    const n = String(num || '').trim(); if (!n) return;
+    const cell = garageCellOf(garageGrid, n);
+    const ok = window.confirm(
+      `Déclarer la paire N°${n} PERDUE ?\n\n` +
+      `• Son numéro sera libéré (plus compté en stock).\n` +
+      (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
+      `• La vente reste dans ta compta comme perte.\n\n` +
+      `À ne faire que si la paire ne te revient pas.`
+    );
+    if (!ok) return;
+    setPairsLost(prev => { const u = { ...prev, [n]: { at: new Date().toISOString(), title: o && o.title || '', transaction: o && o.transaction_id != null ? String(o.transaction_id) : null } }; save('vinted_pairs_lost', u); return u; });
+    if (onFreeNum) onFreeNum(n); // vide la case au garage
+  };
+  const unmarkPairLost = (num) => {
+    const n = String(num || '').trim(); if (!n) return;
+    setPairsLost(prev => { const u = { ...prev }; delete u[n]; save('vinted_pairs_lost', u); return u; });
   };
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
@@ -8439,7 +8480,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                     {(()=>{ const vs=venteStage(o); return <span style={{color:vs.color,fontWeight:900,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px'}}>{vs.label}</span>; })()}
                     {o.status && <span style={{color:C.muted,fontStyle:'italic',opacity:0.8}} title="Statut exact renvoyé par Vinted">« {o.status} »</span>}
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:800,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:700}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
-                    {st==='cancelled' && num && <span style={{color:C.warn,fontWeight:800,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'1px 8px'}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>}
+                    {st==='cancelled' && num && (()=>{
+                      const out = saleOutcome(o);
+                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:800,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:999,padding:'1px 8px'}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
+                      if (out === 'retour') return <span style={{color:INV_STATUS.online.color,fontWeight:800,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:999,padding:'1px 8px'}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
+                      if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:800,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:999,padding:'1px 8px'}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
+                      return <span style={{color:C.warn,fontWeight:800,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'1px 8px'}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
+                    })()}
                     {!num && st!=='cancelled' && <span style={{color:C.warn,fontWeight:800}} title="Paire pas encore identifiée automatiquement (photo non reconnue). Ajoute son N° et son prix d'achat dans les champs ci-dessous.">⚠️ à identifier</span>}
                   </div>
                 </div>
@@ -8454,6 +8501,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav }) 
                 )}
                 {needsBordereau(o.status) && !hidden && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📄</button>
+                )}
+                {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
+                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:800,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
+                )}
+                {num && isPairLost(num) && (
+                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:700,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
                 )}
                 <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title={hidden?'Réintégrer à la compta':'Masquer de la compta'} aria-label={hidden?'Réafficher':'Masquer'} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:hidden?(C.blue||C.accent):C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>{hidden?'↩︎':'🚫'}</button>
                </div>
@@ -10668,6 +10721,22 @@ export default function App() {
       setCanBack(navHistRef.current.length>0);
     }
   },[tab]);
+  // Libère un numéro au garage : vide la case qui le contient (paire perdue
+  // après un litige). Ne touche à rien d'autre — le numéro reste dans
+  // l'historique (vinted_used_numeros) et n'est jamais redonné à une autre paire.
+  const freeGarageNum=(num)=>{
+    const target=String(num||'').trim().toLowerCase(); if(!target) return;
+    setGarageGrid(prev=>{
+      const next={...prev}; let touched=false;
+      for(const key in next){
+        const arr=next[key]; if(!Array.isArray(arr)) continue;
+        const idx=arr.findIndex(v=>v!=null&&String(v).trim().toLowerCase()===target);
+        if(idx>=0){ const copy=[...arr]; copy[idx]=''; next[key]=copy; touched=true; }
+      }
+      if(touched) save('vinted_garage_grid',next);
+      return touched?next:prev;
+    });
+  };
   const goBack=()=>{ if(!navHistRef.current.length) return; const dest=navHistRef.current.pop(); backingRef.current=true; setTab(dest); setCanBack(navHistRef.current.length>0); };
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
@@ -11426,7 +11495,7 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'expedition'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'expedition'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
       </main>
       <BottomBar tab={tab} setTab={setTab}/>
