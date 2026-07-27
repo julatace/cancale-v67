@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · ✨';
+const BUILD_ID = 'v27/07 · 🏠';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -4930,6 +4930,12 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   const [activeColor,setActiveColor]=useState('#ffb830');
   const [focusedCell,setFocusedCell]=useState(null); // {zid, ci, si}
   const highlightRef=React.useRef(null);
+  // Rangement lancé DEPUIS le garage (bouton « Ranger » sur une paire à ranger),
+  // en plus de celui lancé depuis Annonces (prop placeNum). placing = le N° en cours.
+  const [localPlace,setLocalPlace]=useState(null);
+  const [advanced,setAdvanced]=useState(false); // options avancées (modes, colonnes) repliées par défaut
+  const placing = placeNum || localPlace;
+  const clearPlacing = () => { setLocalPlace(null); onPlaced&&onPlaced(); };
 
   // Quand une recherche trouve une case, on défile automatiquement jusqu'à elle (centré)
   useEffect(()=>{
@@ -5113,10 +5119,10 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
 
       {garageView==='grid' && (<>
-      {placeNum && (
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 14px',borderRadius:10,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:800}}>
-          <span>📦 Range la paire <b>N°{placeNum}</b> : clique une case vide pour l'y placer.</span>
-          <button onClick={()=>onPlaced&&onPlaced()} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:700,padding:'3px 10px'}}>Annuler</button>
+      {placing && (
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:12,background:C.accent,color:C.onAccent,fontSize:13.5,fontWeight:800,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
+          <span>📦 Range la paire <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
+          <button onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:700,padding:'4px 11px',flexShrink:0}}>Annuler</button>
         </div>
       )}
 
@@ -5146,10 +5152,13 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {numberedNotStored.length>0&&(
             <Card style={{padding:12,background:`${C.warn}11`,borderColor:`${C.warn}44`}}>
-              <div style={{fontSize:11,color:C.warn,fontWeight:700,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>📦 Numérotées mais pas au garage ({numberedNotStored.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Ces paires ont un numéro mais ne sont dans aucune case — à ranger.</div>
+              <div style={{fontSize:11,color:C.warn,fontWeight:700,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>📦 À ranger ({numberedNotStored.length})</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Ces paires ont un numéro mais ne sont dans aucune boîte. <b>Touche-en une</b>, puis touche la boîte où tu la ranges.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-                {numberedNotStored.map(n=>(<span key={n} style={{background:C.bg,padding:'4px 10px',borderRadius:6,color:C.text,border:`1px solid ${C.warn}66`,fontWeight:700}}>N°{n}</span>))}
+                {numberedNotStored.map(n=>(
+                  <button key={n} type="button" onClick={()=>{ setLocalPlace(n); try{window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}catch(_){} }}
+                    style={{background:placing===n?C.warn:C.bg,color:placing===n?'#fff':C.text,padding:'5px 11px',borderRadius:8,border:`1px solid ${C.warn}66`,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>📦 N°{n}</button>
+                ))}
               </div>
             </Card>
           )}
@@ -5183,6 +5192,14 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           :<span style={{color:C.danger}}>✗ Numéro #{garageSearch} non trouvé dans le garage</span>}
       </div>}
       
+      {/* Réglages avancés repliés par défaut : le vendeur n'a besoin que de
+          « À ranger » + recherche + les boîtes. Le reste (blocage, couleurs,
+          colonnes) est là pour qui veut, mais ne pollue plus l'écran. */}
+      <button type="button" onClick={()=>{ const v=!advanced; setAdvanced(v); if(!v){setAddMode(false);setBlockMode(false);setColorMode(false);} }}
+        style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:999,padding:'5px 13px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+        ⚙️ {advanced?'Masquer les réglages':'Réglages (couleurs, blocage, colonnes)'}
+      </button>
+      {advanced && (<>
       {/* Modes & boutons */}
       <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
         <Btn small onClick={()=>{setAddMode(!addMode);setBlockMode(false);setColorMode(false);}} color={addMode?C.accent:C.border} style={{color:addMode?'#fff':C.muted}}>
@@ -5225,6 +5242,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         </div>
       </Card>
       
+      </>)}
+
       {/* Garage visuel */}
       <Card style={{overflowX:'auto',padding:'14px 10px'}}>
         <div style={{display:'flex',gap:GAP,marginBottom:6}}>
@@ -5255,7 +5274,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                     const cellColor=getColor(z.id,ci,si);
                     
                     // Masquer les cases vides (non bloquées, sans couleur) sauf en mode ajout/blocage/couleur/rangement
-                    const showAllCells=addMode||blockMode||colorMode||!!placeNum;
+                    const showAllCells=addMode||blockMode||colorMode||!!placing;
                     if(!showAllCells&&!blocked&&t===''&&!cellColor){
                       // Case invisible : on rend juste un placeholder vide pour garder l'alignement
                       return <div key={si} style={{width:CW,height:CH}}/>;
@@ -5286,7 +5305,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                         {!blockMode&&!colorMode&&<input value={val}
                           data-cell={`${z.id}_${ci}_${si}`}
                           onChange={e=>onChange(z.id,ci,si,e.target.value,maxBoxes)}
-                          onClick={()=>{ if(placeNum&&!t){ onChange(z.id,ci,si,String(placeNum),maxBoxes); onBlur(z.id,ci,maxBoxes); onPlaced&&onPlaced(); } }}
+                          onClick={()=>{ if(placing&&!t){ onChange(z.id,ci,si,String(placing),maxBoxes); onBlur(z.id,ci,maxBoxes); clearPlacing(); } }}
                           onBlur={()=>onBlur(z.id,ci,maxBoxes)}
                           onKeyDown={e=>{
                             if(e.key==='ArrowUp'){e.preventDefault();navigateFromCell(z.id,ci,si,'up');}
