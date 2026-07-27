@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v26/07 · 📭';
+const BUILD_ID = 'v27/07 · 🚚';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -227,10 +227,17 @@ const fetchEmailBordereaux = async () => {
 // EFFECTUÉ — jamais « à retirer » / « prêt à être retiré » / « peut récupérer »
 // (= encore à retirer). Validé sans faux positif sur les vrais sujets stockés.
 const TRACK_DELIVERED_RE = /livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinataire|en\s+mains?)|vous\s+a\s+[ée]t[ée]\s+(?:remis|livr[ée])|(?:colis\s+)?a\s+(?:bien\s+)?[ée]t[ée]\s+retir[ée]|bien\s+retir[ée]|retir[ée]\s+(?:le|avec|par)|colis\s+retir[ée]|(?:vous\s+)?avez\s+(?:bien\s+)?retir[ée]|merci\s+d[e']?\s*avoir\s+(?:bien\s+)?(?:retir[ée]|r[ée]cup[ée]r[ée])|(?:vous\s+)?avez\s+(?:bien\s+)?r[ée]cup[ée]r[ée]|bien\s+r[ée]cup[ée]r[ée]|r[ée]cup[ée]r[ée]\s+(?:le|votre|avec)|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/i;
+// Formulations « colis disponible / à retirer ». Un ancien bug du parseur
+// rétrogradait ces emails en « en transit » (une règle transit s'exécutait après
+// et écrasait le statut), et le colis disparaissait de « à retirer » alors qu'il
+// était bien arrivé au point relais. On le rétablit ici depuis le SUJET.
+const TRACK_AVAILABLE_RE = /disponible|à\s*retirer|arriv[ée]\s+(?:dans|en|au)\s+point|pr[êe]t.*retrait|vous\s+attend/i;
 const reclassifyTrack = (d) => {
   if (!d || d.status === 'delivered') return d;
   const s = `${d.subject || ''} ${d.statusLabel || ''}`;
   if (TRACK_DELIVERED_RE.test(s)) return { ...d, status: 'delivered', statusLabel: 'Livré / retiré' };
+  // Colis « disponible » mal classé « en transit » (avec n° de suivi) → à retirer.
+  if (d.status !== 'available' && (d.suivi || '').trim() && TRACK_AVAILABLE_RE.test(s)) return { ...d, status: 'available', statusLabel: 'Arrivé au point de retrait' };
   return d;
 };
 const fetchEmailTracking = async () => {
@@ -6788,7 +6795,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Un bordereau est « expédié » (donc à retirer de la liste à imprimer) dès que
   // Vinted a fait avancer la vente au-delà de « bordereau envoyé » (pris en charge,
   // en transit, déposé, livré, finalisé) → automatique, sans que tu marques rien.
-  const bordShipped = (b) => { const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null; return !!o && /exp[ée]di|achemin|livr[ée]|finalis|d[ée]pos[ée]|termin/i.test(o.status || ''); };
+  // Suivis présents dans les emails transporteur (hors « info ») : le colis est
+  // dans le réseau (en transit / arrivé au relais / retiré) ⟹ il a été EXPÉDIÉ.
+  // Signal plus rapide que le statut Vinted pour vider « à expédier ».
+  const shippedSuivis = useMemo(() => {
+    const s = new Set();
+    for (const t of (tracking || [])) { if (t && t.suivi && t.status && t.status !== 'info') s.add(String(t.suivi).toUpperCase()); }
+    return s;
+  }, [tracking]);
+  const bordShipped = (b) => {
+    if (b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) return true; // colis déjà dans le réseau transporteur
+    const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null;
+    return !!o && /exp[ée]di|achemin|livr[ée]|finalis|d[ée]pos[ée]|termin/i.test(o.status || '');
+  };
   // Expédié À LA MAIN (quand le statut Vinted est en retard, ex. tu as posté
   // aujourd'hui mais Vinted dit encore « bordereau envoyé »).
   const [bordsShipped, setBordsShipped] = useState(() => load('vinted_bords_shipped', {}));
