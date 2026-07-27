@@ -109,6 +109,7 @@ async function storeHarvest(domain, type, id, body) {
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
   if (type === 'conversation' && id) rowId = `harvest_${uid}_conv_${id}`;
+  else if (type === 'transaction' && id) rowId = `harvest_${uid}_txn_${id}`;
   else rowId = `harvest_${uid}_${type}`;
 
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };

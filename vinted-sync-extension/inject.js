@@ -30,6 +30,12 @@
     { re: /\/api\/v\d+\/my_orders/,             type: 'orders'   },
     { re: /\/api\/v\d+\/(?:inbox|conversations)(?:\?|$)/, type: 'inbox' },
     { re: /\/api\/v\d+\/conversations\/(\d+)/,  type: 'conversation' },
+    // Détail d'une transaction (vente/achat) : c'est là que se trouve le VRAI
+    // n° de suivi du colis (shipment / tracking_code), capté passivement quand tu
+    // ouvres une commande ou télécharges un bordereau. Permet à l'app de fiabiliser
+    // le suivi des bordereaux à 100 % (au lieu de le parser depuis l'email). On ne
+    // matche QUE le détail (…/transactions/{id}), pas les sous-chemins (…/shipment/order).
+    { re: /\/api\/v\d+\/transactions\/(\d+)(?:\?|$)/, type: 'transaction' },
     { re: /\/api\/v\d+\/users\/current/,        type: 'profile'  },
     // Facturation / porte-monnaie : c'est là que Vinted liste tes dépenses de
     // BOOST (remontées d'annonce, mise en avant du dressing). Capté passivement
