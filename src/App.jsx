@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🏷️✅';
+const BUILD_ID = 'v27/07 · 💼';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -251,6 +251,21 @@ const fetchEmailTracking = async () => {
     return rows.map(r => reclassifyTrack(r.data)).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
+};
+// Solde BLOQUÉ (escrow) de chaque porte-monnaie Vinted, capté par l'extension
+// (lignes harvest_*_billing quand tu ouvres ton porte-monnaie). On somme sur
+// tous les comptes. total=0/accounts=0 si aucun porte-monnaie n'a été capté.
+const fetchWalletEscrow = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return { total: 0, accounts: 0 };
+    const rows = await res.json();
+    let total = 0, accounts = 0;
+    for (const r of rows) { const p = (r.data || {}).payload || {}; const e = p.escrow && p.escrow.amount; if (e != null) { const n = parseFloat(e); if (!isNaN(n)) { total += n; accounts++; } } }
+    return { total, accounts };
+  } catch (_) { return { total: 0, accounts: 0 }; }
 };
 // Factures Pro préparées par le serveur (lignes email_invoice_*) :
 // { number, status: draft|queued|sent, designation, prix, buyerName,
@@ -7788,7 +7803,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buys.items, offBuys, hiddenSales, hiddenAccts]);
   const [showTreasury, setShowTreasury] = useState(false);
-  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
+  const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
+  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow().then(setWalletEscrow); };
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
@@ -9296,46 +9312,66 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
         })()}
         {/* ── ACHATS HORS VINTED (brocante, fournisseur, particulier…) ────── */}
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div style={{flex:1,fontSize:13,fontWeight:900,color:C.text}}>🏷️ Achats hors Vinted{offBuys.length>0?` · ${offBuys.length}`:''}</div>
-            {offBuys.length>0 && <span style={{fontSize:11.5,fontWeight:800,color:C.muted}}>{Math.round(offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0))} €</span>}
-            <button type="button" onClick={()=>{ setOffEditId(null); setOffDraft(OFF_DRAFT0); setOffOpen(o=>!o); }} style={{border:`1px solid ${C.accent}`,background:offOpen?C.accent:`${C.accent}12`,color:offOpen?'#fff':C.accent,borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{offOpen?'Fermer':'➕ Ajouter'}</button>
+        {(()=>{
+          const SRC = { brocante:{e:'🏷️',l:'Brocante'}, fournisseur:{e:'🏭',l:'Fournisseur'}, particulier:{e:'👤',l:'Particulier'}, 'vide-grenier':{e:'🎪',l:'Vide-grenier'}, autre:{e:'📦',l:'Autre'} };
+          const srcOf = s => SRC[s] || SRC.autre;
+          const offTotal = offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0);
+          const saveOff = () => {
+            const rec = { title:offDraft.title.trim(), price:offDraft.price, numero:offDraft.numero, source:offDraft.source, date:offDraft.date };
+            if (offEditId) updOffBuy(offEditId, rec); else addOffBuy(rec);
+            // Lien compta : le N° + prix nourrit le prix d'achat PAR NUMÉRO → quand
+            // cette paire se vend, son bénéfice utilise ce coût automatiquement.
+            const nm = String(rec.numero||'').trim(); const pr = String(rec.price||'').trim();
+            if (nm && pr) setBuyByNum(prev=>{ const u={...prev,[nm]:pr}; save('vinted_buyprice_by_num',u); return u; });
+            setOffDraft(OFF_DRAFT0); setOffEditId(null); setOffOpen(false);
+          };
+          const Field = ({label,children}) => (<label style={{display:'flex',flexDirection:'column',gap:3,flex:1,minWidth:0}}><span style={{fontSize:9.5,color:C.muted,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>{label}</span>{children}</label>);
+          const inp = {border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 11px',fontSize:13.5,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
+          return (
+        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'12px 13px',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{width:38,height:38,borderRadius:11,background:`${C.accent}14`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🏷️</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13.5,fontWeight:900,color:C.text}}>Achats hors Vinted</div>
+              <div style={{fontSize:11,color:C.muted}}>{offBuys.length>0 ? `${offBuys.length} paire${offBuys.length>1?'s':''} · ${Math.round(offTotal)} € dépensés` : 'Brocante, fournisseur, particulier…'}</div>
+            </div>
+            <button type="button" onClick={()=>{ setOffEditId(null); setOffDraft(OFF_DRAFT0); setOffOpen(o=>!o); }} style={{border:`1px solid ${C.accent}`,background:offOpen?C.accent:`${C.accent}12`,color:offOpen?'#fff':C.accent,borderRadius:999,padding:'7px 14px',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>{offOpen?'✕ Fermer':'➕ Ajouter'}</button>
           </div>
-          <div style={{fontSize:10.5,color:C.muted,marginTop:3}}>Les paires achetées ailleurs (brocante, fournisseur…). Mets le même N° que sur la boîte → il fait le lien avec la vente.</div>
           {offOpen && (
-            <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
-              <input value={offDraft.title} onChange={e=>setOffDraft(d=>({...d,title:e.target.value}))} placeholder="Désignation (ex : Nike P-6000 argenté 38)" style={{border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
-              <div style={{display:'flex',gap:7}}>
-                <input value={offDraft.price} onChange={e=>setOffDraft(d=>({...d,price:e.target.value}))} inputMode="decimal" placeholder="Prix payé €" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
-                <input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.replace(/[^\d]/g,'')}))} inputMode="numeric" placeholder="N°" style={{width:70,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+            <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:9,background:C.bg,borderRadius:12,padding:'12px',border:`1px solid ${C.border}`}}>
+              <Field label="Désignation"><input value={offDraft.title} onChange={e=>setOffDraft(d=>({...d,title:e.target.value}))} placeholder="ex : Nike P-6000 argenté 38" style={inp} autoFocus/></Field>
+              <div style={{display:'flex',gap:9}}>
+                <Field label="Prix payé €"><input value={offDraft.price} onChange={e=>setOffDraft(d=>({...d,price:e.target.value}))} inputMode="decimal" placeholder="0" style={inp}/></Field>
+                <Field label="N° de la paire"><input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.replace(/[^\d]/g,'')}))} inputMode="numeric" placeholder={String(nextNumero)} style={inp}/></Field>
               </div>
-              <div style={{display:'flex',gap:7}}>
-                <select value={offDraft.source} onChange={e=>setOffDraft(d=>({...d,source:e.target.value}))} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}>
-                  {['brocante','fournisseur','particulier','vide-grenier','autre'].map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-                <input type="date" value={offDraft.date} onChange={e=>setOffDraft(d=>({...d,date:e.target.value}))} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              <div style={{display:'flex',gap:9}}>
+                <Field label="Provenance"><select value={offDraft.source} onChange={e=>setOffDraft(d=>({...d,source:e.target.value}))} style={inp}>{Object.entries(SRC).map(([k,v])=><option key={k} value={k}>{v.e} {v.l}</option>)}</select></Field>
+                <Field label="Date"><input type="date" value={offDraft.date} onChange={e=>setOffDraft(d=>({...d,date:e.target.value}))} style={inp}/></Field>
               </div>
-              <button type="button" disabled={!offDraft.title.trim()} onClick={()=>{ const rec={ title:offDraft.title.trim(), price:offDraft.price, numero:offDraft.numero, source:offDraft.source, date:offDraft.date }; if(offEditId) updOffBuy(offEditId, rec); else addOffBuy(rec); setOffDraft(OFF_DRAFT0); setOffEditId(null); setOffOpen(false); }} style={{border:'none',background:offDraft.title.trim()?C.accent:C.border,color:'#fff',borderRadius:9,padding:'9px',fontSize:13,fontWeight:800,cursor:offDraft.title.trim()?'pointer':'default',fontFamily:'inherit'}}>{offEditId?'Enregistrer':'Ajouter cet achat'}</button>
+              <button type="button" disabled={!offDraft.title.trim()} onClick={saveOff} style={{border:'none',background:offDraft.title.trim()?C.accent:C.border,color:'#fff',borderRadius:10,padding:'11px',fontSize:13.5,fontWeight:800,cursor:offDraft.title.trim()?'pointer':'default',fontFamily:'inherit',marginTop:2}}>{offEditId?'💾 Enregistrer':'➕ Ajouter cet achat'}</button>
+              <div style={{fontSize:10,color:C.muted,textAlign:'center',lineHeight:1.4}}>💡 Le N° relie l'achat à la vente : quand la paire se vend, son bénéfice utilise ce prix tout seul.</div>
             </div>
           )}
           {offBuys.length>0 && (
-            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:10}}>
-              {offBuys.map(b=>(
-                <div key={b.id} style={{display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:9,padding:'7px 9px',background:C.bg}}>
+            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:11}}>
+              {offBuys.map(b=>{ const sc=srcOf(b.source); return (
+                <div key={b.id} style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,borderRadius:11,padding:'9px 10px',background:C.bg}}>
+                  <div style={{width:32,height:32,borderRadius:9,background:`${C.accent}0e`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}} title={sc.l}>{sc.e}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title}</div>
-                    <div style={{fontSize:10,color:C.muted,marginTop:1}}>{[b.source,b.date?new Date(b.date).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:1}}>{[sc.l,b.date?new Date(b.date).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
                   </div>
-                  {b.numero && <span title="Numéro de la paire" style={{fontSize:11,fontWeight:900,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'1px 7px'}}>N°{b.numero}</span>}
-                  <span style={{fontSize:13,fontWeight:900,color:C.text}}>{b.price?`${b.price} €`:'—'}</span>
-                  <button type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:14,cursor:'pointer',padding:'2px 4px'}}>✎</button>
-                  <button type="button" onClick={()=>{ if(window.confirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:14,cursor:'pointer',padding:'2px 4px'}}>🗑</button>
+                  {b.numero && <span title="Numéro de la paire (lien avec la vente)" style={{fontSize:11,fontWeight:900,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'2px 7px'}}>N°{b.numero}</span>}
+                  <span style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{b.price?`${b.price} €`:'—'}</span>
+                  <button type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:14,cursor:'pointer',padding:'2px 4px',flexShrink:0}}>✎</button>
+                  <button type="button" onClick={()=>{ if(window.confirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:14,cursor:'pointer',padding:'2px 4px',flexShrink:0}}>🗑</button>
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </div>
+          );
+        })()}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
@@ -10381,12 +10417,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)} €</div>
                 <div style={{fontSize:11.5,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — argent crédité sur ton solde Vinted. <b>Ne compte pas</b> tes virements vers ta banque.</div>
               </div>
-              {/* EN ATTENTE */}
+              {/* EN ATTENTE = somme des porte-monnaie Vinted (escrow réel si capté,
+                  sinon somme des ventes en cours = argent que Vinted te retient). */}
+              {(()=>{ const useEscrow = walletEscrow && walletEscrow.total>0; const val = useEscrow ? walletEscrow.total : treasury.attente; return (
               <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:14,padding:'13px 15px',marginBottom:11}}>
-                <div style={{fontSize:11.5,color:C.warn,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>⏳ Argent en attente</div>
-                <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.attente)} €</div>
-                <div style={{fontSize:11.5,color:C.muted}}>{treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours — bloqué par Vinted jusqu'à validation de l'acheteur.</div>
+                <div style={{fontSize:11.5,color:C.warn,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
+                <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)} €</div>
+                <div style={{fontSize:11.5,color:C.muted}}>{useEscrow ? <>Solde <b>bloqué</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
               </div>
+              ); })()}
+              {/* LITIGES EN COURS (paires qui reviennent : retour / remboursement / suspension) */}
+              {retoursAttendus.length>0 && (
+                <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:14,padding:'13px 15px',marginBottom:11}}>
+                  <div style={{fontSize:11.5,color:C.danger,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>⚖️ {retoursAttendus.length} litige{retoursAttendus.length>1?'s':''} en cours</div>
+                  <div style={{fontSize:11.5,color:C.muted,margin:'3px 0 7px'}}>Des paires qui te reviennent (retour / remboursement / suspension) — à republier.</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                    {retoursAttendus.slice(0,6).map((r,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+                        <span style={{fontWeight:900,color:C.danger,background:`${C.danger}18`,borderRadius:6,padding:'1px 7px',flexShrink:0}}>{RETOUR_LABEL[r.kind]?.txt||'↩️'}</span>
+                        <span style={{color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.num?`N°${r.num} · `:''}{r.title}</span>
+                      </div>
+                    ))}
+                    {retoursAttendus.length>6 && <div style={{fontSize:11,color:C.muted}}>+ {retoursAttendus.length-6} autre{retoursAttendus.length-6>1?'s':''}…</div>}
+                  </div>
+                </div>
+              )}
               {/* DÉPENSÉ */}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:11.5,color:C.muted,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>🛒 Argent dépensé (tous comptes)</div>
