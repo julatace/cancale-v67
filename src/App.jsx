@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 👛';
+const BUILD_ID = 'v27/07 · 🧾';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -1264,7 +1264,7 @@ const generateAchatJustificatif = async (o, opts = {}) => {
     page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:rgb(0.1,0.1,0.1) });
     y -= o2.gap || 40;
   };
-  page.drawText('Justificatif d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
+  page.drawText('Recu d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
   page.drawText(opts.shop || 'Shop Cancale35', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
   page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 24;
   line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
@@ -1276,7 +1276,7 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   y -= 6;
   const note = opts.regime==='marge'
     ? 'Achat de seconde main a un particulier : pas de TVA deductible. A conserver pour le regime de la marge (TVA sur la marge a la revente).'
-    : 'Justificatif d\'achat a conserver avec ta comptabilite.';
+    : 'Recu d\'achat a conserver avec ta comptabilite.';
   // Retour à la ligne simple.
   const wrap = (txt, max) => { const words=txt.split(' '); const rows=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>max){ rows.push(cur.trim()); cur=w; } else cur+=' '+w; } if(cur.trim()) rows.push(cur.trim()); return rows; };
   wrap(note, 62).forEach((r,i)=> page.drawText(r, { x:32, y:y-i*13, size:8.5, font:reg, color:rgb(0.5,0.5,0.5) }));
@@ -1285,7 +1285,7 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `justificatif-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
+  a.href = url; a.download = `recu-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 };
@@ -8797,7 +8797,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {isLotTitle(o.title) && (
                   <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:14}}>📦</button>
                 )}
-                <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title={hidden?'Réintégrer à la compta':'Masquer de la compta'} aria-label={hidden?'Réafficher':'Masquer'} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:hidden?(C.blue||C.accent):C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>{hidden?'↩︎':'🚫'}</button>
+                {hidden ? (
+                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
+                ) : st==='cancelled' ? (
+                  <button type="button" onClick={()=>{ if(window.confirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:800,fontFamily:'inherit'}}>🗑</button>
+                ) : (
+                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>🚫</button>
+                )}
                </div>
                {/* Barre de progression de la vente : À expédier · Expédiée · Livrée · Encaissée */}
                {!hidden && (()=>{ const vs=venteStage(o); if(vs.step<=0) return null; return (
@@ -9031,11 +9037,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // retirer + tes points enregistrés. Les dizaines de relais de la ville
           // n'apparaissent QUE si tu n'as aucun colis (pour t'aider à en trouver un).
           const anyColis=avail.length>0;
-          const pins=Object.entries(groups).filter(([,g])=>g.lat && (g.colis.length>0 || g.saved || !anyColis)).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier,label:(g.rue && /casier|point relais|^point /i.test(g.nom||k))?g.rue:(g.nom||k)}));
+          // Carte ÉPURÉE : dès que tu as des colis à retirer, on n'affiche QUE les
+          // points où il y en a (fini les dizaines de casiers/relais de la ville qui
+          // n'ont rien pour toi). La carte des points de la ville ne revient que si
+          // tu n'as aucun colis (pour t'aider à en trouver un).
+          const pins=Object.entries(groups).filter(([,g])=>g.lat && (g.colis.length>0 || !anyColis)).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier,label:(g.rue && /casier|point relais|^point /i.test(g.nom||k))?g.rue:(g.nom||k)}));
           // Liste : d'abord les points avec colis, puis le reste (points de la ville).
           const entriesSorted=Object.entries(groups).sort((a,b)=>(b[1].colis.length-a[1].colis.length)||a[0].localeCompare(b[0]));
           const withColis=entriesSorted.filter(([,g])=>g.colis.length>0);
-          const autres=entriesSorted.filter(([,g])=>g.colis.length===0 && g.saved);
+          // Points enregistrés SANS colis : masqués quand tu as des colis à retirer
+          // (ils encombraient la vue), listés seulement quand tu n'as rien à retirer.
+          const autres=anyColis?[]:entriesSorted.filter(([,g])=>g.colis.length===0 && g.saved);
           const singlePoint=withColis.length===1;
           const selGroup=openPoint?groups[openPoint]:null;
           return (
@@ -9101,7 +9113,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
               {withColis.map(([lieu,g])=>{
                 const colis=g.colis;
-                const isOpen=singlePoint||openPoint===lieu;
+                // Un point qui a des colis est TOUJOURS déplié : tu vois direct le
+                // code + le QR de chaque colis, sans avoir à cliquer.
+                const isOpen=colis.length>0||singlePoint||openPoint===lieu;
                 return (
                 <div key={lieu} style={{border:`1.5px solid ${openPoint===lieu?C.accent:C.border}`,background:C.card,borderRadius:14,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
                   {/* En-tête du point : nom + badge + renommer */}
@@ -9310,7 +9324,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:800,padding:'5px 10px'}}>📄 Reçu</button>
                   ) : (
                     <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
-                      title="Télécharger un justificatif d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:700,padding:'5px 10px'}}>📄 Justif.</button>
+                      title="Télécharger le reçu d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:700,padding:'5px 10px'}}>📄 Reçu</button>
                   ); })()}
                 </div>
               </div>
@@ -10022,7 +10036,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:10,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}€</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime })} title="Justificatif d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
                   </div>
                 ))}
               </div>
@@ -10340,7 +10354,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:10,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}€</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Justificatif d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
                   </div>
                 ))}
               </div>
