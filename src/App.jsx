@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 💰';
+const BUILD_ID = 'v27/07 · 📒';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -39,6 +39,7 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
+  'vinted_offvinted_buys',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -7668,6 +7669,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
+  // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
+  // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
+  // prix, date, source, et surtout un N° → le même numéro que tu écris sur la
+  // boîte et que tu mets sur l'annonce, pour relier l'achat à la vente.
+  const [offBuys, setOffBuys] = useState(() => load('vinted_offvinted_buys', []));
+  const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
+  const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
+  const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
+  const [offOpen, setOffOpen] = useState(false);
+  const OFF_DRAFT0 = { title:'', price:'', numero:'', source:'brocante', date: new Date().toISOString().slice(0,10) };
+  const [offDraft, setOffDraft] = useState(OFF_DRAFT0);
+  const [offEditId, setOffEditId] = useState(null);
+  // Lien ACHAT → N° : un achat Vinted relié à une annonce numérotée (bouton 🔗,
+  // qui pose buyFromId = transaction de l'achat) fait remonter SON numéro ici.
+  // → le même N° apparaît côté Annonces, Ventes ET Achats : lien achat↔vente.
+  const buyNumByTxn = useMemo(() => {
+    const m = {};
+    for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && e.numero!=null && String(e.numero).trim()) m[String(e.buyFromId)] = e.numero; }
+    return m;
+  }, [numeros]);
+
   // ── Trésorerie : l'argent réel, pas le CA ─────────────────────────────
   // Vinted BLOQUE l'argent d'une vente jusqu'à ce que l'acheteur valide (ou que
   // le délai passe). Donc « vendu » ≠ « argent dispo ». On sépare :
@@ -7676,28 +7698,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  • DÉBLOQUÉ = ventes finalisées → Vinted a libéré les fonds sur ton solde.
   // Source = statut Vinted moissonné (fiable, se met à jour tout seul).
   const treasury = useMemo(() => {
-    const items = sales.items || [];
-    const now = new Date(); const ym = now.getFullYear()*100 + now.getMonth();
-    let pending=0, pImminent=0, pTransit=0, pToShip=0, nPending=0, released=0, releasedMonth=0, nReleased=0;
-    for (const o of items) {
+    let recu=0, nRecu=0, attente=0, nAttente=0;
+    for (const o of (sales.items || [])) {
       if (isHidden(o)) continue;
       const stt = classifyOrderStatus(o.status);
       const amt = o.price?.amount!=null ? Number(o.price.amount) : 0;
-      if (stt === 'completed') {
-        released += amt; nReleased += 1;
-        if (o.date) { const d=new Date(o.date); if (!isNaN(d) && d.getFullYear()*100+d.getMonth()===ym) releasedMonth += amt; }
-      } else if (stt === 'pending') {
-        pending += amt; nPending += 1;
-        const st = venteStage(o).step;
-        if (st >= 3) pImminent += amt;        // livrée / au relais → déblocage imminent
-        else if (st === 2) pTransit += amt;   // en transit
-        else pToShip += amt;                  // à expédier / payée
-      }
+      if (stt === 'completed') { recu += amt; nRecu += 1; }        // argent réellement reçu (vente finalisée)
+      else if (stt === 'pending') { attente += amt; nAttente += 1; } // en attente de déblocage
     }
-    return { pending, pImminent, pTransit, pToShip, nPending, released, releasedMonth, nReleased };
+    // Argent dépensé = tous les achats (tous comptes) hors annulés + les achats
+    // hors Vinted saisis à la main (brocante, fournisseur…).
+    let spent=0, nSpent=0;
+    for (const o of (buys.items || [])) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const amt = o.price?.amount!=null ? Number(o.price.amount) : 0;
+      spent += amt; nSpent += 1;
+    }
+    for (const b of offBuys) { const p = parseFloat(String(b.price).replace(',','.')); if (!isNaN(p)) { spent += p; nSpent += 1; } }
+    return { recu, nRecu, attente, nAttente, spent, nSpent };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, saleOv]);
+  }, [sales.items, buys.items, offBuys, hiddenSales, hiddenAccts]);
   const [showTreasury, setShowTreasury] = useState(false);
+  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
@@ -8683,7 +8705,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button onClick={()=>setShowSourcing(true)} title="Stats par marque et taille (quoi racheter)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>🎯 Sourcing</button>
           )}
           {accounts.length>0 && (
-            <button onClick={()=>setShowTreasury(true)} title="Argent en attente de déblocage vs débloqué" style={{padding:'5px 12px',borderRadius:999,border:`1px solid #16a34a`,background:'#16a34a12',color:'#16a34a',fontSize:12,fontWeight:800,cursor:'pointer'}}>💰 Trésorerie{treasury.pending>0?` · ${Math.round(treasury.pending)} € à venir`:''}</button>
+            <button onClick={openTreasury} title="Argent en attente, reçu, dépensé" style={{padding:'5px 12px',borderRadius:999,border:`1px solid #16a34a`,background:'#16a34a12',color:'#16a34a',fontSize:12,fontWeight:800,cursor:'pointer'}}>💰 Trésorerie{treasury.attente>0?` · ${Math.round(treasury.attente)} € à venir`:''}</button>
           )}
           {accounts.length>0 && (
             <button onClick={openReport} title="Rapport comptable mensuel" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Rapport</button>
@@ -9175,6 +9197,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* ── ACHATS HORS VINTED (brocante, fournisseur, particulier…) ────── */}
+        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <div style={{flex:1,fontSize:13,fontWeight:900,color:C.text}}>🏷️ Achats hors Vinted{offBuys.length>0?` · ${offBuys.length}`:''}</div>
+            {offBuys.length>0 && <span style={{fontSize:11.5,fontWeight:800,color:C.muted}}>{Math.round(offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0))} €</span>}
+            <button type="button" onClick={()=>{ setOffEditId(null); setOffDraft(OFF_DRAFT0); setOffOpen(o=>!o); }} style={{border:`1px solid ${C.accent}`,background:offOpen?C.accent:`${C.accent}12`,color:offOpen?'#fff':C.accent,borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{offOpen?'Fermer':'➕ Ajouter'}</button>
+          </div>
+          <div style={{fontSize:10.5,color:C.muted,marginTop:3}}>Les paires achetées ailleurs (brocante, fournisseur…). Mets le même N° que sur la boîte → il fait le lien avec la vente.</div>
+          {offOpen && (
+            <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
+              <input value={offDraft.title} onChange={e=>setOffDraft(d=>({...d,title:e.target.value}))} placeholder="Désignation (ex : Nike P-6000 argenté 38)" style={{border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              <div style={{display:'flex',gap:7}}>
+                <input value={offDraft.price} onChange={e=>setOffDraft(d=>({...d,price:e.target.value}))} inputMode="decimal" placeholder="Prix payé €" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+                <input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.replace(/[^\d]/g,'')}))} inputMode="numeric" placeholder="N°" style={{width:70,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              </div>
+              <div style={{display:'flex',gap:7}}>
+                <select value={offDraft.source} onChange={e=>setOffDraft(d=>({...d,source:e.target.value}))} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}>
+                  {['brocante','fournisseur','particulier','vide-grenier','autre'].map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                <input type="date" value={offDraft.date} onChange={e=>setOffDraft(d=>({...d,date:e.target.value}))} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              </div>
+              <button type="button" disabled={!offDraft.title.trim()} onClick={()=>{ const rec={ title:offDraft.title.trim(), price:offDraft.price, numero:offDraft.numero, source:offDraft.source, date:offDraft.date }; if(offEditId) updOffBuy(offEditId, rec); else addOffBuy(rec); setOffDraft(OFF_DRAFT0); setOffEditId(null); setOffOpen(false); }} style={{border:'none',background:offDraft.title.trim()?C.accent:C.border,color:'#fff',borderRadius:9,padding:'9px',fontSize:13,fontWeight:800,cursor:offDraft.title.trim()?'pointer':'default',fontFamily:'inherit'}}>{offEditId?'Enregistrer':'Ajouter cet achat'}</button>
+            </div>
+          )}
+          {offBuys.length>0 && (
+            <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:10}}>
+              {offBuys.map(b=>(
+                <div key={b.id} style={{display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:9,padding:'7px 9px',background:C.bg}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title}</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:1}}>{[b.source,b.date?new Date(b.date).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
+                  </div>
+                  {b.numero && <span title="Numéro de la paire" style={{fontSize:11,fontWeight:900,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'1px 7px'}}>N°{b.numero}</span>}
+                  <span style={{fontSize:13,fontWeight:900,color:C.text}}>{b.price?`${b.price} €`:'—'}</span>
+                  <button type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:14,cursor:'pointer',padding:'2px 4px'}}>✎</button>
+                  <button type="button" onClick={()=>{ if(window.confirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:14,cursor:'pointer',padding:'2px 4px'}}>🗑</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
@@ -9214,8 +9277,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
                   </div>
                 </div>
-                <div style={{textAlign:'right',flexShrink:0}}>
+                <div style={{textAlign:'right',flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
                   <div style={{fontSize:14,fontWeight:900,color:C.text}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
+                  {buyNumByTxn[String(o.transaction_id)]!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:900,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'1px 7px'}}>N°{buyNumByTxn[String(o.transaction_id)]}</span>}
                 </div>
               </div>
               {/* Barre de suivi : Payé · Expédié · Au relais · Reçu */}
@@ -10211,31 +10275,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowTreasury(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{padding:'14px 16px',overflowY:'auto'}}>
-              {/* EN ATTENTE DE DÉBLOCAGE */}
-              <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:14,padding:'13px 15px',marginBottom:12}}>
-                <div style={{fontSize:11.5,color:C.warn,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente de déblocage</div>
-                <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.pending)} €</div>
-                <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>{treasury.nPending} vente{treasury.nPending>1?'s':''} — argent que Vinted retient jusqu'à validation de l'acheteur.</div>
-                {[['📦 Livrée · déblocage imminent', treasury.pImminent, '#16a34a'],['🚚 En transit', treasury.pTransit, C.blue||C.accent],['📮 À expédier', treasury.pToShip, C.warn]].filter(r=>r[1]>0).map(([lab,val,col])=>(
-                  <div key={lab} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:`1px solid ${C.border}`}}>
-                    <span style={{fontSize:12.5,color:C.text}}>{lab}</span>
-                    <span style={{fontSize:13.5,fontWeight:800,color:col}}>{Math.round(val)} €</span>
-                  </div>
-                ))}
+              {/* ARGENT RÉELLEMENT REÇU */}
+              <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:14,padding:'13px 15px',marginBottom:11}}>
+                <div style={{fontSize:11.5,color:'#16a34a',fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>✅ Argent réellement reçu</div>
+                <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)} €</div>
+                <div style={{fontSize:11.5,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — Vinted a libéré les fonds.</div>
               </div>
-              {/* DÉBLOQUÉ */}
-              <div style={{display:'flex',gap:10,marginBottom:12}}>
-                <div style={{flex:1,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px'}}>
-                  <div style={{fontSize:10.5,color:C.muted,fontWeight:700,textTransform:'uppercase'}}>✅ Débloqué ce mois</div>
-                  <div style={{fontSize:20,fontWeight:900,color:'#16a34a',marginTop:3}}>{Math.round(treasury.releasedMonth)} €</div>
-                </div>
-                <div style={{flex:1,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px'}}>
-                  <div style={{fontSize:10.5,color:C.muted,fontWeight:700,textTransform:'uppercase'}}>💶 Total encaissé</div>
-                  <div style={{fontSize:20,fontWeight:900,color:C.text,marginTop:3}}>{Math.round(treasury.released)} €</div>
-                  <div style={{fontSize:10,color:C.muted}}>{treasury.nReleased} ventes finalisées</div>
-                </div>
+              {/* EN ATTENTE */}
+              <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:14,padding:'13px 15px',marginBottom:11}}>
+                <div style={{fontSize:11.5,color:C.warn,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>⏳ Argent en attente</div>
+                <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.attente)} €</div>
+                <div style={{fontSize:11.5,color:C.muted}}>{treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours — bloqué par Vinted jusqu'à validation de l'acheteur.</div>
               </div>
-              <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5}}>Basé sur le statut Vinted de chaque vente (fiable, se met à jour tout seul). « Débloqué » = fonds libérés par Vinted sur ton solde ; ce qu'il te reste dépend ensuite de tes virements vers ta banque.</div>
+              {/* DÉPENSÉ */}
+              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'13px 15px',marginBottom:11}}>
+                <div style={{fontSize:11.5,color:C.muted,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>🛒 Argent dépensé (tous comptes)</div>
+                <div style={{fontSize:26,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{buys.items===null && offBuys.length===0 ? '…' : `${Math.round(treasury.spent)} €`}</div>
+                <div style={{fontSize:11.5,color:C.muted}}>{treasury.nSpent} achat{treasury.nSpent>1?'s':''} (Vinted + hors Vinted){buys.items===null?' · chargement…':''}</div>
+              </div>
+              <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5}}>Basé sur le statut Vinted de chaque commande (fiable, se met à jour tout seul).</div>
             </div>
           </div>
         </div>
