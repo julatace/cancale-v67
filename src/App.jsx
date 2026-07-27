@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 💶';
+const BUILD_ID = 'v27/07 · 🏷️✅';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -9660,8 +9660,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const atGarage = inGarage(num);
             const age = listedAgeDays(it); const sleeps = age!=null && age>=SLEEP_DAYS;
             // Bordereau reçu pour cette paire → elle est vendue, même si la
-            // synchro Vinted ne l'a pas encore retirée des annonces.
-            const soldBord = bordForItem(it.title, num);
+            // synchro Vinted ne l'a pas encore retirée des annonces. MAIS si
+            // l'annonce a été (re)numérotée APRÈS ce bordereau, c'est une paire
+            // REPUBLIÉE (le N° a resservi) : elle n'est PAS vendue → pas de badge.
+            const soldBord = (()=>{ const b = bordForItem(it.title, num); if(!b) return null; const en=numeros[it.id]; const et=en?new Date(en.repriseAt||en.numberedAt||0).getTime():0; const bt=new Date(b.receivedAt||0).getTime(); return (et&&bt&&et>bt)?null:b; })();
             return (
               <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:14,overflow:'hidden',background:C.card,border:`1.5px solid ${soldBord?C.warn:num?C.accent:C.border}`,...(soldBord?{opacity:0.8}:{}),display:'flex',flexDirection:'column'}}>
                 <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
