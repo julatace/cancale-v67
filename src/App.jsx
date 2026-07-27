@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 📒';
+const BUILD_ID = 'v27/07 · 👛';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -10277,9 +10277,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'14px 16px',overflowY:'auto'}}>
               {/* ARGENT RÉELLEMENT REÇU */}
               <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:14,padding:'13px 15px',marginBottom:11}}>
-                <div style={{fontSize:11.5,color:'#16a34a',fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>✅ Argent réellement reçu</div>
+                <div style={{fontSize:11.5,color:'#16a34a',fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>✅ Reçu dans le porte-monnaie</div>
                 <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)} €</div>
-                <div style={{fontSize:11.5,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — Vinted a libéré les fonds.</div>
+                <div style={{fontSize:11.5,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — argent crédité sur ton solde Vinted. <b>Ne compte pas</b> tes virements vers ta banque.</div>
               </div>
               {/* EN ATTENTE */}
               <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:14,padding:'13px 15px',marginBottom:11}}>
