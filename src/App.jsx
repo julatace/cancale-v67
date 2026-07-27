@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🧱';
+const BUILD_ID = 'v27/07 · ⬇️';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -4570,15 +4570,36 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // réglages : nb de boîtes en largeur/hauteur, taille…). Tap suivant sur une
   // case = y saisir / changer / effacer le N°. Ça évite le prompt intempestif
   // et rend les réglages faciles à trouver.
+  // GRAVITÉ des numéros (comme la grille 2D) : dans chaque colonne, les boîtes
+  // tombent en bas, sans trou. Une case vidée fait descendre la colonne au-dessus.
+  const compactSlots = (slots, nr, nc) => {
+    const out = {};
+    for (let c = 0; c < nc; c++) {
+      const vals = [];
+      for (let r = 0; r < nr; r++) { const a = slots[r + '_' + c]; if (a && a.length && String(a[0]).trim()) vals.push(String(a[0])); }
+      let r = nr - 1;
+      for (let i = vals.length - 1; i >= 0; i--) { out[r + '_' + c] = [vals[i]]; r--; }
+    }
+    return out;
+  };
   const fillCell = (itemId, cellKey) => {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
     const it = items.find(x => x.id === itemId); if (!it) return;
-    const cur = ((it.slots || {})[cellKey] || [])[0] || '';
-    const n = window.prompt('N° de la boîte pour cette case (laisse vide pour effacer) :', cur);
+    const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
+    const c0 = Number(String(cellKey).split('_')[1]);
+    const slots = { ...(it.slots || {}) };
+    const cur = (slots[cellKey] || [])[0] || '';
+    const n = window.prompt('N° de la boîte (laisse vide pour effacer) :', cur);
     if (n == null) return; // annulé
-    const v = String(n).trim(); const slots = { ...(it.slots || {}) };
-    if (v) slots[cellKey] = [v]; else delete slots[cellKey];
-    updateItem(itemId, { slots });
+    const v = String(n).trim();
+    if (cur) { // boîte existante → on modifie / efface EN PLACE
+      if (v) slots[cellKey] = [v]; else delete slots[cellKey];
+    } else if (v) { // AJOUT → va le plus BAS possible de la colonne (case vide la plus basse)
+      let target = cellKey;
+      for (let r = nr - 1; r >= 0; r--) { const k = r + '_' + c0; if (!(slots[k] && slots[k].length)) { target = k; break; } }
+      slots[target] = [v];
+    }
+    updateItem(itemId, { slots: compactSlots(slots, nr, nc) }); // gravité : tout retombe en bas, sans trou
   };
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
