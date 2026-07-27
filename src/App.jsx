@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🏠';
+const BUILD_ID = 'v27/07 · 🏷️';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -3851,24 +3851,46 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // Face AVANT : simple carton kraft (grain léger + rabat central) avec le
       // NUMÉRO écrit directement dessus au marqueur — pas d'étiquette « produit ».
       const KRAFT = '#c19a5f';
-      const colisFrontTex = (num) => {
-        const c = document.createElement('canvas'); c.width = 200; c.height = 200; const x = c.getContext('2d'); const W = c.width, H = c.height;
-        x.fillStyle = KRAFT; x.fillRect(0, 0, W, H);
-        for (let i = 0; i < 46; i++) { x.fillStyle = `rgba(90,60,25,${0.02 + Math.random() * 0.035})`; x.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 26, 1 + Math.random() * 2); } // grain carton
-        x.strokeStyle = 'rgba(80,55,25,0.35)'; x.lineWidth = 2; x.beginPath(); x.moveTo(W / 2, 0); x.lineTo(W / 2, H); x.stroke(); // rabat central
-        x.fillStyle = 'rgba(208,188,150,0.5)'; x.fillRect(0, H * 0.44, W, H * 0.14);                                             // ruban adhésif
-        x.fillStyle = '#2a2018'; x.font = `800 ${Math.round(H * 0.4)}px "Marker Felt","Comic Sans MS",system-ui,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText(String(num).slice(0, 4), W / 2, H * 0.51);                                                                   // numéro au marqueur
-        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.anisotropy = 4; return t;
+      // Petit utilitaire : rectangle à coins arrondis (fallback si roundRect absent).
+      const rrect = (x, px, py, w, h, r) => {
+        if (x.roundRect) { x.beginPath(); x.roundRect(px, py, w, h, r); return; }
+        x.beginPath(); x.moveTo(px + r, py); x.arcTo(px + w, py, px + w, py + h, r); x.arcTo(px + w, py + h, px, py + h, r); x.arcTo(px, py + h, px, py, r); x.arcTo(px, py, px + w, py, r); x.closePath();
       };
-      // Dessus : rabats du carton (croix) + ruban + petit numéro.
-      const colisTopTex = (num) => {
-        const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const S = 128;
+      // Face AVANT premium : carton kraft réaliste + ÉTIQUETTE D'EXPÉDITION blanche
+      // avec le numéro EN GROS, très lisible (bande d'accent colorée en tête).
+      // `accent` = couleur perso du vendeur (code couleur de rangement) sinon teal.
+      const colisFrontTex = (num, accent) => {
+        const S = 320; const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
+        const AC = accent || '#0a7f74';
         x.fillStyle = KRAFT; x.fillRect(0, 0, S, S);
-        x.strokeStyle = 'rgba(80,55,25,0.4)'; x.lineWidth = 3; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.moveTo(0, S / 2); x.lineTo(S, S / 2); x.stroke(); // rabats
-        x.fillStyle = 'rgba(208,188,150,0.5)'; x.fillRect(S * 0.42, 0, S * 0.16, S); // ruban
-        x.fillStyle = '#3a2c12'; x.font = '800 30px "Marker Felt","Comic Sans MS",system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), S / 2, S / 2);
-        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} return t;
+        for (let i = 0; i < 70; i++) { x.fillStyle = `rgba(90,60,25,${0.02 + Math.random() * 0.035})`; x.fillRect(Math.random() * S, Math.random() * S, 3 + Math.random() * 40, 1 + Math.random() * 3); } // grain carton
+        x.strokeStyle = 'rgba(80,55,25,0.30)'; x.lineWidth = 3; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.stroke(); // rabat central
+        x.fillStyle = 'rgba(210,190,150,0.5)'; x.fillRect(0, S * 0.05, S, S * 0.11);                                             // ruban adhésif haut
+        // Étiquette blanche centrée, ombre douce → aspect premium/pro.
+        const lw = S * 0.78, lh = S * 0.56, lx = (S - lw) / 2, ly = (S - lh) / 2 + S * 0.03;
+        x.save(); x.shadowColor = 'rgba(0,0,0,0.28)'; x.shadowBlur = 14; x.shadowOffsetY = 6;
+        x.fillStyle = '#fcfbf8'; rrect(x, lx, ly, lw, lh, 16); x.fill(); x.restore();
+        // Bande d'accent en tête d'étiquette.
+        x.save(); rrect(x, lx, ly, lw, lh, 16); x.clip(); x.fillStyle = AC; x.fillRect(lx, ly, lw, lh * 0.2); x.restore();
+        x.strokeStyle = 'rgba(0,0,0,0.10)'; x.lineWidth = 2; rrect(x, lx, ly, lw, lh, 16); x.stroke();
+        // Petit label « N° » sur la bande.
+        x.fillStyle = 'rgba(255,255,255,0.95)'; x.font = `800 ${Math.round(lh * 0.11)}px system-ui,sans-serif`; x.textAlign = 'left'; x.textBaseline = 'middle';
+        x.fillText('N°', lx + lw * 0.08, ly + lh * 0.1);
+        // NUMÉRO en très gros, noir, centré.
+        x.fillStyle = '#131313'; x.font = `900 ${Math.round(lh * 0.6)}px system-ui,"Arial Black",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(String(num).slice(0, 4), S / 2, ly + lh * 0.6);
+        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.anisotropy = 8; return t;
+      };
+      // Dessus : rabats du carton + petite étiquette avec le numéro (gros aussi).
+      const colisTopTex = (num, accent) => {
+        const S = 192; const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
+        x.fillStyle = KRAFT; x.fillRect(0, 0, S, S);
+        x.strokeStyle = 'rgba(80,55,25,0.4)'; x.lineWidth = 4; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.moveTo(0, S / 2); x.lineTo(S, S / 2); x.stroke(); // rabats
+        const lw = S * 0.66, lh = S * 0.44, lx = (S - lw) / 2, ly = (S - lh) / 2;
+        x.save(); x.shadowColor = 'rgba(0,0,0,0.22)'; x.shadowBlur = 8; x.shadowOffsetY = 3; x.fillStyle = '#fcfbf8'; rrect(x, lx, ly, lw, lh, 10); x.fill(); x.restore();
+        x.fillStyle = accent || '#0a7f74'; x.save(); rrect(x, lx, ly, lw, lh, 10); x.clip(); x.fillRect(lx, ly, lw, lh * 0.16); x.restore();
+        x.fillStyle = '#131313'; x.font = `900 ${Math.round(lh * 0.56)}px system-ui,"Arial Black",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), S / 2, ly + lh * 0.58);
+        const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.anisotropy = 4; return t;
       };
       const makeColis = (num, bw, bh, bd) => {
         let cc = colisCache.get(num);
