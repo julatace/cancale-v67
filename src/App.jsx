@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 💼';
+const BUILD_ID = 'v27/07 · 🧱';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -4099,19 +4099,27 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
             lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
           }
-          // La grille peint elle-même ses cartons (un par case) → on saute
-          // l'empilage générique. Les autres meubles empilent les cartons dans
-          // leurs cases (jusqu'à ~18), N° imprimé en gros, lisible sans cliquer.
+          // La grille peint elle-même ses cartons. Les AUTRES meubles de rangement
+          // (commode, étagère, casiers, armoire) deviennent eux aussi une grille de
+          // boîtes NUMÉROTÉES : chaque case pleine = un carton (N° imprimé en gros,
+          // TAPPABLE pour modifier le numéro), chaque case vide = boîte fantôme
+          // translucide TAPPABLE (pour y déposer un N°) — comme la grille. → on voit
+          // la superposition des numéros et on édite au doigt sur TOUT rangement.
           if (!isGrid && !isBox) {
             const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
             const cellW = w / cols, cellH = ht / rows;
             const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145; // format boîte à chaussures
+            const canAdd = ['commode','etagere','casier','armoire'].includes(it.type); // rangements à cases → cases vides tappables
+            const ghostM = canAdd ? new THREE.MeshStandardMaterial({ color: shade(base, 22), roughness: 0.95, transparent: true, opacity: 0.15, depthWrite: false }) : null;
             let total = 0;
-            for (const key in (it.slots || {})) {
-              const parts = String(key).split('_'); const r = +parts[0], c = +parts[1]; const arr = it.slots[key] || [];
-              if (isNaN(r) || isNaN(c)) continue;
-              const cx = -w / 2 + (c + 0.5) * cellW, baseY = Math.max(0, ht - (r + 1) * cellH); // bas de la case
-              arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.position.set(cx, baseY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+              const key = r + '_' + c; const arr = (it.slots || {})[key] || [];
+              const cx = -w / 2 + (c + 0.5) * cellW, cbY = Math.max(0, ht - (r + 1) * cellH); // bas de la case
+              if (arr.length) {
+                arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.userData = { cell: key }; m.position.set(cx, cbY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
+              } else if (ghostM) {
+                const gh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); gh.userData = { cell: key }; gh.position.set(cx, cbY + bh / 2, d / 2 - bd / 2 - 0.015); g.add(gh);
+              }
             }
           }
           furnGroup.add(g);
