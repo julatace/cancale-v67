@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🧾';
+const BUILD_ID = 'v27/07 · 🔢';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -8952,7 +8952,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {vintedToPickup.slice(0,25).map(o=>{
                 const tk=trackForBuy(o);
                 const code=tk&&tk.code?String(tk.code):null;
-                const hasQr=tk&&(tk.qrB64||tk.qrUrl||tk.code||tk.suivi);
+                const hasQr=tk&&(tk.qrB64||tk.qrUrl); // vrai QR (email) uniquement — pas de faux QR généré
                 return (
                 <div key={o.transaction_id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:11,padding:'8px 10px'}}>
                   <div style={{display:'flex',gap:9,alignItems:'center'}}>
@@ -9170,9 +9170,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <div style={{fontSize:15,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:1.5}}>{t.code}</div>
                             </button>
                           )}
-                          {/* QR de retrait : le vrai de Vinted (qrB64) si capté, sinon on en
-                              génère un depuis le code/suivi. Tap = plein écran pour scanner. */}
-                          {(t.qrB64||t.qrUrl||t.code||t.suivi)&&(
+                          {/* QR de retrait : UNIQUEMENT le vrai QR de Vinted (qrB64/qrUrl)
+                              s'il a été capté. Mondial Relay n'en envoie pas → on ne montre
+                              pas de faux QR, le code ci-dessus suffit au comptoir. */}
+                          {(t.qrB64||t.qrUrl)&&(
                             <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
                               style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:8,padding:0,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                               {t.qrB64?<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:t.qrUrl?<img src={t.qrUrl} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
