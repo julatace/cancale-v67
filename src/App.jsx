@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · ⬇️';
+const BUILD_ID = 'v27/07 · 🔎';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -4808,7 +4808,12 @@ function RoomPlan({ locate, onLocateConsumed }) {
         {search && <button onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}>✕</button>}
       </div>
       {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
-      {hi && hi.itemId && (()=>{ const it=items.find(x=>x.id===hi.itemId); return it ? <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null} (meuble surligné)</div> : null; })()}
+      {hi && hi.itemId && (()=>{
+        const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
+        let pos=null;
+        if (hi.cell!=null){ const p=String(hi.cell).split('_'); const r=+p[0], c=+p[1]; const nr=Math.max(1,it.rows||1); if(!isNaN(r)&&!isNaN(c)) pos=`colonne ${c+1} · ${nr-r}ᵉ boîte depuis le bas`; }
+        return <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800, lineHeight:1.4 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <><br/><span style={{fontWeight:700,color:C.text}}>📍 {pos}</span></> : null}</div>;
+      })()}
 
       {/* Palette de meubles */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
