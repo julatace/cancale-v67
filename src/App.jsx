@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🏷️';
+const BUILD_ID = 'v27/07 · 💶';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -39,7 +39,7 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
-  'vinted_offvinted_buys',
+  'vinted_offvinted_buys','vinted_buyprice_by_num',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -6417,6 +6417,12 @@ const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JS
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
+  // Prix d'achat mémorisé PAR NUMÉRO (et non par id d'annonce, qui change à la
+  // vente/republication). Source de vérité durable : quand tu saisis le prix
+  // d'achat sur une annonce numérotée, il est aussi rangé ici sous son N° → il
+  // suit la paire jusqu'à la vente. Corrige « j'ai mis les prix dans Annonces
+  // mais ils n'apparaissent pas dans les Ventes ».
+  const [buyByNum, setBuyByNum] = useState(() => load('vinted_buyprice_by_num', {}));
   // Annonces marquées VENDUES à la main (id d'annonce) : retirées des Annonces
   // tout de suite, sans attendre que Vinted/l'extension rescanne le compte.
   const [soldManual, setSoldManual] = useState(() => new Set(load('vinted_annonces_vendues', [])));
@@ -6785,6 +6791,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
+    // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
+    const c = numeros[item.id] || {};
+    const num = String((('numero' in patch) ? patch.numero : c.numero) || '').trim();
+    const buy = ('buyPrice' in patch) ? patch.buyPrice : c.buyPrice;
+    if (num) {
+      if (buy != null && String(buy).trim() !== '') setBuyByNum(prev => { const u = { ...prev, [num]: String(buy) }; save('vinted_buyprice_by_num', u); return u; });
+      else if ('buyPrice' in patch) setBuyByNum(prev => { if (prev[num] == null) return prev; const u = { ...prev }; delete u[num]; save('vinted_buyprice_by_num', u); return u; });
+    }
   };
   const recordUsed = (num) => { const n=parseInt(String(num),10); if(isNaN(n)||n<=0) return; setUsedNumeros(prev=>{ if(prev.includes(n))return prev; const u=[...prev,n]; save('vinted_used_numeros',u); return u; }); };
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
@@ -6990,15 +7004,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n)&&n>m)m=n;});
     return m+1; }, [usedNumeros, numeros, saleOv]);
 
+  // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
+  // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
+  // dans les Ventes les prix saisis dans Annonces, même après vente/republication.
+  const withBuyByNum = (e) => {
+    if (!e || e.numero == null) return e;
+    const has = e.buyPrice != null && String(e.buyPrice).trim() !== '';
+    if (has) return e;
+    const bn = buyByNum[String(e.numero).trim()];
+    return (bn != null && String(bn).trim() !== '') ? { ...e, buyPrice: bn } : e;
+  };
   const effEntry = (o) => {
     const base = resolvedEntry(o);
     const ov = (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null;
-    if (!ov) return base;
+    if (!ov) return withBuyByNum(base);
     const merged = { ...(base || {}) };
     if (ov.numero != null && ov.numero !== '') merged.numero = ov.numero;
     if (ov.buyPrice != null && ov.buyPrice !== '') merged.buyPrice = ov.buyPrice;
     if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
-    return merged;
+    return withBuyByNum(merged);
   };
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
   const buyOf = (o) => { const e = effEntry(o); const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null; return (b!=null && !isNaN(b)) ? b : null; };
@@ -7712,7 +7736,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -7807,7 +7831,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ecoul = (online+vendues)>0 ? (vendues/(online+vendues))*100 : null;
     return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, listings.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
@@ -7833,7 +7857,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const total = months.reduce((s,m)=>s+m.ca,0);
     return { months, max, total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // Courbes de PRIX DE VENTE MOYEN par marque, sur 12 mois → voir l'évolution
   // (marché + tes propres prix). Par mois : moyenne des prix de vente finalisés.
@@ -7858,7 +7882,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const brandList = Object.keys(data).filter(b=>b!=='__ALL__').sort((a,b)=>data[b].total-data[a].total);
     return { months, series, brandList, hasData: brandList.length>0 };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Wrapped du vendeur : rétrospective annuelle façon Spotify Wrapped ──
   const [showWrapped, setShowWrapped] = useState(false);
@@ -7884,7 +7908,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const years=[...new Set((sales.items||[]).filter(o=>o.date&&classifyOrderStatus(o.status)==='completed').map(o=>new Date(o.date).getFullYear()))].sort((a,b)=>b-a);
     return { yr, nb:items.length, ca, benef, benefNb, bestPair, topBrand, bestMonth:bestMonth?{nom:moisNoms[bestMonth.i],v:bestMonth.v}:null, fastest, slowest, avg: items.length?ca/items.length:0, streak, years };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, wrappedYear, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, wrappedYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Stats de sourcing : quelles marques / tailles rapportent le plus ──
   // Agrège les ventes finalisées (hors masquées) par marque et par taille :
@@ -7922,7 +7946,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     })).sort((a,b)=> b.nb-a.nb || (b.benefMoy||-1e9)-(a.benefMoy||-1e9));
     return { brands:finalize(brands), sizes:finalize(sizes), total };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Saisonnalité : tes meilleurs mois de vente (pour acheter au bon moment) ─
   const seasonality = useMemo(() => {
@@ -7957,7 +7981,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     list.sort((a, b) => a.net - b.net);
     return list;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   // ── Litiges / annulations : combien de ventes annulées et le manque à gagner ─
   const litiges = useMemo(() => {
     let nb = 0, montant = 0;
@@ -8045,7 +8069,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const estBenef = (avgSell!=null && price!=null) ? avgSell - price : null;
     return { nb, avgSell, joursMoy: daysNb?daysSum/daysNb:null, benefMoy: benefNb?benefSum/benefNb:null, benefNb, online, lastDate, price, estBenef };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [srcQuery, srcPrice, sales.items, listings.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [srcQuery, srcPrice, sales.items, listings.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Assistant de MISE EN VENTE : tu viens d'acheter une paire, tu la mets en
   // ligne. Tape le modèle → prix conseillé (basé sur TES ventes réelles de la
@@ -8103,7 +8127,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { soldNb:sold.length, soldMed:round(soldMed), onlineNb:onlinePrices.length, onlineMed:round(onlineMed),
              reco, lo, hi, bumped, floor:round(floor), buyOk, margin, joursMoy:daysNb?daysSum/daysNb:null, lastDate, title, desc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listQ, listSize, listBuy, sales.items, listings.items, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [listQ, listSize, listBuy, sales.items, listings.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const copyText = (txt, key) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(()=>setCopied(''),1500); } catch(_){} };
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
@@ -8153,7 +8177,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = ca * 0.135;
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportMonth, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, buys.items, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
 
@@ -8243,7 +8267,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = ca*0.135;
     return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportYear, numeros, saleOv, hiddenSales, hiddenAccts]);
+  }, [sales.items, buys.items, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const openAnnual = () => { setShowAnnual(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
   const exportAnnualCsv = () => {
     const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
