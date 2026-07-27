@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🚚';
+const BUILD_ID = 'v27/07 · 💰';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7668,6 +7668,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, hiddenSales, hiddenAccts]);
 
+  // ── Trésorerie : l'argent réel, pas le CA ─────────────────────────────
+  // Vinted BLOQUE l'argent d'une vente jusqu'à ce que l'acheteur valide (ou que
+  // le délai passe). Donc « vendu » ≠ « argent dispo ». On sépare :
+  //  • EN ATTENTE de déblocage = ventes en cours (pas encore finalisées), avec
+  //    un détail par étape (livrée = imminent > en transit > à expédier).
+  //  • DÉBLOQUÉ = ventes finalisées → Vinted a libéré les fonds sur ton solde.
+  // Source = statut Vinted moissonné (fiable, se met à jour tout seul).
+  const treasury = useMemo(() => {
+    const items = sales.items || [];
+    const now = new Date(); const ym = now.getFullYear()*100 + now.getMonth();
+    let pending=0, pImminent=0, pTransit=0, pToShip=0, nPending=0, released=0, releasedMonth=0, nReleased=0;
+    for (const o of items) {
+      if (isHidden(o)) continue;
+      const stt = classifyOrderStatus(o.status);
+      const amt = o.price?.amount!=null ? Number(o.price.amount) : 0;
+      if (stt === 'completed') {
+        released += amt; nReleased += 1;
+        if (o.date) { const d=new Date(o.date); if (!isNaN(d) && d.getFullYear()*100+d.getMonth()===ym) releasedMonth += amt; }
+      } else if (stt === 'pending') {
+        pending += amt; nPending += 1;
+        const st = venteStage(o).step;
+        if (st >= 3) pImminent += amt;        // livrée / au relais → déblocage imminent
+        else if (st === 2) pTransit += amt;   // en transit
+        else pToShip += amt;                  // à expédier / payée
+      }
+    }
+    return { pending, pImminent, pTransit, pToShip, nPending, released, releasedMonth, nReleased };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts, saleOv]);
+  const [showTreasury, setShowTreasury] = useState(false);
+
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
   // CA finalisé du mois en cours.
@@ -8650,6 +8681,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           )}
           {accounts.length>0 && (
             <button onClick={()=>setShowSourcing(true)} title="Stats par marque et taille (quoi racheter)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>🎯 Sourcing</button>
+          )}
+          {accounts.length>0 && (
+            <button onClick={()=>setShowTreasury(true)} title="Argent en attente de déblocage vs débloqué" style={{padding:'5px 12px',borderRadius:999,border:`1px solid #16a34a`,background:'#16a34a12',color:'#16a34a',fontSize:12,fontWeight:800,cursor:'pointer'}}>💰 Trésorerie{treasury.pending>0?` · ${Math.round(treasury.pending)} € à venir`:''}</button>
           )}
           {accounts.length>0 && (
             <button onClick={openReport} title="Rapport comptable mensuel" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Rapport</button>
@@ -10162,6 +10196,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Le bénéfice n'est calculé que pour les ventes dont le prix d'achat est renseigné (bouton 🔗 dans Annonces). Les marques reconnues viennent d'une liste interne.</div>
                 </>);
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+      {showTreasury && (
+        <div onClick={()=>setShowTreasury(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>💰 Trésorerie</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1}}>L'argent réel, pas le chiffre d'affaires</div>
+              </div>
+              <button type="button" onClick={()=>setShowTreasury(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{padding:'14px 16px',overflowY:'auto'}}>
+              {/* EN ATTENTE DE DÉBLOCAGE */}
+              <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:14,padding:'13px 15px',marginBottom:12}}>
+                <div style={{fontSize:11.5,color:C.warn,fontWeight:800,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente de déblocage</div>
+                <div style={{fontSize:30,fontWeight:900,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.pending)} €</div>
+                <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>{treasury.nPending} vente{treasury.nPending>1?'s':''} — argent que Vinted retient jusqu'à validation de l'acheteur.</div>
+                {[['📦 Livrée · déblocage imminent', treasury.pImminent, '#16a34a'],['🚚 En transit', treasury.pTransit, C.blue||C.accent],['📮 À expédier', treasury.pToShip, C.warn]].filter(r=>r[1]>0).map(([lab,val,col])=>(
+                  <div key={lab} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:`1px solid ${C.border}`}}>
+                    <span style={{fontSize:12.5,color:C.text}}>{lab}</span>
+                    <span style={{fontSize:13.5,fontWeight:800,color:col}}>{Math.round(val)} €</span>
+                  </div>
+                ))}
+              </div>
+              {/* DÉBLOQUÉ */}
+              <div style={{display:'flex',gap:10,marginBottom:12}}>
+                <div style={{flex:1,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px'}}>
+                  <div style={{fontSize:10.5,color:C.muted,fontWeight:700,textTransform:'uppercase'}}>✅ Débloqué ce mois</div>
+                  <div style={{fontSize:20,fontWeight:900,color:'#16a34a',marginTop:3}}>{Math.round(treasury.releasedMonth)} €</div>
+                </div>
+                <div style={{flex:1,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px'}}>
+                  <div style={{fontSize:10.5,color:C.muted,fontWeight:700,textTransform:'uppercase'}}>💶 Total encaissé</div>
+                  <div style={{fontSize:20,fontWeight:900,color:C.text,marginTop:3}}>{Math.round(treasury.released)} €</div>
+                  <div style={{fontSize:10,color:C.muted}}>{treasury.nReleased} ventes finalisées</div>
+                </div>
+              </div>
+              <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5}}>Basé sur le statut Vinted de chaque vente (fiable, se met à jour tout seul). « Débloqué » = fonds libérés par Vinted sur ton solde ; ce qu'il te reste dépend ensuite de tes virements vers ta banque.</div>
             </div>
           </div>
         </div>
