@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🔎';
+const BUILD_ID = 'v27/07 · ➕';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -4599,7 +4599,17 @@ function RoomPlan({ locate, onLocateConsumed }) {
       for (let r = nr - 1; r >= 0; r--) { const k = r + '_' + c0; if (!(slots[k] && slots[k].length)) { target = k; break; } }
       slots[target] = [v];
     }
-    updateItem(itemId, { slots: compactSlots(slots, nr, nc) }); // gravité : tout retombe en bas, sans trou
+    const compacted = compactSlots(slots, nr, nc); // gravité : tout retombe en bas, sans trou
+    // GRILLE PLEINE → on ajoute automatiquement une rangée VERS LE HAUT (jusqu'au
+    // plafond) : tu continues à ranger sans jamais avoir à redimensionner ni
+    // déplacer la grille. (Uniquement à l'ajout, sur une grille de boîtes.)
+    let grow = {};
+    if (v && !cur && (FURN_TYPES[it.type] || {}).build === 'grille') {
+      const full = Object.keys(compacted).length >= nr * nc;
+      const cellS = it.cell || 0.5, maxRows = Math.max(1, Math.floor(((room && room.wallH) || 3.4) / cellS));
+      if (full && nr < maxRows) grow = { rows: nr + 1 };
+    }
+    updateItem(itemId, { slots: compacted, ...grow });
   };
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
