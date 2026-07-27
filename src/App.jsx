@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 🔢';
+const BUILD_ID = 'v27/07 · 📦';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -8940,59 +8940,73 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       })()}
 
       {curSub==='achats' && (<>
-        {/* À RETIRER : source = statut Vinted (automatique, se met à jour seul). */}
-        {vintedToPickup.length>0 && (
-          <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:14,padding:'11px 13px',marginBottom:10}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              <div style={{flex:1,fontSize:13.5,fontWeight:900,color:C.text}}>📦 {vintedToPickup.length} colis à retirer</div>
-              {(tracking||[]).some(isPickupActive) && <button type="button" onClick={()=>setTourneeOpen(true)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:999,padding:'5px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🗺️ Relais & QR</button>}
-              <button type="button" onClick={()=>{ if(window.confirm('Marquer TOUS ces colis comme récupérés ?')) markAllPickupDone(vintedToPickup); }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:999,padding:'5px 11px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {vintedToPickup.slice(0,25).map(o=>{
-                const tk=trackForBuy(o);
-                const code=tk&&tk.code?String(tk.code):null;
-                const hasQr=tk&&(tk.qrB64||tk.qrUrl); // vrai QR (email) uniquement — pas de faux QR généré
-                return (
-                <div key={o.transaction_id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:11,padding:'8px 10px'}}>
-                  <div style={{display:'flex',gap:9,alignItems:'center'}}>
-                    <div style={{width:34,height:34,borderRadius:7,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:14}}>📦</span>}</div>
-                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div><div style={{fontSize:10,color:C.muted}}>{tk&&tk.carrier?carrierName(tk.carrier):'point relais'}{tk&&tk.suivi?` · ${tk.suivi}`:''}{o._acc?` · ${accNameOf(o._acc)}`:''}</div></div>
-                    <button type="button" onClick={()=>markPickupDone(o)} title="J'ai récupéré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>✓ Récupéré</button>
-                  </div>
-                  {(code||hasQr)&&(
-                    <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
-                      {code&&(
-                        <button type="button" onClick={()=>openQrView(tk)} title="Afficher en grand pour scanner" style={{flex:1,textAlign:'left',background:`${C.accent}0e`,border:`1.5px dashed ${C.accent}`,borderRadius:9,padding:'6px 11px',cursor:'pointer',fontFamily:'inherit'}}>
-                          <div style={{fontSize:8.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:800}}>Code de retrait</div>
-                          <div style={{fontSize:19,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{code}</div>
-                        </button>
-                      )}
-                      {hasQr&&(
-                        <button type="button" onClick={()=>openQrView(tk)} title="QR de retrait — afficher en grand" aria-label="QR de retrait" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:9,padding:0,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                          {tk.qrB64?<img src={`data:${tk.qrType||'image/png'};base64,${tk.qrB64}`} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:tk.qrUrl?<img src={tk.qrUrl} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:24}}>🔳</span>}
-                        </button>
-                      )}
+        {/* À RETIRER — liste simple façon appli de colis : groupée par point relais,
+            avec LE CODE de retrait en gros (c'est ça qu'on donne au comptoir) et un
+            « Y aller ». Source = emails transporteur (qui portent le code), et non
+            plus le statut Vinted (qui n'a pas les codes). La carte est en option. */}
+        {(()=>{
+          const avail = (tracking||[]).filter(isPickupActive);
+          const okCode = (c) => { const s = String(c||'').trim(); return /^\d{3,8}$/.test(s) ? s : null; };
+          if (!avail.length) {
+            return vintedToPickup.length>0 ? (
+              <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:14,padding:'12px 14px',marginBottom:10}}>
+                <div style={{fontSize:14,fontWeight:900,color:C.text,marginBottom:3}}>📦 {vintedToPickup.length} colis à retirer</div>
+                <div style={{fontSize:11.5,color:C.muted}}>Le code de retrait arrive par email dès que le colis est au point relais.</div>
+              </div>
+            ) : null;
+          }
+          const groups = {};
+          avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          return (
+            <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:14,padding:'12px 14px',marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
+                <div style={{flex:1,fontSize:14.5,fontWeight:900,color:C.text}}>📦 {avail.length} colis à retirer</div>
+                <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{border:`1px solid ${C.accent}`,background:showRelais?C.accent:'transparent',color:showRelais?'#fff':C.accent,borderRadius:999,padding:'5px 12px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🗺️ {showRelais?'Masquer la carte':'Carte'}</button>
+              </div>
+              {Object.entries(groups).map(([nom,g])=>(
+                <div key={nom} style={{marginBottom:12}}>
+                  <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:8}}>
+                    {g.carrier&&<CarrierBadge carrier={g.carrier} size={22}/>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:900,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {nom}</div>
+                      <div style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.adresse,`${g.colis.length} colis`].filter(Boolean).join(' · ')}</div>
                     </div>
-                  )}
-                  {!code&&!hasQr&&<div style={{fontSize:10,color:C.muted,marginTop:5,fontStyle:'italic'}}>Code de retrait pas encore reçu par email pour ce colis.</div>}
+                    <a href={`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:800}}>🧭 Y aller</a>
+                  </div>
+                  {g.colis.map((t,i)=>{
+                    const code=okCode(t.code);
+                    return (
+                      <div key={i} style={{display:'flex',gap:11,alignItems:'center',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                        <span style={{fontSize:21,flexShrink:0}}>📦</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
+                          <div style={{fontSize:10,color:C.muted}}>{code?'Donne ce code au comptoir 👉':'Code pas encore reçu'}</div>
+                        </div>
+                        {code && (
+                          <div style={{flexShrink:0,textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 13px'}}>
+                            <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:800}}>Code</div>
+                            <div style={{fontSize:21,fontWeight:900,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{code}</div>
+                          </div>
+                        )}
+                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:9,padding:'8px 11px',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                      </div>
+                    );
+                  })}
                 </div>
-                );
-              })}
+              ))}
+              <div style={{fontSize:10.5,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — ou ça se met à jour tout seul.</div>
             </div>
-            <div style={{fontSize:10.5,color:C.muted,marginTop:7,lineHeight:1.4}}>Se met à jour <b>tout seul</b> quand Vinted enregistre le retrait — ou coche <b>✓</b> pour le retirer tout de suite.</div>
-          </div>
-        )}
-        {vintedToPickup.length===0 && (tracking||[]).some(isPickupActive) && (
-          <button type="button" onClick={()=>setTourneeOpen(true)} style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'11px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:10}}>🗺️ Points relais & QR de retrait</button>
-        )}
+          );
+        })()}
         {/* Carte des points relais : où retirer tes colis + codes/QR de retrait.
             Repliée par défaut quand il n'y a AUCUN colis à retirer (elle prenait
             tout l'écran avant les achats). */}
         {(()=>{ const hasPickup=(tracking||[]).some(isPickupActive)||vintedToPickup.length>0; return !hasPickup ? (
           <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit',marginBottom:12}}>📍 Points relais {ville?`de ${ville}`:''} <span style={{color:C.muted}}>{showRelais?'▲ masquer':'▼ voir la carte'}</span></button>
         ) : null; })()}
-        {(()=>{ const hasPickup=(tracking||[]).some(isPickupActive)||vintedToPickup.length>0; return (hasPickup || showRelais); })() && (()=>{
+        {/* Carte des relais : masquée par défaut (la liste ci-dessus suffit pour
+            retirer). On l'affiche seulement si tu tapes « 🗺️ Carte ». */}
+        {showRelais && (()=>{
           const avail=(tracking||[]).filter(isPickupActive);
           const norm=s=>String(s||'').toLowerCase();
           // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
