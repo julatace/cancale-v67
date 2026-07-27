@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · 📦';
+const BUILD_ID = 'v27/07 · ✨';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6517,6 +6517,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const d = new Date(t.receivedAt); if (isNaN(d)) return true;
     return (Date.now() - d.getTime()) / 86400000 <= PICKUP_MAX_DAYS;
   };
+  // Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller ou on a
+  // un code). Écarte les lignes de suivi parasites (ni lieu, ni code valide) qui
+  // polluaient la liste. Utilisé partout pour que les compteurs concordent.
+  const isRetirable = (t) => isPickupActive(t) && (!!cleanLieu(t.lieu).nom || /^\d{3,8}$/.test(String((t && t.code) || '').trim()));
   // Ouvre la vue « scan » en grand : QR authentique de Vinted (qrB64) si présent,
   // sinon on génère un QR à partir du code de retrait ou du n° de suivi.
   const openQrView = async (t) => {
@@ -8397,7 +8401,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         const jobs=[];
         if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_expedition',prio:late>0?0:1});
-        if(vintedToPickup.length) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${vintedToPickup.length} colis`,sub:'Déposés en point relais — va les chercher',tab:'cat_achats',prio:2});
+        const pickupCount=(tracking||[]).filter(isRetirable).length||vintedToPickup.length; // même compte que l'onglet Achats
+        if(pickupCount) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${pickupCount} colis`,sub:'Déposés en point relais — récupère-les avec ton code',tab:'cat_achats',prio:2});
         if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(offersToSend) jobs.push({icon:'💌',color:INV_STATUS.online.color,title:`Relancer ${offersToSend} intéressé${offersToSend>1?'s':''}`,sub:'Envoie une offre aux gens qui ont liké → ça convertit',tab:'cat_annonces',prio:4});
         if(repriceList.length) jobs.push({icon:'🏷️',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
@@ -8764,7 +8769,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     {(()=>{ const vs=venteStage(o); return <span style={{color:vs.color,fontWeight:900,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px'}}>{vs.label}</span>; })()}
-                    {o.status && <span style={{color:C.muted,fontStyle:'italic',opacity:0.8}} title="Statut exact renvoyé par Vinted">« {o.status} »</span>}
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:800,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:700}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
@@ -8945,7 +8949,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             « Y aller ». Source = emails transporteur (qui portent le code), et non
             plus le statut Vinted (qui n'a pas les codes). La carte est en option. */}
         {(()=>{
-          const avail = (tracking||[]).filter(isPickupActive);
+          const avail = (tracking||[]).filter(isRetirable);
           const okCode = (c) => { const s = String(c||'').trim(); return /^\d{3,8}$/.test(s) ? s : null; };
           if (!avail.length) {
             return vintedToPickup.length>0 ? (
