@@ -23,6 +23,7 @@
   let queue = [];
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
   let stats = { postedCount: 0, lbcCount: 0, limit: null, plan: null, detected: null }; // compteur d'annonces LBC + offre
+  let loadError = false; // vrai si getQueue a échoué (≠ file vide)
   let photoRes = null; // { numero, title, photos:[...] } — photos d'une paire à envoyer à un acheteur
   let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
   // Lit toute l'annonce (titre + description) de la page courante et récupère nos
@@ -121,6 +122,7 @@
     .cbar{height:7px;border-radius:999px;background:#eef0f2;overflow:hidden;margin-top:7px}
     .cbarfill{height:100%;border-radius:999px;transition:width .3s}
     .cmsg{font-size:11px;font-weight:700;margin-top:5px}
+    .deposit{display:block;text-align:center;background:#ff6e14;color:#fff;text-decoration:none;font-size:13px;font-weight:900;padding:10px;margin:0 10px 6px;border-radius:10px}
   `;
 
   let open = false;
@@ -135,10 +137,18 @@
            <div class="hd"><span class="t">🟠 ${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
-           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : '<div class="empty">Rien à publier pour le moment.<br>Dès qu&#39;une annonce numérotée est en ligne sur Vinted, elle apparaît ici.</div>'}</div>
-           <div class="hint">Sur « Déposer une annonce », clique <b>Pré-remplir</b> puis vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
+           <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
+           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : emptyHtml()}</div>
+           <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
+  }
+  function emptyHtml() {
+    if (loadError) return '<div class="empty" style="color:#c0392b">⚠️ Chargement impossible (extension endormie ?). Clique sur ⟳ en haut, ou recharge la page.</div>';
+    const s = stats || {};
+    if ((s.onlineCount || 0) === 0) return '<div class="empty">Aucune annonce Vinted captée.<br>Passe sur ton dressing vinted.fr avec l&#39;extension, puis reviens ici et clique ⟳.</div>';
+    if ((s.numberedCount || 0) === 0) return `<div class="empty">${s.onlineCount} annonce${s.onlineCount > 1 ? 's' : ''} en ligne sur Vinted, mais <b>aucune numérotée</b>.<br>Mets un N° sur tes annonces dans l&#39;app VRM, elles apparaîtront ici.</div>`;
+    return `<div class="empty">Tout est déjà publié 🎉<br><span style="font-size:10.5px">${s.numberedCount} paire${s.numberedCount > 1 ? 's' : ''} numérotée${s.numberedCount > 1 ? 's' : ''}, toutes marquées publiées sur Leboncoin.</span></div>`;
   }
   function photoHtml() {
     const res = photoRes;
@@ -298,6 +308,7 @@
     scanPageRefs();
     captureLbcListings();
     const r = await send({ action: 'getQueue' });
+    loadError = !(r && r.ok);
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
     removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
     if (r && r.ok && r.stats) stats = r.stats;

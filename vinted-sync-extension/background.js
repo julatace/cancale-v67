@@ -754,7 +754,9 @@ async function buildLbcData() {
   // Quota détecté automatiquement depuis l'offre Leboncoin (si trouvé).
   let detected = null;
   try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=data'); const q = rec && rec[0] && rec[0].data && rec[0].data.quota; if (q && q.value) detected = q.value; } catch (_) {}
-  const stats = { postedCount, lbcCount, limit: lbcLimit, plan: lbcPlan, detected };
+  // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
+  const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
+  const stats = { postedCount, lbcCount, limit: lbcLimit, plan: lbcPlan, detected, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length };
   return { queue, removals, stats };
 }
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
