@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v34/07 · ⚡réponses';
+const BUILD_ID = 'v35/07 · 🔍global';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -11738,6 +11738,22 @@ export default function App() {
   // onglets (annonces en ligne, ventes, achats) + sa case au garage.
   const [gsOpen,setGsOpen]=useState(false);
   const [gsQ,setGsQ]=useState('');
+  // Recherche globale COMPLÈTE : au 1er usage, on charge une fois les données
+  // moissonnées (annonces/ventes/achats en ligne + publiées Leboncoin) depuis
+  // Supabase → la recherche marche même sans avoir ouvert les onglets Ventes/Achats.
+  const [gsData,setGsData]=useState(null); // { online:Set, sold:[], bought:[], lbc:Set }
+  useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
+    const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}}); return r.ok?await r.json():null; }catch(_){ return null; } };
+    const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
+    const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
+    for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
+    const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data')||[];
+    const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
+    const po=await sb('app_data?id=like.harvest_*_orders_purchased&select=data')||[];
+    const seenP=new Set(); for(const r of po){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
+    const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
+    setGsData({online,sold,bought,lbc});
+  })(); /* eslint-disable-next-line */ },[gsOpen]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
@@ -12307,9 +12323,10 @@ export default function App() {
         const q = gsQ.trim().toLowerCase();
         const numeros = load('vinted_annonce_numeros', {});
         const listCache = (_acctCache['listings'] && _acctCache['listings'].items) || [];
-        const soldCache = (_acctCache['sold'] && _acctCache['sold'].items) || [];
-        const buyCache = (_acctCache['purchased'] && _acctCache['purchased'].items) || [];
-        const onlineIds = new Set(listCache.map(it=>String(it.id)));
+        const soldCache = ((_acctCache['sold'] && _acctCache['sold'].items) || []).length ? _acctCache['sold'].items : (gsData && gsData.sold) || [];
+        const buyCache = ((_acctCache['purchased'] && _acctCache['purchased'].items) || []).length ? _acctCache['purchased'].items : (gsData && gsData.bought) || [];
+        const onlineIds = new Set([...listCache.map(it=>String(it.id)), ...((gsData && [...gsData.online]) || [])]);
+        const lbcSet = (gsData && gsData.lbc) || new Set();
         const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
         const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
         let pairs=[], ventes=[], achats=[];
@@ -12317,7 +12334,7 @@ export default function App() {
           // Paires numérotées (index principal : N°, titre, marque).
           pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
             .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
-            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); return {...e, box, online}; })
+            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
             .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
             .slice(0,40);
           const numeredIds = new Set(pairs.map(p=>String(p.id)));
@@ -12338,8 +12355,8 @@ export default function App() {
               style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,width:38,height:38,color:C.text,cursor:'pointer',fontSize:16,fontWeight:800,fontFamily:'inherit',flexShrink:0}}>✕</button>
           </div>
           <div style={{flex:1,overflowY:'auto',padding:'8px 14px 40px',WebkitOverflowScrolling:'touch'}}>
-            {!q && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:11.5}}>Cherche dans les annonces en ligne, les ventes, les achats et le garage.</span></div>}
-            {q && total===0 && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:11.5}}>Les onglets non encore ouverts ne sont pas indexés — ouvre Ventes/Achats puis réessaie.</span></div>}
+            {!q && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:11.5}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
+            {q && total===0 && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:11.5}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
             {pairs.length>0 && <div style={{fontSize:11,fontWeight:900,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
             {pairs.map(p=>(
               <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
@@ -12350,6 +12367,7 @@ export default function App() {
                   <div style={{fontSize:13.5,fontWeight:800,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title||'(sans titre)'}</div>
                   <div style={{fontSize:11.5,color:C.muted,fontWeight:700,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
                     <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
+                    {p.onLbc && <span style={{color:'#ff6e14'}}>🟠 Leboncoin</span>}
                     {p.box!=null && <span style={{color:C.accent}}>🏠 Au garage</span>}
                     {p.buyPrice && <span>achat {p.buyPrice}€</span>}
                     {p.price && <span>· {p.price}€</span>}
