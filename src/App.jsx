@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v28/07 · 💰marge';
+const BUILD_ID = 'v28/07 · 🗺️3D';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -4129,6 +4129,8 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.target.set(0, 0.6, 0); controls.enableDamping = true; controls.dampingFactor = 0.1;
       controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 2.5; controls.maxDistance = Math.max(room.w, room.h) * 2.6; controls.update();
+      // Position de départ mémorisée → bouton « Recentrer » qui remet la vue par défaut.
+      const homePos = camera.position.clone(), homeTgt = controls.target.clone();
       // Rotation/zoom de la caméra pilotés par les BOUTONS de l'overlay (fiable
       // sur mobile, indépendant du geste tactile). rotateView = tourner autour de
       // la pièce (gauche/droite) ; zoomView = avancer/reculer.
@@ -4146,6 +4148,15 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         camera.position.set(controls.target.x + ox * factor, controls.target.y + oy * factor, controls.target.z + oz * factor);
         controls.update();
       };
+      // Vue de dessus (plan) : caméra à la verticale du centre → on voit toute la
+      // pièce d'un coup pour organiser le rangement, comme un plan d'architecte.
+      const topView = () => {
+        controls.target.set(0, 0, 0);
+        const d = Math.min(controls.maxDistance, Math.max(room.w, room.h) * 1.25);
+        camera.position.set(0.001, d, 0.001); controls.update();
+      };
+      // Recentrer : remet la vue immersive de départ.
+      const resetView = () => { camera.position.copy(homePos); controls.target.copy(homeTgt); controls.update(); };
       // Interaction directe : en MODE DÉPLACEMENT, glisser un meuble le déplace ;
       // sinon glisser = tourner la vue (OrbitControls) et un tap = sélectionner.
       const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
@@ -4255,7 +4266,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
@@ -4295,6 +4306,10 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         const call = (fn, ...a) => { const s = st.current || {}; if (s[fn]) s[fn](...a); };
         return (
           <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus">🗺️</button>
+              <button onPointerDown={stop} onClick={() => call('resetView')} title="Recentrer la vue" style={btn} aria-label="Recentrer la vue">🎯</button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <button onPointerDown={stop} onClick={() => call('zoomView', 0.85)} title="Zoom avant" style={btn} aria-label="Zoom avant">＋</button>
               <button onPointerDown={stop} onClick={() => call('zoomView', 1.18)} title="Zoom arrière" style={btn} aria-label="Zoom arrière">−</button>
@@ -4789,6 +4804,26 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const cellRemove = (it, cell, n) => { const cur = ((it.slots && it.slots[cell]) || []).filter(x => x !== n); const slots = { ...(it.slots || {}) }; if (cur.length) slots[cell] = cur; else delete slots[cell]; updateItem(it.id, { slots }); };
   const setGrid = (it, rows, cols) => updateItem(it.id, { rows: Math.max(1, rows), cols: Math.max(1, cols) });
 
+  // Occupation de la pièce : combien de boîtes rangées, combien de places libres,
+  // combien de meubles → un vrai tableau de bord de rangement en un coup d'œil.
+  const capacity = useMemo(() => {
+    const GRID = ['grille', 'commode', 'etagere', 'casier', 'armoire'];
+    let boxes = 0, freeCells = 0, furn = 0;
+    items.forEach(it => {
+      const ft = FURN_TYPES[it.type] || {};
+      if (ft.box) { boxes += 1; return; }                 // boîte à empiler = 1 boîte
+      if (ft.build === 'pile') { boxes += pileNums(it).length; furn += 1; return; }
+      furn += 1;
+      if (GRID.includes(it.type)) {
+        const cells = Math.max(1, it.cols || 1) * Math.max(1, it.rows || 1);
+        const filled = Object.values(it.slots || {}).filter(a => a && a.length).length;
+        boxes += storedCount(it);
+        freeCells += Math.max(0, cells - filled);
+      } else { boxes += storedCount(it); }
+    });
+    return { boxes, freeCells, furn };
+  }, [items]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
@@ -4874,6 +4909,15 @@ function RoomPlan({ locate, onLocateConsumed }) {
         </div>
       ); })()}
 
+      {/* Tableau de bord d'occupation de la pièce */}
+      {items.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, fontSize: 12.5 }}>
+          <span style={{ fontWeight: 900, color: C.text }}>📊 {activeRoom.name}</span>
+          <span style={{ fontWeight: 800, color: INV_STATUS.online.color }}>📦 {capacity.boxes} boîte{capacity.boxes > 1 ? 's' : ''} rangée{capacity.boxes > 1 ? 's' : ''}</span>
+          {capacity.freeCells > 0 && <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.freeCells} place{capacity.freeCells > 1 ? 's' : ''} libre{capacity.freeCells > 1 ? 's' : ''}</span>}
+          <span style={{ fontWeight: 700, color: C.muted }}>· {capacity.furn} meuble{capacity.furn > 1 ? 's' : ''}</span>
+        </div>
+      )}
       {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
       <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
