@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v28/07 · 🗺️3D';
+const BUILD_ID = 'v29/07 · 🧹épuré';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6842,8 +6842,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
   // Comptes entiers exclus de la compta (par vinted_user_id).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
+  // Comptes détectés BLOQUÉS par Vinted (un appel réel « Synchroniser » a renvoyé
+  // 401/403 même après refresh du token → le compte est fermé/suspendu). On garde
+  // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement
+  // tant qu'un futur « Synchroniser » ne le voit pas revenir en ligne.
+  const [blockedAccts, setBlockedAccts] = useState(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)));
+  const isAuthBlock = (e) => e===401 || e===403 || /\b(401|403)\b|suspend|block|bloqu|forbidden|unauthor/i.test(String(e||''));
+  // Sur un appel RÉEL (force) : on marque bloqué si auth échoue, on débloque si OK.
+  const noteAcctLive = (uid, res, force) => {
+    if (!force || !uid) return;
+    const k = String(uid);
+    setBlockedAccts(prev => {
+      const n = new Set(prev); const was = n.has(k);
+      if (!res.ok && isAuthBlock(res.error)) n.add(k);
+      else if (res.ok) n.delete(k);
+      if (n.size !== prev.size || was !== n.has(k)) save('vinted_accounts_blocked', [...n]);
+      return n;
+    });
+  };
   const [showHidden, setShowHidden] = useState(false);
-  const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || hiddenAccts.has(String(o._acc?.vinted_user_id));
+  const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || hiddenAccts.has(String(o._acc?.vinted_user_id)) || blockedAccts.has(String(o._acc?.vinted_user_id));
   const toggleHidden = (tid) => {
     setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
   };
@@ -7101,11 +7119,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Prochain N° suggéré = max de TOUTES les sources + 1 : numéros déjà utilisés,
   // annonces numérotées, ET numéros posés sur les ventes (saleOv, déclaré
   // juste au-dessus) — sinon on resuggère un numéro déjà donné (doublon !).
-  const nextNumero = useMemo(() => { let m=0;
-    usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>m)m=n;});
-    Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>m)m=n;});
-    Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n)&&n>m)m=n;});
-    return m+1; }, [usedNumeros, numeros, saleOv]);
+  const nextNumero = useMemo(() => {
+    // Prochain numéro = plus PETIT numéro libre (on comble les trous), pas max+1 :
+    // ainsi la numérotation reste basse et continue au lieu de grimper sans raison.
+    const taken=new Set();
+    usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});
+    Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n))taken.add(n);});
+    Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n))taken.add(n);});
+    let n=1; while(taken.has(n)) n++;
+    return n; }, [usedNumeros, numeros, saleOv]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -7213,7 +7235,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emailSales, emailBords, listings.items, numeros]);
   const annShown = useMemo(() => {
-    let arr = [...(listings.items || [])].filter(it => !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id))));
+    // Un compte détecté BLOQUÉ par Vinted : ses annonces moissonnées sont périmées
+    // (le compte est fermé) → on les retire automatiquement de la liste.
+    let arr = [...(listings.items || [])].filter(it => !blockedAccts.has(String(it._acc?.vinted_user_id)) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id))));
     const q = annSearch.trim().toLowerCase();
     if (q) arr = arr.filter(it => {
       const num = String(numeros[it.id]?.numero || '');
@@ -7244,7 +7268,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold]);
+  }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold, blockedAccts]);
+  // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
+  const blockedList = useMemo(() => accounts.filter(a => blockedAccts.has(String(a.vinted_user_id))), [accounts, blockedAccts]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
   // ── LITIGES / RETOURS : que devient le NUMÉRO de la paire ? ────────────────
   // Statuts réellement renvoyés par Vinted dans ce cas : « Retour initié »,
@@ -7531,6 +7557,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
     for (const acc of accounts) {
       const res = await fetchVintedOrders(acc, type, 1, 'all', { force });
+      noteAcctLive(acc.vinted_user_id, res, force);
       if (res.ok) { anyOk=true; for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } } }
       else { anyErr=true; failed.push(accNameOf(acc)); }
     }
@@ -7586,48 +7613,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Deuxième filet : si l'app ne connaît AUCUNE paire numérotée, c'est que les
     // données ne sont pas (encore) là — on ne mint rien plutôt que de tout renuméroter.
     if (!Object.keys(numeros).length) return;
-    let maxN = 0;
-    usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n)&&n>maxN)maxN=n;});
-    Object.values(numeros).forEach(e=>{const n=parseInt(String(e.numero),10);if(!isNaN(n)&&n>maxN)maxN=n;});
-    Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n)&&n>maxN)maxN=n;});
     const ovNext = { ...saleOv };
-    const usedNext = new Set(usedNumeros.map(x=>parseInt(String(x),10)).filter(n=>!isNaN(n)));
     let changed = false;
+    // ⚠️ CHANGEMENT (juillet 2026) : on n'INVENTE plus JAMAIS de numéro pour une
+    // vente. Inventer des numéros pour des ventes non reconnues faisait grimper le
+    // compteur sans raison (ex. sauter de 50 à 120). Désormais : RÉUTILISATION SEULE.
+    // Si la paire est déjà numérotée (annonce reliée, même photo/titre) → on remet
+    // CE numéro. Sinon la vente reste « à identifier » et TU mets ton vrai numéro de
+    // boîte. En plus, on NETTOIE les vieux numéros auto-inventés (autoAssigned) qui
+    // ne correspondent à rien → ils libèrent la séquence.
     for (const o of sales.items) {
       const st = classifyOrderStatus(o.status);
-      if (st === 'cancelled' || st === 'completed') continue; // seulement les ventes ACTIVES
       const tid = o.transaction_id != null ? String(o.transaction_id) : null;
       if (!tid) continue;
-      const already = ovNext[tid];
-      if (already && already.numero != null && String(already.numero).trim() !== '') continue; // déjà un N°
-      if (resolvedEntry(o)) continue; // déjà retrouvée par la résolution normale
-      // Recherche LARGE (sans exclure les annonces en ligne) : la paire est-elle
-      // déjà numérotée quelque part dans l'app ?
+      const cur = ovNext[tid];
+      // Numéro SAISI À LA MAIN (pas autoAssigned) : on n'y touche jamais.
+      if (cur && cur.numero != null && String(cur.numero).trim() !== '' && !cur.autoAssigned) continue;
       const broadKey = entryKeyByPhoto(o) || keyOfEntry(entryByTitleLoose(o.title, extractSize(o.title)));
-      let num;
-      if (broadKey && numeros[broadKey] && numeros[broadKey].numero) {
-        num = parseInt(String(numeros[broadKey].numero),10); // 1) réutilise l'existant
-      } else {
-        maxN += 1; num = maxN; // 2) nouveau numéro libre
+      const reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
+      if (reuse) {
+        if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
+      } else if (cur && cur.autoAssigned && cur.numero != null && String(cur.numero).trim() !== '') {
+        // Ancien numéro inventé sans correspondance → on le retire (garde le reste).
+        const { numero, autoAssigned, ...rest } = cur; ovNext[tid] = rest; changed = true;
       }
-      if (isNaN(num) || num <= 0) continue;
-      ovNext[tid] = { ...(ovNext[tid]||{}), numero: String(num), autoAssigned: true };
-      usedNext.add(num);
-      changed = true;
     }
     if (changed) {
       setSaleOv(ovNext); save('vinted_sale_overrides', ovNext);
-      const ua = [...usedNext].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, autoNum]);
+  }, [sales.items, numeros, autoNum, cloudReady]);
 
   const loadListings = async (force) => {
     const cached = !force && fromCache('listings');
     if (cached) { setListings({ loading:false, items:cached }); return; }
     setListings({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false;
-    for (const acc of accounts) { const r = await fetchVintedListings(acc, 1, { force }); if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); } else anyErr=true; }
+    for (const acc of accounts) { const r = await fetchVintedListings(acc, 1, { force }); noteAcctLive(acc.vinted_user_id, r, force); if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); } else anyErr=true; }
     const error = out.length===0 && anyErr && !anyOk;
     if (!error) putCache('listings', out);
     setListings({ loading:false, items: out, error });
@@ -7773,7 +7795,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         continue;
       }
       let num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
-      if (!num) { do { base += 1; } while (taken.has(base)); num = String(base); taken.add(base); } // prochain numéro VRAIMENT libre
+      // Prochain numéro = plus PETIT libre (on comble les trous) → la séquence
+      // reste basse et continue au lieu de sauter (ex. 50 → 120).
+      if (!num) { let cand = 1; while (taken.has(cand)) cand += 1; num = String(cand); taken.add(cand); }
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       nextUsed.add(parseInt(num, 10));
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
@@ -8563,7 +8587,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const hello = h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
         const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
         const unread = (convs.items||[]).filter(c=>c.unread).length;
-        const offersToSend = likedList.filter(x=>x._offer!=null).length || likedList.length;
         const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
         const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
@@ -8573,7 +8596,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const pickupCount=(tracking||[]).filter(isRetirable).length||vintedToPickup.length; // même compte que l'onglet Achats
         if(pickupCount) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${pickupCount} colis`,sub:'Déposés en point relais — récupère-les avec ton code',tab:'cat_achats',prio:2});
         if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
-        if(offersToSend) jobs.push({icon:'💌',color:INV_STATUS.online.color,title:`Relancer ${offersToSend} intéressé${offersToSend>1?'s':''}`,sub:'Envoie une offre aux gens qui ont liké → ça convertit',tab:'cat_annonces',prio:4});
         if(repriceList.length) jobs.push({icon:'🏷️',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
         jobs.sort((a,b)=>a.prio-b.prio);
         return (
@@ -8876,22 +8898,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button onClick={()=>{ loadOrders('sold',setSales,true); loadListings&&loadListings(true); }} disabled={sales.loading} title="Va chercher tes ventes en direct sur Vinted (tous comptes), sans attendre l'extension" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:800,cursor:sales.loading?'default':'pointer',opacity:sales.loading?0.6:1}}>{sales.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
           )}
           {accounts.length>0 && (
-            <button onClick={()=>setShowSourcing(true)} title="Stats par marque et taille (quoi racheter)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>🎯 Sourcing</button>
-          )}
-          {accounts.length>0 && (
-            <button onClick={openTreasury} title="Argent en attente, reçu, dépensé" style={{padding:'5px 12px',borderRadius:999,border:`1px solid #16a34a`,background:'#16a34a12',color:'#16a34a',fontSize:12,fontWeight:800,cursor:'pointer'}}>💰 Trésorerie{treasury.attente>0?` · ${Math.round(treasury.attente)} € à venir`:''}</button>
-          )}
-          {accounts.length>0 && (
-            <button onClick={openReport} title="Rapport comptable mensuel" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Rapport</button>
-          )}
-          {accounts.length>0 && (
-            <button onClick={openAnnual} title="Bilan annuel (12 mois)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📅 Bilan</button>
-          )}
-          {sales.items && sales.items.length>0 && (
-            <button onClick={()=>{ if(!curveBrand && brandCurves.brandList[0]) setCurveBrand(brandCurves.brandList[0]); setShowBrandCurves(true); }} title="Évolution du prix de vente moyen par marque" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📈 Prix/marque</button>
-          )}
-          {sales.items && sales.items.length>0 && (
-            <button onClick={()=>setShowWrapped(true)} title="Ta rétrospective de revendeur" style={{padding:'5px 12px',borderRadius:999,border:`1px solid #7a5cff`,background:'#7a5cff14',color:'#7a5cff',fontSize:12,fontWeight:800,cursor:'pointer'}}>🎉 Wrapped</button>
+            <button onClick={openReport} title="Rapport comptable mensuel (CA, bénéfice, cotisations)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Compta</button>
           )}
           {(disputes.salesLost.length>0||disputes.buysBack.length>0) && (
             <button onClick={()=>setShowDisputes(true)} title="Litiges, annulations et remboursements — l'argent perdu/récupéré" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.danger}`,background:`${C.danger}12`,color:C.danger,fontSize:12,fontWeight:800,cursor:'pointer'}}>⚖️ Litiges{disputes.totalLost>0?` · −${Math.round(disputes.totalLost)} €`:''}</button>
@@ -9153,7 +9160,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span style={{fontSize:21,flexShrink:0}}>📦</span>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
-                          <div style={{fontSize:10,color:C.muted}}>{code?'Donne ce code au comptoir 👉':'Code pas encore reçu'}</div>
+                          <div style={{fontSize:11,fontWeight:800,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}</div>
+                          <div style={{fontSize:10,color:C.muted,marginTop:1}}>{code?'Donne ce code au comptoir 👉':'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
                         </div>
                         {code && (
                           <div style={{flexShrink:0,textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 13px'}}>
@@ -9543,6 +9551,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
       {curSub==='annonces' && (<>
+        {/* Compte bloqué par Vinted : détecté à la synchro (401/403). Ses annonces
+            sont retirées automatiquement — on te dit lequel et tu peux le retirer. */}
+        {blockedList.length>0 && (
+          <div style={{marginBottom:12,border:`1px solid ${C.danger}`,background:`${C.danger}10`,borderRadius:12,padding:'11px 13px'}}>
+            {blockedList.map(a=>(
+              <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                <span style={{fontSize:18}}>🚫</span>
+                <div style={{flex:1,minWidth:160}}>
+                  <div style={{fontSize:13,fontWeight:900,color:C.danger}}>Compte « {accNameOf(a)} » bloqué par Vinted</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:1}}>Ses annonces ont été retirées automatiquement (le compte ne répond plus). Tu peux le déconnecter définitivement.</div>
+                </div>
+                <button type="button" onClick={()=>{ if(window.confirm(`Déconnecter « ${accNameOf(a)} » ? Ses tokens seront supprimés de l'app.`)){ deleteVintedAccount(a.vinted_user_id); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:9,padding:'7px 12px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
+              </div>
+            ))}
+          </div>
+        )}
         {listings.loading && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
         {listings.items && !listings.error && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune annonce en ligne.<br/><span style={{fontSize:11.5}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici.</span></div>}
@@ -9685,73 +9709,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
             </div>
           )}
-          {/* ── Qualité d'annonce : ce qui plombe la conversion ── */}
-          {qualityList.length>0 && (
-            <div style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:14,overflow:'hidden'}}>
-              <button onClick={()=>setShowQuality(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                <span style={{fontSize:18}}>🖼️</span>
-                <span style={{flex:1,minWidth:0}}>
-                  <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text}}>Qualité d'annonce — {qualityList.length} à améliorer</span>
-                  <span style={{display:'block',fontSize:11,color:C.muted,fontWeight:700}}>Photos, marque, taille, description manquantes → moins de ventes</span>
-                </span>
-                <span style={{fontSize:13,color:C.muted}}>{showQuality?'▲':'▼'}</span>
-              </button>
-              {showQuality && (
-                <div style={{borderTop:`1px solid ${C.border}`}}>
-                  {qualityList.slice(0,30).map(({it,issues})=>{
-                    const num = numeros[it.id]?.numero;
-                    return (
-                      <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.border}`}}>
-                        <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
-                        </div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
-                          <div style={{fontSize:10.5,color:C.warn,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>⚠ {issues.join(' · ')}</div>
-                        </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour l'améliorer" style={{flexShrink:0,textDecoration:'none',background:C.accent,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 11px',borderRadius:8}}>✏️ Améliorer</a>
-                      </div>
-                    );
-                  })}
-                  {qualityList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {qualityList.length-30} autres…</div>}
-                </div>
-              )}
-            </div>
-          )}
-          {/* ── Relance des likers : annonces likées à convertir (ban-safe) ── */}
-          {likedList.length>0 && (
-            <div style={{marginBottom:12,border:`1px solid ${INV_STATUS.online.color}55`,background:`${INV_STATUS.online.color}0c`,borderRadius:14,overflow:'hidden'}}>
-              <button onClick={()=>setShowLikers(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                <span style={{fontSize:18}}>💌</span>
-                <span style={{flex:1,minWidth:0}}>
-                  <span style={{display:'block',fontSize:13.5,fontWeight:900,color:C.text}}>Relancer les intéressés — {likedList.length} annonce{likedList.length>1?'s':''} likée{likedList.length>1?'s':''}</span>
-                  <span style={{display:'block',fontSize:11,color:C.muted,fontWeight:700}}>Envoie-leur une petite offre sur Vinted · tu confirmes, rien d'automatique</span>
-                </span>
-                <span style={{fontSize:13,color:C.muted}}>{showLikers?'▲':'▼'}</span>
-              </button>
-              {showLikers && (
-                <div style={{borderTop:`1px solid ${INV_STATUS.online.color}33`}}>
-                  {likedList.slice(0,30).map(it=>{
-                    const num = numeros[it.id]?.numero;
-                    return (
-                      <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${INV_STATUS.online.color}22`}}>
-                        <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
-                        </div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
-                          <div style={{fontSize:10.5,color:C.muted}}>❤️ {it.favourites} intéressé{it.favourites>1?'s':''}{it.views!=null?` · 👁 ${it.views}`:''}{it.price!=null?` · ${it.price} ${cur(it.currency)}`:''}</div>
-                          {it._offer!=null && <div style={{fontSize:11,fontWeight:800,color:INV_STATUS.online.color,marginTop:2}}>→ propose {it._offer} €{it._atFloor?<span style={{color:C.warn,fontWeight:700}}> (ton mini)</span>:it.price!=null?<span style={{color:C.muted,fontWeight:600}}> au lieu de {it.price} €</span>:''}</div>}
-                        </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour proposer une offre aux personnes intéressées" style={{flexShrink:0,textDecoration:'none',background:INV_STATUS.online.color,color:'#fff',fontSize:11,fontWeight:800,padding:'6px 11px',borderRadius:8}}>💌 Relancer</a>
-                      </div>
-                    );
-                  })}
-                  {likedList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {likedList.length-30} autres annonces likées…</div>}
-                </div>
-              )}
-            </div>
-          )}
           {/* Recherche + tri */}
           <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="🔎 Rechercher (titre, marque, N°)…"
@@ -9869,50 +9826,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
-        {/* ── COPILOTE D'OFFRES : chaque offre reçue par email, avec le conseil
-             chiffré (accepter/refuser + net) calculé côté serveur. Marche même
-             app fermée / iPhone déconnecté de Vinted (source = emails). ── */}
-        {Array.isArray(offers) && (()=>{
-          const recent = offers.filter(o=>{ const d=o.receivedAt?new Date(o.receivedAt):null; return !d || (Date.now()-d.getTime())<14*86400000; });
-          if(!recent.length) return null;
-          return (
-            <div style={{border:`1px solid ${C.accent}55`,background:`${C.accent}0c`,borderRadius:14,padding:'12px 13px',marginBottom:14}}>
-              <div style={{fontSize:13,fontWeight:900,color:C.text,marginBottom:2}}>🤝 Copilote d'offres <span style={{fontSize:11,color:C.muted,fontWeight:700}}>· {recent.length}</span></div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.4}}>Chaque offre reçue, avec le bénéfice net si tu acceptes — décide en un coup d'œil.</div>
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                {recent.map((o,i)=>{
-                  const amt = parseFloat(String(o.montant||'').replace(',','.'));
-                  const hasNet = o.net!=null && !isNaN(o.net);
-                  const good = hasNet && o.net>0;
-                  return (
-                    <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'10px 11px',borderRadius:11,border:`1px solid ${hasNet?(good?C.accent:C.danger)+'55':C.border}`,background:C.card}}>
-                      <div style={{fontSize:20,lineHeight:1,flexShrink:0}}>{hasNet?(good?'✅':'⚠️'):'💰'}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>{isNaN(amt)?'Offre':`${Math.round(amt)} €`}{o.qui?<span style={{color:C.muted,fontWeight:600}}> · {o.qui}</span>:''}</div>
-                        {o.article && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>« {o.article} »</div>}
-                        <div style={{marginTop:5}}>
-                          {hasNet ? (
-                            <span style={{fontSize:11.5,fontWeight:800,color:good?C.accent:C.danger}}>
-                              {good?`✅ Accepte : +${Math.round(o.net)} € net`:`⚠️ Refuse : sous ton coût`}
-                              {o.buy!=null&&!isNaN(parseFloat(o.buy))?<span style={{color:C.muted,fontWeight:600}}> (achat {Math.round(parseFloat(o.buy))} €)</span>:''}
-                            </span>
-                          ) : (
-                            <span style={{fontSize:11,color:C.muted}}>Prix d'achat inconnu — à toi de voir.</span>
-                          )}
-                        </div>
-                        <div style={{marginTop:6,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                          <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{fontSize:11,fontWeight:800,color:C.accent,textDecoration:'none',border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 9px'}}>Répondre sur Vinted →</a>
-                          {o.receivedAt && <span style={{fontSize:10,color:C.muted}}>{new Date(o.receivedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</span>}
-                          {o.account && <span style={{fontSize:10,color:C.muted}}>· {o.account}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
           <button onClick={()=>setMsgAcc('all')} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc==='all'?C.accent:C.border}`,background:msgAcc==='all'?C.accent:'transparent',color:msgAcc==='all'?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>Tous</button>
           {accounts.map(acc=>(
