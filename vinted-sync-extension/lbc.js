@@ -214,7 +214,8 @@
       ${ph ? `<div class="ph">${ph}</div>` : ''}
       <div class="desc">${esc(ad.description)}</div>
       <div class="btns">
-        <button class="btn p" data-a="prefill">✍️ Pré-remplir le formulaire</button>
+        <button class="btn p" data-a="prepare" style="flex:1 1 100%" title="Télécharge les photos, copie tout le texte de l'annonce et ouvre la page de dépôt Leboncoin.">🚀 Tout préparer (photos + texte + page)</button>
+        <button class="btn" data-a="prefill">✍️ Pré-remplir</button>
         <button class="btn" data-a="ctitle">Titre</button>
         <button class="btn" data-a="cdesc">Description</button>
         <button class="btn" data-a="cprice">Prix</button>
@@ -329,6 +330,12 @@
     else if (a === 'cdesc') { copy(ad.description); toast('Description copiée'); }
     else if (a === 'cprice') { copy(ad.price); toast('Prix copié'); }
     else if (a === 'photos') { const r = await send({ action: 'downloadPhotos', urls: ad.photos || [], numero: ad.numero }); toast((r && r.count ? r.count : 0) + ' photo(s) téléchargée(s) → dossier VRM-' + ad.numero); }
+    else if (a === 'prepare') {
+      const dl = await send({ action: 'downloadPhotos', urls: ad.photos || [], numero: ad.numero });
+      copy('TITRE :\n' + ad.title + '\n\nDESCRIPTION :\n' + ad.description + '\n\nPRIX : ' + ad.price + ' €\nRÉFÉRENCE : ' + (ad.ref || ('VRM-' + ad.numero)) + '\nCATÉGORIE : ' + ad.category);
+      window.open('https://www.leboncoin.fr/deposer-une-annonce', '_blank');
+      toast('🚀 ' + (dl && dl.count ? dl.count : 0) + ' photo(s) téléchargée(s) + texte copié + page de dépôt ouverte');
+    }
     else if (a === 'prefill') { prefill(ad); }
     else if (a === 'posted') {
       if (!confirm('⚠️ Ceci NE publie PAS l\'annonce.\n\nÀ cliquer seulement si tu as DÉJÀ publié la N°' + ad.numero + ' toi-même sur Leboncoin.\nÇa la retire juste de la liste « à publier ». Continuer ?')) return;
