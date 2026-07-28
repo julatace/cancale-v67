@@ -165,7 +165,7 @@
     const grid = res && res.photos && res.photos.length
       ? `<div class="ph" style="flex-wrap:wrap">${res.photos.map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir en grand">`).join('')}</div>
          <div class="btns" style="margin-top:6px">
-           <button class="btn p" data-a="photoall">🖼️ Tout ouvrir (${res.photos.length})</button>
+           <button class="btn p" data-a="photoall">⬇️ Télécharger (${res.photos.length})</button>
            <button class="btn" data-a="photocopy">Copier les liens</button>
            <button class="btn" data-a="photoclose">Fermer</button>
          </div>`
@@ -218,7 +218,7 @@
         <button class="btn" data-a="ctitle">Titre</button>
         <button class="btn" data-a="cdesc">Description</button>
         <button class="btn" data-a="cprice">Prix</button>
-        <button class="btn" data-a="photos">📷 Photos</button>
+        <button class="btn" data-a="photos">⬇️ Photos</button>
         <button class="btn" data-a="posted" style="border-color:#0a7f3f;color:#0a7f3f" title="À cliquer SEULEMENT après avoir publié toi-même sur Leboncoin. Ça ne publie rien, ça la retire juste de la liste.">✓ Je l'ai déjà publiée</button>
       </div>
     </div>`;
@@ -260,8 +260,23 @@
     if (setField(findField([/titre|title|subject/]), ad.title)) n++;
     if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
     if (setField(findField([/prix|price|montant/]), ad.price)) n++;
-    if (n) toast(n + ' champ' + (n > 1 ? 's' : '') + ' pré-rempli' + (n > 1 ? 's' : '') + ' — vérifie la catégorie « ' + ad.category + ' » et les photos, puis publie.');
+    // Champ RÉFÉRENCE des comptes PRO : on y met VRM-{N°} → pas besoin de le mettre
+    // dans le titre, et tu peux rechercher la paire par ce numéro dans ton profil.
+    if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
+    if (n) toast(n + ' champ' + (n > 1 ? 's' : '') + ' pré-rempli' + (n > 1 ? 's' : '') + ' (dont la réf ' + (ad.ref || ('VRM-' + ad.numero)) + ') — vérifie la catégorie « ' + ad.category + ' » et les photos, puis publie.');
     else { copy(ad.title + '\n\n' + ad.description); toast('Formulaire non détecté sur cette page — titre + description copiés.'); }
+  }
+  // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
+  // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
+  function captureDepositForm() {
+    try {
+      if (!/depos|d[ée]p[oô]t|\/ai\/|creation|nouvelle-annonce/i.test(location.href)) return;
+      const fields = [];
+      document.querySelectorAll('input, select, textarea').forEach((el) => {
+        fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: ((el.labels && el.labels[0] && el.labels[0].innerText) || '').slice(0, 50), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '' });
+      });
+      if (fields.length) chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href, fields: fields.slice(0, 150) });
+    } catch (_) {}
   }
 
   root.addEventListener('click', async (e) => {
@@ -288,7 +303,7 @@
       render();
       return;
     }
-    if (a === 'photoall') { (photoRes && photoRes.photos || []).forEach((u, i) => setTimeout(() => window.open(u, '_blank'), i * 250)); toast('Photos ouvertes — enregistre-les pour l\'acheteur'); return; }
+    if (a === 'photoall') { const r = await send({ action: 'downloadPhotos', urls: (photoRes && photoRes.photos) || [], numero: (photoRes && photoRes.numero) || 'paire' }); toast((r && r.count ? r.count : 0) + ' photo(s) téléchargée(s) → dossier VRM-' + ((photoRes && photoRes.numero) || '')); return; }
     if (a === 'photocopy') { copy((photoRes && photoRes.photos || []).join('\n')); toast('Liens copiés'); return; }
     if (a === 'photoclose') { photoRes = null; render(); return; }
     if (a === 'setplan') {
@@ -313,7 +328,7 @@
     if (a === 'ctitle') { copy(ad.title); toast('Titre copié'); }
     else if (a === 'cdesc') { copy(ad.description); toast('Description copiée'); }
     else if (a === 'cprice') { copy(ad.price); toast('Prix copié'); }
-    else if (a === 'photos') { (ad.photos || []).forEach((u, i) => setTimeout(() => window.open(u, '_blank'), i * 250)); toast('Photos ouvertes — enregistre-les pour les déposer'); }
+    else if (a === 'photos') { const r = await send({ action: 'downloadPhotos', urls: ad.photos || [], numero: ad.numero }); toast((r && r.count ? r.count : 0) + ' photo(s) téléchargée(s) → dossier VRM-' + ad.numero); }
     else if (a === 'prefill') { prefill(ad); }
     else if (a === 'posted') {
       if (!confirm('⚠️ Ceci NE publie PAS l\'annonce.\n\nÀ cliquer seulement si tu as DÉJÀ publié la N°' + ad.numero + ' toi-même sur Leboncoin.\nÇa la retire juste de la liste « à publier ». Continuer ?')) return;
@@ -325,6 +340,7 @@
   async function load() {
     scanPageRefs();
     captureLbcListings();
+    captureDepositForm();
     const r = await send({ action: 'getQueue' });
     loadError = !(r && r.ok);
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];

@@ -163,6 +163,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats, postedList: r.postedList }); return; }
           if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
           if (msg.action === 'getPhotos') { const r = await getPairPhotos(msg.numero); sendResponse({ ok: true, numero: r.numero, title: r.title, photos: r.photos }); return; }
+          if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
+          if (msg.action === 'lbcForm' && Array.isArray(msg.fields)) { await storeLbcRecon({ form: { url: msg.url, fields: msg.fields, at: new Date().toISOString() } }); sendResponse({ ok: true }); return; }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
@@ -783,6 +785,7 @@ async function storeLbcRecon(patch) {
     if (patch.paths) { const set = new Set([...(next.paths || []), ...patch.paths]); next.paths = [...set].slice(0, 300); }
     if (patch.sample) { next.samples = [patch.sample, ...(next.samples || [])].slice(0, 6); }
     if (patch.quota) next.quota = patch.quota;                 // quota d'annonces détecté (offre)
+    if (patch.form) next.form = patch.form;                     // structure du formulaire de dépôt (pour pré-remplir juste)
     if (patch.url) next.lastUrl = patch.url;
     next.updatedAt = new Date().toISOString();
     await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
@@ -856,6 +859,18 @@ async function getPairPhotos(numero) {
     if (numeros[id] && numeros[id].photo) add(numeros[id].photo);
   }
   return { numero: num, title, photos };
+}
+// Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans
+// un sous-dossier VRM-{N°} pour les retrouver et les glisser dans Leboncoin.
+async function downloadPhotos(urls, numero) {
+  if (!chrome.downloads) return 0;
+  const list = urls.filter(Boolean); let n = 0;
+  for (let i = 0; i < list.length; i++) {
+    const u = list[i];
+    const ext = ((String(u).split('?')[0].match(/\.(jpe?g|png|webp)$/i) || [])[1] || 'jpg');
+    try { await chrome.downloads.download({ url: u, filename: `VRM-${numero || 'paire'}/photo-${i + 1}.${ext}`, conflictAction: 'uniquify' }); n++; } catch (_) {}
+  }
+  return n;
 }
 async function readPostedData() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
