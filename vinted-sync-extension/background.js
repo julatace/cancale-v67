@@ -155,6 +155,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true; // reponse asynchrone
     }
+    // PONT LEBONCOIN : le script lbc.js (sur leboncoin.fr) demande la liste des
+    // annonces Vinted prêtes à publier, ou marque une annonce comme publiée.
+    if (msg && msg.from === 'cancale-lbc') {
+      (async () => {
+        try {
+          if (msg.action === 'getQueue') { const q = await buildLbcQueue(); sendResponse({ ok: true, queue: q }); return; }
+          if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
+          if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
+          sendResponse({ ok: false, error: 'action inconnue' });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     return;
   }
   const domain = msg.domain || 'www.vinted.fr';
@@ -599,3 +612,110 @@ try {
     cookieTimer = setTimeout(() => { captureDomain(dom).then(() => runActive()); }, 2000);
   });
 } catch (_) {}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LEBONCOIN — préparation des annonces à publier (assistant, jamais d'auto-post)
+// On lit les annonces Vinted EN LIGNE + leur détail complet (déjà moissonnés),
+// on construit une annonce Leboncoin prête (titre, description avec le N°, prix,
+// catégorie, photos) et on la propose dans le panneau lbc.js. La publication
+// reste un geste HUMAIN (tu cliques « Publier » sur Leboncoin).
+// ═══════════════════════════════════════════════════════════════════════════
+async function sbGet(query) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) { return null; }
+}
+// Correspondance de catégorie Vinted → Leboncoin. La boutique = sneakers → la
+// catégorie Leboncoin est « Chaussures » (Mode). On garde une logique simple et
+// extensible (vêtements/accessoires si un jour d'autres articles).
+function lbcCategory(det, raw) {
+  const t = ((det.title || raw.title || '') + ' ' + (det.description || '')).toLowerCase();
+  if (/(sac|sacoche|bandouli|cabas)/.test(t)) return 'Sacs à main';
+  if (/(veste|manteau|pull|t-?shirt|chemise|jean|pantalon|robe|short|sweat|hoodie)/.test(t)) return 'Vêtements';
+  if (/(casquette|bonnet|ceinture|montre|lunettes|écharpe|gants)/.test(t)) return 'Accessoires & Bagagerie';
+  return 'Chaussures';
+}
+function firstDefined(...v) { for (const x of v) if (x !== undefined && x !== null && x !== '') return x; return ''; }
+function buildLbcAd(raw, det, num, account) {
+  const brand = firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand);
+  const base = String(firstDefined(det.title, raw.title)).trim();
+  const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
+  const cond = String(firstDefined(det.status, raw.status)).trim();
+  const color = [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' ').trim();
+  const price = String(firstDefined(det.price && det.price.amount, raw.price && raw.price.amount, raw.price, det.price)).replace(',', '.');
+  const desc0 = String(firstDefined(det.description, '')).trim();
+  // Photos HD
+  let photos = [];
+  const ph = det.photos || raw.photos || [];
+  if (Array.isArray(ph)) photos = ph.map((p) => firstDefined(p.full_size_url, p.url, typeof p === 'string' ? p : '')).filter(Boolean);
+  if (!photos.length && raw.photo && raw.photo.url) photos = [raw.photo.url];
+  // Titre Leboncoin (≤ 50 caractères, avec des termes qui « ressortent »)
+  let title = [brand, base].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  if (size && !/taille|t\s?\d/i.test(title)) title += ' T' + size;
+  if (title.length > 50) title = title.slice(0, 50).trim();
+  // Description structurée
+  const specs = [];
+  if (brand) specs.push('Marque : ' + brand);
+  if (size) specs.push('Taille : ' + size);
+  if (cond) specs.push('État : ' + cond);
+  if (color) specs.push('Couleur : ' + color);
+  const parts = [];
+  parts.push(desc0 || base);
+  if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
+  parts.push('');
+  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  parts.push('Réf. ' + num);
+  const description = parts.join('\n');
+  return { id: String(raw.id), numero: String(num), account: account || '', title, description, price, category: lbcCategory(det, raw), photos, vintedUrl: firstDefined(raw.url, det.url) };
+}
+async function buildLbcQueue() {
+  const mainRows = await sbGet('app_data?id=eq.main&select=data');
+  const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
+  const numeros = main.vinted_annonce_numeros || {};
+  const labels = main.vinted_account_labels || {};
+  const accounts = main.vinted_accounts || [];
+  const uid2login = {};
+  accounts.forEach((a) => { uid2login[String(a.vinted_user_id)] = labels[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id); });
+  // Déjà publiées sur Leboncoin (ligne DÉDIÉE → on n'écrase jamais le blob main).
+  const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
+  const posted = new Set(((postedRows && postedRows[0] && postedRows[0].data && postedRows[0].data.ids) || []).map(String));
+  // Annonces EN LIGNE (harvest listings).
+  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  const online = []; const seen = new Set();
+  for (const r of listRows) {
+    const d = r.data || {}; const p = d.payload || {}; const uid = String(d.uid);
+    for (const it of (p.items || [])) {
+      const oid = String(it.id);
+      if (it.is_closed || it.is_hidden || it.is_draft) continue;
+      if (seen.has(oid)) continue; seen.add(oid);
+      online.push({ id: oid, uid, raw: it });
+    }
+  }
+  // Détails complets (harvest_{uid}_item_{id}).
+  const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
+  const details = {};
+  for (const r of itemRows) { const d = r.data || {}; const p = d.payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
+  const queue = [];
+  for (const o of online) {
+    const e = numeros[o.id]; const num = e && e.numero;
+    if (!num || String(num).trim() === '') continue;          // seulement les annonces numérotées
+    if (posted.has(o.id) || posted.has(String(num))) continue;  // déjà publiée sur LBC
+    queue.push(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]));
+  }
+  queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  return queue;
+}
+async function readPostedIds() {
+  const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
+  return new Set(((rows && rows[0] && rows[0].data && rows[0].data.ids) || []).map(String));
+}
+async function markLbcPosted(id) {
+  const s = await readPostedIds(); s.add(String(id));
+  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: [...s], updatedAt: new Date().toISOString() } }], 'id');
+}
+async function unmarkLbcPosted(id) {
+  const s = await readPostedIds(); s.delete(String(id));
+  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: [...s], updatedAt: new Date().toISOString() } }], 'id');
+}

@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "4.0.0",
-  "description": "Synchronise, depuis TON navigateur (ton IP), tes comptes et donnees Vinted (annonces, ventes, achats, messages) vers VRM. Fetch actif + capture passive + renouvellement auto du login + actions 1-clic (repondre, offre) executees depuis ton navigateur. Aucun appel via un serveur.",
+  "version": "4.1.0",
+  "description": "Synchronise tes comptes et donnees Vinted (annonces detaillees, ventes, achats, messages) vers VRM, depuis TON navigateur. + Assistant Leboncoin : prepare tes annonces (titre, description, prix, categorie, photos) et pre-remplit le formulaire de depot pour que tu publies en 1 clic. Aucune publication automatique.",
   "permissions": ["cookies", "storage", "alarms", "scripting", "tabs"],
   "host_permissions": [
     "https://*.vinted.fr/*",
     "https://*.vinted.com/*",
     "https://*.vinted.it/*",
     "https://*.vinted.de/*",
+    "https://*.vinted.net/*",
+    "https://*.leboncoin.fr/*",
     "https://lgonxzrzjcqthjtbdpzo.supabase.co/*"
   ],
   "background": { "service_worker": "background.js" },
@@ -30,6 +32,12 @@
         "https://cancale-v67.vercel.app/*"
       ],
       "js": ["bridge.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://*.leboncoin.fr/*"],
+      "js": ["lbc.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
