@@ -10,14 +10,9 @@
   if (window.__vrmLbcLoaded) return; window.__vrmLbcLoaded = true;
   const send = (m) => new Promise((res) => { try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-lbc' }, m), (r) => res(r || { ok: false })); } catch (_) { res({ ok: false }); } });
 
-  // Injecte l'observateur réseau MAIN world (lit les réponses « annonces » que la
-  // page charge déjà) et relaie ce qu'il capte au background.
-  try {
-    const s = document.createElement('script');
-    s.src = chrome.runtime.getURL('lbc-inject.js');
-    s.onload = function () { this.remove(); };
-    (document.head || document.documentElement).appendChild(s);
-  } catch (_) {}
+  // L'observateur réseau MAIN world (lbc-inject.js) est injecté via le manifest
+  // (content_script world:MAIN) → immunisé à la CSP de Leboncoin. Ici on ne fait
+  // que RELAYER au background ce qu'il capte (window.postMessage).
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
     const d = event.data; if (!d || d.__tag !== 'CANCALE_LBC') return;

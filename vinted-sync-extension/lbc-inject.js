@@ -5,6 +5,7 @@
 // background. Un mouchard note aussi les chemins d'API vus (pour brancher juste).
 (function () {
   'use strict';
+  if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
   const post = (payload) => { try { window.postMessage(Object.assign({ __tag: TAG }, payload), '*'); } catch (_) {} };
 
