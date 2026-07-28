@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v35/07 · 🔍global';
+const BUILD_ID = 'v35/07 · 🔔LBC';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -12164,6 +12164,7 @@ export default function App() {
       const ageDays=(it)=>{ let ts=null; if(it.createdTs!=null) ts=it.createdTs<1e12?it.createdTs*1000:it.createdTs; else { const e=nums[it.id]; if(e&&e.numberedAt){ const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } } return ts!=null?Math.floor((Date.now()-ts)/86400000):null; };
       let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
       const unreadByAcct={}; // nom du compte -> nb de messages non lus (pour l'indice)
+      const lbcOnlineIds=new Set(); // ids d'annonces encore en ligne (pour la synchro Leboncoin)
       for(const a of vintedAccounts){
         const acctName = acctLabels[a.vinted_user_id] || a.login || 'compte';
         const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
@@ -12190,6 +12191,7 @@ export default function App() {
           for(const raw of listH.items){
             if(!isOnlineListing(raw)) continue;
             const it=mapWardrobeItem(raw);
+            lbcOnlineIds.add(String(it.id));
             const age=ageDays(it);
             if(age!=null && age>=30) sleepCount+=1;
             if(!nums[it.id] || !nums[it.id].numero) noNumCount+=1;
@@ -12199,11 +12201,19 @@ export default function App() {
       // Colis à retirer (emails transporteurs) : source légère, module-level.
       let colisCount=0;
       try{ const tr=await fetchEmailTracking(); colisCount=(tr||[]).filter(t=>t.status==='available').length; }catch(_){}
+      // Leboncoin : paires publiées sur LBC mais VENDUES sur Vinted (plus en ligne)
+      // → à retirer de Leboncoin pour ne pas les vendre deux fois.
+      let lbcRemoveCount=0;
+      try{
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
+        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; lbcRemoveCount=posted.filter(x=>/^\d+$/.test(String(x))&&!lbcOnlineIds.has(String(x))).length; }
+      }catch(_){}
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
       const items=[];
       if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
       if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_expedition'});
+      if(lbcRemoveCount>0) items.push({icon:'🟠', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(unreadTotal>0){
         const accs=Object.entries(unreadByAcct).sort((x,y)=>y[1]-x[1]).map(([n,c])=>`${n} (${c})`);
         const hint=accs.length?` · sur ${accs.join(', ')}`:'';
