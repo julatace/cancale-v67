@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v34/07 · 📚compta';
+const BUILD_ID = 'v34/07 · ⚡réponses';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -39,7 +39,16 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
-  'vinted_offvinted_buys','vinted_buyprice_by_num',
+  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies',
+];
+// Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
+const DEFAULT_QUICK_REPLIES = [
+  'Bonjour 🙂 Oui, l\'article est toujours disponible !',
+  'Bonjour, merci pour votre message ! Je vous réponds au plus vite 🙂',
+  'La taille est indiquée dans l\'annonce, elle taille normalement 👍',
+  'Je peux faire un petit geste : je vous propose ce prix, ça vous convient ?',
+  'C\'est parfait ! Je prépare le colis et je l\'envoie très vite 📦',
+  'Merci beaucoup pour votre achat et à bientôt ! 🙏',
 ];
 
 // Indicateur de synchro (mis a jour par l'app)
@@ -6906,6 +6915,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const setSub = only ? (()=>{}) : setSubRaw;
   const curSub = only || sub;
   const [msgAcc, setMsgAcc] = useState('all'); // filtre compte pour les messages
+  // Réponses rapides (modèles) copiables en 1 clic pour répondre vite sur Vinted.
+  const [quickReplies, setQuickReplies] = useState(() => { const q = load('vinted_quick_replies', null); return Array.isArray(q) && q.length ? q : DEFAULT_QUICK_REPLIES; });
+  const [showQR, setShowQR] = useState(false);
+  const saveQR = (arr) => { setQuickReplies(arr); save('vinted_quick_replies', arr); };
   // Ventes masquées de la compta (par n° de transaction). Réversible.
   const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
   // Comptes entiers exclus de la compta (par vinted_user_id).
@@ -10002,6 +10015,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
+        {/* Réponses rapides : modèles copiables en 1 clic (répondre se fait sur Vinted). */}
+        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <span style={{fontSize:12.5,fontWeight:900,color:C.text,flex:1}}>⚡ Réponses rapides</span>
+            <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':'✎ Modifier'}</button>
+          </div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {quickReplies.map((t,i)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:999,background:C.bg,padding:'4px 4px 4px 10px'}}>
+                <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent='✓ Copié !'; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:230,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t}</button>
+                {showQR ? (
+                  <>
+                    <button type="button" onClick={()=>{ const v=window.prompt('Modifier le message :',t); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}>✎</button>
+                    <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
+                  </>
+                ) : <span style={{color:C.muted,fontSize:11,paddingRight:4}}>📋</span>}
+              </div>
+            ))}
+            {showQR && <button type="button" onClick={()=>{ const v=window.prompt('Nouveau message rapide :',''); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:999,background:'transparent',color:C.accent,fontSize:11.5,fontWeight:800,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
+          </div>
+          <div style={{fontSize:10,color:C.muted,marginTop:6}}>Clique un message pour le <b>copier</b>, puis colle-le dans la conversation Vinted.</div>
+        </div>
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
           <button onClick={()=>setMsgAcc('all')} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc==='all'?C.accent:C.border}`,background:msgAcc==='all'?C.accent:'transparent',color:msgAcc==='all'?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>Tous</button>
           {accounts.map(acc=>(
