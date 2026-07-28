@@ -27,6 +27,11 @@
     // Variante « dressing » : certaines versions listent les articles d'un
     // utilisateur via /items?user_id=… au lieu de /wardrobe/{id}/items.
     { re: /\/api\/v\d+\/items\?[^]*user_id=(\d+)/, type: 'listings' },
+    // Détail COMPLET d'un article : /api/v2/items/{id} → titre, DESCRIPTION,
+    // marque, taille, état, couleur, matière, CATÉGORIE (catalog_id), dimensions
+    // du colis, photos HD. Capté passivement quand tu ouvres une de tes annonces
+    // (et complété activement, voir plus bas) → l'app a TOUT pour la republier.
+    { re: /\/api\/v\d+\/items\/(\d+)(?:\?|$)/,   type: 'item'     },
     { re: /\/api\/v\d+\/my_orders/,             type: 'orders'   },
     { re: /\/api\/v\d+\/(?:inbox|conversations)(?:\?|$)/, type: 'inbox' },
     { re: /\/api\/v\d+\/conversations\/(\d+)/,  type: 'conversation' },
@@ -272,10 +277,31 @@
       let pid = null;
       if (who) { sendHarvest('/api/v2/users/current', who); try { pid = JSON.parse(who).user.id; } catch (_) {} }
       // 2) annonces en ligne (dressing).
+      let wardrobeIds = [];
       if (pid) {
         await new Promise(r => setTimeout(r, jitter(600, 1500)));
         const w = await apiGet(`/api/v2/wardrobe/${pid}/items?page=1&per_page=200&order=relevance`);
-        if (w) sendHarvest(`/api/v2/wardrobe/${pid}/items`, w);
+        if (w) {
+          sendHarvest(`/api/v2/wardrobe/${pid}/items`, w);
+          try { wardrobeIds = (JSON.parse(w).items || []).filter(it => !it.is_closed && !it.is_hidden).map(it => String(it.id)); } catch (_) {}
+        }
+      }
+      // 2b) DÉTAIL COMPLET de chaque annonce (description, catégorie, attributs…),
+      //     par PETITS LOTS tournants, à un rythme HUMAIN (jitter), pour tout
+      //     récupérer sur plusieurs passages sans marteler Vinted. Un curseur
+      //     mémorise où on en était → au fil des visites, tout finit capté.
+      if (wardrobeIds.length) {
+        const CK = '__cancale_item_cursor';
+        let cur = 0; try { cur = +(localStorage.getItem(CK) || 0) || 0; } catch (_) {}
+        if (cur >= wardrobeIds.length) cur = 0;
+        const BATCH = 6; // combien de détails par passage (doux)
+        for (let i = 0; i < BATCH && i < wardrobeIds.length; i++) {
+          const id = wardrobeIds[(cur + i) % wardrobeIds.length];
+          await new Promise(r => setTimeout(r, jitter(900, 2200)));
+          const d = await apiGet(`/api/v2/items/${id}`);
+          if (d) sendHarvest(`/api/v2/items/${id}`, d);
+        }
+        try { localStorage.setItem(CK, String((cur + BATCH) % wardrobeIds.length)); } catch (_) {}
       }
       // 3) ventes + achats.
       for (const t of ['sold', 'bought']) {

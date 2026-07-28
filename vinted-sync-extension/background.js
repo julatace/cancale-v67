@@ -110,6 +110,7 @@ async function storeHarvest(domain, type, id, body) {
   let rowId;
   if (type === 'conversation' && id) rowId = `harvest_${uid}_conv_${id}`;
   else if (type === 'transaction' && id) rowId = `harvest_${uid}_txn_${id}`;
+  else if (type === 'item' && id) rowId = `harvest_${uid}_item_${id}`; // détail complet d'une annonce
   else rowId = `harvest_${uid}_${type}`;
 
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
