@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v29/07 · 🔢reset43';
+const BUILD_ID = 'v30/07 · 📍relais';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -5985,8 +5985,14 @@ const cleanLieu = (raw) => {
     const adresse = `${titleCasePR(rue)}, ${cp} ${titleCasePR(ville)}`;
     return { nom, adresse, display: `${nom}, ${adresse}` };
   }
-  // Pas d'adresse claire : on prend le début comme nom.
-  const nom = titleCasePR(s.split(',')[0].slice(0, 40).trim());
+  // Pas d'adresse claire : on prend le début comme nom — SAUF si c'est du
+  // remplissage capté à tort dans l'email (« juste ici », « super pratique »,
+  // un lien…). Dans ce cas on renvoie vide → le point relais sera déduit du
+  // relais habituel du transporteur (voir onglet Achats).
+  const nomRaw = s.split(',')[0].slice(0, 40).trim();
+  const BAD_NOM = /^(®?\s*)?(juste\s*ici|ici|super\s*pratique|voir|cliquez?|retrouvez|en\s*savoir\s*plus|le\s*point\s*relais|point\s*relais|suivi|suivant|https?)/i;
+  if (BAD_NOM.test(nomRaw) || nomRaw.replace(/[^a-zà-ÿ]/gi, '').length < 4) return { nom: '', adresse: '', display: '' };
+  const nom = titleCasePR(nomRaw);
   return { nom, adresse: s.replace(/^[^,]+,?\s*/, '').trim(), display: titleCasePR(s.slice(0, 60)) };
 };
 // Clé photo stable (indépendante de la taille d'image) extraite d'une URL Vinted :
@@ -9163,8 +9169,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             ) : null;
           }
+          // Point relais HABITUEL par transporteur : certains emails ne contiennent
+          // pas l'adresse du relais (juste un lien « juste ici »). On déduit alors
+          // le relais le plus fréquent de CE transporteur (ex. Mondial Relay →
+          // Maison de la Presse) à partir de TOUS les emails de suivi connus.
+          const relayFreq = {}; // carrier -> { "nom|adresse": count }
+          (tracking||[]).forEach(t=>{ const cl=cleanLieu(t.lieu); if(cl.nom){ const k=cl.nom+'|'+(cl.adresse||''); (relayFreq[t.carrier]=relayFreq[t.carrier]||{})[k]=((relayFreq[t.carrier]||{})[k]||0)+1; } });
+          const usualRelay = (carrier)=>{ const m=relayFreq[carrier]; if(!m) return null; let best=null,bn=0; for(const k in m){ if(m[k]>bn){bn=m[k];best=k;} } if(!best) return null; const [nom,adresse]=best.split('|'); return {nom,adresse}; };
           const groups = {};
-          avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          avail.forEach(t=>{ let cl=cleanLieu(t.lieu); if(!cl.nom){ const u=usualRelay(t.carrier); if(u) cl={...u,guessed:true}; } const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse,guessed:cl.guessed}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
             <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:14,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
@@ -9188,7 +9201,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span style={{fontSize:21,flexShrink:0}}>📦</span>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
-                          <div style={{fontSize:11,fontWeight:800,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}</div>
+                          <div style={{fontSize:11,fontWeight:800,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}{g.guessed?<span style={{color:C.muted,fontWeight:600}}> (relais habituel)</span>:''}</div>
                           <div style={{fontSize:10,color:C.muted,marginTop:1}}>{code?'Donne ce code au comptoir 👉':'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
                         </div>
                         {code && (
@@ -9909,18 +9922,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* Import direct : marche toujours, même si la vente n'apparaît pas / iPhone */}
-        <button type="button" onClick={()=>{ bordCtx.current = { standalone:true }; bordRef.current?.click(); }}
-          style={{width:'100%',border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'12px',cursor:'pointer',fontSize:14,fontWeight:800,marginBottom:6}}>
-          📄 Importer un bordereau à tamponner
-        </button>
-        <div style={{fontSize:11,color:C.muted,marginBottom:14,lineHeight:1.4}}>Télécharge d'abord ton bordereau depuis Vinted (dans la conversation), puis choisis-le ici — l'app y imprime le N° + le titre. Ça marche sur iPhone (via Fichiers/iCloud).</div>
         {/* Bordereaux reçus AUTOMATIQUEMENT par email (pipeline usevrm) */}
         {Array.isArray(emailBords) && emailBords.length>0 && (
           <div style={{marginBottom:16}}>
             <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
               <div style={{fontSize:12,fontWeight:800,color:C.text,flex:1}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
             </div>
+            {/* Impression EN LOT : tamponne tous les bordereaux non imprimés et les
+                met à la suite dans un seul PDF à imprimer d'un coup. */}
+            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordDone(b)).length; return nPending>=2 ? (
+              <button type="button" onClick={batchBordereaux} disabled={batchBusy}
+                title="Tamponne tous les bordereaux non imprimés et les met à la suite dans un seul PDF à imprimer d'un coup"
+                style={{width:'100%',border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'12px',cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:800,marginBottom:10,opacity:batchBusy?0.6:1}}>
+                {batchBusy?'Préparation…':`🖨 Tout imprimer à la suite (${nPending})`}
+              </button>
+            ) : null; })()}
             {(()=>{ const done=[...emailBords].filter(b=>!isBordHidden(b)&&isBordDone(b)); return done.length>0 ? (
               <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
                 <span style={{color:INV_STATUS.online.color,fontWeight:800}}>✅ {done.length} bordereau{done.length>1?'x':''} expédié{done.length>1?'s':''}</span>
