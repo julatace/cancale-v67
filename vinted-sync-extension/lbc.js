@@ -22,6 +22,7 @@
 
   let queue = [];
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
+  let stats = { postedCount: 0, lbcCount: 0, limit: null }; // compteur d'annonces LBC + seuil
   let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
   // Lit toute l'annonce (titre + description) de la page courante et récupère nos
   // références « VRM-{num} ». Marche pour un compte PRO comme normal : on lit
@@ -114,6 +115,11 @@
     .remsec{border:1px solid #f0b6b0;background:#fdeceb;border-radius:12px;padding:8px;margin-bottom:10px}
     .remhd{font-size:12px;font-weight:900;color:#c0392b;margin-bottom:6px}
     .rem{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f2cfcb;border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12px}
+    .counter{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:9px 11px;margin-bottom:10px}
+    .crow{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#111}
+    .cbar{height:7px;border-radius:999px;background:#eef0f2;overflow:hidden;margin-top:7px}
+    .cbarfill{height:100%;border-radius:999px;transition:width .3s}
+    .cmsg{font-size:11px;font-weight:700;margin-top:5px}
   `;
 
   let open = false;
@@ -128,10 +134,27 @@
            <div class="hd"><span class="t">🟠 ${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
-           <div class="body">${remHtml}${items.length ? items.map(cardHtml).join('') : '<div class="empty">Rien à publier pour le moment.<br>Dès qu&#39;une annonce numérotée est en ligne sur Vinted, elle apparaît ici.</div>'}</div>
+           <div class="body">${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : '<div class="empty">Rien à publier pour le moment.<br>Dès qu&#39;une annonce numérotée est en ligne sur Vinted, elle apparaît ici.</div>'}</div>
            <div class="hint">Sur « Déposer une annonce », clique <b>Pré-remplir</b> puis vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
+  }
+  function counterHtml() {
+    const n = Math.max(stats.postedCount || 0, stats.lbcCount || 0); // le plus fiable des deux
+    const lim = stats.limit;
+    let bar = '';
+    if (lim) {
+      const pct = Math.min(100, Math.round((n / lim) * 100));
+      const near = n >= lim ? 'full' : (n >= lim - 3 ? 'warn' : 'ok');
+      const col = near === 'full' ? '#c0392b' : near === 'warn' ? '#e67e22' : '#0a7f3f';
+      bar = `<div class="cbar"><div class="cbarfill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="cmsg" style="color:${col}">${n >= lim ? '⚠️ Limite atteinte — Leboncoin peut te bloquer la prochaine publication.' : near === 'warn' ? '⚠️ Tu approches de ta limite.' : 'Il te reste ' + (lim - n) + ' annonce' + ((lim - n) > 1 ? 's' : '') + '.'}</div>`;
+    }
+    return `<div class="counter">
+      <div class="crow"><b>📊 ${n}</b> annonce${n > 1 ? 's' : ''} sur Leboncoin${lim ? ' / ' + lim : ''}
+        <button class="btn" data-a="setlimit" style="margin-left:auto">${lim ? '✎ Limite' : 'Définir ma limite'}</button></div>
+      ${bar}
+    </div>`;
   }
   function remHtmlOne(r) {
     return `<div class="rem" data-rid="${esc(r.id)}">
@@ -206,6 +229,14 @@
     if (a === 'open') { open = true; render(); return; }
     if (a === 'close') { open = false; render(); return; }
     if (a === 'refresh') { await load(); toast('Actualisé'); return; }
+    if (a === 'setlimit') {
+      const cur = stats.limit || '';
+      const v = window.prompt('Nombre max d\'annonces Leboncoin (ta limite gratuite/pro).\nLaisse vide pour enlever la limite :', cur);
+      if (v === null) return;
+      await send({ action: 'setLimit', limit: v.trim() === '' ? 0 : v.trim() });
+      await load(); toast('Limite mise à jour');
+      return;
+    }
     if (a === 'removed') {
       const rid = e.target.closest('.rem') && e.target.closest('.rem').getAttribute('data-rid');
       if (!rid) return;
@@ -233,6 +264,7 @@
     const r = await send({ action: 'getQueue' });
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
     removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
+    if (r && r.ok && r.stats) stats = r.stats;
     render();
   }
   render();

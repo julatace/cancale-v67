@@ -160,7 +160,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-lbc') {
       (async () => {
         try {
-          if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals }); return; }
+          if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats }); return; }
+          if (msg.action === 'setLimit') { await setLbcLimit(msg.limit); sendResponse({ ok: true }); return; }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
@@ -700,8 +701,9 @@ async function buildLbcData() {
   const uid2login = {};
   accounts.forEach((a) => { uid2login[String(a.vinted_user_id)] = labels[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id); });
   // Déjà publiées sur Leboncoin (ligne DÉDIÉE → on n'écrase jamais le blob main).
-  const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
-  const posted = new Set(((postedRows && postedRows[0] && postedRows[0].data && postedRows[0].data.ids) || []).map(String));
+  const postedData = await readPostedData();
+  const posted = new Set(postedData.ids);
+  const lbcLimit = postedData.limit;
   // Annonces EN LIGNE (harvest listings).
   const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
   const online = []; const onlineIds = new Set(); const seen = new Set();
@@ -738,7 +740,17 @@ async function buildLbcData() {
     removals.push({ id: pid, numero: String(e.numero || '?'), ref: 'VRM-' + (e.numero || '?'), title: e.title || '' });
   }
   removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-  return { queue, removals };
+  // Compteur d'annonces Leboncoin : ce que TU as marqué publié (fiable) et, si la
+  // capture LBC a remonté quelque chose, le nombre réellement vu en ligne.
+  let lbcCount = 0;
+  try {
+    const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    const items = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
+    lbcCount = Object.values(items).filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v && v.status || ''))).length;
+  } catch (_) {}
+  const postedCount = [...posted].filter((x) => /^\d+$/.test(x)).length;
+  const stats = { postedCount, lbcCount, limit: lbcLimit };
+  return { queue, removals, stats };
 }
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
 // fusionne (par id) avec ce qui est déjà connu → l'historique se complète au fil
@@ -809,15 +821,25 @@ async function handleLbcRaw(url, body) {
   await storeLbcRecon({ url, sample: { url, at: new Date().toISOString(), found: found.length, body: String(body).slice(0, 9000) } });
   if (found.length) await storeLbcListings(url, found);
 }
-async function readPostedIds() {
+async function readPostedData() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
-  return new Set(((rows && rows[0] && rows[0].data && rows[0].data.ids) || []).map(String));
+  const d = (rows && rows[0] && rows[0].data) || {};
+  return { ids: (d.ids || []).map(String), limit: d.limit != null ? d.limit : null };
+}
+async function readPostedIds() { return new Set((await readPostedData()).ids); }
+async function writePosted(d) {
+  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: d.ids, limit: d.limit != null ? d.limit : null, updatedAt: new Date().toISOString() } }], 'id');
 }
 async function markLbcPosted(id) {
-  const s = await readPostedIds(); s.add(String(id));
-  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: [...s], updatedAt: new Date().toISOString() } }], 'id');
+  const d = await readPostedData(); const s = new Set(d.ids); s.add(String(id));
+  await writePosted({ ids: [...s], limit: d.limit });
 }
 async function unmarkLbcPosted(id) {
-  const s = await readPostedIds(); s.delete(String(id));
-  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: [...s], updatedAt: new Date().toISOString() } }], 'id');
+  const d = await readPostedData(); const s = new Set(d.ids); s.delete(String(id));
+  await writePosted({ ids: [...s], limit: d.limit });
+}
+async function setLbcLimit(limit) {
+  const d = await readPostedData();
+  const n = parseInt(String(limit), 10);
+  await writePosted({ ids: d.ids, limit: (isNaN(n) || n <= 0) ? null : n });
 }
