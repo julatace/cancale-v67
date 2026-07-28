@@ -11849,14 +11849,18 @@ export default function App() {
       const firstMsgRun = localStorage.getItem('vinted_notif_seen_convs')===null;
       const nextSeen = {}; // reconstruit à chaque passage -> se purge tout seul
       const nums = load('vinted_annonce_numeros', {}); // pour repérer les annonces sans N°
+      const acctLabels = load('vinted_account_labels', {}); // pour dire SUR QUEL COMPTE aller voir
       const ageDays=(it)=>{ let ts=null; if(it.createdTs!=null) ts=it.createdTs<1e12?it.createdTs*1000:it.createdTs; else { const e=nums[it.id]; if(e&&e.numberedAt){ const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } } return ts!=null?Math.floor((Date.now()-ts)/86400000):null; };
       let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
+      const unreadByAcct={}; // nom du compte -> nb de messages non lus (pour l'indice)
       for(const a of vintedAccounts){
+        const acctName = acctLabels[a.vinted_user_id] || a.login || 'compte';
         const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
         if(inbox && Array.isArray(inbox.conversations)){
           for(const c of inbox.conversations){
             if(!c.unread) continue;
             unreadTotal+=1;
+            unreadByAcct[acctName]=(unreadByAcct[acctName]||0)+1;
             const cid=String(c.id);
             const stamp=String(c.updated_at||'1');
             if(!firstMsgRun && seenConvs[cid]!==stamp) newMsgs+=1;
@@ -11889,7 +11893,11 @@ export default function App() {
       const items=[];
       if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
       if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_expedition'});
-      if(unreadTotal>0)  items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}`, n:unreadTotal, tab:'cat_msg'});
+      if(unreadTotal>0){
+        const accs=Object.entries(unreadByAcct).sort((x,y)=>y[1]-x[1]).map(([n,c])=>`${n} (${c})`);
+        const hint=accs.length?` · sur ${accs.join(', ')}`:'';
+        items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}${hint}`, n:unreadTotal, tab:'cat_msg'});
+      }
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       if(noNumCount>0)   items.push({icon:'🔢', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
       if(sleepCount>0)   items.push({icon:'😴', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui dort → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
