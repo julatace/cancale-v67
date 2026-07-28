@@ -24,6 +24,8 @@
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
   let stats = { postedCount: 0, lbcCount: 0, limit: null, plan: null, detected: null }; // compteur d'annonces LBC + offre
   let loadError = false; // vrai si getQueue a échoué (≠ file vide)
+  let postedList = []; // paires marquées « publiées » (pour annuler une erreur)
+  let showPosted = false;
   let photoRes = null; // { numero, title, photos:[...] } — photos d'une paire à envoyer à un acheteur
   let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
   // Lit toute l'annonce (titre + description) de la page courante et récupère nos
@@ -138,10 +140,18 @@
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
            <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
-           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : emptyHtml()}</div>
+           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : emptyHtml()}${donePostedHtml()}</div>
            <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
+  }
+  function donePostedHtml() {
+    if (!postedList.length) return '';
+    return `<div class="counter" style="margin-top:10px">
+      <div class="crow"><b>✓ ${postedList.length} déjà publiée${postedList.length > 1 ? 's' : ''}</b>
+        <button class="btn" data-a="togdone" style="margin-left:auto">${showPosted ? 'masquer' : 'gérer / annuler'}</button></div>
+      ${showPosted ? postedList.map((p) => `<div class="rem" data-pid="${esc(p.id)}"><div style="flex:1;min-width:0"><b>N°${esc(p.numero)}</b> ${esc((p.title || '').slice(0, 30))}</div><button class="btn" data-a="unpost">↩︎ Remettre</button></div>`).join('') : ''}
+    </div>`;
   }
   function emptyHtml() {
     if (loadError) return '<div class="empty" style="color:#c0392b">⚠️ Chargement impossible (extension endormie ?). Clique sur ⟳ en haut, ou recharge la page.</div>';
@@ -204,12 +214,12 @@
       ${ph ? `<div class="ph">${ph}</div>` : ''}
       <div class="desc">${esc(ad.description)}</div>
       <div class="btns">
-        <button class="btn p" data-a="prefill">✍️ Pré-remplir</button>
+        <button class="btn p" data-a="prefill">✍️ Pré-remplir le formulaire</button>
         <button class="btn" data-a="ctitle">Titre</button>
         <button class="btn" data-a="cdesc">Description</button>
         <button class="btn" data-a="cprice">Prix</button>
         <button class="btn" data-a="photos">📷 Photos</button>
-        <button class="btn g" data-a="posted">✓ Publiée</button>
+        <button class="btn" data-a="posted" style="border-color:#0a7f3f;color:#0a7f3f" title="À cliquer SEULEMENT après avoir publié toi-même sur Leboncoin. Ça ne publie rien, ça la retire juste de la liste.">✓ Je l'ai déjà publiée</button>
       </div>
     </div>`;
   }
@@ -261,6 +271,14 @@
     if (a === 'open') { open = true; render(); return; }
     if (a === 'close') { open = false; render(); return; }
     if (a === 'refresh') { await load(); toast('Actualisé'); return; }
+    if (a === 'togdone') { showPosted = !showPosted; render(); return; }
+    if (a === 'unpost') {
+      const pid = e.target.closest('.rem') && e.target.closest('.rem').getAttribute('data-pid');
+      if (!pid) return;
+      await send({ action: 'unmarkPosted', id: pid });
+      await load(); toast('Remise dans la liste à publier ✓');
+      return;
+    }
     if (a === 'photolookup') {
       const num = window.prompt('Numéro (N°) de la paire dont tu veux les photos :', (photoRes && photoRes.numero) || '');
       if (num === null || !num.trim()) return;
@@ -298,9 +316,9 @@
     else if (a === 'photos') { (ad.photos || []).forEach((u, i) => setTimeout(() => window.open(u, '_blank'), i * 250)); toast('Photos ouvertes — enregistre-les pour les déposer'); }
     else if (a === 'prefill') { prefill(ad); }
     else if (a === 'posted') {
-      if (!confirm('Marquer la N°' + ad.numero + ' comme publiée sur Leboncoin ?\nElle disparaîtra de la liste à publier.')) return;
+      if (!confirm('⚠️ Ceci NE publie PAS l\'annonce.\n\nÀ cliquer seulement si tu as DÉJÀ publié la N°' + ad.numero + ' toi-même sur Leboncoin.\nÇa la retire juste de la liste « à publier ». Continuer ?')) return;
       await send({ action: 'markPosted', id: ad.id });
-      queue = queue.filter((x) => x.id !== ad.id); render(); toast('N°' + ad.numero + ' marquée publiée ✓');
+      queue = queue.filter((x) => x.id !== ad.id); render(); toast('N°' + ad.numero + ' retirée de la liste (tu peux annuler dans « déjà publiées »)');
     }
   });
 
@@ -311,6 +329,7 @@
     loadError = !(r && r.ok);
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
     removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
+    postedList = (r && r.ok && Array.isArray(r.postedList)) ? r.postedList : [];
     if (r && r.ok && r.stats) stats = r.stats;
     render();
   }

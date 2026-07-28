@@ -160,7 +160,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-lbc') {
       (async () => {
         try {
-          if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats }); return; }
+          if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats, postedList: r.postedList }); return; }
           if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
           if (msg.action === 'getPhotos') { const r = await getPairPhotos(msg.numero); sendResponse({ ok: true, numero: r.numero, title: r.title, photos: r.photos }); return; }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
@@ -757,7 +757,9 @@ async function buildLbcData() {
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
   const stats = { postedCount, lbcCount, limit: lbcLimit, plan: lbcPlan, detected, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length };
-  return { queue, removals, stats };
+  // Liste des paires marquées « publiées » (pour pouvoir annuler une erreur).
+  const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  return { queue, removals, stats, postedList };
 }
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
 // fusionne (par id) avec ce qui est déjà connu → l'historique se complète au fil
