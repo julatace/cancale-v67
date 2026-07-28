@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v27/07 · ➕';
+const BUILD_ID = 'v28/07 · 💰marge';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -9755,7 +9755,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:900,padding:'3px 8px',borderRadius:999}}>😴 {age}j</div>}
                 </a>
                 <div style={{padding:'8px 10px 6px'}}>
-                  <div style={{fontSize:16,fontWeight:900,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
+                  <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}>
+                    <div style={{fontSize:16,fontWeight:900,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
+                    {(()=>{
+                      // Marge potentielle = prix en ligne − prix d'achat − boost.
+                      // Le prix d'achat vient du champ ci-dessous, sinon du mémo par N°.
+                      const effBuy = buy!=='' ? buy : (num && buyByNum[num]!=null ? buyByNum[num] : '');
+                      const b = parseFloat(String(effBuy).replace(',','.'));
+                      if(it.price==null || effBuy==='' || isNaN(b)) return null;
+                      const m = Math.round(Number(it.price) - b - feesOf(e));
+                      const pos = m>=0;
+                      return <span title="Marge potentielle si vendue à ce prix (prix en ligne − prix d'achat − boost)" style={{fontSize:11.5,fontWeight:900,color:pos?INV_STATUS.online.color:C.danger,background:(pos?INV_STATUS.online.color:C.danger)+'18',borderRadius:7,padding:'1px 6px'}}>{pos?`+${m}`:m} € {pos?'💰':'⚠️'}</span>;
+                    })()}
+                  </div>
                   <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.brand||it.title}</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
                   {(it.views!=null||it.favourites!=null) && (
