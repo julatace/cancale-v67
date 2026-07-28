@@ -164,6 +164,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcCapture' && Array.isArray(msg.listings)) { await storeLbcListings(msg.url, msg.listings); sendResponse({ ok: true }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -736,6 +737,18 @@ async function buildLbcData() {
   }
   removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   return { queue, removals };
+}
+// Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
+// fusionne (par id) avec ce qui est déjà connu → l'historique se complète au fil
+// de ta navigation, sans écraser. Sert au dispatcher LBC→Vinted + synchro inverse.
+async function storeLbcListings(url, listings) {
+  try {
+    const prevRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    const prev = (prevRows && prevRows[0] && prevRows[0].data && prevRows[0].data.items) || {};
+    const merged = Object.assign({}, prev);
+    for (const l of listings) { if (l && l.id) merged[String(l.id)] = Object.assign({}, merged[String(l.id)], l, { seenAt: new Date().toISOString() }); }
+    await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
+  } catch (_) {}
 }
 async function readPostedIds() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');

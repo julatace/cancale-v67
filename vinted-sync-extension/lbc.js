@@ -25,6 +25,51 @@
     } catch (_) {}
     pageRefs = s;
   }
+
+  // ── CAPTURE de TES annonces Leboncoin (passif : on lit ce que la page a déjà
+  //    chargé, aucune requête en plus). Leboncoin est du Next.js → les données
+  //    sont dans la balise <script id="__NEXT_DATA__"> du DOM. On y cherche les
+  //    objets « annonce » (un prix + un titre) et on remonte les champs utiles.
+  //    Sert au dispatcher (LBC → choisir un compte Vinted) et à la synchro inverse.
+  function captureLbcListings() {
+    let listings = [];
+    try {
+      const el = document.getElementById('__NEXT_DATA__');
+      if (el && el.textContent) {
+        const data = JSON.parse(el.textContent);
+        const found = [];
+        const seen = new Set();
+        const looksLikeAd = (o) => o && typeof o === 'object' && (o.subject || o.title) && (o.price != null || o.price_cents != null || (o.attributes && o.price));
+        const walk = (node, depth) => {
+          if (!node || depth > 8 || found.length > 120) return;
+          if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1); return; }
+          if (typeof node !== 'object') return;
+          if (looksLikeAd(node)) {
+            const id = String(node.list_id || node.ad_id || node.id || '');
+            if (id && !seen.has(id)) {
+              seen.add(id);
+              const price = Array.isArray(node.price) ? node.price[0] : (node.price != null ? node.price : (node.price_cents != null ? node.price_cents / 100 : null));
+              const body = String(node.body || node.description || '');
+              found.push({
+                id, subject: node.subject || node.title || '', price, url: node.url || '',
+                body: body.slice(0, 400),
+                ref: (body.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || (String(node.subject || '').match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null,
+                images: (node.images && (node.images.urls || node.images.thumb_urls)) || node.image_urls || [],
+                category: (node.category_name || node.category_id || ''),
+                status: node.status || node.ad_status || '',
+              });
+            }
+          }
+          for (const k in node) { if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1); }
+        };
+        walk(data, 0);
+        listings = found;
+      }
+    } catch (_) {}
+    if (listings.length) {
+      send({ action: 'lbcCapture', url: location.href, listings });
+    }
+  }
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;z-index:2147483647;right:16px;bottom:16px;';
   const root = host.attachShadow({ mode: 'open' });
@@ -174,6 +219,7 @@
 
   async function load() {
     scanPageRefs();
+    captureLbcListings();
     const r = await send({ action: 'getQueue' });
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
     removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
