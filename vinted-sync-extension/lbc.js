@@ -22,7 +22,7 @@
 
   let queue = [];
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
-  let stats = { postedCount: 0, lbcCount: 0, limit: null }; // compteur d'annonces LBC + seuil
+  let stats = { postedCount: 0, lbcCount: 0, limit: null, plan: null, detected: null }; // compteur d'annonces LBC + offre
   let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
   // Lit toute l'annonce (titre + description) de la page courante et récupère nos
   // références « VRM-{num} ». Marche pour un compte PRO comme normal : on lit
@@ -141,7 +141,10 @@
   }
   function counterHtml() {
     const n = Math.max(stats.postedCount || 0, stats.lbcCount || 0); // le plus fiable des deux
-    const lim = stats.limit;
+    // Limite effective : celle que TU as choisie, sinon celle détectée sur ton offre.
+    const lim = stats.limit != null ? stats.limit : (stats.detected || null);
+    const auto = stats.limit == null && stats.detected;
+    const planLbl = stats.plan ? stats.plan : (auto ? 'offre détectée' : (lim ? '' : 'Gratuit'));
     let bar = '';
     if (lim) {
       const pct = Math.min(100, Math.round((n / lim) * 100));
@@ -152,7 +155,8 @@
     }
     return `<div class="counter">
       <div class="crow"><b>📊 ${n}</b> annonce${n > 1 ? 's' : ''} sur Leboncoin${lim ? ' / ' + lim : ''}
-        <button class="btn" data-a="setlimit" style="margin-left:auto">${lim ? '✎ Limite' : 'Définir ma limite'}</button></div>
+        <button class="btn" data-a="setplan" style="margin-left:auto">${lim || stats.plan ? '✎ Mon offre' : 'Choisir mon offre'}</button></div>
+      ${planLbl ? `<div style="font-size:10.5px;color:#8a8f98;font-weight:700;margin-top:3px">Offre : ${esc(planLbl)}${auto ? ' · adaptée automatiquement' : ''}</div>` : ''}
       ${bar}
     </div>`;
   }
@@ -229,12 +233,14 @@
     if (a === 'open') { open = true; render(); return; }
     if (a === 'close') { open = false; render(); return; }
     if (a === 'refresh') { await load(); toast('Actualisé'); return; }
-    if (a === 'setlimit') {
-      const cur = stats.limit || '';
-      const v = window.prompt('Nombre max d\'annonces Leboncoin (ta limite gratuite/pro).\nLaisse vide pour enlever la limite :', cur);
+    if (a === 'setplan') {
+      const plan = window.prompt('Nom de ton offre Leboncoin (ex. Gratuit, Pack Pro…) :', stats.plan || 'Gratuit');
+      if (plan === null) return;
+      const cur = stats.limit != null ? stats.limit : (stats.detected || '');
+      const v = window.prompt('Nombre d\'annonces incluses dans cette offre.\n(Laisse vide = illimité / pas de limite)', cur);
       if (v === null) return;
-      await send({ action: 'setLimit', limit: v.trim() === '' ? 0 : v.trim() });
-      await load(); toast('Limite mise à jour');
+      await send({ action: 'setLimit', limit: v.trim() === '' ? 0 : v.trim(), plan });
+      await load(); toast('Offre mise à jour');
       return;
     }
     if (a === 'removed') {

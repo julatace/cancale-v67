@@ -161,7 +161,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (async () => {
         try {
           if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats }); return; }
-          if (msg.action === 'setLimit') { await setLbcLimit(msg.limit); sendResponse({ ok: true }); return; }
+          if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
@@ -704,6 +704,7 @@ async function buildLbcData() {
   const postedData = await readPostedData();
   const posted = new Set(postedData.ids);
   const lbcLimit = postedData.limit;
+  const lbcPlan = postedData.plan;
   // Annonces EN LIGNE (harvest listings).
   const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
   const online = []; const onlineIds = new Set(); const seen = new Set();
@@ -749,7 +750,10 @@ async function buildLbcData() {
     lbcCount = Object.values(items).filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v && v.status || ''))).length;
   } catch (_) {}
   const postedCount = [...posted].filter((x) => /^\d+$/.test(x)).length;
-  const stats = { postedCount, lbcCount, limit: lbcLimit };
+  // Quota détecté automatiquement depuis l'offre Leboncoin (si trouvé).
+  let detected = null;
+  try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=data'); const q = rec && rec[0] && rec[0].data && rec[0].data.quota; if (q && q.value) detected = q.value; } catch (_) {}
+  const stats = { postedCount, lbcCount, limit: lbcLimit, plan: lbcPlan, detected };
   return { queue, removals, stats };
 }
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
@@ -773,6 +777,7 @@ async function storeLbcRecon(patch) {
     const next = Object.assign({ paths: [], samples: [] }, prev);
     if (patch.paths) { const set = new Set([...(next.paths || []), ...patch.paths]); next.paths = [...set].slice(0, 300); }
     if (patch.sample) { next.samples = [patch.sample, ...(next.samples || [])].slice(0, 6); }
+    if (patch.quota) next.quota = patch.quota;                 // quota d'annonces détecté (offre)
     if (patch.url) next.lastUrl = patch.url;
     next.updatedAt = new Date().toISOString();
     await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
@@ -817,29 +822,53 @@ async function handleLbcRaw(url, body) {
     for (const k in node) { if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1); }
   };
   try { walk(data, 0); } catch (_) {}
+  // Détection auto du quota d'annonces (offre Leboncoin) → la limite s'adapte.
+  const quota = detectLbcQuota(data);
   // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
-  await storeLbcRecon({ url, sample: { url, at: new Date().toISOString(), found: found.length, body: String(body).slice(0, 9000) } });
+  await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } });
   if (found.length) await storeLbcListings(url, found);
 }
 async function readPostedData() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
   const d = (rows && rows[0] && rows[0].data) || {};
-  return { ids: (d.ids || []).map(String), limit: d.limit != null ? d.limit : null };
+  return { ids: (d.ids || []).map(String), limit: d.limit != null ? d.limit : null, plan: d.plan || null };
 }
 async function readPostedIds() { return new Set((await readPostedData()).ids); }
 async function writePosted(d) {
-  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: d.ids, limit: d.limit != null ? d.limit : null, updatedAt: new Date().toISOString() } }], 'id');
+  await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: d.ids, limit: d.limit != null ? d.limit : null, plan: d.plan || null, updatedAt: new Date().toISOString() } }], 'id');
 }
 async function markLbcPosted(id) {
   const d = await readPostedData(); const s = new Set(d.ids); s.add(String(id));
-  await writePosted({ ids: [...s], limit: d.limit });
+  await writePosted({ ids: [...s], limit: d.limit, plan: d.plan });
 }
 async function unmarkLbcPosted(id) {
   const d = await readPostedData(); const s = new Set(d.ids); s.delete(String(id));
-  await writePosted({ ids: [...s], limit: d.limit });
+  await writePosted({ ids: [...s], limit: d.limit, plan: d.plan });
 }
-async function setLbcLimit(limit) {
+async function setLbcLimit(limit, plan) {
   const d = await readPostedData();
   const n = parseInt(String(limit), 10);
-  await writePosted({ ids: d.ids, limit: (isNaN(n) || n <= 0) ? null : n });
+  await writePosted({ ids: d.ids, limit: (isNaN(n) || n <= 0) ? null : n, plan: (plan && String(plan).trim()) || null });
+}
+// AUTO-DÉTECTION du quota d'annonces depuis les données Leboncoin (offre / pack).
+// On cherche les champs qui ressemblent à un maximum/quota d'annonces. Best-effort :
+// si on trouve, la limite s'adapte toute seule à l'abonnement en cours.
+function detectLbcQuota(data) {
+  let best = null;
+  const KEY = /(max.?ads|ads.?(max|limit|quota|count|allowed|available|remaining|total)|listing.?(limit|quota|max)|quota|nb.?annonces|package.?size|subscription.?ads|credits?)/i;
+  const walk = (node, depth) => {
+    if (!node || depth > 9 || best) return;
+    if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1); return; }
+    if (typeof node !== 'object') return;
+    for (const k in node) {
+      const v = node[k];
+      if (KEY.test(k) && (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v)))) {
+        const n = parseInt(v, 10);
+        if (n > 0 && n < 100000) { best = { value: n, key: k }; return; }
+      }
+    }
+    for (const k in node) { if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1); }
+  };
+  try { walk(data, 0); } catch (_) {}
+  return best;
 }
