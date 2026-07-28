@@ -10,6 +10,21 @@
   if (window.__vrmLbcLoaded) return; window.__vrmLbcLoaded = true;
   const send = (m) => new Promise((res) => { try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-lbc' }, m), (r) => res(r || { ok: false })); } catch (_) { res({ ok: false }); } });
 
+  // Injecte l'observateur réseau MAIN world (lit les réponses « annonces » que la
+  // page charge déjà) et relaie ce qu'il capte au background.
+  try {
+    const s = document.createElement('script');
+    s.src = chrome.runtime.getURL('lbc-inject.js');
+    s.onload = function () { this.remove(); };
+    (document.head || document.documentElement).appendChild(s);
+  } catch (_) {}
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    const d = event.data; if (!d || d.__tag !== 'CANCALE_LBC') return;
+    if (d.kind === 'lbcraw' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcRaw', url: d.url, body: d.body }); } catch (_) {} }
+    else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href }); } catch (_) {} }
+  }, false);
+
   let queue = [];
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
   let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin

@@ -165,6 +165,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'lbcCapture' && Array.isArray(msg.listings)) { await storeLbcListings(msg.url, msg.listings); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -749,6 +751,63 @@ async function storeLbcListings(url, listings) {
     for (const l of listings) { if (l && l.id) merged[String(l.id)] = Object.assign({}, merged[String(l.id)], l, { seenAt: new Date().toISOString() }); }
     await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
   } catch (_) {}
+}
+// RECON : on garde un échantillon des réponses Leboncoin (chemins d'API + un bout
+// de corps) pour brancher l'extraction au millimètre. Ligne dédiée lbc_recon.
+async function storeLbcRecon(patch) {
+  try {
+    const prevRows = await sbGet('app_data?id=eq.lbc_recon&select=data');
+    const prev = (prevRows && prevRows[0] && prevRows[0].data) || {};
+    const next = Object.assign({ paths: [], samples: [] }, prev);
+    if (patch.paths) { const set = new Set([...(next.paths || []), ...patch.paths]); next.paths = [...set].slice(0, 300); }
+    if (patch.sample) { next.samples = [patch.sample, ...(next.samples || [])].slice(0, 6); }
+    if (patch.url) next.lastUrl = patch.url;
+    next.updatedAt = new Date().toISOString();
+    await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
+  } catch (_) {}
+}
+// Extraction GÉNÉRIQUE des annonces depuis une réponse JSON Leboncoin : on cherche
+// récursivement les objets qui ressemblent à une annonce (un id + un titre + un
+// prix). Marche quel que soit l'endpoint. On garde aussi un échantillon (recon).
+async function handleLbcRaw(url, body) {
+  let data = null;
+  try { data = JSON.parse(body); } catch (_) { return; }
+  const found = []; const seen = new Set();
+  const priceOf = (o) => {
+    if (o.price != null) return Array.isArray(o.price) ? o.price[0] : o.price;
+    if (o.price_cents != null) return o.price_cents / 100;
+    if (o.list_price != null) return Array.isArray(o.list_price) ? o.list_price[0] : o.list_price;
+    return null;
+  };
+  const walk = (node, depth) => {
+    if (!node || depth > 9 || found.length > 200) return;
+    if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1); return; }
+    if (typeof node !== 'object') return;
+    const id = node.list_id || node.ad_id || node.id;
+    const title = node.subject || node.title;
+    const price = priceOf(node);
+    if (id && title && price != null) {
+      const sid = String(id);
+      if (!seen.has(sid)) {
+        seen.add(sid);
+        const bodyTxt = String(node.body || node.description || '');
+        found.push({
+          id: sid, subject: String(title), price,
+          body: bodyTxt.slice(0, 400),
+          ref: (bodyTxt.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || (String(title).match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null,
+          url: node.url || '',
+          images: (node.images && (node.images.urls || node.images.thumb_urls || node.images.urls_thumb)) || node.image_urls || [],
+          category: node.category_name || node.category_id || '',
+          status: node.status || node.ad_status || '',
+        });
+      }
+    }
+    for (const k in node) { if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1); }
+  };
+  try { walk(data, 0); } catch (_) {}
+  // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
+  await storeLbcRecon({ url, sample: { url, at: new Date().toISOString(), found: found.length, body: String(body).slice(0, 9000) } });
+  if (found.length) await storeLbcListings(url, found);
 }
 async function readPostedIds() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
