@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v32/07 · 🩺diag+sync';
+const BUILD_ID = 'v33/07 · 🟠LBC+📄';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6596,6 +6596,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setCloudReady(true);
   }), []);
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
+  // Bordereau PDF capté par l'extension quand tu le télécharges sur Vinted → on
+  // signale qu'il est dispo pour le tamponner en 1 clic (cf. startBordereau).
+  const [freshLabel, setFreshLabel] = useState(null); // { name, mins } ou null
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
@@ -7786,6 +7789,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
+  // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
+  // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
+  useEffect(() => { (async () => {
+    if (curSub!=='bordereaux' || !accounts.length) return;
+    let best = null;
+    for (const a of accounts) {
+      const lbl = await fetchCapturedLabel(a.vinted_user_id);
+      if (lbl && lbl.pdfB64 && lbl.capturedAt) {
+        const mins = (Date.now()-new Date(lbl.capturedAt).getTime())/60000;
+        if (mins < 60 && (!best || mins < best.mins)) best = { name: accNameOf(a), mins: Math.max(0, Math.round(mins)) };
+      }
+    }
+    setFreshLabel(best);
+  })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
@@ -8641,7 +8658,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lbl = acc ? await fetchCapturedLabel(acc.vinted_user_id) : null;
     if (lbl && lbl.pdfB64) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
-      if (age<20 && window.confirm(`Utiliser le dernier bordereau téléchargé pour le N°${numero} (${title}) ?\n\nOK = oui · Annuler = choisir un fichier`)) {
+      const mins = Math.max(0, Math.round(age));
+      if (age<60 && window.confirm(`📄 Tamponner en 1 clic le bordereau téléchargé il y a ${mins} min, avec le N°${numero} (${title}) ?\n\nOK = oui (auto) · Annuler = choisir un fichier`)) {
         try { await processBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; } catch(_){}
       }
     }
@@ -9990,6 +10008,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
+        {/* Bordereau capté par l'extension (téléchargé sur Vinted) → tamponnage 1 clic. */}
+        {freshLabel && (
+          <div style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}12`,borderRadius:12,padding:'10px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <span style={{fontSize:18}}>🆕</span>
+            <div style={{flex:1,minWidth:160}}>
+              <div style={{fontSize:12.5,fontWeight:900,color:INV_STATUS.online.color}}>Bordereau téléchargé il y a {freshLabel.mins} min ({freshLabel.name})</div>
+              <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>
+            </div>
+          </div>
+        )}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
         {Array.isArray(emailBords) && (()=>{
           let overdue=0, today=0, tomorrow=0;
@@ -11118,6 +11146,85 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 }
 
 /* ── Paramètres (accessible via le rouage en haut à droite) ──────────────── */
+// Écran LEBONCOIN dans l'app : vue d'ensemble du cross-posting (lecture seule),
+// consultable depuis le téléphone. La publication elle-même se fait via
+// l'extension sur leboncoin.fr (assistant 1-clic). Ici on montre : combien
+// publiées / ton offre, ce qu'il reste à publier, et ce qu'il faut retirer
+// (vendu sur Vinted). Tout est lu depuis Supabase (0 appel Vinted/Leboncoin).
+function LeboncoinScreen() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const sbGet = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
+  const reload = async () => {
+    setLoading(true);
+    const mainRows = await sbGet('app_data?id=eq.main&select=data');
+    const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
+    const numeros = main.vinted_annonce_numeros || {};
+    const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
+    const pd = (postedRows && postedRows[0] && postedRows[0].data) || {};
+    const posted = new Set((pd.ids || []).map(String));
+    const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+    const online = []; const onlineIds = new Set(); const seen = new Set();
+    for (const r of listRows) { const p = (r.data && r.data.payload) || {}; for (const it of (p.items || [])) { const oid = String(it.id); if (it.is_closed || it.is_hidden || it.is_draft) continue; onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid); online.push({ id: oid, title: it.title }); } }
+    const queue = [];
+    for (const o of online) { const e = numeros[o.id]; const num = e && e.numero; if (!num || String(num).trim() === '') continue; if (posted.has(o.id) || posted.has(String(num))) continue; queue.push({ numero: String(num), title: o.title || (e && e.title) || '' }); }
+    queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    const removals = [];
+    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid)) continue; const e = numeros[pid] || {}; removals.push({ numero: String(e.numero || '?'), title: e.title || '' }); }
+    removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
+    setData({ queue, removals, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: Object.keys(lbcItems).length, limit: pd.limit, plan: pd.plan });
+    setLoading(false);
+  };
+  useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
+  const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
+  const lim = data ? (data.limit || null) : null;
+  const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
+  const barCol = lim ? (n >= lim ? C.danger : n >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
+  const Card = ({ children, style }) => <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 14, padding: '13px 15px', marginBottom: 12, ...style }}>{children}</div>;
+  return (
+    <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>🟠 Leboncoin</h2>
+        <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
+      </div>
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>Vue d'ensemble de tes annonces croisées sur Leboncoin. La <b>publication</b> se fait via l'extension VRM sur leboncoin.fr (bouton « 🚀 Tout préparer »). Ici tu suis juste l'état.</div>
+      {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
+        {/* Compteur / offre */}
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 26, fontWeight: 900, color: C.text }}>{n}</span>
+            <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan || (lim ? '' : 'Gratuit')}{data.plan || !lim ? '' : ''}</div>
+          {lim ? (<>
+            <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? '⚠️ Limite atteinte' : n >= lim - 3 ? '⚠️ Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
+          </>) : <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Définis ta limite d'offre dans le panneau VRM sur Leboncoin pour suivre ton quota.</div>}
+        </Card>
+        {/* À retirer (vendues sur Vinted) */}
+        {data.removals.length > 0 && (
+          <Card style={{ border: `1px solid ${C.danger}`, background: `${C.danger}0e` }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: C.danger, marginBottom: 6 }}>🔴 {data.removals.length} à retirer de Leboncoin</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Vendues sur Vinted → retire-les de Leboncoin pour ne pas les vendre deux fois (cherche « VRM-N° »).</div>
+            {data.removals.slice(0, 30).map((r, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{r.numero}</b> · {r.title || '—'}</div>)}
+          </Card>
+        )}
+        {/* À publier */}
+        <Card>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 6 }}>🟠 {data.queue.length} à publier sur Leboncoin</div>
+          {data.queue.length === 0 ? <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div> : (<>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Paires numérotées en ligne sur Vinted, pas encore sur Leboncoin. Ouvre Leboncoin avec l'extension pour les publier.</div>
+            {data.queue.slice(0, 60).map((q, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{q.numero}</b> · {q.title || '—'}</div>)}
+            {data.queue.length > 60 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {data.queue.length - 60} autres…</div>}
+          </>)}
+        </Card>
+        <a href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: '#ff6e14', color: '#fff', textDecoration: 'none', fontWeight: 900, fontSize: 14, padding: '12px', borderRadius: 12 }}>➕ Ouvrir « Déposer une annonce » sur Leboncoin</a>
+      </>)}
+    </div>
+  );
+}
 function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
   const Row = ({icon,title,desc,onClick,color}) => (
     <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'14px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10}}>
@@ -11135,6 +11242,9 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'0 0 8px 2px'}}>Comptes Vinted</div>
       <Row icon="🔗" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
+
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Leboncoin</div>
+      <Row icon="🟠" title="Leboncoin" desc="Publiées, à publier, à retirer, ton offre." onClick={()=>setTab('leboncoin')}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
       <Row icon="📤" title="Exporter mes données" desc="Télécharge une sauvegarde (catalogue, ventes, garage)." onClick={onExport}/>
@@ -12287,6 +12397,7 @@ export default function App() {
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'expedition'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
+        {tab==='leboncoin'&&<LeboncoinScreen/>}
       </main>
       <BottomBar tab={tab} setTab={setTab}/>
       {showBackup&&<BackupModal
