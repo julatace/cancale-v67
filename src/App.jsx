@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v30/07 · 📍relais';
+const BUILD_ID = 'v31/07 · 🔢compact';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7677,6 +7677,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudReady, numeros, saleOv, garageGrid]);
+
+  // ── COMPACTAGE (une seule fois) des numéros d'annonces trop hauts ──────────
+  // Un ancien bug a attribué AUTOMATIQUEMENT des numéros gonflés (92, 115, 133…)
+  // à des annonces alors que les vraies boîtes vont de 1 à 42. On remet ces
+  // annonces (uniquement celles au numéro AUTO, jamais un numéro saisi à la main)
+  // au plus petit numéro libre → la séquence redevient continue (43, 44, 45…).
+  // GARDE-FOUS : on ne touche jamais un numéro manuel, un numéro déjà rangé au
+  // garage, ni un numéro d'une paire vendue (il reste réservé). Une seule fois.
+  useEffect(() => {
+    if (!cloudReady) return;
+    if (load('vinted_num_compact_v1', false)) return;
+    if (!listings.items || !listings.items.length) return;   // besoin des annonces en ligne
+    if (!numeros || !Object.keys(numeros).length) return;
+    const onlineIds = new Set(listings.items.map(it => String(it.id)));
+    const taken = new Set();                                  // numéros à ne PAS réutiliser
+    const addN = (x) => { const n = parseInt(String(x), 10); if (!isNaN(n)) taken.add(n); };
+    for (const k in numeros) { const e = numeros[k]; if (!e) continue; if (!e.auto) addN(e.numero); if (!onlineIds.has(String(k))) addN(e.numero); }
+    Object.values(saleOv).forEach(e => { if (e && !e.autoAssigned) addN(e.numero); });
+    const collect = (g) => { if (Array.isArray(g)) g.forEach(collect); else if (g && typeof g === 'object') Object.values(g).forEach(collect); else addN(g); };
+    collect(garageGrid);
+    // Les annonces en ligne au numéro ≤ 42 gardent leur numéro (déjà « taken »).
+    for (const k of onlineIds) { const e = numeros[k]; if (e && /^\d+$/.test(String(e.numero)) && parseInt(e.numero, 10) <= 42) addN(e.numero); }
+    // Cibles = annonces EN LIGNE, numéro AUTO, > 42.
+    const targets = [];
+    for (const k of onlineIds) { const e = numeros[k]; if (e && e.auto && /^\d+$/.test(String(e.numero)) && parseInt(e.numero, 10) > 42) targets.push([parseInt(e.numero, 10), String(k)]); }
+    save('vinted_num_compact_v1', true);
+    if (!targets.length) return;
+    targets.sort((a, b) => a[0] - b[0]);
+    const next = { ...numeros };
+    const usedSet = new Set((usedNumeros || []).map(x => parseInt(String(x), 10)).filter(n => !isNaN(n)));
+    const smallestFree = () => { let n = 1; while (taken.has(n)) n++; taken.add(n); return n; };
+    for (const [, k] of targets) { const nn = smallestFree(); next[k] = { ...next[k], numero: String(nn) }; usedSet.add(nn); }
+    setNumeros(next); save('vinted_annonce_numeros', next);
+    const ua = [...usedSet].sort((a, b) => a - b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, listings.items]);
 
   const loadListings = async (force) => {
     const cached = !force && fromCache('listings');
