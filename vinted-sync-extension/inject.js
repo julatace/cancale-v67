@@ -163,12 +163,15 @@
   // Capture un BORDEREAU (PDF) que Vinted renvoie quand tu le telecharges. On
   // repere par le content-type application/pdf (l'URL du label n'est pas connue
   // d'avance). Sert a tamponner automatiquement le bordereau cote app.
+  // Un PDF de FACTURE / REÇU (compta pro) se distingue du bordereau par son URL.
+  const RECEIPT_URL = /invoice|receipt|facture|re[çc]u|billing|document/i;
   const maybeCaptureLabel = (contentType, url, getArrayBuffer) => {
     try {
       if (!/application\/pdf/i.test(contentType || '')) return;
+      const isReceipt = RECEIPT_URL.test(url || '');
       getArrayBuffer().then((buf) => {
         if (buf && buf.byteLength && buf.byteLength < 4000000) {
-          post({ kind: 'label', url, b64: abToB64(buf) });
+          post({ kind: isReceipt ? 'receipt' : 'label', url, b64: abToB64(buf) });
         }
       }).catch(() => {});
     } catch (_) {}

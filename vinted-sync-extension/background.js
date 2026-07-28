@@ -187,6 +187,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeHarvest(domain, msg.type, msg.id, msg.body);
   } else if (msg.kind === 'label' && msg.b64) {
     storeLabel(domain, msg.url, msg.b64);
+  } else if (msg.kind === 'receipt' && msg.b64) {
+    storeReceipt(domain, msg.url, msg.b64);
   } else if (msg.kind === 'writereq' && msg.url) {
     storeWriteReq(domain, msg.method, msg.url, msg.body);
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
@@ -225,6 +227,13 @@ async function storeLabel(domain, url, b64) {
   if (!uid) return;
   const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64 };
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
+}
+// Range le dernier REÇU / FACTURE officiel Vinted (PDF) consulte, pour la compta pro.
+async function storeReceipt(domain, url, b64) {
+  const uid = await activeAccountId(domain);
+  if (!uid) return;
+  const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64 };
+  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_receipt_latest`, data }], 'id');
 }
 
 // --- FETCH ACTIF (v3) ------------------------------------------------------

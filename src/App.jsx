@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v33/07 · 🟠LBC+📄';
+const BUILD_ID = 'v34/07 · 📚compta';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -581,6 +581,19 @@ const fetchCapturedLabel = async (uid) => {
   if (!uid) return null;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows[0]?.data || null;
+  } catch (_) { return null; }
+};
+// Dernier REÇU / FACTURE officiel Vinted capté par l'extension quand tu l'as
+// consulté sur Vinted (ligne harvest_{uid}_receipt_latest). Pour la compta pro.
+const fetchCapturedReceipt = async (uid) => {
+  if (!uid) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_receipt_latest&select=data`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return null;
@@ -8500,6 +8513,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tvaRate = Number(load('vinted_tva',20))||20;
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0;
+    const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
     for (const o of (sales.items||[])) {
       if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
@@ -8510,7 +8524,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const mo=months[d.getMonth()];
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); mo.cout+=buy; mo.nbCout+=1; }
+      saleLines.push({ date:o.date, num:(e&&e.numero)||'', title:o.title||'', account:accName(o._acc), sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, marge:(buy!=null&&!isNaN(buy))?(sell-buy-fee):null });
     }
+    saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     let achatsTotal=0, achatsNb=0;
     const buyLines=[];
     for (const o of (buys.items||[])) {
@@ -8526,10 +8542,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
     const urssaf = ca*0.135;
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines };
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines, saleLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buys.items, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
-  const openAnnual = () => { setShowAnnual(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
+  const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
+  const openAnnual = async () => {
+    setShowAnnual(true);
+    if (buys.items===null && accounts.length) loadOrders('purchased', setBuys);
+    // Reçus officiels Vinted captés par l'extension (compta pro), par compte.
+    const out=[];
+    for (const a of accounts) { const r = await fetchCapturedReceipt(a.vinted_user_id); if (r && r.pdfB64) out.push({ name: accName(a), ...r }); }
+    setCapturedReceipts(out);
+  };
+  const downloadReceipt = (rec) => {
+    try { const buf=b64ToArrayBuffer(rec.pdfB64); const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ alert('Impossible d\'ouvrir ce reçu.'); }
+  };
   const exportAnnualCsv = () => {
     const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
     const L=[];
@@ -8539,6 +8566,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['Mois','CA encaissé','Coût achat','Boosts','Bénéfice net','Ventes']);
     R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.ca-m.cout-m.frais).toFixed(2), String(m.nb)]));
     L.push(['TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2), String(R.nb)]);
+    L.push([]);
+    // Registre des ventes ligne par ligne (ce que l'expert-comptable attend).
+    L.push(['VENTES (registre)']); L.push(['Date','N°','Article','Compte','Prix vente','Prix achat','Boost','Marge']);
+    R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'', s.num, s.title, s.account, s.sell.toFixed(2), s.buy==null?'':s.buy.toFixed(2), s.fee?s.fee.toFixed(2):'', s.marge==null?'':s.marge.toFixed(2)]));
+    L.push(['','','','TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2)]);
     L.push([]);
     L.push(['ACHATS (registre)']); L.push(['Date','Vendeur','Article','Montant']);
     R.buyLines.forEach(b=>L.push([b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',b.seller,b.title,b.montant.toFixed(2)]));
@@ -9033,6 +9065,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           )}
           {accounts.length>0 && (
             <button onClick={openReport} title="Rapport comptable mensuel (CA, bénéfice, cotisations)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Compta</button>
+          )}
+          {accounts.length>0 && (
+            <button onClick={openAnnual} title="Registre comptable de l'année (ventes + achats ligne par ligne, CSV/PDF pour l'expert-comptable)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📚 Registre annuel</button>
           )}
           {(disputes.salesLost.length>0||disputes.buysBack.length>0) && (
             <button onClick={()=>setShowDisputes(true)} title="Litiges, annulations et remboursements — l'argent perdu/récupéré" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.danger}`,background:`${C.danger}12`,color:C.danger,fontSize:12,fontWeight:800,cursor:'pointer'}}>⚖️ Litiges{disputes.totalLost>0?` · −${Math.round(disputes.totalLost)} €`:''}</button>
@@ -10251,8 +10286,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:900,color:C.text}}>📅 Bilan annuel</div>
-                <div style={{fontSize:11,color:C.muted}}>{annual.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
+                <div style={{fontSize:15,fontWeight:900,color:C.text}}>📚 Registre comptable {annual.year}</div>
+                <div style={{fontSize:11,color:C.muted}}>{annual.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>le CSV contient le détail ventes + achats ligne par ligne</span></div>
               </div>
               <button type="button" onClick={()=>setShowAnnual(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -10322,8 +10357,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 ))}
               </div>
+              {/* Reçus officiels Vinted captés par l'extension (compta pro). */}
+              <div style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px',marginBottom:12}}>
+                <div style={{fontSize:12.5,fontWeight:900,color:C.text,marginBottom:2}}>📄 Reçus officiels Vinted</div>
+                {capturedReceipts.length>0 ? (
+                  <>
+                    <div style={{fontSize:10.5,color:C.muted,marginBottom:8}}>Dernier reçu consulté sur Vinted, capté par l'extension (le vrai document, pas le justificatif maison).</div>
+                    {capturedReceipts.map((rec,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
+                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:C.text}}>{rec.name}</div><div style={{fontSize:10,color:C.muted}}>capté le {rec.capturedAt?new Date(rec.capturedAt).toLocaleDateString('fr-FR'):'—'}</div></div>
+                        <button type="button" onClick={()=>downloadReceipt(rec)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:8,padding:'5px 11px',cursor:'pointer',fontSize:12,fontWeight:800}}>⬇️ Télécharger</button>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5}}>Aucun reçu capté pour l'instant. Ouvre/télécharge un reçu ou une facture officielle sur Vinted (avec l'extension active) → il apparaîtra ici, prêt pour ta compta.</div>
+                )}
+              </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12.5,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
+                <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12.5,fontWeight:700,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
                 <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12.5,fontWeight:800,cursor:'pointer'}}>📄 PDF</button>
               </div>
               <div style={{fontSize:10.5,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
