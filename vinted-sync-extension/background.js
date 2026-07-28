@@ -160,9 +160,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-lbc') {
       (async () => {
         try {
-          if (msg.action === 'getQueue') { const q = await buildLbcQueue(); sendResponse({ ok: true, queue: q }); return; }
+          if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals }); return; }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
+          if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -687,7 +688,7 @@ function refFromText(text) {
   m = /r[ée]f\.?\s*[:#]?\s*(\d{1,5})/i.exec(s);
   return m ? m[1] : null;
 }
-async function buildLbcQueue() {
+async function buildLbcData() {
   const mainRows = await sbGet('app_data?id=eq.main&select=data');
   const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
   const numeros = main.vinted_annonce_numeros || {};
@@ -700,12 +701,13 @@ async function buildLbcQueue() {
   const posted = new Set(((postedRows && postedRows[0] && postedRows[0].data && postedRows[0].data.ids) || []).map(String));
   // Annonces EN LIGNE (harvest listings).
   const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
-  const online = []; const seen = new Set();
+  const online = []; const onlineIds = new Set(); const seen = new Set();
   for (const r of listRows) {
     const d = r.data || {}; const p = d.payload || {}; const uid = String(d.uid);
     for (const it of (p.items || [])) {
       const oid = String(it.id);
       if (it.is_closed || it.is_hidden || it.is_draft) continue;
+      onlineIds.add(oid);
       if (seen.has(oid)) continue; seen.add(oid);
       online.push({ id: oid, uid, raw: it });
     }
@@ -722,7 +724,18 @@ async function buildLbcQueue() {
     queue.push(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]));
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-  return queue;
+  // À RETIRER de Leboncoin : une paire publiée sur LBC qui n'est PLUS en ligne
+  // sur Vinted = vendue (ou retirée) côté Vinted → il faut la retirer de LBC pour
+  // ne pas la vendre deux fois. On la retrouve par son id d'annonce Vinted.
+  const removals = [];
+  for (const pid of posted) {
+    if (!/^\d+$/.test(pid)) continue;                 // on ne suit que les ids d'annonce
+    if (onlineIds.has(pid)) continue;                  // encore en ligne sur Vinted → RAS
+    const e = numeros[pid] || {};
+    removals.push({ id: pid, numero: String(e.numero || '?'), ref: 'VRM-' + (e.numero || '?'), title: e.title || '' });
+  }
+  removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  return { queue, removals };
 }
 async function readPostedIds() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');

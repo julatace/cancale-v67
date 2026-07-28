@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v31/07 · 🔢compact';
+const BUILD_ID = 'v32/07 · 🩺diag+sync';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -5801,6 +5801,32 @@ function VintedAccounts({ accounts, setAccounts }) {
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   })(); }, []);
+  // ── DIAGNOSTIC : santé de chaque compte (dernière capture par l'extension) ──
+  // Requête LÉGÈRE : on ne lit que la colonne updated_at des lignes harvest_* (pas
+  // les gros payloads) → pour chaque compte, la date de dernière capture. Croisé
+  // avec updated_at du compte (fraîcheur du token) et la liste des bloqués.
+  const [lastCap, setLastCap] = useState({}); // uid -> ms de la dernière capture
+  const blockedAccts = useMemo(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)), []);
+  useEffect(() => { (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+      if (!res.ok) return;
+      const rows = await res.json(); const by = {};
+      rows.forEach(r => { const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return; const t = r.updated_at ? new Date(r.updated_at).getTime() : 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
+      setLastCap(by);
+    } catch (_) {}
+  })(); }, []);
+  const acctHealth = (acc) => {
+    const uid = String(acc.vinted_user_id);
+    if (blockedAccts.has(uid)) return { icon: '🚫', label: 'Bloqué', color: C.danger, hint: 'Vinted a refusé ce compte (401/403). Ses annonces/ventes sont masquées.' };
+    const cap = lastCap[uid];
+    if (!cap) return { icon: '⚪', label: 'Jamais capté', color: C.muted, hint: 'Ouvre ta boutique sur vinted.fr avec l\'extension pour capter ce compte.' };
+    const ageH = (Date.now() - cap) / 3600000;
+    const ago = ageH < 1 ? 'il y a <1 h' : ageH < 48 ? `il y a ${Math.round(ageH)} h` : `il y a ${Math.round(ageH / 24)} j`;
+    if (ageH < 12) return { icon: '🟢', label: 'À jour', color: INV_STATUS.online.color, hint: `Dernière capture ${ago}.` };
+    if (ageH < 72) return { icon: '🟡', label: `Capté ${ago}`, color: C.warn, hint: 'Repasse sur vinted.fr pour rafraîchir.' };
+    return { icon: '🔴', label: `Pas capté (${ago})`, color: C.danger, hint: 'Repasse sur vinted.fr avec l\'extension pour re-capter ce compte.' };
+  };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
   const toggleAcctCompta = (uid) => {
@@ -5875,6 +5901,23 @@ function VintedAccounts({ accounts, setAccounts }) {
         </div>
       )}
 
+      {/* Diagnostic global : combien de comptes à jour / à rafraîchir / bloqués. */}
+      {accounts.length > 0 && (()=>{
+        const st = accounts.map(acctHealth);
+        const ok = st.filter(s=>s.icon==='🟢').length;
+        const warn = st.filter(s=>s.icon==='🟡'||s.icon==='⚪').length;
+        const bad = st.filter(s=>s.icon==='🔴'||s.icon==='🚫').length;
+        return (
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,marginBottom:14,fontSize:12.5,fontWeight:800}}>
+            <span style={{color:C.text}}>🩺 État des comptes :</span>
+            <span style={{color:INV_STATUS.online.color}}>🟢 {ok} à jour</span>
+            {warn>0 && <span style={{color:C.warn}}>🟡 {warn} à rafraîchir</span>}
+            {bad>0 && <span style={{color:C.danger}}>🔴 {bad} en panne</span>}
+            <span style={{color:C.muted,fontWeight:600,flex:'1 1 100%',fontSize:11,marginTop:2}}>« À jour » = capté récemment par l'extension. Un compte « à rafraîchir » ou « en panne » : repasse sur vinted.fr, l'extension le recapte tout seul.</span>
+          </div>
+        );
+      })()}
+
       {accounts.length > 0 && (
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {accounts.map(acc => {
@@ -5904,6 +5947,9 @@ function VintedAccounts({ accounts, setAccounts }) {
                       {acc.login && acc.login !== accountName(acc) ? `@${acc.login} · ` : ''}
                       maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}
                     </div>
+                    {(()=>{ const h=acctHealth(acc); return (
+                      <div title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:800,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:999,padding:'2px 9px'}}>{h.icon} {h.label}</div>
+                    ); })()}
                     {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
                       <div style={{fontSize:11.5,marginTop:3,fontWeight:800,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
                         {stars!=null?<>⭐ {stars.toFixed(2)}/5</>:''}

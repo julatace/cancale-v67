@@ -11,6 +11,7 @@
   const send = (m) => new Promise((res) => { try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-lbc' }, m), (r) => res(r || { ok: false })); } catch (_) { res({ ok: false }); } });
 
   let queue = [];
+  let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
   let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
   // Lit toute l'annonce (titre + description) de la page courante et récupère nos
   // références « VRM-{num} ». Marche pour un compte PRO comme normal : on lit
@@ -55,20 +56,33 @@
     .btn.g{background:#0a7f3f;color:#fff;border-color:#0a7f3f}
     .hint{font-size:10.5px;color:#8a8f98;padding:4px 2px 8px;line-height:1.4}
     .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#111;color:#fff;padding:9px 14px;border-radius:10px;font-size:12.5px;font-weight:700;opacity:0;transition:opacity .2s;z-index:2147483647}
+    .remsec{border:1px solid #f0b6b0;background:#fdeceb;border-radius:12px;padding:8px;margin-bottom:10px}
+    .remhd{font-size:12px;font-weight:900;color:#c0392b;margin-bottom:6px}
+    .rem{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f2cfcb;border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12px}
   `;
 
   let open = false;
   function render() {
     const items = queue;
+    const badge = items.length + (removals.length ? '+' + removals.length : '');
+    const remHtml = removals.length
+      ? `<div class="remsec"><div class="remhd">🔴 ${removals.length} vendue${removals.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</div>${removals.map(remHtmlOne).join('')}</div>`
+      : '';
     root.innerHTML = `<style>${css}</style>` + (open
       ? `<div class="panel">
-           <div class="hd"><span class="t">🟠 ${items.length} annonce${items.length > 1 ? 's' : ''} à publier</span>
+           <div class="hd"><span class="t">🟠 ${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
-           <div class="body">${items.length ? items.map(cardHtml).join('') : '<div class="empty">Rien à publier pour le moment.<br>Dès qu&#39;une annonce numérotée est en ligne sur Vinted, elle apparaît ici.</div>'}</div>
+           <div class="body">${remHtml}${items.length ? items.map(cardHtml).join('') : '<div class="empty">Rien à publier pour le moment.<br>Dès qu&#39;une annonce numérotée est en ligne sur Vinted, elle apparaît ici.</div>'}</div>
            <div class="hint">Sur « Déposer une annonce », clique <b>Pré-remplir</b> puis vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
-      : `<button class="fab" data-a="open">🟠 VRM <span class="b">${items.length}</span></button>`);
+      : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
+  }
+  function remHtmlOne(r) {
+    return `<div class="rem" data-rid="${esc(r.id)}">
+      <div style="flex:1;min-width:0"><b>N°${esc(r.numero)}</b> ${esc((r.title || '').slice(0, 34))}<div style="font-size:10.5px;color:#a33">cherche « ${esc(r.ref)} » dans tes annonces Leboncoin et supprime-la</div></div>
+      <button class="btn" data-a="removed" style="border-color:#c0392b;color:#c0392b">✓ Retirée</button>
+    </div>`;
   }
   function cardHtml(ad) {
     const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo">`).join('');
@@ -137,6 +151,13 @@
     if (a === 'open') { open = true; render(); return; }
     if (a === 'close') { open = false; render(); return; }
     if (a === 'refresh') { await load(); toast('Actualisé'); return; }
+    if (a === 'removed') {
+      const rid = e.target.closest('.rem') && e.target.closest('.rem').getAttribute('data-rid');
+      if (!rid) return;
+      await send({ action: 'markRemoved', id: rid });
+      removals = removals.filter((x) => x.id !== rid); render(); toast('Retirée de la synchro ✓');
+      return;
+    }
     const card = e.target.closest('.card'); const id = card && card.getAttribute('data-id');
     const ad = queue.find((x) => x.id === id); if (!ad && a !== 'open') return;
     if (a === 'ctitle') { copy(ad.title); toast('Titre copié'); }
@@ -155,6 +176,7 @@
     scanPageRefs();
     const r = await send({ action: 'getQueue' });
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
+    removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
     render();
   }
   render();
