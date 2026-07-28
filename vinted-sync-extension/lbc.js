@@ -23,6 +23,7 @@
   let queue = [];
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
   let stats = { postedCount: 0, lbcCount: 0, limit: null, plan: null, detected: null }; // compteur d'annonces LBC + offre
+  let photoRes = null; // { numero, title, photos:[...] } — photos d'une paire à envoyer à un acheteur
   let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
   // Lit toute l'annonce (titre + description) de la page courante et récupère nos
   // références « VRM-{num} ». Marche pour un compte PRO comme normal : on lit
@@ -134,10 +135,27 @@
            <div class="hd"><span class="t">🟠 ${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
-           <div class="body">${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : '<div class="empty">Rien à publier pour le moment.<br>Dès qu&#39;une annonce numérotée est en ligne sur Vinted, elle apparaît ici.</div>'}</div>
+           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : '<div class="empty">Rien à publier pour le moment.<br>Dès qu&#39;une annonce numérotée est en ligne sur Vinted, elle apparaît ici.</div>'}</div>
            <div class="hint">Sur « Déposer une annonce », clique <b>Pré-remplir</b> puis vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
+  }
+  function photoHtml() {
+    const res = photoRes;
+    const grid = res && res.photos && res.photos.length
+      ? `<div class="ph" style="flex-wrap:wrap">${res.photos.map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir en grand">`).join('')}</div>
+         <div class="btns" style="margin-top:6px">
+           <button class="btn p" data-a="photoall">🖼️ Tout ouvrir (${res.photos.length})</button>
+           <button class="btn" data-a="photocopy">Copier les liens</button>
+           <button class="btn" data-a="photoclose">Fermer</button>
+         </div>`
+      : (res ? '<div style="font-size:11.5px;color:#a33;margin-top:5px">Aucune photo trouvée pour ce N° (la paire n&#39;a peut-être pas encore été captée sur Vinted).</div>' : '');
+    return `<div class="counter">
+      <div class="crow"><b>📷 Photos d&#39;une paire</b> <span style="font-size:10.5px;color:#8a8f98;font-weight:700">pour un acheteur</span>
+        <button class="btn" data-a="photolookup" style="margin-left:auto">Chercher un N°</button></div>
+      ${res && res.numero ? `<div style="font-size:11px;color:#555;font-weight:700;margin-top:4px">N°${esc(res.numero)}${res.title ? ' · ' + esc(String(res.title).slice(0, 32)) : ''} — ${res.photos.length} photo${res.photos.length > 1 ? 's' : ''} Vinted</div>` : ''}
+      ${grid}
+    </div>`;
   }
   function counterHtml() {
     const n = Math.max(stats.postedCount || 0, stats.lbcCount || 0); // le plus fiable des deux
@@ -233,6 +251,18 @@
     if (a === 'open') { open = true; render(); return; }
     if (a === 'close') { open = false; render(); return; }
     if (a === 'refresh') { await load(); toast('Actualisé'); return; }
+    if (a === 'photolookup') {
+      const num = window.prompt('Numéro (N°) de la paire dont tu veux les photos :', (photoRes && photoRes.numero) || '');
+      if (num === null || !num.trim()) return;
+      toast('Recherche des photos…');
+      const r = await send({ action: 'getPhotos', numero: num.trim() });
+      photoRes = (r && r.ok) ? { numero: r.numero, title: r.title, photos: r.photos || [] } : { numero: num.trim(), title: '', photos: [] };
+      render();
+      return;
+    }
+    if (a === 'photoall') { (photoRes && photoRes.photos || []).forEach((u, i) => setTimeout(() => window.open(u, '_blank'), i * 250)); toast('Photos ouvertes — enregistre-les pour l\'acheteur'); return; }
+    if (a === 'photocopy') { copy((photoRes && photoRes.photos || []).join('\n')); toast('Liens copiés'); return; }
+    if (a === 'photoclose') { photoRes = null; render(); return; }
     if (a === 'setplan') {
       const plan = window.prompt('Nom de ton offre Leboncoin (ex. Gratuit, Pack Pro…) :', stats.plan || 'Gratuit');
       if (plan === null) return;

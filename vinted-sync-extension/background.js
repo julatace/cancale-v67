@@ -162,6 +162,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats }); return; }
           if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
+          if (msg.action === 'getPhotos') { const r = await getPairPhotos(msg.numero); sendResponse({ ok: true, numero: r.numero, title: r.title, photos: r.photos }); return; }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
@@ -827,6 +828,30 @@ async function handleLbcRaw(url, body) {
   // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
   await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } });
   if (found.length) await storeLbcListings(url, found);
+}
+// Toutes les photos Vinted (HD) d'une paire, par son N°. Leboncoin limite le
+// nombre de photos ; ici on récupère TOUTES celles de Vinted (déjà moissonnées)
+// pour pouvoir en envoyer davantage à un acheteur qui en demande, sans rien
+// re-télécharger. Cherche dans le détail complet (item) puis dans le dressing.
+async function getPairPhotos(numero) {
+  const num = String(numero || '').trim();
+  if (!num) return { numero: num, title: '', photos: [] };
+  const mainRows = await sbGet('app_data?id=eq.main&select=data');
+  const numeros = (mainRows && mainRows[0] && mainRows[0].data && mainRows[0].data.vinted_annonce_numeros) || {};
+  const ids = Object.keys(numeros).filter((k) => String(numeros[k] && numeros[k].numero) === num);
+  const photos = []; const seen = new Set(); let title = '';
+  const add = (u) => { const s = typeof u === 'string' ? u : (u && (u.full_size_url || u.url)); if (s && !seen.has(s)) { seen.add(s); photos.push(s); } };
+  const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
+  const detById = {}; for (const r of itemRows) { const p = (r.data && r.data.payload) || {}; const it = p.item || p; if (it && it.id) detById[String(it.id)] = it; }
+  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  const rawById = {}; for (const r of listRows) { const p = (r.data && r.data.payload) || {}; for (const it of (p.items || [])) rawById[String(it.id)] = it; }
+  for (const id of ids) {
+    title = title || (numeros[id] && numeros[id].title) || '';
+    const det = detById[id]; if (det && Array.isArray(det.photos)) det.photos.forEach(add);
+    const raw = rawById[id]; if (raw) { (raw.photos || []).forEach(add); if (raw.photo) add(raw.photo); }
+    if (numeros[id] && numeros[id].photo) add(numeros[id].photo);
+  }
+  return { numero: num, title, photos };
 }
 async function readPostedData() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
