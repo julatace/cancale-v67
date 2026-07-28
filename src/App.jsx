@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v29/07 · 🧹épuré';
+const BUILD_ID = 'v29/07 · 🔢reset43';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7644,6 +7644,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, autoNum, cloudReady]);
 
+  // ── NETTOYAGE (une seule fois) de la liste des numéros utilisés ───────────
+  // Un bug passé avait « brûlé » des numéros (43→88, 116→144) qui n'ont jamais
+  // été posés sur une vraie boîte : ils gonflaient la séquence pour rien. On
+  // reconstruit `vinted_used_numeros` à partir des SEULS numéros réels :
+  //   • annonces numérotées (vinted_annonce_numeros),
+  //   • numéros rangés au garage (vinted_garage_grid),
+  //   • numéros saisis À LA MAIN sur des ventes (saleOv non auto).
+  // Les numéros fantômes disparaissent → la prochaine paire repart au 1er trou
+  // réel (43). Aucune vraie boîte ne perd son numéro. Idempotent + une seule fois.
+  useEffect(() => {
+    if (!cloudReady) return;
+    if (load('vinted_used_cleaned_v1', false)) return;      // déjà nettoyé sur cet appareil
+    if (!numeros || !Object.keys(numeros).length) return;    // données pas prêtes → on ne touche à rien
+    const real = new Set();
+    Object.values(numeros).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) real.add(n); });
+    Object.values(saleOv).forEach(e => { if (e && !e.autoAssigned) { const n = parseInt(String(e.numero), 10); if (!isNaN(n)) real.add(n); } });
+    const collect = (g) => { if (Array.isArray(g)) g.forEach(collect); else if (g && typeof g === 'object') Object.values(g).forEach(collect); else { const n = parseInt(String(g), 10); if (!isNaN(n)) real.add(n); } };
+    collect(garageGrid);
+    const cleaned = [...real].sort((a, b) => a - b);
+    const cur = (usedNumeros || []).map(x => parseInt(String(x), 10)).filter(n => !isNaN(n));
+    save('vinted_used_cleaned_v1', true);
+    // On n'écrit que si ça change vraiment (évite un save inutile).
+    if (cleaned.length !== cur.length || cleaned.some((v, i) => v !== cur[i])) {
+      setUsedNumeros(cleaned); save('vinted_used_numeros', cleaned);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, numeros, saleOv, garageGrid]);
+
   const loadListings = async (force) => {
     const cached = !force && fromCache('listings');
     if (cached) { setListings({ loading:false, items:cached }); return; }
@@ -9893,13 +9921,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
               <div style={{fontSize:12,fontWeight:800,color:C.text,flex:1}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
             </div>
-            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordDone(b)).length; return nPending>=2 ? (
-              <button type="button" onClick={batchBordereaux} disabled={batchBusy}
-                title="Tamponne tous les bordereaux non imprimés et les met à la suite dans un seul PDF à imprimer d'un coup"
-                style={{width:'100%',border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'12px',cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:800,marginBottom:10,opacity:batchBusy?0.6:1}}>
-                {batchBusy?'Préparation…':`🖨 Tout imprimer à la suite (${nPending})`}
-              </button>
-            ) : null; })()}
             {(()=>{ const done=[...emailBords].filter(b=>!isBordHidden(b)&&isBordDone(b)); return done.length>0 ? (
               <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
                 <span style={{color:INV_STATUS.online.color,fontWeight:800}}>✅ {done.length} bordereau{done.length>1?'x':''} expédié{done.length>1?'s':''}</span>
