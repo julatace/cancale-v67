@@ -11,6 +11,19 @@
   const send = (m) => new Promise((res) => { try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-lbc' }, m), (r) => res(r || { ok: false })); } catch (_) { res({ ok: false }); } });
 
   let queue = [];
+  let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
+  // Lit toute l'annonce (titre + description) de la page courante et récupère nos
+  // références « VRM-{num} ». Marche pour un compte PRO comme normal : on lit
+  // NOTRE jeton, pas la numérotation Leboncoin. Sert à savoir ce qui est déjà en ligne.
+  function scanPageRefs() {
+    const s = new Set();
+    try {
+      const txt = (document.body && document.body.innerText || '').slice(0, 500000);
+      const re = /VRM[-\s]?(\d{1,5})/gi; let m;
+      while ((m = re.exec(txt))) s.add(m[1]);
+    } catch (_) {}
+    pageRefs = s;
+  }
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;z-index:2147483647;right:16px;bottom:16px;';
   const root = host.attachShadow({ mode: 'open' });
@@ -59,8 +72,9 @@
   }
   function cardHtml(ad) {
     const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo">`).join('');
+    const onPage = pageRefs.has(String(ad.numero));
     return `<div class="card" data-id="${esc(ad.id)}">
-      <div class="row"><span class="num">N°${esc(ad.numero)}</span><span class="cat">${esc(ad.category)}</span><span class="acc">${esc(ad.account)}</span></div>
+      <div class="row"><span class="num">N°${esc(ad.numero)}</span><span class="cat">${esc(ad.category)}</span>${onPage ? '<span class="cat" style="background:#e6f6ec;color:#0a7f3f">déjà sur cette page ?</span>' : ''}<span class="acc">${esc(ad.account)}</span></div>
       <div class="tt">${esc(ad.title)}</div>
       <div class="pr">${esc(ad.price)} €</div>
       ${ph ? `<div class="ph">${ph}</div>` : ''}
@@ -138,12 +152,16 @@
   });
 
   async function load() {
+    scanPageRefs();
     const r = await send({ action: 'getQueue' });
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
     render();
   }
   render();
   load();
-  // Rafraîchit quand on revient sur l'onglet (nouvelle annonce entre-temps).
+  // Rafraîchit quand on revient sur l'onglet (nouvelle annonce entre-temps) et
+  // re-scanne la page après navigation interne (Leboncoin est une SPA).
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+  let lastUrl = location.href;
+  setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(load, 1200); } }, 2000);
 })();

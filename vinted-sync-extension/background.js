@@ -661,14 +661,31 @@ function buildLbcAd(raw, det, num, account) {
   if (size) specs.push('Taille : ' + size);
   if (cond) specs.push('État : ' + cond);
   if (color) specs.push('Couleur : ' + color);
+  // RÉFÉRENCE UNIVERSELLE : on écrit NOTRE numéro « VRM-{num} » dans l'annonce,
+  // en HAUT (visible pour retrouver la paire en rayon) ET en bas. Ça marche sur
+  // TOUT compte — pas besoin de la numérotation auto des comptes PRO. C'est aussi
+  // la clé qui permettra de resynchroniser (vendu sur LBC → retirer de Vinted).
+  const ref = 'VRM-' + num;
   const parts = [];
+  parts.push('📦 Réf. ' + ref);
+  parts.push('');
   parts.push(desc0 || base);
   if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
   parts.push('');
   parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
-  parts.push('Réf. ' + num);
+  parts.push('Réf. ' + ref);
   const description = parts.join('\n');
-  return { id: String(raw.id), numero: String(num), account: account || '', title, description, price, category: lbcCategory(det, raw), photos, vintedUrl: firstDefined(raw.url, det.url) };
+  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), photos, vintedUrl: firstDefined(raw.url, det.url) };
+}
+// Extrait NOTRE numéro depuis n'importe quel texte d'annonce Leboncoin (titre +
+// description). Marche pour un compte PRO (numérotation auto ignorée) comme pour
+// un compte normal, car on lit d'abord notre jeton « VRM-{num} », puis « Réf X ».
+function refFromText(text) {
+  const s = String(text || '');
+  let m = /VRM[-\s]?(\d{1,5})/i.exec(s);
+  if (m) return m[1];
+  m = /r[ée]f\.?\s*[:#]?\s*(\d{1,5})/i.exec(s);
+  return m ? m[1] : null;
 }
 async function buildLbcQueue() {
   const mainRows = await sbGet('app_data?id=eq.main&select=data');
