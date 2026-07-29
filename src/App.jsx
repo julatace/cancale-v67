@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v35/07 · 🔔LBC';
+const BUILD_ID = 'v35/08 · 🙈masqué';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -5994,9 +5994,9 @@ function VintedAccounts({ accounts, setAccounts }) {
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                   {tr && !tr.loading && <span style={{fontSize:11,fontWeight:700,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
                   {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
-                    <button onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est EXCLU de ta comptabilité':'Ce compte compte dans ta comptabilité'}
+                    <button onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
                       style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:off?C.muted:C.accent}}>
-                      {off ? '🚫 Hors compta' : '✅ Dans la compta'}
+                      {off ? '🚫 Masqué (annonces + compta)' : '✅ Actif'}
                     </button>
                   ); })()}
                   <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
@@ -7318,7 +7318,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const annShown = useMemo(() => {
     // Un compte détecté BLOQUÉ par Vinted : ses annonces moissonnées sont périmées
     // (le compte est fermé) → on les retire automatiquement de la liste.
-    let arr = [...(listings.items || [])].filter(it => !blockedAccts.has(String(it._acc?.vinted_user_id)) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id))));
+    // Comptes bloqués (détectés) OU masqués à la main : leurs annonces ne s'affichent pas.
+    let arr = [...(listings.items || [])].filter(it => !blockedAccts.has(String(it._acc?.vinted_user_id)) && !hiddenAccts.has(String(it._acc?.vinted_user_id)) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id))));
     const q = annSearch.trim().toLowerCase();
     if (q) arr = arr.filter(it => {
       const num = String(numeros[it.id]?.numero || '');
@@ -7349,7 +7350,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold, blockedAccts]);
+  }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
   const blockedList = useMemo(() => accounts.filter(a => blockedAccts.has(String(a.vinted_user_id))), [accounts, blockedAccts]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
