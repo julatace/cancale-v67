@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/12 · ☀️jour';
+const BUILD_ID = 'v36/13 · 📄fusion';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -1549,7 +1549,6 @@ const BOTTOM_TABS=[
   {id:'cat_annonces', icon:'🟢',label:'Annonces'},
   {id:'cat_ventes',   icon:'💸',label:'Ventes'},
   {id:'cat_achats',   icon:'🛍️',label:'Achats'},
-  {id:'cat_expedition',icon:'📦',label:'Expédition'},
   {id:'cat_bord',     icon:'📄',label:'Bordereaux'},
   {id:'cat_msg',      icon:'💬',label:'Messages'},
   {id:'garage',       icon:'🏠',label:'Garage'},
@@ -8845,7 +8844,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         const jobs=[];
-        if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_expedition',prio:late>0?0:1});
+        if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_bord',prio:late>0?0:1});
         const pickupCount=(tracking||[]).filter(isRetirable).length||vintedToPickup.length; // même compte que l'onglet Achats
         if(pickupCount) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${pickupCount} colis`,sub:'Déposés en point relais — récupère-les avec ton code',tab:'cat_achats',prio:2});
         if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
@@ -8960,7 +8959,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:12.5,fontWeight:900,color:col}}>{toShip.length} colis à expédier{late>0?` · ${late} en retard`:urgent>0?` · ${urgent} urgent${urgent>1?'s':''}`:''}</div>
                   {s.shipBy && <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Le plus pressé : <b>{s.o.title||'vente'}</b> — {when(s)}</div>}
                 </div>
-                {onNav && <button type="button" onClick={()=>onNav('cat_expedition')} style={{flexShrink:0,border:'none',background:col,color:'#fff',borderRadius:9,padding:'8px 11px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>📦 Expédier</button>}
+                {onNav && <button type="button" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,border:'none',background:col,color:'#fff',borderRadius:9,padding:'8px 11px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>📦 Expédier</button>}
               </div>
               <div style={{fontSize:10,color:C.muted,marginTop:6,lineHeight:1.4}}>Vinted laisse ~{SHIP_DAYS} j après la vente pour expédier ; à temps = note vendeur préservée. Échéance estimée. Génère le bordereau plus bas (bouton 📄) ou dans l'onglet Bordereaux.</div>
             </div>
@@ -10342,23 +10341,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(() => {
           if (sales.loading || sales.error) return null;
           // Uniquement les ventes À EXPÉDIER (ni expédiées, ni finalisées, ni annulées).
-          const list = (sales.items||[]).filter(o=>needsBordereau(o.status)).filter(o=>matchOrd(o));
+          // FUSION avec l'ancien onglet « Expédition » : même liste, mais avec
+          // l'URGENCE, la CASE AU GARAGE et la coche « posté » — plus besoin de
+          // deux onglets qui montraient la même chose.
+          const urg = {}; (toShip||[]).forEach(t=>{ if(t && t.o && t.o.transaction_id!=null) urg[String(t.o.transaction_id)] = t; });
+          const all = (sales.items||[]).filter(o=>needsBordereau(o.status)).filter(o=>matchOrd(o));
+          const list = [...all].sort((a,b)=>{
+            const da = urg[String(a.transaction_id)], db = urg[String(b.transaction_id)];
+            const va = da && da.daysLeft!=null ? da.daysLeft : 999;
+            const vb = db && db.daysLeft!=null ? db.daysLeft : 999;
+            if (va!==vb) return va-vb;                    // le plus urgent en haut
+            return (isShipDone(a)?1:0)-(isShipDone(b)?1:0); // déjà postés en bas
+          });
           if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente à expédier.<br/><span style={{fontSize:11.5}}>Les bordereaux apparaissent pour les ventes en cours d'expédition.</span></div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {list.map(o=>{ const num=effEntry(o)?.numero||''; const st=classifyOrderStatus(o.status);
+                const t = urg[String(o.transaction_id)];
+                const dl = t && t.daysLeft!=null ? t.daysLeft : null;
+                const posted = isShipDone(o);
+                const cell = num ? garageCellOf(garageGrid, num) : null;
+                const urgCol = dl==null ? C.muted : dl<0 ? C.danger : dl<=1 ? C.warn : C.muted;
+                const urgTxt = dl==null ? null : dl<0 ? `⚠️ ${-dl}j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl}j pour poster`;
                 return (
-                  <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
+                  <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${dl!=null&&dl<0?C.danger+'66':C.border}`,background:C.card,opacity:posted?0.6:1}}>
                     <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</div>
                       <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                         <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                        <span style={{color:st==='completed'?INV_STATUS.online.color:C.warn,fontWeight:700}}>{st==='completed'?'finalisée':'en cours'}</span>
-                        {!num && <span style={{color:C.muted}}>titre seul</span>}
+                        {urgTxt && <span style={{color:urgCol,fontWeight:800}}>{urgTxt}</span>}
+                        {cell
+                          ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',padding:0,fontSize:10,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>
+                          : (num ? <span>🏠 pas rangée</span> : <span>titre seul</span>)}
+                        {posted && <span style={{color:INV_STATUS.online.color,fontWeight:800}}>✓ posté</span>}
                       </div>
                     </div>
-                    <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:13,fontWeight:800}}>📄 Bordereau</button>
+                    <div style={{display:'flex',flexDirection:'column',gap:4,flexShrink:0}}>
+                      <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} style={{border:'none',background:C.accent,color:'#fff',borderRadius:8,padding:'7px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit'}}>📄 Bordereau</button>
+                      <button type="button" onClick={()=>toggleShipDone(o)} title={posted?'Annuler « posté »':'Marquer comme posté'} style={{border:`1px solid ${posted?INV_STATUS.online.color:C.border}`,background:'transparent',color:posted?INV_STATUS.online.color:C.muted,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:11.5,fontWeight:800,fontFamily:'inherit'}}>{posted?'↩︎ annuler':'✓ Posté'}</button>
+                    </div>
                   </div>
                 );
               })}
@@ -12502,7 +12524,7 @@ export default function App() {
         }
       }catch(_){}
       if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
-      if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_expedition'});
+      if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(unreadTotal>0){
         const accs=Object.entries(unreadByAcct).sort((x,y)=>y[1]-x[1]).map(([n,c])=>`${n} (${c})`);
@@ -12842,7 +12864,7 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'expedition'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
       </main>
