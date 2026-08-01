@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "4.14.0",
-  "description": "Synchronise tes comptes et donnees Vinted (annonces detaillees, ventes, achats, messages) vers VRM, depuis TON navigateur. + Assistant Leboncoin : prepare tes annonces (titre, description, prix, categorie, photos) et pre-remplit le formulaire de depot pour que tu publies en 1 clic. Aucune publication automatique.",
-  "permissions": ["cookies", "storage", "alarms", "scripting", "tabs", "downloads", "clipboardWrite"],
+  "version": "4.15.0",
+  "description": "Synchronise tes comptes et donnees Vinted (annonces detaillees, ventes, achats, messages) vers VRM, depuis TON navigateur. + Panneau VRM sur Vinted (numero de la paire, prix achat, case garage, paires a relancer - affichage seul). + Assistant Leboncoin : prepare tes annonces (titre, description, prix, categorie, photos) et pre-remplit le formulaire de depot pour que tu publies en 1 clic. Aucune publication automatique.",
+  "permissions": ["cookies", "storage", "alarms", "scripting", "tabs", "downloads"],
   "host_permissions": [
     "https://*.vinted.fr/*",
     "https://*.vinted.com/*",
@@ -24,6 +24,17 @@
       ],
       "js": ["content.js"],
       "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.vinted.fr/*",
+        "https://*.vinted.com/*",
+        "https://*.vinted.it/*",
+        "https://*.vinted.de/*"
+      ],
+      "js": ["vinted-panel.js"],
+      "run_at": "document_idle",
       "all_frames": false
     },
     {

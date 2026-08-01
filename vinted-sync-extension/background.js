@@ -97,29 +97,6 @@ async function captureAllAccounts() {
   return results;
 }
 
-// Construit le "bundle token" à coller dans l'app (écran « Connecter un compte »).
-// Prend le domaine Vinted actuellement connecté (celui qui a un access_token).
-// Contient tout ce qu'il faut pour connecter/rafraîchir le compte proprement.
-async function buildTokenBundle() {
-  for (const domain of VINTED_DOMAINS) {
-    const access = await getCookie(domain, 'access_token_web');
-    if (!access) continue;
-    const refresh = await getCookie(domain, 'refresh_token_web');
-    const anon = await getCookie(domain, 'anon_id');
-    const payload = jwtPayload(access);
-    const uid = payload && payload.account_id ? String(payload.account_id) : null;
-    return {
-      vinted_user_id: uid,
-      domain,
-      access_token: access,
-      refresh_token: refresh || '',
-      anon_id: anon || '',
-      csrf_token: lastCsrfByDomain[domain] || '',
-    };
-  }
-  return null;
-}
-
 // --- Capture passive des donnees ------------------------------------------
 
 // Range une donnee moissonnee dans app_data sous une ligne dediee.
@@ -162,11 +139,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
       return true; // reponse asynchrone
     }
-    // « Copier mon token » : renvoie le bundle du compte Vinted connecté.
-    if (msg && msg.from === 'cancale-popup' && msg.action === 'copyToken') {
-      buildTokenBundle().then((b) => sendResponse({ ok: !!b, bundle: b }));
-      return true; // reponse asynchrone
-    }
     // PONT APP -> EXTENSION : l'app VRM demande d'EXECUTER une action Vinted
     // (repondre, faire une offre...) depuis TON navigateur/IP. On n'accepte que
     // des endpoints /api/ Vinted, et on agit avec le token du compte vise.
@@ -182,6 +154,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
       return true; // reponse asynchrone
+    }
+    // PANNEAU VRM SUR VINTED : vinted-panel.js demande les données de TON app
+    // (numéros, garage, paires qui dorment, stats). Lecture Supabase seule —
+    // aucune requête vers Vinted, aucune action automatisée sur le site.
+    if (msg && msg.from === 'cancale-vpanel') {
+      (async () => {
+        try {
+          if (msg.action === 'panelData') { const r = await buildPanelData(); sendResponse({ ok: true, ...r }); return; }
+          sendResponse({ ok: false, error: 'action inconnue' });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
     }
     // PONT LEBONCOIN : le script lbc.js (sur leboncoin.fr) demande la liste des
     // annonces Vinted prêtes à publier, ou marque une annonce comme publiée.
@@ -665,6 +649,77 @@ try {
 // catégorie, photos) et on la propose dans le panneau lbc.js. La publication
 // reste un geste HUMAIN (tu cliques « Publier » sur Leboncoin).
 // ═══════════════════════════════════════════════════════════════════════════
+// ── PANNEAU VRM SUR VINTED ──────────────────────────────────────────────────
+// Agrège, POUR TOI, ce que ton app sait déjà : le numéro de chaque annonce, son
+// prix d'achat, sa case au garage, et les paires « qui dorment » (en ligne
+// depuis longtemps) à relancer à la main. 100 % lecture Supabase : aucun appel
+// à Vinted, aucun clic automatisé. Le panneau AFFICHE, c'est toi qui agis.
+async function buildPanelData() {
+  const rows = await sbGet('app_data?id=eq.main&select=data');
+  const d = (rows && rows[0] && rows[0].data) || {};
+  const numeros = d.vinted_annonce_numeros || {};
+  const grid = d.vinted_garage_grid || {};
+  // Case du garage par numéro (grille 2D : { "A1": ["12","34"], … }).
+  const cellByNum = {};
+  for (const cell in grid) {
+    const vals = Array.isArray(grid[cell]) ? grid[cell] : [];
+    for (const v of vals) { const t = String(v || '').trim(); if (t) cellByNum[t] = cell; }
+  }
+  // Annonces réellement en ligne, depuis la moisson (par compte).
+  const lst = await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || [];
+  const online = [];
+  const seen = new Set();
+  for (const r of lst) {
+    const p = (r.data && r.data.payload) || {};
+    for (const it of (p.items || [])) {
+      if (it.is_closed || it.is_hidden || it.is_draft) continue;
+      const id = String(it.id); if (seen.has(id)) continue; seen.add(id);
+      const e = numeros[id] || null;
+      // Ancienneté : date Vinted de mise en ligne si dispo, sinon date de numérotation.
+      let ts = null;
+      const raw = it.created_at_ts || it.created_at || it.createdAt;
+      if (raw != null) { const n = Number(raw); ts = isFinite(n) ? (n < 1e12 ? n * 1000 : n) : Date.parse(raw) || null; }
+      if (!ts && e && e.numberedAt) ts = Date.parse(e.numberedAt) || null;
+      const ageDays = ts ? Math.floor((Date.now() - ts) / 86400000) : null;
+      const numero = e && e.numero ? String(e.numero) : null;
+      online.push({
+        id, title: it.title || '', url: it.url || `https://www.vinted.fr/items/${id}`,
+        price: (it.price && (it.price.amount != null ? it.price.amount : it.price)) ?? null,
+        photo: (it.photo && it.photo.url) || (it.photos && it.photos[0] && it.photos[0].url) || null,
+        views: it.view_count != null ? it.view_count : null,
+        favs: it.favourite_count != null ? it.favourite_count : null,
+        numero, buyPrice: e && e.buyPrice != null ? e.buyPrice : null,
+        cell: numero ? (cellByNum[numero] || null) : null,
+        ageDays,
+      });
+    }
+  }
+  // « À relancer » : le signal FIABLE est le ratio favoris/vues, pas l'âge.
+  // (Vinted ne donne pas la date de mise en ligne dans le dressing, et la date
+  // de numérotation ne mesure que le moment où TU as numéroté la paire.)
+  // Une annonce très vue mais peu mise en favori par rapport à TES propres
+  // annonces = prix probablement trop haut → candidate à une baisse. Le seuil
+  // est calculé sur ta médiane, pas sur une valeur arbitraire.
+  const rated = online.filter(o => o.views != null && o.views >= 40);
+  let relance = [];
+  if (rated.length >= 5) {
+    const ratios = rated.map(o => (o.favs || 0) / o.views).sort((a, b) => a - b);
+    const median = ratios[Math.floor(ratios.length / 2)];
+    const seuil = median * 0.5;
+    relance = rated.filter(o => (o.favs || 0) / o.views < seuil)
+                   .sort((a, b) => b.views - a.views)
+                   .map(o => ({ ...o, ratio: (o.favs || 0) / o.views }));
+  }
+  const noNum = online.filter(o => !o.numero);
+  const stats = {
+    online: online.length,
+    relance: relance.length,
+    noNum: noNum.length,
+    value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
+  };
+  return { online, relance, noNum, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+}
+
 async function sbGet(query) {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
