@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/07 · ☀️journée';
+const BUILD_ID = 'v37/08 · 🎨cartes';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -6137,7 +6137,7 @@ function VintedAccounts({ accounts, setAccounts }) {
           {accounts.map(acc => {
             const tr = testResult[acc.vinted_user_id];
             return (
-              <div key={acc.vinted_user_id} style={{borderRadius:14,border:`1px solid ${C.border}`,background:C.card,padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+              <div key={acc.vinted_user_id} style={{borderRadius:16,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
                 <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
                   <span style={{width:36,height:36,flexShrink:0,borderRadius:999,background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900}}>
                     {accountName(acc).slice(0,1).toUpperCase()}
@@ -6514,8 +6514,9 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
       <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
         {[['all','Toutes'],['online','En ligne'],['pending_sale','En cours'],['sold','Vendues'],['stock','Stock']].map(([id,label]) => (
           <button key={id} type="button" onClick={()=>setFilter(id)}
-            style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${filter===id?C.accent:C.border}`,
-              background:filter===id?C.accent:'transparent',color:filter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+            style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${filter===id?C.accent:C.border}`,
+              background:filter===id?C.accent:'transparent',color:filter===id?'#fff':C.muted,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+              boxShadow:filter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>
             {label} <span style={{opacity:0.7}}>({counts[id]})</span>
           </button>
         ))}
@@ -6600,7 +6601,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           const stt = INV_STATUS[p.status] || INV_STATUS.stock;
           const garage = inGarage(p.numero);
           return (
-            <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:10,borderRadius:12,border:`1px solid ${C.border}`,background:C.card}}>
+            <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:11,borderRadius:14,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                 {p.photo ? <img src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}>👟</span>}
               </div>
@@ -9365,7 +9366,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
-            <button key={id} onClick={()=>setVFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
+            <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
           {accounts.length>0 && (
             <button onClick={()=>{ loadOrders('sold',setSales,true); loadListings&&loadListings(true); }} disabled={sales.loading} title="Va chercher tes ventes en direct sur Vinted (tous comptes), sans attendre l'extension" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:800,cursor:sales.loading?'default':'pointer',opacity:sales.loading?0.6:1}}>{sales.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
@@ -10003,7 +10004,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
-            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>{label}</button>
+            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
           {accounts.length>0 && (
             <button onClick={()=>loadOrders('purchased',setBuys,true)} disabled={buys.loading} title="Va chercher tes achats en direct sur Vinted (tous comptes)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:800,cursor:buys.loading?'default':'pointer',opacity:buys.loading?0.6:1}}>{buys.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
@@ -10365,13 +10366,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // REPUBLIÉE (le N° a resservi) : elle n'est PAS vendue → pas de badge.
             const soldBord = (()=>{ const b = bordForItem(it.title, num); if(!b) return null; const en=numeros[it.id]; const et=en?new Date(en.repriseAt||en.numberedAt||0).getTime():0; const bt=new Date(b.receivedAt||0).getTime(); return (et&&bt&&et>bt)?null:b; })();
             return (
-              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:14,overflow:'hidden',background:C.card,border:`1.5px solid ${soldBord?C.warn:num?C.accent:C.border}`,...(soldBord?{opacity:0.8}:{}),display:'flex',flexDirection:'column'}}>
+              // Carte d'annonce : coins plus généreux + ombre douce. La bordure
+              // colorée d'1,5 px pour signaler « numérotée » était lourde sur une
+              // grille entière — on garde une bordure fine et c'est la PASTILLE
+              // du numéro qui porte la couleur.
+              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:16,overflow:'hidden',background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',...(soldBord?{opacity:0.85}:{}),display:'flex',flexDirection:'column'}}>
                 <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
                   <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:34}}>👟</span>}
                   </div>
                   {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:900,padding:'4px 8px',borderRadius:8,textAlign:'center'}}>📦 VENDUE — bordereau reçu</div>}
-                  {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'3px 9px',borderRadius:999}}>N°{num}</div>}
+                  {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:900,padding:'4px 10px',borderRadius:999,boxShadow:'0 2px 8px rgba(0,0,0,.28)',letterSpacing:-0.2}}>N°{num}</div>}
                   {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:900,padding:'3px 8px',borderRadius:999}}>😴 {age}j</div>}
                 </a>
                 <div style={{padding:'8px 10px 6px'}}>
@@ -11913,7 +11918,7 @@ function LeboncoinScreen() {
 }
 function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
   const Row = ({icon,title,desc,onClick,color}) => (
-    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'14px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10}}>
+    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:14,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
       <span style={{fontSize:22,flexShrink:0}}>{icon}</span>
       <span style={{flex:1,minWidth:0}}>
         <span style={{display:'block',fontSize:14,fontWeight:800,color:color||C.text}}>{title}</span>
