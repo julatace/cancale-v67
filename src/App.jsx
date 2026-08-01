@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/02 · 🔑état-comptes';
+const BUILD_ID = 'v36/03 · 🛟rappel-sauvegarde';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -11455,6 +11455,15 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
       <Row icon="🛟" title="Sauvegarde complète (1 clic)" desc="Télécharge TOUT : catalogue, ventes, achats, numéros, comptes, garage, réglages. Ton filet de sécurité." onClick={onExport}/>
       <Row icon="♻️" title="Restaurer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde, puis recharge l'app." onClick={onImport} color={C.blue}/>
+      {(()=>{ const t=Number(load('vinted_last_backup',0))||0; const days=t?Math.floor((Date.now()-t)/86400000):null;
+        const old = days===null || days>=30;
+        return (
+          <div style={{fontSize:11.5,fontWeight:700,color:old?C.warn:C.muted,margin:'-4px 2px 2px',display:'flex',alignItems:'center',gap:6}}>
+            <span>{old?'⚠️':'✅'}</span>
+            <span>{t? `Dernière sauvegarde : ${days===0?"aujourd'hui":days===1?'hier':`il y a ${days} j`}${old?' — pense à en refaire une !':''}` : 'Jamais sauvegardé — fais-en une maintenant pour protéger tes données.'}</span>
+          </div>
+        );
+      })()}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Ancienne application</div>
       <Row icon="📦" title="Ancien catalogue" desc="Les paires de l'ancienne appli (toujours comptées dans les stats)." onClick={()=>setTab('catalog')}/>
@@ -12620,6 +12629,7 @@ export default function App() {
             const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;
             a.download=`cancale-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            try{ localStorage.setItem('vinted_last_backup', String(Date.now())); }catch(_){}
           }catch(err){alert('Erreur export : '+err.message);} }}
           onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{
             const data=JSON.parse(await file.text());
