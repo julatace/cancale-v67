@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/11 · 🧾ca-juste';
+const BUILD_ID = 'v36/12 · ☀️jour';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -39,7 +39,7 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
-  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies',
+  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -2085,6 +2085,25 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             <span style={{fontSize:13.5,fontWeight:700,color:C.text}}>Tout est à jour — rien qui presse ✨</span>
           </div>
         )
+      )}
+
+      {/* AUJOURD'HUI : ce que tu as VENDU dans la journée (pas l'argent viré,
+          qui arrive plusieurs jours après — deux choses différentes). */}
+      {liveStats && liveStats.ventesJour!=null && (
+        <button type="button" onClick={()=>onGo&&onGo('cat_ventes')}
+          style={{width:'100%',textAlign:'left',border:`1px solid ${liveStats.ventesJour>0?C.accent:C.border}`,background:liveStats.ventesJour>0?`${C.accent}0e`:C.card,borderRadius:14,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit'}}>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,marginBottom:3}}>Aujourd'hui</div>
+          {liveStats.ventesJour>0 ? (
+            <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+              <span style={{fontSize:26,fontWeight:900,color:C.accent,letterSpacing:-0.5}}>{liveStats.ventesJour}</span>
+              <span style={{fontSize:14,fontWeight:800,color:C.text}}>vente{liveStats.ventesJour>1?'s':''}</span>
+              <span style={{fontSize:14,fontWeight:800,color:C.muted}}>· {liveStats.caJour.toFixed(0)} €</span>
+            </div>
+          ) : (
+            <div style={{fontSize:13.5,fontWeight:700,color:C.muted}}>Pas encore de vente aujourd'hui 👟</div>
+          )}
+          <div style={{fontSize:10.5,color:C.muted,marginTop:3}}>Paires vendues dans la journée (pas l'argent viré, qui arrive plus tard).</div>
+        </button>
       )}
 
       {/* Résumé Vinted EN DIRECT (cliquable) */}
@@ -5874,6 +5893,21 @@ function VintedAccounts({ accounts, setAccounts }) {
   const [removing, setRemoving] = useState(null);
   const disconnectAccount = async (acc) => {
     if (!window.confirm(`Déconnecter « ${accountName(acc)} » de l'application ?\n\nSes tokens seront supprimés. Un compte encore actif dans Chrome pourra revenir au prochain passage sur Vinted ; un compte bloqué ne reviendra pas.`)) return;
+    // TON CHOIX : ses ventes passées comptent-elles encore dans ton chiffre
+    // d'affaires ? (C'est bien de l'argent que tu as gagné — mais tu peux
+    // vouloir sortir un compte bloqué de tes stats.) Mémorisé par pseudo, car
+    // c'est ce que portent les emails de vente.
+    const login = String(acc.login || '').trim().toLowerCase();
+    if (login) {
+      const keep = window.confirm(
+        `Garder le chiffre d'affaires passé de « ${accountName(acc)} » dans tes statistiques ?\n\n` +
+        `OK = OUI, ses ventes continuent d'être comptées (c'est de l'argent réellement gagné).\n` +
+        `Annuler = NON, on le sort complètement des stats.`
+      );
+      const cur = (load('vinted_ca_keep_removed', []) || []).map(String);
+      const next = keep ? [...new Set([...cur, login])] : cur.filter(x => x !== login);
+      save('vinted_ca_keep_removed', next);
+    }
     setRemoving(acc.vinted_user_id);
     const ok = await deleteVintedAccount(acc.vinted_user_id);
     setRemoving(null);
@@ -12267,6 +12301,10 @@ export default function App() {
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
       let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, ok=false;
+      // VENTES DU JOUR : nombre de paires vendues aujourd'hui + leur montant.
+      // ⚠️ C'est bien la VENTE (le moment où ça part), pas l'argent viré sur ton
+      // compte — les deux sont décalés de plusieurs jours chez Vinted.
+      let ventesJour=0, caJour=0;
       // Comptes BLOQUÉS (détectés) ou MASQUÉS (à la main) : on les EXCLUT
       // totalement des stats — leurs annonces sont périmées et leurs ventes ne
       // comptent pas. Sinon le dashboard gonfle « annonces en ligne » / CA avec
@@ -12326,6 +12364,7 @@ export default function App() {
       // le calcul « harvest » (extension) qui pouvait être partiel/incohérent.
       try{
         const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const todayStr=`${ymStr}-${String(now.getDate()).padStart(2,'0')}`;
         const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
         // Comptes dont les ventes COMPTENT : ceux encore liés à l'app, et non
         // masqués/bloqués. Un compte DÉCONNECTÉ ne doit plus peser dans le CA —
@@ -12336,6 +12375,9 @@ export default function App() {
           if(skipAcc(a.vinted_user_id)) continue;
           const l=String(a.login||'').trim().toLowerCase(); if(l) liveLogins.add(l);
         }
+        // Comptes retirés dont TU as choisi de garder le CA (au moment de la
+        // déconnexion) : leurs ventes continuent de compter.
+        (load('vinted_ca_keep_removed',[])||[]).forEach(l=>{ const t=String(l||'').trim().toLowerCase(); if(t) liveLogins.add(t); });
         if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue;
           const acct=String(d.account||'').toLowerCase();
           // Vente rattachée à un compte identifié qui n'est plus actif → exclue.
@@ -12356,10 +12398,13 @@ export default function App() {
           // faussé par un gros montant unique.
           const lm=/(\d+)\s*articles?/i.exec(desig);
           const nItems=(/lot/i.test(desig)&&lm)?Math.max(1,parseInt(lm[1],10)):1;
-          vm+=nItems; if(!isNaN(p)&&p>0) cm+=p; } if(vm>0){ caMois=cm; ventesMois=vm; } }
+          vm+=nItems; if(!isNaN(p)&&p>0) cm+=p;
+          // Vendu AUJOURD'HUI ?
+          if(String(d.receivedAt||'').slice(0,10)===todayStr){ ventesJour+=nItems; if(!isNaN(p)&&p>0) caJour+=p; }
+        } if(vm>0){ caMois=cm; ventesMois=vm; } }
       }catch(_){}
       if(!stop && ok){
-        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock});
+        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
         // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
