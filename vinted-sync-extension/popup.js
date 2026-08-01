@@ -19,3 +19,26 @@ document.getElementById('syncBtn').addEventListener('click', () => {
     else { s.textContent = 'Échec — réessaie'; }
   });
 });
+
+// « Copier mon token » : récupère le bundle du compte Vinted connecté et le met
+// dans le presse-papier. Julien le colle ensuite dans l'app (Comptes liés →
+// « Connecter un compte »).
+document.getElementById('copyTokenBtn').addEventListener('click', () => {
+  const s = document.getElementById('status');
+  s.textContent = 'Récupération du token…';
+  chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'copyToken' }, async (resp) => {
+    if (!resp || !resp.ok || !resp.bundle) { s.textContent = 'Aucun compte Vinted connecté ici. Connecte-toi sur vinted.fr d\'abord.'; return; }
+    const text = JSON.stringify(resp.bundle);
+    try {
+      await navigator.clipboard.writeText(text);
+      s.textContent = 'Token copié ✓ — colle-le dans l\'app';
+    } catch (_) {
+      // Repli si l'API clipboard est bloquée dans le popup.
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); s.textContent = 'Token copié ✓ — colle-le dans l\'app'; }
+      catch (e) { s.textContent = 'Copie impossible — réessaie'; }
+      ta.remove();
+    }
+  });
+});

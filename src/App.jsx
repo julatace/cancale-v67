@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v35/09 · 📦expédition';
+const BUILD_ID = 'v36/00 · 🔐token';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -5903,14 +5903,127 @@ function VintedAccounts({ accounts, setAccounts }) {
     }));
   };
 
+  // ── CONNEXION D'UN COMPTE PAR TOKEN (façon Vinteer) ───────────────────────
+  // Julien colle son token Vinted (récupéré via l'extension, bouton « Copier mon
+  // token »). L'app le vérifie via /api/vinted-connect et gère le compte, SANS
+  // dépendre de la capture passive. Sert aussi à RECONNECTER un compte expiré.
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [connectStep, setConnectStep] = useState(0); // 0 idle · 1-3 en cours · 4 OK
+  const [connectErr, setConnectErr] = useState('');
+  const [connectedInfo, setConnectedInfo] = useState(null);
+  // Accepte soit un refresh_token brut (JWT eyJ...), soit un petit JSON exporté
+  // par l'extension { refresh_token, access_token, anon_id, csrf_token, domain }.
+  const parseTokenInput = (raw) => {
+    const s = (raw || '').trim();
+    if (!s) return null;
+    if (s.startsWith('{')) {
+      try {
+        const o = JSON.parse(s);
+        return {
+          refreshToken: o.refresh_token || o.refreshToken || o.refresh_token_web || '',
+          accessToken: o.access_token || o.accessToken || o.access_token_web || '',
+          anonId: o.anon_id || o.anonId || '',
+          csrfToken: o.csrf_token || o.csrfToken || '',
+          domain: o.domain || '',
+        };
+      } catch { /* pas du JSON → token brut */ }
+    }
+    return { refreshToken: s, accessToken: '', anonId: '', csrfToken: '', domain: '' };
+  };
+  const connectByToken = async () => {
+    const parsed = parseTokenInput(tokenInput);
+    if (!parsed || (!parsed.refreshToken && !parsed.accessToken)) { setConnectErr('Colle d\'abord ton token Vinted.'); return; }
+    setConnecting(true); setConnectErr(''); setConnectedInfo(null); setConnectStep(1);
+    // Petit fil d'étapes visuel (cosmétique) le temps de la requête.
+    const t1 = setTimeout(() => setConnectStep(s => s < 2 ? 2 : s), 500);
+    const t2 = setTimeout(() => setConnectStep(s => s < 3 ? 3 : s), 1100);
+    try {
+      const res = await fetch('/api/vinted-connect', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsed),
+      });
+      const json = await res.json().catch(() => ({}));
+      clearTimeout(t1); clearTimeout(t2);
+      if (!res.ok || !json.ok) {
+        setConnectErr(json.error || 'Vinted a refusé ce token.'); setConnectStep(0); setConnecting(false); return;
+      }
+      setConnectStep(4); setConnectedInfo(json.account);
+      await refreshAccounts();
+      setTokenInput('');
+    } catch (e) {
+      clearTimeout(t1); clearTimeout(t2);
+      setConnectErr('Erreur réseau : ' + (e.message || e)); setConnectStep(0);
+    }
+    setConnecting(false);
+  };
+
   return (
     <div style={{padding:'16px 14px 40px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:18,fontWeight:800,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
-        <button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
-          {loading ? '…' : '↻ Actualiser'}
-        </button>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={()=>{ setConnectOpen(o=>!o); setConnectErr(''); setConnectStep(0); setConnectedInfo(null); }} title="Connecter (ou reconnecter) un compte en collant son token Vinted" style={{background:connectOpen?C.accent:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:800,color:connectOpen?'#fff':C.accent}}>
+            ➕ Connecter un compte
+          </button>
+          <button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:700,color:C.text}}>
+            {loading ? '…' : '↻ Actualiser'}
+          </button>
+        </div>
       </div>
+
+      {connectOpen && (
+        <div style={{border:`1px solid ${C.accent}`,background:C.card,borderRadius:16,padding:'16px 16px 18px',marginBottom:16}}>
+          <div style={{fontSize:15,fontWeight:900,color:C.text,marginBottom:3}}>🔐 Connexion via token</div>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Connecte ton compte Vinted pour importer automatiquement tes ventes et achats — même sans repasser par l'extension à chaque fois. Sert aussi à <b>reconnecter un compte expiré</b>.</div>
+
+          <label style={{fontSize:11.5,fontWeight:800,color:C.text,display:'block',marginBottom:5}}>Token Vinted</label>
+          <textarea
+            value={tokenInput}
+            onChange={e=>setTokenInput(e.target.value)}
+            placeholder="Colle ici ton token (bouton « Copier mon token » de l'extension)"
+            rows={3}
+            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:12,fontFamily:'ui-monospace,Menlo,monospace',background:C.surface,color:C.text,outline:'none',resize:'vertical',wordBreak:'break-all'}}
+          />
+
+          {/* Fil d'étapes façon onboarding */}
+          {(connecting || connectStep>0) && (
+            <div style={{display:'flex',flexDirection:'column',gap:6,margin:'12px 0 4px'}}>
+              {[[1,'Vérification du token'],[2,'Connexion à Vinted'],[3,'Récupération des données'],[4,'Profil vérifié']].map(([n,lbl])=>{
+                const reached = connectStep>=n;
+                const ok = connectStep>n || connectStep===4;
+                return (
+                  <div key={n} style={{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:700,color:reached?C.text:C.muted,opacity:reached?1:0.5}}>
+                    <span style={{width:18,textAlign:'center'}}>{ok?'✅':reached?'⏳':'○'}</span>
+                    {lbl}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {connectErr && <div style={{fontSize:12,fontWeight:700,color:C.danger,marginTop:10,lineHeight:1.5,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'9px 11px'}}>⚠️ {connectErr}</div>}
+          {connectStep===4 && connectedInfo && <div style={{fontSize:12.5,fontWeight:800,color:INV_STATUS.online.color,marginTop:10,background:`${INV_STATUS.online.color}12`,border:`1px solid ${INV_STATUS.online.color}44`,borderRadius:10,padding:'9px 11px'}}>✅ Compte connecté : {connectedInfo.login ? '@'+connectedInfo.login : 'compte #'+connectedInfo.vinted_user_id}</div>}
+
+          <button onClick={connectByToken} disabled={connecting} style={{marginTop:12,width:'100%',border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',cursor:connecting?'default':'pointer',fontSize:14,fontWeight:800,fontFamily:'inherit',opacity:connecting?0.6:1}}>
+            {connecting ? 'Vérification…' : '✓ Vérifier le token'}
+          </button>
+
+          <details style={{marginTop:14}}>
+            <summary style={{fontSize:12,fontWeight:800,color:C.accent,cursor:'pointer'}}>Comment récupérer mon token ?</summary>
+            <ol style={{fontSize:12,color:C.text,lineHeight:1.7,margin:'8px 0 0',paddingLeft:18}}>
+              <li>Installe / ouvre l'extension « Shop Cancale35 – Vinted Sync ».</li>
+              <li>Sur <b>vinted.fr</b>, connecte-toi au compte voulu (idéalement en <b>navigation privée</b> pour isoler la session).</li>
+              <li>Clique sur l'icône de l'extension → bouton <b>« Copier mon token »</b>.</li>
+              <li>Reviens ici et colle-le dans le champ ci-dessus.</li>
+            </ol>
+            <div style={{fontSize:11.5,color:C.warn,lineHeight:1.5,marginTop:8,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'9px 11px'}}>
+              💡 <b>Pourquoi la navigation privée ?</b> Si tu es connecté à Vinted dans ton navigateur habituel, ton token peut être invalidé quand Vinted rafraîchit ta session. La navigation privée isole le token et évite ce souci.
+            </div>
+            <div style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:8}}>🔒 Ton token n'est utilisé que pour lire <b>tes</b> ventes/achats et il est stocké dans <b>ta</b> base (Supabase). Rien n'est partagé.</div>
+          </details>
+        </div>
+      )}
 
       <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>
         Les comptes ci-dessous sont ceux captés par l'extension Chrome quand tu navigues sur Vinted.

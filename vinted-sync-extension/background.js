@@ -97,6 +97,29 @@ async function captureAllAccounts() {
   return results;
 }
 
+// Construit le "bundle token" à coller dans l'app (écran « Connecter un compte »).
+// Prend le domaine Vinted actuellement connecté (celui qui a un access_token).
+// Contient tout ce qu'il faut pour connecter/rafraîchir le compte proprement.
+async function buildTokenBundle() {
+  for (const domain of VINTED_DOMAINS) {
+    const access = await getCookie(domain, 'access_token_web');
+    if (!access) continue;
+    const refresh = await getCookie(domain, 'refresh_token_web');
+    const anon = await getCookie(domain, 'anon_id');
+    const payload = jwtPayload(access);
+    const uid = payload && payload.account_id ? String(payload.account_id) : null;
+    return {
+      vinted_user_id: uid,
+      domain,
+      access_token: access,
+      refresh_token: refresh || '',
+      anon_id: anon || '',
+      csrf_token: lastCsrfByDomain[domain] || '',
+    };
+  }
+  return null;
+}
+
 // --- Capture passive des donnees ------------------------------------------
 
 // Range une donnee moissonnee dans app_data sous une ligne dediee.
@@ -137,6 +160,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.from !== 'cancale-content') {
     if (msg && msg.from === 'cancale-popup' && msg.action === 'syncNow') {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
+      return true; // reponse asynchrone
+    }
+    // « Copier mon token » : renvoie le bundle du compte Vinted connecté.
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'copyToken') {
+      buildTokenBundle().then((b) => sendResponse({ ok: !!b, bundle: b }));
       return true; // reponse asynchrone
     }
     // PONT APP -> EXTENSION : l'app VRM demande d'EXECUTER une action Vinted
