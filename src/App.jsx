@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/00 · 🔐token';
+const BUILD_ID = 'v36/01 · 🛟sauvegarde';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -11449,8 +11449,8 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <Row icon="🟠" title="Leboncoin" desc="Publiées, à publier, à retirer, ton offre." onClick={()=>setTab('leboncoin')}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
-      <Row icon="📤" title="Exporter mes données" desc="Télécharge une sauvegarde (catalogue, ventes, garage)." onClick={onExport}/>
-      <Row icon="📥" title="Importer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde." onClick={onImport} color={C.blue}/>
+      <Row icon="🛟" title="Sauvegarde complète (1 clic)" desc="Télécharge TOUT : catalogue, ventes, achats, numéros, comptes, garage, réglages. Ton filet de sécurité." onClick={onExport}/>
+      <Row icon="♻️" title="Restaurer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde, puis recharge l'app." onClick={onImport} color={C.blue}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Ancienne application</div>
       <Row icon="📦" title="Ancien catalogue" desc="Les paires de l'ancienne appli (toujours comptées dans les stats)." onClick={()=>setTab('catalog')}/>
@@ -12606,8 +12606,49 @@ export default function App() {
               setNotifEnabled(false); save('vinted_notif_enabled',false);
             }
           }}
-          onExport={()=>{ try{ const data={catalog,sales,garageGrid,exportDate:new Date().toISOString()}; const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`cancale-backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);}catch(err){alert('Erreur export : '+err.message);} }}
-          onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!data.catalog&&!data.sales&&!data.garageGrid){alert('⚠ Fichier invalide.');return;} let msg='Importer ce fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES.'; if(!window.confirm(msg))return; if(data.catalog){setCatalog(data.catalog);save('vinted_catalog',data.catalog);} if(data.sales){setSales(data.sales);save('vinted_sales',data.sales);} if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);} alert('✓ Import réussi !'); }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
+          onExport={()=>{ try{
+            // SAUVEGARDE COMPLÈTE : toutes les clés synchronisées (catalogue,
+            // ventes, achats, numéros, comptes, garage, réglages…), pas juste 3.
+            const keys={};
+            SYNC_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null){ try{ keys[k]=JSON.parse(v); }catch{ keys[k]=v; } } });
+            const data={ _cancale_backup:2, exportDate:new Date().toISOString(), keys };
+            const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+            const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;
+            a.download=`cancale-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+          }catch(err){alert('Erreur export : '+err.message);} }}
+          onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{
+            const data=JSON.parse(await file.text());
+            // Écrit les clés puis POUSSE tout de suite au cloud (sinon le
+            // rechargement rechargerait l'ancienne version depuis Supabase et
+            // écraserait la restauration), puis recharge pour tout ré-appliquer.
+            const applyAndReload=async(entries)=>{
+              entries.forEach(([k,v])=>{ try{ localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v)); }catch(_){} });
+              try{
+                const payload={}; SYNC_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null){ try{ payload[k]=JSON.parse(raw); }catch{ payload[k]=raw; } } });
+                if(Object.keys(payload).length){ await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json', Prefer:'return=minimal' }, body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) }); }
+              }catch(_){}
+              alert('✓ Sauvegarde restaurée ! L\'app va se recharger.');
+              location.reload();
+            };
+            // Format complet (nouveau)
+            if(data && data._cancale_backup && data.keys && typeof data.keys==='object'){
+              const entries=Object.entries(data.keys).filter(([k])=>SYNC_KEYS.includes(k));
+              const cat=Array.isArray(data.keys.vinted_catalog)?data.keys.vinted_catalog.length:0;
+              const sal=Array.isArray(data.keys.vinted_sales)?data.keys.vinted_sales.length:0;
+              const num=data.keys.vinted_annonce_numeros?Object.keys(data.keys.vinted_annonce_numeros).length:0;
+              if(!window.confirm(`Restaurer cette sauvegarde complète ?\n\n📦 Catalogue : ${cat}\n💸 Ventes : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques au total\n\n⚠ Tes données actuelles seront REMPLACÉES, puis l'app se rechargera.`)) return;
+              await applyAndReload(entries); return;
+            }
+            // Ancien format (compat) : { catalog, sales, garageGrid }
+            if(data && (data.catalog||data.sales||data.garageGrid)){
+              let msg='Importer cet ancien fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES, puis l\'app se rechargera.';
+              if(!window.confirm(msg)) return;
+              const entries=[]; if(data.catalog)entries.push(['vinted_catalog',data.catalog]); if(data.sales)entries.push(['vinted_sales',data.sales]); if(data.garageGrid)entries.push(['vinted_garage_grid',data.garageGrid]);
+              await applyAndReload(entries); return;
+            }
+            alert('⚠ Fichier de sauvegarde invalide.');
+          }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
           dark={dark} toggleDark={toggleDark}/>}
         {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&<Onboarding setTab={setTab}/>}
