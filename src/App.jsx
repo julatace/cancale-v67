@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/05 · 📊stats-comptes';
+const BUILD_ID = 'v36/06 · 📄bordereau-auto';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7949,7 +7949,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const lbl = await fetchCapturedLabel(a.vinted_user_id);
       if (lbl && lbl.pdfB64 && lbl.capturedAt) {
         const mins = (Date.now()-new Date(lbl.capturedAt).getTime())/60000;
-        if (mins < 60 && (!best || mins < best.mins)) best = { name: accNameOf(a), mins: Math.max(0, Math.round(mins)) };
+        if (mins < 60 && (!best || mins < best.mins)) best = { acc: a, name: accNameOf(a), mins: Math.max(0, Math.round(mins)) };
       }
     }
     setFreshLabel(best);
@@ -10232,15 +10232,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
         {/* Bordereau capté par l'extension (téléchargé sur Vinted) → tamponnage 1 clic. */}
-        {freshLabel && (
-          <div style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}12`,borderRadius:12,padding:'10px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <span style={{fontSize:18}}>🆕</span>
-            <div style={{flex:1,minWidth:160}}>
-              <div style={{fontSize:12.5,fontWeight:900,color:INV_STATUS.online.color}}>Bordereau téléchargé il y a {freshLabel.mins} min ({freshLabel.name})</div>
-              <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>
+        {freshLabel && (()=>{
+          // Bordereau frais capté → on cherche la vente À EXPÉDIER de CE compte.
+          // S'il n'y en a qu'UNE, on la pré-associe : bouton « Tamponner N°X » en
+          // 1 tap (auto number + titre + fichier capté). Sinon on invite à cliquer
+          // 📄 sur la bonne vente.
+          const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && isAwaitingShipStatus(o.status) && !isShipDone(o));
+          const one = pending.length===1 ? pending[0] : null;
+          const e = one ? effEntry(one) : null; const num = e?.numero || '';
+          return (
+            <div style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}12`,borderRadius:12,padding:'10px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+              <span style={{fontSize:18}}>🆕</span>
+              <div style={{flex:1,minWidth:160}}>
+                <div style={{fontSize:12.5,fontWeight:900,color:INV_STATUS.online.color}}>Bordereau téléchargé il y a {freshLabel.mins} min ({freshLabel.name})</div>
+                {one
+                  ? <div style={{fontSize:11,color:C.text,marginTop:1}}>Prêt à tamponner pour <b>{num?`N°${num} · `:''}{one.title}</b> — un tap et c'est fait.</div>
+                  : <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>}
+              </div>
+              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc)} style={{flexShrink:0,border:'none',background:INV_STATUS.online.color,color:'#fff',borderRadius:9,padding:'9px 13px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
             </div>
-          </div>
-        )}
+          );
+        })()}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
         {Array.isArray(emailBords) && (()=>{
           let overdue=0, today=0, tomorrow=0;
