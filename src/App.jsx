@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/09 · 📅ancienneté';
+const BUILD_ID = 'v36/10 · 🟠lbc-réel';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -11341,15 +11341,54 @@ function LeboncoinScreen() {
     const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
     const online = []; const onlineIds = new Set(); const seen = new Set();
     for (const r of listRows) { const p = (r.data && r.data.payload) || {}; for (const it of (p.items || [])) { const oid = String(it.id); if (it.is_closed || it.is_hidden || it.is_draft) continue; onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid); online.push({ id: oid, title: it.title }); } }
-    const queue = [];
-    for (const o of online) { const e = numeros[o.id]; const num = e && e.numero; if (!num || String(num).trim() === '') continue; if (posted.has(o.id) || posted.has(String(num))) continue; queue.push({ numero: String(num), title: o.title || (e && e.title) || '' }); }
-    queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-    const removals = [];
-    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid)) continue; const e = numeros[pid] || {}; removals.push({ numero: String(e.numero || '?'), title: e.title || '' }); }
-    removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    // Annonces Leboncoin réellement captées (par l'extension). On s'en sert pour
+    // reconnaître TOUT SEUL ce qui est déjà en ligne là-bas, via la référence
+    // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
+    // pour que les deux écrans racontent la même chose.
     const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
     const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
-    setData({ queue, removals, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: Object.keys(lbcItems).length, limit: pd.limit, plan: pd.plan });
+    const lbcAds = Object.values(lbcItems).filter(Boolean);
+    const numFrom = (s) => { const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(s || '')); return m ? m[1] : null; };
+    const adKeys = (ad) => {
+      const ks = [];
+      const c = ad.customRef != null ? String(ad.customRef) : '';
+      const mc = /(\d{1,5})/.exec(c); if (mc) ks.push(mc[1]);
+      if (ad.ref && !ks.includes(String(ad.ref))) ks.push(String(ad.ref));
+      const mt = numFrom(ad.subject); if (mt && !ks.includes(mt)) ks.push(mt);
+      return ks;
+    };
+    const isDead = (ad) => /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
+    const liveAds = lbcAds.filter(ad => !isDead(ad));
+    const refToAd = new Map();
+    liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
+    const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(String(e.numero).trim()); const m = numFrom(title || e.title); if (m) ks.push(m); return ks; };
+
+    const queue = []; let autoMatched = 0;
+    for (const o of online) {
+      const e = numeros[o.id]; const num = e && e.numero;
+      if (!num || String(num).trim() === '') continue;
+      if (posted.has(o.id) || posted.has(String(num))) continue;
+      if (vKeys(o.id, o.title).some(k => refToAd.has(k))) { autoMatched++; continue; } // déjà sur LBC
+      queue.push({ numero: String(num), title: o.title || (e && e.title) || '' });
+    }
+    queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+
+    const removals = [];
+    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid)) continue; const e = numeros[pid] || {}; removals.push({ numero: String(e.numero || '?'), title: e.title || '' }); }
+    // Détection auto : annonce LBC active dont la paire n'est plus en ligne sur
+    // Vinted = vendue → à retirer. Uniquement si la paire est connue de VRM.
+    const keysOnline = new Set(); online.forEach(o => vKeys(o.id, o.title).forEach(k => keysOnline.add(k)));
+    const keysKnown = new Set();
+    for (const id in numeros) { const e = numeros[id] || {}; if (e.numero) keysKnown.add(String(e.numero).trim()); const m = numFrom(e.title); if (m) keysKnown.add(m); }
+    const unlinked = [];
+    for (const ad of liveAds) {
+      const ks = adKeys(ad);
+      if (!ks.length || !ks.some(k => keysKnown.has(k))) { unlinked.push(ad); continue; }
+      if (ks.some(k => keysOnline.has(k))) continue;
+      removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '' });
+    }
+    removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    setData({ queue, removals, unlinked, liveAds, autoMatched, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -11386,9 +11425,42 @@ function LeboncoinScreen() {
             {data.removals.slice(0, 30).map((r, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{r.numero}</b> · {r.title || '—'}</div>)}
           </Card>
         )}
+        {/* Annonces Leboncoin non reliées à une paire VRM : informatif. On ne les
+            présente JAMAIS comme « à retirer » (VRM ne connaît pas la paire). */}
+        {data.unlinked && data.unlinked.length > 0 && (
+          <Card>
+            <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 4 }}>❔ {data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>VRM ne retrouve pas la paire correspondante (référence inconnue). Mets le numéro de la paire en <b>référence</b> sur l'annonce Leboncoin pour qu'elle se relie toute seule.</div>
+            {data.unlinked.slice(0, 20).map((u, i) => (
+              <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}>
+                {u.customRef ? <b>réf {u.customRef}</b> : <b>sans réf</b>} · {u.subject || '—'}
+                {u.price != null ? ` · ${u.price} €` : ''}
+                {u.issue ? <span style={{ color: C.warn, fontWeight: 700 }}> · ⚠️ {u.issue === 'LowVisibility' ? 'peu visible' : u.issue}</span> : null}
+                {u.url ? <> · <a href={u.url} target="_blank" rel="noreferrer" style={{ color: C.blue || C.accent, fontWeight: 700 }}>voir</a></> : null}
+              </div>
+            ))}
+          </Card>
+        )}
+        {/* Diagnostic fourni par Leboncoin lui-même sur tes annonces en ligne. */}
+        {(() => {
+          const flagged = (data.liveAds || []).filter(a => a.issue);
+          if (!flagged.length) return null;
+          return (
+            <Card style={{ border: `1px solid ${C.warn}66`, background: `${C.warn}0e` }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: C.warn, marginBottom: 4 }}>⚠️ {flagged.length} annonce{flagged.length > 1 ? 's' : ''} signalée{flagged.length > 1 ? 's' : ''} par Leboncoin</div>
+              <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>C'est Leboncoin qui le dit dans ton espace pro : ces annonces sortent mal. Baisse le prix, améliore le titre/les photos, ou passe une option de visibilité.</div>
+              {flagged.slice(0, 20).map((a, i) => (
+                <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}>
+                  {a.subject || '—'}{a.price != null ? ` · ${a.price} €` : ''} · <span style={{ color: C.warn, fontWeight: 700 }}>{a.issue === 'LowVisibility' ? 'peu visible' : a.issue}</span>
+                  {a.url ? <> · <a href={a.url} target="_blank" rel="noreferrer" style={{ color: C.blue || C.accent, fontWeight: 700 }}>voir</a></> : null}
+                </div>
+              ))}
+            </Card>
+          );
+        })()}
         {/* À publier */}
         <Card>
-          <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 6 }}>🟠 {data.queue.length} à publier sur Leboncoin</div>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 6 }}>🟠 {data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
           {data.queue.length === 0 ? <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div> : (<>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Paires numérotées en ligne sur Vinted, pas encore sur Leboncoin. Ouvre Leboncoin avec l'extension pour les publier.</div>
             {data.queue.slice(0, 60).map((q, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{q.numero}</b> · {q.title || '—'}</div>)}
