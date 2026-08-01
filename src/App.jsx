@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/10 · 🟠lbc-réel';
+const BUILD_ID = 'v36/11 · 🧾ca-juste';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -10154,6 +10154,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
+        {/* RÉCAP EN HAUT : combien de bordereaux restent à imprimer, et le bouton
+            d'impression groupée juste à côté. Avant, le bouton était enfoui dans
+            la section « reçus par email » et passait inaperçu. On affiche aussi
+            le détail (imprimés / auto-expédiés) pour qu'un 0 s'explique. */}
+        {(()=>{
+          if (emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des bordereaux…</div>;
+          if (!Array.isArray(emailBords)) return null;
+          const withPdf = emailBords.filter(b=>b.pdfB64);
+          const pending = withPdf.filter(b=>!isBordDone(b));
+          const done = withPdf.length - pending.length;
+          return (
+            <div style={{border:`1px solid ${pending.length?C.accent:C.border}`,background:pending.length?`${C.accent}0e`:C.card,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                <div style={{flex:1,minWidth:150}}>
+                  <div style={{fontSize:14,fontWeight:900,color:C.text}}>
+                    {pending.length>0 ? `📄 ${pending.length} bordereau${pending.length>1?'x':''} à imprimer` : '✅ Aucun bordereau à imprimer'}
+                  </div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
+                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} déjà imprimé{done>1?'s':''} ou expédié{done>1?'s':''}
+                  </div>
+                </div>
+                {pending.length>0 && (
+                  <button type="button" onClick={batchBordereaux} disabled={batchBusy}
+                    title="Tamponne tous les bordereaux non imprimés (numéro + titre) et les met à la suite dans un seul PDF"
+                    style={{flexShrink:0,border:'none',borderRadius:11,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13.5,fontWeight:800,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
+                    {batchBusy?'Préparation…':pending.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${pending.length})`}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         {/* Bordereau capté par l'extension (téléchargé sur Vinted) → tamponnage 1 clic. */}
         {freshLabel && (()=>{
           // Bordereau frais capté → on cherche la vente À EXPÉDIER de CE compte.
@@ -12295,8 +12327,21 @@ export default function App() {
       try{
         const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
         const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
+        // Comptes dont les ventes COMPTENT : ceux encore liés à l'app, et non
+        // masqués/bloqués. Un compte DÉCONNECTÉ ne doit plus peser dans le CA —
+        // avant, ses emails de vente continuaient d'être comptés (ex. 54 € d'un
+        // compte retiré restaient dans le chiffre du mois).
+        const liveLogins=new Set();
+        for(const a of vintedAccounts){
+          if(skipAcc(a.vinted_user_id)) continue;
+          const l=String(a.login||'').trim().toLowerCase(); if(l) liveLogins.add(l);
+        }
         if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue;
           const acct=String(d.account||'').toLowerCase();
+          // Vente rattachée à un compte identifié qui n'est plus actif → exclue.
+          // Une vente SANS compte identifié est conservée (on ne peut pas
+          // prouver qu'elle est à écarter, et la jeter sous-estimerait le CA).
+          if(acct && liveLogins.size && !liveLogins.has(acct)) continue;
           const desig=String(d.designation||d.article||'');
           const p=parseFloat(String(d.prix||'').replace(',','.'));
           // REMBOURSÉE ? Un email de vente dit qu'une vente a eu lieu, mais si
@@ -12399,6 +12444,18 @@ export default function App() {
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
       const items=[];
+      // ⚠️ EN TÊTE : un compte que Vinted a bloqué (401/403 détecté à la synchro).
+      // On te le dit tout de suite au lieu de te laisser le découvrir en voyant
+      // des chiffres bizarres ; c'est toi qui décides ensuite de le garder
+      // (masqué) ou de le déconnecter, depuis « Comptes liés ».
+      try{
+        const blocked=new Set((load('vinted_accounts_blocked',[])||[]).map(String));
+        const hit=(vintedAccounts||[]).filter(a=>blocked.has(String(a.vinted_user_id)));
+        if(hit.length){
+          const noms=hit.map(a=>String(a.login||`#${a.vinted_user_id}`)).join(', ');
+          items.push({icon:'🚫', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts'});
+        }
+      }catch(_){}
       if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
       if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_expedition'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
