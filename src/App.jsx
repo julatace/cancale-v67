@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/04 · 👋onboarding-token';
+const BUILD_ID = 'v36/05 · 📊stats-comptes';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7045,6 +7045,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
   // Comptes entiers exclus de la compta (par vinted_user_id).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
+  // Masquer/afficher un compte partout (annonces + compta) depuis l'onglet Annonces.
+  const toggleHideAcc = (uid) => setHiddenAccts(prev => { const n = new Set(prev); const k = String(uid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
   // Comptes détectés BLOQUÉS par Vinted (un appel réel « Synchroniser » a renvoyé
   // 401/403 même après refresh du token → le compte est fermé/suspendu). On garde
   // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement
@@ -9879,6 +9881,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </div>
         )}
+        {/* Visibilité par compte : une puce par compte qui a des annonces, avec
+            son nb en ligne. Tape pour MASQUER (compte bloqué/fermé → ses annonces
+            disparaissent partout) ou réafficher. Réglé le souci « 2 comptes
+            bloqués dont les annonces restaient affichées ». */}
+        {listings.items && listings.items.length>0 && (()=>{
+          const counts = {};
+          for (const it of listings.items) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; counts[uid] = (counts[uid]||0)+1; }
+          const uids = Object.keys(counts);
+          if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // 1 seul compte visible : inutile
+          const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
+          const anyHidden = uids.some(u=>hiddenAccts.has(u));
+          return (
+            <div style={{marginBottom:12,display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontSize:11,fontWeight:800,color:C.muted}}>Comptes :</span>
+              {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
+                const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
+                const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
+                return (
+                  <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)} title={off?'Masqué — tape pour réafficher ses annonces':'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
+                    style={{border:`1px solid ${off?C.border:C.accent}`,background:off?'transparent':`${C.accent}12`,color:off?C.muted:C.accent,borderRadius:999,padding:'4px 10px',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
+                    {off?'🚫 ':''}{name} · {counts[uid]}
+                  </button>
+                );
+              })}
+              {anyHidden && <span style={{fontSize:10.5,color:C.muted,flex:'1 1 100%'}}>Un compte masqué (🚫) n'apparaît ni dans les annonces ni dans la compta. Retape-le pour le réafficher.</span>}
+            </div>
+          );
+        })()}
         {listings.loading && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
         {listings.items && !listings.error && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune annonce en ligne.<br/><span style={{fontSize:11.5}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici.</span></div>}
@@ -12198,11 +12228,19 @@ export default function App() {
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
       let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, ok=false;
+      // Comptes BLOQUÉS (détectés) ou MASQUÉS (à la main) : on les EXCLUT
+      // totalement des stats — leurs annonces sont périmées et leurs ventes ne
+      // comptent pas. Sinon le dashboard gonfle « annonces en ligne » / CA avec
+      // des comptes morts (incohérent avec l'onglet Annonces qui les masque).
+      const blockedS=new Set((load('vinted_accounts_blocked',[])||[]).map(String));
+      const hiddenS=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
+      const skipAcc=(uid)=>blockedS.has(String(uid))||hiddenS.has(String(uid));
       // Ventes ANNULÉES / REMBOURSÉES du mois (statut Vinted frais) : servent à
       // retirer du CA les emails de vente correspondants (une vente remboursée
       // n'est plus du chiffre d'affaires — ex. un lot vendu puis remboursé).
       const refunded=[];
       for(const a of vintedAccounts){
+        if(skipAcc(a.vinted_user_id)) continue;
         const sold=await fetchVintedOrders(a,'sold',1,'all');
         if(sold.ok){ ok=true; for(const o of sold.items){
           const st=classifyOrderStatus(o.status);
