@@ -72,22 +72,82 @@
     } catch (_) { /* page inattendue */ }
     return null;
   }
-  // Mémorise la date lue (une fois par annonce) côté Supabase.
-  const savedDates = new Set();
-  function captureDate(id) {
-    if (!id || savedDates.has(id)) return;
-    const d = readListingDateFromPage();
-    if (!d) return;
-    savedDates.add(id);
+  // ── DESCRIPTION + PHOTOS HD ────────────────────────────────────────────────
+  // Vinted ne renvoie plus le détail d'une annonce par son API quand on la
+  // consulte (la page est rendue côté serveur). On lit donc la DESCRIPTION et
+  // les PHOTOS directement sur la page que tu regardes — zéro requête en plus.
+  // À quoi ça sert : (1) tes annonces Leboncoin reprennent ta vraie description
+  // au lieu d'un texte générique ; (2) tu gardes une copie de tes photos et de
+  // tes textes, donc tu ne les perds jamais et tu n'as pas à tout refaire.
+  function readListingDetailFromPage() {
+    const out = { description: '', photos: [] };
     try {
-      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'saveDate', id, ts: d.ts, text: d.text }, () => {
-        if (chrome.runtime.lastError) return; // extension rechargée
-        if (DATA && DATA.byId && DATA.byId[id]) {
-          DATA.byId[id].ageDays = Math.floor((Date.now() - d.ts) / 86400000);
-          if (open && tab === 'paire') render();
-        }
-      });
-    } catch (_) {}
+      // Description : plusieurs pistes, de la plus fiable à la plus générale.
+      const sel = [
+        '[itemprop="description"]',
+        '[data-testid*="description"] span',
+        '[data-testid*="description"]',
+        'meta[property="og:description"]',
+      ];
+      for (const s of sel) {
+        const el = document.querySelector(s);
+        if (!el) continue;
+        const v = (el.tagName === 'META' ? el.getAttribute('content') : el.textContent) || '';
+        const t = v.trim();
+        if (t.length > 15) { out.description = t.slice(0, 3000); break; }
+      }
+      // Photos : les images Vinted en grand format présentes sur la page.
+      const seen = new Set();
+      const og = document.querySelector('meta[property="og:image"]');
+      if (og && og.getAttribute('content')) { const u = og.getAttribute('content'); seen.add(u); out.photos.push(u); }
+      for (const img of document.querySelectorAll('img[src*="vinted.net"]')) {
+        const u = img.getAttribute('src') || '';
+        // On ne garde que les grands formats (les vignettes 70x100 ne servent à rien).
+        if (!/\/(f800|f1200|tc)\//.test(u)) continue;
+        if (seen.has(u)) continue;
+        seen.add(u); out.photos.push(u);
+        if (out.photos.length >= 20) break;
+      }
+    } catch (_) { /* page inattendue */ }
+    return (out.description || out.photos.length) ? out : null;
+  }
+
+  // Mémorise ce qu'on a lu sur la page (date + description + photos), une fois
+  // par annonce et par visite.
+  const savedDates = new Set();
+  const savedDetails = new Set();
+  function captureDate(id) {
+    if (!id) return;
+    if (!savedDates.has(id)) {
+      const d = readListingDateFromPage();
+      if (d) {
+        savedDates.add(id);
+        try {
+          chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'saveDate', id, ts: d.ts, text: d.text }, () => {
+            if (chrome.runtime.lastError) return; // extension rechargée
+            if (DATA && DATA.byId && DATA.byId[id]) {
+              DATA.byId[id].ageDays = Math.floor((Date.now() - d.ts) / 86400000);
+              if (open && tab === 'paire') render();
+            }
+          });
+        } catch (_) {}
+      }
+    }
+    if (!savedDetails.has(id)) {
+      const det = readListingDetailFromPage();
+      if (det) {
+        savedDetails.add(id);
+        try {
+          chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'saveDetail', id, detail: det }, () => {
+            if (chrome.runtime.lastError) return;
+            if (DATA && DATA.byId && DATA.byId[id]) {
+              DATA.byId[id].hasDetail = true;
+              if (open && tab === 'paire') render();
+            }
+          });
+        } catch (_) {}
+      }
+    }
   }
 
   // ── UI ────────────────────────────────────────────────────────────────────
@@ -161,6 +221,10 @@
         ${o.buyPrice != null ? `Achat ${fmt(o.buyPrice)}` : '<b>Prix d\'achat non renseigné</b>'}
         ${marge != null ? ` · Marge <b>${fmt(marge)}</b>` : ''}
         ${o.cell ? ` · 🏠 case <b>${esc(o.cell)}</b>` : (o.numero ? ' · 🏠 pas rangée' : '')}
+      </div>
+      <div class="vrm-m" style="margin-top:3px">
+        ${o.hasDesc ? '✅ description enregistrée' : '⏳ description en cours de lecture…'}
+        ${o.nPhotos ? ` · 📷 ${o.nPhotos} photo${o.nPhotos > 1 ? 's' : ''} gardées` : ''}
       </div>`;
     return card(o, extra);
   }

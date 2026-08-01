@@ -163,6 +163,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           if (msg.action === 'panelData') { const r = await buildPanelData(); sendResponse({ ok: true, ...r }); return; }
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
+          if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -670,6 +671,27 @@ async function saveListingDate(id, ts, text) {
   await supabaseUpsert('app_data', [{ id: 'vinted_listing_dates', data: cur }], 'id');
 }
 
+// Mémorise la DESCRIPTION et les PHOTOS lues sur la page de l'annonce, dans
+// app_data `vinted_item_details` = { id: {description, photos, readAt} }.
+// Sert (1) aux annonces Leboncoin (vraie description au lieu d'un texte
+// générique) et (2) d'archive de tes textes/photos.
+async function saveItemDetail(id, detail) {
+  const rows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const key = String(id);
+  const prev = cur[key] || {};
+  const desc = String(detail.description || '').trim();
+  const photos = Array.isArray(detail.photos) ? detail.photos.filter(Boolean).slice(0, 20) : [];
+  // On complète sans écraser par du vide (une relecture partielle ne doit pas
+  // effacer une description déjà captée).
+  cur[key] = {
+    description: desc || prev.description || '',
+    photos: photos.length ? photos : (prev.photos || []),
+    readAt: new Date().toISOString(),
+  };
+  await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+}
+
 async function buildPanelData() {
   const rows = await sbGet('app_data?id=eq.main&select=data');
   const d = (rows && rows[0] && rows[0].data) || {};
@@ -685,6 +707,9 @@ async function buildPanelData() {
   // Dates de mise en ligne lues sur les pages d'annonce (voir saveListingDate).
   const drows = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
   const listingDates = (drows && drows[0] && drows[0].data) || {};
+  // Descriptions/photos lues sur les pages d'annonce (pour Leboncoin + archive).
+  const detRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  const pageDetails = (detRows && detRows[0] && detRows[0].data) || {};
   const lst = await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || [];
   const online = [];
   const seen = new Set();
@@ -715,6 +740,8 @@ async function buildPanelData() {
         numero, buyPrice: e && e.buyPrice != null ? e.buyPrice : null,
         cell: numero ? (cellByNum[numero] || null) : null,
         ageDays,
+        hasDesc: !!(pageDetails[id] && pageDetails[id].description),
+        nPhotos: (pageDetails[id] && (pageDetails[id].photos || []).length) || 0,
       });
     }
   }
@@ -746,6 +773,7 @@ async function buildPanelData() {
     sleeping: sleeping.length,
     datesKnown,
     noNum: noNum.length,
+    withDesc: online.filter(o => o.hasDesc).length,
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
   };
   return { online, relance, sleeping, noNum, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
@@ -848,6 +876,18 @@ async function buildLbcData() {
   const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
   const details = {};
   for (const r of itemRows) { const d = r.data || {}; const p = d.payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
+  // Détails lus sur la PAGE de l'annonce (description + photos HD). Vinted ne
+  // les renvoyant plus par API à la consultation, c'est devenu la source
+  // principale : on complète (sans écraser) ce qui vient de l'API.
+  const pageRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  const pageDet = (pageRows && pageRows[0] && pageRows[0].data) || {};
+  for (const id in pageDet) {
+    const pd = pageDet[id] || {};
+    const cur = details[id] || {};
+    if (!cur.description && pd.description) cur.description = pd.description;
+    if ((!cur.photos || !cur.photos.length) && pd.photos && pd.photos.length) cur.photos = pd.photos.map(u => ({ url: u }));
+    details[id] = cur;
+  }
   const queue = [];
   for (const o of online) {
     const e = numeros[o.id]; const num = e && e.numero;
@@ -973,6 +1013,16 @@ async function getPairPhotos(numero) {
   const add = (u) => { const s = typeof u === 'string' ? u : (u && (u.full_size_url || u.url)); if (s && !seen.has(s)) { seen.add(s); photos.push(s); } };
   const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
   const detById = {}; for (const r of itemRows) { const p = (r.data && r.data.payload) || {}; const it = p.item || p; if (it && it.id) detById[String(it.id)] = it; }
+  // Photos HD lues sur la page de l'annonce (voir saveItemDetail).
+  const pageRows2 = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  const pageDet2 = (pageRows2 && pageRows2[0] && pageRows2[0].data) || {};
+  for (const id in pageDet2) {
+    const ph = (pageDet2[id] || {}).photos || [];
+    if (!ph.length) continue;
+    const cur = detById[id] || {};
+    if (!cur.photos || !cur.photos.length) cur.photos = ph.map(u => ({ url: u }));
+    detById[id] = cur;
+  }
   const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
   const rawById = {}; for (const r of listRows) { const p = (r.data && r.data.payload) || {}; for (const it of (p.items || [])) rawById[String(it.id)] = it; }
   for (const id of ids) {
