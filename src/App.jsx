@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/08 · 🧹sans-token';
+const BUILD_ID = 'v36/09 · 📅ancienneté';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -6598,6 +6598,20 @@ const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'
 const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
+  // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
+  // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
+  // source fiable de l'ancienneté d'une annonce — voir listedAgeDays.
+  const [listingDates, setListingDates] = useState({});
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      if (!r.ok) return;
+      const rows = await r.json();
+      setListingDates((rows && rows[0] && rows[0].data) || {});
+    } catch (_) { /* pas de date connue : l'âge restera « inconnu » */ }
+  })(); }, []);
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   // Prix d'achat mémorisé PAR NUMÉRO (et non par id d'annonce, qui change à la
   // vente/republication). Source de vérité durable : quand tu saisis le prix
@@ -7255,11 +7269,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ligne si dispo (createdTs, en secondes ou ms), sinon la date de numérotation
   // (quand on a commencé à la suivre). null si on ne sait pas.
   const SLEEP_DAYS = 30; // seuil « paire qui dort »
+  // ⚠️ On n'utilise PLUS la date de numérotation comme substitut : elle dit
+  // quand TU as numéroté la paire, pas depuis quand elle est en ligne. Comme la
+  // numérotation a été refaite en bloc, toutes les paires paraissaient neuves
+  // et « qui dort » affichait n'importe quoi. Source fiable = la date « Ajouté
+  // il y a… » lue sur la page de l'annonce par l'extension (vinted_listing_dates),
+  // sinon la date Vinted si elle est présente. Sinon : inconnu (null), et on
+  // l'assume au lieu d'inventer.
   const listedAgeDays = (it) => {
     let ts = null;
-    if (it.createdTs!=null) ts = it.createdTs < 1e12 ? it.createdTs*1000 : it.createdTs;
-    else { const e = numeros[it.id]; if (e?.numberedAt) { const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } }
-    return ts!=null ? Math.floor((Date.now()-ts)/86400000) : null;
+    const d = listingDates[String(it.id)];
+    if (d && d.ts) ts = Number(d.ts);
+    else if (it.createdTs!=null) ts = it.createdTs < 1e12 ? it.createdTs*1000 : it.createdTs;
+    return ts!=null && !isNaN(ts) ? Math.floor((Date.now()-ts)/86400000) : null;
   };
 
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
@@ -7549,18 +7571,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   const annStats = useMemo(() => {
     const arr = listings.items || [];
-    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0;
+    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0;
     for (const it of arr) {
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
       if (it.views!=null) { views+=it.views; hasView=true; }
       if (!(numeros[it.id]?.numero)) sansNum++;
-      const age = listedAgeDays(it); if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
+      const age = listedAgeDays(it); if (age!=null) datesKnown++; if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, numeros]);
+  }, [listings.items, numeros, listingDates]);
   // ── Assistant de repricing : quoi baisser, de combien, pourquoi ────────────
   // Règles : plus une paire dort, plus la baisse conseillée est forte ; une paire
   // très vue sans favori a un prix perçu trop haut. On ne conseille JAMAIS sous
@@ -9905,6 +9927,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
               😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:800,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
+              {annStats.datesKnown<annStats.n && <div style={{fontSize:10.5,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
+            </div>
+          )}
+          {/* Aucune date connue : on le DIT (avant, l'app déduisait l'ancienneté
+              de la date de numérotation → chiffres faux, « qui dort » à 0). */}
+          {annStats.n>0 && annStats.datesKnown===0 && (
+            <div style={{fontSize:11.5,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.45}}>
+              ⏳ <b>Ancienneté des annonces inconnue.</b> Vinted ne la donne que sur la page de l'annonce : ouvre quelques-unes de tes annonces sur vinted.fr avec l'extension — elle lit « Ajouté il y a… » au passage et le retient. Le « qui dort » se remplira tout seul.
             </div>
           )}
           {/* ── Assistant de repricing : liste consolidée à baisser ── */}
