@@ -2,17 +2,28 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/15 · ✨mise-en-page';
+const BUILD_ID = 'v37/00 · ✨premium';
+// PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
+// bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
+// profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
+// conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
   light: {
-    bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
-    accent:"#1f7a55", onAccent:"#ffffff", danger:"#c34a4a", warn:"#b07d18",
-    blue:"#3f7fae", purple:"#7a6ad0", text:"#162019", muted:"#697971",
+    bg:"#f4f7f5", surface:"#ffffff", card:"#ffffff", border:"#e6ebe7",
+    accent:"#14795a", onAccent:"#ffffff", danger:"#c0453f", warn:"#a9760f",
+    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0e1712", muted:"#66756d",
+    // Élévation : ombres douces, jamais de noir pur (c'est ce qui fait « cheap »).
+    shadow:"0 1px 2px rgba(16,32,24,.05), 0 2px 8px rgba(16,32,24,.05)",
+    shadowLg:"0 4px 12px rgba(16,32,24,.08), 0 12px 32px rgba(16,32,24,.08)",
+    glass:"rgba(255,255,255,.82)",
   },
   dark: {
-    bg:"#0f1411", surface:"#161f1a", card:"#1c2822", border:"#283831",
-    accent:"#3f9e74", onAccent:"#ffffff", danger:"#e0737a", warn:"#d2a44e",
-    blue:"#5a9fcf", purple:"#a394e6", text:"#e9f1ec", muted:"#88998f",
+    bg:"#0d1210", surface:"#151d19", card:"#1a2420", border:"#2a3630",
+    accent:"#4aa87d", onAccent:"#04150d", danger:"#e87b7f", warn:"#dcae5c",
+    blue:"#6aabd8", purple:"#ac9dea", text:"#eef4f0", muted:"#8d9d94",
+    shadow:"0 1px 2px rgba(0,0,0,.35), 0 2px 10px rgba(0,0,0,.30)",
+    shadowLg:"0 6px 18px rgba(0,0,0,.45), 0 16px 40px rgba(0,0,0,.40)",
+    glass:"rgba(21,29,25,.78)",
   },
 };
 let C = THEMES.light;
@@ -1567,17 +1578,23 @@ function BottomBar({tab,setTab}) {
     return ()=>{ window.removeEventListener('focusin',onIn); window.removeEventListener('focusout',onOut); };
   },[]);
   return (
+    // Barre en VERRE DÉPOLI (comme iOS) : le contenu défile derrière au lieu
+    // d'être coupé net par un bandeau opaque. L'onglet actif porte une pastille
+    // colorée — repère visuel net, plus lisible qu'un simple changement de teinte.
     <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'auto',
-      background:C.surface,borderTop:`1px solid ${C.border}`,boxShadow:'0 -2px 10px rgba(0,0,0,0.08)',
+      background:C.glass||C.surface,backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
+      borderTop:`1px solid ${C.border}`,boxShadow:'0 -1px 0 rgba(0,0,0,.03), 0 -8px 24px rgba(16,32,24,.06)',
       paddingBottom:'env(safe-area-inset-bottom)',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',
-      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .18s ease',pointerEvents:kbOpen?'none':'auto'}}>
+      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)',pointerEvents:kbOpen?'none':'auto'}}>
       {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
-          flex:'1 0 auto',minWidth:64,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 6px 7px',
+          flex:'1 0 auto',minWidth:64,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'9px 6px 8px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
-          color:on?C.accent:C.muted}}>
-          <span aria-hidden="true" style={{fontSize:20,lineHeight:1,opacity:on?1:0.65}}>{t.icon}</span>
-          <span style={{fontSize:10,fontWeight:on?800:600,whiteSpace:'nowrap'}}>{t.label}</span>
+          color:on?C.accent:C.muted,transition:'color .18s ease'}}>
+          <span aria-hidden="true" style={{fontSize:19,lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',
+            width:38,height:26,borderRadius:999,transition:'background .2s ease, transform .2s cubic-bezier(.32,.72,0,1)',
+            background:on?`${C.accent}1c`:'transparent',transform:on?'translateY(-1px)':'none',opacity:on?1:0.6}}>{t.icon}</span>
+          <span style={{fontSize:9.5,fontWeight:on?800:600,whiteSpace:'nowrap',letterSpacing:on?0:0.1}}>{t.label}</span>
         </button>
       );})}
     </nav>
@@ -2041,17 +2058,20 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
 
   // Carte avec icône et taille
   const StatCard=({icon,label,value,color=C.text,sub,gradient})=>(
+    // Carte de statistique : coins plus généreux, ombre douce et chiffre mis en
+    // avant. Le rendu « plat à angles durs » faisait daté.
     <div style={{
       flex:1,minWidth:140,
       background:gradient||C.card,
-      border:`1px solid ${C.border}`,borderRadius:8,padding:'16px 18px',
+      border:`1px solid ${C.border}`,borderRadius:16,padding:'16px 18px',
+      boxShadow:C.shadow||'none',
     }}>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-        <span style={{fontSize:18,opacity:0.9}}>{icon}</span>
-        <span style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>{label}</span>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:9}}>
+        <span style={{fontSize:17,opacity:0.9}}>{icon}</span>
+        <span style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.4,fontWeight:700}}>{label}</span>
       </div>
-      <div style={{fontSize:22,fontWeight:800,color,lineHeight:1.1,letterSpacing:-0.5}}>{value}</div>
-      {sub&&<div style={{fontSize:10,color:C.muted,marginTop:4}}>{sub}</div>}
+      <div style={{fontSize:25,fontWeight:900,color,lineHeight:1.05,letterSpacing:-0.8}}>{value}</div>
+      {sub&&<div style={{fontSize:10.5,color:C.muted,marginTop:5,lineHeight:1.35}}>{sub}</div>}
     </div>
   );
 
@@ -2116,10 +2136,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
               {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.blue||C.accent},
               {k:'unread', icon:'💬', label:'Messages non lus', val:liveStats.unread, go:'cat_msg', color:liveStats.unread>0?C.danger:C.muted},
             ].map(s=>(
-              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'12px 14px',cursor:'pointer',display:'flex',flexDirection:'column',gap:2}}>
+              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'13px 15px',cursor:'pointer',display:'flex',flexDirection:'column',gap:3,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
                 <span style={{fontSize:16}}>{s.icon}</span>
-                <span style={{fontSize:22,fontWeight:900,color:s.color,letterSpacing:-0.5}}>{s.val}</span>
-                <span style={{fontSize:11,color:C.muted,fontWeight:600}}>{s.label}</span>
+                <span style={{fontSize:24,fontWeight:900,color:s.color,letterSpacing:-0.7,lineHeight:1.05}}>{s.val}</span>
+                <span style={{fontSize:11,color:C.muted,fontWeight:700}}>{s.label}</span>
               </button>
             ))}
           </div>
