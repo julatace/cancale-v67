@@ -29,6 +29,67 @@
     return m ? m[1] : null;
   };
 
+  // ── DATE DE MISE EN LIGNE (« Ajouté il y a … », bas de l'annonce) ──────────
+  // Vinted affiche l'ancienneté sur la page de l'annonce, mais ne la renvoie pas
+  // dans les données du dressing. Comme ce panneau tourne DÉJÀ sur la page, on
+  // lit simplement ce qui est affiché — zéro requête supplémentaire — et on le
+  // mémorise. Au fil de ta navigation, on constitue la vraie ancienneté de
+  // chaque annonce, ce qui rend le « qui dort » enfin fiable.
+  const REL = [
+    [/(\d+)\s*(?:minute|min)/i, 60e3],
+    [/(\d+)\s*(?:heure|h)\b/i, 3600e3],
+    [/(\d+)\s*jour/i, 86400e3],
+    [/(\d+)\s*semaine/i, 7 * 86400e3],
+    [/(\d+)\s*mois/i, 30 * 86400e3],
+    [/(\d+)\s*an/i, 365 * 86400e3],
+  ];
+  function parseFrRelative(txt) {
+    const s = String(txt || '');
+    if (/à l'instant|maintenant/i.test(s)) return Date.now();
+    for (const [re, ms] of REL) {
+      const m = re.exec(s);
+      if (m) return Date.now() - Number(m[1]) * ms;
+    }
+    return null;
+  }
+  // Cherche la date sur la page : d'abord un <time datetime>, sinon le texte
+  // « Ajouté il y a … ». Best-effort et défensif : si Vinted change sa page, on
+  // renvoie simplement null (le panneau affiche alors juste sans l'ancienneté).
+  function readListingDateFromPage() {
+    try {
+      for (const t of document.querySelectorAll('time[datetime]')) {
+        const v = Date.parse(t.getAttribute('datetime'));
+        if (!isNaN(v)) return { ts: v, text: (t.textContent || '').trim() };
+      }
+      const nodes = document.querySelectorAll('div,span,p,li');
+      for (const n of nodes) {
+        const txt = (n.textContent || '').trim();
+        if (txt.length > 80) continue;
+        if (!/ajout[ée]/i.test(txt)) continue;
+        const ts = parseFrRelative(txt);
+        if (ts) return { ts, text: txt };
+      }
+    } catch (_) { /* page inattendue */ }
+    return null;
+  }
+  // Mémorise la date lue (une fois par annonce) côté Supabase.
+  const savedDates = new Set();
+  function captureDate(id) {
+    if (!id || savedDates.has(id)) return;
+    const d = readListingDateFromPage();
+    if (!d) return;
+    savedDates.add(id);
+    try {
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'saveDate', id, ts: d.ts, text: d.text }, () => {
+        if (chrome.runtime.lastError) return; // extension rechargée
+        if (DATA && DATA.byId && DATA.byId[id]) {
+          DATA.byId[id].ageDays = Math.floor((Date.now() - d.ts) / 86400000);
+          if (open && tab === 'paire') render();
+        }
+      });
+    } catch (_) {}
+  }
+
   // ── UI ────────────────────────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
@@ -104,6 +165,16 @@
     return card(o, extra);
   }
 
+  // L'ancienneté n'est connue que pour les annonces dont tu as ouvert la page.
+  // On le dit clairement plutôt que d'afficher un « 0 » trompeur.
+  function sleepEmpty() {
+    const s = (DATA && DATA.stats) || {};
+    const k = s.datesKnown || 0, n = s.online || 0;
+    if (k === 0) return 'Aucune date connue pour l&#39;instant.<br>Vinted ne donne l&#39;ancienneté que sur la page de l&#39;annonce : ouvre-en quelques-unes, VRM lit la date « Ajouté il y a… » au passage et la retient.';
+    if (k < n) return `Aucune ne dort parmi les ${k} annonce${k > 1 ? 's' : ''} dont la date est connue (sur ${n}). Ouvre les autres pour compléter.`;
+    return 'Aucune annonce ne dort. 👌';
+  }
+
   function renderList(list, empty, hint) {
     if (!list || !list.length) return `<div class="vrm-m">${empty}</div>`;
     return (hint ? `<div class="vrm-m" style="margin-bottom:8px">${hint}</div>` : '') + list.slice(0, 40).map(o => card(o)).join('');
@@ -118,16 +189,19 @@
       <div class="vrm-stats">
         <div class="vrm-st"><b>${s.online}</b><span class="vrm-m">en ligne</span></div>
         <div class="vrm-st"><b>${s.relance || 0}</b><span class="vrm-m">à relancer</span></div>
+        <div class="vrm-st"><b>${s.sleeping || 0}</b><span class="vrm-m">dorment</span></div>
         <div class="vrm-st"><b>${s.noNum}</b><span class="vrm-m">sans N°</span></div>
       </div>
       <div class="vrm-tabs">
         <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
         <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
+        <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Qui dorment 😴</button>
         <button class="vrm-tab ${tab === 'sansnum' ? 'on' : ''}" data-t="sansnum">Sans N°</button>
       </div>
       <div id="vrm-body">${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'paire' ? renderPaire()
+        : tab === 'dorment' ? renderList(DATA.sleeping, sleepEmpty(), 'En ligne depuis 30 jours et plus (date lue sur la page de l&#39;annonce). À baisser ou republier — par toi.')
         : tab === 'relance' ? renderList(DATA.relance, 'Rien à relancer : tes annonces accrochent bien. 👌', 'Beaucoup vues mais peu mises en favori <b>par rapport à tes autres annonces</b> → le prix est sans doute trop haut. Ouvre-les et baisse le prix toi-même.')
         : renderList(DATA.noNum, 'Toutes tes annonces ont un N°. 👌', 'Ces annonces n\'ont pas encore de numéro dans ton app.')
       }</div>
@@ -141,8 +215,8 @@
   function load() {
     try {
       chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'panelData' }, (resp) => {
-        if (chrome.runtime.lastError) { DATA = { stats: {}, byId: {}, relance: [], noNum: [] }; render(); return; }
-        DATA = (resp && resp.ok) ? resp : { stats: {}, byId: {}, relance: [], noNum: [] };
+        if (chrome.runtime.lastError) { DATA = { stats: {}, byId: {}, relance: [], sleeping: [], noNum: [] }; render(); return; }
+        DATA = (resp && resp.ok) ? resp : { stats: {}, byId: {}, relance: [], sleeping: [], noNum: [] };
         render();
         // Pastille : nombre de paires à relancer.
         const n = (DATA.relance || []).length;
@@ -162,9 +236,19 @@
   // Navigation interne Vinted (SPA) : si on change d'annonce, on rafraîchit
   // l'onglet « Cette paire » sans recharger les données.
   let lastPath = location.pathname;
+  const onPage = () => {
+    const id = currentItemId();
+    // La page Vinted se remplit progressivement : on retente un peu.
+    if (id) { captureDate(id); setTimeout(() => captureDate(id), 1500); setTimeout(() => captureDate(id), 4000); }
+  };
   setInterval(() => {
-    if (location.pathname !== lastPath) { lastPath = location.pathname; if (open && tab === 'paire') render(); }
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      onPage();
+      if (open && tab === 'paire') render();
+    }
   }, 800);
 
-  load(); // pastille dès l'arrivée sur Vinted
+  load();   // pastille dès l'arrivée sur Vinted
+  onPage(); // lit la date si on arrive directement sur une annonce
 })();

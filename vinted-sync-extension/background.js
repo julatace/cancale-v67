@@ -162,6 +162,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (async () => {
         try {
           if (msg.action === 'panelData') { const r = await buildPanelData(); sendResponse({ ok: true, ...r }); return; }
+          if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -654,6 +655,21 @@ try {
 // prix d'achat, sa case au garage, et les paires « qui dorment » (en ligne
 // depuis longtemps) à relancer à la main. 100 % lecture Supabase : aucun appel
 // à Vinted, aucun clic automatisé. Le panneau AFFICHE, c'est toi qui agis.
+// Mémorise la date de mise en ligne lue sur la page de l'annonce (« Ajouté il
+// y a … »), dans une seule ligne app_data `vinted_listing_dates` = { id: ts }.
+// C'est la SEULE source de l'ancienneté réelle : Vinted ne la renvoie pas dans
+// les données du dressing. Elle se remplit au fil de ta navigation.
+async function saveListingDate(id, ts, text) {
+  const rows = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const key = String(id);
+  // On ne réécrit pas une date déjà connue (la 1re lecture est la plus proche
+  // de la vérité ; « il y a 3 mois » lu plus tard donnerait la même chose).
+  if (cur[key] && cur[key].ts) return;
+  cur[key] = { ts: Number(ts), text: String(text || '').slice(0, 60), readAt: new Date().toISOString() };
+  await supabaseUpsert('app_data', [{ id: 'vinted_listing_dates', data: cur }], 'id');
+}
+
 async function buildPanelData() {
   const rows = await sbGet('app_data?id=eq.main&select=data');
   const d = (rows && rows[0] && rows[0].data) || {};
@@ -666,6 +682,9 @@ async function buildPanelData() {
     for (const v of vals) { const t = String(v || '').trim(); if (t) cellByNum[t] = cell; }
   }
   // Annonces réellement en ligne, depuis la moisson (par compte).
+  // Dates de mise en ligne lues sur les pages d'annonce (voir saveListingDate).
+  const drows = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
+  const listingDates = (drows && drows[0] && drows[0].data) || {};
   const lst = await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || [];
   const online = [];
   const seen = new Set();
@@ -675,11 +694,16 @@ async function buildPanelData() {
       if (it.is_closed || it.is_hidden || it.is_draft) continue;
       const id = String(it.id); if (seen.has(id)) continue; seen.add(id);
       const e = numeros[id] || null;
-      // Ancienneté : date Vinted de mise en ligne si dispo, sinon date de numérotation.
-      let ts = null;
-      const raw = it.created_at_ts || it.created_at || it.createdAt;
-      if (raw != null) { const n = Number(raw); ts = isFinite(n) ? (n < 1e12 ? n * 1000 : n) : Date.parse(raw) || null; }
-      if (!ts && e && e.numberedAt) ts = Date.parse(e.numberedAt) || null;
+      // Ancienneté RÉELLE : la date « Ajouté il y a … » lue sur la page de
+      // l'annonce prime (seule source fiable). Sinon la date Vinted si un jour
+      // elle apparaît dans le dressing. On n'utilise PAS la date de
+      // numérotation : elle dit quand TU as numéroté, pas depuis quand c'est
+      // en ligne — ça donnait une ancienneté fausse.
+      let ts = listingDates[id] && listingDates[id].ts ? Number(listingDates[id].ts) : null;
+      if (!ts) {
+        const raw = it.created_at_ts || it.created_at || it.createdAt;
+        if (raw != null) { const n = Number(raw); ts = isFinite(n) ? (n < 1e12 ? n * 1000 : n) : Date.parse(raw) || null; }
+      }
       const ageDays = ts ? Math.floor((Date.now() - ts) / 86400000) : null;
       const numero = e && e.numero ? String(e.numero) : null;
       online.push({
@@ -711,13 +735,20 @@ async function buildPanelData() {
                    .map(o => ({ ...o, ratio: (o.favs || 0) / o.views }));
   }
   const noNum = online.filter(o => !o.numero);
+  // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
+  // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
+  const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)
+                         .sort((a, b) => b.ageDays - a.ageDays);
+  const datesKnown = online.filter(o => o.ageDays != null).length;
   const stats = {
     online: online.length,
     relance: relance.length,
+    sleeping: sleeping.length,
+    datesKnown,
     noNum: noNum.length,
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
   };
-  return { online, relance, noNum, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
