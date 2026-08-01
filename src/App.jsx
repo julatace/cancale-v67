@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/00 · ✨premium';
+const BUILD_ID = 'v37/01 · ✨premium+';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -6538,11 +6538,11 @@ function AcctTag({ acc, name }) {
 // « Chargement… » figé. `variant` = 'card' (grille d'annonces) ou 'row' (listes).
 function Skeleton({ variant='row', count=6 }) {
   const bg = C.border;
-  const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:8 };
+  const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:10 };
   if (variant==='card') {
     return <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
       {Array.from({length:count}).map((_,i)=>(
-        <div key={i} style={{borderRadius:14,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`}}>
+        <div key={i} style={{borderRadius:16,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,boxShadow:C.shadow||'none'}}>
           <div style={{...shimmer,width:'100%',aspectRatio:'3/4',borderRadius:0}}/>
           <div style={{padding:'8px 10px 10px',display:'flex',flexDirection:'column',gap:6}}>
             <div style={{...shimmer,height:14,width:'55%'}}/>
@@ -6554,7 +6554,7 @@ function Skeleton({ variant='row', count=6 }) {
   }
   return <div style={{display:'flex',flexDirection:'column',gap:10}}>
     {Array.from({length:count}).map((_,i)=>(
-      <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12,background:C.surface}}>
+      <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 13px',border:`1px solid ${C.border}`,borderRadius:14,background:C.surface,boxShadow:C.shadow||'none'}}>
         <div style={{...shimmer,width:48,height:48,borderRadius:10,flexShrink:0}}/>
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
           <div style={{...shimmer,height:13,width:'45%'}}/>
@@ -12608,7 +12608,11 @@ export default function App() {
 
   return (
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
-      <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+      {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
+          derrière au défilement au lieu de buter sur un bandeau plein. */}
+      <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',
+        background:C.glass||C.surface,backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
+        borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           {canBack && <button type="button" onClick={goBack} title="Retour" aria-label="Retour"
             style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:999,border:`1px solid ${C.border}`,background:C.bg,color:C.text,cursor:'pointer',fontSize:19,fontWeight:800,fontFamily:'inherit',lineHeight:1}}>‹</button>}
@@ -12618,13 +12622,13 @@ export default function App() {
             onClick={()=>logoInputRef.current&&logoInputRef.current.click()}
             onContextMenu={(e)=>{e.preventDefault();resetLogo();}}
             title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)"
-            style={{position:'relative',width:42,height:42,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:6,overflow:'hidden',cursor:'pointer'}}>
-            <img src={logoSrc} alt="Cancale" style={{width:42,height:42,objectFit:'cover'}}/>
-            <div style={{position:'absolute',bottom:0,left:0,right:0,height:13,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>✎</div>
+            style={{position:'relative',width:40,height:40,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:12,overflow:'hidden',cursor:'pointer',boxShadow:C.shadow||'none'}}>
+            <img src={logoSrc} alt="Cancale" style={{width:40,height:40,objectFit:'cover'}}/>
+            <div style={{position:'absolute',bottom:0,left:0,right:0,height:12,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:8.5,color:'#fff'}}>✎</div>
           </div>
           <div>
-            <div style={{fontWeight:900,fontSize:21,color:C.accent,letterSpacing:-0.3,lineHeight:1}}>VRM</div>
-            <div style={{fontSize:8.5,color:C.muted,fontWeight:700,letterSpacing:0.2,marginTop:1}}>{BUILD_ID}</div>
+            <div style={{fontWeight:900,fontSize:21,color:C.accent,letterSpacing:-0.6,lineHeight:1}}>VRM</div>
+            <div style={{fontSize:8.5,color:C.muted,fontWeight:700,letterSpacing:0.2,marginTop:2,opacity:0.75}}>{BUILD_ID}</div>
           </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:14}}>

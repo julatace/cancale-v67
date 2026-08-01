@@ -63,7 +63,15 @@
       input,textarea,select{font-size:max(16px,1em);}
     }
 
-    /* 7) IMAGES : jamais déformées, et fondu à l'arrivée plutôt qu'un « pop ». */
+    /* 7) CHANGEMENT D'ONGLET : le contenu arrive en fondu au lieu d'apparaître
+          brutalement — discret, mais c'est ce qui fait « app » plutôt que « site ».
+          ⚠️ On anime UNIQUEMENT l'opacité, jamais transform : un transform sur un
+          conteneur redéfinit le référentiel des enfants en position:fixed, ce qui
+          décalerait les modales. */
+    @keyframes cancaleEnter{from{opacity:0}to{opacity:1}}
+    main > *{animation:cancaleEnter .24s ease both;}
+
+    /* 8) IMAGES : jamais déformées, et fondu à l'arrivée plutôt qu'un « pop ». */
     img{max-width:100%;}
     @keyframes cancaleFadeIn{from{opacity:0}to{opacity:1}}
     img[loading="lazy"]{animation:cancaleFadeIn .25s ease both;}
