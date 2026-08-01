@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/14 · 📄ordre';
+const BUILD_ID = 'v36/15 · ✨mise-en-page';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -10279,12 +10279,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ) : null; })()}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[...emailBords].filter(b=>!isBordHidden(b) && (showBordDone || !isBordDone(b))).sort((a,b2)=>{
-                // ORDRE D'ARRIVÉE : les bordereaux se suivent dans l'ordre où ils
-                // sont arrivés (le plus ancien en premier) — c'est l'ordre dans
-                // lequel on les imprime et on prépare les colis. Les déjà
+                // ORDRE D'ARRIVÉE, LE PLUS RÉCENT EN HAUT : les derniers
+                // bordereaux reçus sont ceux qu'on traite en premier. Les déjà
                 // imprimés/expédiés restent en bas pour ne pas gêner.
                 const pa=isBordDone(a)?1:0, pb=isBordDone(b2)?1:0; if(pa!==pb) return pa-pb;
-                return new Date(a.receivedAt||0)-new Date(b2.receivedAt||0);
+                return new Date(b2.receivedAt||0)-new Date(a.receivedAt||0);
               }).map((b,i)=>(
                 <div key={i} data-bord-card style={{padding:'11px 12px',border:`1px solid ${INV_STATUS.online.color}44`,...(isBordDone(b)?{opacity:0.45,filter:'grayscale(0.85)'}:{}),background:C.card,borderRadius:14}}>
                   {/* Ligne haute : photo + infos de la paire */}
@@ -10299,37 +10298,57 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {(()=>{ const nn=numForBord(b); return nn?<span style={{fontSize:12,fontWeight:900,color:'#fff',background:INV_STATUS.online.color,borderRadius:7,padding:'2px 7px',flexShrink:0}}>N°{nn}</span>:null; })()}
                         <span style={{fontSize:13.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.modele||b.article||'Bordereau'}</span>
                       </div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:3}}>{[b.taille?`Pointure ${b.taille}`:'', b.receivedAt?new Date(b.receivedAt).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
+                      {/* Compte de vente + date de la vente : savoir d'où vient
+                          la vente et depuis quand, sans ouvrir l'onglet Ventes. */}
+                      {(()=>{
+                        const o = b.transaction!=null ? soldByTxn[String(b.transaction)] : null;
+                        const sd = o && o.date ? new Date(o.date) : null;
+                        const bits = [];
+                        if (b.taille) bits.push(`Pointure ${b.taille}`);
+                        if (sd && !isNaN(sd)) bits.push(`vendu le ${sd.toLocaleDateString('fr-FR')}`);
+                        else if (b.receivedAt) bits.push(`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`);
+                        const nom = (o && o._acc) ? accNameOf(o._acc) : (b.account || '');
+                        return (
+                          <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                            {o && o._acc ? <AcctTag acc={o._acc} name={nom}/> : (nom ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{nom}</span> : null)}
+                            {bits.length ? <span>{bits.join(' · ')}</span> : null}
+                          </div>
+                        );
+                      })()}
                       {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{display:'inline-block',fontSize:11,fontWeight:800,marginTop:5,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,background:`${dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}14`,borderRadius:7,padding:'2px 8px'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"À poster aujourd'hui":dl.days===1?'À poster demain':'À poster avant'} {dl.text}</div> : null; })()}
                       {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:11,fontWeight:800,marginTop:5,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
                     </div>
                     <button type="button" onClick={()=>{ if(window.confirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }} title="Masquer ce bordereau" aria-label="Masquer ce bordereau" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:16,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}>✕</button>
                   </div>
-                  {/* Ligne basse : actions, alignées, sans surcharge */}
-                  <div style={{display:'flex',gap:8,alignItems:'center',marginTop:11}}>
-                    <button type="button" onClick={()=>{
-                      const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
-                      processBordereau(numForBord(b), b.modele||b.article||'', bytes);
-                    }} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit'}}>🖨 Imprimer</button>
-                    {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{flexShrink:0,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit'}}>🔗 Relier</button>}
-                    {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{flexShrink:0,padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12.5,fontWeight:800,textDecoration:'none'}}>🔍 Suivre</a>}
-                    <button type="button" onClick={()=>toggleBordPrinted(b)}
-                      title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
-                      style={{flexShrink:0,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit',
-                        border:`1.5px solid ${isBordPrinted(b)?C.accent:C.border}`,
-                        background:isBordPrinted(b)?C.accent:'transparent',
-                        color:isBordPrinted(b)?'#fff':C.muted}}>
-                      {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
-                    </button>
-                    <button type="button" onClick={()=>{ if(isBordShippedManual(b)) unmarkBordShipped(b); else markBordShipped(b); }}
-                      title={isBordShippedManual(b)?'Annuler « expédié »':'Marquer comme expédié → le retire de la liste'}
-                      style={{flexShrink:0,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:12.5,fontWeight:800,fontFamily:'inherit',
-                        border:`1.5px solid ${isBordShippedManual(b)?INV_STATUS.online.color:C.border}`,
-                        background:isBordShippedManual(b)?INV_STATUS.online.color:'transparent',
-                        color:isBordShippedManual(b)?'#fff':C.muted}}>
-                      {isBordShippedManual(b)?'↺ Pas expédié':'✓ Expédié'}
-                    </button>
-                  </div>
+                  {/* ACTIONS : une hiérarchie claire au lieu de 5 boutons de même
+                      poids qui se bousculaient. L'action principale (Imprimer)
+                      prend toute la largeur ; le suivi de statut passe en dessous,
+                      plus discret. */}
+                  {(()=>{
+                    const sec = { flexShrink:0, borderRadius:9, padding:'7px 11px', cursor:'pointer', fontSize:11.5, fontWeight:800, fontFamily:'inherit' };
+                    return (<>
+                      <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12}}>
+                        <button type="button" onClick={()=>{
+                          const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
+                          processBordereau(numForBord(b), b.modele||b.article||'', bytes);
+                        }} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:11,padding:'12px',cursor:'pointer',fontSize:14,fontWeight:800,fontFamily:'inherit'}}>🖨 Imprimer</button>
+                        {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:12.5}}>🔗 Relier</button>}
+                      </div>
+                      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+                        <button type="button" onClick={()=>toggleBordPrinted(b)}
+                          title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
+                          style={{...sec,border:`1px solid ${isBordPrinted(b)?C.accent:C.border}`,background:isBordPrinted(b)?`${C.accent}18`:'transparent',color:isBordPrinted(b)?C.accent:C.muted}}>
+                          {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
+                        </button>
+                        <button type="button" onClick={()=>{ if(isBordShippedManual(b)) unmarkBordShipped(b); else markBordShipped(b); }}
+                          title={isBordShippedManual(b)?'Annuler « expédié »':'Marquer comme expédié → le retire de la liste'}
+                          style={{...sec,border:`1px solid ${isBordShippedManual(b)?INV_STATUS.online.color:C.border}`,background:isBordShippedManual(b)?`${INV_STATUS.online.color}18`:'transparent',color:isBordShippedManual(b)?INV_STATUS.online.color:C.muted}}>
+                          {isBordShippedManual(b)?'↺ Pas expédié':'✓ Expédié'}
+                        </button>
+                        {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
+                      </div>
+                    </>);
+                  })()}
                 </div>
               ))}
             </div>
