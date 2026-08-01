@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/03 · 🛟rappel-sauvegarde';
+const BUILD_ID = 'v36/04 · 👋onboarding-token';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -1788,8 +1788,12 @@ function Onboarding({ setTab }) {
           style={{marginTop:22,width:'100%',background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'13px 16px',cursor:'pointer',fontSize:15,fontWeight:800}}>
           Voir mes comptes connectés
         </button>
+        <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.5,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+          <b style={{color:C.text}}>Plus rapide :</b> connecte un compte en collant son token.<br/>
+          Extension → « 📋 Copier mon token », puis <button onClick={()=>setTab('vintedaccounts')} style={{background:'transparent',border:'none',color:C.accent,fontWeight:800,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>« ➕ Connecter un compte »</button>.
+        </div>
         <div style={{fontSize:11.5,color:C.muted,textAlign:'center',marginTop:12,lineHeight:1.4}}>
-          Déjà des données ailleurs ? Va dans ⚙️ Paramètres → Importer pour les récupérer.
+          Déjà des données ailleurs ? Va dans ⚙️ Paramètres → Restaurer pour les récupérer.
         </div>
       </div>
     </div>
