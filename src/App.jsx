@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/13 · 📄fusion';
+const BUILD_ID = 'v36/14 · 📄ordre';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -10279,12 +10279,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ) : null; })()}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[...emailBords].filter(b=>!isBordHidden(b) && (showBordDone || !isBordDone(b))).sort((a,b2)=>{
-                // Non imprimés d'abord, puis par date limite d'expédition (plus
-                // urgent en haut), puis les plus récents.
+                // ORDRE D'ARRIVÉE : les bordereaux se suivent dans l'ordre où ils
+                // sont arrivés (le plus ancien en premier) — c'est l'ordre dans
+                // lequel on les imprime et on prépare les colis. Les déjà
+                // imprimés/expédiés restent en bas pour ne pas gêner.
                 const pa=isBordDone(a)?1:0, pb=isBordDone(b2)?1:0; if(pa!==pb) return pa-pb;
-                const da=bordDeadline(a), db=bordDeadline(b2);
-                const va=da&&da.days!=null?da.days:Infinity, vb=db&&db.days!=null?db.days:Infinity; if(va!==vb) return va-vb;
-                return new Date(b2.receivedAt||0)-new Date(a.receivedAt||0);
+                return new Date(a.receivedAt||0)-new Date(b2.receivedAt||0);
               }).map((b,i)=>(
                 <div key={i} data-bord-card style={{padding:'11px 12px',border:`1px solid ${INV_STATUS.online.color}44`,...(isBordDone(b)?{opacity:0.45,filter:'grayscale(0.85)'}:{}),background:C.card,borderRadius:14}}>
                   {/* Ligne haute : photo + infos de la paire */}
@@ -10335,7 +10335,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>
         )}
-        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Ou depuis une vente <b>à expédier</b> ci-dessous (numéro pré-rempli) :</div>
+        <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>Ventes à expédier <b>dont le bordereau n'est pas encore arrivé</b> — génère-le ici (numéro pré-rempli) :</div>
         {sales.loading && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {(() => {
@@ -10345,7 +10345,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // l'URGENCE, la CASE AU GARAGE et la coche « posté » — plus besoin de
           // deux onglets qui montraient la même chose.
           const urg = {}; (toShip||[]).forEach(t=>{ if(t && t.o && t.o.transaction_id!=null) urg[String(t.o.transaction_id)] = t; });
-          const all = (sales.items||[]).filter(o=>needsBordereau(o.status)).filter(o=>matchOrd(o));
+          // On EXCLUT les ventes dont le bordereau est déjà listé plus haut :
+          // sinon la même paire apparaissait deux fois sur l'écran.
+          const bordTxns = new Set((emailBords||[]).filter(b=>!isBordHidden(b)).map(b=>String(b.transaction||'')).filter(Boolean));
+          const all = (sales.items||[])
+            .filter(o=>needsBordereau(o.status))
+            .filter(o=>!bordTxns.has(String(o.transaction_id)))
+            .filter(o=>matchOrd(o));
           const list = [...all].sort((a,b)=>{
             const da = urg[String(a.transaction_id)], db = urg[String(b.transaction_id)];
             const va = da && da.daysLeft!=null ? da.daysLeft : 999;
@@ -10353,7 +10359,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (va!==vb) return va-vb;                    // le plus urgent en haut
             return (isShipDone(a)?1:0)-(isShipDone(b)?1:0); // déjà postés en bas
           });
-          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente à expédier.<br/><span style={{fontSize:11.5}}>Les bordereaux apparaissent pour les ventes en cours d'expédition.</span></div>;
+          if (sales.items && list.length===0) return <div style={{fontSize:12.5,color:C.muted,textAlign:'center',padding:'18px 16px',lineHeight:1.5}}>✅ Toutes tes ventes à expédier ont déjà leur bordereau ci-dessus.</div>;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {list.map(o=>{ const num=effEntry(o)?.numero||''; const st=classifyOrderStatus(o.status);
