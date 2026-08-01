@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/04 · ⏳chargement';
+const BUILD_ID = 'v37/05 · 🔔notifs';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1603,6 +1603,56 @@ function ScreenHead({ icon, title, desc, right }) {
   );
 }
 
+// ── NOTIFICATIONS (toasts) ─────────────────────────────────────────────────
+// Remplace les alert() du navigateur : une boîte système bloque l'app, coupe le
+// geste en cours et fait « site web des années 2000 ». Ici : un bandeau discret
+// en bas de l'écran, qui s'empile et disparaît tout seul.
+// ⚠️ On NE remplace PAS window.confirm : celui-ci attend une VRAIE décision de
+// l'utilisateur (supprimer, remplacer…) et un toast ne peut pas la recueillir.
+let _toasts = [];
+let _toastId = 0;
+const _toastSubs = new Set();
+const _emitToasts = () => { _toastSubs.forEach(f => { try { f([..._toasts]); } catch (_) {} }); };
+const onToasts = (fn) => { _toastSubs.add(fn); fn([..._toasts]); return () => _toastSubs.delete(fn); };
+const dismissToast = (id) => { _toasts = _toasts.filter(t => t.id !== id); _emitToasts(); };
+// type : 'ok' | 'err' | 'info'. Le ton est déduit du texte quand il n'est pas
+// précisé, pour que les appels existants restent courts.
+const toast = (msg, type) => {
+  const text = String(msg == null ? '' : msg);
+  if (!text.trim()) return;
+  const t = type || (/^(⚠|❌|erreur|échec|impossible|invalide)/i.test(text.trim()) ? 'err'
+                    : /^(✓|✅)/.test(text.trim()) ? 'ok' : 'info');
+  const id = ++_toastId;
+  _toasts = [..._toasts.slice(-3), { id, text, type: t }];
+  _emitToasts();
+  setTimeout(() => dismissToast(id), t === 'err' ? 6000 : 3800);
+};
+
+function Toaster() {
+  const [list, setList] = React.useState([]);
+  React.useEffect(() => onToasts(setList), []);
+  if (!list.length) return null;
+  return (
+    <div style={{position:'fixed',left:0,right:0,bottom:'calc(92px + env(safe-area-inset-bottom))',zIndex:210,
+      display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'0 14px',pointerEvents:'none'}}>
+      {list.map(t => {
+        const col = t.type==='err' ? C.danger : t.type==='ok' ? INV_STATUS.online.color : C.text;
+        return (
+          <button key={t.id} type="button" onClick={()=>dismissToast(t.id)}
+            style={{pointerEvents:'auto',maxWidth:520,width:'100%',textAlign:'left',cursor:'pointer',fontFamily:'inherit',
+              display:'flex',alignItems:'flex-start',gap:9,padding:'11px 14px',borderRadius:14,
+              background:C.card,border:`1px solid ${t.type==='info'?C.border:col+'66'}`,
+              boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',
+              animation:'cancaleToast .26s cubic-bezier(.32,.72,0,1) both'}}>
+            <span style={{fontSize:15,flexShrink:0,lineHeight:1.3}}>{t.type==='err'?'⚠️':t.type==='ok'?'✅':'ℹ️'}</span>
+            <span style={{fontSize:12.5,fontWeight:700,color:C.text,lineHeight:1.45,whiteSpace:'pre-wrap'}}>{t.text}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function TopProgress() {
   const [busy, setBusy] = React.useState(false);
   const [pct, setPct] = React.useState(0);
@@ -2123,7 +2173,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
       const a=document.createElement('a');
       a.href=url; a.download=`cancale-comptabilite-${new Date().toISOString().slice(0,10)}.csv`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    }catch(err){ alert('Erreur export : '+err.message); }
+    }catch(err){ toast('Erreur export : '+err.message); }
   };
 
   // Carte avec icône et taille
@@ -2580,7 +2630,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
   const addRow=()=>{
     const id=newRow.id.trim();
     if(!id||!newRow.buyPrice) return;
-    if(catalog.find(p=>p.id===id)){alert('Numéro déjà existant !');return;}
+    if(catalog.find(p=>p.id===id)){toast('Numéro déjà existant !');return;}
     const u=[...catalog,{id,buyPrice:+newRow.buyPrice,status:'stock',addedAt:tod()}];
     setCatalog(u); save('vinted_catalog',u);
     setLastAddedId(id);
@@ -2631,7 +2681,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
         <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:800}}>Catalogue ({catalog.length})</h2>
         <Btn small onClick={()=>{
-          if(fullList.length===0){alert('Aucune paire à exporter');return;}
+          if(fullList.length===0){toast('Aucune paire à exporter');return;}
           const headers=['N° Paire','Prix Achat (€)','Statut','Date ajout'];
           const rows=fullList.map(p=>[p.id||'',String(p.buyPrice||'').replace('.',','),p.status||'',p.addedAt||'']);
           const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
@@ -2892,7 +2942,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
           <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
           <Btn small onClick={()=>{
-            if(fullFiltered.length===0){alert('Aucune vente à exporter');return;}
+            if(fullFiltered.length===0){toast('Aucune vente à exporter');return;}
             const headers=['ID','N° Paire','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
             const rows=fullFiltered.map(s=>[
               s.id||'',s.productId||'',s.saleDate||'',s.receiveDate||'',
@@ -3167,7 +3217,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       const res=await fetch(VINTED_API_URL);
       const data=await res.json();
       if(!Array.isArray(data)){
-        if(!silencieux) alert('Format de données inattendu');
+        if(!silencieux) toast('Format de données inattendu');
         return;
       }
       // Convertir les lignes Sheets en factures de l'app
@@ -3220,14 +3270,14 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       });
       
       if(newInvoices.length===0){
-        if(!silencieux) alert('Aucune nouvelle facture à importer');
+        if(!silencieux) toast('Aucune nouvelle facture à importer');
       } else {
         const u=[...newInvoices,...invoices];
         setInvoices(u); save('vinted_invoices',u);
-        if(!silencieux) alert(`✓ ${newInvoices.length} nouvelle(s) facture(s) importée(s) depuis Vinted !`);
+        if(!silencieux) toast(`✓ ${newInvoices.length} nouvelle(s) facture(s) importée(s) depuis Vinted !`);
       }
     } catch(err) {
-      if(!silencieux) alert('Erreur récupération : '+err.message);
+      if(!silencieux) toast('Erreur récupération : '+err.message);
     } finally {
       setFetching(false);
     }
@@ -3325,7 +3375,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   
   // Export CSV/Excel
   const exportExcel=()=>{
-    if(fullList.length===0){alert('Aucune facture à exporter');return;}
+    if(fullList.length===0){toast('Aucune facture à exporter');return;}
     const headers=['N° Facture','Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
     const rows=fullList.map(i=>[
       i.number||'',i.saleDate||'',i.productId||'',i.itemName||'',
@@ -3399,7 +3449,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                       <button type="button" onClick={async()=>{
                         if(!window.confirm(`Envoyer la facture ${inv.number} à ${inv.buyerEmail} ?\n(part dans les 5 minutes via Gmail)`)) return;
                         const ok=await setProInvoiceStatus(inv,'queued');
-                        if(ok) setProInvs(await fetchProInvoices()); else alert('Échec — réessaie.');
+                        if(ok) setProInvs(await fetchProInvoices()); else toast('Échec — réessaie.');
                       }} style={{padding:'6px 12px',borderRadius:8,border:'none',background:C.accent,color:'#fff',fontSize:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
                     )}
                   </div>
@@ -3772,7 +3822,7 @@ function LocalPhoto({ locate, onLocateConsumed }) {
   const addPhoto = async (file) => {
     if (!file) return; setBusy(true);
     const data = await compressImage(file); setBusy(false);
-    if (!data) { alert('Impossible de lire cette image. Réessaie avec une autre photo.'); return; }
+    if (!data) { toast('Impossible de lire cette image. Réessaie avec une autre photo.'); return; }
     const p = { id: 'ph' + Date.now(), name: `Zone ${photos.length + 1}`, img: data, pins: [] };
     const next = [...photos, p]; persist(next); setActive(next.length - 1);
   };
@@ -5619,14 +5669,14 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
       try{
         const data=JSON.parse(ev.target.result);
         if(!data.catalog&&!data.sales){
-          alert('❌ Fichier invalide : pas de données détectées');
+          toast('❌ Fichier invalide : pas de données détectées');
           return;
         }
         if(window.confirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} paires\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
           onImport(data);
         }
       }catch(err){
-        alert('❌ Erreur de lecture : '+err.message);
+        toast('❌ Erreur de lecture : '+err.message);
       }
     };
     reader.readAsText(file);
@@ -5700,7 +5750,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   const addOne=()=>{
     const n=norm(input);
     if(!n){ return; }
-    if(stockVinted.includes(n)){ alert('Le numéro '+n+' est déjà dans le stock Vinted.'); setInput(''); return; }
+    if(stockVinted.includes(n)){ toast('Le numéro '+n+' est déjà dans le stock Vinted.'); setInput(''); return; }
     const u=[...stockVinted,n];
     setStockVinted(u); save('vinted_stock_vinted',u);
     setInput('');
@@ -5709,14 +5759,14 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   // Ajoute plusieurs numéros d'un coup (séparés par virgule, espace, point-virgule ou saut de ligne)
   const addBulk=()=>{
     const parts=bulk.split(/[\s,;]+/).map(norm).filter(Boolean);
-    if(parts.length===0){ alert('Aucun numéro détecté.'); return; }
+    if(parts.length===0){ toast('Aucun numéro détecté.'); return; }
     const set=new Set(stockVinted);
     let added=0;
     parts.forEach(p=>{ if(!set.has(p)){ set.add(p); added++; } });
     const u=Array.from(set);
     setStockVinted(u); save('vinted_stock_vinted',u);
     setBulk(''); setShowBulk(false);
-    alert(added+' numéro(s) ajouté(s) au stock Vinted.');
+    toast(added+' numéro(s) ajouté(s) au stock Vinted.');
   };
 
   // Retire un numéro manuellement
@@ -6000,7 +6050,7 @@ function VintedAccounts({ accounts, setAccounts }) {
     setRemoving(acc.vinted_user_id);
     const ok = await deleteVintedAccount(acc.vinted_user_id);
     setRemoving(null);
-    if (!ok) { alert('Échec de la déconnexion. Réessaie.'); return; }
+    if (!ok) { toast('Échec de la déconnexion. Réessaie.'); return; }
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
   };
 
@@ -6240,13 +6290,13 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
     const pair = bordereauPairRef.current;
     if (!file || !pair) return;
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Merci de choisir le bordereau au format PDF téléchargé depuis Vinted.'); return;
+      toast('Merci de choisir le bordereau au format PDF téléchargé depuis Vinted.'); return;
     }
     try {
       const buf = await file.arrayBuffer();
       await annotateAndDownloadBordereau(pair.numero, pair.title, buf);
     } catch (err) {
-      alert('Impossible d\'annoter ce PDF : ' + String(err));
+      toast('Impossible d\'annoter ce PDF : ' + String(err));
     }
   };
 
@@ -6267,8 +6317,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
   const addPair = () => {
     const numero = addForm.numero.trim();
-    if (!numero) { alert('Indique un numéro.'); return; }
-    if (numeroExists(numero)) { alert(`Le numéro ${numero} est déjà utilisé.`); return; }
+    if (!numero) { toast('Indique un numéro.'); return; }
+    if (numeroExists(numero)) { toast(`Le numéro ${numero} est déjà utilisé.`); return; }
     const pair = { id: uid(), numero, title: addForm.title.trim(), status: addForm.status,
       vintedItemId:null, vintedAccountId:null, price:null, photo:null, soldAt:null, transactionId:null, createdAt: tod() };
     persist([pair, ...inventory]);
@@ -6284,8 +6334,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   const startEdit = (p) => { setEditing(p.id); setEditDraft({ ...p }); };
   const commitEdit = () => {
     const numero = String(editDraft.numero).trim();
-    if (!numero) { alert('Le numéro ne peut pas être vide.'); return; }
-    if (numeroExists(numero, editDraft.id)) { alert(`Le numéro ${numero} est déjà utilisé.`); return; }
+    if (!numero) { toast('Le numéro ne peut pas être vide.'); return; }
+    if (numeroExists(numero, editDraft.id)) { toast(`Le numéro ${numero} est déjà utilisé.`); return; }
     persist(inventory.map(p => p.id === editDraft.id ? { ...editDraft, numero } : p));
     setEditing(null); setEditDraft(null);
   };
@@ -6308,7 +6358,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   // Associe une annonce en ligne a un numero (cree ou met a jour la paire).
   const associate = (acc, listing) => {
     const numero = String(importNums[listing.id] || '').trim();
-    if (!numero) { alert('Indique le numéro à associer à cette annonce.'); return; }
+    if (!numero) { toast('Indique le numéro à associer à cette annonce.'); return; }
     const existing = inventory.find(p => String(p.numero).trim().toLowerCase() === numero.toLowerCase());
     if (existing) {
       // On sauvegarde le titre EXACT de l'annonce : c'est ce même titre qui
@@ -6952,14 +7002,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Recherche faite CÔTÉ SERVEUR (api/relais) → fiable, pas de blocage réseau.
       const r = await fetch(`/api/relais?city=${encodeURIComponent(city)}`);
       const j = await r.json();
-      if (j && j.error === 'ville_introuvable') { setVilleLoading(false); alert('Ville introuvable — vérifie l\'orthographe.'); return; }
+      if (j && j.error === 'ville_introuvable') { setVilleLoading(false); toast('Ville introuvable — vérifie l\'orthographe.'); return; }
       const pts = (j && Array.isArray(j.points)) ? j.points : [];
-      if (!pts.length && j && j.error) { setVilleLoading(false); alert('Service de carte momentanément indisponible, réessaie dans un instant.'); return; }
+      if (!pts.length && j && j.error) { setVilleLoading(false); toast('Service de carte momentanément indisponible, réessaie dans un instant.'); return; }
       const cache = { city, pts };
       setVilleCache(cache); save('vrm_ville_points', cache);
       setVille(city); save('vrm_ville', city);
       setVilleInput(city);
-    } catch (_) { alert('Recherche indisponible, réessaie.'); }
+    } catch (_) { toast('Recherche indisponible, réessaie.'); }
     setVilleLoading(false);
   };
   // Géocode une adresse précise via l'API Adresse du gouvernement français
@@ -6987,7 +7037,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nom = parts[0].trim();
     const adresse = parts.slice(1).join(',').trim() || input.trim();
     const hit = await geocode(adresse) || await geocode(input.trim());
-    if (!hit) { alert('Adresse introuvable. Donne la rue + le code postal + la ville (ex : 40 Rue du Port, 35260 Cancale).'); return; }
+    if (!hit) { toast('Adresse introuvable. Donne la rue + le code postal + la ville (ex : 40 Rue du Port, 35260 Cancale).'); return; }
     const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
     byName.set(nom.toLowerCase(), { nom, full: input.trim(), lat: hit.lat, lon: hit.lon });
     persistPoints([...byName.values()]);
@@ -8740,7 +8790,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setCapturedReceipts(out);
   };
   const downloadReceipt = (rec) => {
-    try { const buf=b64ToArrayBuffer(rec.pdfB64); const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ alert('Impossible d\'ouvrir ce reçu.'); }
+    try { const buf=b64ToArrayBuffer(rec.pdfB64); const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ toast('Impossible d\'ouvrir ce reçu.'); }
   };
   const exportAnnualCsv = () => {
     const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
@@ -8812,7 +8862,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const pos = posForFormat(width, height);
       const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
-    } catch(err){ alert('Impossible de lire ce PDF : '+String(err)); }
+    } catch(err){ toast('Impossible de lire ce PDF : '+String(err)); }
   };
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
   // titre dans les annonces numérotées (si le titre n'est pas ambigu).
@@ -8844,13 +8894,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const batchBordereaux = async () => {
     if (batchBusy) return;
     const pending = (emailBords || []).filter(b => b.pdfB64 && !isBordDone(b));
-    if (!pending.length) { alert('Aucun bordereau à imprimer (tous sont déjà marqués imprimés).'); return; }
+    if (!pending.length) { toast('Aucun bordereau à imprimer (tous sont déjà marqués imprimés).'); return; }
     setBatchBusy(true);
     try {
       const items = pending.map(b => ({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: b64ToBytes(b.pdfB64) })).filter(it => it.pdfBuf);
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false));
       setBordResult({ ...r, batch: true });
-    } catch(err){ alert('Erreur : ' + String(err)); }
+    } catch(err){ toast('Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
   // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
@@ -8865,7 +8915,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const p = bordPlace; if(!p) return;
     const next = { ...bordFormats, [p.key]: pos };
     setBordFormats(next); save('vinted_bordereau_formats', next);
-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, w:p.w, h:p.h }); } catch(err){ alert('Erreur : '+String(err)); }
+    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, w:p.w, h:p.h }); } catch(err){ toast('Erreur : '+String(err)); }
     URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
   };
   const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
@@ -8885,14 +8935,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const onBordFile = async (e) => {
     const f = e.target.files && e.target.files[0]; e.target.value='';
     let ctx = bordCtx.current; if (!f || !ctx) return;
-    if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { alert('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
+    if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { toast('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
     // Import direct (pas depuis une vente) : on demande le N° + le titre.
     if (ctx.standalone) {
       const numero = (window.prompt('Numéro de la paire (laisse vide si aucun) :', '') || '').trim();
       const title = (window.prompt('Titre / description (ex : Nike Air Max 90) :', '') || '').trim();
       ctx = { numero, title };
     }
-    try { await processBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ alert('Erreur : '+String(err)); }
+    try { await processBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ toast('Erreur : '+String(err)); }
   };
 
   const fmtE = (n)=> (n==null?'—':Number(n).toFixed(2).replace('.',',')+' €');
@@ -9661,7 +9711,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   style={{flex:'1 1 150px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <button onClick={()=>{ const v=(villeInput||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12.5,fontWeight:800,padding:'9px 16px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
                 <button onClick={()=>{
-                  if(!navigator.geolocation){ alert('Position non disponible sur cet appareil.'); return; }
+                  if(!navigator.geolocation){ toast('Position non disponible sur cet appareil.'); return; }
                   setVilleLoading(true);
                   navigator.geolocation.getCurrentPosition(async pos=>{
                     try{
@@ -9669,10 +9719,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       const j=await r.json();
                       const pts=(j&&Array.isArray(j.points))?j.points:[];
                       if(j&&j.city){ const cache={city:j.city,pts}; setVilleCache(cache); save('vrm_ville_points',cache); setVille(j.city); save('vrm_ville',j.city); setVilleInput(j.city); }
-                      else alert('Ville non trouvée depuis ta position.');
-                    }catch(_){ alert('Recherche indisponible, réessaie.'); }
+                      else toast('Ville non trouvée depuis ta position.');
+                    }catch(_){ toast('Recherche indisponible, réessaie.'); }
                     setVilleLoading(false);
-                  }, ()=>{ setVilleLoading(false); alert('Autorise la localisation pour utiliser ta position.'); }, {timeout:8000});
+                  }, ()=>{ setVilleLoading(false); toast('Autorise la localisation pour utiliser ta position.'); }, {timeout:8000});
                 }} disabled={villeLoading} title="Utiliser ma position" style={{border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,fontSize:12.5,fontWeight:800,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit'}}>📍</button>
               </div>
               {/* Accès direct aux CODES/QR de retrait — un tap = QR plein écran à scanner. */}
@@ -10520,7 +10570,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return (<>
                       <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12}}>
                         <button type="button" onClick={()=>{
-                          const bytes=b64ToBytes(b.pdfB64); if(!bytes){alert('PDF illisible.');return;}
+                          const bytes=b64ToBytes(b.pdfB64); if(!bytes){toast('PDF illisible.');return;}
                           processBordereau(numForBord(b), b.modele||b.article||'', bytes);
                         }} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:11,padding:'12px',cursor:'pointer',fontSize:14,fontWeight:800,fontFamily:'inherit'}}>🖨 Imprimer</button>
                         {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:12.5}}>🔗 Relier</button>}
@@ -11818,7 +11868,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Comptabilité</div>
       <RegimeSetting/>
       <div style={{height:10}}/>
-      <Row icon="📄" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={()=>{ if(window.confirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); alert('✓ Emplacements réinitialisés.'); } }}/>
+      <Row icon="📄" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={()=>{ if(window.confirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:700,margin:'18px 0 8px 2px'}}>Notifications</div>
       <PushSetting/>
@@ -12253,14 +12303,14 @@ export default function App() {
   const handleLogoChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if(!file) return;
-    if(!file.type.startsWith('image/')){ alert('Merci de choisir une image (jpg, png...)'); return; }
+    if(!file.type.startsWith('image/')){ toast('Merci de choisir une image (jpg, png...)'); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target.result;
       setCustomLogo(dataUrl);
-      try{ localStorage.setItem('vinted_custom_logo', JSON.stringify(dataUrl)); cloudPush(); }catch(_){ alert("Image trop lourde pour être enregistrée. Essaie une image plus petite."); }
+      try{ localStorage.setItem('vinted_custom_logo', JSON.stringify(dataUrl)); cloudPush(); }catch(_){ toast("Image trop lourde pour être enregistrée. Essaie une image plus petite."); }
     };
-    reader.onerror = () => alert("Impossible de lire l'image.");
+    reader.onerror = () => toast("Impossible de lire l'image.");
     reader.readAsDataURL(file);
     e.target.value='';
   };
@@ -12782,6 +12832,7 @@ export default function App() {
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
+      <Toaster/>
       {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
           derrière au défilement au lieu de buter sur un bandeau plein. */}
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',
@@ -12836,9 +12887,9 @@ export default function App() {
                   setNotifEnabled(true); save('vinted_notif_enabled',true);
                   pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
                 } else if(res==='denied'){
-                  alert("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
+                  toast("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
                 } else if(res==='unsupported'){
-                  alert("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
+                  toast("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
                 }
               } else {
                 setNotifEnabled(false); save('vinted_notif_enabled',false);
@@ -13018,9 +13069,9 @@ export default function App() {
                 setNotifEnabled(true); save('vinted_notif_enabled',true);
                 pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
               } else if(res==='denied'){
-                alert("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
+                toast("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
               } else if(res==='unsupported'){
-                alert("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
+                toast("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
               }
             } else {
               setNotifEnabled(false); save('vinted_notif_enabled',false);
@@ -13037,7 +13088,7 @@ export default function App() {
             a.download=`cancale-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
             try{ localStorage.setItem('vinted_last_backup', String(Date.now())); }catch(_){}
-          }catch(err){alert('Erreur export : '+err.message);} }}
+          }catch(err){toast('Erreur export : '+err.message);} }}
           onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{
             const data=JSON.parse(await file.text());
             // Écrit les clés puis POUSSE tout de suite au cloud (sinon le
@@ -13049,7 +13100,7 @@ export default function App() {
                 const payload={}; SYNC_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null){ try{ payload[k]=JSON.parse(raw); }catch{ payload[k]=raw; } } });
                 if(Object.keys(payload).length){ await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json', Prefer:'return=minimal' }, body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) }); }
               }catch(_){}
-              alert('✓ Sauvegarde restaurée ! L\'app va se recharger.');
+              toast('✓ Sauvegarde restaurée ! L\'app va se recharger.');
               location.reload();
             };
             // Format complet (nouveau)
@@ -13068,8 +13119,8 @@ export default function App() {
               const entries=[]; if(data.catalog)entries.push(['vinted_catalog',data.catalog]); if(data.sales)entries.push(['vinted_sales',data.sales]); if(data.garageGrid)entries.push(['vinted_garage_grid',data.garageGrid]);
               await applyAndReload(entries); return;
             }
-            alert('⚠ Fichier de sauvegarde invalide.');
-          }catch(err){alert('Erreur : '+err.message);} }; inp.click(); }}
+            toast('⚠ Fichier de sauvegarde invalide.');
+          }catch(err){toast('Erreur : '+err.message);} }; inp.click(); }}
           dark={dark} toggleDark={toggleDark}/>}
         {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&<Onboarding setTab={setTab}/>}
@@ -13101,7 +13152,7 @@ export default function App() {
           if(data.garageGrid){setGarageGrid(data.garageGrid);save('vinted_garage_grid',data.garageGrid);}
           if(data.blockedCells){setBlockedCells(data.blockedCells);save('vinted_blocked',data.blockedCells);}
           setShowBackup(false);
-          alert('✓ Restauration réussie !');
+          toast('✓ Restauration réussie !');
         }}
       />}
       <style>{`

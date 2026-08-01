@@ -69,6 +69,8 @@
           conteneur redéfinit le référentiel des enfants en position:fixed, ce qui
           décalerait les modales. */
     @keyframes cancaleEnter{from{opacity:0}to{opacity:1}}
+    /* Arrivée des notifications : léger glissement depuis le bas. */
+    @keyframes cancaleToast{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
     main > *{animation:cancaleEnter .24s ease both;}
 
     /* 8) IMAGES : jamais déformées, et fondu à l'arrivée plutôt qu'un « pop ». */
