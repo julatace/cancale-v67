@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/02 · 🧹épuré';
+const BUILD_ID = 'v37/03 · 🧹épuré+';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -7130,6 +7130,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Idem pour les conseils/signalements de l'onglet Annonces.
   const [tipsOpen, setTipsOpen] = useState(() => !!load('vinted_tips_open', false));
   useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
+  const [toolsOpen, setToolsOpen] = useState(false); // menu « ⋯ Outils » (Ventes)
+  const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
   // Listes AUTOMATIQUES (statut Vinted, pas les emails) : à retirer / à expédier.
   // « à retirer » exclut ce que tu as déjà coché récupéré à la main.
   const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buys.items, pickupDone]);
@@ -9194,18 +9196,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {accounts.length>0 && (
             <button onClick={()=>{ loadOrders('sold',setSales,true); loadListings&&loadListings(true); }} disabled={sales.loading} title="Va chercher tes ventes en direct sur Vinted (tous comptes), sans attendre l'extension" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:800,cursor:sales.loading?'default':'pointer',opacity:sales.loading?0.6:1}}>{sales.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
           )}
-          {accounts.length>0 && (
-            <button onClick={openReport} title="Rapport comptable mensuel (CA, bénéfice, cotisations)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📊 Compta</button>
-          )}
-          {accounts.length>0 && (
-            <button onClick={openAnnual} title="Registre comptable de l'année (ventes + achats ligne par ligne, CSV/PDF pour l'expert-comptable)" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:12,fontWeight:800,cursor:'pointer'}}>📚 Registre annuel</button>
-          )}
-          {(disputes.salesLost.length>0||disputes.buysBack.length>0) && (
-            <button onClick={()=>setShowDisputes(true)} title="Litiges, annulations et remboursements — l'argent perdu/récupéré" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.danger}`,background:`${C.danger}12`,color:C.danger,fontSize:12,fontWeight:800,cursor:'pointer'}}>⚖️ Litiges{disputes.totalLost>0?` · −${Math.round(disputes.totalLost)} €`:''}</button>
-          )}
-          {sales.items && sales.items.length>0 && (
-            <button onClick={exportCsv} title="Exporter les ventes en CSV" style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇️ CSV</button>
-          )}
+          {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
+              sur une ligne). Les filtres restent visibles — c'est le réglage du
+              quotidien — et Compta / Registre / Litiges / CSV passent derrière un
+              seul « ⋯ Outils ». Les litiges gardent une pastille d'alerte car
+              c'est de l'argent en jeu. */}
+          {accounts.length>0 && (()=>{
+            const alert = disputes.salesLost.length>0 || disputes.buysBack.length>0;
+            return (
+              <div style={{position:'relative'}}>
+                <button onClick={()=>setToolsOpen(v=>!v)} title="Outils : compta, registre annuel, litiges, export"
+                  style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
+                  ⋯ Outils {alert && <span style={{width:7,height:7,borderRadius:999,background:C.danger,display:'inline-block'}}/>}
+                </button>
+                {toolsOpen && (
+                  <>
+                    <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+                    <div style={{position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:71,minWidth:220,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                      {[
+                        {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
+                        {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
+                        ...(alert?[{k:'lit', icon:'⚖️', lab:`Litiges${disputes.totalLost>0?` · −${Math.round(disputes.totalLost)} €`:''}`, desc:'Annulations et remboursements', danger:true, on:()=>{ setToolsOpen(false); setShowDisputes(true); }}]:[]),
+                        ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter en CSV', desc:'Toutes tes ventes', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+                      ].map(t=>(
+                        <button key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:10,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                          <span style={{fontSize:16,flexShrink:0}}>{t.icon}</span>
+                          <span style={{minWidth:0}}>
+                            <span style={{display:'block',fontSize:12.5,fontWeight:800,color:t.danger?C.danger:C.text}}>{t.lab}</span>
+                            <span style={{display:'block',fontSize:10.5,color:C.muted,marginTop:1}}>{t.desc}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
         {sales.items && sales.items.length>0 && (
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, acheteur)…"
@@ -10092,8 +10119,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <option value="nonum">Sans numéro</option>
             </select>
             <button type="button" onClick={()=>{ const v=!autoNum; setAutoNum(v); save('vinted_autonum', v); }} title="Numéroter automatiquement chaque annonce (réutilise le numéro d'une paire renvoyée/republiée)" style={{border:`1px solid ${autoNum?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:autoNum?`${INV_STATUS.online.color}14`:'transparent',color:autoNum?INV_STATUS.online.color:C.text,cursor:'pointer'}}>{autoNum?'🔢 Auto N° ✓':'🔢 Auto N°'}</button>
-            <button type="button" onClick={()=>{ setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }} title="Répartir le prix d'un achat groupé (lot) sur plusieurs paires" style={{border:`1px solid ${C.accent}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:`${C.accent}12`,color:C.accent,cursor:'pointer'}}>🧮 Répartir un lot</button>
-            <button type="button" onClick={()=>setAuditOpen(true)} title="Audit d'inventaire : retrouve les paires perdues ou mal rangées" style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:'transparent',color:C.text,cursor:'pointer'}}>🔎 Audit stock</button>
+            {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
+                ne servent pas tous les jours et encombraient la barre. */}
+            <div style={{position:'relative'}}>
+              <button type="button" onClick={()=>setAnnToolsOpen(v=>!v)} title="Outils : répartir un lot, audit du stock"
+                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:800,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
+              {annToolsOpen && (<>
+                <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+                <div style={{position:'absolute',left:0,top:'calc(100% + 6px)',zIndex:71,minWidth:230,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                  {[
+                    {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
+                  ].map(t=>(
+                    <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:10,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                      <span style={{fontSize:16,flexShrink:0}}>{t.icon}</span>
+                      <span style={{minWidth:0}}>
+                        <span style={{display:'block',fontSize:12.5,fontWeight:800,color:C.text}}>{t.lab}</span>
+                        <span style={{display:'block',fontSize:10.5,color:C.muted,marginTop:1}}>{t.desc}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>)}
+            </div>
           </div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>{autoNum?<>Les numéros se mettent <b>automatiquement</b> (modifiables à la main). Une paire renvoyée puis republiée <b>garde son numéro</b>. Prochain libre : <b>{nextNumero}</b>.</>:<>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</>}</div>
         </>)}
