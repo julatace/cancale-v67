@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/01 · ✨premium+';
+const BUILD_ID = 'v37/02 · 🧹épuré';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -7123,6 +7123,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const unhideBord = (b) => { const k=bordKey(b); if(!k) return; setBordsHidden(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_hidden',u); return u; }); };
   const isBordHidden = (b) => !!bordsHidden[bordKey(b)];
   const [showBordDone, setShowBordDone] = useState(false); // afficher les bordereaux déjà expédiés
+  // Section « Analyse » de l'onglet Ventes : repliée par défaut pour que l'écran
+  // aille droit à la liste des ventes. Le choix est mémorisé sur l'appareil.
+  const [analyseOpen, setAnalyseOpen] = useState(() => !!load('vinted_analyse_open', false));
+  useEffect(() => { save('vinted_analyse_open', analyseOpen); }, [analyseOpen]);
+  // Idem pour les conseils/signalements de l'onglet Annonces.
+  const [tipsOpen, setTipsOpen] = useState(() => !!load('vinted_tips_open', false));
+  useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
   // Listes AUTOMATIQUES (statut Vinted, pas les emails) : à retirer / à expédier.
   // « à retirer » exclut ce que tu as déjà coché récupéré à la main.
   const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buys.items, pickupDone]);
@@ -9048,6 +9055,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* ── ANALYSE : tout ce qui n'est pas l'action du jour est REPLIÉ ────
+            L'onglet Ventes montrait 6 panneaux d'analyse AVANT la liste des
+            ventes — l'essentiel était enterré. On les regroupe derrière un seul
+            bouton, fermé par défaut : l'écran va droit au but, l'analyse reste
+            à un tap. */}
+        {(totals.nb>0) && (
+          <div style={{marginBottom:12}}>
+            <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+              <span style={{fontSize:15}}>📊</span>
+              <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:800,color:C.text}}>Analyse de tes ventes</span>
+              <span style={{fontSize:11,color:C.muted,fontWeight:700}}>{analyseOpen?'masquer':'voir'}</span>
+              <span style={{fontSize:13,color:C.muted,transform:analyseOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
+            </button>
+          </div>
+        )}
+        {analyseOpen && (<>
         {/* Analyse de perf : temps de vente, écoulement, meilleure marque */}
         {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
@@ -9141,6 +9165,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>
         ); })()}
+        </>)}
         {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
           <div style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
             ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Annonces » (bouton 🔗).
@@ -9963,6 +9988,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button onClick={()=>loadListings(true)} disabled={listings.loading} title="Va chercher tes annonces EN DIRECT sur Vinted (tous comptes) — enlève les paires vendues qui traînent encore" style={{marginLeft:'auto',fontSize:12,fontWeight:800,color:'#fff',background:C.accent,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:listings.loading?'default':'pointer',opacity:listings.loading?0.6:1}}>{listings.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
             <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:800,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
+          {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
+              Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
+              auto, marquées vendues, qui dorment, dates inconnues, repricing).
+              Ils sont regroupés derrière un seul bouton avec un compteur : on voit
+              qu'il y a quelque chose à regarder, sans que ça mange l'écran. */}
+          {(()=>{
+            const n = (emailSoldIds.size>0?1:0) + (soldManual.size>0?1:0)
+              + ((annStats.sleeping>0 && annSort!=='sleeping')?1:0)
+              + ((annStats.n>0 && annStats.datesKnown===0)?1:0)
+              + (repriceList.length>0?1:0);
+            if (!n) return null;
+            return (
+              <button type="button" onClick={()=>setTipsOpen(v=>!v)}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+                <span style={{fontSize:15}}>💡</span>
+                <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:800,color:C.text}}>Conseils & signalements</span>
+                <span style={{fontSize:11,fontWeight:900,color:'#fff',background:C.accent,borderRadius:999,padding:'1px 8px'}}>{n}</span>
+                <span style={{fontSize:13,color:C.muted,transform:tipsOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
+              </button>
+            );
+          })()}
+          {tipsOpen && (<>
           {emailSoldIds.size>0 && (
             <div style={{fontSize:11.5,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:800}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
@@ -10027,6 +10074,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
             </div>
           )}
+          </>)}
           {/* Recherche + tri */}
           <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="🔎 Rechercher (titre, marque, N°)…"
