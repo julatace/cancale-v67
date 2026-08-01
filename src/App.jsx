@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/06 · 🧹achats';
+const BUILD_ID = 'v37/07 · ☀️journée';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1588,6 +1588,20 @@ const BOTTOM_TABS=[
 // En-tête d'écran : un titre + UNE ligne qui dit à quoi sert l'écran. Compact
 // (l'app est déjà dense), mais ça enlève toute ambiguïté sur ce qu'on regarde —
 // indispensable pour quelqu'un qui découvre l'app.
+// État vide soigné : une icône, une phrase qui explique POURQUOI c'est vide, et
+// quand c'est possible une action. Un simple texte gris laisse l'utilisateur se
+// demander si l'app est cassée ou s'il n'a vraiment rien.
+function EmptyState({ icon, title, desc, action }) {
+  return (
+    <div style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:18,boxShadow:C.shadow||'none'}}>
+      <div style={{width:56,height:56,margin:'0 auto 12px',borderRadius:999,background:`${C.accent}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{icon}</div>
+      <div style={{fontSize:15,fontWeight:900,color:C.text,letterSpacing:-0.3}}>{title}</div>
+      {desc && <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.5,maxWidth:340,marginLeft:'auto',marginRight:'auto'}}>{desc}</div>}
+      {action && <div style={{marginTop:14}}>{action}</div>}
+    </div>
+  );
+}
+
 function ScreenHead({ icon, title, desc, right }) {
   return (
     <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:12}}>
@@ -9004,6 +9018,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(repriceList.length) jobs.push({icon:'🏷️',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
         jobs.sort((a,b)=>a.prio-b.prio);
+        // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
+        // qui arrive plusieurs jours après). Source = les emails de vente, la
+        // même que le tableau de bord → les deux écrans affichent le même chiffre.
+        // Les comptes retirés/masqués sont exclus, et un lot compte son nombre
+        // d'articles.
+        let jourN=0, jourEur=0;
+        if (Array.isArray(emailSales)) {
+          const today = new Date(); const dStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+          const live = new Set(); (accounts||[]).forEach(a=>{ if(hiddenAccts.has(String(a.vinted_user_id))||blockedAccts.has(String(a.vinted_user_id))) return; const l=String(a.login||'').trim().toLowerCase(); if(l) live.add(l); });
+          for (const d of emailSales) {
+            if (String(d.receivedAt||'').slice(0,10) !== dStr) continue;
+            const acct = String(d.account||'').toLowerCase();
+            if (acct && live.size && !live.has(acct)) continue;
+            const desig = String(d.designation||d.article||'');
+            const lm = /(\d+)\s*articles?/i.exec(desig);
+            jourN += (/lot/i.test(desig)&&lm) ? Math.max(1,parseInt(lm[1],10)) : 1;
+            const p = parseFloat(String(d.prix||'').replace(',','.'));
+            if (!isNaN(p) && p>0) jourEur += p;
+          }
+        }
         return (
           <div>
             <div style={{marginBottom:16}}>
@@ -9015,6 +9049,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               )}
             </div>
+
+            {/* RÉSULTAT DU JOUR : ce que tu as vendu aujourd'hui. Placé tout en
+                haut parce que c'est la première chose qu'on veut savoir en
+                ouvrant l'app le soir. */}
+            {jourN>0 && (
+              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:16,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+                <div style={{fontSize:10.5,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:800}}>Vendu aujourd'hui</div>
+                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginTop:4}}>
+                  <span style={{fontSize:30,fontWeight:900,color:C.accent,letterSpacing:-1,lineHeight:1}}>{jourEur.toFixed(0)} €</span>
+                  <span style={{fontSize:14,fontWeight:800,color:C.text}}>{jourN} paire{jourN>1?'s':''}</span>
+                </div>
+              </button>
+            )}
 
             {/* 🗓️ Bilan de la semaine (7 derniers jours) — depuis les emails de
                 vente (fiable), + ce qu'il reste à expédier. */}
@@ -9967,7 +10015,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {buys.loading && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
-        {buys.items && !buys.error && buys.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucun achat pour l'instant.<br/><span style={{fontSize:11.5}}>Tes achats Vinted apparaîtront ici automatiquement.</span></div>}
+        {buys.items && !buys.error && buys.items.length===0 && (
+          <EmptyState icon="🛍️" title="Aucun achat pour l'instant"
+            desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/>
+        )}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
             .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
@@ -10081,7 +10132,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {listings.loading && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
-        {listings.items && !listings.error && listings.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune annonce en ligne.<br/><span style={{fontSize:11.5}}>Ouvre ta boutique sur vinted.fr une fois pour qu'elles remontent ici.</span></div>}
+        {listings.items && !listings.error && listings.items.length===0 && (
+          <EmptyState icon="🟢" title="Aucune annonce en ligne"
+            desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
+            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:800,fontSize:13,padding:'10px 16px',borderRadius:11}}>Ouvrir Vinted ↗</a>}/>
+        )}
         {listings.items && listings.items.length>0 && (<>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
@@ -10427,7 +10482,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // on liste simplement toutes les conversations du compte sélectionné.
           const shown = (convs.items||[]).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc);
           return (<>
-            {convs.items && !convs.error && shown.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune conversation.<br/><span style={{fontSize:11.5}}>Tes échanges Vinted s'afficheront ici.</span></div>}
+            {convs.items && !convs.error && shown.length===0 && (
+              <EmptyState icon="💬" title="Aucune conversation"
+                desc="Les échanges avec tes acheteurs s'affichent ici dès que l'extension les a captés."/>
+            )}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {shown.map((conv,i)=>{
                 const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
