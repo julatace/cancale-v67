@@ -22,6 +22,7 @@
 
   let queue = [];
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
+  let unlinked = []; // annonces LBC que VRM n'a pas su relier à une paire connue
   let stats = { postedCount: 0, lbcCount: 0, limit: null, plan: null, detected: null }; // compteur d'annonces LBC + offre
   let loadError = false; // vrai si getQueue a échoué (≠ file vide)
   let postedList = []; // paires marquées « publiées » (pour annuler une erreur)
@@ -131,6 +132,15 @@
   function render() {
     const items = queue;
     const badge = items.length + (removals.length ? '+' + removals.length : '');
+    // Annonces Leboncoin non rapprochées : informatif, JAMAIS présenté comme
+    // « à retirer » (VRM ne connaît pas la paire, il ne peut pas trancher).
+    const unlHtml = unlinked.length
+      ? `<div class="remsec"><div class="remhd" style="color:#7a8">❔ ${unlinked.length} annonce${unlinked.length > 1 ? 's' : ''} Leboncoin non reliée${unlinked.length > 1 ? 's' : ''} à une paire VRM</div>`
+        + unlinked.slice(0, 20).map((u) => `<div class="rem"><div class="remt">${esc(u.title || '(sans titre)')}</div>`
+          + `<div class="remm">réf ${esc(u.ref || '—')}${u.price != null ? ' · ' + esc(u.price) + ' €' : ''}${u.issue ? ' · ⚠️ ' + esc(u.issue) : ''}`
+          + `${u.url ? ` · <a href="${esc(u.url)}" target="_blank" rel="noreferrer">voir</a>` : ''}</div></div>`).join('')
+        + `<div class="remm" style="padding:4px 2px">VRM ne connaît pas ces numéros — à toi de voir. Ajoute la référence de la paire sur l&#39;annonce pour qu&#39;elles se relient toutes seules.</div></div>`
+      : '';
     const remHtml = removals.length
       ? `<div class="remsec"><div class="remhd">🔴 ${removals.length} vendue${removals.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</div>${removals.map(remHtmlOne).join('')}</div>`
       : '';
@@ -140,7 +150,7 @@
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
            <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
-           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${items.length ? items.map(cardHtml).join('') : emptyHtml()}${donePostedHtml()}</div>
+           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${unlHtml}${items.length ? items.map(cardHtml).join('') : emptyHtml()}${donePostedHtml()}</div>
            <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
@@ -352,6 +362,7 @@
     loadError = !(r && r.ok);
     queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
     removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
+    unlinked = (r && r.ok && Array.isArray(r.unlinked)) ? r.unlinked : [];
     postedList = (r && r.ok && Array.isArray(r.postedList)) ? r.postedList : [];
     if (r && r.ok && r.stats) stats = r.stats;
     render();

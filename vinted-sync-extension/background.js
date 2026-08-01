@@ -846,6 +846,27 @@ function refFromText(text) {
   m = /r[ée]f\.?\s*[:#]?\s*(\d{1,5})/i.exec(s);
   return m ? m[1] : null;
 }
+// Lit les annonces Leboncoin captées (ligne lbc_listings) sous forme de tableau.
+async function readLbcItems() {
+  try {
+    const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+    return Object.values(items).filter(Boolean);
+  } catch (_) { return []; }
+}
+// Clés de rapprochement d'une annonce Leboncoin : sa référence pro (CustomRef),
+// le VRM-xxx éventuel, et tout numéro « nXXXX » présent dans son titre.
+function adRefKeys(ad) {
+  const keys = [];
+  const push = (v) => { const t = String(v == null ? '' : v).trim(); if (t && !keys.includes(t)) keys.push(t); };
+  if (ad.customRef) { const m = /(\d{1,5})/.exec(String(ad.customRef)); if (m) push(m[1]); }
+  if (ad.ref) push(ad.ref);
+  const t = String(ad.subject || '');
+  let m = /VRM[-\s]?(\d{1,5})/i.exec(t); if (m) push(m[1]);
+  m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(t); if (m) push(m[1]);
+  return keys;
+}
+
 async function buildLbcData() {
   const mainRows = await sbGet('app_data?id=eq.main&select=data');
   const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
@@ -888,11 +909,39 @@ async function buildLbcData() {
     if ((!cur.photos || !cur.photos.length) && pd.photos && pd.photos.length) cur.photos = pd.photos.map(u => ({ url: u }));
     details[id] = cur;
   }
+  // ── RAPPROCHEMENT AUTOMATIQUE VINTED ↔ LEBONCOIN ──────────────────────────
+  // Tes annonces Leboncoin portent une RÉFÉRENCE pro (`CustomRef`, ex. « 2057 »)
+  // qui correspond au numéro écrit dans ton titre Vinted (« … n2057 »). On s'en
+  // sert pour reconnaître TOUT SEUL ce qui est déjà en ligne sur Leboncoin :
+  // plus besoin de cliquer « je l'ai déjà publiée » à la main.
+  const lbcItems = await readLbcItems();
+  const lbcByRef = new Map();
+  for (const ad of lbcItems) {
+    const dead = /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
+    if (dead) continue;
+    for (const k of adRefKeys(ad)) if (!lbcByRef.has(k)) lbcByRef.set(k, ad);
+  }
+  // Clés de rapprochement d'une annonce Vinted : son numéro VRM + le « nXXXX »
+  // présent dans son titre (les deux numérotations coexistent chez toi).
+  const vintedKeys = (o, num) => {
+    const keys = [];
+    if (num != null && String(num).trim() !== '') keys.push(String(num).trim());
+    const t = String((o.raw && o.raw.title) || '');
+    const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(t);
+    if (m) keys.push(m[1]);
+    return keys;
+  };
+  const autoMatched = new Map(); // id d'annonce Vinted -> annonce LBC trouvée
+
   const queue = [];
   for (const o of online) {
     const e = numeros[o.id]; const num = e && e.numero;
     if (!num || String(num).trim() === '') continue;          // seulement les annonces numérotées
-    if (posted.has(o.id) || posted.has(String(num))) continue;  // déjà publiée sur LBC
+    if (posted.has(o.id) || posted.has(String(num))) continue;  // déjà publiée (marquée à la main)
+    // Déjà en ligne sur Leboncoin d'après la capture ? -> pas dans la file.
+    let hit = null;
+    for (const k of vintedKeys(o, num)) { if (lbcByRef.has(k)) { hit = lbcByRef.get(k); break; } }
+    if (hit) { autoMatched.set(o.id, hit); continue; }
     queue.push(buildLbcAd(o.raw, details[o.id] || {}, num, uid2login[o.uid]));
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
@@ -900,11 +949,58 @@ async function buildLbcData() {
   // sur Vinted = vendue (ou retirée) côté Vinted → il faut la retirer de LBC pour
   // ne pas la vendre deux fois. On la retrouve par son id d'annonce Vinted.
   const removals = [];
+  const removalSeen = new Set();
+  // Annonces Leboncoin que VRM n'arrive pas à relier à une paire connue.
+  // Informatif : on les montre au lieu de les ignorer, mais on ne les présente
+  // JAMAIS comme « à retirer » (on ne sait pas si elles doivent l'être).
+  const unlinked = [];
+  const lbcRow = (ad, keys) => ({
+    lbcId: String(ad.id), ref: ad.customRef || (keys && keys[0]) || null,
+    title: ad.subject || '', price: ad.price != null ? ad.price : null,
+    url: ad.url || '', status: ad.status || '', issue: ad.issue || null,
+  });
   for (const pid of posted) {
     if (!/^\d+$/.test(pid)) continue;                 // on ne suit que les ids d'annonce
     if (onlineIds.has(pid)) continue;                  // encore en ligne sur Vinted → RAS
     const e = numeros[pid] || {};
+    removalSeen.add(pid);
     removals.push({ id: pid, numero: String(e.numero || '?'), ref: 'VRM-' + (e.numero || '?'), title: e.title || '' });
+  }
+  // Détection AUTOMATIQUE (sans marquage manuel) : une annonce Leboncoin encore
+  // active dont la paire n'est PLUS en ligne sur Vinted = vendue là-bas → à
+  // retirer de Leboncoin pour ne pas la vendre deux fois. On rapproche par la
+  // référence pro, et on ne signale que si la paire est bien connue de VRM
+  // (sinon on alerterait sur des annonces Leboncoin sans rapport).
+  {
+    const keysOnline = new Set();
+    for (const o of online) {
+      const e = numeros[o.id]; const num = e && e.numero;
+      for (const k of vintedKeys(o, num)) keysOnline.add(k);
+    }
+    // Numéros connus de VRM (toutes annonces numérotées, en ligne ou non).
+    const keysKnown = new Set();
+    for (const id in numeros) {
+      const e = numeros[id] || {};
+      if (e.numero != null && String(e.numero).trim() !== '') keysKnown.add(String(e.numero).trim());
+      const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(e.title || ''));
+      if (m) keysKnown.add(m[1]);
+    }
+    for (const ad of lbcItems) {
+      if (/(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''))) continue;
+      const keys = adRefKeys(ad);
+      if (!keys.length) { unlinked.push(lbcRow(ad, keys)); continue; }
+      if (keys.some((k) => keysOnline.has(k))) continue;   // encore en ligne sur Vinted
+      // Paire inconnue de VRM : on ne crie PAS « à retirer » (on risquerait de
+      // faire supprimer une bonne annonce). On la remonte à part, pour info.
+      if (!keys.some((k) => keysKnown.has(k))) { unlinked.push(lbcRow(ad, keys)); continue; }
+      const key = 'lbc:' + ad.id;
+      if (removalSeen.has(key)) continue; removalSeen.add(key);
+      removals.push({
+        id: key, lbcId: String(ad.id), numero: keys[0] || '?',
+        ref: ad.customRef || keys[0] || '?', title: ad.subject || '',
+        url: ad.url || '', auto: true,
+      });
+    }
   }
   removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   // Compteur d'annonces Leboncoin : ce que TU as marqué publié (fiable) et, si la
@@ -921,10 +1017,11 @@ async function buildLbcData() {
   try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=data'); const q = rec && rec[0] && rec[0].data && rec[0].data.quota; if (q && q.value) detected = q.value; } catch (_) {}
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
-  const stats = { postedCount, lbcCount, limit: lbcLimit, plan: lbcPlan, detected, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length };
+  const stats = { postedCount, lbcCount, limit: lbcLimit, plan: lbcPlan, detected, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
+    autoMatched: autoMatched.size, lbcSeen: lbcItems.length, unlinkedCount: unlinked.length };
   // Liste des paires marquées « publiées » (pour pouvoir annuler une erreur).
   const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-  return { queue, removals, stats, postedList };
+  return { queue, removals, unlinked, stats, postedList };
 }
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
 // fusionne (par id) avec ce qui est déjà connu → l'historique se complète au fil
@@ -961,6 +1058,49 @@ async function handleLbcRaw(url, body) {
   let data = null;
   try { data = JSON.parse(body); } catch (_) { return; }
   const found = []; const seen = new Set();
+
+  // ── CAS PRO LEBONCOIN (endpoint réel de « mes annonces ») ──────────────────
+  // GET /api/stats/proxy/v2/account/classifieds/analysis/list
+  //   → { Facets:{Total}, Ads:[{ Id, Status, CreatedAt,
+  //         Info:{ Title, Price, URL, CustomRef, Category, ImageSmall },
+  //         Analysis:{ Issue, CTR, Appreciation, LowVisibility } }] }
+  // ⚠️ Les clés sont en MAJUSCULES : le parcours générique plus bas cherchait
+  // id/title/price en minuscules et ne trouvait donc jamais rien — c'est pour
+  // ça que la liste des annonces Leboncoin restait vide.
+  // La RÉFÉRENCE PRO (`CustomRef`) est le lien direct avec le numéro de paire.
+  if (data && Array.isArray(data.Ads) && data.Ads.length) {
+    for (const ad of data.Ads) {
+      const info = ad.Info || {};
+      const id = ad.Id != null ? String(ad.Id) : null;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const title = String(info.Title || '');
+      const custom = info.CustomRef != null ? String(info.CustomRef).trim() : '';
+      const an = ad.Analysis || {};
+      found.push({
+        id,
+        subject: title,
+        price: info.Price != null ? info.Price : null,
+        body: '',
+        // Référence : le champ pro CustomRef d'abord (c'est le bon), sinon
+        // un VRM-xxx écrit dans le titre.
+        ref: (custom.match(/(\d{1,5})/) || [])[1] || (title.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null,
+        customRef: custom || null,
+        url: info.URL || '',
+        images: info.ImageSmall ? [info.ImageSmall] : [],
+        category: info.Category || info.CategoryId || '',
+        status: ad.Status || '',
+        createdAt: ad.CreatedAt || ad.PostedAt || null,
+        // Diagnostic fourni par Leboncoin : utile pour savoir quelle annonce
+        // ne sort pas (visibilité faible, peu de clics…).
+        issue: an.Issue || null,
+        ctr: an.CTR != null ? an.CTR : null,
+        appreciation: an.Appreciation || null,
+      });
+    }
+    if (found.length) { await storeLbcListings(url, found); return; }
+  }
+
   const priceOf = (o) => {
     if (o.price != null) return Array.isArray(o.price) ? o.price[0] : o.price;
     if (o.price_cents != null) return o.price_cents / 100;
