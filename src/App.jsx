@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/05 · 🔔notifs';
+const BUILD_ID = 'v37/06 · 🧹achats';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -7252,6 +7252,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
   const [toolsOpen, setToolsOpen] = useState(false); // menu « ⋯ Outils » (Ventes)
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
+  // Encart « achats hors Vinted » (saisie occasionnelle) : replié par défaut.
+  // NB : offOpen existe déjà plus bas pour le FORMULAIRE d'ajout — d'où un nom
+  // distinct ici, qui pilote la SECTION entière.
+  const [offSecOpen, setOffSecOpen] = useState(() => !!load('vinted_off_open', false));
+  useEffect(() => { save('vinted_off_open', offSecOpen); }, [offSecOpen]);
   // Listes AUTOMATIQUES (statut Vinted, pas les emails) : à retirer / à expédier.
   // « à retirer » exclut ce que tu as déjà coché récupéré à la main.
   const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buys.items, pickupDone]);
@@ -9863,6 +9868,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* ACHATS HORS VINTED : c'est de la SAISIE occasionnelle (brocante,
+            fournisseur…), pas une info à consulter tous les jours. Replié
+            derrière un bouton qui garde le total visible — la compta reste
+            juste, l'écran reste léger. */}
+        {(()=>{
+          const tot = offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0);
+          return (
+            <button type="button" onClick={()=>setOffSecOpen(v=>!v)}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,background:C.card,borderRadius:14,padding:'11px 14px',marginBottom:offSecOpen?10:12,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+              <span style={{fontSize:15}}>🏷️</span>
+              <span style={{flex:1,textAlign:'left',minWidth:0}}>
+                <span style={{display:'block',fontSize:13,fontWeight:800,color:C.text}}>Achats hors Vinted</span>
+                <span style={{display:'block',fontSize:10.5,color:C.muted,marginTop:1}}>
+                  {offBuys.length ? `${offBuys.length} achat${offBuys.length>1?'s':''} · ${tot.toFixed(0)} € — brocante, fournisseur, particulier` : 'Ajoute une paire achetée ailleurs (brocante, fournisseur…)'}
+                </span>
+              </span>
+              <span style={{fontSize:13,color:C.muted,transform:offSecOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
+            </button>
+          );
+        })()}
+        {offSecOpen && (<>
         {/* ── ACHATS HORS VINTED (brocante, fournisseur, particulier…) ────── */}
         {(()=>{
           const SRC = { brocante:{e:'🏷️',l:'Brocante'}, fournisseur:{e:'🏭',l:'Fournisseur'}, particulier:{e:'👤',l:'Particulier'}, 'vide-grenier':{e:'🎪',l:'Vide-grenier'}, autre:{e:'📦',l:'Autre'} };
@@ -9924,6 +9950,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
           );
         })()}
+        </>)}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
