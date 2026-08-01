@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/01 · 🛟sauvegarde';
+const BUILD_ID = 'v36/02 · 🔑état-comptes';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -5842,6 +5842,10 @@ function VintedAccounts({ accounts, setAccounts }) {
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
     if (blockedAccts.has(uid)) return { icon: '🚫', label: 'Bloqué', color: C.danger, hint: 'Vinted a refusé ce compte (401/403). Ses annonces/ventes sont masquées.' };
+    // Sans refresh_token, le compte ne peut pas se renouveler tout seul → il
+    // faudra le reconnecter à la main. (Le simple access_token expiré, lui, est
+    // normal et se renouvelle automatiquement — on ne le signale pas.)
+    if (!acc.refresh_token) return { icon: '🔑', label: 'À reconnecter', color: C.warn, hint: 'Pas de jeton de renouvellement : ce compte ne restera pas connecté seul. Reconnecte-le via « ➕ Connecter un compte » (bouton « Copier mon token » de l\'extension).' };
     const cap = lastCap[uid];
     if (!cap) return { icon: '⚪', label: 'Jamais capté', color: C.muted, hint: 'Ouvre ta boutique sur vinted.fr avec l\'extension pour capter ce compte.' };
     const ageH = (Date.now() - cap) / 3600000;
@@ -6041,7 +6045,7 @@ function VintedAccounts({ accounts, setAccounts }) {
       {accounts.length > 0 && (()=>{
         const st = accounts.map(acctHealth);
         const ok = st.filter(s=>s.icon==='🟢').length;
-        const warn = st.filter(s=>s.icon==='🟡'||s.icon==='⚪').length;
+        const warn = st.filter(s=>s.icon==='🟡'||s.icon==='⚪'||s.icon==='🔑').length;
         const bad = st.filter(s=>s.icon==='🔴'||s.icon==='🚫').length;
         return (
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,marginBottom:14,fontSize:12.5,fontWeight:800}}>
