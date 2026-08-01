@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/03 · 🧹épuré+';
+const BUILD_ID = 'v37/04 · ⏳chargement';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -203,8 +203,22 @@ const HARVEST_MAX_AGE_MS = 12 * 3600 * 1000; // 12 h
 // données dans l'UI (« données du 7 juil. ») au lieu de laisser croire au direct.
 const _harvestSeen = {};
 const harvestAgeMs = (uid, type) => { const t = _harvestSeen[`${uid}_${type}`]; return t ? (Date.now() - t) : null; };
+// ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
+// Tous les chargements de données passent par fetchHarvest (moisson) ou
+// vintedApiCall (Vinted). On compte les requêtes en cours à cet endroit unique,
+// et <TopProgress/> affiche une fine barre tant qu'il en reste. Résultat :
+// l'utilisateur voit TOUJOURS que l'app travaille, sur n'importe quel écran,
+// sans avoir à câbler un indicateur dans chaque composant.
+let _busy = 0;
+const _busySubs = new Set();
+const _emitBusy = () => { _busySubs.forEach(f => { try { f(_busy > 0); } catch (_) {} }); };
+const onBusy = (fn) => { _busySubs.add(fn); fn(_busy > 0); return () => _busySubs.delete(fn); };
+const busyStart = () => { _busy++; _emitBusy(); };
+const busyEnd = () => { _busy = Math.max(0, _busy - 1); _emitBusy(); };
+
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
+  busyStart();
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data,updated_at`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
@@ -220,6 +234,7 @@ const fetchHarvest = async (uid, type, opts = {}) => {
     if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
     return row.data?.payload || null;
   } catch (_) { return null; }
+  finally { busyEnd(); }  // finally : le compteur redescend quel que soit le chemin de sortie
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
@@ -832,6 +847,7 @@ const persistRefreshedTokens = async (account, refreshed) => {
 // Appelle un endpoint de l'API Vinted pour le compte donne, via le proxy
 // (evite le blocage CORS puisque le navigateur ne parle qu'a notre propre domaine).
 const vintedApiCall = async (account, endpoint, opts = {}) => {
+  busyStart();
   try {
     const siteDomain = account.domain || 'www.vinted.fr';
     const host = opts.host || siteDomain;
@@ -855,7 +871,7 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
     return json; // { status, ok, data, refreshed? }
   } catch (err) {
     return { ok: false, error: String(err) };
-  }
+  } finally { busyEnd(); }
 };
 
 // Classe le texte de statut renvoye par Vinted en 3 categories utilisables
@@ -1565,6 +1581,60 @@ const BOTTOM_TABS=[
   {id:'garage',       icon:'🏠',label:'Garage'},
   {id:'invoices',     icon:'🧾',label:'Factures'},
 ];
+// Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
+// vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
+// requêtes multiples, donc on donne une progression PLAUSIBLE plutôt qu'un
+// pourcentage inventé, et on termine à 100 % d'un coup quand tout est fini.
+// En-tête d'écran : un titre + UNE ligne qui dit à quoi sert l'écran. Compact
+// (l'app est déjà dense), mais ça enlève toute ambiguïté sur ce qu'on regarde —
+// indispensable pour quelqu'un qui découvre l'app.
+function ScreenHead({ icon, title, desc, right }) {
+  return (
+    <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:12}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:7}}>
+          <span style={{fontSize:17}}>{icon}</span>
+          <h2 style={{margin:0,fontSize:17,fontWeight:900,color:C.text,letterSpacing:-0.4}}>{title}</h2>
+        </div>
+        {desc && <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>{desc}</div>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function TopProgress() {
+  const [busy, setBusy] = React.useState(false);
+  const [pct, setPct] = React.useState(0);
+  const [show, setShow] = React.useState(false);
+  React.useEffect(() => onBusy(setBusy), []);
+  React.useEffect(() => {
+    let t;
+    if (busy) {
+      setShow(true); setPct(p => (p > 0 && p < 90 ? p : 8));
+      // Progression qui s'essouffle : jamais 100 % tant que ça charge.
+      t = setInterval(() => setPct(p => (p >= 90 ? 90 : p + Math.max(0.6, (90 - p) * 0.08))), 180);
+    } else {
+      setPct(100);
+      t = setTimeout(() => { setShow(false); setPct(0); }, 340);
+    }
+    return () => { clearInterval(t); clearTimeout(t); };
+  }, [busy]);
+  if (!show) return null;
+  return (
+    <div aria-hidden="true" style={{position:'fixed',top:0,left:0,right:0,height:3,zIndex:200,pointerEvents:'none',background:'transparent'}}>
+      <div style={{
+        height:'100%', width:`${pct}%`,
+        background:`linear-gradient(90deg, ${C.accent}, ${C.blue||C.accent})`,
+        boxShadow:`0 0 8px ${C.accent}88`,
+        borderRadius:'0 999px 999px 0',
+        transition:'width .22s ease, opacity .3s ease',
+        opacity: pct>=100 ? 0 : 1,
+      }}/>
+    </div>
+  );
+}
+
 function BottomBar({tab,setTab}) {
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
@@ -8972,6 +9042,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
 
       {curSub==='ventes' && (<>
+        <ScreenHead icon="💸" title="Ventes" desc="Tout ce que tu as vendu, tous comptes confondus : bénéfice par paire, suivi de l'expédition à l'encaissement, et tes documents comptables."/>
         {/* Rappel d'expédition : alerte les ventes à expédier, les plus urgentes
             d'abord (échéance estimée à +5 j). Protège la note vendeur. */}
         {toShip.length>0 && (()=>{
@@ -9447,6 +9518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       })()}
 
       {curSub==='achats' && (<>
+        <ScreenHead icon="🛍️" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
         {/* À RETIRER — liste simple façon appli de colis : groupée par point relais,
             avec LE CODE de retrait en gros (c'est ça qu'on donne au comptoir) et un
             « Y aller ». Source = emails transporteur (qui portent le code), et non
@@ -9885,6 +9957,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
       {curSub==='annonces' && (<>
+        <ScreenHead icon="🟢" title="Annonces en ligne" desc="Tes annonces actuellement en vente. Donne un numéro et un prix d'achat à chaque paire : c'est ce qui rend ton bénéfice et ton garage justes."/>
         {/* Compte bloqué par Vinted : détecté à la synchro (401/403). Ses annonces
             sont retirées automatiquement — on te dit lequel et tu peux le retirer. */}
         {blockedList.length>0 && (
@@ -10240,6 +10313,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
+        <ScreenHead icon="💬" title="Messages" desc="Les conversations de tes comptes Vinted, en lecture. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
         {/* Réponses rapides : modèles copiables en 1 clic (répondre se fait sur Vinted). */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
@@ -10303,6 +10377,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
+        <ScreenHead icon="📄" title="Bordereaux & expéditions" desc="Tes étiquettes d'envoi, tamponnées au numéro de la paire. Imprime-les d'un coup, coche ce qui est posté, et suis les colis."/>
         {/* RÉCAP EN HAUT : combien de bordereaux restent à imprimer, et le bouton
             d'impression groupée juste à côté. Avant, le bouton était enfoui dans
             la section « reçus par email » et passait inaperçu. On affiche aussi
@@ -12704,6 +12779,9 @@ export default function App() {
 
   return (
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
+      {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
+          chargement, sur n'importe quel écran. */}
+      <TopProgress/>
       {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
           derrière au défilement au lieu de buter sur un bandeau plein. */}
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',
