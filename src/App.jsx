@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v36/06 · 📄bordereau-auto';
+const BUILD_ID = 'v36/07 · ⚡rapide';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -7760,10 +7760,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const cached = !force && fromCache(type);
     if (cached) { setter({ loading:false, items:cached }); return; }
     setter({ loading:true, items:null, error:false });
-    const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
-    for (const acc of accounts) {
+    // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
+    // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
+    // moisson Supabase, donc paralléliser est sûr et bien plus rapide.
+    const results = await Promise.all(accounts.map(async acc => {
       const res = await fetchVintedOrders(acc, type, 1, 'all', { force });
       noteAcctLive(acc.vinted_user_id, res, force);
+      return { acc, res };
+    }));
+    const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
+    for (const { acc, res } of results) {
       if (res.ok) { anyOk=true; for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } } }
       else { anyErr=true; failed.push(accNameOf(acc)); }
     }
@@ -7919,7 +7925,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (cached) { setListings({ loading:false, items:cached }); return; }
     setListings({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false;
-    for (const acc of accounts) { const r = await fetchVintedListings(acc, 1, { force }); noteAcctLive(acc.vinted_user_id, r, force); if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); } else anyErr=true; }
+    // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
+    const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedListings(acc, 1, { force }); noteAcctLive(acc.vinted_user_id, r, force); return { acc, r }; }));
+    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); } else anyErr=true; }
     const error = out.length===0 && anyErr && !anyOk;
     if (!error) putCache('listings', out);
     setListings({ loading:false, items: out, error });
@@ -7929,7 +7937,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (cached) { setConvs({ loading:false, items:cached }); return; }
     setConvs({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false;
-    for (const acc of accounts) { const r = await fetchVintedConversations(acc, 1, { force }); if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else anyErr=true; }
+    // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
+    const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedConversations(acc, 1, { force }); return { acc, r }; }));
+    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else anyErr=true; }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
     const error = out.length===0 && anyErr && !anyOk;
     if (!error) putCache('convs', out);
@@ -10275,11 +10285,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {/* Impression EN LOT : tamponne tous les bordereaux non imprimés et les
                 met à la suite dans un seul PDF à imprimer d'un coup. */}
-            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordDone(b)).length; return nPending>=2 ? (
+            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordDone(b)).length; return nPending>=1 ? (
               <button type="button" onClick={batchBordereaux} disabled={batchBusy}
                 title="Tamponne tous les bordereaux non imprimés et les met à la suite dans un seul PDF à imprimer d'un coup"
                 style={{width:'100%',border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'12px',cursor:batchBusy?'default':'pointer',fontSize:14,fontWeight:800,marginBottom:10,opacity:batchBusy?0.6:1}}>
-                {batchBusy?'Préparation…':`🖨 Tout imprimer à la suite (${nPending})`}
+                {batchBusy?'Préparation…':nPending===1?'🖨 Imprimer le bordereau (tamponné)':`🖨 Tout imprimer à la suite (${nPending})`}
               </button>
             ) : null; })()}
             {(()=>{ const done=[...emailBords].filter(b=>!isBordHidden(b)&&isBordDone(b)); return done.length>0 ? (
@@ -12251,9 +12261,20 @@ export default function App() {
       // retirer du CA les emails de vente correspondants (une vente remboursée
       // n'est plus du chiffre d'affaires — ex. un lot vendu puis remboursé).
       const refunded=[];
-      for(const a of vintedAccounts){
-        if(skipAcc(a.vinted_user_id)) continue;
-        const sold=await fetchVintedOrders(a,'sold',1,'all');
+      // PARALLÈLE : tous les comptes actifs interrogés en même temps, et les 3
+      // appels (ventes / annonces / messages) de chaque compte aussi en parallèle
+      // → chargement du tableau de bord bien plus rapide (avant : 9 comptes × 3
+      // appels en série). Lecture moissonnée d'abord, donc paralléliser est sûr.
+      const activeAccts=vintedAccounts.filter(a=>!skipAcc(a.vinted_user_id));
+      const perAcc=await Promise.all(activeAccts.map(async a=>{
+        const [sold,list,conv]=await Promise.all([
+          fetchVintedOrders(a,'sold',1,'all'),
+          fetchVintedListings(a,1),
+          fetchVintedConversations(a,1),
+        ]);
+        return { a, sold, list, conv };
+      }));
+      for(const { a, sold, list, conv } of perAcc){
         if(sold.ok){ ok=true; for(const o of sold.items){
           const st=classifyOrderStatus(o.status);
           const amt0=(o.price?.amount!=null?Number(o.price.amount):0);
@@ -12264,9 +12285,9 @@ export default function App() {
           }
           if(st==='cancelled'){ let inMonth=true; if(o.date){ const d=new Date(o.date); inMonth=!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym; } if(inMonth) refunded.push({ acct:String(a.login||'').toLowerCase(), amount:amt0, title:normTitle(o.title||'') }); }
         }}
-        const list=await fetchVintedListings(a,1); if(list.ok){ ok=true; online+=list.items.length;
+        if(list.ok){ ok=true; online+=list.items.length;
           for(const it of list.items){ const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0; } }
-        const conv=await fetchVintedConversations(a,1); if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
+        if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
       }
       // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
       // Un numéro peut être posé sur une boîte seule (it.num), dans une case de
