@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v35/08 · 🙈masqué';
+const BUILD_ID = 'v35/09 · 📦expédition';
 const THEMES = {
   light: {
     bg:"#f6f8f6", surface:"#ffffff", card:"#ffffff", border:"#e3e8e4",
@@ -1549,6 +1549,7 @@ const BOTTOM_TABS=[
   {id:'cat_annonces', icon:'🟢',label:'Annonces'},
   {id:'cat_ventes',   icon:'💸',label:'Ventes'},
   {id:'cat_achats',   icon:'🛍️',label:'Achats'},
+  {id:'cat_expedition',icon:'📦',label:'Expédition'},
   {id:'cat_bord',     icon:'📄',label:'Bordereaux'},
   {id:'cat_msg',      icon:'💬',label:'Messages'},
   {id:'garage',       icon:'🏠',label:'Garage'},
