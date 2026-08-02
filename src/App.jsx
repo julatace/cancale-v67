@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v59/01 · traçable';
+const BUILD_ID = 'v60/00 · prix d achat';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -8315,7 +8315,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setPickerFor(item); setPurchasesPick({loading:true,items:[]});
     const seen=new Set(); const out=[];
     for(const acc of accounts){ const r=await fetchVintedOrders(acc,'purchased',1,'all'); if(r.ok) for(const o of r.items){ const id=String(o.transaction_id); if(!seen.has(id)){seen.add(id); out.push({...o,_acc:acc});} } }
-    out.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+    // CLASSEMENT PAR PERTINENCE, pas seulement par date. Avec ~700 achats,
+    // une liste chronologique rend la recherche décourageante — et c'est
+    // exactement pour ça qu'aucun prix d'achat n'était renseigné (0 sur 177
+    // paires, donc tous les bénéfices calculés avec un coût nul).
+    // On remonte les achats de la MÊME MARQUE et de la MÊME TAILLE, dont le
+    // prix payé est inférieur au prix de vente. À défaut, on garde la date.
+    const marqueRef = (extractBrand(item?.title) || '').toLowerCase();
+    const tailleRef = String(extractSize(item?.title) || '').toLowerCase();
+    const prixVente = Number(item?.price?.amount ?? item?.price ?? 0) || 0;
+    const score = (o) => {
+      let pts = 0;
+      const t = o.title || '';
+      if (marqueRef && (extractBrand(t) || '').toLowerCase() === marqueRef) pts += 4;
+      if (tailleRef && String(extractSize(t) || '').toLowerCase() === tailleRef) pts += 4;
+      const pa = Number(o.price?.amount);
+      if (!isNaN(pa) && prixVente > 0 && pa > 0 && pa < prixVente) pts += 1; // un achat coûte moins cher que la revente
+      if (normTitle(t) === normTitle(item?.title || '')) pts += 6;            // titre identique : quasi sûr
+      return pts;
+    };
+    out.forEach(o => { o._score = score(o); });
+    out.sort((a,b) => (b._score - a._score) || (new Date(b.date||0) - new Date(a.date||0)));
     setPurchasesPick({loading:false,items:out});
   };
   const choosePick = (p) => { const price=p.price?.amount!=null?Number(p.price.amount):null; updatePair(pickerFor,{buyPrice:price!=null?String(price):'',buyFromId:p.transaction_id?String(p.transaction_id):null}); setPickerFor(null); };
@@ -12263,11 +12283,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const curId = numeros[pickerFor.id]?.buyFromId;
                 const avail = purchasesPick.items.filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId));
                 if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat disponible.</div>;
-                return avail.map(p => (
+                // Les meilleurs candidats (même marque ET même taille) sont
+                // signalés : avec ~700 achats, sans repère on ne sait pas par où
+                // commencer, et le prix d'achat finit par ne jamais être saisi.
+                return avail.map((p, iP) => (
                   <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
                     <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title}</div>
+                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {(p._score||0) >= 8 && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
+                        {p.title}
+                      </div>
                       <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
                     </div>
                     <div style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{p.price?.amount} {cur(p.price?.currency_code)}</div>

@@ -546,3 +546,34 @@ Chiffres réels (2 août) : **542 ventes moissonnées**, fraîches de 0,2 à 0,5
 
 ### Leçon de méthode
 Avant d'affirmer « la donnée est vide », **vérifier la clé qu'on lit**. Deux fois de suite dans ce projet, une conclusion alarmante venait de mon propre outil de mesure, pas de la base (ici `my_orders` ; plus haut les `harvest_*_inbox` absents du banc de test qui gonflaient les appels Vinted à 16).
+
+---
+
+## 22. Session août 2026 (suite) — audit croisé de TOUTES les sources
+
+Méthode : un seul script qui recoupe ventes moissonnées / achats / annonces en ligne / bordereaux / numéros / garage, contre la vraie base.
+
+| contrôle | résultat |
+|---|---|
+| bordereaux sans vente correspondante | **1 / 51** |
+| ventes « à expédier » sans bordereau reçu | 6 / 11 (normal : le bordereau arrive après) |
+| numéros dans `used` mais nulle part ailleurs | **0** |
+| numéros au garage inconnus ailleurs | **0** (le garage est vide : 0 case posée) |
+| titres en double parmi les annonces en ligne | 1 titre, 3 annonces |
+| **prix d'achat renseignés** | **0 sur 177** ⚠️ |
+
+### ⚠️ LE problème de cohérence : aucun prix d'achat
+`buyPrice` est vide sur les 177 entrées, et `vinted_buyprice_by_num` est **vide**. Conséquence : **tout le calcul de bénéfice tourne avec un coût de zéro** — bénéfice = prix de vente, marge ≈ 100 %, « meilleure marque » sans valeur, rapport comptable qui sous-estime les charges. L'app le signale déjà (« X ventes sans prix d'achat — le bénéfice est faux »), donc rien n'est faussement affirmé, mais les chiffres restent inexploitables.
+
+**Association automatique par titre : impossible.** Mesuré — sur 119 annonces en ligne, **1 seule** a un titre identique à un achat (Julien réécrit ses titres à la revente). 28 ventes sur 542 seulement matchent. Ne pas retenter cette piste.
+
+**Ce qui débloque vraiment : le sélecteur d'achat.** Il listait les ~700 achats **par date**, donc retrouver la bonne paire était décourageant — c'est la vraie raison pour laquelle aucun prix n'est saisi. `openPicker` classe désormais par pertinence :
+- titre identique **+6**
+- même marque **+4**, même taille **+4** (`extractBrand` / `extractSize`)
+- prix payé < prix de vente **+1**
+- à score égal, le plus récent
+
+Mesuré sur 60 annonces : marque détectée 113/119, taille **119/119** ; 8 annonces n'ont **qu'un seul** candidat « même marque + même taille », la plupart moins de 8, seules 12 n'en ont aucun. Les candidats à score ≥ 8 portent une pastille **« suggéré »**.
+
+### Reste ouvert
+- `vinted_stock_vinted` : **1815 entrées** encore synchronisées à chaque sauvegarde pour un écran retiré (13 Ko dans la ligne `main`). À arbitrer avec Julien avant de purger — c'est son historique.
