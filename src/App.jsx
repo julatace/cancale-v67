@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v54/01 · cohérence';
+const BUILD_ID = 'v55/00 · épuré';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1605,7 +1605,9 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
   //    opts.force = on saute la moisson (bouton "Synchroniser") pour le dernier état.
   if (page === 1 && !opts.force) {
     const h = await fetchHarvest(account.vinted_user_id, 'inbox');
-    if (h && Array.isArray(h.conversations)) {
+    // Une moisson VIDE n'est pas une réponse (cf. fetchVintedOrders) : la page
+    // n'a pas encore été ouverte ou la session a expiré. On va voir plus loin.
+    if (h && Array.isArray(h.conversations) && h.conversations.length > 0) {
       return { ok: true, items: h.conversations, pagination: h.pagination || null, raw: null, source: 'harvest' };
     }
   }
@@ -1804,7 +1806,11 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
   //    directement sur Vinted (bouton "Synchroniser").
   if (page === 1 && !opts.force) {
     const h = await fetchHarvest(account.vinted_user_id, 'listings');
-    if (h && Array.isArray(h.items)) {
+    // ⚠️ Une moisson VIDE n'est pas une réponse. Zéro annonce moissonnée voulait
+    // dire « rien capté », pas « plus rien en ligne » — et l'app le prenait pour
+    // argent comptant : d'où les bandeaux « compte muet » et « annonces
+    // disparues » alors que les annonces étaient bien en ligne.
+    if (h && Array.isArray(h.items) && h.items.length > 0) {
       return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem), pagination: h.pagination || null, source: 'harvest' };
     }
   }
@@ -8291,6 +8297,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const unhideBord = (b) => { const k=bordKey(b); if(!k) return; setBordsHidden(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_hidden',u); return u; }); };
   const isBordHidden = (b) => !!bordsHidden[bordKey(b)];
   const [showBordDone, setShowBordDone] = useState(false); // afficher les bordereaux déjà expédiés
+  // Signalements de l'écran Annonces : repliés par défaut. Ils s'empilaient
+  // au-dessus de la grille et obligeaient à défiler longtemps avant de voir
+  // ses propres annonces.
+  const [diagOpen, setDiagOpen] = useState(false);
   // Section « Analyse » de l'onglet Ventes : repliée par défaut pour que l'écran
   // aille droit à la liste des ventes. Le choix est mémorisé sur l'appareil.
   const [analyseOpen, setAnalyseOpen] = useState(() => !!load('vinted_analyse_open', false));
@@ -11298,6 +11308,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         <ScreenHead icon="tag" title="Annonces en ligne" desc="Tes annonces actuellement en vente. Donne un numéro et un prix d'achat à chaque paire : c'est ce qui rend ton bénéfice et ton garage justes."/>
         <NoAcc/>
+        {/* ── SIGNALEMENTS, REPLIÉS ────────────────────────────────────────
+            Trois bandeaux d'alerte s'empilaient ici en permanence (compte muet,
+            annonces disparues, compte bloqué) : il fallait défiler longtemps
+            avant de voir ses annonces. Ils sont maintenant derrière une seule
+            ligne, dépliable, et n'apparaissent que s'il y a vraiment quelque
+            chose à signaler. */}
+        {(() => {
+          const n = comptesMuets.length + (disparues.length ? 1 : 0) + (blockedList.length ? 1 : 0);
+          if (!n) return null;
+          return (
+            <button type="button" onClick={() => setDiagOpen(v => !v)}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,
+                borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
+              <span style={{fontSize:15}}>⚠️</span>
+              <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
+                {n} signalement{n>1?'s':''} sur tes annonces
+              </span>
+              <span style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
+            </button>
+          );
+        })()}
+        {diagOpen && (<>
         {/* COMPTE MUET : il a des paires numérotées mais ne renvoie plus AUCUNE
             annonce. C'est la signature d'un masquage par Vinted. On le dit tout
             de suite, sinon on croit avoir perdu son stock. */}
@@ -11367,6 +11399,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </div>
         )}
+        </>)}
         {/* Visibilité par compte : une puce par compte qui a des annonces, avec
             son nb en ligne. Tape pour MASQUER (compte bloqué/fermé → ses annonces
             disparaissent partout) ou réafficher. Réglé le souci « 2 comptes
@@ -11934,7 +11967,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     ); })()}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:6}}>
-                        {(()=>{ const nn=numForBord(b); return nn?<span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{nn}</span>:null; })()}
+                        {(()=>{ const nn=numForBord(b);
+                          // Sans numéro, la pastille était simplement absente : le bordereau
+                          // avait l'air normal alors qu'il n'est rattaché à aucune paire.
+                          // On le DIT, et le bouton « Relier » est juste en dessous.
+                          return nn
+                            ? <span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{nn}</span>
+                            : <span title="Aucune paire numérotée reconnue — utilise « Relier » ci-dessous" style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N° ?</span>; })()}
                         <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.modele||b.article||'Bordereau'}</span>
                       </div>
                       {/* Compte de vente + date de la vente : savoir d'où vient
