@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v40/00 · 🔢numéros';
+const BUILD_ID = 'v41/00 · 👥comptes';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -45,6 +45,181 @@ const INIT_SAL = [];
 const SUPABASE_URL = "https://lgonxzrzjcqthjtbdpzo.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ";
 const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
+
+// ════════════════════════════════════════════════════════════════════════════
+//  COMPTES VENDEURS (multi-utilisateurs)
+// ════════════════════════════════════════════════════════════════════════════
+//  Objectif : plusieurs vendeurs sur la même app, chacun ne voyant QUE ses
+//  données (ses comptes Vinted, son garage, ses numéros, sa compta).
+//
+//  ⚠️ L'ISOLATION N'EST PAS FAITE ICI. Elle est faite par la base (Row Level
+//  Security Postgres : chaque ligne porte un `owner`, et Postgres refuse les
+//  lignes des autres). Le code ci-dessous ne fait que porter l'identité de
+//  l'utilisateur jusqu'à la base. C'est important : une isolation écrite en
+//  JavaScript ne protège de rien (n'importe qui peut ouvrir la console et
+//  changer une variable) ; une isolation écrite dans Postgres, si.
+//
+//  ⚠️ INTERRUPTEUR : tant que MULTI_USER vaut false, l'app fonctionne
+//  EXACTEMENT comme avant — un seul vendeur, aucune connexion demandée. On ne
+//  bascule à true qu'APRÈS avoir appliqué supabase/migrations/001-multi-
+//  utilisateurs.sql. Dans l'autre ordre, on se retrouverait enfermé dehors de
+//  son propre outil (écran de connexion sans base capable d'authentifier).
+const MULTI_USER = false;
+
+// Session = ce que Supabase renvoie à la connexion : un jeton d'accès qui
+// prouve qui tu es (valable ~1 h) + un jeton de renouvellement pour en
+// obtenir un nouveau sans redemander le mot de passe.
+const SESSION_KEY = 'vrm_session';
+let AUTH = { session: null, user: null, ready: !MULTI_USER };
+let _authListeners = [];
+const onAuthChange = (fn) => { _authListeners.push(fn); return () => { _authListeners = _authListeners.filter(f => f !== fn); }; };
+const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch (_) {} }); };
+
+const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
+const writeSession = (s) => {
+  try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
+  AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
+  // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
+  // quoi que ce soit ne soit relu ou repoussé (voir ensureLocalOwner).
+  if (s && s.user && s.user.id) ensureLocalOwner(s.user.id);
+  _emitAuth();
+};
+
+// EN-TÊTES SUPABASE — le point de passage unique de toute l'app.
+// `apikey` reste la clé publique du projet (Supabase l'exige toujours), mais
+// `Authorization` porte le jeton de l'utilisateur connecté : c'est LUI qui
+// décide quelles lignes Postgres accepte de montrer. En mode solo, on retombe
+// sur la clé publique et rien ne change.
+const sbAuth = (extra) => {
+  const tok = (MULTI_USER && AUTH.session && AUTH.session.access_token) || SUPABASE_KEY;
+  return Object.assign({ apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, extra || {});
+};
+// Cible d'un « upsert » : en multi-vendeurs la clé primaire devient
+// (owner, id) — deux vendeurs ont chacun leur ligne « main ».
+const SB_CONFLICT = MULTI_USER ? 'owner,id' : 'id';
+// Complète une ligne à écrire avec son propriétaire. La base a un défaut
+// (auth.uid()) mais on l'envoie explicitement : c'est plus lisible, et la règle
+// `with check` de Postgres vérifie qu'on n'écrit pas au nom d'un autre.
+const withOwner = (row) => (MULTI_USER && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, row) : row;
+
+const authCall = async (path, body) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: json.error_description || json.msg || json.message || `Erreur ${res.status}` };
+    return { ok: true, json };
+  } catch (e) { return { ok: false, error: 'Pas de connexion internet.' }; }
+};
+
+// Le jeton d'accès expire vite (≈1 h). On le renouvelle en silence avec le
+// jeton de renouvellement — sinon l'app se déconnecterait toute seule en
+// pleine journée.
+const authRefresh = async () => {
+  const s = AUTH.session;
+  if (!s || !s.refresh_token) return false;
+  const r = await authCall('token?grant_type=refresh_token', { refresh_token: s.refresh_token });
+  if (!r.ok) return false;
+  writeSession(sessionFrom(r.json));
+  return true;
+};
+const sessionFrom = (j) => ({
+  access_token: j.access_token,
+  refresh_token: j.refresh_token,
+  expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
+  user: j.user ? { id: j.user.id, email: j.user.email } : (AUTH.user || null),
+});
+const authValid = () => !!(AUTH.session && AUTH.session.access_token && AUTH.session.expires_at > Date.now() + 60000);
+
+const authSignIn  = async (email, password) => {
+  const r = await authCall('token?grant_type=password', { email: String(email).trim().toLowerCase(), password });
+  if (!r.ok) return { ok: false, error: /invalid|credential/i.test(r.error) ? 'Email ou mot de passe incorrect.' : r.error };
+  writeSession(sessionFrom(r.json));
+  return { ok: true };
+};
+const authSignUp  = async (email, password) => {
+  const r = await authCall('signup', { email: String(email).trim().toLowerCase(), password });
+  if (!r.ok) return { ok: false, error: /already registered/i.test(r.error) ? 'Un compte existe déjà avec cet email.' : r.error };
+  // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
+  // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
+  if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
+  return { ok: true, needsConfirm: true };
+};
+const authReset   = (email) => authCall('recover', { email: String(email).trim().toLowerCase() });
+const authSignOut = () => { writeSession(null); wipeLocalData(); };
+
+// CHANGEMENT DE VENDEUR SUR LE MÊME NAVIGATEUR : le localStorage est commun à
+// tout le site. Sans ménage, le vendeur qui se connecte après un autre
+// hériterait de ses numéros, de son garage et — pire — les repousserait dans
+// le cloud sous SON compte. On efface donc toutes les clés de données quand
+// l'identité change (on garde les préférences d'affichage, elles ne trahissent
+// personne).
+const KEEP_ON_SWITCH = ['vinted_dark', SESSION_KEY];
+const wipeLocalData = () => {
+  try {
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (KEEP_ON_SWITCH.includes(k)) continue;
+      if (/^(vinted_|vrm_|cancale)/.test(k)) doomed.push(k);
+    }
+    doomed.forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+};
+// Mémorise à qui appartiennent les données présentes dans ce navigateur.
+const OWNER_MARK = 'vrm_local_owner';
+const ensureLocalOwner = (uid) => {
+  try {
+    const prev = localStorage.getItem(OWNER_MARK);
+    if (prev && prev !== uid) wipeLocalData();          // ce n'était pas toi → on repart propre
+    if (prev !== uid) localStorage.setItem(OWNER_MARK, uid);
+  } catch (_) {}
+};
+
+// Restaure la session au démarrage, et renouvelle le jeton s'il a expiré.
+const authBoot = async () => {
+  if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
+  const s = readSession();
+  if (!s) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
+  AUTH = { ...AUTH, session: s, user: s.user || null };
+  if (!authValid()) { const ok = await authRefresh(); if (!ok) { writeSession(null); return; } }
+  AUTH = { ...AUTH, ready: true };
+  if (AUTH.user && AUTH.user.id) ensureLocalOwner(AUTH.user.id);
+  _emitAuth();
+};
+// Renouvellement périodique tant que l'app est ouverte.
+if (MULTI_USER && typeof window !== 'undefined') {
+  setInterval(() => { if (AUTH.session && !authValid()) authRefresh(); }, 4 * 60 * 1000);
+}
+
+// L'EXTENSION A BESOIN DE SAVOIR QUI TU ES.
+// Elle écrit dans la même base (annonces, ventes, messages captés au passage).
+// Une fois l'isolation activée, la clé publique n'a plus le droit d'écrire :
+// il faut qu'elle écrive sous TON compte. On lui transmet donc la session dès
+// qu'elle change — l'extension la garde et la renouvelle toute seule ensuite.
+// À la déconnexion on envoie null : elle oublie tout.
+const pushSessionToExtension = () => {
+  if (!MULTI_USER) return;
+  try {
+    const s = AUTH.session;
+    window.postMessage({ __vmr: 'session', session: s ? {
+      access_token: s.access_token, refresh_token: s.refresh_token,
+      expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
+    } : null }, window.location.origin);
+  } catch (_) {}
+};
+if (MULTI_USER && typeof window !== 'undefined') {
+  onAuthChange(pushSessionToExtension);
+  // L'extension annonce sa présence au chargement de la page ; on en profite
+  // pour lui donner la session tout de suite (elle démarre parfois après nous).
+  window.addEventListener('message', (ev) => {
+    if (ev.source === window && ev.data && ev.data.__vmr === 'ready') pushSessionToExtension();
+  }, false);
+}
 
 // Liste des cles synchronisees dans le cloud
 const SYNC_KEYS = [
@@ -93,7 +268,7 @@ const load = (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.par
 const cloudLoad = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -121,10 +296,13 @@ const cloudPush = () => {
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { try { payload[k] = JSON.parse(v); } catch { payload[k] = v; } } });
       // verrou 2 : ne JAMAIS écraser le cloud avec un état vide.
       if (Object.keys(payload).length === 0) { _emitSync('error'); _cloudTimer = null; return; }
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ data: payload, updated_at: new Date().toISOString() }),
+      // UPSERT et non PATCH : un PATCH ne modifie qu'une ligne existante, donc
+      // un vendeur qui vient de créer son compte (pas encore de ligne) n'aurait
+      // jamais rien de sauvegardé. L'upsert crée la ligne au premier envoi.
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method: 'POST',
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify([withOwner({ id: SUPABASE_ROW, data: payload, updated_at: new Date().toISOString() })]),
       });
       _emitSync(res.ok ? 'synced' : 'error');
     } catch (_) { _emitSync('error'); }
@@ -154,7 +332,7 @@ const save = (k,v) => {
 const fetchVintedAccounts = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     return await res.json();
@@ -170,7 +348,7 @@ const deleteVintedAccount = async (vintedUserId) => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${vintedUserId}`, {
       method: 'DELETE',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Prefer: 'return=minimal' },
+      headers: sbAuth({ Prefer: 'return=minimal' }),
     });
     return res.ok;
   } catch (_) { return false; }
@@ -186,7 +364,7 @@ const fetchVintedLogin = async (account) => {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
         method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
         body: JSON.stringify({ login }),
       });
     } catch (_) { /* cache best-effort */ }
@@ -230,7 +408,7 @@ const fetchHarvest = async (uid, type, opts = {}) => {
   busyStart();
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data,updated_at`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -250,7 +428,7 @@ const fetchHarvest = async (uid, type, opts = {}) => {
 const fetchEmailBordereaux = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=id,data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -288,7 +466,7 @@ const reclassifyTrack = (d) => {
 const fetchEmailTracking = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_track_*&select=id,data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -302,7 +480,7 @@ const fetchEmailTracking = async () => {
 const fetchWalletEscrow = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return { total: 0, accounts: 0 };
     const rows = await res.json();
@@ -317,7 +495,7 @@ const fetchWalletEscrow = async () => {
 const fetchProInvoices = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_invoice_*&select=id,data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -330,7 +508,7 @@ const setProInvoiceStatus = async (inv, status) => {
     const data = { ...inv, status }; delete data._id;
     await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(inv._id)}`, {
       method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
       body: JSON.stringify({ data }),
     });
     return true;
@@ -341,7 +519,7 @@ const setProInvoiceStatus = async (inv, status) => {
 const fetchEmailAchats = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_achat_*&select=id,data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -353,7 +531,7 @@ const fetchEmailAchats = async () => {
 const fetchEmailOffers = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_offer_*&select=id,data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -366,7 +544,7 @@ const fetchEmailOffers = async () => {
 const fetchEmailSales = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     return (await res.json()).map(r => r.data).filter(Boolean);
@@ -598,7 +776,7 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
   if (!uid) return null;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data,updated_at`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -625,7 +803,7 @@ const fetchCapturedLabel = async (uid) => {
   if (!uid) return null;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -638,7 +816,7 @@ const fetchCapturedReceipt = async (uid) => {
   if (!uid) return null;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_receipt_latest&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -766,7 +944,7 @@ const extractPickupPoints = (payload) => {
 const fetchHarvestPickupPoints = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -783,7 +961,7 @@ const fetchHarvestPickupPoints = async () => {
 const fetchHarvestBoosts = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
@@ -800,7 +978,7 @@ const fetchHarvestConversation = async (uid, convId) => {
   if (!uid || !convId) return null;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_conv_${convId}&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -839,7 +1017,7 @@ const persistRefreshedTokens = async (account, refreshed) => {
     if (account.vinted_user_id) {
       await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
         method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
         body: JSON.stringify({
           access_token: refreshed.access_token,
           refresh_token: refreshed.refresh_token,
@@ -1948,6 +2126,106 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── ÉCRAN DE CONNEXION (multi-vendeurs) ───────────────────────────────────
+// Volontairement minimal : un logo, deux champs, un bouton. C'est la première
+// chose qu'un nouveau vendeur voit — s'il hésite ici, il n'ira pas plus loin.
+function AuthScreen() {
+  const [mode, setMode] = React.useState('in');      // in = connexion · up = création · reset = mot de passe oublié
+  const [email, setEmail] = React.useState('');
+  const [pw, setPw] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [info, setInfo] = React.useState('');
+
+  const submit = async (e) => {
+    e && e.preventDefault();
+    setErr(''); setInfo('');
+    if (!email.trim()) { setErr('Indique ton email.'); return; }
+    if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
+    setBusy(true);
+    try {
+      if (mode === 'reset') {
+        await authReset(email);
+        // Réponse volontairement identique que le compte existe ou non : sinon
+        // ce formulaire dirait à n'importe qui quels emails sont inscrits.
+        setInfo("Si un compte existe avec cet email, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
+      } else if (mode === 'up') {
+        const r = await authSignUp(email, pw);
+        if (!r.ok) setErr(r.error);
+        else if (r.needsConfirm) setInfo("Compte créé ! Ouvre l'email de confirmation qu'on vient de t'envoyer, puis reviens te connecter.");
+      } else {
+        const r = await authSignIn(email, pw);
+        if (!r.ok) setErr(r.error);
+        // Rechargement volontaire après connexion : l'app relit alors le cloud
+        // du bon vendeur depuis un état propre. Sans ça, un composant déjà monté
+        // pourrait garder en mémoire les données du vendeur précédent.
+        else location.reload();
+      }
+    } finally { setBusy(false); }
+  };
+
+  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:12,
+    padding:'13px 14px', fontSize:15, background:C.card, color:C.text, outline:'none', fontFamily:'inherit' };
+
+  return (
+    <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
+      <div style={{width:'100%',maxWidth:380}}>
+        <div style={{textAlign:'center',marginBottom:26}}>
+          <div style={{fontSize:32,fontWeight:700,color:C.accent,letterSpacing:-1,lineHeight:1}}>VRM</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6}}>Vendre · Ranger · Marge</div>
+        </div>
+        <form onSubmit={submit} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
+          <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:3}}>
+            {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : 'Se connecter'}
+          </div>
+          <div style={{fontSize:12.5,color:C.muted,marginBottom:16,lineHeight:1.45}}>
+            {mode==='up' ? 'Tes données (annonces, garage, compta) ne seront visibles que par toi.'
+             : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
+             : 'Retrouve ta boutique, tes numéros et ta compta.'}
+          </div>
+
+          <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
+            value={email} onChange={e=>setEmail(e.target.value)} style={{...field, marginBottom:9}}/>
+          {mode!=='reset' && (
+            <input type="password" autoComplete={mode==='up'?'new-password':'current-password'} placeholder="Mot de passe"
+              value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
+          )}
+
+          {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
+          {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
+
+          <button type="submit" disabled={busy} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
+            borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',opacity:busy?0.6:1,fontFamily:'inherit'}}>
+            {busy ? '…' : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : 'Se connecter'}
+          </button>
+
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'}}>
+            <button type="button" onClick={()=>{ setMode(mode==='up'?'in':'up'); setErr(''); setInfo(''); }}
+              style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+              {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
+            </button>
+            {mode!=='reset' && (
+              <button type="button" onClick={()=>{ setMode('reset'); setErr(''); setInfo(''); }}
+                style={{border:'none',background:'transparent',color:C.muted,fontSize:12.5,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                Mot de passe oublié ?
+              </button>
+            )}
+            {mode==='reset' && (
+              <button type="button" onClick={()=>{ setMode('in'); setErr(''); setInfo(''); }}
+                style={{border:'none',background:'transparent',color:C.muted,fontSize:12.5,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                Retour
+              </button>
+            )}
+          </div>
+        </form>
+        <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:16,lineHeight:1.5}}>
+          Chaque vendeur ne voit que ses propres données.<br/>L'isolation est appliquée par la base, pas par l'application.
+        </div>
       </div>
     </div>
   );
@@ -3831,7 +4109,7 @@ const compressImage = (file, maxDim = 1400, quality = 0.6) => new Promise((resol
 });
 const loadLocalPlan = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_local&select=data`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_local&select=data`, { headers: sbAuth() });
     if (!res.ok) return null;
     const rows = await res.json();
     return rows[0]?.data || null;
@@ -3839,10 +4117,10 @@ const loadLocalPlan = async () => {
 };
 const saveLocalPlan = async (data) => {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ id: 'vrm_local', data }),
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(withOwner({ id: 'vrm_local', data })),
     });
   } catch (_) {}
 };
@@ -3984,10 +4262,10 @@ function LocalPhoto({ locate, onLocateConsumed }) {
 // ranger tes N° dans ses tiroirs/rayons (empilables). La recherche te montre le
 // meuble + la case. Rangé dans une ligne Supabase dédiée (vrm_room).
 const loadRoomPlan = async () => {
-  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }); if (!res.ok) return null; const rows = await res.json(); return rows[0]?.data || null; } catch (_) { return null; }
+  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return null; const rows = await res.json(); return rows[0]?.data || null; } catch (_) { return null; }
 };
 const saveRoomPlan = async (data) => {
-  try { await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: 'vrm_room', data }) }); } catch (_) {}
+  try { await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_room', data })) }); } catch (_) {}
 };
 // Catalogue de rangements — volontairement large pour convenir à TOUTE méthode.
 // `build` = quel constructeur 3D utiliser (plusieurs types partagent une forme).
@@ -6014,7 +6292,7 @@ function VintedAccounts({ accounts, setAccounts }) {
   useEffect(() => { (async () => {
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_profile&select=id,data`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        headers: sbAuth(),
       });
       if (!res.ok) return;
       const rows = await res.json();
@@ -6051,7 +6329,7 @@ function VintedAccounts({ accounts, setAccounts }) {
   const blockedAccts = useMemo(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)), []);
   useEffect(() => { (async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at`, { headers: sbAuth() });
       if (!res.ok) return;
       const rows = await res.json(); const by = {};
       rows.forEach(r => { const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return; const t = r.updated_at ? new Date(r.updated_at).getTime() : 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
@@ -6858,7 +7136,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        headers: sbAuth(),
       });
       if (!r.ok) return;
       const rows = await r.json();
@@ -10010,7 +10288,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         try{
                           await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}`,{
                             method:'PATCH',
-                            headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',Prefer:'return=minimal'},
+                            headers:sbAuth({ 'Content-Type':'application/json',Prefer:'return=minimal' }),
                             body:JSON.stringify({data:{...t,lieu:nom.trim()}}),
                           });
                         }catch(_){}
@@ -12009,7 +12287,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const sbGet = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
+  const sbGet = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
   const reload = async () => {
     setLoading(true);
     const mainRows = await sbGet('app_data?id=eq.main&select=data');
@@ -12167,7 +12445,25 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
     <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
       <h2 style={{fontSize:20,fontWeight:600,color:C.text,margin:'0 0 16px'}}>⚙️ Paramètres</h2>
 
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'0 0 8px 2px'}}>Comptes Vinted</div>
+      {/* Ton compte VRM (multi-vendeurs). Absent en mode solo : il n'y a alors
+          personne à identifier ni de quoi se déconnecter. */}
+      {MULTI_USER && AUTH.user && (<>
+        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'0 0 8px 2px'}}>Ton compte</div>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+          <span style={{width:38,height:38,borderRadius:999,flexShrink:0,background:`${C.accent}18`,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
+            {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
+          </span>
+          <span style={{flex:1,minWidth:0}}>
+            <span style={{display:'block',fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{AUTH.user.email}</span>
+            <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Tes données ne sont visibles que par toi.</span>
+          </span>
+        </div>
+        <Row icon="🚪" title="Se déconnecter" color={C.danger}
+          desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
+          onClick={()=>{ if(window.confirm('Se déconnecter ? Tes données restent en ligne, elles reviendront à la prochaine connexion.')) { authSignOut(); location.reload(); } }}/>
+      </>)}
+
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
       <Row icon="🔗" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Leboncoin</div>
@@ -12233,7 +12529,7 @@ function ProFactureSetting() {
   const DEFAULTS = { actif:false, autoSend:false, nom:'', adresse:'', codePostal:'', ville:'', siret:'', tva:'', prefixe:'FA', tauxTva:'0', mentions:'', logo:'' };
   const [cfg, setCfg] = useState(null); // null = chargement
   const [status, setStatus] = useState('');
-  const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+  const HEADERS = sbAuth();
   const saveTimer = React.useRef(null);
 
   useEffect(() => { (async () => {
@@ -12250,10 +12546,10 @@ function ProFactureSetting() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
-        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
           method: 'POST',
           headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify([{ id: 'vrm_pro_facture', data: next }]),
+          body: JSON.stringify([withOwner({ id: 'vrm_pro_facture', data: next })]),
         });
         setStatus('✓ enregistré');
       } catch (_) { setStatus('⚠ échec — réessaie'); }
@@ -12348,7 +12644,7 @@ function ProFactureSetting() {
 function EmailStartSetting() {
   const [date, setDate] = useState('');
   const [status, setStatus] = useState('load'); // load | ok | saving | err
-  const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+  const HEADERS = sbAuth();
 
   useEffect(() => { (async () => {
     try {
@@ -12364,10 +12660,10 @@ function EmailStartSetting() {
     if (!v) return;
     setDate(v); setStatus('saving');
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
         method: 'POST',
         headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([{ id: 'vrm_email_config', data: { startDate: v, updatedAt: new Date().toISOString() } }]),
+        body: JSON.stringify([withOwner({ id: 'vrm_email_config', data: { startDate: v, updatedAt: new Date().toISOString() } })]),
       });
       setStatus('ok');
     } catch (_) { setStatus('err'); }
@@ -12514,6 +12810,11 @@ function RegimeSetting() {
 }
 
 export default function App() {
+  // ── PORTE D'ENTRÉE (multi-vendeurs) ─────────────────────────────────────
+  // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
+  // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
+  const [authState,setAuthState]=useState(AUTH);
+  React.useEffect(()=>{ const off=onAuthChange(setAuthState); authBoot(); return off; },[]);
   const [tab,setTab]=useState('journee');
   // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
   const navHistRef = React.useRef([]);
@@ -12592,7 +12893,7 @@ export default function App() {
   // Supabase → la recherche marche même sans avoir ouvert les onglets Ventes/Achats.
   const [gsData,setGsData]=useState(null); // { online:Set, sold:[], bought:[], lbc:Set }
   useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
-    const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}}); return r.ok?await r.json():null; }catch(_){ return null; } };
+    const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
     const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
@@ -13000,7 +13301,7 @@ export default function App() {
       try{
         const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
         const todayStr=`${ymStr}-${String(now.getDate()).padStart(2,'0')}`;
-        const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
+        const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:sbAuth()});
         // Comptes dont les ventes COMPTENT : ceux encore liés à l'app, et non
         // masqués/bloqués. Un compte DÉCONNECTÉ ne doit plus peser dans le CA —
         // avant, ses emails de vente continuaient d'être comptés (ex. 54 € d'un
@@ -13044,10 +13345,10 @@ export default function App() {
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
         // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
         try{
-          await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`,{
+          await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`,{
             method:'POST',
-            headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
-            body:JSON.stringify([{id:'widget_stats',data:{caMois:Math.round(caMois),ventesMois,enAttente:Math.round(enAttente),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock,updatedAt:new Date().toISOString()}}]),
+            headers:sbAuth({ 'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal' }),
+            body:JSON.stringify([withOwner({id:'widget_stats',data:{caMois:Math.round(caMois),ventesMois,enAttente:Math.round(enAttente),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock,updatedAt:new Date().toISOString()}})]),
           });
         }catch(_){}
       }
@@ -13130,7 +13431,7 @@ export default function App() {
       // → à retirer de Leboncoin pour ne pas les vendre deux fois.
       let lbcRemoveCount=0;
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
         if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; lbcRemoveCount=posted.filter(x=>/^\d+$/.test(String(x))&&!lbcOnlineIds.has(String(x))).length; }
       }catch(_){}
       if(cancelled) return;
@@ -13185,6 +13486,12 @@ export default function App() {
     return ()=>{cancelled=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vintedAccounts]);
+
+  // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
+  // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
+  // session on affiche la porte d'entrée au lieu de l'app.
+  if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
+  if (MULTI_USER && !authState.session) return <AuthScreen/>;
 
   return (
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
@@ -13459,7 +13766,7 @@ export default function App() {
               entries.forEach(([k,v])=>{ try{ localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v)); }catch(_){} });
               try{
                 const payload={}; SYNC_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null){ try{ payload[k]=JSON.parse(raw); }catch{ payload[k]=raw; } } });
-                if(Object.keys(payload).length){ await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json', Prefer:'return=minimal' }, body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) }); }
+                if(Object.keys(payload).length){ await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:sbAuth({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) }); }
               }catch(_){}
               toast('✓ Sauvegarde restaurée ! L\'app va se recharger.');
               location.reload();

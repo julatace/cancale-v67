@@ -21,6 +21,16 @@
 
     if (d.__vmr === 'ping') { announce(); return; }
 
+    // SESSION DU VENDEUR (multi-vendeurs). L'app, une fois connectee, nous
+    // transmet son jeton : c'est ce qui permet a l'extension d'ecrire dans la
+    // base SOUS SON COMPTE une fois l'isolation activee. On ne la stocke pas
+    // ici (une page web n'a pas a garder ca) : on la relaie au service worker.
+    // A la deconnexion, l'app envoie session:null et l'extension oublie tout.
+    if (d.__vmr === 'session') {
+      try { chrome.runtime.sendMessage({ from: 'vmr-bridge', action: 'session', session: d.session || null }); } catch (_) {}
+      return;
+    }
+
     if (d.__vmr === 'exec' && d.reqId) {
       try {
         chrome.runtime.sendMessage(

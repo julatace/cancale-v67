@@ -251,3 +251,29 @@ Passeport de la paire (📖), Répartiteur de lot (🧮), Audit stock fantôme (
 - **Icônes au trait** (`ICON_PATHS` + `<Icon name size/>`) dans la barre du bas ET dans les `ScreenHead` : un écran et son onglet portent le même symbole. Les emojis restent ailleurs.
 - Police : **Inter uniquement** (l'app forçait encore Nunito par-dessus, et un `@import` chargeait Nunito + Instrument Sans pour rien).
 - Titre en double supprimé (le `<h2>` de `Comptabilite` répétait le `ScreenHead`), et « Aucun compte lié » est devenu un vrai `EmptyState` **sous** le titre.
+
+
+---
+
+## 12. Multi-vendeurs (posé août 2026, PAS ENCORE ACTIF)
+
+**Modèle choisi avec Julien : SaaS — chaque vendeur a ses propres données**, aucun partage. (Pas le modèle « équipe sur une même boutique ».)
+
+### Où vit l'isolation
+**Dans Postgres, pas dans le JavaScript.** Chaque ligne de `app_data` et `vinted_accounts` porte un `owner uuid` (défaut `auth.uid()`), et une policy RLS `owner = auth.uid()` filtre lecture ET écriture. Une isolation écrite côté app ne protégerait de rien (console du navigateur). ⚠️ **Ne jamais « simplifier » en filtrant côté client.**
+
+### Interrupteur
+`const MULTI_USER = false;` en haut de `src/App.jsx`. À `false` (état actuel) : l'app se comporte exactement comme avant, aucune connexion demandée. On ne passe à `true` **qu'après** avoir appliqué la migration SQL — dans l'autre ordre, Julien se retrouverait devant un écran de connexion que la base ne sait pas honorer.
+
+### Pièces en place
+- `supabase/migrations/001-multi-utilisateurs.sql` — migration en 2 étapes (colonnes + défauts, puis attribution des lignes existantes à Julien, clé primaire `(owner,id)`, RLS). `supabase/README.md` = le mode d'emploi pas à pas.
+- `AUTH` / `authBoot` / `authSignIn` / `authSignUp` / `authReset` / `authRefresh` / `authSignOut` dans `App.jsx` (Supabase Auth en REST, session en localStorage `vrm_session`, renouvellement auto toutes les 4 min).
+- **`sbAuth(extra)` = le point de passage UNIQUE de tous les appels Supabase** (37 sites convertis). Il met le jeton du vendeur dans `Authorization`, la clé publique dans `apikey`. Ne plus jamais écrire `Authorization: Bearer ${SUPABASE_KEY}` à la main.
+- `withOwner(row)` sur toute ligne écrite, `SB_CONFLICT` (`'id'` en solo, `'owner,id'` en multi) sur tous les upserts.
+- `cloudPush` est passé de PATCH à **upsert** : un nouveau vendeur n'a pas encore de ligne, un PATCH n'aurait jamais rien sauvegardé.
+- `ensureLocalOwner(uid)` + `wipeLocalData()` : le localStorage est commun à tout le site — sans ménage, le vendeur B héritait des numéros de A **et les repoussait dans le cloud sous son propre compte**. Changement d'identité ⇒ effacement des clés `vinted_*` / `vrm_*`, puis `location.reload()` après connexion.
+- `AuthScreen` : connexion / création / mot de passe oublié. Réponse identique que le compte existe ou non (sinon le formulaire révèle qui est inscrit).
+- **Extension** : `background.js` a sa propre session (`chrome.storage.local.vrmSession`), `sbHeaders()` / `withOwner()` / `appDataConflict()`. L'app lui transmet le jeton par `window.postMessage({__vmr:'session'})` → `bridge.js` → background, **avec vérification de l'origine** (seuls les domaines de l'app sont acceptés, sinon n'importe quel site pourrait injecter un jeton).
+
+### Ce qui bloque encore la bascule
+Les fonctions `api/*.js` (widget, email-inbound, ship-reminders, push) écrivent avec la clé anon → **cassées dès que RLS est activé**. Il leur faut `SUPABASE_SERVICE_KEY` (Vercel) + savoir à quel vendeur attribuer chaque ligne. Pour les emails, ça suppose de rattacher une adresse email à un vendeur — chantier à part entière.

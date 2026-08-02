@@ -18,6 +18,80 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const VINTED_DOMAINS = ['www.vinted.fr', 'www.vinted.com', 'www.vinted.it', 'www.vinted.de'];
 
+// ── COMPTE VENDEUR (multi-vendeurs) ────────────────────────────────────────
+// Une fois la base passee en multi-vendeurs, la cle publique « anon » n'a plus
+// le droit d'ecrire : chaque ligne doit porter le compte de son proprietaire.
+// L'extension ne demande PAS de mot de passe : quand tu ouvres l'app VRM
+// connecte, la page transmet sa session a l'extension (bridge.js), qui la
+// garde et s'en sert pour ecrire sous ton compte. Si aucune session n'a encore
+// ete recue, on retombe sur la cle publique — c'est le mode solo d'aujourd'hui,
+// qui continue de marcher a l'identique.
+let VRM_SESSION = null;   // { access_token, refresh_token, expires_at, user_id }
+const SESSION_STORE = 'vrmSession';
+
+async function loadSession() {
+  if (VRM_SESSION) return VRM_SESSION;
+  try {
+    const got = await chrome.storage.local.get(SESSION_STORE);
+    VRM_SESSION = got && got[SESSION_STORE] ? got[SESSION_STORE] : null;
+  } catch (_) { VRM_SESSION = null; }
+  return VRM_SESSION;
+}
+async function saveSession(sess) {
+  VRM_SESSION = sess || null;
+  try {
+    if (sess) await chrome.storage.local.set({ [SESSION_STORE]: sess });
+    else await chrome.storage.local.remove(SESSION_STORE);
+  } catch (_) {}
+}
+// Le jeton d'acces dure ~1 h ; on le renouvelle tout seul, sinon l'extension
+// cesserait d'ecrire des que tu fermes l'app.
+async function refreshSession() {
+  const s = await loadSession();
+  if (!s || !s.refresh_token) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: s.refresh_token }),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const next = {
+      access_token: j.access_token,
+      refresh_token: j.refresh_token,
+      expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
+      user_id: (j.user && j.user.id) || s.user_id || null,
+    };
+    await saveSession(next);
+    return next;
+  } catch (_) { return null; }
+}
+async function authToken() {
+  let s = await loadSession();
+  if (!s) return null;
+  if (!s.expires_at || s.expires_at < Date.now() + 60000) s = await refreshSession();
+  return s && s.access_token ? s : null;
+}
+// En-tetes Supabase : jeton du vendeur si on en a un, cle publique sinon.
+async function sbHeaders(extra) {
+  const s = await authToken();
+  return Object.assign({
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${(s && s.access_token) || SUPABASE_KEY}`,
+  }, extra || {});
+}
+// Ajoute le proprietaire a une ligne a ecrire (ignore en mode solo).
+async function withOwner(row) {
+  const s = await authToken();
+  return (s && s.user_id) ? Object.assign({ owner: s.user_id }, row) : row;
+}
+// Cible d'upsert sur app_data : la cle devient (owner, id) en multi-vendeurs.
+async function appDataConflict() {
+  const s = await authToken();
+  return (s && s.user_id) ? 'owner,id' : 'id';
+}
+
 // Dernier csrf-token vu par domaine (fourni par inject.js).
 const lastCsrfByDomain = {};
 
@@ -41,15 +115,20 @@ function getCookie(domain, name) {
 
 async function supabaseUpsert(table, rows, onConflict) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
+    const list = Array.isArray(rows) ? rows : [rows];
+    const owned = [];
+    for (const r of list) owned.push(await withOwner(r));
+    // Sur app_data la cible du conflit depend du mode (solo / multi-vendeurs).
+    let target = onConflict;
+    if (table === 'app_data' && onConflict === 'id') target = await appDataConflict();
+    if (table === 'vinted_accounts' && onConflict === 'vinted_user_id') {
+      const s = await authToken();
+      if (s && s.user_id) target = 'owner,vinted_user_id';
+    }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${target}`, {
       method: 'POST',
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify(rows),
+      headers: await sbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(owned),
     });
     return res.ok;
   } catch (_) { return false; }
@@ -124,7 +203,7 @@ async function storeHarvest(domain, type, id, body) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, {
         method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: await sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
         body: JSON.stringify({ login: parsed.user.login }),
       });
     } catch (_) { /* best-effort */ }
@@ -139,6 +218,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
       return true; // reponse asynchrone
     }
+    // SESSION DU VENDEUR : relayee par bridge.js depuis l'app connectee.
+    // On ne l'accepte QUE d'un onglet de l'app elle-meme (verification de
+    // l'origine de l'expediteur) — sinon n'importe quel site pourrait nous
+    // refiler un jeton et ecrire sous le compte de quelqu'un d'autre.
+    if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
+      const from = (sender && sender.origin) || (sender && sender.url) || '';
+      const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|vrm\.center)/.test(from);
+      if (!trusted) { sendResponse({ ok: false, error: 'origine non autorisee' }); return true; }
+      saveSession(msg.session || null).then(() => sendResponse({ ok: true }));
+      return true;
+    }
+
     // PONT APP -> EXTENSION : l'app VRM demande d'EXECUTER une action Vinted
     // (repondre, faire une offre...) depuis TON navigateur/IP. On n'accepte que
     // des endpoints /api/ Vinted, et on agit avec le token du compte vise.
@@ -404,7 +495,7 @@ async function activeFetchAccount(acc) {
       try {
         await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, {
           method: 'PATCH',
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          headers: await sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
           body: JSON.stringify({ login }),
         });
       } catch (_) {}
@@ -439,7 +530,7 @@ async function activeFetchAccount(acc) {
 async function getStoredAccounts() {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: await sbHeaders(),
     });
     if (!res.ok) return [];
     return await res.json();
@@ -480,7 +571,7 @@ async function activeUidForDomain(domain) {
 async function lastProfileId(uid) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_profile&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: await sbHeaders(),
     });
     if (!r.ok) return null;
     const rows = await r.json();
@@ -781,7 +872,7 @@ async function buildPanelData() {
 
 async function sbGet(query) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: await sbHeaders() });
     if (!res.ok) return null;
     return await res.json();
   } catch (_) { return null; }
