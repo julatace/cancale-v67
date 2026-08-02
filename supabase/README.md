@@ -2,9 +2,23 @@
 
 ## Où on en est
 
-**L'écran de connexion est DÉSACTIVÉ** (`MULTI_USER = false`). L'app s'ouvre
-directement, comme avant. C'est volontaire, après un essai en conditions réelles
-qui a échoué :
+**L'écran de connexion est ACTIF** (`MULTI_USER = true`), et le compte vendeur
+existe : `shopcancale35@gmail.com`, **User UID `74eea6e7-f060-46b6-b9c7-d500cedf4738`**
+(c'est cet identifiant qu'il faudra coller dans l'étape 2 de la migration).
+
+Il a été créé depuis **Authentication → Add user → Create new user**, avec
+« Auto confirm user » : aucun email envoyé, donc aucun quota, donc aucun
+blocage. **C'est la seule méthode qui fonctionne sur ce projet** — retenir ça
+pour les prochains comptes de test.
+
+**La séparation des données n'est toujours PAS active** : il manque la migration
+SQL. Tant qu'elle n'est pas passée, un deuxième compte verrait les données du
+premier — c'est pourquoi le lien « Créer un compte » reste masqué dans l'app.
+
+### Historique : pourquoi la connexion avait été coupée un moment
+Elle avait été activée AVANT la migration. Résultat : un écran de connexion
+sans aucune protection à offrir, et impossible de créer le compte pour le
+franchir :
 
 - l'écran de connexion n'apportait **aucune protection** (rien n'est cloisonné
   tant que la base n'a pas de colonne `owner`) mais il **bloquait l'accès à
@@ -17,8 +31,8 @@ qui a échoué :
 - et cette version du tableau de bord n'a **pas** d'action « Confirm email » sur
   un utilisateur : uniquement des boutons qui envoient des mails.
 
-Tout le code d'authentification reste en place et testé. **La bascule ne tient
-qu'à une ligne**, mais elle vient APRÈS la migration, pas avant.
+La leçon retenue : **créer le compte AVANT d'activer la connexion**, et le créer
+depuis « Add user » plutôt que par le formulaire d'inscription.
 
 ## L'ordre correct, et il n'y en a pas d'autre
 
