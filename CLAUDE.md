@@ -380,7 +380,7 @@ Deux dégâts, longtemps invisibles :
 | ventes moissonnées | **0 partout** (cause ci-dessus) |
 | `email_sale_*` | 49, jusqu'au 1er août |
 | `email_bord_*` | 51 — 40 avec n°, 51 avec transaction, 50 avec PDF |
-| `email_track_*` | 61 — **0 vrai QR (`qrB64`)**, 13 `qrUrl`, 16 codes de retrait |
+| `email_track_*` | 61 — 0 `qrB64`, **11 `qrUrl` (tous Chronopost)**, 16 codes de retrait |
 | lieu de retrait | **48/61 vides**, 11 mal découpés (« ® MAISON DE LA PRESSE … SUPER PRATIQUE Retr ») |
 
 ### PAS RÉSOLU — il faut un email d'exemple
@@ -407,3 +407,27 @@ Les trois bandeaux d'alerte (compte muet / annonces disparues / compte bloqué) 
 
 ### Bordereaux sans numéro
 11 sur 51 n'ont aucun numéro. La pastille était simplement absente → le bordereau avait l'air normal. Il porte maintenant « N° ? » en orange ; le bouton « Relier » existait déjà juste en dessous.
+
+
+---
+
+## 17. Session août 2026 (suite) — le QR : par transporteur, et on n'en fabrique plus
+
+Julien : « je n'ai pas de code, j'ai que pour Chronopost » — et surtout « ça me génère le QR code, mais c'est juste une retranscription ». Il avait raison sur les deux.
+
+### Ce que disent vraiment les 61 colis reçus
+| transporteur | colis | vrai QR | code retrait | lieu |
+|---|---|---|---|---|
+| **Mondial Relay** | 39 | **0** | 15 | 13 |
+| **Chronopost** | 15 | **11** (`qrUrl`) | 1 | 0 |
+| vinted / colissimo / shop2shop | 7 | 2 | 0 | 0 |
+
+➡️ **Le QR n'existe que chez Chronopost**, en image hébergée. **Mondial Relay fonctionne au CODE de retrait**, jamais au QR. Ma conclusion précédente (« 0 vrai QR ») était fausse : il y en a 11, l'app les affichait déjà.
+
+### Ce qui était vraiment cassé
+`openQrView` **fabriquait** un QR à partir du n° de suivi quand il n'y en avait pas — un carré que le comptoir ne scanne pas. C'est la « retranscription » dont parlait Julien, et elle faisait perdre du temps au relais.
+
+- **`makeQrDataUrl` et la dépendance `qrcode-generator` sont SUPPRIMÉS.** ⚠️ Ne pas les réintroduire.
+- Sans vrai QR, la modale montre **le code en 44 px** (au lieu de 32), le **point relais** (`cleanLieu(...).display`) et un texte qui dit quoi présenter au comptoir.
+- Si l'image Chronopost hébergée ne charge pas, on bascule sur le code — plus jamais sur un QR fabriqué.
+- Ni QR ni code ⟹ on affiche le **numéro de colis** en gros, honnêtement.

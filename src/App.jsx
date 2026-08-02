@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v55/00 · épuré';
+const BUILD_ID = 'v56/00 · retrait';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1071,20 +1071,11 @@ const openReceipt = (a) => {
   </body></html>`);
   w.document.close();
 };
-// Génère un QR code (data URL GIF) à partir d'un texte — code de retrait ou n° de
-// suivi. Import dynamique de qrcode-generator (léger, hors du bundle principal).
-// Sert de repli quand Vinted n'a pas fourni son propre QR (qrB64) dans l'email.
-let _qrLib = null;
-const makeQrDataUrl = async (text) => {
-  const t = String(text || '').trim();
-  if (!t) return null;
-  try {
-    if (!_qrLib) { const m = await import('qrcode-generator'); _qrLib = m.default || m; }
-    const qr = _qrLib(0, 'M'); // version auto, correction moyenne
-    qr.addData(t); qr.make();
-    return qr.createDataURL(8, 4); // pixels par module, marge
-  } catch (_) { return null; }
-};
+// ⚠️ Le générateur de QR (qrcode-generator) a été RETIRÉ à dessein.
+// Vérifié sur 61 colis : le QR n'existe que chez Chronopost (image hébergée).
+// Mondial Relay — 39 colis, zéro QR — fonctionne au CODE DE RETRAIT. Fabriquer
+// un QR depuis le n° de suivi donnait un carré que le comptoir ne scanne pas.
+// Ne pas le réintroduire : sans vrai QR, on affiche le code, en gros.
 // Page de suivi officielle du transporteur, n° pré-rempli.
 const trackUrl = (carrier, suivi) => {
   const s = encodeURIComponent(String(suivi || '').trim());
@@ -7986,15 +7977,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const isRetirable = (t) => isColisRetirable(t, collected);
   // Ouvre la vue « scan » en grand : QR authentique de Vinted (qrB64) si présent,
   // sinon on génère un QR à partir du code de retrait ou du n° de suivi.
+  // ⚠️ ON NE FABRIQUE PLUS DE QR. Vérifié sur les 61 colis reçus : le QR
+  // n'existe QUE chez Chronopost (11 sur 15, en image hébergée). Mondial Relay
+  // — 39 colis, aucun QR — marche au CODE DE RETRAIT. Fabriquer un QR à partir
+  // du n° de suivi produisait un carré que le comptoir ne scanne pas : c'est
+  // « juste une retranscription », et ça fait perdre du temps au relais.
+  // Quand il n'y a pas de vrai QR, la bonne réponse est le code, en gros.
   const openQrView = async (t) => {
-    const base = { title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '', carrier: t.carrier || '', _t: t };
-    // QR authentique capté par email : image intégrée (qrB64) ou hébergée (qrUrl).
+    const base = {
+      title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '',
+      carrier: t.carrier || '', lieu: cleanLieu(t.lieu).display || '', _t: t,
+    };
     if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
     if (t.qrUrl) { setQrView({ ...base, img: t.qrUrl, real: true, hosted: true }); return; }
-    // Sinon on en génère un depuis le code de retrait / n° de suivi.
     setQrView({ ...base, img: null, real: false });
-    const img = await makeQrDataUrl(t.code || t.suivi);
-    setQrView(v => (v && v._t === t) ? { ...v, img } : v);
   };
   // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
   useEffect(() => { if (!lastCollected) return; const id = setTimeout(() => setLastCollected(null), 6000); return () => clearTimeout(id); }, [lastCollected]);
@@ -13133,22 +13129,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:20,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
-            {qrView.img
-              ? <img src={qrView.img} alt="QR de retrait"
-                  onError={qrView.hosted ? (async()=>{ const img=await makeQrDataUrl(qrView.code||qrView.suivi); setQrView(v=>v?{...v,img,real:false,hosted:false}:v); }) : undefined}
-                  style={{width:'86%',maxWidth:300,aspectRatio:'1',objectFit:'contain',imageRendering:'pixelated'}}/>
-              : <div style={{width:'86%',maxWidth:300,aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',color:'#888',fontSize:13}}>Génération du QR…</div>}
+            {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
+                pas, on bascule sur le code — surtout pas sur un QR fabriqué. */}
+            {qrView.img && (
+              <img src={qrView.img} alt="QR de retrait"
+                onError={qrView.hosted ? (()=>setQrView(v=>v?{...v,img:null,real:false,hosted:false}:v)) : undefined}
+                style={{width:'86%',maxWidth:300,aspectRatio:'1',objectFit:'contain',imageRendering:'pixelated'}}/>
+            )}
             {qrView.code && (
               <div style={{textAlign:'center'}}>
                 <div style={{fontSize:9,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>Code de retrait</div>
-                <div style={{fontSize:32,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:3}}>{qrView.code}</div>
+                {/* Sans QR, LE code est ce qu'on présente au comptoir : il passe en grand. */}
+                <div style={{fontSize:qrView.img?32:44,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:3,lineHeight:1.1}}>{qrView.code}</div>
               </div>
             )}
-            {qrView.suivi && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
+            {!qrView.img && !qrView.code && qrView.suivi && (
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:9,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>Numéro de colis</div>
+                <div style={{fontSize:30,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:2,lineHeight:1.1}}>{qrView.suivi}</div>
+              </div>
+            )}
+            {qrView.lieu && <div style={{fontSize:12.5,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>📍 {qrView.lieu}</div>}
+            {qrView.suivi && (qrView.img || qrView.code) && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
             <div style={{fontSize:11,color:'#999',textAlign:'center',lineHeight:1.4}}>
               {qrView.real
-                ? 'QR officiel Vinted — présente-le au point relais.'
-                : 'QR généré depuis ton code de retrait. Si le comptoir ne le scanne pas, donne le code ci-dessus.'}
+                ? 'QR officiel — présente-le au comptoir.'
+                : qrView.code
+                  ? `${qrView.carrier==='mondialrelay'?'Mondial Relay ne scanne pas de QR' : 'Pas de QR pour ce colis'} : donne ce code au comptoir, avec ta pièce d'identité.`
+                  : 'Ni QR ni code reçus pour ce colis : donne le numéro ci-dessus et ta pièce d\'identité.'}
             </div>
             <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:12,background:'#111',color:'#fff',fontSize:15,fontWeight:600,padding:'11px 22px',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
           </div>
