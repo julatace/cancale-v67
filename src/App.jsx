@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v52/00 · confirmations';
+const BUILD_ID = 'v52/01 · saisies';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -554,43 +554,105 @@ const askConfirm = (opts) => new Promise((resolve)=>{
   if (!_askListener) { resolve(window.confirm(o.desc || o.title || 'Confirmer ?')); return; }
   _askListener({ ...o, resolve });
 });
+
+// Meme chose pour window.prompt : une saisie, dans la feuille de l'app.
+// Renvoie la chaine saisie, ou null si on annule — exactement comme avant,
+// pour que les appels existants (`|| ''`, `!= null`) continuent de marcher.
+// `numeric` fait apparaitre le pave numerique sur telephone : la moitie des
+// saisies du garage sont des numeros de boite.
+const askText = (opts) => new Promise((resolve)=>{
+  const o = typeof opts === 'string' ? { desc: opts } : (opts || {});
+  if (!_askListener) { resolve(window.prompt(o.desc || o.title || '', o.value || '')); return; }
+  _askListener({ ...o, kind: 'text', resolve });
+});
+
+// Découpe le message en un titre et un corps. Les anciens messages étaient
+// écrits d'un bloc, avec des retours à la ligne : le premier paragraphe fait
+// le titre. Et une question d'un seul tenant est coupée à la fin de sa
+// première phrase, sinon on obtenait un titre de six lignes en gras.
+function sheetTexte(q, defaut) {
+  const lignes = String(q.desc || '').split('\n').filter(x => x.trim() !== '');
+  let titre = q.title || lignes[0] || defaut;
+  let corps = q.title ? lignes : lignes.slice(1);
+  if (!q.title && titre.length > 58) {
+    const m = titre.match(/^(.{10,90}?[?!.])\s+(\S.*)$/s);
+    if (m) { titre = m[1]; corps = [m[2], ...corps]; }
+  }
+  return { titre, corps };
+}
+
+// Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
+function SheetShell({ onClose, children }) {
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
+      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
+        <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'0 auto 14px'}}/>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Feuille de SAISIE (remplace window.prompt).
+function AskTextSheet({ q, close }) {
+  const [v, setV] = React.useState(q.value == null ? '' : String(q.value));
+  const ref = React.useRef(null);
+  // Sur téléphone le clavier ne s'ouvre que si le champ prend le focus tout
+  // seul ; sinon il faut taper dessus, ce que window.prompt n'imposait pas.
+  React.useEffect(() => { const t = setTimeout(() => { try { ref.current.focus(); ref.current.select(); } catch (_) {} }, 60); return () => clearTimeout(t); }, []);
+  const { titre, corps } = sheetTexte(q, 'Saisir');
+  return (
+    <SheetShell onClose={() => close(null)}>
+      <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
+      {corps.length > 0 && (
+        <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
+      )}
+      <form onSubmit={(e) => { e.preventDefault(); close(v); }}>
+        <input ref={ref} value={v} onChange={e => setV(e.target.value)}
+          placeholder={q.placeholder || ''}
+          inputMode={q.numeric ? 'numeric' : undefined}
+          style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.surface,color:C.text,fontSize:16,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
+        <div style={{display:'flex',gap:9,marginTop:12}}>
+          <button type="button" onClick={() => close(null)}
+            style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            {q.cancel || 'Annuler'}
+          </button>
+          <button type="submit"
+            style={{flex:2,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            {q.ok || 'Valider'}
+          </button>
+        </div>
+      </form>
+    </SheetShell>
+  );
+}
+
 function ConfirmHost() {
   const [q, setQ] = React.useState(null);
   React.useEffect(() => onAsk(setQ), []);
   if (!q) return null;
   const close = (val) => { try { q.resolve(val); } catch (_) {} setQ(null); };
+  if (q.kind === 'text') return <AskTextSheet q={q} close={close}/>;
   // Le premier paragraphe du message sert de titre : les anciens messages
   // étaient écrits d'un bloc avec des retours à la ligne.
-  const lignes = String(q.desc || '').split('\n').filter(x => x.trim() !== '');
-  let titre = q.title || lignes[0] || 'Confirmer ?';
-  let corps = q.title ? lignes : lignes.slice(1);
-  // Une question posée d'un seul tenant ferait un titre de six lignes en gras.
-  // On coupe à la fin de la première phrase : la question devient le titre,
-  // l'explication passe en dessous, en texte normal.
-  if (!q.title && titre.length > 58) {
-    const m = titre.match(/^(.{10,90}?[?!.])\s+(\S.*)$/s);
-    if (m) { titre = m[1]; corps = [m[2], ...corps]; }
-  }
+  const { titre, corps } = sheetTexte(q, 'Confirmer ?');
   return (
-    <div onClick={() => close(false)} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
-      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
-        <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'0 auto 14px'}}/>
-        <div style={{fontSize:17,fontWeight:700,color:q.danger?C.danger:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
-        {corps.length > 0 && (
-          <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
-        )}
-        <div style={{display:'flex',gap:9,marginTop:16}}>
-          <button type="button" onClick={() => close(false)}
-            style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            {q.cancel || 'Annuler'}
-          </button>
-          <button type="button" autoFocus onClick={() => close(true)}
-            style={{flex:2,border:'none',background:q.danger?C.danger:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            {q.ok || 'Confirmer'}
-          </button>
-        </div>
+    <SheetShell onClose={() => close(false)}>
+      <div style={{fontSize:17,fontWeight:700,color:q.danger?C.danger:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
+      {corps.length > 0 && (
+        <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
+      )}
+      <div style={{display:'flex',gap:9,marginTop:16}}>
+        <button type="button" onClick={() => close(false)}
+          style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          {q.cancel || 'Annuler'}
+        </button>
+        <button type="button" autoFocus onClick={() => close(true)}
+          style={{flex:2,border:'none',background:q.danger?C.danger:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          {q.ok || 'Confirmer'}
+        </button>
       </div>
-    </div>
+    </SheetShell>
   );
 }
 
@@ -4728,15 +4790,15 @@ function LocalPhoto({ locate, onLocateConsumed }) {
     const p = { id: 'ph' + Date.now(), name: `Zone ${photos.length + 1}`, img: data, pins: [] };
     const next = [...photos, p]; persist(next); setActive(next.length - 1);
   };
-  const renamePhoto = (idx) => { const nom = window.prompt('Nom de cette zone (ex : Étagère du fond, Commode d\'entrée) :', photos[idx].name || ''); if (nom == null) return; persist(photos.map((p, i) => i === idx ? { ...p, name: nom.trim() || p.name } : p)); };
+  const renamePhoto = async (idx) => { const nom = await askText({ desc: 'Nom de cette zone (ex : Étagère du fond, Commode d\'entrée) :', value: photos[idx].name || '' }); if (nom == null) return; persist(photos.map((p, i) => i === idx ? { ...p, name: nom.trim() || p.name } : p)); };
   const removePhoto = async (idx)=>{ if (!await askConfirm('Supprimer cette photo et tous ses repères ?')) return; const next = photos.filter((_, i) => i !== idx); persist(next); setActive(a => Math.max(0, Math.min(a, next.length - 1))); setHighlight(null); setSelPin(null); };
 
-  const onImgClick = (e) => {
+  const onImgClick = async (e) => {
     if (!placing) return;
     const r = imgWrapRef.current?.getBoundingClientRect(); if (!r) return;
     const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    const numero = (window.prompt('Numéro de la paire rangée à cet endroit :', '') || '').trim();
+    const numero = (await askText({ numeric: true, desc: 'Numéro de la paire rangée à cet endroit :', value: '' }) || '').trim();
     if (!numero) return;
     const pin = { id: 'pn' + Date.now(), numero, x, y };
     persist(photos.map((p, i) => i === active ? { ...p, pins: [...(p.pins || []), pin] } : p));
@@ -5511,7 +5573,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     setSel(null); setOpenItem(null); setHi(null); setSearch('');
   };
   const switchRoom = (id) => { if (id === plan.active) return; persist({ ...plan, active: id }); setSel(null); setOpenItem(null); setHi(null); setSearch(''); };
-  const renameRoom = () => { const n = window.prompt('Nom de la pièce :', activeRoom.name); if (n != null && n.trim()) patchRoom({ name: n.trim() }); };
+  const renameRoom = async () => { const n = await askText({ desc: 'Nom de la pièce :', value: activeRoom.name }); if (n != null && n.trim()) patchRoom({ name: n.trim() }); };
   const removeRoom = async ()=>{
     if (plan.rooms.length <= 1) { window.alert('Il faut garder au moins une pièce.'); return; }
     if (!await askConfirm('Supprimer la pièce « ' + activeRoom.name + ' » et tout son contenu ?')) return;
@@ -5521,21 +5583,21 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
   // Pas de la grille-sol pour poser/empiler les boîtes (0,5 m).
   const BOX_S = 0.5;
-  const addFurn = (type) => {
+  const addFurn = async (type) => {
     const t = FURN_TYPES[type]; const id = 'f' + Date.now();
     let name = t.label, emoji = t.emoji;
     // PILE DE BOÎTES : on demande juste COMBIEN de boîtes ; elles s'empilent et se
     // numérotent toutes seules. L'utilisateur déplace ensuite la pile où il veut.
     if (t.pile) {
-      const colsStr = window.prompt('Combien de COLONNES (piles côte à côte) ?', '1');
+      const colsStr = await askText({ numeric: true, desc: 'Combien de COLONNES (piles côte à côte) ?', value: '1' });
       if (colsStr == null) return;
       const cols = Math.max(1, Math.min(12, parseInt(colsStr, 10) || 1));
-      const rowsStr = window.prompt('Combien de boîtes de HAUT (par colonne) ?', '5');
+      const rowsStr = await askText({ numeric: true, desc: 'Combien de boîtes de HAUT (par colonne) ?', value: '5' });
       if (rowsStr == null) return;
       const rows = Math.max(1, Math.min(40, parseInt(rowsStr, 10) || 5));
       // Numéro de départ proposé = à la suite des piles déjà posées (jamais de doublon).
       let mx = 0; items.forEach(o => { if ((FURN_TYPES[o.type] || {}).pile) { const c = Math.max(1, o.cols || 1) * Math.max(1, o.rows || 1); const last = (parseInt(o.start, 10) || 1) + c - 1; if (last > mx) mx = last; } });
-      const startStr = window.prompt('Numéro de la 1re boîte (en bas de la 1re colonne) ?', String(mx + 1));
+      const startStr = await askText({ numeric: true, desc: 'Numéro de la 1re boîte (en bas de la 1re colonne) ?', value: String(mx + 1) });
       if (startStr == null) return;
       const start = Math.max(1, parseInt(startStr, 10) || (mx + 1));
       const cell = t.cell, w = +(cols * cell).toFixed(2);
@@ -5549,7 +5611,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     // endroit libre ; l'utilisateur l'empile ensuite en la glissant sur une autre.
     if (t.box) {
       let mx = 0; items.forEach(o => { if ((FURN_TYPES[o.type] || {}).box) { const v = parseInt(o.num, 10); if (!isNaN(v) && v > mx) mx = v; } });
-      const num = (window.prompt('Numéro de la boîte :', mx > 0 ? String(mx + 1) : '') || '').trim();
+      const num = (await askText({ numeric: true, desc: 'Numéro de la boîte :', value: mx > 0 ? String(mx + 1) : '' }) || '').trim();
       if (!num) return;
       setItems(list => {
         // pose sur une colonne au sol pas encore occupée (empilage ensuite à la main)
@@ -5561,9 +5623,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
       setSel(id); return;
     }
     if (type === 'autre') {
-      const n = (window.prompt('Nom de ton meuble (ex : Armoire, Bac à chaussures) :', '') || '').trim();
+      const n = (await askText({ desc: 'Nom de ton meuble (ex : Armoire, Bac à chaussures) :', value: '' }) || '').trim();
       if (n) name = n;
-      const e = (window.prompt('Un emoji pour le représenter (facultatif) :', '🪑') || '').trim();
+      const e = (await askText({ desc: 'Un emoji pour le représenter (facultatif) :', value: '🪑' }) || '').trim();
       if (e) emoji = e;
     }
     // Pour une grille, le footprint (w/h) découle de la taille de case × nb de cases,
@@ -5595,17 +5657,17 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const pileNums = (it) => (Array.isArray(it.nums) && it.nums.length) ? it.nums : Array.from({ length: Math.max(1, it.cols || 1) * Math.max(1, it.rows || 5) }, (_, i) => String((parseInt(it.start, 10) || 1) + i));
   const pileSet = (it, nums) => { const rows = Math.max(1, it.rows || 5); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { nums, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
   const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = pileNums(it); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
-  const pileAdd = (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = window.prompt('Numéro de la nouvelle boîte (au-dessus) :', String(nextN)); if (v == null) return; const t = String(v).trim(); if (!t) return; nums.push(t); pileSet(it, nums); };
+  const pileAdd = async (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = await askText({ numeric: true, desc: 'Numéro de la nouvelle boîte (au-dessus) :', value: String(nextN) }); if (v == null) return; const t = String(v).trim(); if (!t) return; nums.push(t); pileSet(it, nums); };
   const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (nums.length <= 1) return; nums.pop(); pileSet(it, nums); };
-  const pileRestart = (it) => { const s = window.prompt('Renuméroter toute la pile à partir de (dans l\'ordre) :', String(it.start || (pileNums(it)[0]) || 1)); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; const nums = pileNums(it).map((_, i) => String(st + i)); updateItem(it.id, { nums, start: st }); };
+  const pileRestart = async (it) => { const s = await askText({ numeric: true, desc: 'Renuméroter toute la pile à partir de (dans l\'ordre) :', value: String(it.start || (pileNums(it)[0]) || 1) }); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; const nums = pileNums(it).map((_, i) => String(st + i)); updateItem(it.id, { nums, start: st }); };
   // Toucher une boîte de la pile (pile déjà sélectionnée) → changer SON numéro
   // (on peut mettre n'importe quel numéro, pas forcément dans l'ordre), ou la
   // retirer si on laisse vide (les boîtes du dessus descendent).
-  const pileTap = (itemId, idx) => {
+  const pileTap = async (itemId, idx) => {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne la pile
     const it = items.find(o => o.id === itemId); if (!it) return;
     const nums = pileNums(it).slice(); if (idx < 0 || idx >= nums.length) return;
-    const v = window.prompt('Numéro de cette boîte (laisse VIDE pour la retirer, les autres descendent) :', nums[idx]);
+    const v = await askText({ numeric: true, desc: 'Numéro de cette boîte (laisse VIDE pour la retirer, les autres descendent) :', value: nums[idx] });
     if (v == null) return;
     const t = String(v).trim();
     if (!t) { nums.splice(idx, 1); pileSet(it, nums); return; }
@@ -5613,8 +5675,8 @@ function RoomPlan({ locate, onLocateConsumed }) {
   };
   // Remplir la grille EN SÉRIE : un numéro de départ → toutes les cases vides se
   // remplissent en croissant (gauche→droite, haut→bas). Gain de temps énorme.
-  const fillGridSeries = (it) => {
-    const start = window.prompt('Remplir en série — numéro de départ (les cases vides se remplissent en croissant) :', '');
+  const fillGridSeries = async (it) => {
+    const start = await askText({ numeric: true, desc: 'Remplir en série — numéro de départ (les cases vides se remplissent en croissant) :', value: '' });
     if (start == null) return;
     let n = parseInt(String(start).trim(), 10);
     if (isNaN(n)) { window.alert('Entre un numéro (ex : 40).'); return; }
@@ -5628,7 +5690,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // Poser une boîte : on l'EMPILE à la prochaine place libre (bas→haut d'une
   // colonne jusqu'au plafond, puis colonne suivante). Si tout est plein, on
   // ajoute automatiquement une colonne. Toujours bien aligné, dans l'ordre.
-  const addBoxToGrid = (it) => {
+  const addBoxToGrid = async (it) => {
     const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
     let target = null;
     for (let c = 0; c < nc && !target; c++) for (let r = nr - 1; r >= 0 && !target; r--) { const k = r + '_' + c; if (!((it.slots && it.slots[k]) || []).length) target = k; }
@@ -5638,7 +5700,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       patch = { cols: newCols, w: +(newCols * (it.cell || 0.5)).toFixed(2) };
     }
     let mx = 0; for (const k in (it.slots || {})) { const v = parseInt(((it.slots[k] || [])[0]) || '', 10); if (!isNaN(v) && v > mx) mx = v; }
-    const n = window.prompt('Numéro de la boîte (elle s\'empile toute seule à la prochaine place, bien alignée) :', mx > 0 ? String(mx + 1) : '');
+    const n = await askText({ numeric: true, desc: 'Numéro de la boîte (elle s\'empile toute seule à la prochaine place, bien alignée) :', value: mx > 0 ? String(mx + 1) : '' });
     if (n == null) return; const v = String(n).trim(); if (!v) return;
     updateItem(it.id, { ...patch, slots: { ...(it.slots || {}), [target]: [v] } });
   };
@@ -5680,14 +5742,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
     }
     return out;
   };
-  const fillCell = (itemId, cellKey) => {
+  const fillCell = async (itemId, cellKey) => {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
     const it = items.find(x => x.id === itemId); if (!it) return;
     const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
     const c0 = Number(String(cellKey).split('_')[1]);
     const slots = { ...(it.slots || {}) };
     const cur = (slots[cellKey] || [])[0] || '';
-    const n = window.prompt('N° de la boîte (laisse vide pour effacer) :', cur);
+    const n = await askText({ numeric: true, desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur });
     if (n == null) return; // annulé
     const v = String(n).trim();
     if (cur) { // boîte existante → on modifie / efface EN PLACE
@@ -5883,7 +5945,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const storedCount = (it) => Object.values(it.slots || {}).reduce((s, a) => s + (a ? a.length : 0), 0);
 
   // Ajoute/retire un N° dans une case (empilable).
-  const cellAdd = (it, cell) => { const n = (window.prompt('Numéro à ranger dans cette case (empilable) :', '') || '').trim(); if (!n) return; const cur = (it.slots && it.slots[cell]) || []; updateItem(it.id, { slots: { ...(it.slots || {}), [cell]: [...cur, n] } }); };
+  const cellAdd = async (it, cell) => { const n = (await askText({ numeric: true, desc: 'Numéro à ranger dans cette case (empilable) :', value: '' }) || '').trim(); if (!n) return; const cur = (it.slots && it.slots[cell]) || []; updateItem(it.id, { slots: { ...(it.slots || {}), [cell]: [...cur, n] } }); };
   const cellRemove = (it, cell, n) => { const cur = ((it.slots && it.slots[cell]) || []).filter(x => x !== n); const slots = { ...(it.slots || {}) }; if (cur.length) slots[cell] = cur; else delete slots[cell]; updateItem(it.id, { slots }); };
   const setGrid = (it, rows, cols) => updateItem(it.id, { rows: Math.max(1, rows), cols: Math.max(1, cols) });
 
@@ -6014,7 +6076,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
               <button onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
               {(selItem.lvl || 0) > 0 && <button onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-              <button onClick={()=>{ const n = (window.prompt('Numéro de cette boîte :', selItem.num || '') || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+              <button onClick={async ()=>{ const n = (await askText({ numeric: true, desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
             </div>
           )}
           {/* Personnalisation : couleur + hauteur */}
@@ -6024,7 +6086,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
-            {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={()=>{ const e = (window.prompt('Emoji du meuble :', emojiOf(selItem)) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
+            {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
             {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
               {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
@@ -6072,7 +6134,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <button onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
             <button onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
           </>}
-          <button onClick={()=>{ const n = window.prompt('Nom du meuble :', selItem.name); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>✎</button>
+          <button onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>✎</button>
           <button onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
@@ -7948,7 +8010,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Ajout MANUEL d'un point relais par son adresse exacte (fiable, pas de
   // « magasins au hasard »). On géocode l'adresse précise donnée.
   const addPointByAddress = async () => {
-    const input = window.prompt('Point relais — nom et adresse exacte :\nex : Maison de la Presse, 40 Rue du Port, 35260 Cancale');
+    const input = await askText({ desc: 'Point relais — nom et adresse exacte :\nex : Maison de la Presse, 40 Rue du Port, 35260 Cancale' });
     if (!input || !input.trim()) return;
     const parts = input.split(',');
     const nom = parts[0].trim();
@@ -10082,8 +10144,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { toast('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
     // Import direct (pas depuis une vente) : on demande le N° + le titre.
     if (ctx.standalone) {
-      const numero = (window.prompt('Numéro de la paire (laisse vide si aucun) :', '') || '').trim();
-      const title = (window.prompt('Titre / description (ex : Nike Air Max 90) :', '') || '').trim();
+      const numero = (await askText({ numeric: true, desc: 'Numéro de la paire (laisse vide si aucun) :', value: '' }) || '').trim();
+      const title = (await askText({ desc: 'Titre / description (ex : Nike Air Max 90) :', value: '' }) || '').trim();
       ctx = { numero, title };
     }
     try { await processBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ toast('Erreur : '+String(err)); }
@@ -10908,7 +10970,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {g.lat && <a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" onClick={(ev)=>ev.stopPropagation()} title="Itinéraire vers ce point relais" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'5px 9px',fontSize:11,fontWeight:600}}>🧭 Y aller</a>}
                     {!g.saved&&<span onClick={async(ev)=>{
                       ev.stopPropagation();
-                      const nom=window.prompt('Nom du point relais (ex : Maison de la Presse, Cancale) :', colis[0].lieu||'');
+                      const nom=await askText({ desc: 'Nom du point relais (ex : Maison de la Presse, Cancale) :', value: colis[0].lieu||'' });
                       if(nom===null) return;
                       for(const t of colis){
                         const rowId=`email_track_${t.carrier}_${t.suivi||''}`;
@@ -11619,13 +11681,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent='✓ Copié !'; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:230,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t}</button>
                 {showQR ? (
                   <>
-                    <button type="button" onClick={()=>{ const v=window.prompt('Modifier le message :',t); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}>✎</button>
+                    <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}>✎</button>
                     <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
                   </>
                 ) : <span style={{color:C.muted,fontSize:11,paddingRight:4}}>📋</span>}
               </div>
             ))}
-            {showQR && <button type="button" onClick={()=>{ const v=window.prompt('Nouveau message rapide :',''); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:999,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
+            {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:999,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6}}>Clique un message pour le <b>copier</b>, puis colle-le dans la conversation Vinted.</div>
         </div>
