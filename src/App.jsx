@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v59/00 · discret';
+const BUILD_ID = 'v59/01 · traçable';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -10836,6 +10836,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                    {/* Ligne reconstituée depuis l'email (filet quand la moisson
+                        Vinted manque). On le DIT : sinon on cherche d'où sort une
+                        ligne sans statut ni n° de transaction Vinted. */}
+                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     {(()=>{ const vs=venteStage(o); return <span style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px'}}>{vs.label}</span>; })()}
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
@@ -11337,6 +11341,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                    {/* Ligne reconstituée depuis l'email (filet quand la moisson
+                        Vinted manque). On le DIT : sinon on cherche d'où sort une
+                        ligne sans statut ni n° de transaction Vinted. */}
+                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     <span style={{fontWeight:700,color:st.color,background:`${st.color}18`,borderRadius:999,padding:'1px 8px'}}>{st.step===3?'📦 ':st.step===2?'🚚 ':st.step===4?'✅ ':''}{st.label}</span>
                     {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
@@ -12218,6 +12226,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</div>
                       <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                         <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                    {/* Ligne reconstituée depuis l'email (filet quand la moisson
+                        Vinted manque). On le DIT : sinon on cherche d'où sort une
+                        ligne sans statut ni n° de transaction Vinted. */}
+                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
                         {urgTxt && <span style={{color:urgCol,fontWeight:600}}>{urgTxt}</span>}
                         {cell
                           ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>

@@ -377,7 +377,7 @@ Deux dégâts, longtemps invisibles :
 | donnée | constat |
 |---|---|
 | annonces moissonnées | 8 comptes /10 à moins de 6 h ; 1 à 3 j ; 1 mort (0 annonce, 26 j) |
-| ventes moissonnées | **0 partout** (cause ci-dessus) |
+| ventes moissonnées | **542, fraîches (0,2–0,5 j)** — voir la correction en section 21 |
 | `email_sale_*` | 49, jusqu'au 1er août |
 | `email_bord_*` | 51 — 40 avec n°, 51 avec transaction, 50 avec PDF |
 | `email_track_*` | 61 — 0 `qrB64`, **11 `qrUrl` (tous Chronopost)**, 16 codes de retrait |
@@ -525,3 +525,24 @@ La règle « une liste vide n'est pas une réponse » (section 16) faisait retom
 Appliqué aux commandes ET aux conversations. **Mesuré : 21 → 7 appels**, les 7 restants correspondant à des lignes réellement absentes.
 
 `ordersFromEmailAchats()` complète `ordersFromEmailSales()` : les 46 reçus `email_achat_*` alimentent l'onglet Achats, pour que couper le proxy ne vide rien.
+
+
+---
+
+## 21. ⚠️ CORRECTION d'une de MES analyses — les ventes n'étaient PAS vides
+
+Dans la section 15 j'ai écrit « ventes moissonnées : 0 partout ». **C'est faux.** Mon script d'analyse lisait `payload.items` / `payload.orders` alors que les commandes sont sous **`payload.my_orders`** — il comptait donc zéro partout.
+
+Chiffres réels (2 août) : **542 ventes moissonnées**, fraîches de 0,2 à 0,5 jour, sur 8 comptes (320 pour `199082413`, 81, 74, 39, 23…). Statuts : 436 finalisées, 61 remboursements, 24 en acheminement, 11 bordereaux envoyés, 3 retours initiés.
+
+**Ce que ça change dans le diagnostic :**
+- La vraie cause de l'onglet Ventes vide est **le piège `updated_at`** (section 15) : cette moisson fraîche était **jetée** par le seuil de péremption de 12 h. C'est ce correctif-là qui soigne.
+- Le garde-fou « ne jamais ranger du vide » (extension) et la règle « une liste vide n'est pas une réponse » (app) restent justes, mais ce sont des **ceintures de sécurité**, pas le remède.
+- Le filet email (`ordersFromEmailSales`) est un **complément**, pas la source principale.
+
+**Risque de doublon mesuré** : 47 des 49 emails de vente sont reconnus comme déjà présents par la clé `normTitle(titre) + prix arrondi`. Les 2 restants sont un lot Vinted (« 7 Lot 7 articles », 146 €) et une ligne de test. Pas de doublon significatif — mais les lignes issues d'un email portent désormais une pastille **« email »** pour qu'on sache toujours d'où sort une ligne sans statut ni n° de transaction.
+
+**Le panneau « X paires qui te reviennent » est correct** : il dérive de vrais statuts Vinted (remboursements, retours initiés, transactions suspendues), pas d'une erreur de classement.
+
+### Leçon de méthode
+Avant d'affirmer « la donnée est vide », **vérifier la clé qu'on lit**. Deux fois de suite dans ce projet, une conclusion alarmante venait de mon propre outil de mesure, pas de la base (ici `my_orders` ; plus haut les `harvest_*_inbox` absents du banc de test qui gonflaient les appels Vinted à 16).
