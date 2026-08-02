@@ -529,6 +529,25 @@ async function storeHarvestRow(uid, type, payload, domain) {
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
 }
 
+// Recupere TOUTES les pages du dressing. Vinted plafonne per_page a ~96 : sans
+// pagination, un compte de 604 articles n'en rendait que 96 et le reste etait
+// invisible pour l'app (annonces « disparues », numerotation faussee).
+// `getter(path)` renvoie { ok, json } — on branche indifferemment la version a
+// jetons ou la version a cookies.
+async function fetchAllWardrobe(getter, profileId, maxPages = 10) {
+  let out = null;
+  for (let page = 1; page <= maxPages; page++) {
+    const r = await getter(`/api/v2/wardrobe/${profileId}/items?page=${page}&per_page=100`);
+    const lot = r && r.ok && r.json && Array.isArray(r.json.items) ? r.json.items : null;
+    if (!lot) break;
+    if (!out) out = r.json; else out.items = out.items.concat(lot);
+    const tp = r.json.pagination && r.json.pagination.total_pages;
+    if (!lot.length || (tp && page >= tp)) break;
+    await wait(1200); // rythme d'une navigation humaine
+  }
+  return out;
+}
+
 // Recupere TOUTES les pages de commandes d'un type (ventes/achats), en douceur.
 // On s'arrete quand une page est incomplete (derniere) ou au plafond de securite.
 async function fetchAllOrders(acc, type, maxPages = 8) {
@@ -579,8 +598,8 @@ async function activeFetchAccount(acc) {
   // 2) Annonces en ligne (dressing) via l'ID DE PROFIL.
   const profileId = prof.json && prof.json.user && prof.json.user.id;
   if (profileId) {
-    const w = await vintedGet(acc, `/api/v2/wardrobe/${profileId}/items?page=1&per_page=100`);
-    if (w.ok && w.json) await storeHarvestRow(uid, 'listings', w.json, domain);
+    const w = await fetchAllWardrobe((path) => vintedGet(acc, path), profileId);
+    if (w && Array.isArray(w.items) && w.items.length) await storeHarvestRow(uid, 'listings', w, domain);
     await wait(1500);
   }
 
@@ -716,7 +735,24 @@ async function pageActiveFetch() {
         };
         const who = await get('/api/v2/users/current');
         const pid = (who && who.user && who.user.id) || knownPidArg; // repli sur l'id connu
-        const listings = pid ? await get('/api/v2/wardrobe/' + pid + '/items?page=1&per_page=100') : null;
+        // ⚠️ TOUTES LES PAGES, pas seulement la premiere. Constate en base : un
+        // compte annoncait 604 articles sur 7 pages et l'app n'en voyait que 96
+        // — les autres etaient invisibles (annonces « disparues », numerotation
+        // faussee). Vinted plafonne per_page a ~96, donc il FAUT paginer.
+        let listings = null;
+        if (pid) {
+          const MAX_PAGES = 10;               // garde-fou
+          for (let pg = 1; pg <= MAX_PAGES; pg++) {
+            const r = await get('/api/v2/wardrobe/' + pid + '/items?page=' + pg + '&per_page=100');
+            const lot = r && Array.isArray(r.items) ? r.items : null;
+            if (!lot) break;
+            if (!listings) listings = r; else listings.items = listings.items.concat(lot);
+            const tp = r.pagination && r.pagination.total_pages;
+            if (!lot.length || (tp && pg >= tp)) break;
+            // Petite pause : on reste sur le rythme d'une navigation humaine.
+            await new Promise(res => setTimeout(res, 700));
+          }
+        }
         const sold = await get('/api/v2/my_orders?type=sold&page=1&per_page=100');
         const bought = await get('/api/v2/my_orders?type=purchased&page=1&per_page=100');
         const inbox = await get('/api/v2/inbox?page=1&per_page=30');
@@ -759,8 +795,8 @@ async function activeFetchActiveAccount() {
     const profileId = prof.json.user && prof.json.user.id;
     await wait(1200);
     if (profileId) {
-      const w = await vintedGetCookie(domain, `/api/v2/wardrobe/${profileId}/items?page=1&per_page=100`);
-      if (w.ok && w.json) await storeHarvestRow(uid, 'listings', w.json, domain);
+      const w = await fetchAllWardrobe((path) => vintedGetCookie(domain, path), profileId);
+      if (w && Array.isArray(w.items) && w.items.length) await storeHarvestRow(uid, 'listings', w, domain);
       await wait(1200);
     }
     const sold = await fetchAllOrdersCookie(domain, 'sold');

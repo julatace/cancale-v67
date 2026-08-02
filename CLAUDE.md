@@ -431,3 +431,36 @@ Julien : « je n'ai pas de code, j'ai que pour Chronopost » — et surtout « �
 - Sans vrai QR, la modale montre **le code en 44 px** (au lieu de 32), le **point relais** (`cleanLieu(...).display`) et un texte qui dit quoi présenter au comptoir.
 - Si l'image Chronopost hébergée ne charge pas, on bascule sur le code — plus jamais sur un QR fabriqué.
 - Ni QR ni code ⟹ on affiche le **numéro de colis** en gros, honnêtement.
+
+---
+
+## 18. Session août 2026 (suite) — ⚠️ LA PAGINATION DU DRESSING (508 annonces invisibles)
+
+**Constaté en base** : le compte `199082413` annonce `total_entries = 604` sur **7 pages**, et la moisson n'en contenait que **96** — la première page. Les 96 captées étaient **toutes en ligne**, donc les 508 autres n'ont jamais été vues par l'app.
+
+Conséquences : bandeau « annonces disparues », numérotation faussée (le pool de numéros libres se calcule sur `annBase`), taux d'écoulement faux, stats fausses.
+
+**Vinted plafonne `per_page` autour de 96**, même quand on demande 100 ou 200. Il FAUT donc paginer. Quatre chemins récupéraient le dressing, **tous en page 1** — les quatre sont corrigés :
+
+| fichier | fonction | avant | après |
+|---|---|---|---|
+| `background.js` | `refreshAccount` (jetons) | page 1, `per_page=100` | `fetchAllWardrobe()` — toutes les pages |
+| `background.js` | version cookies | page 1 | `fetchAllWardrobe()` |
+| `background.js` | `activeFetchAll` (dans la page) | page 1 | boucle jusqu'à `total_pages` |
+| `inject.js` | capture passive | page 1, `per_page=200` | boucle jusqu'à `total_pages` |
+| `src/App.jsx` | `fetchVintedListings` (proxy) | **page 1, `per_page=40`** | boucle, `per_page=100` |
+
+Garde-fou à 10 pages partout, avec une pause (1,2 s côté extension, aléatoire côté page) pour garder un rythme de navigation humaine.
+
+⚠️ **Il faut recharger l'extension dans Chrome** (`chrome://extensions` → ⟳) pour que la moisson complète parte. Version bumpée à **4.23.0**.
+
+### Ce que `total_entries` compte vraiment
+Le dressing contient **tout l'historique**, pas seulement le stock en ligne. Répartition réelle des articles captés :
+| compte | captés | en ligne | fermés/vendus |
+|---|---|---|---|
+| 3156028798 | 95 | 8 | 87 |
+| 147827838 | 54 | 2 | 46 (+6 masqués) |
+| 199082413 | 96 | **96** | 0 |
+| autres | 61 | 13 | 48 |
+
+Donc un gros `total_entries` n'est pas alarmant en soi — mais quand la page 1 est **entièrement** en ligne (cas de `199082413`), les pages suivantes contiennent forcément d'autres annonces en ligne.

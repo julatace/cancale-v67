@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v56/00 · retrait';
+const BUILD_ID = 'v57/00 · dressing complet';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1816,10 +1816,24 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     if (profileId) account._vintedProfileId = profileId;
   }
   if (!profileId) return { ok: false, error: 'Profil Vinted introuvable', items: [], pagination: null };
-  const res = await vintedApiCall(account, `/api/v2/wardrobe/${profileId}/items?page=${page}&per_page=40&order=relevance`);
-  if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null };
-  const items = (res.data?.items || []).filter(isOnlineListing).map(mapWardrobeItem);
-  return { ok: true, items, pagination: res.data?.pagination || null };
+  // ⚠️ TOUTES LES PAGES. Avant : une seule page de 40 articles. Constaté en
+  // base, un compte annonçait 604 articles sur 7 pages — l'app n'en voyait
+  // qu'une poignée, et prenait le reste pour des « annonces disparues ».
+  // Vinted plafonne per_page autour de 96, donc il FAUT boucler.
+  const MAX_PAGES = 10;
+  let brut = []; let pagination = null; let okUn = false;
+  for (let pg = page; pg < page + MAX_PAGES; pg++) {
+    const res = await vintedApiCall(account, `/api/v2/wardrobe/${profileId}/items?page=${pg}&per_page=100&order=relevance`);
+    if (!res.ok) { if (pg === page) return { ok: false, error: res.status || res.error, items: [], pagination: null }; break; }
+    okUn = true;
+    const lot = res.data?.items || [];
+    brut = brut.concat(lot);
+    pagination = res.data?.pagination || pagination;
+    const tp = res.data?.pagination?.total_pages;
+    if (!lot.length || (tp && pg >= tp)) break;
+  }
+  const items = brut.filter(isOnlineListing).map(mapWardrobeItem);
+  return { ok: okUn, items, pagination };
 };
 
 // Detecte un numero de paire ecrit dans un titre Vinted, au format "nXX",

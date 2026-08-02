@@ -283,10 +283,24 @@
       let wardrobeIds = [];
       if (pid) {
         await new Promise(r => setTimeout(r, jitter(600, 1500)));
-        const w = await apiGet(`/api/v2/wardrobe/${pid}/items?page=1&per_page=200&order=relevance`);
-        if (w) {
-          sendHarvest(`/api/v2/wardrobe/${pid}/items`, w);
-          try { wardrobeIds = (JSON.parse(w).items || []).filter(it => !it.is_closed && !it.is_hidden).map(it => String(it.id)); } catch (_) {}
+        // TOUTES les pages : Vinted plafonne per_page (~96 malgre le 200
+        // demande). Un compte de 604 articles ne rendait que sa 1re page, et
+        // l'app croyait le reste disparu.
+        let tout = null;
+        for (let page = 1; page <= 10; page++) {
+          const w = await apiGet(`/api/v2/wardrobe/${pid}/items?page=${page}&per_page=200&order=relevance`);
+          if (!w) break;
+          let j = null; try { j = JSON.parse(w); } catch (_) { break; }
+          const lot = Array.isArray(j.items) ? j.items : null;
+          if (!lot) break;
+          if (!tout) tout = j; else tout.items = tout.items.concat(lot);
+          const tp = j.pagination && j.pagination.total_pages;
+          if (!lot.length || (tp && page >= tp)) break;
+          await new Promise(r => setTimeout(r, jitter(600, 1500)));
+        }
+        if (tout) {
+          sendHarvest(`/api/v2/wardrobe/${pid}/items`, JSON.stringify(tout));
+          try { wardrobeIds = (tout.items || []).filter(it => !it.is_closed && !it.is_hidden).map(it => String(it.id)); } catch (_) {}
         }
       }
       // 2b) DÉTAIL COMPLET de chaque annonce (description, catégorie, attributs…),
