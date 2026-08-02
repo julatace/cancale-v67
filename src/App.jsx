@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v61/00 · rapide';
+const BUILD_ID = 'v62/00 · bordereaux sûrs';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -8066,17 +8066,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Photo de la paire d'un bordereau : par N° (annonces numérotées, fiable),
   // sinon par titre non ambigu, sinon dans les annonces/ventes chargées.
+  // ── LA PHOTO DE LA PAIRE, à côté du bordereau ────────────────────────────
+  // Sources certaines uniquement, dans l'ordre : lien manuel → VENTE reliée par
+  // n° de transaction (photo Vinted réelle, moissonnée par l'extension) →
+  // annonce portant exactement ce numéro.
+  // ⚠️ Les replis « par titre approchant » ont été retirés : ils affichaient la
+  // photo d'une AUTRE paire à côté du bordereau, ce qui est pire que pas de
+  // photo du tout. Sans source sûre, on n'affiche rien.
   const bordPhoto = (b) => {
-    const man = manualEntry(b); if (man && man.photo) return man.photo; // lien manuel prioritaire
-    // Le plus fiable : la VENTE liée par n° de transaction → vraie photo Vinted.
-    if (b.transaction) { const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction)); if (so && (so.photo_url || so.photo)) return so.photo_url || so.photo; }
-    if (b.numero) { for (const k in numeros) { const e2 = numeros[k]; if (e2 && String(e2.numero) === String(b.numero) && e2.photo) return e2.photo; } }
-    const title = b.modele || b.article || '';
-    if (title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.photo) return e2.photo; } // paire numérotée (match tolérant + départage par taille)
-    const n = normTitle(title);
-    if (n) {
-      const hit = (listings.items || []).find(o => normTitle(o.title) === n || normTitle(o.title).includes(n) || n.includes(normTitle(o.title))) || (sales.items || []).find(o => normTitle(o.title) === n || normTitle(o.title).includes(n) || n.includes(normTitle(o.title)));
-      if (hit) return hit.photo || hit.photo_url || null;
+    const man = manualEntry(b); if (man && man.photo) return man.photo;
+    if (b.transaction) {
+      const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
+      if (so && (so.photo_url || so.photo)) return so.photo_url || (so.photo && (so.photo.url || so.photo)) || null;
+    }
+    if (b.numero) {
+      for (const k in numeros) {
+        const e = numeros[k];
+        if (e && String(e.numero) === String(b.numero) && e.photo) return e.photo;
+      }
     }
     return null;
   };
@@ -10326,15 +10333,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
   // titre dans les annonces numérotées (si le titre n'est pas ambigu).
+  // ── QUEL NUMÉRO PORTE CE BORDEREAU ? ──────────────────────────────────────
+  // UNIQUEMENT des liens certains, dans cet ordre :
+  //   1. le lien posé à la main (« Relier ») ;
+  //   2. le numéro écrit dans l'email de bordereau lui-même ;
+  //   3. le n° de TRANSACTION : bordereau → vente moissonnée par l'extension
+  //      → annonce verrouillée → numéro.
+  // ⚠️ Le rapprochement par TITRE a été RETIRÉ. Il « retrouvait » un numéro en
+  // comparant le libellé de l'email à celui d'une annonce, à la tolérance près :
+  // il pouvait donc tamponner LA MAUVAISE PAIRE, sans que rien ne le signale.
+  // Sans lien certain on n'invente plus : le bordereau reste « en attente » et
+  // le bouton « Relier » permet de trancher. Ne pas le réintroduire.
   const numForBord = (b) => {
-    const man = manualEntry(b); if (man && man.numero) return String(man.numero); // lien manuel prioritaire
-    let num = b.numero || '';
-    const title = b.modele || b.article || '';
-    if (!num && title) { const e2 = entryByTitleLoose(title, b.taille); if (e2 && e2.numero) num = String(e2.numero); } // match tolérant + départage par taille → retrouve le N° même si le titre email diffère / est en double
-    // Filet le plus fiable : la vente liée (par transaction) retrouve le N° via
-    // le lien verrouillé vente↔annonce, même si le titre de l'email diffère.
-    if (!num && b.transaction) { const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction)); if (so) { const e3 = effEntry(so); if (e3 && e3.numero) num = String(e3.numero); } }
-    return num;
+    const man = manualEntry(b); if (man && man.numero) return String(man.numero);
+    if (b.numero) return String(b.numero);
+    if (b.transaction) {
+      const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
+      if (so) { const e = effEntry(so); if (e && e.numero) return String(e.numero); }
+    }
+    return '';
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
   // met en avant, en rouge si c'est aujourd'hui/demain ou dépassé, orange à 2 j.
@@ -12220,7 +12237,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           // On le DIT, et le bouton « Relier » est juste en dessous.
                           return nn
                             ? <span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{nn}</span>
-                            : <span title="Aucune paire numérotée reconnue — utilise « Relier » ci-dessous" style={{fontSize:12,fontWeight:700,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N° ?</span>; })()}
+                            : <span title="Le numéro viendra tout seul dès que la vente correspondante sera moissonnée par l'extension. Tu peux aussi le poser à la main avec « Relier »." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>; })()}
                         <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.modele||b.article||'Bordereau'}</span>
                       </div>
                       {/* Compte de vente + date de la vente : savoir d'où vient

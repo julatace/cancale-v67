@@ -613,3 +613,28 @@ Les anciennes lignes restent lisibles (on enlève des champs, on n'en renomme au
 
 ### Vérifié
 Rendu réel avec les données allégées : Annonces (96 pour shop_cancale), Ventes, Achats (3 colis, code 077831), Bordereaux (6 à imprimer / 50 reçus) — identiques à avant, zéro erreur.
+
+---
+
+## 24. Session août 2026 (suite) — bordereaux : plus aucune devinette
+
+Demande de Julien : « je veux que les ventes soient connectées au bordereau grâce à l'extension, et non plus grâce à une imagination de l'application. Mets la photo à côté du bordereau, et le numéro ne le devine pas. »
+
+### Ce qui était « imaginé »
+`numForBord` et `bordPhoto` retombaient sur `entryByTitleLoose(titre, taille)` — un rapprochement **par ressemblance de libellé**. Conséquence : un bordereau pouvait être tamponné du numéro d'une **autre paire**, ou afficher la photo d'une autre paire, **sans aucun signalement**. C'est pire que de ne rien afficher.
+
+### Sources retenues, toutes certaines
+**Numéro** (`numForBord`) : lien manuel → numéro écrit dans l'email → **n° de TRANSACTION** (bordereau → vente moissonnée par l'extension → annonce verrouillée → numéro). Sinon `''`.
+**Photo** (`bordPhoto`) : lien manuel → **vente reliée par transaction** (vraie photo Vinted captée par l'extension) → annonce portant exactement ce numéro. Sinon `null`.
+
+⚠️ **Ne jamais réintroduire le rapprochement par titre dans ces deux fonctions.**
+
+### Mesuré sur les 51 bordereaux réels
+| | |
+|---|---|
+| numéro venu de l'email (certain) | **40** |
+| numéro venu de la transaction (certain) | **2** |
+| « N° en attente » | **9** |
+| **photo réelle via la vente reliée** | **50 / 51** |
+
+Sans lien certain, le bordereau porte une pastille **« N° en attente »** (au lieu de « N° ? ») : il n'est pas oublié, le numéro arrivera tout seul dès que la vente correspondante sera moissonnée. Le bouton « Relier » reste là pour trancher à la main.
