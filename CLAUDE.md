@@ -262,7 +262,16 @@ Passeport de la paire (📖), Répartiteur de lot (🧮), Audit stock fantôme (
 ### Où vit l'isolation
 **Dans Postgres, pas dans le JavaScript.** Chaque ligne de `app_data` et `vinted_accounts` porte un `owner uuid` (défaut `auth.uid()`), et une policy RLS `owner = auth.uid()` filtre lecture ET écriture. Une isolation écrite côté app ne protégerait de rien (console du navigateur). ⚠️ **Ne jamais « simplifier » en filtrant côté client.**
 
-### Interrupteur
+### Deux interrupteurs, à ne PAS confondre
+- **`MULTI_USER`** (constante en haut de `src/App.jsx`) = est-ce qu'on demande une connexion ? **Actuellement `true`.**
+- **`CLOISONNE`** (détecté au démarrage par `detectSchema()`, qui teste si la colonne `owner` existe) = est-ce que la base sait séparer les vendeurs ? **Actuellement faux** tant que la migration SQL n'est pas passée.
+
+⚠️ **Tant que `CLOISONNE` est faux, on écrit EXACTEMENT comme avant** : clé publique dans `Authorization`, pas de colonne `owner`, cible d'upsert `id`, ligne `main` partagée. Envoyer un `owner` inexistant ferait échouer **toutes** les sauvegardes. Le jeton du vendeur ne remplace la clé publique que lorsque la base sait s'en servir (le rôle `authenticated` n'a pas forcément les mêmes autorisations — ne pas parier là-dessus).
+L'extension fait la même détection de son côté (`isCloisonne()`, mise en cache le temps de vie du service worker).
+
+**Porte de secours** : tant que `CLOISONNE` est faux, l'écran de connexion propose « Entrer sans compte (temporaire) » (`vrm_acces_direct` en localStorage). Elle ne donne accès à rien de plus (les données sont communes de toute façon) et **disparaît automatiquement** dès la migration. Sans elle, un email de confirmation qui n'arrive pas enfermerait Julien hors de son outil de travail quotidien.
+
+### Ancien texte de l'interrupteur (historique)
 `const MULTI_USER = false;` en haut de `src/App.jsx`. À `false` (état actuel) : l'app se comporte exactement comme avant, aucune connexion demandée. On ne passe à `true` **qu'après** avoir appliqué la migration SQL — dans l'autre ordre, Julien se retrouverait devant un écran de connexion que la base ne sait pas honorer.
 
 ### Pièces en place

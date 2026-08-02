@@ -73,21 +73,42 @@ async function authToken() {
   if (!s.expires_at || s.expires_at < Date.now() + 60000) s = await refreshSession();
   return s && s.access_token ? s : null;
 }
-// En-tetes Supabase : jeton du vendeur si on en a un, cle publique sinon.
+// EST-CE QUE LA BASE SAIT SEPARER LES VENDEURS ?
+// Tant que la colonne `owner` n'existe pas, ecrire un `owner` ferait echouer
+// TOUTES les captures (400 : colonne inconnue). On teste donc l'etat reel de la
+// base, une fois, et on garde la reponse le temps de vie du service worker.
+let CLOISONNE = null;   // null = pas encore verifie
+async function isCloisonne() {
+  if (CLOISONNE !== null) return CLOISONNE;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    CLOISONNE = r.ok;
+  } catch (_) { CLOISONNE = false; }
+  return CLOISONNE;
+}
+
+// En-tetes Supabase : jeton du vendeur UNIQUEMENT si la base sait s'en servir.
+// Avant la migration on garde la cle publique — c'est le fonctionnement
+// d'aujourd'hui, qui marche.
 async function sbHeaders(extra) {
-  const s = await authToken();
+  const cl = await isCloisonne();
+  const s = cl ? await authToken() : null;
   return Object.assign({
     apikey: SUPABASE_KEY,
     Authorization: `Bearer ${(s && s.access_token) || SUPABASE_KEY}`,
   }, extra || {});
 }
-// Ajoute le proprietaire a une ligne a ecrire (ignore en mode solo).
+// Ajoute le proprietaire a une ligne a ecrire (sans effet avant la migration).
 async function withOwner(row) {
+  if (!(await isCloisonne())) return row;
   const s = await authToken();
   return (s && s.user_id) ? Object.assign({ owner: s.user_id }, row) : row;
 }
-// Cible d'upsert sur app_data : la cle devient (owner, id) en multi-vendeurs.
+// Cible d'upsert sur app_data : la cle devient (owner, id) une fois migre.
 async function appDataConflict() {
+  if (!(await isCloisonne())) return 'id';
   const s = await authToken();
   return (s && s.user_id) ? 'owner,id' : 'id';
 }
@@ -121,7 +142,7 @@ async function supabaseUpsert(table, rows, onConflict) {
     // Sur app_data la cible du conflit depend du mode (solo / multi-vendeurs).
     let target = onConflict;
     if (table === 'app_data' && onConflict === 'id') target = await appDataConflict();
-    if (table === 'vinted_accounts' && onConflict === 'vinted_user_id') {
+    if (table === 'vinted_accounts' && onConflict === 'vinted_user_id' && await isCloisonne()) {
       const s = await authToken();
       if (s && s.user_id) target = 'owner,vinted_user_id';
     }

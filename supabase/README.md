@@ -1,9 +1,28 @@
 # Passer VRM en multi-vendeurs — mode d'emploi
 
-Tout le code est déjà en place. Il ne manque que **trois actions dans Supabase**
-et **une ligne à changer dans le code**. Tant que tu n'as rien fait, l'app
-continue de marcher exactement comme aujourd'hui : aucun écran de connexion,
-aucun risque.
+## Où on en est
+
+**L'écran de connexion est ACTIF.** L'app demande maintenant un compte.
+
+**La séparation des données ne l'est pas encore.** Il manque la migration SQL
+(je ne peux pas la lancer : la clé que l'app utilise ne permet pas de modifier
+la structure de la base). En attendant :
+
+- tu te connectes, et tu retrouves **toutes tes données** — elles sont au même
+  endroit qu'avant, rien n'a bougé ;
+- l'extension continue d'écrire exactement là où elle écrivait ;
+- ⚠️ **n'invite personne** : sans la migration, un deuxième compte verrait tes
+  données.
+
+L'app détecte l'état réel de la base (`CLOISONNE`) et te le dit sous le
+formulaire de connexion. Dès que la migration est passée, elle bascule seule en
+vrai cloisonnement — aucun changement de code à faire.
+
+**Si la connexion coince** (email de confirmation qui n'arrive pas, fournisseur
+pas encore activé), il y a un bouton **« Entrer sans compte (temporaire) »** sous
+le formulaire. Il ne donne accès à rien de plus qu'avant — les données sont
+communes de toute façon — et **il disparaît tout seul** une fois la migration
+passée. Tu ne peux pas te retrouver enfermé dehors de ton propre outil.
 
 L'ordre compte. Ne saute pas d'étape.
 
@@ -85,8 +104,10 @@ un lien de connexion qui renvoie le jeton vers son propre site.
 
 ## Étape 3 — Créer ton compte et récupérer ton identifiant
 
-1. Dis-moi de passer `MULTI_USER` à `true` (une ligne dans `src/App.jsx`), je
-   déploie
+1. Supabase → **Authentication → Providers → Email** → décoche **« Confirm
+   email »** (étape 2 ci-dessus). Sans ça, la création de compte attend un email
+   que le serveur de test de Supabase n'envoie qu'au propriétaire du projet, et
+   à quelques exemplaires par heure.
 2. Ouvre l'app → **Créer un compte** avec ton email
 3. Supabase → **Authentication** → **Users** → clique sur ton email → copie
    l'**User UID**

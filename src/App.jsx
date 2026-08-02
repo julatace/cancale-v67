@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v42/00 · 🔐sécurité';
+const BUILD_ID = 'v43/00 · 🔑connexion';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -64,7 +64,7 @@ const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 //  bascule à true qu'APRÈS avoir appliqué supabase/migrations/001-multi-
 //  utilisateurs.sql. Dans l'autre ordre, on se retrouverait enfermé dehors de
 //  son propre outil (écran de connexion sans base capable d'authentifier).
-const MULTI_USER = false;
+const MULTI_USER = true;
 
 // Session = ce que Supabase renvoie à la connexion : un jeton d'accès qui
 // prouve qui tu es (valable ~1 h) + un jeton de renouvellement pour en
@@ -90,17 +90,44 @@ const writeSession = (s) => {
 // `Authorization` porte le jeton de l'utilisateur connecté : c'est LUI qui
 // décide quelles lignes Postgres accepte de montrer. En mode solo, on retombe
 // sur la clé publique et rien ne change.
+// ── L'ÉTAT RÉEL DE LA BASE COMMANDE, PAS UN RÉGLAGE ───────────────────────
+// Deux choses différentes, qu'il ne faut surtout pas confondre :
+//   • MULTI_USER  = est-ce qu'on demande une connexion ? (réglage de l'app)
+//   • CLOISONNE   = est-ce que la base sait séparer les vendeurs ?
+//                   (= la colonne `owner` existe-t-elle vraiment ?)
+//
+// On peut avoir le premier sans le second : c'est l'état pendant la bascule —
+// on se connecte déjà, mais les données restent communes tant que la migration
+// SQL n'est pas passée. Dans cet état on continue d'écrire EXACTEMENT comme
+// avant (clé publique, ligne « main » partagée). Envoyer une colonne `owner`
+// inexistante ferait échouer toutes les sauvegardes ; se croire cloisonné alors
+// qu'on ne l'est pas serait pire encore.
+let CLOISONNE = false;
+let SB_CONFLICT = 'id';
+const detectSchema = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    CLOISONNE = r.ok;                       // 400 « column does not exist » → pas encore migré
+  } catch (_) { CLOISONNE = false; }
+  SB_CONFLICT = CLOISONNE ? 'owner,id' : 'id';
+  return CLOISONNE;
+};
+
 const sbAuth = (extra) => {
-  const tok = (MULTI_USER && AUTH.session && AUTH.session.access_token) || SUPABASE_KEY;
+  // Le jeton du vendeur ne sert QUE si la base sait s'en servir. Avant la
+  // migration on garde la clé publique : le rôle « connecté » n'a pas forcément
+  // les mêmes autorisations, et on ne prend pas le risque de casser les
+  // sauvegardes pour un gain nul (il n'y a rien à cloisonner encore).
+  const useUser = MULTI_USER && CLOISONNE && AUTH.session && AUTH.session.access_token;
+  const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, extra || {});
 };
-// Cible d'un « upsert » : en multi-vendeurs la clé primaire devient
-// (owner, id) — deux vendeurs ont chacun leur ligne « main ».
-const SB_CONFLICT = MULTI_USER ? 'owner,id' : 'id';
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
 // (auth.uid()) mais on l'envoie explicitement : c'est plus lisible, et la règle
 // `with check` de Postgres vérifie qu'on n'écrit pas au nom d'un autre.
-const withOwner = (row) => (MULTI_USER && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, row) : row;
+const withOwner = (row) => (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, row) : row;
 
 const authCall = async (path, body) => {
   try {
@@ -296,6 +323,7 @@ const ensureLocalOwner = (uid) => {
 // Restaure la session au démarrage, et renouvelle le jeton s'il a expiré.
 let AUTH_REDIRECT = null;   // résultat du retour OAuth / lien email, lu par l'écran de connexion
 const authBoot = async () => {
+  await detectSchema();     // AVANT tout : savoir si la base sait cloisonner
   if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   // Retour de Google / Discord / d'un lien email : ça prime sur tout le reste.
   try { AUTH_REDIRECT = await consumeAuthRedirect(); } catch (_) { AUTH_REDIRECT = null; }
@@ -2394,8 +2422,24 @@ function AuthScreen() {
             )}
           </div>
         </form>
+        {/* Tant que rien n'est cloisonné, on laisse une porte : personne ne doit
+            se retrouver enfermé dehors de son propre outil à cause d'un email de
+            confirmation qui n'arrive pas. Elle disparaît dès la migration. */}
+        {!CLOISONNE && (
+          <button type="button"
+            onClick={()=>{ try{ localStorage.setItem('vrm_acces_direct','1'); }catch(_){} location.reload(); }}
+            style={{width:'100%',marginTop:12,border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,
+              borderRadius:12,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            Entrer sans compte (temporaire)
+          </button>
+        )}
+        {/* On dit la VÉRITÉ sur l'état de la base. Afficher « chacun ses
+            données » alors que la migration n'est pas passée serait un mensonge
+            — et exactement le genre de mensonge qui fait fuiter des données. */}
         <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:16,lineHeight:1.5}}>
-          Chaque vendeur ne voit que ses propres données.<br/>L'isolation est appliquée par la base, pas par l'application.
+          {CLOISONNE
+            ? <>Chaque vendeur ne voit que ses propres données.<br/>L'isolation est appliquée par la base, pas par l'application.</>
+            : <><b style={{color:C.warn}}>Séparation des comptes pas encore activée.</b><br/>Connecte-toi pour retrouver tes données — mais n'invite personne tant que la migration n'est pas passée.</>}
         </div>
       </div>
     </div>
@@ -13694,7 +13738,15 @@ export default function App() {
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
   // session on affiche la porte d'entrée au lieu de l'app.
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
-  if (MULTI_USER && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
+  // PORTE DE SECOURS — n'existe QUE tant que la base n'est pas cloisonnée.
+  // Raison : si la création de compte coince (email de confirmation qui
+  // n'arrive pas, fournisseur pas encore activé…), Julien serait enfermé hors
+  // de son outil de travail quotidien. Tant qu'il n'y a rien à cloisonner, ce
+  // contournement ne donne accès à rien de plus que la veille — les données
+  // sont communes de toute façon. Dès que la migration est passée, `CLOISONNE`
+  // devient vrai et la porte se referme toute seule, sans changement de code.
+  const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+  if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
