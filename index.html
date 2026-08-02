@@ -2,7 +2,11 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=0.85, maximum-scale=0.85, user-scalable=no, viewport-fit=cover" />
+  <!-- Échelle NORMALE (1) : l'app était forcée à 85 %, donc tout était rétréci
+       (des textes de 11-12 px s'affichaient à ~10 px) — d'où l'impression de page
+       web tassée. Le zoom n'est plus bloqué non plus : le désactiver est un
+       anti-patron d'accessibilité (et c'est signalé par les audits). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="VRM" />
@@ -19,14 +23,14 @@
        (comptes, moisson) démarre son handshake TLS pendant que le JS se parse. -->
   <link rel="preconnect" href="https://lgonxzrzjcqthjtbdpzo.supabase.co" crossorigin />
   <!-- Police chargée SANS bloquer l'affichage : la page s'affiche tout de suite
-       avec la police système, puis bascule sur Nunito une fois prête (display=swap).
+       avec la police système, puis bascule sur Inter une fois prête (display=swap).
        Le média « print » rend le lien non-bloquant, l'onload le réactive. -->
   <link rel="stylesheet" media="print" onload="this.media='all'"
-        href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap" />
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap" /></noscript>
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
   <title>VRM — Vendre · Ranger · Marge</title>
   <style>
-    body{margin:0;padding:0;background:#f4f7f5;font-family:'Nunito',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+    body{margin:0;padding:0;background:#f4f7f5;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     *{-webkit-tap-highlight-color:transparent;}
     @keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}
 
@@ -36,7 +40,7 @@
     /* 1) CHIFFRES ALIGNÉS : les montants et compteurs utilisent des chiffres de
           largeur fixe → les colonnes ne « dansent » plus d'une ligne à l'autre.
           C'est le détail qui distingue une vraie app d'un prototype. */
-    body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"cv01" 1;}
+    body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"cv05" 1,"ss01" 1;}
 
     /* 2) RÉPONSE AU TOUCHER : léger enfoncement au clic, comme une app native. */
     button,a[role="button"]{transition:transform .12s cubic-bezier(.32,.72,0,1),box-shadow .2s ease,background-color .2s ease,border-color .2s ease,opacity .2s ease;}
@@ -58,7 +62,10 @@
 
     /* 6) CHAMPS DE SAISIE : jamais de zoom auto sur iOS (police >= 16px au focus)
           et un anneau propre — les champs trop petits font « site web », pas « app ». */
-    input,textarea,select{font-family:inherit;}
+    /* Les boutons et champs n'héritent PAS de la police par défaut en HTML :
+       sans cette règle, certains gardaient la police système et juraient au
+       milieu du reste. */
+    button,input,textarea,select{font-family:inherit;}
     @supports (-webkit-touch-callout: none){
       input,textarea,select{font-size:max(16px,1em);}
     }
