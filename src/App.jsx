@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v45/01 · ✉️lien';
+const BUILD_ID = 'v46/00 · 🔓accès direct';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -59,12 +59,23 @@ const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 //  JavaScript ne protège de rien (n'importe qui peut ouvrir la console et
 //  changer une variable) ; une isolation écrite dans Postgres, si.
 //
-//  ⚠️ INTERRUPTEUR : tant que MULTI_USER vaut false, l'app fonctionne
-//  EXACTEMENT comme avant — un seul vendeur, aucune connexion demandée. On ne
-//  bascule à true qu'APRÈS avoir appliqué supabase/migrations/001-multi-
-//  utilisateurs.sql. Dans l'autre ordre, on se retrouverait enfermé dehors de
-//  son propre outil (écran de connexion sans base capable d'authentifier).
-const MULTI_USER = true;
+//  ⚠️ INTERRUPTEUR — REMIS À false (août 2026, après essai en conditions réelles).
+//  On l'avait passé à true avant la migration SQL : résultat, un écran de
+//  connexion qui n'apportait AUCUNE protection (rien n'est cloisonné tant que la
+//  base n'a pas de colonne `owner`) mais qui bloquait l'accès à l'outil de
+//  travail quotidien. La création de compte, elle, dépendait d'un email de
+//  confirmation que le serveur de test de Supabase n'envoyait pas (quota de
+//  quelques messages par heure), et le tableau de bord refusait d'enregistrer
+//  ses réglages (une option réservée au plan payant faisait échouer la page).
+//  Bilan : que des inconvénients, zéro bénéfice.
+//
+//  L'ORDRE CORRECT, et il n'y en a pas d'autre :
+//    1. appliquer supabase/migrations/001-multi-utilisateurs.sql
+//    2. créer le compte vendeur (tableau de bord Supabase, « Add user »)
+//    3. SEULEMENT ENSUITE repasser MULTI_USER à true
+//  Tout le code d'authentification reste en place et testé : la bascule ne
+//  demande que cette ligne.
+const MULTI_USER = false;
 
 // Session = ce que Supabase renvoie à la connexion : un jeton d'accès qui
 // prouve qui tu es (valable ~1 h) + un jeton de renouvellement pour en

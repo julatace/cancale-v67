@@ -2,7 +2,35 @@
 
 ## Où on en est
 
-**L'écran de connexion est ACTIF.** L'app demande maintenant un compte.
+**L'écran de connexion est DÉSACTIVÉ** (`MULTI_USER = false`). L'app s'ouvre
+directement, comme avant. C'est volontaire, après un essai en conditions réelles
+qui a échoué :
+
+- l'écran de connexion n'apportait **aucune protection** (rien n'est cloisonné
+  tant que la base n'a pas de colonne `owner`) mais il **bloquait l'accès à
+  l'outil de travail quotidien** ;
+- la création de compte dépend d'un email de confirmation que le serveur de test
+  de Supabase n'envoie pas (quota : quelques messages par heure) ;
+- le tableau de bord refuse d'enregistrer ses réglages : l'option « Prevent use
+  of leaked passwords » est réservée au plan payant et fait échouer la
+  sauvegarde de la page entière ;
+- et cette version du tableau de bord n'a **pas** d'action « Confirm email » sur
+  un utilisateur : uniquement des boutons qui envoient des mails.
+
+Tout le code d'authentification reste en place et testé. **La bascule ne tient
+qu'à une ligne**, mais elle vient APRÈS la migration, pas avant.
+
+## L'ordre correct, et il n'y en a pas d'autre
+
+1. **Migration SQL** (étapes 1 et 2 ci-dessous) — c'est elle qui crée la
+   séparation réelle.
+2. **Créer le compte vendeur** depuis Supabase → Authentication → **Add user** →
+   *Create new user*. Créé depuis le tableau de bord, il est confirmé d'office :
+   aucun email, donc aucun quota, donc aucun blocage.
+3. **Seulement ensuite**, repasser `MULTI_USER` à `true` dans `src/App.jsx`.
+
+Fait dans cet ordre, il n'y a aucun moment où on se retrouve devant une porte
+fermée dont personne n'a la clé.
 
 **La séparation des données ne l'est pas encore.** Il manque la migration SQL
 (je ne peux pas la lancer : la clé que l'app utilise ne permet pas de modifier
