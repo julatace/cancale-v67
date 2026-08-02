@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v38/02 · 📋listes';
+const BUILD_ID = 'v39/00 · 🧭cohérence';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -57,6 +57,9 @@ const SYNC_KEYS = [
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
+  // Dérivé (annonces vendues d'après les emails) : partagé pour que le tableau
+  // de bord compte exactement comme l'onglet Annonces, même sur un autre appareil.
+  'vinted_annonces_email_sold',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -6242,6 +6245,24 @@ const INV_STATUS = {
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
 const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// ── COLIS À RETIRER : UNE SEULE DÉFINITION POUR TOUTE L'APP ─────────────────
+// Le compteur de l'onglet Achats, celui de l'accueil et celui du centre de
+// notifications comptaient chacun à leur façon (l'un « available », l'autre avec
+// les filtres d'ancienneté/lieu) → trois nombres différents pour les mêmes colis.
+// Tout passe désormais par ces fonctions, module-level, lisibles de partout.
+const colisKey = (t) => String((t && (t.suivi || t.subject)) || '').trim();
+const PICKUP_MAX_DAYS = 14;   // au-delà, un point relais a forcément rendu le colis
+const loadCollected = () => new Set((load('vrm_colis_collected', []) || []).map(String));
+const isColisActive = (t, collected) => {
+  if (!t || t.status !== 'available') return false;
+  if (collected && collected.has(colisKey(t))) return false;
+  const d = new Date(t.receivedAt); if (isNaN(d)) return true;
+  return (Date.now() - d.getTime()) / 86400000 <= PICKUP_MAX_DAYS;
+};
+// Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller, ou on a
+// un code de retrait). Écarte les lignes de suivi parasites.
+const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || /^\d{3,8}$/.test(String((t && t.code) || '').trim()));
+
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
 // Retrouvez… »). Renvoie { nom, adresse, display } propres.
@@ -6799,7 +6820,7 @@ const _CACHE_TTL = 180000; // 3 min
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
 const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -6951,7 +6972,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
   const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
   const [qrView, setQrView] = useState(null); // colis affiché en grand pour le scan { title, code, suivi, carrier, img }
-  const colisKey = (t) => String(t.suivi || t.subject || '').trim();
   const markCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.add(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(t); };
   const unmarkCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.delete(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(null); };
   // Tout marquer retiré en un tap (les transporteurs n'envoient pas d'email « récupéré »).
@@ -6960,16 +6980,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Un colis « à retirer » (available) qui traîne depuis > 14 j est forcément
   // déjà récupéré (un point relais ne garde pas un colis plus longtemps) : on
   // arrête de le compter, même si aucun email « retiré » n'est arrivé.
-  const PICKUP_MAX_DAYS = 14;
-  const isPickupActive = (t) => {
-    if (!t || t.status !== 'available' || isCollected(t)) return false;
-    const d = new Date(t.receivedAt); if (isNaN(d)) return true;
-    return (Date.now() - d.getTime()) / 86400000 <= PICKUP_MAX_DAYS;
-  };
+  const isPickupActive = (t) => isColisActive(t, collected);
   // Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller ou on a
   // un code). Écarte les lignes de suivi parasites (ni lieu, ni code valide) qui
   // polluaient la liste. Utilisé partout pour que les compteurs concordent.
-  const isRetirable = (t) => isPickupActive(t) && (!!cleanLieu(t.lieu).nom || /^\d{3,8}$/.test(String((t && t.code) || '').trim()));
+  const isRetirable = (t) => isColisRetirable(t, collected);
   // Ouvre la vue « scan » en grand : QR authentique de Vinted (qrB64) si présent,
   // sinon on génère un QR à partir du code de retrait ou du n° de suivi.
   const openQrView = async (t) => {
@@ -7166,7 +7181,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   };
   const [showHidden, setShowHidden] = useState(false);
-  const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || hiddenAccts.has(String(o._acc?.vinted_user_id)) || blockedAccts.has(String(o._acc?.vinted_user_id));
+  // ── COHÉRENCE DES COMPTES (source unique) ────────────────────────────────
+  // Un compte masqué à la main OU détecté bloqué par Vinted ne doit exister
+  // NULLE PART dans l'app : ni ses ventes, ni ses achats, ni ses annonces, ni
+  // ses messages, ni dans les compteurs. Avant, chaque vue refaisait ce test à
+  // sa façon (ou l'oubliait) → les Achats et les Messages continuaient
+  // d'afficher un compte déconnecté, et le bandeau de stats des Annonces
+  // comptait des annonces que la grille en dessous n'affichait pas.
+  // Tout passe désormais par ces deux fonctions.
+  const acctOff = (uid) => { const k = String(uid ?? ''); return hiddenAccts.has(k) || blockedAccts.has(k); };
+  const acctOffOf = (o) => acctOff(o?._acc?.vinted_user_id);
+  const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = (tid) => {
     setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
   };
@@ -7289,8 +7314,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { save('vinted_off_open', offSecOpen); }, [offSecOpen]);
   // Listes AUTOMATIQUES (statut Vinted, pas les emails) : à retirer / à expédier.
   // « à retirer » exclut ce que tu as déjà coché récupéré à la main.
-  const vintedToPickup = useMemo(() => (buys.items || []).filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buys.items, pickupDone]);
-  const vintedToShip = useMemo(() => (sales.items || []).filter(o => isAwaitingShipStatus(o.status)), [sales.items]);
+  // Base commune des achats : mêmes règles de compte que les ventes/annonces —
+  // un compte masqué ou bloqué ne compte plus nulle part (avant, ses achats
+  // continuaient d'alimenter « à retirer », la trésorerie et le registre alors
+  // que ses ventes, elles, avaient disparu → chiffres qui ne se recoupaient pas).
+  const buysBase = useMemo(() => (buys.items || []).filter(o => !acctOffOf(o)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [buys.items, hiddenAccts, blockedAccts]);
+  const vintedToPickup = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
+  const vintedToShip = useMemo(() => (sales.items || []).filter(o => !isHidden(o) && isAwaitingShipStatus(o.status)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
   const soldByTxn = useMemo(() => { const m = {}; (sales.items || []).forEach(o => { if (o.transaction_id != null) m[String(o.transaction_id)] = o; }); return m; }, [sales.items]);
   // Un bordereau est « expédié » (donc à retirer de la liste à imprimer) dès que
   // Vinted a fait avancer la vente au-delà de « bordereau envoyé » (pris en charge,
@@ -7561,11 +7595,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emailSales, emailBords, listings.items, numeros]);
+  // On MÉMORISE la liste des annonces auto-retirées (vendues d'après les emails).
+  // Pourquoi : le tableau de bord compte « annonces en ligne » AVANT que cet
+  // onglet ait tourné ; sans cette mémoire il comptait des paires déjà vendues
+  // et affichait un total supérieur à celui de l'onglet Annonces. Il lit
+  // maintenant la même exclusion. Se recalcule seul à chaque passage ici.
+  useEffect(() => {
+    if (!listings.items) return;
+    const arr = [...emailSoldIds];
+    const prev = load('vinted_annonces_email_sold', []) || [];
+    if (arr.length !== prev.length || arr.some(x => !prev.includes(x))) save('vinted_annonces_email_sold', arr);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailSoldIds, listings.items]);
+  // Base commune des annonces : tout ce qui est réellement « en ligne chez moi ».
+  // Un compte détecté BLOQUÉ par Vinted a des annonces moissonnées périmées (le
+  // compte est fermé) → on les retire, comme celles d'un compte masqué à la main.
+  // ⚠️ C'est CETTE liste que doivent utiliser la grille ET le bandeau de stats :
+  // sinon le compteur annonce un nombre que la grille ne montre pas.
+  const annBase = useMemo(
+    () => (listings.items || []).filter(it => !acctOffOf(it) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id)))),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts]);
   const annShown = useMemo(() => {
-    // Un compte détecté BLOQUÉ par Vinted : ses annonces moissonnées sont périmées
-    // (le compte est fermé) → on les retire automatiquement de la liste.
-    // Comptes bloqués (détectés) OU masqués à la main : leurs annonces ne s'affichent pas.
-    let arr = [...(listings.items || [])].filter(it => !blockedAccts.has(String(it._acc?.vinted_user_id)) && !hiddenAccts.has(String(it._acc?.vinted_user_id)) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id))));
+    let arr = [...annBase];
     const q = annSearch.trim().toLowerCase();
     if (q) arr = arr.filter(it => {
       const num = String(numeros[it.id]?.numero || '');
@@ -7596,7 +7648,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, annSearch, annSort, numeros, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts]);
+  }, [annBase, annSearch, annSort, numeros]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
   const blockedList = useMemo(() => accounts.filter(a => blockedAccts.has(String(a.vinted_user_id))), [accounts, blockedAccts]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
@@ -7702,7 +7754,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // annonce fraîchement numérotée automatiquement. Un clic remet l'ancien
   // numéro. Jamais automatique : deux paires identiques existent vraiment.
   const numeroReprises = useMemo(() => {
-    const online = listings.items || [];
+    const online = annBase;
     if (!online.length || !Object.keys(numeros).length) return [];
     const soldKeys = new Set(Object.values(txnLink || {}).map(String));
     // Orphelins : numérotés, plus en ligne, pas vendus, pas déclarés perdus.
@@ -7737,7 +7789,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, numeros, onlineAnnonceIds, txnLink, pairsLost]);
+  }, [annBase, numeros, onlineAnnonceIds, txnLink, pairsLost]);
 
   // Applique la reprise : l'annonce en ligne récupère l'ancien numéro, et le
   // numéro auto tout juste créé est rendu (il n'a jamais été écrit sur une boîte).
@@ -7787,7 +7839,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [numeroReprises, autoNum, cloudReady]);
 
   const annStats = useMemo(() => {
-    const arr = listings.items || [];
+    // Même base que la grille (annBase) : le bandeau compte exactement ce qui
+    // est affiché en dessous. Avant, il partait de listings.items (TOUS les
+    // comptes, même déconnectés) → « 42 en ligne » avec 30 cartes visibles.
+    const arr = annBase;
     let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0;
     for (const it of arr) {
       const p = it.price!=null ? Number(it.price) : 0;
@@ -7799,7 +7854,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, numeros, listingDates]);
+  }, [annBase, numeros, listingDates]);
   // ── Assistant de repricing : quoi baisser, de combien, pourquoi ────────────
   // Règles : plus une paire dort, plus la baisse conseillée est forte ; une paire
   // très vue sans favori a un prix perçu trop haut. On ne conseille JAMAIS sous
@@ -7807,7 +7862,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'annonce (sûr, ton rythme) — aucune écriture automatique côté Vinted.
   const repriceList = useMemo(() => {
     const out = [];
-    for (const it of (listings.items || [])) {
+    for (const it of annBase) {
       const price = it.price != null ? Number(it.price) : 0;
       if (!price || price <= 1) continue;
       const age = listedAgeDays(it);
@@ -7828,13 +7883,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => b.score - a.score);
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, numeros]);
+  }, [annBase, numeros]);
   // ── Qualité d'annonce : ce qui plombe la conversion (photos, marque, taille,
   // description). On ne signale QUE ce que Vinted nous confirme (champ présent)
   // → pas de faux positif. But : dire quoi améliorer pour vendre plus.
   const qualityList = useMemo(() => {
     const out = [];
-    for (const it of (listings.items || [])) {
+    for (const it of annBase) {
       const issues = [];
       if (it.photoCount != null && it.photoCount < 3) issues.push(it.photoCount <= 1 ? '1 seule photo' : `${it.photoCount} photos`);
       if (!it.brand) issues.push('marque manquante');
@@ -7845,7 +7900,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => b.n - a.n);
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items]);
+  }, [annBase]);
   // ── Relance des « likers » : annonces mises en favori mais pas vendues. Ce sont
   // des acheteurs quasi décidés → leur envoyer une petite offre convertit fort.
   // BAN-SAFE : on liste + on donne un lien vers l'annonce ; TU envoies l'offre
@@ -7853,7 +7908,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Aucun envoi automatique, aucune écriture Vinted côté app.
   const likedList = useMemo(() => {
     const out = [];
-    for (const it of (listings.items || [])) {
+    for (const it of annBase) {
       if (it.favourites != null && it.favourites >= 2) {
         // Prix d'offre suggéré : −10 % du prix actuel (le geste qui déclenche
         // l'achat des personnes déjà intéressées), jamais sous ton plancher de
@@ -7873,7 +7928,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => (b.favourites ?? 0) - (a.favourites ?? 0));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, numeros]);
+  }, [annBase, numeros]);
 
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
   const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; _persistAcctCache(); };
@@ -8100,7 +8155,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
   // Achat correspondant à un suivi : par titre d'article extrait de l'email.
   const buyForTrack = (t) => {
-    const items = buys.items || [];
+    const items = buysBase;
     if (!t || !t.artTitle) return null;
     const n = normTitle(t.artTitle);
     if (!n) return null;
@@ -8174,7 +8229,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Modifiable à la main ensuite (le champ N° reste éditable), et désactivable.
   useEffect(() => {
     if (!autoNum || !cloudReady) return; // ⛔ pas de numérotation avant que le cloud soit chargé
-    const items = listings.items || [];
+    const items = annBase;   // jamais de numéro consommé pour un compte masqué/bloqué
     if (!items.length) return;
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
@@ -8231,7 +8286,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ua = [...nextUsed].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, autoNum, cloudReady]);
+  }, [annBase, autoNum, cloudReady]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
@@ -8321,7 +8376,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Argent dépensé = tous les achats (tous comptes) hors annulés + les achats
     // hors Vinted saisis à la main (brocante, fournisseur…).
     let spent=0, nSpent=0;
-    for (const o of (buys.items || [])) {
+    for (const o of buysBase) {
       if (classifyOrderStatus(o.status) === 'cancelled') continue;
       const amt = o.price?.amount!=null ? Number(o.price.amount) : 0;
       spent += amt; nSpent += 1;
@@ -8329,7 +8384,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const b of offBuys) { const p = parseFloat(String(b.price).replace(',','.')); if (!isNaN(p)) { spent += p; nSpent += 1; } }
     return { recu, nRecu, attente, nAttente, spent, nSpent };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, offBuys, hiddenSales, hiddenAccts]);
+  }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
   const [showTreasury, setShowTreasury] = useState(false);
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
   const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow().then(setWalletEscrow); };
@@ -8370,12 +8425,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let bestBrand=null;
     Object.entries(brands).forEach(([b,v])=>{ if (v.nb>=2){ const moy=v.benef/v.nb; if (!bestBrand||moy>bestBrand.moy) bestBrand={ brand:b, moy, nb:v.nb }; } });
     // Taux d'écoulement : nécessite le nb d'annonces en ligne (chargé si dispo).
-    const online = (listings.items||[]).length;
+    const online = annBase.length;
     const vendues = items.filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='completed').length;
     const ecoul = (online+vendues)>0 ? (vendues/(online+vendues))*100 : null;
     return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
@@ -8560,7 +8615,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       totalBack: buysBack.reduce((s,x)=>s+x.amount,0),
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, hiddenSales, hiddenAccts]);
+  }, [sales.items, buysBase, hiddenSales, hiddenAccts]);
   // ── Rappel d'expédition : ventes à expédier, triées par urgence ────────────
   // Vinted laisse ~5 jours pour expédier après la vente ; expédier en retard
   // abîme la note vendeur et le classement des annonces. my_orders ne donne pas
@@ -8571,6 +8626,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const o of (sales.items || [])) {
       if (isHidden(o)) continue;
       if (!needsBordereau(o.status)) continue;
+      // Déjà coché « posté » : ce colis ne fait plus partie du travail du jour.
+      // Avant, la carte « Expédier N colis » comptait les colis déjà postés alors
+      // que l'onglet Bordereaux les mettait de côté → deux nombres différents
+      // pour la même chose.
+      if (isShipDone(o)) continue;
       const d = o.date ? new Date(o.date) : null;
       if (!d || isNaN(d)) { out.push({ o, daysLeft: null, shipBy: null }); continue; }
       const shipBy = new Date(d.getTime() + SHIP_DAYS * 86400000);
@@ -8580,7 +8640,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts]);
+  }, [sales.items, hiddenSales, hiddenAccts, shipDone]);
 
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
@@ -8606,14 +8666,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { benefSum += (sell-buy-feesOf(e)); benefNb+=1; }
     }
-    const online = (listings.items||[]).filter(it=>match(it.title)).length;
+    const online = annBase.filter(it=>match(it.title)).length;
     const avgSell = nb ? caSum/nb : null;
     const p = parseFloat(String(srcPrice).replace(',','.'));
     const price = (!isNaN(p) && p>0) ? p : null;
     const estBenef = (avgSell!=null && price!=null) ? avgSell - price : null;
     return { nb, avgSell, joursMoy: daysNb?daysSum/daysNb:null, benefMoy: benefNb?benefSum/benefNb:null, benefNb, online, lastDate, price, estBenef };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [srcQuery, srcPrice, sales.items, listings.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [srcQuery, srcPrice, sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Assistant de MISE EN VENTE : tu viens d'acheter une paire, tu la mets en
   // ligne. Tape le modèle → prix conseillé (basé sur TES ventes réelles de la
@@ -8639,7 +8699,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = effEntry(o);
       if (e && e.numberedAt && o.date) { const j=(new Date(o.date)-new Date(e.numberedAt))/86400000; if(j>=0&&j<3650){daysSum+=j;daysNb+=1;} }
     }
-    const onlinePrices = (listings.items||[]).filter(it=>match(it.title) && it.price!=null).map(it=>Number(it.price)).filter(v=>v>0);
+    const onlinePrices = annBase.filter(it=>match(it.title) && it.price!=null).map(it=>Number(it.price)).filter(v=>v>0);
     const buy = parseFloat(String(listBuy).replace(',','.')); const buyOk = !isNaN(buy) && buy>0;
     const soldMed = median(sold), onlineMed = median(onlinePrices);
     // Prix conseillé : d'abord ce à quoi TES paires identiques se sont vendues,
@@ -8671,7 +8731,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { soldNb:sold.length, soldMed:round(soldMed), onlineNb:onlinePrices.length, onlineMed:round(onlineMed),
              reco, lo, hi, bumped, floor:round(floor), buyOk, margin, joursMoy:daysNb?daysSum/daysNb:null, lastDate, title, desc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listQ, listSize, listBuy, sales.items, listings.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [listQ, listSize, listBuy, sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const copyText = (txt, key) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(()=>setCopied(''),1500); } catch(_){} };
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
@@ -8682,11 +8742,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reportMonths = useMemo(() => {
     const s = new Set();
     (sales.items||[]).forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
-    (buys.items||[]).forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
+    buysBase.forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
     s.add(reportMonth);
     return [...s].sort().reverse();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items]);
+  }, [sales.items, buysBase]);
   const report = useMemo(() => {
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
@@ -8707,7 +8767,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Registre d'achats du mois (hors annulés).
     const buyLines=[];
     let achatsTotal=0;
-    for (const o of (buys.items||[])) {
+    for (const o of buysBase) {
       if (classifyOrderStatus(o.status)==='cancelled') continue;
       if (ymOf(o.date)!==reportMonth) continue;
       const montant = o.price?.amount!=null?Number(o.price.amount):0;
@@ -8721,7 +8781,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = ca * 0.135;
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
 
@@ -8775,9 +8835,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reportYears = useMemo(() => {
     const s = new Set([new Date().getFullYear()]);
     (sales.items||[]).forEach(o=>{ const d=o.date&&new Date(o.date); if(d&&!isNaN(d)) s.add(d.getFullYear()); });
-    (buys.items||[]).forEach(o=>{ const d=o.date&&new Date(o.date); if(d&&!isNaN(d)) s.add(d.getFullYear()); });
+    buysBase.forEach(o=>{ const d=o.date&&new Date(o.date); if(d&&!isNaN(d)) s.add(d.getFullYear()); });
     return [...s].sort((a,b)=>b-a);
-  }, [sales.items, buys.items]);
+  }, [sales.items, buysBase]);
   const annual = useMemo(() => {
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
@@ -8799,7 +8859,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     let achatsTotal=0, achatsNb=0;
     const buyLines=[];
-    for (const o of (buys.items||[])) {
+    for (const o of buysBase) {
       if (classifyOrderStatus(o.status)==='cancelled' || !o.date) continue;
       const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
       const montant = o.price?.amount!=null?Number(o.price.amount):0;
@@ -8814,7 +8874,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = ca*0.135;
     return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines, saleLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const openAnnual = async () => {
     setShowAnnual(true);
@@ -9022,7 +9082,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const h = new Date().getHours();
         const hello = h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
         const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
-        const unread = (convs.items||[]).filter(c=>c.unread).length;
+        const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
         const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
         const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
@@ -9300,7 +9360,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         {/* Objectif de CA mensuel */}
-        {accounts.length>0 && (()=>{ const pct = goal>0 ? Math.min(100, (perf.caMois/goal)*100) : 0; return (
+        {/* CA du mois : EXACTEMENT le chiffre du tableau de bord (emails de vente,
+            source complète). Avant, cette barre utilisait un calcul local basé sur
+            les ventes moissonnées → l'objectif affichait un CA différent de la
+            tuile « CA du mois » de l'accueil. Une seule source, un seul nombre. */}
+        {accounts.length>0 && (()=>{ const caM = (liveStats && liveStats.caMois!=null) ? liveStats.caMois : perf.caMois; const pct = goal>0 ? Math.min(100, (caM/goal)*100) : 0; return (
           <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',marginBottom:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:goal>0?8:0,flexWrap:'wrap',gap:6}}>
               <div style={{fontSize:12,fontWeight:800,color:C.text}}>🎯 Objectif du mois</div>
@@ -9312,7 +9376,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               ) : (
                 <button onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:C.text}}>
-                  {goal>0 ? `${perf.caMois.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
+                  {goal>0 ? `${caM.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
                 </button>
               )}
             </div>
@@ -9323,7 +9387,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {goal>0 && (()=>{
               if(pct>=100) return <div style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:800,marginTop:5}}>🎉 Objectif atteint !</div>;
-              const reste=goal-perf.caMois;
+              const reste=goal-caM;
               const avg=totals.nb>0?totals.ca/totals.nb:null; // prix de vente moyen finalisé
               const nb=avg&&avg>0?Math.ceil(reste/avg):null;
               return <div style={{fontSize:11,color:C.muted,marginTop:5}}><b style={{color:C.text}}>{reste.toFixed(0)} €</b> restants ce mois-ci{nb!=null?<> — soit <b style={{color:C.accent}}>~{nb} paire{nb>1?'s':''}</b> à {avg.toFixed(0)} € (ton prix moyen)</>:''}</div>;
@@ -9563,105 +9627,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       </>)}
 
-      {curSub==='expedition' && (()=>{
-        // MODE EXPÉDITION : tout ce qu'il faut pour poster tes colis d'un coup —
-        // liste triée par urgence, N° + case garage pour retrouver la paire,
-        // bouton bordereau, et une case « Posté » par colis.
-        const pending = toShip.filter(t=>!isShipDone(t.o));
-        const posted  = (sales.items||[]).filter(o=>needsBordereau(o.status)&&!isHidden(o)&&isShipDone(o));
-        const late = pending.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
-        const urgent = pending.filter(t=>t.daysLeft!=null && t.daysLeft>=0 && t.daysLeft<=1).length;
-        const urgencyChip=(t)=>{
-          if(t.daysLeft==null) return null;
-          const col = t.daysLeft<0?C.danger : t.daysLeft<=1?C.warn : C.muted;
-          const txt = t.daysLeft<0?`⚠️ ${-t.daysLeft}j de retard` : t.daysLeft===0?"à poster aujourd'hui" : t.daysLeft===1?'à poster demain' : `${t.daysLeft}j pour poster`;
-          return <span style={{color:col,fontWeight:900,background:`${col}18`,borderRadius:999,padding:'1px 8px'}}>{txt}</span>;
-        };
-        return (
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          <div>
-            <h2 style={{margin:0,color:C.text,fontSize:22,fontWeight:800,letterSpacing:-0.4}}>📦 Mode expédition</h2>
-            <div style={{fontSize:12,color:C.muted,marginTop:2}}>Prépare tous tes envois d'un coup : bordereau, paire au garage, coche par colis.</div>
-          </div>
-          {sales.items===null ? (
-            <Skeleton variant="row" count={3}/>
-          ) : pending.length===0 ? (
-            <div style={{textAlign:'center',padding:'40px 16px',background:C.card,border:`1px solid ${C.border}`,borderRadius:16}}>
-              <div style={{fontSize:40}}>🎉</div>
-              <div style={{fontSize:15,fontWeight:900,color:C.text,marginTop:6}}>Rien à expédier — tout est parti !</div>
-              <div style={{fontSize:12,color:C.muted,marginTop:4}}>Les nouvelles ventes à poster s'afficheront ici automatiquement.</div>
-            </div>
-          ) : (<>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              <div style={{flex:1,minWidth:90,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
-                <div style={{fontSize:22,fontWeight:900,color:C.warn,lineHeight:1}}>{pending.length}</div>
-                <div style={{fontSize:11,color:C.muted,fontWeight:700,marginTop:2}}>à expédier</div>
-              </div>
-              {late>0 && <div style={{flex:1,minWidth:90,background:`${C.danger}12`,border:`1px solid ${C.danger}55`,borderRadius:12,padding:'10px 12px'}}>
-                <div style={{fontSize:22,fontWeight:900,color:C.danger,lineHeight:1}}>{late}</div>
-                <div style={{fontSize:11,color:C.danger,fontWeight:700,marginTop:2}}>en retard</div>
-              </div>}
-              {urgent>0 && <div style={{flex:1,minWidth:90,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'10px 12px'}}>
-                <div style={{fontSize:22,fontWeight:900,color:C.warn,lineHeight:1}}>{urgent}</div>
-                <div style={{fontSize:11,color:C.warn,fontWeight:700,marginTop:2}}>aujourd'hui/demain</div>
-              </div>}
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {pending.map(t=>{
-                const o=t.o; const e=effEntry(o); const num=e?.numero;
-                const cell = num ? garageCellOf(garageGrid,num) : null;
-                const autoNew = !!(saleOv[String(o.transaction_id)] && saleOv[String(o.transaction_id)].autoAssigned);
-                const sell = o.price?.amount!=null?Number(o.price.amount):null;
-                return (
-                  <div key={o.transaction_id} style={{borderRadius:14,border:`1px solid ${t.daysLeft!=null&&t.daysLeft<0?C.danger+'66':C.border}`,background:C.card,padding:10,display:'flex',flexDirection:'column',gap:9}}>
-                    <div style={{display:'flex',gap:11,alignItems:'center'}}>
-                      <div style={{width:52,height:52,borderRadius:9,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
-                        <div style={{fontSize:10.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                          {urgencyChip(t)}
-                        </div>
-                      </div>
-                      {sell!=null && <div style={{fontSize:14,fontWeight:900,color:C.text,flexShrink:0}}>{sell.toFixed(0)} {cur(o.price?.currency_code)}</div>}
-                    </div>
-                    {/* Où est la paire */}
-                    <div style={{fontSize:12,fontWeight:800,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                      {num ? (cell
-                        ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{border:`1px solid ${C.blue||C.accent}`,background:'transparent',color:C.blue||C.accent,borderRadius:9,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:800,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)} · voir</button>
-                        : <span style={{color:C.muted,fontWeight:700}}>🏠 pas rangée au garage</span>)
-                        : <span style={{color:C.warn,fontWeight:800}}>⚠️ paire à identifier (ajoute son N° dans Ventes)</span>}
-                      {autoNew && <span style={{color:INV_STATUS.online.color,fontWeight:800,background:`${INV_STATUS.online.color}18`,borderRadius:999,padding:'2px 8px'}} title="Cette paire n'avait pas de numéro : l'app lui en a attribué un tout neuf. Écris-le sur la boîte.">🆕 N°{num} attribué — étiquette la paire</span>}
-                    </div>
-                    {/* Actions : bordereau + coche posté */}
-                    <div style={{display:'flex',gap:8}}>
-                      <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit'}}>📄 Bordereau</button>
-                      <button type="button" onClick={()=>toggleShipDone(o)} style={{flex:1,border:`1px solid ${INV_STATUS.online.color}`,background:'transparent',color:INV_STATUS.online.color,borderRadius:10,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:800,fontFamily:'inherit'}}>✓ Posté</button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>)}
-          {posted.length>0 && (
-            <div>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,fontWeight:800,margin:'6px 2px 8px'}}>Déjà postés ({posted.length}) — en attente côté Vinted</div>
-              <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {posted.map(o=>{ const e=effEntry(o); const num=e?.numero; return (
-                  <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:C.card,border:`1px solid ${C.border}`,borderRadius:11,opacity:0.75}}>
-                    <span style={{fontSize:16}}>✅</span>
-                    <span style={{flex:1,fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</span>
-                    <button type="button" onClick={()=>toggleShipDone(o)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',cursor:'pointer',fontSize:11,fontWeight:700,fontFamily:'inherit'}}>↩︎ annuler</button>
-                  </div>
-                ); })}
-              </div>
-            </div>
-          )}
-        </div>
-        );
-      })()}
 
       {curSub==='achats' && (<>
         <ScreenHead icon="🛍️" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
@@ -10052,18 +10017,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button onClick={()=>loadOrders('purchased',setBuys,true)} disabled={buys.loading} title="Va chercher tes achats en direct sur Vinted (tous comptes)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:800,cursor:buys.loading?'default':'pointer',opacity:buys.loading?0.6:1}}>{buys.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
           )}
         </div>
-        {buys.items && buys.items.length>0 && (
+        {buysBase.length>0 && (
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
             style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
         )}
         {buys.loading && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
-        {buys.items && !buys.error && buys.items.length===0 && (
+        {buys.items && !buys.error && buysBase.length===0 && (
           <EmptyState icon="🛍️" title="Aucun achat pour l'instant"
             desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/>
         )}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(buys.items||[]).filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
+          {buysBase.filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
             .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
             .sort((a,b)=>{ const pr=x=> x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4; const d=pr(a)-pr(b); return d!==0?d:(new Date(b.o.date||0)-new Date(a.o.date||0)); })
             .map(({o,tk,st})=>{
@@ -10534,7 +10499,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const daysSince = (d)=>{ if(!d) return null; const t=new Date(d); if(isNaN(t)) return null; return Math.floor((Date.now()-t.getTime())/86400000); };
           // Bandeau « acheteurs en attente » retiré à la demande de Julien (inutile) :
           // on liste simplement toutes les conversations du compte sélectionné.
-          const shown = (convs.items||[]).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc);
+          // Un compte masqué/bloqué ne montre plus ses conversations (cohérence
+          // avec Ventes/Achats/Annonces : un compte déconnecté disparaît partout).
+          const shown = (convs.items||[]).filter(c=>!acctOffOf(c)).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc);
           return (<>
             {convs.items && !convs.error && shown.length===0 && (
               <EmptyState icon="💬" title="Aucune conversation"
@@ -10750,6 +10717,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // sinon la même paire apparaissait deux fois sur l'écran.
           const bordTxns = new Set((emailBords||[]).filter(b=>!isBordHidden(b)).map(b=>String(b.transaction||'')).filter(Boolean));
           const all = (sales.items||[])
+            .filter(o=>!isHidden(o))   // compte masqué/bloqué ou vente masquée : jamais dans « à expédier »
             .filter(o=>needsBordereau(o.status))
             .filter(o=>!bordTxns.has(String(o.transaction_id)))
             .filter(o=>matchOrd(o));
@@ -10944,17 +10912,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {annual.months.map((m,i)=>{ const b=m.ca-m.cout-m.frais; return (
                       <tr key={i} style={{borderTop:`1px solid ${C.border}`,color:C.text,textAlign:'right'}}>
                         <td style={{textAlign:'left',padding:'5px 6px',textTransform:'capitalize'}}>{m.label}</td>
-                        <td style={{padding:'5px 6px'}}>{m.ca?m.ca.toFixed(0)+'€':'—'}</td>
-                        <td style={{padding:'5px 6px',color:C.muted}}>{m.cout?m.cout.toFixed(0)+'€':'—'}</td>
-                        <td style={{padding:'5px 6px',fontWeight:700,color:m.nbCout?(b>=0?INV_STATUS.online.color:C.danger):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+'€':'—'}</td>
+                        <td style={{padding:'5px 6px'}}>{m.ca?m.ca.toFixed(0)+' €':'—'}</td>
+                        <td style={{padding:'5px 6px',color:C.muted}}>{m.cout?m.cout.toFixed(0)+' €':'—'}</td>
+                        <td style={{padding:'5px 6px',fontWeight:700,color:m.nbCout?(b>=0?INV_STATUS.online.color:C.danger):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+' €':'—'}</td>
                         <td style={{padding:'5px 6px',color:C.muted}}>{m.nb||'—'}</td>
                       </tr>
                     );})}
                     <tr style={{borderTop:`2px solid ${C.border}`,color:C.text,textAlign:'right',fontWeight:900}}>
                       <td style={{textAlign:'left',padding:'6px'}}>TOTAL</td>
-                      <td style={{padding:'6px'}}>{annual.ca.toFixed(0)}€</td>
-                      <td style={{padding:'6px'}}>{annual.cout.toFixed(0)}€</td>
-                      <td style={{padding:'6px',color:annual.benefNet>=0?INV_STATUS.online.color:C.danger}}>{(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)}€</td>
+                      <td style={{padding:'6px'}}>{annual.ca.toFixed(0)} €</td>
+                      <td style={{padding:'6px'}}>{annual.cout.toFixed(0)} €</td>
+                      <td style={{padding:'6px',color:annual.benefNet>=0?INV_STATUS.online.color:C.danger}}>{(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)} €</td>
                       <td style={{padding:'6px'}}>{annual.nb}</td>
                     </tr>
                   </tbody>
@@ -10970,7 +10938,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:10,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
-                    <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}€</div>
+                    <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
                     <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
                   </div>
                 ))}
@@ -11092,7 +11060,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:11,padding:'9px 11px'}}>
                       <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:8,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:900,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
                       <span style={{flex:1,fontSize:13,fontWeight:700,color:C.text}}>{it.title}</span>
-                      {it.price!=null && <span style={{fontSize:12,fontWeight:800,color:C.muted}}>{Number(it.price).toFixed(0)}€</span>}
+                      {it.price!=null && <span style={{fontSize:12,fontWeight:800,color:C.muted}}>{Number(it.price).toFixed(0)} €</span>}
                     </div>
                   );
                 })}
@@ -11211,7 +11179,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <div style={{fontSize:10.5,color:C.muted}}>{r.nb} vendue{r.nb>1?'s':''} · CA {fmtE(r.ca)}{r.joursMoy!=null?` · ${r.joursMoy.toFixed(0)} j en moy.`:''}</div>
                             </div>
                             <div style={{textAlign:'right',flexShrink:0}}>
-                              <div style={{fontSize:14,fontWeight:900,color:r.benefMoy==null?C.muted:(r.benefMoy>=0?INV_STATUS.online.color:C.danger)}}>{r.benefMoy==null?'—':`${r.benefMoy>=0?'+':''}${r.benefMoy.toFixed(0)}€`}</div>
+                              <div style={{fontSize:14,fontWeight:900,color:r.benefMoy==null?C.muted:(r.benefMoy>=0?INV_STATUS.online.color:C.danger)}}>{r.benefMoy==null?'—':`${r.benefMoy>=0?'+':''}${r.benefMoy.toFixed(0)} €`}</div>
                               <div style={{fontSize:9.5,color:C.muted}}>{r.benefMoy==null?'achat inconnu':'bénéf./paire'}</div>
                             </div>
                           </div>
@@ -11324,7 +11292,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:10,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
-                    <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}€</div>
+                    <div style={{fontSize:13,fontWeight:800,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
                     <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}>📄</button>
                   </div>
                 ))}
@@ -11630,7 +11598,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Audit d'inventaire : réconcilie numéros / garage / en ligne / vendu ── */}
       {auditOpen && (()=>{
-        const onlineNums = new Set(); (listings.items||[]).forEach(it=>{ const nn=numeros[it.id]?.numero; if(nn) onlineNums.add(String(nn)); });
+        const onlineNums = new Set(); annBase.forEach(it=>{ const nn=numeros[it.id]?.numero; if(nn) onlineNums.add(String(nn)); });
         const soldNums = new Set(); (sales.items||[]).forEach(o=>{ if(classifyOrderStatus(o.status)==='completed'){ const e=effEntry(o); if(e&&e.numero) soldNums.add(String(e.numero)); } });
         const byNum = new Map(); Object.values(numeros).forEach(e=>{ if(e&&e.numero!=null) byNum.set(String(e.numero), e); });
         // Tous les numéros présents au garage (grille 2D + pièces 3D).
@@ -11687,7 +11655,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Répartiteur de lot : ventile le prix d'un achat groupé sur N paires ── */}
       {lotOpen && (()=>{
         const q = lotSearch.trim().toLowerCase();
-        const list = (listings.items||[]).filter(it=>{ if(!q) return true; const num=numeros[it.id]?.numero||''; return String(num).includes(q) || (it.title||'').toLowerCase().includes(q) || (it.brand||'').toLowerCase().includes(q); });
+        const list = annBase.filter(it=>{ if(!q) return true; const num=numeros[it.id]?.numero||''; return String(num).includes(q) || (it.title||'').toLowerCase().includes(q) || (it.brand||'').toLowerCase().includes(q); });
         const shares = lotShares();
         const nSel = lotSel.size; const total = eur(lotTotal);
         return (
@@ -12741,6 +12709,17 @@ export default function App() {
       const blockedS=new Set((load('vinted_accounts_blocked',[])||[]).map(String));
       const hiddenS=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
       const skipAcc=(uid)=>blockedS.has(String(uid))||hiddenS.has(String(uid));
+      // Paires déjà vendues mais encore présentes dans la moisson wardrobe :
+      // marquées à la main (✓ vendue) ou confirmées par un email de vente /
+      // bordereau (calcul de l'onglet Annonces, mémorisé). Même exclusion des
+      // deux côtés → le compteur du tableau de bord == la liste des annonces.
+      // Ventes masquées à la main (✕ sur une ligne de vente) : elles ne comptent
+      // plus dans l'onglet Ventes, elles ne doivent pas compter ici non plus.
+      const hiddenTx=new Set((load('vinted_sales_hidden',[])||[]).map(String));
+      const soldIds=new Set([
+        ...((load('vinted_annonces_vendues',[])||[]).map(String)),
+        ...((load('vinted_annonces_email_sold',[])||[]).map(String)),
+      ]);
       // Ventes ANNULÉES / REMBOURSÉES du mois (statut Vinted frais) : servent à
       // retirer du CA les emails de vente correspondants (une vente remboursée
       // n'est plus du chiffre d'affaires — ex. un lot vendu puis remboursé).
@@ -12760,6 +12739,7 @@ export default function App() {
       }));
       for(const { a, sold, list, conv } of perAcc){
         if(sold.ok){ ok=true; for(const o of sold.items){
+          if(hiddenTx.has(String(o.transaction_id))) continue;
           const st=classifyOrderStatus(o.status);
           const amt0=(o.price?.amount!=null?Number(o.price.amount):0);
           if(st==='pending'){ enCours++; enAttente+=amt0; }
@@ -12769,8 +12749,17 @@ export default function App() {
           }
           if(st==='cancelled'){ let inMonth=true; if(o.date){ const d=new Date(o.date); inMonth=!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym; } if(inMonth) refunded.push({ acct:String(a.login||'').toLowerCase(), amount:amt0, title:normTitle(o.title||'') }); }
         }}
-        if(list.ok){ ok=true; online+=list.items.length;
-          for(const it of list.items){ const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0; } }
+        // « En ligne » compte EXACTEMENT ce que montre l'onglet Annonces : on
+        // retire les paires marquées vendues à la main et celles auto-retirées
+        // parce qu'un email de vente/bordereau les a confirmées vendues. Sinon
+        // le tableau de bord affichait plus d'annonces que la liste elle-même.
+        if(list.ok){ ok=true;
+          for(const it of list.items){
+            const id=String(it.id);
+            if(soldIds.has(id)) continue;
+            online++;
+            const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0;
+          } }
         if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
       }
       // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
@@ -12872,7 +12861,16 @@ export default function App() {
       let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
       const unreadByAcct={}; // nom du compte -> nb de messages non lus (pour l'indice)
       const lbcOnlineIds=new Set(); // ids d'annonces encore en ligne (pour la synchro Leboncoin)
+      // MÊMES RÈGLES QUE LES ÉCRANS : un compte masqué/bloqué ne génère aucune
+      // notification, un colis déjà coché « posté » n'est plus à expédier, et une
+      // paire déjà vendue ne compte ni comme « qui dort » ni comme « sans N° ».
+      // Sans ça, le centre de notifications annonçait des chiffres que les
+      // onglets ne montraient pas.
+      const offAcc=new Set([...(load('vinted_accounts_blocked',[])||[]), ...(load('vinted_accounts_hidden',[])||[])].map(String));
+      const shipDoneN=load('vinted_ship_done',{})||{};
+      const soldIdsN=new Set([...(load('vinted_annonces_vendues',[])||[]), ...(load('vinted_annonces_email_sold',[])||[])].map(String));
       for(const a of vintedAccounts){
+        if(offAcc.has(String(a.vinted_user_id))) continue;
         const acctName = acctLabels[a.vinted_user_id] || a.login || 'compte';
         const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
         if(inbox && Array.isArray(inbox.conversations)){
@@ -12889,7 +12887,7 @@ export default function App() {
         const sold=await fetchHarvestOrders(a.vinted_user_id,'sold');
         if(sold && Array.isArray(sold.my_orders)){
           salesCount += sold.my_orders.filter(o=>classifyOrderStatus(o.status)!=='cancelled').length;
-          toShipCount += sold.my_orders.filter(o=>needsBordereau(o.status)).length;
+          toShipCount += sold.my_orders.filter(o=>needsBordereau(o.status) && !shipDoneN[String(o.transaction_id)]).length;
         }
         // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
         // (≥30 j → baisser le prix, action GRATUITE) et celles SANS numéro.
@@ -12898,6 +12896,9 @@ export default function App() {
           for(const raw of listH.items){
             if(!isOnlineListing(raw)) continue;
             const it=mapWardrobeItem(raw);
+            // Vendue : elle n'est plus « en ligne » — ni pour les alertes, ni pour
+            // Leboncoin (au contraire, c'est justement là qu'il faut la retirer de LBC).
+            if(soldIdsN.has(String(it.id))) continue;
             lbcOnlineIds.add(String(it.id));
             const age=ageDays(it);
             if(age!=null && age>=30) sleepCount+=1;
@@ -12907,7 +12908,7 @@ export default function App() {
       }
       // Colis à retirer (emails transporteurs) : source légère, module-level.
       let colisCount=0;
-      try{ const tr=await fetchEmailTracking(); colisCount=(tr||[]).filter(t=>t.status==='available').length; }catch(_){}
+      try{ const tr=await fetchEmailTracking(); const col=loadCollected(); colisCount=(tr||[]).filter(t=>isColisRetirable(t,col)).length; }catch(_){}
       // Leboncoin : paires publiées sur LBC mais VENDUES sur Vinted (plus en ligne)
       // → à retirer de Leboncoin pour ne pas les vendre deux fois.
       let lbcRemoveCount=0;
@@ -12969,7 +12970,7 @@ export default function App() {
   },[vintedAccounts]);
 
   return (
-    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:"'Nunito','Instrument Sans',system-ui,sans-serif",paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
+    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -13279,7 +13280,7 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
       </main>
@@ -13297,7 +13298,10 @@ export default function App() {
         }}
       />}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+        /* La police (Inter) est chargée une seule fois dans index.html, sans
+           bloquer l'affichage. Cet @import chargeait EN PLUS Nunito, qui n'est
+           plus la police de l'app depuis la refonte : deux polices téléchargées,
+           et le conteneur racine qui forçait encore Nunito par-dessus Inter. */
         html, body, #root { max-width: 100%; overflow-x: hidden; margin: 0; }
         * { box-sizing: border-box; }
         @media (max-width: 600px) {
