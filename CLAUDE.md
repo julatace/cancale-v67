@@ -463,7 +463,14 @@ Le dressing contient **tout l'historique**, pas seulement le stock en ligne. Ré
 | 199082413 | 96 | **96** | 0 |
 | autres | 61 | 13 | 48 |
 
-Donc un gros `total_entries` n'est pas alarmant en soi — mais quand la page 1 est **entièrement** en ligne (cas de `199082413`), les pages suivantes contiennent forcément d'autres annonces en ligne.
+⚠️ **CORRECTION (Julien avait raison) — il n'y a PAS 508 annonces en ligne cachées.**
+J'avais déduit « la page 1 est 100 % en ligne, donc les suivantes le sont aussi ». C'est faux :
+le dressing est trié **actifs d'abord**, donc une page 1 entièrement active est le comportement
+NORMAL, et les 508 suivantes sont selon toute vraisemblance l'historique vendu (comme sur les
+autres comptes : 87 fermés sur 95, 46 sur 54). **On ne sait pas** combien des 508 sont en ligne
+tant que les pages n'ont pas été lues — c'est justement ce que la pagination corrige.
+La pagination reste nécessaire (l'historique sert à retrouver une vente par son titre), mais
+elle ne « récupère » pas un stock caché.
 
 ---
 
