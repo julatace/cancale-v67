@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v52/02 · icônes';
+const BUILD_ID = 'v53/00 · zoom + geste souris';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -13513,6 +13513,64 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
+      <ZoomSetting/>
+    </div>
+  );
+}
+
+// ── DENSITÉ D'AFFICHAGE ────────────────────────────────────────────────────
+// « Ça fait un peu gros sur iPhone. » On dézoome toute l'app d'un coup avec la
+// propriété `zoom` sur <html> : tout suit (textes, marges, barre du bas, photos)
+// et le contenu qui tient à l'écran augmente vraiment. Mettre à l'échelle une
+// police de base ne servirait à rien : l'app dessine ses tailles en pixels.
+//
+// ⚠️ Volontairement PAS dans SYNC_KEYS : ça dépend de l'écran, pas du vendeur.
+// Le même compte sur un iPhone et sur un 27 pouces ne veut pas la même densité.
+const ZOOM_KEY = 'vrm_zoom';
+const ZOOMS = [['0.8', 'Petit'], ['0.9', 'Compact'], ['1', 'Normal'], ['1.1', 'Grand']];
+const readZoom = () => { try { return localStorage.getItem(ZOOM_KEY) || '1'; } catch (_) { return '1'; } };
+// ⚠️ `zoom` seul ne suffit PAS : il rétrécit la page sans élargir la mise en
+// page, et il reste une bande vide sur la droite. Il faut lui rendre la largeur
+// perdue — et en PIXELS, pas en `vw` : à l'intérieur d'un élément zoomé, `vw`
+// est zoomé lui aussi, donc il s'annule tout seul.
+const applyZoom = (z) => {
+  try {
+    const d = document.documentElement;
+    // On remet à zéro AVANT de mesurer : sinon on lit une largeur déjà zoomée
+    // et on la redivise, ce qui compose les zooms à chaque appel.
+    d.style.zoom = ''; d.style.minWidth = '';
+    const f = parseFloat(z);
+    if (f && f !== 1) {
+      const w = d.clientWidth;              // largeur réelle, zoom retiré
+      d.style.zoom = z;
+      d.style.minWidth = Math.round(w / f) + 'px';
+    }
+    localStorage.setItem(ZOOM_KEY, z);
+  } catch (_) {}
+};
+
+function ZoomSetting() {
+  const [z, setZ] = React.useState(readZoom);
+  const choisir = (v) => { setZ(v); applyZoom(v); };
+  return (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
+      <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>
+      <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
+        Dézoome toute l'app : plus de choses tiennent à l'écran. Réglage propre à cet appareil.
+      </div>
+      <div role="group" aria-label="Taille de l'affichage"
+        style={{display:'flex',gap:4,background:C.bg,borderRadius:999,padding:3,border:`1px solid ${C.border}`,marginTop:11}}>
+        {ZOOMS.map(([v, label]) => {
+          const on = v === z;
+          return (
+            <button key={v} type="button" onClick={() => choisir(v)} aria-pressed={on}
+              style={{flex:1,border:'none',borderRadius:999,padding:'8px 4px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+                background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,transition:'background .18s ease, color .18s ease'}}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -13911,6 +13969,37 @@ export default function App() {
     setGsData({online,sold,bought,lbc});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
+  // Passer à l'onglet voisin. Partagé par le doigt, la souris et les flèches du
+  // clavier : une seule règle, sinon les trois finissent par diverger.
+  const slideTab=React.useCallback((dx,dy,seuil)=>{
+    if(Math.abs(dx)<=seuil || Math.abs(dx)<=Math.abs(dy)*2) return;
+    setTab(t=>{
+      const i=BOTTOM_TABS.findIndex(x=>x.id===t); if(i<0) return t;
+      const ni=dx<0?Math.min(BOTTOM_TABS.length-1,i+1):Math.max(0,i-1);
+      return BOTTOM_TABS[ni].id;
+    });
+  },[]);
+  // La largeur rendue au zoom est calculée en pixels : il faut la recalculer
+  // quand l'écran change de taille (rotation du téléphone, fenêtre redimensionnée),
+  // sinon la page dépasse ou laisse une bande vide.
+  React.useEffect(()=>{
+    const onResize=()=>{ const z=readZoom(); if(z!=='1') applyZoom(z); };
+    window.addEventListener('resize',onResize);
+    window.addEventListener('orientationchange',onResize);
+    return ()=>{ window.removeEventListener('resize',onResize); window.removeEventListener('orientationchange',onResize); };
+  },[]);
+  // Flèches ← → sur ordinateur : le clavier est là, autant s'en servir.
+  React.useEffect(()=>{
+    const onKey=e=>{
+      if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
+      if(e.metaKey||e.ctrlKey||e.altKey) return;
+      const a=document.activeElement, tag=a&&a.tagName;
+      if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(a&&a.isContentEditable)) return;
+      slideTab(e.key==='ArrowRight'?-999:999, 0, 1);
+    };
+    window.addEventListener('keydown',onKey);
+    return ()=>window.removeEventListener('keydown',onKey);
+  },[slideTab]);
   const [stockVinted,setStockVinted]=useState(()=>load('vinted_stock_vinted',[]));
   const [notifEnabled,setNotifEnabled]=useState(()=>load('vinted_notif_enabled',false));
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
@@ -14530,7 +14619,62 @@ export default function App() {
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
-    <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>
+    <div style={{minHeight:'100vh',width:'100%',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}
+      onTouchStart={e=>{
+      // Pas de navigation par balayage quand le geste commence dans une
+      // surface flottante (modale, ajustement du tampon, carte...) :
+      // sinon glisser le tampon changeait d'onglet et perdait le réglage !
+      let n=e.target, overlay=false;
+      while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
+      if(overlay){ swipeStart.current=null; return; }
+      const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
+      }}
+      onTouchEnd={e=>{
+      const s=swipeStart.current; if(!s) return; swipeStart.current=null;
+      const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
+      slideTab(t.clientX-s.x, t.clientY-s.y, 70);
+      }}
+      // À LA SOURIS (ordinateur). Les événements tactiles ci-dessus ne sont
+      // JAMAIS émis par une souris : sur ordinateur, glisser ne faisait donc
+      // rien du tout. On écoute le pointeur, mais uniquement pour la souris —
+      // le tactile continue de passer par les gestes ci-dessus, qui marchent
+      // (un `pointerup` n'arrive pas toujours sur mobile : dès que la page se
+      // met à défiler, le navigateur envoie `pointercancel` à la place).
+      onPointerDown={e=>{
+      if(e.pointerType!=='mouse' || e.button!==0) return;
+      const t=e.target, tag=t&&t.tagName;
+      // Ne pas confondre avec une sélection de texte ou l'usage d'un champ.
+      if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable)) { swipeStart.current=null; return; }
+      let n=e.target, overlay=false;
+      while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
+      if(overlay){ swipeStart.current=null; return; }
+      swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
+      }}
+      // Dès que le geste part franchement de côté, on coupe la sélection de
+      // texte. Sans ça, glisser surlignait la page, et la sélection restée en
+      // place faisait échouer tous les gestes suivants : le balayage ne
+      // marchait qu'une fois. Un geste vertical ou oblique, lui, sélectionne
+      // normalement — c'est ce qui distingue « je navigue » de « je copie ».
+      onPointerMove={e=>{
+      const s=swipeStart.current; if(!s||!s.souris) return;
+      if(s.horiz) return;
+      const dx=e.clientX-s.x, dy=e.clientY-s.y;
+      if(Math.abs(dx)>25 && Math.abs(dx)>Math.abs(dy)*1.5){
+      s.horiz=true;
+      try{ document.body.style.userSelect='none'; window.getSelection().removeAllRanges(); }catch(_){}
+      }
+      }}
+      onPointerUp={e=>{
+      const s=swipeStart.current;
+      if(!s||!s.souris||e.pointerType!=='mouse') return;
+      swipeStart.current=null;
+      try{ document.body.style.userSelect=''; }catch(_){}
+      // Un geste qui n'est jamais devenu horizontal, c'est une sélection.
+      if(!s.horiz) return;
+      // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
+      slideTab(e.clientX-s.x, e.clientY-s.y, 110);
+      }}
+      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -14758,25 +14902,7 @@ export default function App() {
           <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:6,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
-      <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:'calc(84px + env(safe-area-inset-bottom))'}}
-        onTouchStart={e=>{
-          // Pas de navigation par balayage quand le geste commence dans une
-          // surface flottante (modale, ajustement du tampon, carte...) :
-          // sinon glisser le tampon changeait d'onglet et perdait le réglage !
-          let n=e.target, overlay=false;
-          while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
-          if(overlay){ swipeStart.current=null; return; }
-          const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY};
-        }}
-        onTouchEnd={e=>{
-          const s=swipeStart.current; if(!s) return; swipeStart.current=null;
-          const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
-          const dx=t.clientX-s.x, dy=t.clientY-s.y;
-          if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)*2){
-            const idx=BOTTOM_TABS.findIndex(x=>x.id===tab);
-            if(idx>=0){ const ni=dx<0?Math.min(BOTTOM_TABS.length-1,idx+1):Math.max(0,idx-1); if(ni!==idx) setTab(BOTTOM_TABS[ni].id); }
-          }
-        }}>
+      <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:'calc(84px + env(safe-area-inset-bottom))'}}>
         {tab==='settings'&&<SettingsScreen setTab={setTab}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}

@@ -325,3 +325,28 @@ Dans les deux familles, il faut rendre `async` la fonction **au-dessus**, pas le
 `ICON_PATHS` gagne `trash` / `close` / `pencil`. Les 25 boutons qui ne portaient qu'un emoji nu (🗑 ✕ ✎ 📄) passent au trait — un emoji est dessiné par un fournisseur différent des icônes de la barre du bas, ça ne va pas ensemble. `<Icon>` porte `vertical-align: middle` : une `<svg>` est un élément en ligne, sans ça elle se pose sur la ligne de base et paraît décalée. Les emojis **dans les libellés** (« 📤 Exporter Excel ») sont gardés : là, ils aident.
 
 **Garage** et **Factures** étaient les deux derniers écrans avec leur vieux `<h2>` vert + emoji ; ils passent à `<ScreenHead>` comme tous les autres.
+
+---
+
+## 14. Session août 2026 (suite) — densité d'affichage + gestes à la souris
+
+### « Ça fait un peu gros sur iPhone » → réglage de taille
+Réglages → Affichage → **Petit / Compact / Normal / Grand** (`ZoomSetting`, clé `vrm_zoom`).
+**Volontairement PAS dans `SYNC_KEYS`** : ça dépend de l'écran, pas du vendeur. Le même compte sur un iPhone et sur un 27 pouces ne veut pas la même densité.
+
+⚠️ **Pièges, tous rencontrés et corrigés :**
+1. **`zoom` seul ne suffit pas.** Il rétrécit la page sans élargir la mise en page → bande vide sur la droite. Il faut lui rendre la largeur perdue : `minWidth = largeurRéelle / facteur`.
+2. **En PIXELS, jamais en `vw`.** À l'intérieur d'un élément zoomé, `100vw` est zoomé lui aussi : `calc(100vw / 0.8)` s'annule tout seul. Testé, ça ne marche pas.
+3. **Remettre à zéro avant de mesurer.** `applyZoom` fait `zoom=''; minWidth=''` puis lit `clientWidth`, sinon on lit une largeur déjà zoomée et on la redivise → les zooms se composent à chaque appel.
+4. **Le conteneur racine avait `maxWidth:'100vw'`**, qui plafonnait la page à la largeur non zoomée et ramenait la bande grise. Retiré ; `overflowX:'clip'` faisait déjà le travail.
+5. **Recalcul sur `resize` / `orientationchange`** : la largeur est en pixels, elle ne suit pas toute seule.
+6. Appliqué par un petit script **dans `index.html`, avant le chargement de l'app** : sinon la page s'affiche à 100 % puis saute de taille à chaque ouverture.
+
+### « Sur l'ordinateur je ne peux pas glisser avec la souris »
+Le balayage entre onglets n'écoutait que `onTouchStart`/`onTouchEnd` — **une souris n'émet jamais ces événements**.
+
+- Ajout de `onPointerDown/Move/Up/Cancel` **filtrés sur `pointerType === 'mouse'`**. Le tactile continue de passer par les gestes tactiles : sur mobile un `pointerup` n'arrive pas toujours (dès que la page défile, le navigateur envoie `pointercancel`), donc on ne touche pas à ce qui marche.
+- **Un glissé franchement horizontal coupe la sélection de texte** (`userSelect:none` + `removeAllRanges`). Sans ça le geste surlignait la page, et la sélection restée en place faisait échouer tous les gestes suivants : **le balayage ne marchait qu'une fois**. Un geste vertical ou oblique sélectionne normalement.
+- Seuil souris 110 px (contre 70 au doigt) : à la souris on bouge sans le vouloir.
+- **Flèches ← → du clavier** aussi, via le même `slideTab()` — une seule règle pour les trois entrées.
+- ⚠️ **Les gestes sont sur le conteneur racine, plus sur `<main>`.** Sur `<main>` ils ne marchaient que là où il y a du contenu : dézoomé, le contenu s'arrête plus haut et glisser dans le vide ne faisait rien. Le garde-fou « surface flottante » (`data-noswipe` ou `position:fixed`) protège toujours la barre du bas et les modales.

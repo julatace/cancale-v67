@@ -101,5 +101,11 @@
     @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}button:active:not(:disabled){transform:none!important;}}
   </style>
 </head>
-<body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
+<body><div id="root"></div>
+<!-- Densité d'affichage (Réglages → Affichage). Appliquée AVANT le chargement
+     de l'app : sinon la page s'affiche à 100 % puis saute de taille sous les
+     yeux de l'utilisateur à chaque ouverture. -->
+<script>try{var z=localStorage.getItem('vrm_zoom'),f=parseFloat(z);
+if(f&&f!==1){var d=document.documentElement,w=d.clientWidth;d.style.zoom=z;d.style.minWidth=Math.round(w/f)+'px';}}catch(e){}</script>
+<script type="module" src="/src/main.jsx"></script></body>
 </html>
