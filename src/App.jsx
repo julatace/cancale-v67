@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v44/00 · 👻disparues';
+const BUILD_ID = 'v44/01 · ✉️confirmation';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -175,6 +175,46 @@ const authSignIn  = async (email, password) => {
   writeSession(sessionFrom(r.json));
   return { ok: true };
 };
+// ── CONFIRMER EN COLLANT LE LIEN REÇU ─────────────────────────────────────
+// Le lien du mail passe par Supabase, qui renvoie ensuite vers l'adresse
+// configurée dans le projet (« Site URL »). Si elle est restée sur la valeur
+// d'usine (http://localhost:3000), le navigateur affiche « impossible d'accéder
+// au site » — et selon le moment où ça casse, le compte n'est même pas confirmé.
+//
+// Plutôt que de dépendre de ce réglage, on accepte que le lien soit COLLÉ ici :
+// on en extrait le jeton et on fait nous-mêmes la vérification. Aucune
+// redirection, donc rien à casser.
+const authConfirmFromLink = async (raw, email) => {
+  const txt = String(raw || '').trim();
+  if (!txt) return { ok: false, error: 'Colle le lien reçu par email.' };
+  let q = null;
+  if (/^\d{6}$/.test(txt)) q = new URLSearchParams({ token: txt, type: 'signup' });  // code à 6 chiffres collé tel quel
+  else {
+    try { q = new URL(txt).searchParams; }
+    catch (_) { const i = txt.indexOf('?'); if (i >= 0) q = new URLSearchParams(txt.slice(i + 1)); }
+  }
+  if (!q) return { ok: false, error: "Ce n'est ni un lien, ni un code à 6 chiffres." };
+  const type = q.get('type') || 'signup';
+  const hash = q.get('token_hash');
+  const token = q.get('token');
+  if (!hash && !token) return { ok: false, error: "Ce lien ne contient pas de jeton de confirmation." };
+  // ⚠️ PIÈGE : dans un lien d'email, le paramètre `token` contient DÉJÀ un jeton
+  // haché — c'est la même chose qu'un `token_hash`. Si on l'envoie comme un code
+  // à 6 chiffres (`{token, email}`), le serveur le hache une deuxième fois et le
+  // rejette systématiquement. On ne prend ce format QUE pour un vrai code court
+  // tapé à la main.
+  const body = (!hash && /^\d{6}$/.test(String(token)))
+    ? { type, token, email: String(email || '').trim().toLowerCase() }
+    : { type, token_hash: hash || token };
+  const r = await authCall('verify', body);
+  if (!r.ok) {
+    if (/expired|invalid/i.test(r.error)) return { ok: false, error: 'Lien expiré ou déjà utilisé. Redemande un email, et colle le PLUS RÉCENT.' };
+    return { ok: false, error: r.error };
+  }
+  if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true, connected: true }; }
+  return { ok: true };
+};
+
 // Renvoyer l'email de confirmation (le premier peut s'être perdu, ou avoir été
 // bloqué par le quota du serveur d'envoi de test de Supabase).
 const authResendConfirm = async (email) => {
@@ -2356,6 +2396,7 @@ function AuthScreen() {
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
   const [info, setInfo] = React.useState('');
   const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
+  const [confirmLink, setConfirmLink] = React.useState('');      // lien du mail, collé à la main
 
   const oauth = async (p) => {
     setErr(''); setBusy(true);
@@ -2465,14 +2506,30 @@ function AuthScreen() {
           {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {needConfirm && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
-              Ouvre le mail de confirmation reçu à <b>{email}</b> (regarde aussi les spams), puis reviens te connecter.
-              <button type="button" disabled={busy}
-                onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
-                  if(r.ok){ setErr(''); setInfo('Email de confirmation renvoyé.'); } else setErr(r.error); }}
-                style={{display:'block',marginTop:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
-                  borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                Renvoyer l'email
-              </button>
+              Ton compte <b>{email}</b> attend sa confirmation.
+              <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+                Si le lien du mail affiche « <i>impossible d'accéder au site</i> », c'est normal : il renvoie vers une adresse de test.
+                <b style={{color:C.text}}> Copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
+              </div>
+              <input value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
+                style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:10,
+                  padding:'10px 11px',fontSize:12,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
+                <button type="button" disabled={busy||!confirmLink.trim()}
+                  onClick={async()=>{ setBusy(true); setErr(''); const r=await authConfirmFromLink(confirmLink, email); setBusy(false);
+                    if(r.ok){ setNeedConfirm(false); setInfo('Compte confirmé !'); setTimeout(()=>location.reload(), 800); } else setErr(r.error); }}
+                  style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 13px',
+                    fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
+                  Confirmer avec ce lien
+                </button>
+                <button type="button" disabled={busy}
+                  onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
+                    if(r.ok){ setErr(''); setInfo('Nouvel email envoyé — utilise le plus récent.'); } else setErr(r.error); }}
+                  style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
+                    borderRadius:10,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  Renvoyer l'email
+                </button>
+              </div>
             </div>
           )}
           {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}

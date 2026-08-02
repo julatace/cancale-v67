@@ -103,11 +103,22 @@ application chez chaque fournisseur et donner ses clés à Supabase.
 4. Supabase → **Authentication → Providers → Discord** → active, colle les deux,
    **Save**
 
-### Et l'adresse de retour vers l'app
+### Et l'adresse de retour vers l'app — À FAIRE MÊME SANS GOOGLE/DISCORD
 Supabase → **Authentication → URL Configuration** :
 - **Site URL** : `https://vrm.center`
 - **Redirect URLs** : ajoute `https://vrm.center/**` et
   `https://cancale-v67-ten.vercel.app/**`
+
+> ⚠️ **C'est ce réglage qui casse les liens de confirmation.** Par défaut, la
+> Site URL vaut `http://localhost:3000`. Le lien du mail passe par Supabase puis
+> renvoie vers cette adresse — qui n'existe pas sur ton téléphone, d'où
+> « impossible d'accéder au site ». Tant qu'il n'est pas corrigé, tous les liens
+> (confirmation, mot de passe oublié) finissent sur une page d'erreur.
+>
+> Contournement en attendant : l'écran de connexion accepte qu'on **colle le
+> lien** du mail (ou un code à 6 chiffres) — l'app fait la vérification
+> elle-même, sans redirection. Et le chemin garanti reste
+> **Authentication → Users → clic sur l'email → Confirm email**.
 
 Cette liste est une **liste blanche** : sans elle, quelqu'un pourrait fabriquer
 un lien de connexion qui renvoie le jeton vers son propre site.
