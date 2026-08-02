@@ -296,3 +296,32 @@ L'extension fait la même détection de son côté (`isCloisonne()`, mise en cac
 
 ### Ce qui bloque encore la bascule
 Les fonctions `api/*.js` (widget, email-inbound, ship-reminders, push) écrivent avec la clé anon → **cassées dès que RLS est activé**. Il leur faut `SUPABASE_SERVICE_KEY` (Vercel) + savoir à quel vendeur attribuer chaque ligne. Pour les emails, ça suppose de rattacher une adresse email à un vendeur — chantier à part entière.
+
+---
+
+## 13. Session août 2026 (suite) — plus aucune boîte de dialogue du navigateur
+
+C'était **le** détail qui faisait « site web » plutôt qu'« application » : chaque suppression, chaque saisie de numéro ouvrait la boîte grise du navigateur — sur iPhone, une alerte système au milieu de rien.
+
+### Ce qui remplace quoi
+| Avant | Après |
+|---|---|
+| `window.confirm()` (29 appels) | `await askConfirm({title, desc, ok, cancel, danger})` → `<ConfirmHost/>` |
+| `window.prompt()` (25 appels) | `await askText({desc, value, numeric, ok})` → `<AskTextSheet/>` |
+| `window.alert()` (2 appels) | `toast()` |
+
+- Les deux feuilles partagent `SheetShell` (voile flouté + panneau qui monte du bas, animation `cancaleSheet` dans `index.html`) et `sheetTexte()` (la première phrase devient le titre, le reste passe en dessous en texte normal — sinon une question d'un seul tenant faisait un titre de six lignes en gras).
+- `askText` renvoie **la chaîne saisie, ou `null` à l'annulation**, exactement comme `window.prompt` : les appels existants (`|| ''`, `!= null`) marchent tels quels.
+- 14 champs sont en `inputMode="numeric"` (pavé numérique sur téléphone) — la moitié des saisies du Garage sont des numéros de boîte.
+- **Filet** : si `<ConfirmHost/>` n'est pas monté, on retombe sur la boîte du navigateur au lieu de bloquer. Il **est** monté, à côté de `<Toaster/>`.
+
+### ⚠️ Piège si tu refais ce genre de conversion en masse
+Passer de synchrone à `await` oblige à rendre `async` toutes les fonctions englobantes. Un script qui remonte automatiquement jusqu'à la fonction la plus proche **se trompe** sur deux familles de cas, et ça ne se voit pas au build :
+1. **Les fonctions de RENDU** (`{cond && (()=>{ … })()}`). React ne sait pas afficher une Promise → l'écran devient blanc. 4 cas dans le Garage.
+2. **Les callbacks dont la valeur de retour compte** : `items.find(async o => …)` renvoie toujours une Promise, donc toujours vrai → **le mauvais meuble est retourné**. Pareil pour `.reduce`, `.map`, `.filter`. 4 cas.
+Dans les deux familles, il faut rendre `async` la fonction **au-dessus**, pas le callback. Vérifier après coup : `git diff | grep async` puis chercher chaque nom converti pour voir si son retour est consommé quelque part.
+
+### Icônes
+`ICON_PATHS` gagne `trash` / `close` / `pencil`. Les 25 boutons qui ne portaient qu'un emoji nu (🗑 ✕ ✎ 📄) passent au trait — un emoji est dessiné par un fournisseur différent des icônes de la barre du bas, ça ne va pas ensemble. `<Icon>` porte `vertical-align: middle` : une `<svg>` est un élément en ligne, sans ça elle se pose sur la ligne de base et paraît décalée. Les emojis **dans les libellés** (« 📤 Exporter Excel ») sont gardés : là, ils aident.
+
+**Garage** et **Factures** étaient les deux derniers écrans avec leur vieux `<h2>` vert + emoji ; ils passent à `<ScreenHead>` comme tous les autres.
