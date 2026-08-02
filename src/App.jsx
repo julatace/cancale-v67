@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v47/00 · 🔑connexion';
+const BUILD_ID = 'v47/01 · 🔑connexion';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -13063,7 +13063,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
             );
           })}
           <div style={{fontSize:10.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-            Google et Discord apparaissent comme « disponibles » dès que tu as créé l'application chez eux et collé les clés dans Supabase (procédure dans supabase/README.md).
+            Ces deux boutons apparaîtront tout seuls dès que tu auras créé l'application chez Google / Discord et collé les clés dans Supabase. Tant que ce n'est pas fait, on ne les affiche pas : un bouton qui mène à une page d'erreur ne sert à rien.
           </div>
         </div>
 
