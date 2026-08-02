@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v45/00 · 👤compte';
+const BUILD_ID = 'v45/01 · ✉️lien';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -219,11 +219,27 @@ const authConfirmFromLink = async (raw, email) => {
 // bloqué par le quota du serveur d'envoi de test de Supabase).
 const authResendConfirm = async (email) => {
   const r = await authCall('resend', { type: 'signup', email: String(email).trim().toLowerCase() });
-  if (!r.ok) {
-    if (/rate limit/i.test(r.error)) return { ok: false, error: "Quota d'emails atteint. Confirme depuis Supabase : Authentication → Users → clique sur ton email → Confirm email." };
-    return { ok: false, error: r.error };
-  }
+  if (!r.ok) return { ok: false, error: mapMailError(r.error) };
   return { ok: true };
+};
+
+// LIEN DE CONNEXION PAR EMAIL (« magic link »). Utile quand le mot de passe est
+// bon mais que le compte attend encore sa confirmation : ouvrir ce lien confirme
+// l'adresse ET connecte, d'un coup. Comme le lien renvoie vers l'adresse
+// configurée dans Supabase (souvent restée sur localhost), on le fait plutôt
+// COLLER dans l'app, qui le vérifie elle-même.
+const authMagicLink = async (email) => {
+  const r = await authCall('otp', { email: String(email).trim().toLowerCase(), create_user: false });
+  if (!r.ok) return { ok: false, error: mapMailError(r.error) };
+  return { ok: true };
+};
+
+// Le serveur d'envoi intégré de Supabase est limité à quelques messages par
+// heure. « email rate limit exceeded » n'aide personne : on dit ce qui se passe
+// et par où passer en attendant.
+const mapMailError = (err) => {
+  if (/rate limit/i.test(err || '')) return "Quota d'emails Supabase atteint (quelques envois par heure). Réessaie dans une heure, ou confirme sans email : Supabase → Authentication → Users → clic sur ton email → Confirm email.";
+  return err;
 };
 const authSignUp  = async (email, password) => {
   const r = await authCall('signup', { email: String(email).trim().toLowerCase(), password });
@@ -2528,6 +2544,13 @@ function AuthScreen() {
                   style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
                     borderRadius:10,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                   Renvoyer l'email
+                </button>
+                <button type="button" disabled={busy}
+                  onClick={async()=>{ setBusy(true); const r=await authMagicLink(email); setBusy(false);
+                    if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le mail, copie le lien, colle-le ci-dessus : ça confirme ton compte ET te connecte."); } else setErr(r.error); }}
+                  style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
+                    borderRadius:10,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  Recevoir un lien de connexion
                 </button>
               </div>
             </div>
