@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v43/01 · 🔑connexion';
+const BUILD_ID = 'v43/02 · 🔑connexion';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -163,8 +163,26 @@ const authValid = () => !!(AUTH.session && AUTH.session.access_token && AUTH.ses
 
 const authSignIn  = async (email, password) => {
   const r = await authCall('token?grant_type=password', { email: String(email).trim().toLowerCase(), password });
-  if (!r.ok) return { ok: false, error: /invalid|credential/i.test(r.error) ? 'Email ou mot de passe incorrect.' : r.error };
+  if (!r.ok) {
+    // « Email not confirmed » veut dire que le compte existe bel et bien : il
+    // attend juste que le lien reçu par email soit cliqué. C'est une situation
+    // qui se règle, pas une erreur de saisie — on le dit, et on propose de
+    // renvoyer l'email plutôt que de laisser l'utilisateur devant un mur.
+    if (/not confirmed/i.test(r.error)) return { ok: false, needsConfirm: true, error: "Ton compte existe, mais l'email n'est pas encore confirmé." };
+    if (/invalid|credential/i.test(r.error)) return { ok: false, error: 'Email ou mot de passe incorrect.' };
+    return { ok: false, error: r.error };
+  }
   writeSession(sessionFrom(r.json));
+  return { ok: true };
+};
+// Renvoyer l'email de confirmation (le premier peut s'être perdu, ou avoir été
+// bloqué par le quota du serveur d'envoi de test de Supabase).
+const authResendConfirm = async (email) => {
+  const r = await authCall('resend', { type: 'signup', email: String(email).trim().toLowerCase() });
+  if (!r.ok) {
+    if (/rate limit/i.test(r.error)) return { ok: false, error: "Quota d'emails atteint. Confirme depuis Supabase : Authentication → Users → clique sur ton email → Confirm email." };
+    return { ok: false, error: r.error };
+  }
   return { ok: true };
 };
 const authSignUp  = async (email, password) => {
@@ -2337,6 +2355,7 @@ function AuthScreen() {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
   const [info, setInfo] = React.useState('');
+  const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
 
   const oauth = async (p) => {
     setErr(''); setBusy(true);
@@ -2369,7 +2388,7 @@ function AuthScreen() {
         else if (r.needsConfirm) setInfo("Compte créé ! Ouvre l'email de confirmation qu'on vient de t'envoyer, puis reviens te connecter.");
       } else {
         const r = await authSignIn(email, pw);
-        if (!r.ok) setErr(r.error);
+        if (!r.ok) { setErr(r.error); setNeedConfirm(!!r.needsConfirm); }
         // Rechargement volontaire après connexion : l'app relit alors le cloud
         // du bon vendeur depuis un état propre. Sans ça, un composant déjà monté
         // pourrait garder en mémoire les données du vendeur précédent.
@@ -2444,6 +2463,18 @@ function AuthScreen() {
           )}
 
           {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
+          {needConfirm && (
+            <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
+              Ouvre le mail de confirmation reçu à <b>{email}</b> (regarde aussi les spams), puis reviens te connecter.
+              <button type="button" disabled={busy}
+                onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
+                  if(r.ok){ setErr(''); setInfo('Email de confirmation renvoyé.'); } else setErr(r.error); }}
+                style={{display:'block',marginTop:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
+                  borderRadius:10,padding:'8px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                Renvoyer l'email
+              </button>
+            </div>
+          )}
           {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
           <button type="submit" disabled={busy} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
