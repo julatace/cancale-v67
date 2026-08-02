@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v58/00 · numéros sûrs';
+const BUILD_ID = 'v59/00 · discret';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1006,6 +1006,33 @@ const ordersFromEmailSales = (mails, accounts) => {
     };
   }).filter(Boolean);
 };
+// Même filet pour les ACHATS : les reçus d'achat `email_achat_*` (46 en base)
+// portent article, prix, transaction et date. Ils prennent le relais quand la
+// moisson des achats est vide, sans aller déranger Vinted.
+const ordersFromEmailAchats = (mails, accounts) => {
+  const parCle = new Map();
+  (accounts || []).forEach(a => {
+    parCle.set(String(a.vinted_user_id), a);
+    if (a.login) parCle.set(String(a.login).toLowerCase(), a);
+  });
+  return (mails || []).map(m => {
+    const titre = String(m.article || '').trim();
+    if (!titre) return null;
+    const montant = parseFloat(String(m.prix || '').replace(',', '.'));
+    const acc = parCle.get(String(m.uid || '')) || parCle.get(String(m.account || '').toLowerCase())
+      || { vinted_user_id: m.uid || '', login: m.account || '' };
+    return {
+      transaction_id: m.transaction || ('mail:' + (m.uid || '') + ':' + (m.receivedAt || '')),
+      title: titre,
+      price: { amount: isNaN(montant) ? null : montant, currency_code: 'EUR' },
+      date: m.receivedAt || null,
+      status: 'Achat confirmé',
+      _fromEmail: true,
+      _acc: acc,
+    };
+  }).filter(Boolean);
+};
+
 // Extrait les champs propres d'un reçu d'achat depuis l'email Vinted (montant,
 // détail, vendeur, date, transaction). Sert à la fois à la modale in-app et à
 // l'impression PDF. On retire les astérisques de mise en forme de Vinted.
@@ -1556,8 +1583,20 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
     // page n'a pas encore été ouverte / la session a expiré », pas « aucune
     // vente ». En la prenant pour argent comptant, l'onglet Ventes affichait
     // zéro vente alors qu'il y en avait — on continue vers le proxy.
-    if (h && Array.isArray(h.my_orders) && h.my_orders.length > 0) {
-      return { ok: true, items: applyStatus(h.my_orders), pagination: h.pagination || null, source: 'harvest' };
+    if (h && Array.isArray(h.my_orders)) {
+      // Moisson NON vide : c'est la réponse.
+      if (h.my_orders.length > 0) {
+        return { ok: true, items: applyStatus(h.my_orders), pagination: h.pagination || null, source: 'harvest' };
+      }
+      // Moisson PRÉSENTE mais vide. On ne va PAS interroger Vinted pour autant :
+      // avec 8 comptes, ça faisait ~20 appels depuis l'IP du serveur à chaque
+      // ouverture — précisément le motif « multi-comptes piloté par un robot »
+      // que Vinted détecte. Les ventes sont de toute façon reconstituées depuis
+      // les emails (plus complètes ici), et les achats aussi. Le bouton
+      // « Synchroniser » (opts.force) reste là pour aller chercher le direct.
+      // ⚠️ Ligne ABSENTE (h == null) = compte jamais moissonné : là, on tente
+      // le proxy, sinon un compte tout neuf n'afficherait jamais rien.
+      return { ok: true, items: [], pagination: null, source: 'harvest-vide' };
     }
   }
   // Mode "moisson seulement" : on n'interroge PAS Vinted, on renvoie du vide si
@@ -1598,8 +1637,15 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
     const h = await fetchHarvest(account.vinted_user_id, 'inbox');
     // Une moisson VIDE n'est pas une réponse (cf. fetchVintedOrders) : la page
     // n'a pas encore été ouverte ou la session a expiré. On va voir plus loin.
-    if (h && Array.isArray(h.conversations) && h.conversations.length > 0) {
-      return { ok: true, items: h.conversations, pagination: h.pagination || null, raw: null, source: 'harvest' };
+    if (h && Array.isArray(h.conversations)) {
+      if (h.conversations.length > 0) {
+        return { ok: true, items: h.conversations, pagination: h.pagination || null, raw: null, source: 'harvest' };
+      }
+      // Boîte de réception moissonnée mais vide : on n'interroge PAS Vinted.
+      // Mesuré : ça déclenchait 16 appels au démarrage (8 comptes × 2 domaines)
+      // depuis l'IP du serveur, sans que l'écran Messages soit même ouvert —
+      // le signal exact que Vinted lit comme du multi-comptes automatisé.
+      return { ok: true, items: [], pagination: null, raw: null, source: 'harvest-vide' };
     }
   }
   // Mode "moisson seulement" : aucun appel Vinted.
@@ -9174,16 +9220,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // par email et que ni la moisson ni le proxy n'ont rendues. Doublon écarté
     // sur « même titre + même prix ». Les emails ne remplacent jamais une vraie
     // commande (elle porte le vrai statut et le vrai n° de transaction).
-    if (type === 'sold') {
-      try {
-        const cle = (o) => normTitle(o.title) + '@' + Math.round(Number(o.price?.amount) || 0);
-        const vus = new Set(out.map(cle));
-        for (const o of ordersFromEmailSales(await fetchEmailSales(), accounts)) {
-          const k = cle(o); if (vus.has(k)) continue;
-          vus.add(k); out.push(o); anyOk = true;
-        }
-      } catch (_) {}
-    }
+    try {
+      const cle = (o) => normTitle(o.title) + '@' + Math.round(Number(o.price?.amount) || 0);
+      const vus = new Set(out.map(cle));
+      const depuisEmails = type === 'sold'
+        ? ordersFromEmailSales(await fetchEmailSales(), accounts)
+        : ordersFromEmailAchats(await fetchEmailAchats(), accounts);
+      for (const o of depuisEmails) {
+        const k = cle(o); if (vus.has(k)) continue;
+        vus.add(k); out.push(o); anyOk = true;
+      }
+    } catch (_) {}
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;

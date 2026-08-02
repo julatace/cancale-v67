@@ -489,3 +489,32 @@ Donc un gros `total_entries` n'est pas alarmant en soi — mais quand la page 1 
 
 ### ⚠️ PIÈGE TDZ — rencontré une deuxième fois, à ne pas refaire
 Un `useMemo` placé **avant** la déclaration d'un `const` qu'il lit plante l'app au premier rendu (`Cannot access 'X' before initialization`, écran blanc) : la fabrique du `useMemo` s'exécute immédiatement, pas plus tard. `numDoublons` lisait `annBase`, déclaré 20 lignes plus bas. **Toujours placer un `useMemo` après tout ce qu'il lit** — le build ne le voit pas, seul un rendu réel le révèle. (Même piège déjà noté pour `disparues`/`pairsLost`.)
+
+---
+
+## 20. Session août 2026 (suite) — vérification de bout en bout avec les VRAIES données
+
+Méthode : Playwright + interception des appels Supabase, alimentés par des copies réelles de la base (annonces, ventes, achats, inbox, profils, emails, ligne `main`). But : voir l'app telle que Julien la voit, au lieu de vérifier fonction par fonction. **À refaire à chaque gros changement** — c'est ce qui a révélé les points ci-dessous.
+
+⚠️ **Deux pièges du banc de test lui-même** (sinon on mesure un artefact) :
+1. `detectSchema()` sonde `select=owner` : le mock doit répondre **400**, sinon l'app se croit cloisonnée et affiche l'écran de connexion.
+2. **Servir TOUTES les familles de lignes.** Sans les `harvest_*_inbox`, le banc simulait 8 comptes sans boîte de réception et comptait 16 appels Vinted fantômes. Avec les vraies lignes : 2.
+
+### Résultat : l'app fonctionne
+| écran | ce qui s'affiche |
+|---|---|
+| Ventes | **44 ventes en cours, ≈1204 €** — le filet email marche, l'onglet n'est plus vide |
+| Bordereaux | 6 à imprimer, 50 reçus, **43 auto-marqués expédiés** (avant : les 51 restaient) |
+| Achats | 3 colis à retirer, **« Maison de la Presse — 40 Rue du Port »** + code 077831, sans QR fabriqué |
+| Annonces | 8 comptes chiffrés, 2 signalements |
+
+### ⚠️ Régression que j'avais introduite : 21 appels Vinted au démarrage
+La règle « une liste vide n'est pas une réponse » (section 16) faisait retomber sur le proxy pour **chaque compte** dont la moisson était vide → **21 appels depuis l'IP Vercel à chaque ouverture**, dont 16 sur l'inbox alors que l'écran Messages n'était même pas ouvert. C'est très exactement le motif « multi-comptes piloté par un robot » que Vinted détecte (section 5).
+
+**Distinction posée** — elle vaut pour tout nouveau `fetchVinted*` :
+- **ligne ABSENTE** (`h == null`) = compte jamais moissonné → on tente le proxy, sinon un compte neuf n'afficherait jamais rien ;
+- **ligne PRÉSENTE mais vide** → on renvoie `{ items: [], source: 'harvest-vide' }` **sans appeler Vinted**. Les données viennent des emails, et « Synchroniser » (`opts.force`) reste là pour forcer.
+
+Appliqué aux commandes ET aux conversations. **Mesuré : 21 → 7 appels**, les 7 restants correspondant à des lignes réellement absentes.
+
+`ordersFromEmailAchats()` complète `ordersFromEmailSales()` : les 46 reçus `email_achat_*` alimentent l'onglet Achats, pour que couper le proxy ne vide rien.
