@@ -142,7 +142,10 @@ Sans accès terminal/git direct (session Cowork), chaque modification suivait ce
 - **Navigation** : une **barre du bas façon Vinted** (`BOTTOM_TABS`, `BottomBar` — fixe en bas, scrollable/swipe) avec des **onglets dédiés par catégorie** : Stats / **Annonces** (`cat_annonces`) / **Ventes** (`cat_ventes`) / **Achats** (`cat_achats`) / **Bordereaux** (`cat_bord`) / **Messages** (`cat_msg`) / Garage / Factures. En haut à droite, un **rouage ⚙️** ouvre les **Paramètres** (`SettingsScreen`) : export/import, ancien catalogue + anciennes ventes (`ARCHIVE_TABS`, toujours lus par le tableau de bord), thème, et l'accès à **« Comptes liés »**.
 - **Un seul composant rend toutes les catégories** : `Comptabilite({ only })`. Chaque onglet dédié le monte avec `only='annonces'|'ventes'|'achats'|'bordereaux'|'messages'` (agrège **tous les comptes**). Petite **étiquette de compte** (`AcctTag`) sur chaque ligne pour savoir d'où vient la vente/l'annonce. Les Messages sont **séparés par compte** (sélecteur `msgAcc`).
   - **Annonces** = annonces réellement en ligne (`fetchVintedListings` → `wardrobe/{PROFIL_id}/items`, filtrées `isOnlineListing` = `!is_closed && !is_hidden && !is_draft`). ⚠️ **Le wardrobe utilise l'ID DE PROFIL** (`users/current.user.id`, ≠ `vinted_user_id`=account_id) — sinon 0 annonce. Affichage façon Vinted (photo, prix, marque·taille·état). Sur chaque annonce : champ **N°** (badge), **prix d'achat**, bouton **🔗** (relier à un achat Vinted de N'IMPORTE quel compte → récupère le prix payé, exclut les achats déjà reliés), indicateur **🏠 Au garage / Ranger**.
-  - **Numérotation** : stockée dans **`vinted_annonce_numeros`** (clé = id d'annonce wardrobe) = `{numero, title, buyPrice, buyFromId, photo, price, numberedAt}`. **`vinted_used_numeros`** (append-only) = tous les numéros déjà utilisés : **un numéro n'est JAMAIS réattribué** (compta non ambiguë), suggestion = max+1.
+  - **Numérotation** : stockée dans **`vinted_annonce_numeros`** (clé = id d'annonce wardrobe) = `{numero, title, buyPrice, buyFromId, photo, price, numberedAt}`.
+    ⚠️ **RÈGLE CHANGÉE (août 2026) — un numéro = une PLACE au garage, pas un numéro de facture.** Avant, `vinted_used_numeros` était append-only et **aucun numéro n'était jamais réattribué** : résultat, 116 paires en ligne et un compteur déjà à 181, avec des numéros jusqu'à 172 (plainte de Julien : « pourquoi numéro 156 alors que j'ai à peine 50 paires »). Désormais un numéro est **PRIS** seulement tant qu'une paire l'occupe vraiment : annonce encore en ligne, numéro posé au garage, ou vente **pas encore expédiée** (`needsBordereau`). Sinon il **retourne dans le pool** (`freedNums` / `takenNums` dans `Comptabilite`), et la suggestion est le **plus petit libre**. L'historique n'y perd rien : chaque vente garde son numéro dans sa propre ligne (`vinted_sale_overrides`).
+    **Garde-fou anti-doublon** : on ne libère le numéro d'une annonce disparue que si les ventes sont chargées ET si le compte de cette annonce a bien renvoyé ses annonces au dernier chargement — un chargement partiel ne doit jamais libérer un numéro encore utilisé.
+    **Bouton « 🔢 Renuméroter à la suite »** (Annonces → ⋯ Outils) : `renumPlan` calcule un aperçu (X → Y par paire), `applyRenum` écrit après confirmation. Ne déplace jamais une paire rangée au garage ni une paire dont le numéro sert à une vente pas encore expédiée. Met aussi à jour `vinted_buyprice_by_num` (sinon le prix d'achat suivrait l'ancien numéro).
   - **Ventes/Achats** : filtres (En cours/Finalisées/Annulées ; En attente/Reçus), tri par date, totaux **CA finalisé / Coût / Bénéfice + marge moyenne + temps de vente moyen**, bouton **bordereau 📄** par vente, **export CSV**. Le bénéfice se calcule via le prix d'achat relié dans Annonces (matching par **titre exact**, `normTitle`). ⚠️ **Titres en double** : si plusieurs annonces portent le même titre (`titleAmbiguous`), on **n'associe pas** de prix d'achat au hasard — badge « ⚠️ titre en double » (Ventes/Annonces) et exclusion dans Bordereaux.
   - **Cache** : `_acctCache` (module-level, TTL 3 min) partagé entre vues → changer d'onglet ne re-fetche pas ; le bouton **« Synchroniser »** force (`{force}`).
 - **Écran « Comptes liés »** (`VintedAccounts`, accessible depuis Paramètres) : **gestion des comptes uniquement** — lister les comptes captés par l'extension, les renommer (`vinted_account_labels`), tester la connexion, actualiser, et **« Déconnecter »** (supprime la ligne `vinted_accounts` de Supabase + state — pour un compte bloqué/fermé ; via `deleteVintedAccount`). **Plus aucune vue de données ici** — évite les doublons.
@@ -228,3 +231,23 @@ Passeport de la paire (📖), Répartiteur de lot (🧮), Audit stock fantôme (
 ### RESTE À FAIRE / discuté, pas fait
 - **Multi-utilisateurs** : l'app est **mono-utilisateur** (une seule ligne Supabase `main` partagée). Pour ouvrir à d'autres vendeurs → vrai chantier : login + isolation des données par utilisateur. À scoper avec Julien avant de coder (ne pas bricoler une auth à moitié).
 - Carte des relais : encore perfectible selon les retours de Julien.
+
+
+---
+
+## 11. Session août 2026 (Claude Code) — Cohérence + numérotation + refonte visuelle
+
+### Cohérence (une seule règle par notion)
+- `acctOff(uid)` / `acctOffOf(o)` dans `Comptabilite` = **la** définition d'un compte masqué ou bloqué. Utilisée par les ventes, achats, messages, annonces, trésorerie, rapport, notifications. Ne plus refaire ce test à la main ailleurs.
+- `annBase` = **la** liste des annonces réellement en ligne (comptes actifs, hors paires vendues). La grille, le bandeau de stats, les conseils de prix/qualité/likers, le taux d'écoulement, l'audit et la numérotation auto en dérivent tous.
+- `buysBase` = idem pour les achats.
+- `isColisRetirable(t, collected)` (module-level) = **le** compteur « colis à retirer », partagé par l'accueil, l'onglet Achats et le centre de notifications.
+- `toShip` exclut désormais les colis déjà cochés « posté ».
+- `vinted_annonces_email_sold` (synchronisé) = mémoire des annonces auto-retirées parce qu'un email de vente/bordereau les confirme vendues → le tableau de bord compte comme l'onglet Annonces.
+- La barre d'objectif de CA lit `liveStats.caMois` (prop passée à `Comptabilite`), pas un calcul local.
+
+### Visuel
+- **Échelle typographique** ramenée à 9 / 11 / 12 / 13 / 15 / 17 / 20 / 22 / 26 / 32 (24 tailles avant). **Graisses** : 500 / 600 / 700 uniquement (800 et 900 supprimés). **Rayons** : 6 / 10 / 12 / 16 / 20 / 999 (18 valeurs avant).
+- **Icônes au trait** (`ICON_PATHS` + `<Icon name size/>`) dans la barre du bas ET dans les `ScreenHead` : un écran et son onglet portent le même symbole. Les emojis restent ailleurs.
+- Police : **Inter uniquement** (l'app forçait encore Nunito par-dessus, et un `@import` chargeait Nunito + Instrument Sans pour rien).
+- Titre en double supprimé (le `<h2>` de `Comptabilite` répétait le `ScreenHead`), et « Aucun compte lié » est devenu un vrai `EmptyState` **sous** le titre.
