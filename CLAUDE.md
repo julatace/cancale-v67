@@ -350,3 +350,38 @@ Le balayage entre onglets n'écoutait que `onTouchStart`/`onTouchEnd` — **une 
 - Seuil souris 110 px (contre 70 au doigt) : à la souris on bouge sans le vouloir.
 - **Flèches ← → du clavier** aussi, via le même `slideTab()` — une seule règle pour les trois entrées.
 - ⚠️ **Les gestes sont sur le conteneur racine, plus sur `<main>`.** Sur `<main>` ils ne marchaient que là où il y a du contenu : dézoomé, le contenu s'arrête plus haut et glisser dans le vide ne faisait rien. Le garde-fou « surface flottante » (`data-noswipe` ou `position:fixed`) protège toujours la barre du bas et les modales.
+
+---
+
+## 15. Session août 2026 (suite) — ⚠️ LE PIÈGE `updated_at` (à lire avant de déboguer « données vides »)
+
+**La table `app_data` n'a AUCUN trigger : `updated_at` garde la date de CRÉATION de la ligne.** Vérifié en base : `harvest_147827838_listings` portait `updated_at = 7 juillet` alors que `data.capturedAt = 2 août 14h23`. 5 comptes sur 10 étaient dans ce cas.
+
+Deux dégâts, longtemps invisibles :
+1. L'extension annonçait « rien capté depuis 25 jours » sur des comptes moissonnés deux heures plus tôt (plainte de Julien, il avait raison).
+2. **Bien pire** : cette date sert de **seuil de péremption** (`HARVEST_MAX_AGE_MS` = 12 h) dans `fetchHarvest` / `fetchHarvestOrders`. Une moisson fraîche était donc **jetée**, l'app repartait à vide, et les écrans affichaient « annonces disparues », « compte muet », ventes introuvables.
+
+➡️ **`harvestTs(row)` est LA fonction à utiliser** : elle lit `data.capturedAt` (écrit par l'extension), avec `updated_at` en repli. 7 sites convertis. `storeHarvestRow` écrit maintenant aussi `updated_at` pour que la colonne cesse de mentir aux autres lecteurs (`api/widget.js`…).
+
+### Ventes vides — deux causes cumulées
+1. `background.js` rangeait une moisson **VIDE** par-dessus une bonne : une session expirée renvoie `my_orders: []`, pas une erreur. Les 10 comptes avaient fini à zéro vente. **On ne range plus jamais du vide** (`plein(o, cle)`).
+2. Côté app, `fetchVintedOrders` prenait `my_orders: []` pour « aucune vente » et **coupait le repli sur le proxy**. Une liste vide n'est plus une réponse.
+3. **Filet emails** : `ordersFromEmailSales()` reconstitue des ventes depuis `email_sale_*` (49 en base, tous comptes) au format d'une commande Vinted, dédoublonnées sur `normTitle(titre) + prix`. L'onglet ne peut plus être vide alors que les ventes existent. Les emails ne remplacent jamais une vraie commande (elle porte le vrai statut et le vrai n° de transaction).
+
+### Bordereaux
+- Tri **strictement chronologique**. Avant, `isBordDone` passait en premier critère : imprimer un bordereau le faisait sauter en bas et la liste ne suivait plus l'ordre d'arrivée.
+- Le titre annonce le nombre **affiché**, pas le total — il disait « 51 » au-dessus d'une liste filtrée, d'où « il en manque ».
+- ⚠️ `bordShipped()` dépend de `soldByTxn`, donc **des ventes**. Tant que les ventes étaient vides, aucun bordereau n'était auto-marqué expédié : ils restaient tous dans la liste. Corrigé en amont par les ventes.
+
+### État vérifié en base (2 août 2026)
+| donnée | constat |
+|---|---|
+| annonces moissonnées | 8 comptes /10 à moins de 6 h ; 1 à 3 j ; 1 mort (0 annonce, 26 j) |
+| ventes moissonnées | **0 partout** (cause ci-dessus) |
+| `email_sale_*` | 49, jusqu'au 1er août |
+| `email_bord_*` | 51 — 40 avec n°, 51 avec transaction, 50 avec PDF |
+| `email_track_*` | 61 — **0 vrai QR (`qrB64`)**, 13 `qrUrl`, 16 codes de retrait |
+| lieu de retrait | **48/61 vides**, 11 mal découpés (« ® MAISON DE LA PRESSE … SUPER PRATIQUE Retr ») |
+
+### PAS RÉSOLU — il faut un email d'exemple
+Le QR authentique n'est **jamais** capté (0/61) et le point relais est vide 48 fois sur 61. Le code d'extraction (`api/email-inbound.js`, `extractQr` + parsing `lieu`) existe et l'app affiche déjà le vrai QR quand il est là (`qrB64` → `qrUrl` → repli généré). **Le problème est en amont, dans le découpage de l'email.** Écrire des regex sans voir le HTML réel serait deviner. ➡️ Demander à Julien de **transférer un email Mondial Relay « colis disponible » brut** pour caler l'extraction sur du vrai.
