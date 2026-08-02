@@ -65,7 +65,19 @@ immédiate.
 > dans **Authentication → Emails → SMTP Settings**. La confirmation email évite
 > qu'on crée des comptes avec l'adresse de quelqu'un d'autre.
 
+> **Vérifié le 2 août 2026** : sans cette case décochée, la création de compte
+> échoue avec `email rate limit exceeded`. Supabase essaie d'envoyer un email de
+> confirmation, et son serveur d'envoi de test est limité à quelques messages
+> par heure — le quota est déjà atteint. Décocher « Confirm email » supprime
+> l'email : la création devient immédiate.
+
 ## Étape 2 bis — Activer Google et Discord
+
+> **Tant qu'un fournisseur n'est pas activé ici, son bouton n'apparaît PAS dans
+> l'app** (l'app lit les réglages de Supabase au démarrage). Avant, le bouton
+> était affiché et menait à une page noire avec
+> `{"code":400,"error_code":"validation_failed","msg":"Unsupported provider: provider is not enabled"}`.
+
 
 Les deux boutons « Continuer avec… » sont déjà dans l'app. Il faut créer une
 application chez chaque fournisseur et donner ses clés à Supabase.

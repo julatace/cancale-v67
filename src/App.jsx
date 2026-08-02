@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v43/00 · 🔑connexion';
+const BUILD_ID = 'v43/01 · 🔑connexion';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -169,7 +169,17 @@ const authSignIn  = async (email, password) => {
 };
 const authSignUp  = async (email, password) => {
   const r = await authCall('signup', { email: String(email).trim().toLowerCase(), password });
-  if (!r.ok) return { ok: false, error: /already registered/i.test(r.error) ? 'Un compte existe déjà avec cet email.' : r.error };
+  if (!r.ok) {
+    // On traduit les erreurs techniques de Supabase : « email rate limit
+    // exceeded » ne veut rien dire pour quelqu'un qui essaie juste de créer un
+    // compte, alors que la cause est précise et la solution simple.
+    let msg = r.error;
+    if (/already registered/i.test(r.error)) msg = 'Un compte existe déjà avec cet email.';
+    else if (/rate limit/i.test(r.error)) msg = "Trop d'emails de confirmation demandés. Désactive « Confirm email » dans Supabase (Authentication → Providers → Email) : la création devient immédiate, sans email.";
+    else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse email est refusée par le serveur.';
+    else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont désactivées côté Supabase.';
+    return { ok: false, error: msg };
+  }
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
   // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
@@ -202,6 +212,26 @@ const OAUTH_PROVIDERS = [
   { id: 'google',  label: 'Google' },
   { id: 'discord', label: 'Discord' },
 ];
+
+// ── CE QUE LA BASE ACCEPTE VRAIMENT ───────────────────────────────────────
+// Supabase publie ses réglages d'authentification. On les lit AVANT d'afficher
+// quoi que ce soit, pour ne jamais proposer un bouton qui ne peut pas marcher.
+// Sans ça, « Continuer avec Google » quittait l'app pour afficher une page
+// noire avec du JSON brut — l'utilisateur se retrouvait dehors, devant un
+// message d'erreur technique, sans bouton retour.
+let AUTH_SETTINGS = null;
+const loadAuthSettings = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+    if (r.ok) AUTH_SETTINGS = await r.json();
+  } catch (_) {}
+  return AUTH_SETTINGS;
+};
+// Un fournisseur n'est proposé que s'il est réellement activé côté Supabase.
+const providerEnabled = (id) => !!(AUTH_SETTINGS && AUTH_SETTINGS.external && AUTH_SETTINGS.external[id]);
+// La création de compte attend-elle un email de confirmation ? Si oui, on le
+// dit AVANT que la personne tape son mot de passe.
+const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfirm === false);
 
 const oauthStart = async (provider) => {
   try {
@@ -323,7 +353,10 @@ const ensureLocalOwner = (uid) => {
 // Restaure la session au démarrage, et renouvelle le jeton s'il a expiré.
 let AUTH_REDIRECT = null;   // résultat du retour OAuth / lien email, lu par l'écran de connexion
 const authBoot = async () => {
-  await detectSchema();     // AVANT tout : savoir si la base sait cloisonner
+  // AVANT tout : savoir si la base sait cloisonner, et ce qu'elle accepte
+  // comme moyens de connexion. Les deux en parallèle, c'est le chemin critique
+  // avant le premier affichage.
+  await Promise.all([detectSchema(), MULTI_USER ? loadAuthSettings() : Promise.resolve()]);
   if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   // Retour de Google / Discord / d'un lien email : ça prime sur tout le reste.
   try { AUTH_REDIRECT = await consumeAuthRedirect(); } catch (_) { AUTH_REDIRECT = null; }
@@ -2369,21 +2402,36 @@ function AuthScreen() {
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
               court et le plus sûr (aucun mot de passe à créer, donc aucun mot de
               passe à se faire voler ici). */}
-          {mode!=='newpw' && mode!=='reset' && (<>
-            {OAUTH_PROVIDERS.map(p => (
-              <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
-                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
-                  border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
-                  fontSize:14,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                <BrandMark id={p.id}/> Continuer avec {p.label}
-              </button>
-            ))}
-            <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
-              <span style={{flex:1,height:1,background:C.border}}/>
-              <span style={{fontSize:11,color:C.muted,fontWeight:500}}>ou par email</span>
-              <span style={{flex:1,height:1,background:C.border}}/>
+          {mode!=='newpw' && mode!=='reset' && (()=>{
+            // On n'affiche QUE les fournisseurs réellement activés côté Supabase.
+            // Un bouton qui mène à une page d'erreur JSON vaut moins que pas de
+            // bouton du tout.
+            const dispo = OAUTH_PROVIDERS.filter(p => providerEnabled(p.id));
+            if (!dispo.length) return null;
+            return (<>
+              {dispo.map(p => (
+                <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
+                  style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
+                    fontSize:14,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
+                  <BrandMark id={p.id}/> Continuer avec {p.label}
+                </button>
+              ))}
+              <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
+                <span style={{flex:1,height:1,background:C.border}}/>
+                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>ou par email</span>
+                <span style={{flex:1,height:1,background:C.border}}/>
+              </div>
+            </>);
+          })()}
+
+          {/* Création de compte alors que la confirmation par email est active :
+              on prévient AVANT, sinon on tape son mot de passe pour rien. */}
+          {mode==='up' && confirmRequired() && (
+            <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.45}}>
+              La confirmation par email est active côté Supabase, et son serveur d'envoi de test est limité. Décoche <b>« Confirm email »</b> (Authentication → Providers → Email) pour que la création soit immédiate.
             </div>
-          </>)}
+          )}
 
           {mode!=='newpw' && (
             <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
