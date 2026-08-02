@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v62/00 · bordereaux sûrs';
+const BUILD_ID = 'v62/01 · colis fait';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -8508,9 +8508,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [shipDone, setShipDone] = useState(() => load('vinted_ship_done', {}));
   const isShipDone = (o) => !!(o && shipDone[String(o.transaction_id)]);
   const toggleShipDone = (o) => { const k = o && o.transaction_id!=null ? String(o.transaction_id) : null; if(!k) return; setShipDone(prev=>{ const u={...prev}; if(u[k]) delete u[k]; else u[k]=Date.now(); save('vinted_ship_done',u); return u; }); };
-  // « Terminé » pour la liste des bordereaux = imprimé à la main, expédié d'après
+  // (voir isBordDone plus bas : « colis fait » à la main, ou expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
-  const isBordDone = (b) => isBordPrinted(b) || bordShipped(b) || isBordShippedManual(b);
+  // ── QUAND UN BORDEREAU SORT-IL DE LA LISTE ? ─────────────────────────────
+  // Deux raisons, et deux seulement :
+  //   • tu l'as marqué « colis fait » à la main ;
+  //   • Vinted dit que le colis est parti (statut de la vente moissonné par
+  //     l'extension) — c'est la confirmation qui fait foi.
+  // ⚠️ IMPRIMER NE SUFFIT PAS. Avant, `isBordPrinted` entrait dans ce test :
+  // sortir le papier de l'imprimante faisait disparaître le bordereau de la
+  // liste alors que le colis n'était même pas préparé — on le croyait traité.
+  // L'impression reste affichée (pastille « ✓ Imprimé »), mais elle ne retire
+  // plus rien. Rien n'est jamais supprimé : « Voir » réaffiche les terminés.
+  const isBordDone = (b) => isBordShippedManual(b) || bordShipped(b);
   const [listings, setListings] = useState({ loading:false, items:null });
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
@@ -12129,7 +12139,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {pending.length>0 ? `📄 ${pending.length} bordereau${pending.length>1?'x':''} à imprimer` : '✅ Aucun bordereau à imprimer'}
                   </div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} déjà imprimé{done>1?'s':''} ou expédié{done>1?'s':''}
+                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} colis fait{done>1?'s':''} ou confirmé{done>1?'s':''} par Vinted
                   </div>
                 </div>
                 {pending.length>0 && (
@@ -12207,7 +12217,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ) : null; })()}
             {(()=>{ const done=[...emailBords].filter(b=>!isBordHidden(b)&&isBordDone(b)); return done.length>0 ? (
               <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
-                <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {done.length} bordereau{done.length>1?'x':''} expédié{done.length>1?'s':''}</span>
+                <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {done.length} colis fait{done.length>1?'s':''}</span>
                 <span style={{flex:1,minWidth:0}}>retiré{done.length>1?'s':''} de la liste.</span>
                 <button onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
               </div>
@@ -12286,7 +12296,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <button type="button" onClick={()=>{ if(isBordShippedManual(b)) unmarkBordShipped(b); else markBordShipped(b); }}
                           title={isBordShippedManual(b)?'Annuler « expédié »':'Marquer comme expédié → le retire de la liste'}
                           style={{...sec,border:`1px solid ${isBordShippedManual(b)?INV_STATUS.online.color:C.border}`,background:isBordShippedManual(b)?`${INV_STATUS.online.color}18`:'transparent',color:isBordShippedManual(b)?INV_STATUS.online.color:C.muted}}>
-                          {isBordShippedManual(b)?'↺ Pas expédié':'✓ Expédié'}
+                          {isBordShippedManual(b)?'↺ Pas encore':'✓ Colis fait'}
                         </button>
                         {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
                       </div>

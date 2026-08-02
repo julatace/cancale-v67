@@ -638,3 +638,16 @@ Demande de Julien : « je veux que les ventes soient connectées au bordereau gr
 | **photo réelle via la vente reliée** | **50 / 51** |
 
 Sans lien certain, le bordereau porte une pastille **« N° en attente »** (au lieu de « N° ? ») : il n'est pas oublié, le numéro arrivera tout seul dès que la vente correspondante sera moissonnée. Le bouton « Relier » reste là pour trancher à la main.
+
+### Quand un bordereau sort de la liste (corrigé)
+Demande de Julien : « enlève le bordereau une fois marqué expédié, ou je le marque *traité / colis fait* — mais ça ne le supprime pas tant que le colis n'est pas parti dans Vinted. »
+
+**Défaut trouvé** : `isBordDone` incluait `isBordPrinted`. **Sortir le papier de l'imprimante retirait le bordereau de la liste**, alors que le colis n'était même pas préparé — on le croyait traité. 13 bordereaux étaient dans ce cas.
+
+`isBordDone = isBordShippedManual(b) || bordShipped(b)` — deux raisons, et deux seulement :
+- **« ✓ Colis fait »**, posé à la main (bouton renommé, `vinted_bords_shipped`, synchronisé) ;
+- **Vinted dit que le colis est parti** (`bordShipped` : statut de la vente moissonné par l'extension) — c'est la confirmation qui fait foi.
+
+L'impression garde sa pastille « ✓ Imprimé » mais **ne retire plus rien**. Rien n'est jamais supprimé : « Voir » réaffiche les terminés, et le ✕ (`vinted_bords_hidden`) reste pour masquer un cas particulier.
+
+Mesuré sur les 51 bordereaux réels : 43 confirmés expédiés par Vinted, 2 marqués à la main, **13 impressions qui ne cachent plus rien**.
