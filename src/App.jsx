@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v50/00 · 🎨premium';
+const BUILD_ID = 'v51/00 · 🎨finitions';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -2132,6 +2132,11 @@ const ICON_PATHS = {
   box:    <><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16V8Z"/><path d="M3.5 8 12 12.5 20.5 8M12 12.5V20.5"/></>,
   image:  <><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></>,
   moon:   <><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></>,
+  search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m15.8 15.8 4.4 4.4"/></>,
+  gear:   <><circle cx="12" cy="12" r="3.2"/><path d="M19.6 14.4a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></>,
+  cloud:  <><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.6 3.7 3.7 0 0 1-.3 7.4Z"/></>,
+  cloudOff:<><path d="M17.5 18.5H7a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 8.3-2.9"/><path d="m3 3 18 18"/></>,
+  sync:   <><path d="M20.5 12a8.5 8.5 0 0 1-14.6 6"/><path d="M3.5 12a8.5 8.5 0 0 1 14.6-6"/><path d="M18.5 2.5V6H15M5.5 21.5V18H9"/></>,
   bell2:  <><path d="M6 9a6 6 0 0 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9Z"/><path d="M10 19a2 2 0 0 0 4 0"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
@@ -11188,13 +11193,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
                 const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
                 const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
+                // ÂGE DES DONNÉES DE CE COMPTE. L'extension ne rafraîchit en
+                // direct que le compte connecté dans le navigateur : les autres
+                // peuvent dater de plusieurs semaines. Sans cette pastille, le
+                // compteur « 96 annonces » d'un compte figé depuis 26 jours
+                // passait pour du direct.
+                const ms = harvestAgeMs(uid, 'listings');
+                const j = ms != null ? Math.floor(ms/86400000) : null;
+                const vieux = j != null && j >= 2;
+                const col = off ? C.border : vieux ? (j >= 7 ? C.danger : C.warn) : C.accent;
                 return (
-                  <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)} title={off?'Masqué — tape pour réafficher ses annonces':'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
-                    style={{border:`1px solid ${off?C.border:C.accent}`,background:off?'transparent':`${C.accent}12`,color:off?C.muted:C.accent,borderRadius:999,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
+                  <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)}
+                    title={off ? 'Masqué — tape pour réafficher ses annonces'
+                          : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
+                          : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
+                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:999,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
                     {off?'🚫 ':''}{name} · {counts[uid]}
+                    {!off && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
                   </button>
                 );
               })}
+              {/* Une seule phrase, sous les puces, quand au moins un compte traîne. */}
+              {(()=>{
+                const vieux = uids.filter(u => { const ms = harvestAgeMs(u, 'listings'); return ms != null && ms >= 2*86400000 && !hiddenAccts.has(u) && !blockedAccts.has(u); });
+                if (!vieux.length) return null;
+                const n = vieux.reduce((t,u)=>t+(counts[u]||0), 0);
+                return (
+                  <span style={{fontSize:11,color:C.muted,flex:'1 1 100%',lineHeight:1.5,marginTop:2}}>
+                    <b style={{color:C.warn}}>{n} annonce{n>1?'s':''}</b> {vieux.length>1?'proviennent':'provient'} de {vieux.length>1?'comptes dont les données datent':'un compte dont les données datent'}.
+                    L'extension ne rafraîchit en direct que le compte <b style={{color:C.text}}>connecté dans ton navigateur</b> — connecte-toi sur {vieux.length>1?'ces comptes':'ce compte'} et ouvre ton dressing pour les remettre à jour.
+                  </span>
+                );
+              })()}
               {anyHidden && <span style={{fontSize:11,color:C.muted,flex:'1 1 100%'}}>Un compte masqué (🚫) n'apparaît ni dans les annonces ni dans la compta. Retape-le pour le réafficher.</span>}
             </div>
           );
@@ -14418,7 +14448,12 @@ export default function App() {
               syncStatus==='loading'?'Chargement...':
               syncStatus==='error'?'Hors ligne (sauvegarde locale)':'En attente'
             } style={{fontSize:13,opacity:0.9,display:'flex',alignItems:'center',gap:4}}>
-              {syncStatus==='synced'?'☁️':syncStatus==='saving'||syncStatus==='loading'?'🔄':syncStatus==='error'?'⚠️':'☁️'}
+              {/* Icône au trait plutôt qu'emoji : elle prend la couleur de l'état
+                  (vert synchronisé, orange en cours, rouge hors ligne), ce qu'un
+                  emoji ne sait pas faire. */}
+              <span style={{display:'flex',color:syncStatus==='error'?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
+                <Icon name={syncStatus==='error'?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
+              </span>
               {lastSync&&syncStatus==='synced'&&(
                 <span style={{fontSize:9,color:C.muted,fontWeight:600}}>
                   {String(lastSync.getHours()).padStart(2,'0')}:{String(lastSync.getMinutes()).padStart(2,'0')}
@@ -14452,16 +14487,16 @@ export default function App() {
             </button>}
             <button type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:gsOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              🔍
+              <Icon name="search" size={17}/>
             </button>
             <button type="button" onClick={()=>setNotifOpen(o=>!o)} title="Notifications" aria-label="Notifications"
               style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              🔔
+              <Icon name="bell2" size={17}/>
               {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
             </button>
             <button type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
               style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              ⚙️
+              <Icon name="gear" size={17}/>
             </button>
           </div>
         </div>
