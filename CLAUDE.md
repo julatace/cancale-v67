@@ -464,3 +464,28 @@ Le dressing contient **tout l'historique**, pas seulement le stock en ligne. Ré
 | autres | 61 | 13 | 48 |
 
 Donc un gros `total_entries` n'est pas alarmant en soi — mais quand la page 1 est **entièrement** en ligne (cas de `199082413`), les pages suivantes contiennent forcément d'autres annonces en ligne.
+
+---
+
+## 19. Session août 2026 (suite) — audit de la numérotation contre la vraie base
+
+État réel au 2 août (ligne `main`, 118 Ko, `vinted_annonce_numeros` = 177 entrées / 69 Ko) :
+
+| mesure | valeur |
+|---|---|
+| annonces en ligne | 119 |
+| numéros occupés par une annonce en ligne | 119 |
+| annonces en ligne **sans** numéro | **0** |
+| numéros attribués en tout | 177 (58 concernent des annonces qui ne sont plus en ligne) |
+| plage | 1 → **181** |
+| trous dans 1..181 | **62** |
+| numéros en double | 1 (le **N°1**) |
+
+**Le doublon du N°1** oppose « adidas spezial bleu marine taille 36 » (en ligne) et « basket philippe model bleu taille 38 » (plus en ligne) : **aucun risque d'expédition aujourd'hui**, la seconde n'existe plus.
+
+### Deux garde-fous ajoutés dans les signalements de l'écran Annonces
+1. **`numDoublons`** — deux annonces **EN LIGNE** portant le même numéro = deux paires dans la même boîte, donc la mauvaise chaussure part à l'expédition. Rien ne le détectait (le Garage ne voyait que les doublons de case). Panneau rouge, barre de résumé en 🚨, **dépliage automatique**, et un bouton « → N°X » qui bascule une des deux sur le plus petit numéro libre.
+2. **Numéros trop hauts** — « pourquoi N°156 alors que j'ai à peine 50 paires ». L'outil « 🔢 Renuméroter à la suite » existait mais était enfoui dans « ⋯ Outils ». Il est maintenant proposé dès que l'écart dépasse 15 numéros perdus, avec le chiffre exact (« jusqu'à 181 pour 119 paires, 62 libres »).
+
+### ⚠️ PIÈGE TDZ — rencontré une deuxième fois, à ne pas refaire
+Un `useMemo` placé **avant** la déclaration d'un `const` qu'il lit plante l'app au premier rendu (`Cannot access 'X' before initialization`, écran blanc) : la fabrique du `useMemo` s'exécute immédiatement, pas plus tard. `numDoublons` lisait `annBase`, déclaré 20 lignes plus bas. **Toujours placer un `useMemo` après tout ce qu'il lit** — le build ne le voit pas, seul un rendu réel le révèle. (Même piège déjà noté pour `disparues`/`pairsLost`.)

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v57/00 · dressing complet';
+const BUILD_ID = 'v58/00 · numéros sûrs';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -8741,6 +8741,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     () => (listings.items || []).filter(it => !acctOffOf(it) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id)))),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts]);
+
+  // ── NUMÉROS EN DOUBLE ─────────────────────────────────────────────────
+  // Deux annonces EN LIGNE portant le même numéro = deux paires dans la même
+  // boîte du garage. Au moment d'expédier, on prend la mauvaise chaussure et
+  // l'acheteur reçoit autre chose. Rien ne le signalait : le Garage détectait
+  // les doublons de case, jamais les doublons d'annonce.
+  // Constaté en base le 2 août : le N°1 était porté par deux annonces.
+  const numDoublons = useMemo(() => {
+    const par = new Map();
+    for (const it of annBase) {
+      const n = String((numeros[it.id] || {}).numero || '').trim();
+      if (!n) continue;
+      if (!par.has(n)) par.set(n, []);
+      par.get(n).push(it);
+    }
+    return [...par.entries()]
+      .filter(([, list]) => list.length > 1)
+      .map(([numero, list]) => ({ numero, items: list }))
+      .sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, numeros]);
+
+  // Un numéro en double est trop grave pour rester derrière une barre repliée :
+  // on déplie tout seul. Les autres signalements restent discrets.
+  useEffect(() => { if (numDoublons.length) setDiagOpen(true); }, [numDoublons.length]);
+
   const annShown = useMemo(() => {
     let arr = [...annBase];
     const q = annSearch.trim().toLowerCase();
@@ -11325,21 +11351,82 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ligne, dépliable, et n'apparaissent que s'il y a vraiment quelque
             chose à signaler. */}
         {(() => {
-          const n = comptesMuets.length + (disparues.length ? 1 : 0) + (blockedList.length ? 1 : 0);
+          const nn = annBase.map(it => parseInt(String((numeros[it.id]||{}).numero||''), 10)).filter(x => !isNaN(x));
+          const trous = nn.length >= 5 ? Math.max(...nn) - nn.length : 0;
+          const n = numDoublons.length + comptesMuets.length + (disparues.length ? 1 : 0) + (blockedList.length ? 1 : 0) + (trous >= 15 ? 1 : 0);
           if (!n) return null;
+          // Un numéro en double fait expédier la mauvaise paire : la barre passe
+          // en rouge et le dit, au lieu de se fondre dans les avertissements.
+          const grave = numDoublons.length > 0;
+          const teinte = grave ? C.danger : C.warn;
           return (
             <button type="button" onClick={() => setDiagOpen(v => !v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,
+              style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${teinte}${grave?'':'55'}`,background:`${teinte}12`,
                 borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
-              <span style={{fontSize:15}}>⚠️</span>
+              <span style={{fontSize:15}}>{grave ? '🚨' : '⚠️'}</span>
               <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
-                {n} signalement{n>1?'s':''} sur tes annonces
+                {grave
+                  ? `${numDoublons.length} numéro${numDoublons.length>1?'x':''} en double${n>numDoublons.length?` · ${n-numDoublons.length} autre${n-numDoublons.length>1?'s':''}`:''}`
+                  : `${n} signalement${n>1?'s':''} sur tes annonces`}
               </span>
-              <span style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
+              <span style={{fontSize:11.5,color:grave?C.danger:C.muted,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
             </button>
           );
         })()}
         {diagOpen && (<>
+        {/* NUMÉROS QUI MONTENT TROP HAUT — « pourquoi N°156 alors que j'ai à
+            peine 50 paires ? ». L'outil de renumérotation existait mais était
+            enfoui dans « ⋯ Outils » : personne ne le trouvait. On le propose
+            quand l'écart devient visible (plus de 15 numéros perdus). */}
+        {(() => {
+          const nums = annBase.map(it => parseInt(String((numeros[it.id]||{}).numero||''), 10)).filter(n => !isNaN(n));
+          if (nums.length < 5) return null;
+          const haut = Math.max(...nums), trous = haut - nums.length;
+          if (trous < 15) return null;
+          return (
+            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
+              <div style={{fontSize:13.5,fontWeight:600,color:C.text}}>Tes numéros montent jusqu'à {haut} pour {nums.length} paires</div>
+              <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
+                {trous} numéros sont libres entre les deux. Les remettre à la suite rend le garage plus simple — les paires déjà rangées et celles d'une vente en cours ne bougent pas.
+              </div>
+              <button type="button" onClick={()=>setRenumOpen(true)}
+                style={{marginTop:9,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                🔢 Voir la renumérotation
+              </button>
+            </div>
+          );
+        })()}
+        {/* NUMÉROS EN DOUBLE — le plus grave : deux paires dans la même boîte,
+            donc la mauvaise chaussure part à l'expédition. */}
+        {numDoublons.length > 0 && (
+          <div style={{border:`1.5px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
+            <div style={{fontSize:13.5,fontWeight:700,color:C.danger}}>
+              {numDoublons.length} numéro{numDoublons.length>1?'x':''} porté{numDoublons.length>1?'s':''} par deux annonces
+            </div>
+            <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
+              Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Donne un numéro libre à l'une des deux.
+            </div>
+            {numDoublons.map(g => (
+              <div key={g.numero} style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:6}}>N°{g.numero}</div>
+                {g.items.map(it => (
+                  <div key={it.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
+                    {it.photo && <img src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
+                    <div style={{flex:1,minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
+                    <button type="button" onClick={async ()=>{
+                      const libre = String(nextNumero);
+                      if (!await askConfirm({ title:`Donner le N°${libre} à cette paire ?`, desc:`« ${it.title} »\n\nElle quitte le N°${g.numero}, qui reste à l'autre paire. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
+                      setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre}; save('vinted_annonce_numeros',u); return u; });
+                      toast(`✓ Cette paire est maintenant le N°${libre}.`);
+                    }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                      → N°{nextNumero}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
         {/* COMPTE MUET : il a des paires numérotées mais ne renvoie plus AUCUNE
             annonce. C'est la signature d'un masquage par Vinted. On le dit tout
             de suite, sinon on croit avoir perdu son stock. */}
