@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v44/01 · ✉️confirmation';
+const BUILD_ID = 'v45/00 · 👤compte';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -12970,22 +12970,84 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
     <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
       <h2 style={{fontSize:20,fontWeight:600,color:C.text,margin:'0 0 16px'}}>⚙️ Paramètres</h2>
 
-      {/* Ton compte VRM (multi-vendeurs). Absent en mode solo : il n'y a alors
-          personne à identifier ni de quoi se déconnecter. */}
-      {MULTI_USER && AUTH.user && (<>
+      {/* ── TON COMPTE VRM ──────────────────────────────────────────────────
+          Toujours présent en multi-vendeurs, y compris quand on est entré par la
+          porte de secours : sans ça, une fois passé par « Entrer sans compte »
+          il n'y avait AUCUN moyen de revenir à l'écran de connexion. */}
+      {MULTI_USER && (<>
         <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'0 0 8px 2px'}}>Ton compte</div>
-        <div style={{display:'flex',alignItems:'center',gap:12,padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-          <span style={{width:38,height:38,borderRadius:999,flexShrink:0,background:`${C.accent}18`,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
-            {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
-          </span>
-          <span style={{flex:1,minWidth:0}}>
-            <span style={{display:'block',fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{AUTH.user.email}</span>
-            <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Tes données ne sont visibles que par toi.</span>
-          </span>
+
+        {AUTH.user ? (
+          <div style={{display:'flex',alignItems:'center',gap:12,padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+            <span style={{width:38,height:38,borderRadius:999,flexShrink:0,background:`${C.accent}18`,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
+              {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
+            </span>
+            <span style={{flex:1,minWidth:0}}>
+              <span style={{display:'block',fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{AUTH.user.email}</span>
+              <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>
+                {CLOISONNE ? 'Tes données ne sont visibles que par toi.' : 'Connecté — séparation des comptes pas encore activée.'}
+              </span>
+            </span>
+          </div>
+        ) : (
+          <div style={{padding:'15px 16px',borderRadius:16,border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:8}}>
+            <div style={{fontSize:15,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
+            <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+              Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
+            </div>
+            <button type="button"
+              onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
+              style={{marginTop:10,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+              Aller à l'écran de connexion
+            </button>
+          </div>
+        )}
+
+        {/* MOYENS DE CONNEXION — on affiche l'état RÉEL de chacun, pas une liste
+            décorative. Un bouton Google qui mène à une page d'erreur ne rend
+            service à personne : tant que le fournisseur n'est pas branché dans
+            Supabase, on le dit. */}
+        <div style={{padding:'13px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:8}}>Moyens de connexion</div>
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0'}}>
+            <span style={{fontSize:15,width:20,textAlign:'center'}}>✉️</span>
+            <span style={{flex:1,fontSize:12.5,color:C.text,fontWeight:500}}>Email + mot de passe</span>
+            <span style={{fontSize:11,fontWeight:600,color:INV_STATUS.online.color}}>actif</span>
+          </div>
+          {OAUTH_PROVIDERS.map(pr=>{
+            const on = providerEnabled(pr.id);
+            return (
+              <div key={pr.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
+                <span style={{width:20,display:'flex',justifyContent:'center'}}><BrandMark id={pr.id}/></span>
+                <span style={{flex:1,fontSize:12.5,color:C.text,fontWeight:500}}>{pr.label}</span>
+                {on
+                  ? (AUTH.user
+                      ? <span style={{fontSize:11,fontWeight:600,color:INV_STATUS.online.color}}>disponible</span>
+                      : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:999,padding:'4px 11px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
+                  : <span style={{fontSize:11,fontWeight:500,color:C.muted}}>à activer dans Supabase</span>}
+              </div>
+            );
+          })}
+          <div style={{fontSize:10.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
+            Google et Discord apparaissent comme « disponibles » dès que tu as créé l'application chez eux et collé les clés dans Supabase (procédure dans supabase/README.md).
+          </div>
         </div>
-        <Row icon="🚪" title="Se déconnecter" color={C.danger}
-          desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
-          onClick={()=>{ if(window.confirm('Se déconnecter ? Tes données restent en ligne, elles reviendront à la prochaine connexion.')) { authSignOut(); location.reload(); } }}/>
+
+        {AUTH.user && (<>
+          <Row icon="🔑" title="Changer mon mot de passe"
+            desc="Choisis-en un nouveau, tu restes connecté."
+            onClick={async()=>{
+              const np = window.prompt('Nouveau mot de passe (8 caractères minimum, lettres + chiffres) :');
+              if (np == null) return;
+              if (String(np).length < 8) { toast('Trop court : 8 caractères minimum.', 'error'); return; }
+              if (/^(\d+|[a-z]+)$/i.test(np)) { toast('Mélange lettres et chiffres.', 'error'); return; }
+              const r = await authSetPassword(np);
+              toast(r.ok ? '✓ Mot de passe changé' : (r.error || 'Échec'), r.ok ? 'success' : 'error');
+            }}/>
+          <Row icon="🚪" title="Se déconnecter" color={C.danger}
+            desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
+            onClick={()=>{ if(window.confirm('Se déconnecter ? Tes données restent en ligne, elles reviendront à la prochaine connexion.')) { authSignOut(); location.reload(); } }}/>
+        </>)}
       </>)}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
