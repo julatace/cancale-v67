@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v37/08 · 🎨cartes';
+const BUILD_ID = 'v37/09 · 📈graphiques';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -16,6 +16,10 @@ const THEMES = {
     shadow:"0 1px 2px rgba(16,32,24,.05), 0 2px 8px rgba(16,32,24,.05)",
     shadowLg:"0 4px 12px rgba(16,32,24,.08), 0 12px 32px rgba(16,32,24,.08)",
     glass:"rgba(255,255,255,.82)",
+    // Couleurs de SÉRIE des graphiques (≠ couleurs de statut, jamais réutilisées
+    // pour un avertissement). Paire vérifiée : elle reste distinguable en vision
+    // normale ET en daltonisme (deutan/tritan) sur ce fond.
+    s1:"#14795a", s2:"#6d5cc7",
   },
   dark: {
     bg:"#0d1210", surface:"#151d19", card:"#1a2420", border:"#2a3630",
@@ -24,6 +28,8 @@ const THEMES = {
     shadow:"0 1px 2px rgba(0,0,0,.35), 0 2px 10px rgba(0,0,0,.30)",
     shadowLg:"0 6px 18px rgba(0,0,0,.45), 0 16px 40px rgba(0,0,0,.40)",
     glass:"rgba(21,29,25,.78)",
+    // Mode sombre : teintes RECALCULÉES pour ce fond, pas un simple éclaircissement.
+    s1:"#4aa87d", s2:"#9482d8",
   },
 };
 let C = THEMES.light;
@@ -1803,13 +1809,17 @@ function Sparkline({data,color=C.accent,h=60}) {
   const area=`0,${H} ${pts} ${W},${H}`;
   const id='g'+color.replace('#','');
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:'block'}}>
+    // ⚠️ preserveAspectRatio="none" a été RETIRÉ : il étirait le dessin
+    // horizontalement, donc l'épaisseur du trait variait selon la largeur de
+    // l'écran (fin sur mobile, épais sur grand écran). Avec « slice », le tracé
+    // garde une épaisseur constante partout.
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" style={{display:'block'}}>
       <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor={color} stopOpacity="0.3"/>
+        <stop offset="0%" stopColor={color} stopOpacity="0.22"/>
         <stop offset="100%" stopColor={color} stopOpacity="0"/>
       </linearGradient></defs>
       <polygon points={area} fill={`url(#${id})`}/>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round"/>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
     </svg>
   );
 }
@@ -1839,21 +1849,26 @@ function MonthChart({sales}) {
   const toP=(data,max)=>data.map((v,i)=>`${(i/(data.length-1))*W},${H-((Math.max(v,0)/max)*(H-16))-8}`).join(' ');
   return (
     <div style={{overflowX:'auto'}}>
-      <svg width="100%" viewBox={`0 0 ${W} ${H+24}`} preserveAspectRatio="none" style={{display:'block',minWidth:300}}>
+      {/* vectorEffect + suppression de preserveAspectRatio="none" : l'épaisseur
+          des courbes reste constante quelle que soit la largeur de l'écran. */}
+      <svg width="100%" viewBox={`0 0 ${W} ${H+24}`} style={{display:'block',minWidth:300}}>
         <defs>
-          <linearGradient id="gCA2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.accent} stopOpacity="0.2"/><stop offset="100%" stopColor={C.accent} stopOpacity="0"/></linearGradient>
-          <linearGradient id="gP2"  x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.warn}   stopOpacity="0.2"/><stop offset="100%" stopColor={C.warn}   stopOpacity="0"/></linearGradient>
+          <linearGradient id="gCA2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.s1||C.accent} stopOpacity="0.18"/><stop offset="100%" stopColor={C.s1||C.accent} stopOpacity="0"/></linearGradient>
+          <linearGradient id="gP2"  x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.s2||C.purple} stopOpacity="0.18"/><stop offset="100%" stopColor={C.s2||C.purple} stopOpacity="0"/></linearGradient>
         </defs>
         <polygon points={`0,${H} ${toP(caD,maxCA)} ${W},${H}`} fill="url(#gCA2)"/>
-        <polyline points={toP(caD,maxCA)} fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinejoin="round"/>
+        <polyline points={toP(caD,maxCA)} fill="none" stroke={C.s1||C.accent} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
         <polygon points={`0,${H} ${toP(pD,maxCA)} ${W},${H}`} fill="url(#gP2)"/>
-        <polyline points={toP(pD,maxCA)} fill="none" stroke={C.warn} strokeWidth="2" strokeLinejoin="round" strokeDasharray="5,3"/>
+        <polyline points={toP(pD,maxCA)} fill="none" stroke={C.s2||C.purple} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="5,4" vectorEffect="non-scaling-stroke"/>
         {keys.map((k,i)=><text key={k} x={(i/(keys.length-1))*W} y={H+16} textAnchor="middle" fill={C.muted} fontSize={8} fontFamily="monospace">{k}</text>)}
-        {caD.map((v,i)=><circle key={i} cx={(i/(caD.length-1))*W} cy={H-((Math.max(v,0)/maxCA)*(H-16))-8} r={3} fill={C.accent}/>)}
+        {caD.map((v,i)=><circle key={i} cx={(i/(caD.length-1))*W} cy={H-((Math.max(v,0)/maxCA)*(H-16))-8} r={3.5} fill={C.s1||C.accent} stroke={C.card} strokeWidth="1.5"/>)}
       </svg>
-      <div style={{display:'flex',gap:16,fontSize:11,marginTop:4}}>
-        <span style={{color:C.accent}}>— CA</span>
-        <span style={{color:C.warn}}>- - Bénéfice</span>
+      {/* Légende : la couleur est portée par une PASTILLE, le texte reste neutre
+          (un libellé coloré se lit mal et la couleur ne doit pas être le seul
+          indice — le trait plein / pointillé distingue déjà les deux séries). */}
+      <div style={{display:'flex',gap:16,fontSize:11,marginTop:6,color:C.muted,fontWeight:700}}>
+        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:2,background:C.s1||C.accent,display:'inline-block'}}/>CA</span>
+        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:2,background:`repeating-linear-gradient(90deg, ${C.s2||C.purple} 0 5px, transparent 5px 9px)`,display:'inline-block'}}/>Bénéfice</span>
       </div>
     </div>
   );
@@ -9316,24 +9331,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ); })()}
         {/* Graphique de tendance 6 mois : CA + bénéfice net */}
-        {monthlyChart.total>0 && (()=>{ const W=320, H=110, pad=6, bw=(W-pad*2)/6, gcol=INV_STATUS.online.color; return (
-          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px',marginBottom:12}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,flexWrap:'wrap',gap:6}}>
-              <div style={{fontSize:12,fontWeight:800,color:C.text}}>📈 Tendance — 6 mois</div>
-              <div style={{display:'flex',gap:12,fontSize:10.5,fontWeight:700}}>
-                <span style={{color:C.accent}}>▮ CA</span><span style={{color:gcol}}>▮ Bénéfice net</span>
+        {monthlyChart.total>0 && (()=>{
+          // GRAPHIQUE DE TENDANCE — refait proprement :
+          //  • Les deux séries étaient DEUX VERTS quasi identiques (écart perçu
+          //    bien trop faible) : impossible de distinguer CA et bénéfice, même
+          //    avec une vision normale. Elles utilisent maintenant une paire
+          //    vérifiée (vert / violet), lisible aussi en cas de daltonisme.
+          //  • Chaque barre porte sa VALEUR : on lit le graphique sans survoler.
+          //  • Repères horizontaux discrets pour situer les hauteurs, et sommets
+          //    de barres arrondis posés sur la ligne de base.
+          const W=320, H=112, pad=8, bw=(W-pad*2)/6;
+          const s1=C.s1||C.accent, s2=C.s2||C.purple;
+          const nice=(v)=>{ const p=Math.pow(10,Math.floor(Math.log10(v||1))); return Math.ceil((v||1)/p)*p; };
+          const top=nice(monthlyChart.max||1);
+          const eur=(v)=> v>=1000 ? `${(v/1000).toFixed(1).replace('.',',')}k` : Math.round(v);
+          return (
+          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'14px 15px',marginBottom:12,boxShadow:C.shadow||'none'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:6}}>
+              <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>Tendance — 6 mois</div>
+              <div style={{display:'flex',gap:12,fontSize:10.5,fontWeight:700,color:C.muted}}>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:3,background:s1,display:'inline-block'}}/>CA</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:3,background:s2,display:'inline-block'}}/>Bénéfice net</span>
               </div>
             </div>
             <div style={{width:'100%',overflowX:'auto'}}>
-              <svg viewBox={`0 0 ${W} ${H+20}`} style={{width:'100%',minWidth:280,height:'auto',display:'block'}} role="img" aria-label="Graphique du chiffre d'affaires et du bénéfice net sur 6 mois">
+              <svg viewBox={`0 0 ${W} ${H+22}`} style={{width:'100%',minWidth:280,height:'auto',display:'block'}} role="img" aria-label={`Chiffre d'affaires et bénéfice net sur 6 mois. ${monthlyChart.months.map(m=>`${m.label} : CA ${Math.round(m.ca)} euros, bénéfice ${Math.round(m.benef)} euros`).join('. ')}`}>
+                {/* Repères horizontaux : discrets, sous les données. */}
+                {[0.5,1].map((f,i)=>(
+                  <line key={i} x1={pad} y1={H-H*f} x2={W-pad} y2={H-H*f} stroke={C.border} strokeWidth="1" strokeDasharray={f===1?undefined:'3,4'}/>
+                ))}
                 {monthlyChart.months.map((m,i)=>{
-                  const x=pad+i*bw; const caH=(m.ca/monthlyChart.max)*H; const beH=(Math.max(0,m.benef)/monthlyChart.max)*H;
-                  const barW=bw*0.30;
+                  const x=pad+i*bw;
+                  const caH=Math.max(0,(m.ca/top)*H), beH=Math.max(0,(Math.max(0,m.benef)/top)*H);
+                  const barW=bw*0.28, gap=2; // 2 px de fond entre les deux barres
+                  const cx=x+bw*0.5;
                   return (
                     <g key={i}>
-                      <rect x={x+bw*0.5-barW-1} y={H-caH} width={barW} height={caH} rx={2} fill={C.accent}/>
-                      <rect x={x+bw*0.5+1} y={H-beH} width={barW} height={beH} rx={2} fill={gcol}/>
-                      <text x={x+bw*0.5} y={H+14} textAnchor="middle" fontSize="9" fill={C.muted} fontWeight="700">{m.label}</text>
+                      {caH>0 && <rect x={cx-barW-gap/2} y={H-caH} width={barW} height={caH} rx={4} fill={s1}/>}
+                      {beH>0 && <rect x={cx+gap/2} y={H-beH} width={barW} height={beH} rx={4} fill={s2}/>}
+                      {m.ca>0 && <text x={cx} y={H-Math.max(caH,beH)-5} textAnchor="middle" fontSize="8.5" fill={C.muted} fontWeight="800">{eur(m.ca)}</text>}
+                      <text x={cx} y={H+15} textAnchor="middle" fontSize="9" fill={C.muted} fontWeight="700">{m.label}</text>
                     </g>
                   );
                 })}
