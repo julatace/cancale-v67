@@ -243,15 +243,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (async () => {
         try {
           const accts = await getStoredAccounts();
-          const rows = await sbGet('app_data?id=like.harvest_*_listings&select=id,updated_at') || [];
+          // ⚠️ NE PAS SE FIER A `updated_at` : la table n'a pas de trigger, la
+          // colonne garde donc la date de CREATION de la ligne. Elle affichait
+          // « 25 jours » sur des comptes moissonnes deux heures plus tot.
+          // La vraie date de capture est ecrite par nous dans data.capturedAt.
+          const rows = await sbGet('app_data?id=like.harvest_*_listings&select=id,updated_at,cap:data->>capturedAt,n:data->payload->pagination->total_entries') || [];
           const parUid = {};
           for (const r of rows) {
             const m = /^harvest_(\d+)_listings$/.exec(r.id); if (!m) continue;
-            const t = Date.parse(r.updated_at || ''); if (!isNaN(t)) parUid[m[1]] = t;
+            const t = Date.parse(r.cap || '') || Date.parse(r.updated_at || '');
+            if (!isNaN(t)) parUid[m[1]] = { at: t, n: Number(r.n) || 0 };
           }
-          const fresh = accts.map(a => ({
-            uid: String(a.vinted_user_id), login: a.login || '', at: parUid[String(a.vinted_user_id)] || 0,
-          }));
+          const fresh = accts.map(a => {
+            const e = parUid[String(a.vinted_user_id)] || {};
+            return { uid: String(a.vinted_user_id), login: a.login || '', at: e.at || 0, n: e.n || 0 };
+          });
           sendResponse({ ok: true, fresh });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -514,8 +520,13 @@ async function vintedSend(acc, method, endpoint, body) {
 // Range une reponse Vinted dans une ligne harvest_{uid}_{type} (meme format que
 // la capture passive, donc l'app la lit deja).
 async function storeHarvestRow(uid, type, payload, domain) {
-  const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: new Date().toISOString(), payload };
-  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data }], 'id');
+  const maintenant = new Date().toISOString();
+  const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
+  // On ecrit AUSSI updated_at : la table n'a pas de trigger, la colonne gardait
+  // donc la date de creation de la ligne et faisait passer une moisson de deux
+  // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
+  // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
+  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
 }
 
 // Recupere TOUTES les pages de commandes d'un type (ventes/achats), en douceur.
@@ -719,11 +730,17 @@ async function pageActiveFetch() {
   const uid = await activeUidForDomain(domain);
   if (!uid) return false;
   let stored = false;
+  // ⚠️ NE JAMAIS ECRASER UNE MOISSON PAR DU VIDE. Une session expiree, une
+  // page pas encore chargee ou un appel refuse renvoient une LISTE VIDE, pas
+  // une erreur : en rangeant ce vide, on effacait des donnees valides et
+  // l'onglet Ventes se retrouvait desesperement vide alors que les ventes
+  // existaient. C'est exactement ce qui etait arrive aux 10 comptes.
+  const plein = (o, cle) => o && Array.isArray(o[cle]) && o[cle].length > 0;
   if (out.who) { await storeHarvestRow(uid, 'profile', out.who, domain); stored = true; }
-  if (out.listings) { await storeHarvestRow(uid, 'listings', out.listings, domain); stored = true; }
-  if (out.sold && Array.isArray(out.sold.my_orders)) { await storeHarvestRow(uid, 'orders_sold', out.sold, domain); stored = true; }
-  if (out.bought && Array.isArray(out.bought.my_orders)) { await storeHarvestRow(uid, 'orders_purchased', out.bought, domain); stored = true; }
-  if (out.inbox) { await storeHarvestRow(uid, 'inbox', out.inbox, domain); stored = true; }
+  if (plein(out.listings, 'items')) { await storeHarvestRow(uid, 'listings', out.listings, domain); stored = true; }
+  if (plein(out.sold, 'my_orders')) { await storeHarvestRow(uid, 'orders_sold', out.sold, domain); stored = true; }
+  if (plein(out.bought, 'my_orders')) { await storeHarvestRow(uid, 'orders_purchased', out.bought, domain); stored = true; }
+  if (plein(out.inbox, 'conversations')) { await storeHarvestRow(uid, 'inbox', out.inbox, domain); stored = true; }
   if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
   return stored;
 }

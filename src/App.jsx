@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v53/00 · zoom + geste souris';
+const BUILD_ID = 'v54/00 · ventes + fraîcheur';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -795,6 +795,18 @@ const fetchVintedLogin = async (account) => {
 // depuis apparaissait encore « en ligne »). On considère donc une moisson
 // PÉRIMÉE au-delà de ce délai → l'app retombe sur un vrai appel (comme le
 // bouton « Synchroniser »). En dessous, on garde le mode discret (0 requête).
+// ⚠️ DATE DE CAPTURE — NE PAS UTILISER `updated_at`.
+// La table `app_data` n'a pas de trigger : `updated_at` garde la date de
+// CRÉATION de la ligne. Une moisson faite il y a deux heures s'affichait donc
+// « il y a 25 jours » ET, pire, se faisait JETER par le seuil de péremption
+// ci-dessous — d'où des annonces qui « disparaissaient » et des ventes vides.
+// La vraie date est celle que l'extension écrit elle-même dans data.capturedAt.
+const harvestTs = (row) => {
+  const c = Date.parse((row && row.cap) || (row && row.data && row.data.capturedAt) || '');
+  if (!isNaN(c)) return c;
+  const u = Date.parse((row && row.updated_at) || '');
+  return isNaN(u) ? NaN : u;
+};
 const HARVEST_MAX_AGE_MS = 12 * 3600 * 1000; // 12 h
 // Âge de la dernière moisson lue, par uid+type → sert à AFFICHER la date des
 // données dans l'UI (« données du 7 juil. ») au lieu de laisser croire au direct.
@@ -817,14 +829,14 @@ const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
   busyStart();
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data,updated_at`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data,updated_at,cap:data->>capturedAt`, {
       headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
     const row = rows[0];
     if (!row) return null;
-    const ts = row.updated_at ? new Date(row.updated_at).getTime() : NaN;
+    const ts = harvestTs(row);
     if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
     // Trop vieille → on répond « rien capté », l'appelant ira chercher le direct.
     const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
@@ -959,6 +971,40 @@ const fetchEmailSales = async () => {
     if (!res.ok) return [];
     return (await res.json()).map(r => r.data).filter(Boolean);
   } catch (_) { return []; }
+};
+// Reconstitue des VENTES à partir des emails « X a acheté ton article ».
+// Pourquoi : les emails arrivent 24/7, même quand l'extension n'a rien
+// moissonné. Sans ça, l'onglet Ventes restait DÉSESPÉRÉMENT VIDE alors que les
+// ventes existaient — c'était le cas des 10 comptes, tous moissonnés à zéro
+// vente après qu'une capture vide eut écrasé les bonnes données.
+// La forme renvoyée est celle d'une commande Vinted, pour que tout le reste de
+// l'écran (filtres, totaux, bordereaux, CSV) fonctionne sans changement.
+const ordersFromEmailSales = (mails, accounts) => {
+  const parCle = new Map();
+  (accounts || []).forEach(a => {
+    parCle.set(String(a.vinted_user_id), a);
+    if (a.login) parCle.set(String(a.login).toLowerCase(), a);
+  });
+  return (mails || []).map(m => {
+    const titre = String(m.designation || m.article || '').trim();
+    if (!titre) return null;
+    const montant = parseFloat(String(m.prix || '').replace(',', '.'));
+    // Si le compte n'est pas (ou plus) lié, on en fabrique un le temps de
+    // l'affichage : sinon l'étiquette de compte planterait sur un `null`.
+    const acc = parCle.get(String(m.uid || '')) || parCle.get(String(m.account || '').toLowerCase())
+      || { vinted_user_id: m.uid || '', login: m.account || '' };
+    return {
+      transaction_id: 'mail:' + (m.uid || '') + ':' + (m.receivedAt || '') + ':' + titre.slice(0, 24),
+      title: titre,
+      price: { amount: isNaN(montant) ? null : montant, currency_code: 'EUR' },
+      date: m.receivedAt || null,
+      // Pas de statut dans l'email : une vente annoncée est en cours tant que
+      // rien ne dit le contraire (`classifyOrderStatus` la classe « pending »).
+      status: 'Vendu — en attente',
+      _fromEmail: true,
+      _acc: acc,
+    };
+  }).filter(Boolean);
 };
 // Extrait les champs propres d'un reçu d'achat depuis l'email Vinted (montant,
 // détail, vendeur, date, transaction). Sert à la fois à la modale in-app et à
@@ -1185,7 +1231,7 @@ const b64ToBytes = (b64) => {
 const fetchHarvestOrders = async (uid, side, opts = {}) => {
   if (!uid) return null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data,updated_at`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data,updated_at,cap:data->>capturedAt`, {
       headers: sbAuth(),
     });
     if (!res.ok) return null;
@@ -1197,7 +1243,7 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
       const isBought = /bought|buy|purchas/i.test(key);
       if ((wantSold && isSold) || (!wantSold && isBought)) {
         // Même garde-fou de fraîcheur que fetchHarvest (voir son commentaire).
-        const ts = r.updated_at ? new Date(r.updated_at).getTime() : NaN;
+        const ts = harvestTs(r);
         if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
         const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
         if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
@@ -1515,7 +1561,11 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   //    opts.force = on saute la moisson (bouton "Synchroniser") pour le dernier état.
   if (page === 1 && !opts.force) {
     const h = (await fetchHarvestOrders(account.vinted_user_id, type)) || (await fetchHarvest(account.vinted_user_id, 'orders'));
-    if (h && Array.isArray(h.my_orders)) {
+    // ⚠️ Une moisson VIDE n'est pas une réponse. Une liste vide veut dire « la
+    // page n'a pas encore été ouverte / la session a expiré », pas « aucune
+    // vente ». En la prenant pour argent comptant, l'onglet Ventes affichait
+    // zéro vente alors qu'il y en avait — on continue vers le proxy.
+    if (h && Array.isArray(h.my_orders) && h.my_orders.length > 0) {
       return { ok: true, items: applyStatus(h.my_orders), pagination: h.pagination || null, source: 'harvest' };
     }
   }
@@ -6963,10 +7013,10 @@ function VintedAccounts({ accounts, setAccounts }) {
   const blockedAccts = useMemo(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)), []);
   useEffect(() => { (async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at`, { headers: sbAuth() });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
       if (!res.ok) return;
       const rows = await res.json(); const by = {};
-      rows.forEach(r => { const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return; const t = r.updated_at ? new Date(r.updated_at).getTime() : 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
+      rows.forEach(r => { const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
       setLastCap(by);
     } catch (_) {}
   })(); }, []);
@@ -9073,6 +9123,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const { acc, res } of results) {
       if (res.ok) { anyOk=true; for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } } }
       else { anyErr=true; failed.push(accNameOf(acc)); }
+    }
+    // FILET EMAILS (ventes seulement) : on complète avec les ventes annoncées
+    // par email et que ni la moisson ni le proxy n'ont rendues. Doublon écarté
+    // sur « même titre + même prix ». Les emails ne remplacent jamais une vraie
+    // commande (elle porte le vrai statut et le vrai n° de transaction).
+    if (type === 'sold') {
+      try {
+        const cle = (o) => normTitle(o.title) + '@' + Math.round(Number(o.price?.amount) || 0);
+        const vus = new Set(out.map(cle));
+        for (const o of ordersFromEmailSales(await fetchEmailSales(), accounts)) {
+          const k = cle(o); if (vus.has(k)) continue;
+          vus.add(k); out.push(o); anyOk = true;
+        }
+      } catch (_) {}
     }
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
@@ -11822,7 +11886,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {Array.isArray(emailBords) && emailBords.length>0 && (
           <div style={{marginBottom:16}}>
             <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
-              <div style={{fontSize:12,fontWeight:600,color:C.text,flex:1}}>📧 Reçus par email ({emailBords.length}) — prêts à tamponner</div>
+              {/* Le titre annonçait le TOTAL alors que la liste en dessous est
+                  filtrée (masqués, déjà expédiés) : on croyait qu'il en
+                  manquait. On dit maintenant exactement ce qui est affiché. */}
+              {(()=>{
+                const visibles=emailBords.filter(b=>!isBordHidden(b) && (showBordDone || !isBordDone(b))).length;
+                return (
+                  <div style={{fontSize:12,fontWeight:600,color:C.text,flex:1}}>
+                    📧 {visibles} bordereau{visibles>1?'x':''} affiché{visibles>1?'s':''}
+                    {visibles!==emailBords.length && <span style={{fontWeight:500,color:C.muted}}> · {emailBords.length} reçus en tout</span>}
+                  </div>
+                );
+              })()}
             </div>
             {/* Impression EN LOT : tamponne tous les bordereaux non imprimés et les
                 met à la suite dans un seul PDF à imprimer d'un coup. */}
@@ -11842,10 +11917,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ) : null; })()}
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {[...emailBords].filter(b=>!isBordHidden(b) && (showBordDone || !isBordDone(b))).sort((a,b2)=>{
-                // ORDRE D'ARRIVÉE, LE PLUS RÉCENT EN HAUT : les derniers
-                // bordereaux reçus sont ceux qu'on traite en premier. Les déjà
-                // imprimés/expédiés restent en bas pour ne pas gêner.
-                const pa=isBordDone(a)?1:0, pb=isBordDone(b2)?1:0; if(pa!==pb) return pa-pb;
+                // ORDRE D'ARRIVÉE STRICT, le plus récent en haut. Avant, on
+                // faisait d'abord descendre les bordereaux déjà traités : dès
+                // qu'on en imprimait un, il sautait en bas et la liste ne
+                // suivait plus l'ordre d'arrivée. Un bordereau traité se
+                // reconnaît à son grisé, il n'a pas besoin de changer de place.
                 return new Date(b2.receivedAt||0)-new Date(a.receivedAt||0);
               }).map((b,i)=>(
                 <div key={i} data-bord-card style={{padding:'11px 12px',border:`1px solid ${INV_STATUS.online.color}44`,...(isBordDone(b)?{opacity:0.45,filter:'grayscale(0.85)'}:{}),background:C.card,borderRadius:16}}>
@@ -13527,7 +13603,9 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 // ⚠️ Volontairement PAS dans SYNC_KEYS : ça dépend de l'écran, pas du vendeur.
 // Le même compte sur un iPhone et sur un 27 pouces ne veut pas la même densité.
 const ZOOM_KEY = 'vrm_zoom';
-const ZOOMS = [['0.8', 'Petit'], ['0.9', 'Compact'], ['1', 'Normal'], ['1.1', 'Grand']];
+// Julien trouvait encore « trop serré » au minimum : on descend plus bas.
+// 0,65 fait tenir une fois et demie plus de contenu qu'à 100 %.
+const ZOOMS = [['0.65', 'Minus'], ['0.75', 'Petit'], ['0.85', 'Compact'], ['1', 'Normal'], ['1.1', 'Grand']];
 const readZoom = () => { try { return localStorage.getItem(ZOOM_KEY) || '1'; } catch (_) { return '1'; } };
 // ⚠️ `zoom` seul ne suffit PAS : il rétrécit la page sans élargir la mise en
 // page, et il reste une bande vide sur la droite. Il faut lui rendre la largeur
