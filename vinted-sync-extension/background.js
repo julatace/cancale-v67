@@ -235,6 +235,28 @@ async function storeHarvest(domain, type, id, body) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.from !== 'cancale-content') {
+    // FRAÎCHEUR : pour chaque compte, quand ses annonces ont-elles été captées
+    // pour la dernière fois ? C'est LA question qui compte — un compte capté
+    // mais dont le dressing date de trois semaines fait raconter n'importe quoi
+    // à l'app (stock fantôme, file Leboncoin fausse, numéros bloqués).
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'freshness') {
+      (async () => {
+        try {
+          const accts = await getStoredAccounts();
+          const rows = await sbGet('app_data?id=like.harvest_*_listings&select=id,updated_at') || [];
+          const parUid = {};
+          for (const r of rows) {
+            const m = /^harvest_(\d+)_listings$/.exec(r.id); if (!m) continue;
+            const t = Date.parse(r.updated_at || ''); if (!isNaN(t)) parUid[m[1]] = t;
+          }
+          const fresh = accts.map(a => ({
+            uid: String(a.vinted_user_id), login: a.login || '', at: parUid[String(a.vinted_user_id)] || 0,
+          }));
+          sendResponse({ ok: true, fresh });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'syncNow') {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
       return true; // reponse asynchrone
