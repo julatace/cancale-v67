@@ -1,7 +1,7 @@
 {
-  "name": "VRM — Vendre · Ranger · Marge",
+  "name": "VRM",
   "short_name": "VRM",
-  "description": "Le CRM des revendeurs Vinted : vends, range tes paires au garage, suis ta marge. Catalogue, ventes, annonces numérotées, bordereaux, rapport comptable.",
+  "description": "Ton poste de pilotage de revendeur : annonces, ventes, achats, rangement, marge et comptabilité au même endroit.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

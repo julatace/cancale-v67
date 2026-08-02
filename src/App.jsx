@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v48/00 · ✨logo';
+const BUILD_ID = 'v49/00 · ✨VRM';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -2030,14 +2030,26 @@ function PieChartSVG({data,size=160}){
 }
 
 /* ── Nav ─────────────────────────────────────────────── */
-// ── LOGO VRM ──────────────────────────────────────────────────────────────
-// Un V doré plein cadre sur fond nuit, cerné d'un liseré fin : le registre des
-// marques de revente sneakers (noir + or), pas celui des icônes d'application
-// génériques. Dessiné en TRACÉ vectoriel et non avec une police : une police
-// qui ne charge pas décalerait le logo, et le tracé reste net à toutes les
-// tailles. Vérifié de 92 px (écran de connexion) à 20 px (onglet du
-// navigateur) — c'est la petite taille qui commande le dessin.
+// ── IDENTITÉ VRM ──────────────────────────────────────────────────────────
+// Le sigle VRM, dessiné LETTRE PAR LETTRE en tracés vectoriels. Pourquoi ne pas
+// simplement écrire « VRM » avec la police de l'app : une police met un instant
+// à charger (et peut ne jamais charger), et le logo sauterait d'une graisse à
+// l'autre sous les yeux de l'utilisateur. Un tracé s'affiche juste, tout de
+// suite, identique partout.
+//
+// Le R en doré : un seul détail de couleur, c'est ce qui distingue une marque
+// d'un simple mot écrit en gras. Volontairement SANS référence à la chaussure —
+// l'app doit convenir à quelqu'un qui revend des vêtements, des jeux ou des
+// meubles.
+//
+// Graisse constante 4.8, hauteur 20, largeur ~15 par lettre : le R porte une
+// contre-forme (le trou de sa panse) obtenue par fill-rule evenodd.
+const L_V = 'M0 0 H4.8 L7.5 13.6 L10.2 0 H15 L9.9 20 H5.1 Z';
+const L_R = 'M0 0 H10.2 a5.6 5.6 0 0 1 1.6 11 L15.6 20 H10.2 L7 11.6 H4.8 V20 H0 Z M4.8 3.9 V7.9 H9.6 a2 2 0 0 0 0-4 Z';
+const L_M = 'M0 20 V0 H5.2 L7.6 8.4 L10 0 H15.2 V20 H10.9 V8.2 L8.9 14.6 H6.3 L4.3 8.2 V20 Z';
+
 let _logoSeq = 0;
+// Le sigle en médaillon : l'icône de l'app (écran d'accueil, onglet, en-tête).
 function VrmLogo({ size = 40, style }) {
   // Identifiants de dégradé uniques : deux <svg> qui partagent le même id se
   // volent leur dégradé, et le second s'affiche vide.
@@ -2045,16 +2057,31 @@ function VrmLogo({ size = 40, style }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" style={style} role="img" aria-label="VRM">
       <defs>
-        <linearGradient id={`${uid}o`} x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stopColor="#F6DFAE"/><stop offset=".45" stopColor="#E3BE7B"/><stop offset="1" stopColor="#C79A50"/>
+        <linearGradient id={`${uid}o`} x1="0" y1="0" x2=".3" y2="1">
+          <stop offset="0" stopColor="#F7E3B6"/><stop offset=".5" stopColor="#E0B972"/><stop offset="1" stopColor="#BE8F45"/>
         </linearGradient>
         <linearGradient id={`${uid}n`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#26262A"/><stop offset="1" stopColor="#0A0A0B"/>
+          <stop offset="0" stopColor="#2A2A2F"/><stop offset="1" stopColor="#08080A"/>
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="14" fill={`url(#${uid}n)`}/>
-      <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="12.9" fill="none" stroke="#E3BE7B" strokeOpacity=".38" strokeWidth="1.6"/>
-      <path d="M9.5 13 H23.5 L32 34.5 L40.5 13 H54.5 L36.4 51.6 a5 5 0 0 1-8.8 0 Z" fill={`url(#${uid}o)`}/>
+      <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="12.9" fill="none" stroke="#E0B972" strokeOpacity=".34" strokeWidth="1.6"/>
+      <g transform="translate(6 22)">
+        <path d={L_V} fill="#fff"/>
+        <g transform="translate(18.2 0)"><path d={L_R} fill={`url(#${uid}o)`} fillRule="evenodd"/></g>
+        <g transform="translate(37 0)"><path d={L_M} fill="#fff"/></g>
+      </g>
+    </svg>
+  );
+}
+// Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
+function VrmWord({ height = 22, color, accent, style }) {
+  const k = height / 20;
+  return (
+    <svg width={52.6 * k} height={height} viewBox="0 0 52.6 20" style={style} role="img" aria-label="VRM">
+      <path d={L_V} fill={color || C.text}/>
+      <g transform="translate(18.2 0)"><path d={L_R} fill={accent || color || C.text} fillRule="evenodd"/></g>
+      <g transform="translate(37 0)"><path d={L_M} fill={color || C.text}/></g>
     </svg>
   );
 }
@@ -2519,9 +2546,7 @@ function AuthScreen() {
     <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
       <div style={{width:'100%',maxWidth:380}}>
         <div style={{textAlign:'center',marginBottom:26}}>
-          <VrmLogo size={72} style={{marginBottom:14,filter:'drop-shadow(0 6px 18px rgba(0,0,0,.18))'}}/>
-          <div style={{fontSize:32,fontWeight:700,color:C.text,letterSpacing:-1,lineHeight:1}}>VRM</div>
-          <div style={{fontSize:11,color:C.muted,marginTop:7,letterSpacing:'.12em',textTransform:'uppercase',fontWeight:600}}>Vendre · Ranger · Marge</div>
+          <VrmLogo size={76} style={{filter:'drop-shadow(0 8px 22px rgba(10,10,12,.22))'}}/>
         </div>
         <form onSubmit={submit} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
           <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:3}}>
@@ -2684,10 +2709,12 @@ function Onboarding({ setTab }) {
   return (
     <div style={{padding:'20px 16px 8px'}}>
       <div style={{borderRadius:20,border:`1px solid ${C.border}`,background:C.card,padding:'22px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.04)'}}>
-        <div style={{fontSize:22,fontWeight:700,color:C.text,marginBottom:2}}>Bienvenue sur VRM 👋</div>
-        <div style={{fontSize:12,fontWeight:500,color:C.accent,letterSpacing:0.3,marginBottom:8}}>Vendre · Ranger · Marge</div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+          <VrmLogo size={44}/>
+          <div style={{fontSize:22,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue 👋</div>
+        </div>
         <div style={{fontSize:15,color:C.muted,lineHeight:1.5,marginBottom:20}}>
-          Le CRM des revendeurs Vinted : vends tes paires, range-les au garage, suis ta marge. Connecte ton compte Vinted pour commencer — c'est parti en 3 étapes :
+          Ton poste de pilotage : ce que tu vends, où c'est rangé, ce que ça te rapporte. Connecte ton compte Vinted pour commencer — c'est parti en 3 étapes :
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           {steps.map(s=>(
@@ -13037,7 +13064,7 @@ function LeboncoinScreen() {
     </div>
   );
 }
-function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
+function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif, customLogo, onPickLogo, onResetLogo }) {
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -13190,6 +13217,35 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
       <Row icon="🔗" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
+
+      {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
+      <div style={{padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:14}}>
+          <div style={{width:56,height:56,borderRadius:14,flexShrink:0,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+            {customLogo ? <img src={customLogo} alt="" style={{width:56,height:56,objectFit:'cover'}}/> : <VrmLogo size={56}/>}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:600,color:C.text}}>{customLogo ? 'Ton icône' : 'Icône VRM'}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.45}}>Celle qui s'affiche sur ton écran d'accueil et dans l'onglet du navigateur.</div>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
+          <button type="button" onClick={onPickLogo}
+            style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            Choisir une image
+          </button>
+          {customLogo && (
+            <button type="button" onClick={onResetLogo}
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+              Remettre celle de VRM
+            </button>
+          )}
+        </div>
+        <div style={{fontSize:10.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
+          Prends une image <b>carrée</b> (512 × 512 idéalement). Sur iPhone, l'icône déjà posée sur l'écran d'accueil ne change pas toute seule : <b>supprime le raccourci et refais « Ajouter à l'écran d'accueil »</b> pour qu'il prenne la nouvelle.
+        </div>
+      </div>
 
       {/* WIDGET IPHONE — l'adresse contient ta clé personnelle. Avant, cette
           adresse était publique : n'importe qui pouvait lire ton chiffre
@@ -13709,16 +13765,38 @@ export default function App() {
   // On met à jour dynamiquement les balises <link> d'icônes avec le logo courant
   // (ta photo si tu en as mis une, sinon le logo Cancale par défaut).
   useEffect(()=>{
-    if(!logoSrc) return;
-    const setIcon=(rel)=>{
+    // ICÔNE SUR L'ÉCRAN D'ACCUEIL
+    // On ne remplace les icônes du site QUE si une image personnalisée existe.
+    // Avant, on écrasait aussi avec l'image par défaut — l'icône VRM soignée
+    // était donc remplacée par une photo au chargement, sans que personne
+    // l'ait demandé.
+    const setIcon=(rel,href)=>{
       let link=document.querySelector(`link[rel="${rel}"]`);
       if(!link){ link=document.createElement('link'); link.rel=rel; document.head.appendChild(link); }
-      link.href=logoSrc;
+      link.href=href;
     };
-    setIcon('icon');
-    setIcon('shortcut icon');
-    setIcon('apple-touch-icon');
-  },[logoSrc]);
+    if (customLogo) {
+      setIcon('icon', customLogo);
+      setIcon('shortcut icon', customLogo);
+      setIcon('apple-touch-icon', customLogo);
+      // Android/Chrome lisent le manifeste, pas les balises <link>. On en
+      // fabrique donc un à la volée, avec l'image en clair dedans.
+      try {
+        const man = {
+          name:'VRM', short_name:'VRM', start_url:'/', scope:'/', display:'standalone',
+          orientation:'portrait', background_color:'#eef2f2', theme_color:'#007782',
+          icons:[{ src: customLogo, sizes:'512x512', type:'image/png', purpose:'any' }],
+        };
+        const url = URL.createObjectURL(new Blob([JSON.stringify(man)], { type:'application/manifest+json' }));
+        setIcon('manifest', url);
+      } catch(_) {}
+    } else {
+      setIcon('icon','/icon-192.png');
+      setIcon('shortcut icon','/icon-192.png');
+      setIcon('apple-touch-icon','/apple-touch-icon.png');
+      setIcon('manifest','/manifest.webmanifest');
+    }
+  },[customLogo]);
 
   // Repercute dans le state React les tokens rafraichis automatiquement par le
   // proxy (via persistRefreshedTokens). Sans ca, seuls l'objet compte en memoire
@@ -14290,7 +14368,7 @@ export default function App() {
           {/* minWidth:0 + nowrap : avec la flèche « retour », le numéro de version
               passait à la ligne et faisait grandir l'en-tête d'un écran à l'autre. */}
           <div style={{minWidth:0}}>
-            <div style={{fontWeight:700,fontSize:22,color:C.accent,letterSpacing:-0.6,lineHeight:1}}>VRM</div>
+            <VrmWord height={19} color={C.text} accent={C.accent} style={{display:'block'}}/>
             <div style={{fontSize:9,color:C.muted,fontWeight:500,letterSpacing:0.2,marginTop:2,opacity:0.75,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>{BUILD_ID}</div>
           </div>
         </div>
@@ -14499,6 +14577,7 @@ export default function App() {
           }
         }}>
         {tab==='settings'&&<SettingsScreen setTab={setTab}
+          customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}
           onToggleNotif={async()=>{
             if(!notifEnabled){
