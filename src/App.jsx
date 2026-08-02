@@ -2,32 +2,40 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v49/00 · ✨VRM';
+const BUILD_ID = 'v50/00 · 🎨premium';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
 // conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
   light: {
-    bg:"#f4f7f5", surface:"#ffffff", card:"#ffffff", border:"#e6ebe7",
-    accent:"#14795a", onAccent:"#ffffff", danger:"#c0453f", warn:"#a9760f",
-    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0e1712", muted:"#66756d",
-    // Élévation : ombres douces, jamais de noir pur (c'est ce qui fait « cheap »).
-    shadow:"0 1px 2px rgba(16,32,24,.05), 0 2px 8px rgba(16,32,24,.05)",
-    shadowLg:"0 4px 12px rgba(16,32,24,.08), 0 12px 32px rgba(16,32,24,.08)",
-    glass:"rgba(255,255,255,.82)",
+    // FOND LÉGÈREMENT TEINTÉ, CARTES BLANCHES : c'est le contraste entre les deux
+    // qui donne le relief. Avant, le fond était presque blanc et chaque carte
+    // devait se dessiner un contour gris pour exister — d'où l'impression de
+    // formulaire administratif. Maintenant la carte se détache par sa clarté et
+    // son ombre, et le trait n'est plus qu'un liseré très pâle.
+    bg:"#eef2ef", surface:"#ffffff", card:"#ffffff", border:"#e3e9e5",
+    accent:"#0f6b4f", accentSoft:"#178a66", onAccent:"#ffffff",
+    danger:"#c0453f", warn:"#a9760f", gold:"#B8863B",
+    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0d1512", muted:"#63736b",
+    // Élévation à DEUX niveaux, jamais de noir pur (c'est ce qui fait « cheap »).
+    // La composante large et diffuse fait la profondeur, la fine pose l'objet.
+    shadow:"0 1px 1px rgba(13,32,24,.04), 0 4px 14px -4px rgba(13,32,24,.10)",
+    shadowLg:"0 2px 4px rgba(13,32,24,.05), 0 18px 40px -12px rgba(13,32,24,.18)",
+    glass:"rgba(255,255,255,.78)",
     // Couleurs de SÉRIE des graphiques (≠ couleurs de statut, jamais réutilisées
     // pour un avertissement). Paire vérifiée : elle reste distinguable en vision
     // normale ET en daltonisme (deutan/tritan) sur ce fond.
     s1:"#14795a", s2:"#6d5cc7",
   },
   dark: {
-    bg:"#0d1210", surface:"#151d19", card:"#1a2420", border:"#2a3630",
-    accent:"#4aa87d", onAccent:"#04150d", danger:"#e87b7f", warn:"#dcae5c",
-    blue:"#6aabd8", purple:"#ac9dea", text:"#eef4f0", muted:"#8d9d94",
-    shadow:"0 1px 2px rgba(0,0,0,.35), 0 2px 10px rgba(0,0,0,.30)",
-    shadowLg:"0 6px 18px rgba(0,0,0,.45), 0 16px 40px rgba(0,0,0,.40)",
-    glass:"rgba(21,29,25,.78)",
+    bg:"#0b0f0d", surface:"#141b18", card:"#18211d", border:"#28322d",
+    accent:"#4aa87d", accentSoft:"#5cbb8e", onAccent:"#04150d",
+    danger:"#e87b7f", warn:"#dcae5c", gold:"#E0B972",
+    blue:"#6aabd8", purple:"#ac9dea", text:"#eef4f0", muted:"#8b9b92",
+    shadow:"0 1px 2px rgba(0,0,0,.4), 0 4px 16px -4px rgba(0,0,0,.5)",
+    shadowLg:"0 2px 6px rgba(0,0,0,.5), 0 20px 44px -12px rgba(0,0,0,.6)",
+    glass:"rgba(20,27,24,.74)",
     // Mode sombre : teintes RECALCULÉES pour ce fond, pas un simple éclaircissement.
     s1:"#4aa87d", s2:"#9482d8",
   },
@@ -2112,7 +2120,33 @@ const ICON_PATHS = {
   chat:  <><path d="M20.5 11.6c0 4-3.8 7.2-8.5 7.2-1 0-2-.15-2.9-.42L4 20.5l1.3-3.5A6.8 6.8 0 0 1 3.5 11.6C3.5 7.6 7.3 4.4 12 4.4s8.5 3.2 8.5 7.2Z"/></>,
   home:  <><path d="M3.5 10.4 12 3.6l8.5 6.8"/><path d="M5.6 12v7.5a1 1 0 0 0 1 1h10.8a1 1 0 0 0 1-1V12"/></>,
   receipt: <><path d="M6 2.8h12a1 1 0 0 1 1 1v17.4l-2.3-1.6-2.3 1.6-2.4-1.6-2.4 1.6-2.3-1.6L5 21.2V3.8a1 1 0 0 1 1-1Z"/><path d="M9 8h6M9 12h6"/></>,
+  // Réglages : mêmes traits que le reste, pour remplacer les emojis qui
+  // juraient entre eux (chacun est dessiné par un fournisseur différent).
+  mail:   <><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3.5 6.5 8.5 6 8.5-6"/></>,
+  key:    <><circle cx="8" cy="15" r="4.2"/><path d="m11 12 8.5-8.5M17 6l2.5 2.5M14.5 8.5 17 11"/></>,
+  door:   <><path d="M14.5 3.2H6.8a1.6 1.6 0 0 0-1.6 1.6v14.4a1.6 1.6 0 0 0 1.6 1.6h7.7"/><path d="M11 12h9.5m0 0-3-3m3 3-3 3"/></>,
+  link:   <><path d="M10 13.5a4.5 4.5 0 0 0 6.4.2l2.6-2.6a4.5 4.5 0 0 0-6.4-6.4l-1.5 1.5"/><path d="M14 10.5a4.5 4.5 0 0 0-6.4-.2L5 12.9a4.5 4.5 0 0 0 6.4 6.4l1.5-1.5"/></>,
+  shop:   <><path d="M3.5 8h17l-1 11.3a2 2 0 0 1-2 1.8H6.5a2 2 0 0 1-2-1.8L3.5 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></>,
+  save:   <><path d="M12 3v11m0 0 4-4m-4 4-4-4"/><path d="M4.5 15v3a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-3"/></>,
+  restore:<><path d="M12 21a9 9 0 1 0-9-9"/><path d="M3 4v5h5"/></>,
+  box:    <><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16V8Z"/><path d="M3.5 8 12 12.5 20.5 8M12 12.5V20.5"/></>,
+  image:  <><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></>,
+  moon:   <><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></>,
+  bell2:  <><path d="M6 9a6 6 0 0 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9Z"/><path d="M10 19a2 2 0 0 0 4 0"/></>,
 };
+// Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
+// trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
+// liens : les emojis, eux, sont dessinés par un fournisseur différent chacun et
+// ne s'accordent jamais entre eux.
+function IconTile({ name, color, size = 30 }) {
+  const c = color || C.accent;
+  return (
+    <span style={{width:size,height:size,borderRadius:9,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
+      background:`${c}16`, color:c}}>
+      <Icon name={name} size={Math.round(size*0.6)}/>
+    </span>
+  );
+}
 const Icon = ({ name, size = 24, style }) => {
   const d = ICON_PATHS[name]; if (!d) return null;
   return (
@@ -13072,12 +13106,14 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
   const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
   const Row = ({icon,title,desc,onClick,color}) => (
     <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-      <span style={{fontSize:22,flexShrink:0}}>{icon}</span>
+      {/* Icône au trait dans sa tuile teintée si on connaît le nom ; sinon on
+          retombe sur l'emoji (les écrans pas encore repris). */}
+      {ICON_PATHS[icon] ? <IconTile name={icon} color={color||C.accent}/> : <span style={{fontSize:22,flexShrink:0}}>{icon}</span>}
       <span style={{flex:1,minWidth:0}}>
         <span style={{display:'block',fontSize:15,fontWeight:600,color:color||C.text}}>{title}</span>
-        {desc && <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>{desc}</span>}
+        {desc && <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>{desc}</span>}
       </span>
-      <span style={{color:C.muted,fontSize:20}}>›</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,opacity:.55}}><path d="m9 6 6 6-6 6"/></svg>
     </button>
   );
   // Fenêtre d'action sur le compte (email / mot de passe / déconnexion).
@@ -13137,7 +13173,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
   return (
     <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
       <AcctSheet/>
-      <h2 style={{fontSize:20,fontWeight:600,color:C.text,margin:'0 0 16px'}}>⚙️ Paramètres</h2>
+      <h2 style={{fontSize:26,fontWeight:700,color:C.text,margin:'4px 0 18px',letterSpacing:'-0.03em'}}>Paramètres</h2>
 
       {/* ── TON COMPTE VRM ──────────────────────────────────────────────────
           Toujours présent en multi-vendeurs, y compris quand on est entré par la
@@ -13203,20 +13239,20 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
         </div>
 
         {AUTH.user && (<>
-          <Row icon="✉️" title="Changer mon email"
+          <Row icon="mail" title="Changer mon email"
             desc="L'adresse avec laquelle tu te connectes."
             onClick={()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); }}/>
-          <Row icon="🔑" title="Changer mon mot de passe"
+          <Row icon="key" title="Changer mon mot de passe"
             desc="Choisis-en un nouveau, tu restes connecté."
             onClick={()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); }}/>
-          <Row icon="🚪" title="Se déconnecter" color={C.danger}
+          <Row icon="door" title="Se déconnecter" color={C.danger}
             desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
             onClick={()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); }}/>
         </>)}
       </>)}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
-      <Row icon="🔗" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
+      <Row icon="link" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
 
       {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
@@ -13270,11 +13306,11 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       })()}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Leboncoin</div>
-      <Row icon="🟠" title="Leboncoin" desc="Publiées, à publier, à retirer, ton offre." onClick={()=>setTab('leboncoin')}/>
+      <Row icon="shop" title="Leboncoin" desc="Publiées, à publier, à retirer, ton offre." onClick={()=>setTab('leboncoin')}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
-      <Row icon="🛟" title="Sauvegarde complète (1 clic)" desc="Télécharge TOUT : catalogue, ventes, achats, numéros, comptes, garage, réglages. Ton filet de sécurité." onClick={onExport}/>
-      <Row icon="♻️" title="Restaurer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde, puis recharge l'app." onClick={onImport} color={C.blue}/>
+      <Row icon="save" title="Sauvegarde complète (1 clic)" desc="Télécharge TOUT : catalogue, ventes, achats, numéros, comptes, garage, réglages. Ton filet de sécurité." onClick={onExport}/>
+      <Row icon="restore" title="Restaurer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde, puis recharge l'app." onClick={onImport} color={C.blue}/>
       {(()=>{ const t=Number(load('vinted_last_backup',0))||0; const days=t?Math.floor((Date.now()-t)/86400000):null;
         const old = days===null || days>=30;
         return (
@@ -13286,14 +13322,14 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       })()}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Ancienne application</div>
-      <Row icon="📦" title="Ancien catalogue" desc="Les paires de l'ancienne appli (toujours comptées dans les stats)." onClick={()=>setTab('catalog')}/>
-      <Row icon="💸" title="Anciennes ventes" desc="Les ventes historiques de l'ancienne appli." onClick={()=>setTab('sales')}/>
-      <Row icon="🟢" title="Stock Vinted (ancien)" desc="L'ancienne liste de numéros en ligne." onClick={()=>setTab('stockvinted')}/>
+      <Row icon="box" title="Ancien catalogue" desc="Les paires de l'ancienne appli (toujours comptées dans les stats)." onClick={()=>setTab('catalog')}/>
+      <Row icon="cash" title="Anciennes ventes" desc="Les ventes historiques de l'ancienne appli." onClick={()=>setTab('sales')}/>
+      <Row icon="tag" title="Stock Vinted (ancien)" desc="L'ancienne liste de numéros en ligne." onClick={()=>setTab('stockvinted')}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
       <RegimeSetting/>
       <div style={{height:10}}/>
-      <Row icon="📄" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={()=>{ if(window.confirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
+      <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={()=>{ if(window.confirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Notifications</div>
       <PushSetting/>
