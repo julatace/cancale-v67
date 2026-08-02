@@ -385,3 +385,25 @@ Deux dégâts, longtemps invisibles :
 
 ### PAS RÉSOLU — il faut un email d'exemple
 Le QR authentique n'est **jamais** capté (0/61) et le point relais est vide 48 fois sur 61. Le code d'extraction (`api/email-inbound.js`, `extractQr` + parsing `lieu`) existe et l'app affiche déjà le vrai QR quand il est là (`qrB64` → `qrUrl` → repli généré). **Le problème est en amont, dans le découpage de l'email.** Écrire des regex sans voir le HTML réel serait deviner. ➡️ Demander à Julien de **transférer un email Mondial Relay « colis disponible » brut** pour caler l'extraction sur du vrai.
+
+---
+
+## 16. Session août 2026 (suite) — le bug « liste vide » était partout
+
+`fetchVintedOrders`, `fetchVintedListings` **et** `fetchVintedConversations` prenaient tous une moisson **vide** pour une réponse valable, au lieu de « rien capté ». Corrigé aux trois endroits (`&& X.length > 0`). C'est ce qui déclenchait les bandeaux « compte muet » et « annonces disparues » alors que les annonces étaient bien en ligne — combiné au piège `updated_at` de la section 15, l'app se vidait toute seule.
+
+**Règle à retenir : une liste vide n'est jamais une réponse.** Une session expirée, une page pas encore ouverte ou un appel refusé renvoient `[]`, pas une erreur.
+
+### Écran Annonces épuré
+Les trois bandeaux d'alerte (compte muet / annonces disparues / compte bloqué) s'empilaient en permanence au-dessus de la grille — « il faut trop glisser pour voir les annonces ». Ils sont derrière une ligne repliable « ⚠️ N signalements » (`diagOpen`), affichée seulement s'il y a vraiment quelque chose. Les puces de visibilité par compte restent visibles (c'est une commande, pas une alerte).
+
+### Point relais : vérifié, la donnée n'existe QUE dans l'email
+- `cleanLieu()` **fonctionne** — testé sur les 61 lignes réelles : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE Retrou… » → `{nom:"Maison de la Presse", adresse:"40 Rue du Port, 35260 Cancale"}`. Ce n'est donc **pas** le nettoyage qui est en cause.
+- **Seules 12 lignes sur 61 portent un lieu**, et toutes disent « Maison de la Presse » — d'où la plainte « il n'y a pas que Maison de la Presse ». Le problème est en amont : `api/email-inbound.js` n'extrait le lieu que d'un seul format d'email.
+- **Vérifié : Vinted ne donne pas le point relais.** Les 26 lignes `harvest_*_txn_*` ont un `shipment` réduit à `{id, status, status_title, status_updated_at}` ; aucun champ pickup / drop_off / adresse dans toute la transaction. ➡️ **Il faut vraiment un email brut** pour aller plus loin.
+
+### « Colis retiré » automatique : déjà en place, c'était le harvest qui manquait
+`isAtRelayStatus` exige « déposé » + « point relais / bureau de poste ». Dès que Vinted passe à « Commande livrée ! » (statut vu dans les transactions moissonnées), le colis cesse d'être compté — sans rien faire. Ça ne marchait pas parce que la moisson des achats était **jetée** par le piège `updated_at`. Corrigé en amont.
+
+### Bordereaux sans numéro
+11 sur 51 n'ont aucun numéro. La pastille était simplement absente → le bordereau avait l'air normal. Il porte maintenant « N° ? » en orange ; le bouton « Relier » existait déjà juste en dessous.
