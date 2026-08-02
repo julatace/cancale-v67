@@ -371,8 +371,12 @@
     else if (a === 'prepare') {
       const dl = await send({ action: 'downloadPhotos', urls: ad.photos || [], numero: ad.numero });
       copy('TITRE :\n' + ad.title + '\n\nDESCRIPTION :\n' + ad.description + '\n\nPRIX : ' + ad.price + ' €\nRÉFÉRENCE : ' + (ad.ref || ('VRM-' + ad.numero)) + '\nCATÉGORIE : ' + ad.category);
+      // ON MEMORISE L'ANNONCE EN COURS. C'est ce qui manquait : la page de depot
+      // s'ouvrait dans un NOUVEL onglet, qui n'avait aucune idee de la paire
+      // choisie — donc rien n'etait rempli et il fallait tout recoller a la main.
+      await send({ action: 'setPending', ad });
       window.open('https://www.leboncoin.fr/deposer-une-annonce', '_blank');
-      toast('🚀 ' + (dl && dl.count ? dl.count : 0) + ' photo(s) téléchargée(s) + texte copié + page de dépôt ouverte');
+      toast('🚀 ' + (dl && dl.count ? dl.count : 0) + ' photo(s) téléchargée(s) — le formulaire se remplit tout seul dans le nouvel onglet');
     }
     else if (a === 'prefill') { prefill(ad); }
     else if (a === 'posted') {
@@ -382,7 +386,78 @@
     }
   });
 
+  // ── REMPLISSAGE AUTOMATIQUE DE LA PAGE DE DEPOT ─────────────────────────
+  // Leboncoin est une application a page unique : le formulaire n'existe pas
+  // encore quand la page finit de charger, et il se reconstruit a chaque etape.
+  // On surveille donc l'apparition des champs et on remplit des qu'ils sont la.
+  // ⚠️ On remplit, on ne publie PAS : c'est toi qui relis et qui valides. Les
+  // photos ne peuvent pas etre injectees (un navigateur interdit de remplir un
+  // champ fichier par programme) : elles sont deja dans ton dossier VRM-{N°}.
+  let pending = null, pendingTries = 0, pendingDone = 0, pendingTimer = null;
+  async function autoPrefill() {
+    if (!/deposer|depot|d[ée]p[oô]t/i.test(location.href)) return;
+    const r = await send({ action: 'getPending' });
+    pending = (r && r.ok && r.ad) ? r.ad : null;
+    if (!pending) return;
+    banner();
+    clearInterval(pendingTimer);
+    pendingTimer = setInterval(() => {
+      pendingTries++;
+      const n = fillNow(pending);
+      if (n > pendingDone) { pendingDone = n; banner(); }
+      // On s'arrete au bout de 90 s : au-dela, soit c'est rempli, soit la page
+      // n'est pas celle qu'on croit — inutile de tourner en fond.
+      if (pendingTries > 90) clearInterval(pendingTimer);
+    }, 1000);
+  }
+  function fillNow(ad) {
+    let n = 0;
+    if (setIfEmpty(findField([/titre|title|subject/]), ad.title)) n++;
+    if (setIfEmpty(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
+    if (setIfEmpty(findField([/prix|price|montant/]), String(ad.price || ''))) n++;
+    if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
+    return n;
+  }
+  // On ne remplit QUE les champs vides : sinon, a chaque passage, on effacerait
+  // ce que tu viens de corriger a la main.
+  function setIfEmpty(el, val) {
+    if (!el || !val) return false;
+    if (String(el.value || '').trim()) return false;
+    return setField(el, val);
+  }
+  function banner() {
+    let el = document.getElementById('vrm-lbc-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'vrm-lbc-banner';
+      el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:300px;background:#0d1210;color:#eef4f0;border:1px solid #28322d;border-radius:14px;padding:12px 14px;font:12px/1.5 -apple-system,system-ui,sans-serif;box-shadow:0 18px 40px -12px rgba(0,0,0,.5)';
+      document.documentElement.appendChild(el);
+    }
+    el.innerHTML =
+      '<div style="font-weight:700;font-size:13px;margin-bottom:3px">N°' + (pending.numero || '?') + ' — ' + esc(String(pending.title || '').slice(0, 46)) + '</div>' +
+      '<div style="color:#8b9b92">' + pendingDone + ' champ' + (pendingDone > 1 ? 's' : '') + ' rempli' + (pendingDone > 1 ? 's' : '') +
+      '. Catégorie <b style="color:#eef4f0">' + esc(pending.category || '—') + '</b>. Photos dans le dossier <b style="color:#eef4f0">VRM-' + (pending.numero || '') + '</b>.</div>' +
+      '<div style="display:flex;gap:6px;margin-top:9px">' +
+      '<button id="vrm-refill" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">Re-remplir</button>' +
+      '<button id="vrm-cdesc" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">Copier la description</button>' +
+      '<button id="vrm-close" title="Fermer" style="border:1px solid #3a4a43;background:transparent;color:#8b9b92;border-radius:9px;padding:7px 9px;font-size:11.5px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="color:#6f7f77;font-size:10px;margin-top:7px">VRM ne publie jamais à ta place : relis et clique toi-même sur Publier.</div>';
+    el.querySelector('#vrm-refill').onclick = () => { pendingDone = fillNowForce(pending); banner(); };
+    el.querySelector('#vrm-cdesc').onclick = () => { copy(pending.description || ''); toast('Description copiée'); };
+    el.querySelector('#vrm-close').onclick = () => { clearInterval(pendingTimer); el.remove(); send({ action: 'setPending', ad: null }); };
+  }
+  function fillNowForce(ad) {
+    let n = 0;
+    if (setField(findField([/titre|title|subject/]), ad.title)) n++;
+    if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
+    if (setField(findField([/prix|price|montant/]), String(ad.price || ''))) n++;
+    if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
+    return n;
+  }
+
   async function load() {
+    autoPrefill();
     scanPageRefs();
     captureLbcListings();
     captureDepositForm();

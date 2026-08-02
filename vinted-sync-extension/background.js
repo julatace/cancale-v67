@@ -323,6 +323,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body); sendResponse({ ok: true }); return; }
           if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
+          // ANNONCE EN COURS DE DEPOT : memorisee au clic sur « Tout preparer »,
+          // relue par la page de depot qui s'ouvre dans un AUTRE onglet. Sans ce
+          // relais, le nouvel onglet ne savait pas quelle paire etait choisie.
+          // Duree de vie courte : au-dela de 30 min, on considere que le depot a
+          // ete abandonne et on ne pre-remplit pas une annonce oubliee.
+          if (msg.action === 'setPending') {
+            await chrome.storage.local.set({ vrmPendingAd: msg.ad ? { ad: msg.ad, at: Date.now() } : null });
+            sendResponse({ ok: true }); return;
+          }
+          if (msg.action === 'getPending') {
+            const g = await chrome.storage.local.get('vrmPendingAd');
+            const p = g && g.vrmPendingAd;
+            const frais = p && p.at && (Date.now() - p.at) < 30 * 60 * 1000;
+            sendResponse({ ok: true, ad: frais ? p.ad : null }); return;
+          }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
