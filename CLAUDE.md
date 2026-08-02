@@ -275,5 +275,15 @@ Passeport de la paire (📖), Répartiteur de lot (🧮), Audit stock fantôme (
 - `AuthScreen` : connexion / création / mot de passe oublié. Réponse identique que le compte existe ou non (sinon le formulaire révèle qui est inscrit).
 - **Extension** : `background.js` a sa propre session (`chrome.storage.local.vrmSession`), `sbHeaders()` / `withOwner()` / `appDataConflict()`. L'app lui transmet le jeton par `window.postMessage({__vmr:'session'})` → `bridge.js` → background, **avec vérification de l'origine** (seuls les domaines de l'app sont acceptés, sinon n'importe quel site pourrait injecter un jeton).
 
+### Connexion Google / Discord (OAuth, PKCE)
+- `oauthStart(provider)` → `/auth/v1/authorize?provider=…&code_challenge=…&code_challenge_method=s256`, vérificateur en `sessionStorage`.
+- `consumeAuthRedirect()` au boot gère **les deux formes de retour** : `?code=` (PKCE → échange sur `token?grant_type=pkce` avec `{auth_code, code_verifier}`) et `#access_token=` (liens email, notamment « mot de passe oublié »). `cleanAuthUrl()` efface le jeton de la barre d'adresse.
+- ⚠️ **PKCE et pas implicite** : en implicite le jeton d'accès revient dans l'URL (historique, journaux de proxy, presse-papier). Ne pas « simplifier » en revenant à l'implicite.
+- `RECOVERY_PENDING` : le lien « mot de passe oublié » connecte techniquement le vendeur — sans ce drapeau l'app s'ouvrait normalement et le formulaire de nouveau mot de passe n'apparaissait jamais.
+- Providers à activer dans le dashboard Supabase (clés Google Cloud / Discord Developer) + **liste blanche des Redirect URLs** : sans elle, un lien de connexion fabriqué peut renvoyer le jeton vers un autre site. Procédure dans `supabase/README.md`.
+
+### ⚠️ Faille corrigée : `api/widget.js` était PUBLIQUE
+`https://vrm.center/api/widget` renvoyait **sans aucune clé** le CA du mois, le nombre de ventes, l'argent en attente et les annonces en ligne — avec `Access-Control-Allow-Origin: *` en prime. Exige désormais `?k=<vrm_widget_token>`, comparé **en temps constant** (une comparaison ordinaire s'arrête au premier caractère faux → clé devinable au chronomètre). Le jeton est généré par l'app après `onCloudReady` (une seule fois, sinon chaque appareil en créerait un) et affiché dans **Paramètres → Widget iPhone**. Tant qu'aucun jeton n'existe en base, la route répond encore (transition, pour ne pas casser le widget avant que Julien ait la nouvelle adresse).
+
 ### Ce qui bloque encore la bascule
 Les fonctions `api/*.js` (widget, email-inbound, ship-reminders, push) écrivent avec la clé anon → **cassées dès que RLS est activé**. Il leur faut `SUPABASE_SERVICE_KEY` (Vercel) + savoir à quel vendeur attribuer chaque ligne. Pour les emails, ça suppose de rattacher une adresse email à un vendeur — chantier à part entière.

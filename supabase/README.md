@@ -46,6 +46,43 @@ immédiate.
 > dans **Authentication → Emails → SMTP Settings**. La confirmation email évite
 > qu'on crée des comptes avec l'adresse de quelqu'un d'autre.
 
+## Étape 2 bis — Activer Google et Discord
+
+Les deux boutons « Continuer avec… » sont déjà dans l'app. Il faut créer une
+application chez chaque fournisseur et donner ses clés à Supabase.
+
+**L'adresse de retour est la même dans les deux cas :**
+`https://lgonxzrzjcqthjtbdpzo.supabase.co/auth/v1/callback`
+
+### Google
+1. https://console.cloud.google.com → crée un projet (ou prends-en un existant)
+2. **APIs & Services → OAuth consent screen** → type *External* → renseigne le
+   nom de l'app, ton email de contact, ton email de développeur
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID** →
+   type *Web application*
+4. Dans **Authorized redirect URIs**, colle l'adresse de retour ci-dessus
+5. Copie le *Client ID* et le *Client secret*
+6. Supabase → **Authentication → Providers → Google** → active, colle les deux,
+   **Save**
+
+### Discord
+1. https://discord.com/developers/applications → **New Application**
+2. Onglet **OAuth2** → **Redirects** → *Add Redirect* → colle l'adresse de retour
+3. Copie le *Client ID* et le *Client secret* (**Reset Secret** si besoin)
+4. Supabase → **Authentication → Providers → Discord** → active, colle les deux,
+   **Save**
+
+### Et l'adresse de retour vers l'app
+Supabase → **Authentication → URL Configuration** :
+- **Site URL** : `https://vrm.center`
+- **Redirect URLs** : ajoute `https://vrm.center/**` et
+  `https://cancale-v67-ten.vercel.app/**`
+
+Cette liste est une **liste blanche** : sans elle, quelqu'un pourrait fabriquer
+un lien de connexion qui renvoie le jeton vers son propre site.
+
+---
+
 ## Étape 3 — Créer ton compte et récupérer ton identifiant
 
 1. Dis-moi de passer `MULTI_USER` à `true` (une ligne dans `src/App.jsx`), je
@@ -100,3 +137,63 @@ un vrai morceau, à faire dans un second temps.
   pause quelques jours.
 
 À décider ensemble avant de basculer.
+
+
+---
+
+# Sécurité — ce qui est fait, ce qui reste
+
+## Fait
+
+**L'isolation est dans la base, pas dans l'app.** Une séparation écrite en
+JavaScript ne protège de rien : il suffit d'ouvrir la console du navigateur
+pour la contourner. Ici c'est Postgres qui refuse les lignes des autres.
+
+**La clé publique dans le code n'est pas un problème** — elle est *faite* pour
+être publique. Ce qui la rendait dangereuse, c'est l'absence de RLS : sans
+règle, cette clé donnait accès à tout. Avec RLS, elle ne donne accès à rien
+sans être accompagnée du jeton d'un compte.
+
+**Connexion Google / Discord en PKCE** et pas en méthode « implicite ». En
+implicite le jeton d'accès revient *dans l'URL* : il finit dans l'historique du
+navigateur, dans les journaux d'un proxy, dans le presse-papier si on copie le
+lien. En PKCE il ne revient qu'un code inutilisable seul — l'échanger exige un
+secret tiré par l'app, gardé dans l'onglet, jamais transmis. Intercepter l'URL
+ne suffit plus.
+
+**L'URL est nettoyée** après le retour de connexion : aucun jeton ne reste dans
+la barre d'adresse.
+
+**Le formulaire « mot de passe oublié » répond pareil** que le compte existe ou
+non. Sinon il suffisait d'y taper des adresses pour savoir qui est inscrit.
+
+**La session transmise à l'extension vérifie l'origine** de l'onglet émetteur :
+sans ça, n'importe quel site ouvert dans le navigateur pouvait envoyer un jeton
+à l'extension et lui faire écrire des données.
+
+**La route du widget iPhone est fermée.** Elle était **publique** :
+`https://vrm.center/api/widget` renvoyait à qui la demandait le chiffre
+d'affaires du mois, le nombre de ventes, l'argent en attente et le nombre
+d'annonces en ligne — sans aucune clé, et avec un en-tête qui autorisait même
+n'importe quel site web à la lire. Elle exige maintenant une clé personnelle
+(`?k=…`), comparée en temps constant (une comparaison ordinaire s'arrête au
+premier caractère faux, ce qui permet de deviner la clé lettre par lettre en
+chronométrant les réponses). L'app génère la clé et affiche l'adresse complète
+dans **Paramètres → Widget iPhone** : à recopier dans Scriptable.
+
+## Ce qui reste
+
+**Les autres routes `api/`** (`email-inbound`, `ship-reminders`, `push`)
+écrivent avec la clé publique et seront bloquées par RLS. Elles ont besoin de
+la clé `service_role` et de savoir à quel vendeur rattacher chaque ligne.
+
+**La session est stockée dans le navigateur** (`localStorage`), comme le fait
+la bibliothèque officielle de Supabase. C'est lisible par un script malveillant
+qui parviendrait à s'exécuter sur la page. S'en protéger vraiment demanderait
+des cookies posés par un serveur — un vrai changement d'architecture, à
+envisager le jour où l'app gère l'argent d'inconnus.
+
+**Le proxy Vinted** (`api/vinted-proxy.js`) accepte un jeton fourni par
+l'appelant et le relaie à Vinted. Il ne fuit rien (il faut déjà posséder le
+jeton), mais n'importe qui peut s'en servir comme relais. À restreindre aux
+appels authentifiés quand le multi-vendeurs sera actif.

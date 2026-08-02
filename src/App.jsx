@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v41/00 · 👥comptes';
+const BUILD_ID = 'v42/00 · 🔐sécurité';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -149,6 +149,119 @@ const authSignUp  = async (email, password) => {
   return { ok: true, needsConfirm: true };
 };
 const authReset   = (email) => authCall('recover', { email: String(email).trim().toLowerCase() });
+
+// ── CONNEXION AVEC GOOGLE / DISCORD (OAuth, méthode PKCE) ─────────────────
+// Comment ça marche : on n'échange JAMAIS de mot de passe. On envoie le vendeur
+// chez Google (ou Discord), qui l'identifie et renvoie un code à usage unique.
+// L'app échange ce code contre une session.
+//
+// Pourquoi PKCE et pas la méthode « implicite » (plus simple à écrire) : en
+// implicite, le jeton d'accès revient DANS L'URL. Il finit dans l'historique du
+// navigateur, dans les journaux d'un proxy d'entreprise, dans le presse-papier
+// si on copie le lien. En PKCE il ne revient qu'un code inutilisable seul :
+// pour l'échanger il faut aussi le « vérificateur », un secret aléatoire tiré
+// par l'app, gardé dans cet onglet et jamais transmis à personne d'autre.
+// Résultat : intercepter l'URL ne suffit plus à voler la session.
+const PKCE_KEY = 'vrm_pkce';
+// Le lien « mot de passe oublié » connecte techniquement le vendeur, mais il
+// n'a pas encore choisi son nouveau mot de passe : sans ce drapeau, l'app
+// s'ouvrirait normalement et il ne verrait jamais le formulaire.
+let RECOVERY_PENDING = false;
+const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const makeVerifier = () => { const a = new Uint8Array(48); crypto.getRandomValues(a); return b64url(a); };
+const makeChallenge = async (v) => b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)));
+
+const OAUTH_PROVIDERS = [
+  { id: 'google',  label: 'Google' },
+  { id: 'discord', label: 'Discord' },
+];
+
+const oauthStart = async (provider) => {
+  try {
+    const verifier = makeVerifier();
+    sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet uniquement
+    const challenge = await makeChallenge(verifier);
+    const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${encodeURIComponent(provider)}`
+      + `&redirect_to=${encodeURIComponent(window.location.origin + window.location.pathname)}`
+      + `&code_challenge=${encodeURIComponent(challenge)}&code_challenge_method=s256`;
+    window.location.href = url;
+    return { ok: true };
+  } catch (e) { return { ok: false, error: "Impossible d'ouvrir la connexion " + provider + '.' }; }
+};
+
+// Au retour du fournisseur. Deux formes possibles :
+//  • ?code=…            → OAuth en PKCE (Google, Discord) : on échange le code
+//  • #access_token=…    → lien reçu par email (mot de passe oublié)
+// Dans les deux cas on NETTOIE l'URL derrière nous : un jeton ne doit pas
+// rester dans la barre d'adresse ni partir dans l'historique.
+const cleanAuthUrl = () => {
+  try { window.history.replaceState({}, '', window.location.pathname + window.location.search.replace(/[?&](code|error|error_description|error_code)=[^&]*/g, '').replace(/^&/, '?')); } catch (_) {}
+  try { if (window.location.hash) window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) {}
+};
+const consumeAuthRedirect = async () => {
+  if (!MULTI_USER) return null;
+  const q = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+
+  const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
+  if (err) { cleanAuthUrl(); return { error: decodeURIComponent(String(err).replace(/\+/g, ' ')) }; }
+
+  const code = q.get('code');
+  if (code) {
+    const verifier = sessionStorage.getItem(PKCE_KEY);
+    sessionStorage.removeItem(PKCE_KEY);
+    cleanAuthUrl();
+    if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
+    const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
+    if (!r.ok) return { error: r.error };
+    writeSession(sessionFrom(r.json));
+    return { ok: true };
+  }
+
+  const at = hash.get('access_token');
+  if (at) {
+    const type = hash.get('type');
+    const sess = {
+      access_token: at,
+      refresh_token: hash.get('refresh_token') || '',
+      expires_at: Date.now() + ((parseInt(hash.get('expires_in') || '3600', 10)) * 1000),
+      user: null,
+    };
+    cleanAuthUrl();
+    AUTH = { ...AUTH, session: sess };
+    const me = await fetchMe(at);                        // qui es-tu ?
+    writeSession({ ...sess, user: me });
+    if (type === 'recovery') RECOVERY_PENDING = true;
+    return { ok: true, recovery: type === 'recovery' };
+  }
+  return null;
+};
+
+// Le jeton ne dit pas l'email en clair : on demande à Supabase qui il désigne.
+const fetchMe = async (token) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return { id: j.id, email: j.email };
+  } catch (_) { return null; }
+};
+
+// Choisir un nouveau mot de passe (après le lien « mot de passe oublié »).
+const authSetPassword = async (password) => {
+  const tok = AUTH.session && AUTH.session.access_token;
+  if (!tok) return { ok: false, error: 'Lien expiré, redemande un email.' };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: j.msg || j.message || 'Mot de passe refusé.' };
+    return { ok: true };
+  } catch (_) { return { ok: false, error: 'Pas de connexion internet.' }; }
+};
 const authSignOut = () => { writeSession(null); wipeLocalData(); };
 
 // CHANGEMENT DE VENDEUR SUR LE MÊME NAVIGATEUR : le localStorage est commun à
@@ -181,8 +294,12 @@ const ensureLocalOwner = (uid) => {
 };
 
 // Restaure la session au démarrage, et renouvelle le jeton s'il a expiré.
+let AUTH_REDIRECT = null;   // résultat du retour OAuth / lien email, lu par l'écran de connexion
 const authBoot = async () => {
   if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
+  // Retour de Google / Discord / d'un lien email : ça prime sur tout le reste.
+  try { AUTH_REDIRECT = await consumeAuthRedirect(); } catch (_) { AUTH_REDIRECT = null; }
+  if (AUTH_REDIRECT && AUTH_REDIRECT.ok && !AUTH_REDIRECT.recovery) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   const s = readSession();
   if (!s) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   AUTH = { ...AUTH, session: s, user: s.user || null };
@@ -235,6 +352,9 @@ const SYNC_KEYS = [
   // Dérivé (annonces vendues d'après les emails) : partagé pour que le tableau
   // de bord compte exactement comme l'onglet Annonces, même sur un autre appareil.
   'vinted_annonces_email_sold',
+  // Clé personnelle du widget iPhone (voir api/widget.js) : sans elle, la route
+  // renverrait le chiffre d'affaires à qui connaît l'adresse.
+  'vrm_widget_token',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -2134,22 +2254,50 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
 // ── ÉCRAN DE CONNEXION (multi-vendeurs) ───────────────────────────────────
 // Volontairement minimal : un logo, deux champs, un bouton. C'est la première
 // chose qu'un nouveau vendeur voit — s'il hésite ici, il n'ira pas plus loin.
+// Marques Google et Discord, en SVG : un bouton de connexion sans le logo du
+// service inspire moins confiance qu'un bouton qui montre où on va.
+const BrandMark = ({ id }) => id === 'google' ? (
+  <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
+    <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
+    <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
+    <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/>
+    <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/>
+  </svg>
+) : (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true" style={{flexShrink:0}}>
+    <path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/>
+  </svg>
+);
+
 function AuthScreen() {
-  const [mode, setMode] = React.useState('in');      // in = connexion · up = création · reset = mot de passe oublié
+  const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw' : 'in'); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
   const [pw, setPw] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const [err, setErr] = React.useState('');
+  const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
   const [info, setInfo] = React.useState('');
+
+  const oauth = async (p) => {
+    setErr(''); setBusy(true);
+    const r = await oauthStart(p);
+    if (!r.ok) { setErr(r.error); setBusy(false); }
+    // Si ça marche, la page part chez le fournisseur : rien d'autre à faire.
+  };
 
   const submit = async (e) => {
     e && e.preventDefault();
     setErr(''); setInfo('');
-    if (!email.trim()) { setErr('Indique ton email.'); return; }
+    if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
     if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
+    // Un mot de passe qui protège une comptabilité mérite mieux que « 12345678 ».
+    if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr('Mélange lettres et chiffres — ce mot de passe protège ta compta.'); return; }
     setBusy(true);
     try {
-      if (mode === 'reset') {
+      if (mode === 'newpw') {
+        const r = await authSetPassword(pw);
+        if (!r.ok) setErr(r.error);
+        else { setInfo('Mot de passe enregistré. Tu es connecté.'); setTimeout(()=>location.reload(), 900); }
+      } else if (mode === 'reset') {
         await authReset(email);
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
@@ -2181,18 +2329,41 @@ function AuthScreen() {
         </div>
         <form onSubmit={submit} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
           <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:3}}>
-            {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : 'Se connecter'}
+            {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
           </div>
           <div style={{fontSize:12.5,color:C.muted,marginBottom:16,lineHeight:1.45}}>
             {mode==='up' ? 'Tes données (annonces, garage, compta) ne seront visibles que par toi.'
              : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
+             : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
              : 'Retrouve ta boutique, tes numéros et ta compta.'}
           </div>
 
-          <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
-            value={email} onChange={e=>setEmail(e.target.value)} style={{...field, marginBottom:9}}/>
+          {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
+              court et le plus sûr (aucun mot de passe à créer, donc aucun mot de
+              passe à se faire voler ici). */}
+          {mode!=='newpw' && mode!=='reset' && (<>
+            {OAUTH_PROVIDERS.map(p => (
+              <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
+                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+                  border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
+                  fontSize:14,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
+                <BrandMark id={p.id}/> Continuer avec {p.label}
+              </button>
+            ))}
+            <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
+              <span style={{flex:1,height:1,background:C.border}}/>
+              <span style={{fontSize:11,color:C.muted,fontWeight:500}}>ou par email</span>
+              <span style={{flex:1,height:1,background:C.border}}/>
+            </div>
+          </>)}
+
+          {mode!=='newpw' && (
+            <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
+              value={email} onChange={e=>setEmail(e.target.value)} style={{...field, marginBottom:9}}/>
+          )}
           {mode!=='reset' && (
-            <input type="password" autoComplete={mode==='up'?'new-password':'current-password'} placeholder="Mot de passe"
+            <input type="password" autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'}
+              placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
               value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
           )}
 
@@ -2201,10 +2372,10 @@ function AuthScreen() {
 
           <button type="submit" disabled={busy} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',opacity:busy?0.6:1,fontFamily:'inherit'}}>
-            {busy ? '…' : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : 'Se connecter'}
+            {busy ? '…' : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>
 
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'}}>
+          <div style={{display:mode==='newpw'?'none':'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'}}>
             <button type="button" onClick={()=>{ setMode(mode==='up'?'in':'up'); setErr(''); setInfo(''); }}
               style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
               {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
@@ -12466,6 +12637,28 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
       <Row icon="🔗" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
 
+      {/* WIDGET IPHONE — l'adresse contient ta clé personnelle. Avant, cette
+          adresse était publique : n'importe qui pouvait lire ton chiffre
+          d'affaires en la connaissant. Recopie la nouvelle dans Scriptable. */}
+      {(()=>{ const tok=load('vrm_widget_token',''); if(!tok) return null;
+        const url=`https://vrm.center/api/widget?k=${tok}`;
+        return (<>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Widget iPhone</div>
+          <div style={{padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+            <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:3}}>Adresse de ton widget</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.45}}>
+              Elle contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable à la place de l'ancienne — l'ancienne, sans clé, ne répond plus.
+            </div>
+            <div style={{fontSize:11,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
+              border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 11px',wordBreak:'break-all',lineHeight:1.5,marginBottom:9}}>{url}</div>
+            <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(url); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }}
+              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+              Copier l'adresse
+            </button>
+          </div>
+        </>);
+      })()}
+
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Leboncoin</div>
       <Row icon="🟠" title="Leboncoin" desc="Publiées, à publier, à retirer, ton offre." onClick={()=>setTab('leboncoin')}/>
 
@@ -12815,6 +13008,16 @@ export default function App() {
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
   const [authState,setAuthState]=useState(AUTH);
   React.useEffect(()=>{ const off=onAuthChange(setAuthState); authBoot(); return off; },[]);
+  // Clé du widget iPhone : créée une seule fois, après le chargement du cloud
+  // (sinon chaque appareil en générerait une différente et se voleraient la
+  // place à tour de rôle).
+  React.useEffect(()=>onCloudReady(()=>{
+    if (load('vrm_widget_token','')) return;
+    try {
+      const a=new Uint8Array(24); crypto.getRandomValues(a);
+      save('vrm_widget_token', btoa(String.fromCharCode(...a)).replace(/[+/=]/g,'').slice(0,28));
+    } catch(_) {}
+  }),[]);
   const [tab,setTab]=useState('journee');
   // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
   const navHistRef = React.useRef([]);
@@ -13491,7 +13694,7 @@ export default function App() {
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
   // session on affiche la porte d'entrée au lieu de l'app.
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
-  if (MULTI_USER && !authState.session) return <AuthScreen/>;
+  if (MULTI_USER && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
     <div style={{minHeight:'100vh',width:'100%',maxWidth:'100vw',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}>

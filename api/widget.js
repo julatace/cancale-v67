@@ -58,12 +58,36 @@ async function snapshot() {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // ⚠️ CETTE ROUTE ÉTAIT PUBLIQUE. N'importe qui connaissant l'adresse lisait le
+  // chiffre d'affaires du mois, le nombre de ventes, l'argent en attente et le
+  // nombre d'annonces en ligne. Il n'y avait ni clé, ni compte, ni restriction
+  // d'origine — et l'en-tête « Access-Control-Allow-Origin: * » permettait même
+  // à n'importe quel site web de la lire depuis le navigateur d'un visiteur.
+  //
+  // Elle exige désormais une CLÉ personnelle (?k=…), générée par l'app et
+  // rangée dans tes données. Le widget iPhone la porte dans son URL.
+  //
+  // Transition : tant qu'aucune clé n'existe dans la base (donc avant que tu
+  // aies rouvert l'app une fois), la route continue de répondre — sinon ton
+  // widget tomberait en panne avant même que tu aies pu récupérer la nouvelle
+  // adresse. Dès que la clé existe, la route est fermée sans clé valide.
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
   try {
     const [bords, sold, purchased, finals, sales, m, snap] = await Promise.all([
       rows('email_bord_*'), harvestOrders('sold'), harvestOrders('purchased'), rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
     ]);
+
+    const expected = m && m.vrm_widget_token ? String(m.vrm_widget_token) : '';
+    if (expected) {
+      const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
+      // Comparaison à durée constante : une comparaison classique s'arrête au
+      // premier caractère différent, ce qui laisse deviner la clé lettre par
+      // lettre en mesurant le temps de réponse.
+      const ok = given.length === expected.length
+        && given.split('').reduce((acc, ch, i) => acc | (ch.charCodeAt(0) ^ expected.charCodeAt(i)), 0) === 0;
+      if (!ok) { res.status(401).json({ error: 'cle invalide' }); return; }
+    }
     const today = parisDate(0), tomorrow = parisDate(1), ym = today.slice(0, 7);
 
     // À expédier + à retirer = STATUT VINTED (automatique, à jour). Fini les
