@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v38/00 · 🅰️typo';
+const BUILD_ID = 'v38/01 · 🛍️achats';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -10065,14 +10065,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
             return (
-            <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,opacity:cancelled?0.55:1,padding:'9px 10px'}}>
-              <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
+            // Carte d'achat : rayon + ombre alignés sur le reste de l'app, photo
+            // plus grande (on achète des articles, l'image compte) et hiérarchie
+            // typographique plus nette. Une bordure colorée uniquement quand il y
+            // a une action à faire (colis au relais).
+            <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'11px 12px'}}>
+              <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                <div style={{width:56,height:56,borderRadius:11,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
-                  <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <div style={{fontSize:13.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
+                  <div style={{fontSize:10.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     <span style={{fontWeight:900,color:st.color,background:`${st.color}18`,borderRadius:999,padding:'1px 8px'}}>{st.step===3?'📦 ':st.step===2?'🚚 ':st.step===4?'✅ ':''}{st.label}</span>
@@ -10080,12 +10084,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
-                  <div style={{fontSize:14,fontWeight:900,color:C.text}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
+                  <div style={{fontSize:16,fontWeight:900,color:C.text,letterSpacing:-0.4}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
                   {buyNumByTxn[String(o.transaction_id)]!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:900,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'1px 7px'}}>N°{buyNumByTxn[String(o.transaction_id)]}</span>}
                 </div>
               </div>
-              {/* Barre de suivi : Payé · Expédié · Au relais · Reçu */}
-              {!cancelled && (
+              {/* Barre de suivi : affichée UNIQUEMENT tant que le colis est en
+                  route. Sur un achat déjà reçu, elle n'apprenait rien (tout en
+                  vert) et doublait la hauteur de chaque ligne — la pastille
+                  « ✅ Reçu » suffit. La liste est deux fois plus courte. */}
+              {!cancelled && st.step<4 && (
                 <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}>
                   {[['Payé',1],['Expédié',2],['Au relais',3],['Reçu',4]].map(([lbl,idx])=>{
                     const done=st.step>=idx; const cur2=st.step===idx;
