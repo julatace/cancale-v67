@@ -211,7 +211,14 @@ async function storeHarvest(domain, type, id, body) {
   if (type === 'conversation' && id) rowId = `harvest_${uid}_conv_${id}`;
   else if (type === 'transaction' && id) rowId = `harvest_${uid}_txn_${id}`;
   else if (type === 'item' && id) rowId = `harvest_${uid}_item_${id}`; // détail complet d'une annonce
+  else if (type === 'complaint' && id) rowId = `harvest_${uid}_litige_${id}`; // un litige = une ligne
   else rowId = `harvest_${uid}_${type}`;
+
+  // ⚠️ Cette voie (capture PASSIVE) ecrit en direct, sans passer par
+  // storeHarvestRow : l'allegement doit donc etre applique ICI AUSSI, sinon la
+  // moisson faite en naviguant reste enorme (7 Mo d'annonces) alors que celle
+  // faite activement est allegee. Meme fonction, un seul comportement.
+  parsed = alleger(type, parsed);
 
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');

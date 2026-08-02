@@ -651,3 +651,13 @@ Demande de Julien : « enlève le bordereau une fois marqué expédié, ou je le
 L'impression garde sa pastille « ✓ Imprimé » mais **ne retire plus rien**. Rien n'est jamais supprimé : « Voir » réaffiche les terminés, et le ✕ (`vinted_bords_hidden`) reste pour masquer un cas particulier.
 
 Mesuré sur les 51 bordereaux réels : 43 confirmés expédiés par Vinted, 2 marqués à la main, **13 impressions qui ne cachent plus rien**.
+
+### Litiges captés par l'extension (v4.25.0)
+`inject.js` observe désormais aussi les réclamations, passivement, quand Julien ouvre l'écran « Litiges » ou une conversation en litige :
+- `/api/vN/complaints` → ligne `harvest_{uid}_complaints` (la liste) ;
+- `/api/vN/complaints/{id}` → ligne `harvest_{uid}_litige_{id}` (le détail).
+
+Aujourd'hui l'app **déduit** les litiges du statut de vente (`saleOutcome` : remboursement / retour initié / suspension) — ça marche, mais sans le motif ni l'état réel de la réclamation. Ces lignes permettront d'afficher le vrai motif et de savoir quand la paire revient. **Côté app : pas encore branché** (rien ne les lit pour l'instant).
+
+### ⚠️ Trou comblé dans l'allègement (section 23)
+`alleger()` n'était appliqué que dans `storeHarvestRow` — or la **capture passive** (inject → background, ligne ~217) écrit **en direct** sans passer par cette fonction. La moisson faite en naviguant restait donc énorme (7 Mo d'annonces) alors que la moisson active était allégée. `alleger()` est maintenant appelé sur les deux voies. Un type inconnu (litiges…) passe inchangé — vérifié.

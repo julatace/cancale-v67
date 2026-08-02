@@ -42,6 +42,13 @@
     // matche QUE le détail (…/transactions/{id}), pas les sous-chemins (…/shipment/order).
     { re: /\/api\/v\d+\/transactions\/(\d+)(?:\?|$)/, type: 'transaction' },
     { re: /\/api\/v\d+\/users\/current/,        type: 'profile'  },
+    // LITIGES / RÉCLAMATIONS. Quand un acheteur ouvre un litige, la paire te
+    // revient (ou pas) et il faut la republier — mais Vinted ne le dit que dans
+    // cet écran. On capte la LISTE et le DÉTAIL, passivement, quand tu ouvres la
+    // page « Litiges » ou une conversation en litige : l'app peut alors afficher
+    // le vrai motif et le vrai statut au lieu de les déduire du statut de vente.
+    { re: /\/api\/v\d+\/complaints(?:\?|$)/,     type: 'complaints' },
+    { re: /\/api\/v\d+\/complaints\/(\d+)(?:\?|$)/, type: 'complaint' },
     // Facturation / porte-monnaie : c'est là que Vinted liste tes dépenses de
     // BOOST (remontées d'annonce, mise en avant du dressing). Capté passivement
     // quand tu ouvres ton porte-monnaie / ta facturation → l'app calcule ton
