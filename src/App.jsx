@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v51/00 · 🎨finitions';
+const BUILD_ID = 'v52/00 · confirmations';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -537,6 +537,62 @@ const DEFAULT_QUICK_REPLIES = [
   'C\'est parfait ! Je prépare le colis et je l\'envoie très vite 📦',
   'Merci beaucoup pour votre achat et à bientôt ! 🙏',
 ];
+
+// ── DEMANDE DE CONFIRMATION ───────────────────────────────────────────────
+// Remplace window.confirm, qui affiche la boîte grise du navigateur : elle ne
+// se met pas aux couleurs de l'app, ne distingue pas une action anodine d'une
+// action destructrice, et sur iPhone s'affiche comme une alerte système au
+// milieu de rien. C'est le detail qui fait « page web » plutot qu'« application ».
+//
+// Meme usage qu'avant, mais asynchrone :  if (!(await askConfirm('…'))) return;
+let _askListener = null;
+const onAsk = (fn) => { _askListener = fn; return () => { _askListener = null; }; };
+const askConfirm = (opts) => new Promise((resolve)=>{
+  const o = typeof opts === 'string' ? { desc: opts } : (opts || {});
+  // Filet : si la fenêtre n'est pas montée (composant hors de l'arbre), on
+  // retombe sur la boîte du navigateur plutôt que de bloquer l'utilisateur.
+  if (!_askListener) { resolve(window.confirm(o.desc || o.title || 'Confirmer ?')); return; }
+  _askListener({ ...o, resolve });
+});
+function ConfirmHost() {
+  const [q, setQ] = React.useState(null);
+  React.useEffect(() => onAsk(setQ), []);
+  if (!q) return null;
+  const close = (val) => { try { q.resolve(val); } catch (_) {} setQ(null); };
+  // Le premier paragraphe du message sert de titre : les anciens messages
+  // étaient écrits d'un bloc avec des retours à la ligne.
+  const lignes = String(q.desc || '').split('\n').filter(x => x.trim() !== '');
+  let titre = q.title || lignes[0] || 'Confirmer ?';
+  let corps = q.title ? lignes : lignes.slice(1);
+  // Une question posée d'un seul tenant ferait un titre de six lignes en gras.
+  // On coupe à la fin de la première phrase : la question devient le titre,
+  // l'explication passe en dessous, en texte normal.
+  if (!q.title && titre.length > 58) {
+    const m = titre.match(/^(.{10,90}?[?!.])\s+(\S.*)$/s);
+    if (m) { titre = m[1]; corps = [m[2], ...corps]; }
+  }
+  return (
+    <div onClick={() => close(false)} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
+      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
+        <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'0 auto 14px'}}/>
+        <div style={{fontSize:17,fontWeight:700,color:q.danger?C.danger:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
+        {corps.length > 0 && (
+          <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
+        )}
+        <div style={{display:'flex',gap:9,marginTop:16}}>
+          <button type="button" onClick={() => close(false)}
+            style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            {q.cancel || 'Annuler'}
+          </button>
+          <button type="button" autoFocus onClick={() => close(true)}
+            style={{flex:2,border:'none',background:q.danger?C.danger:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            {q.ok || 'Confirmer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Indicateur de synchro (mis a jour par l'app)
 let _syncListeners = [];
@@ -3463,8 +3519,8 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
     const u=catalog.map(p=>p.id===id?{...p,[field]:field==='buyPrice'?+val:val}:p);
     setCatalog(u); save('vinted_catalog',u);
   };
-  const remove=(id)=>{
-    if(!window.confirm(`Supprimer #${id} ?`)) return;
+  const remove=async (id)=>{
+    if(!await askConfirm(`Supprimer #${id} ?`)) return;
     const u=catalog.filter(p=>p.id!==id);
     setCatalog(u); save('vinted_catalog',u);
     if(onDeleteId) onDeleteId(id);
@@ -3709,8 +3765,8 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
     setSales(u); save('vinted_sales',u);
   };
 
-  const del=(sid,pid)=>{
-    if(!window.confirm('Supprimer cette vente ?')) return;
+  const del=async (sid,pid)=>{
+    if(!await askConfirm('Supprimer cette vente ?')) return;
     const ns=sales.filter(s=>s.id!==sid); setSales(ns); save('vinted_sales',ns);
     const pids=String(pid||'').split('+').map(v=>v.trim()).filter(Boolean);
     const nc=catalog.map(p=>pids.includes(p.id)?{...p,status:'stock'}:p); setCatalog(nc); save('vinted_catalog',nc);
@@ -4196,13 +4252,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     return {attente,comptabilisees};
   },[invoices,accountedSet]);
   
-  const deleteInvoice=(id)=>{
+  const deleteInvoice=async (id)=>{
     const inv=invoices.find(i=>i.id===id);
     const isAcc=inv&&accountedSet.has(String(inv.productId).trim());
     const msg=isAcc
       ? `⚠️ La paire #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
       : 'Supprimer cette facture ?';
-    if(!window.confirm(msg)) return;
+    if(!await askConfirm(msg)) return;
     const u=invoices.filter(i=>i.id!==id);
     setInvoices(u); save('vinted_invoices',u);
   };
@@ -4293,7 +4349,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                       style={{padding:'6px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
                     {inv.status==='draft'&&inv.buyerEmail&&(
                       <button type="button" onClick={async()=>{
-                        if(!window.confirm(`Envoyer la facture ${inv.number} à ${inv.buyerEmail} ?\n(part dans les 5 minutes via Gmail)`)) return;
+                        if(!await askConfirm(`Envoyer la facture ${inv.number} à ${inv.buyerEmail} ?\n(part dans les 5 minutes via Gmail)`)) return;
                         const ok=await setProInvoiceStatus(inv,'queued');
                         if(ok) setProInvs(await fetchProInvoices()); else toast('Échec — réessaie.');
                       }} style={{padding:'6px 12px',borderRadius:10,border:'none',background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
@@ -4673,7 +4729,7 @@ function LocalPhoto({ locate, onLocateConsumed }) {
     const next = [...photos, p]; persist(next); setActive(next.length - 1);
   };
   const renamePhoto = (idx) => { const nom = window.prompt('Nom de cette zone (ex : Étagère du fond, Commode d\'entrée) :', photos[idx].name || ''); if (nom == null) return; persist(photos.map((p, i) => i === idx ? { ...p, name: nom.trim() || p.name } : p)); };
-  const removePhoto = (idx) => { if (!window.confirm('Supprimer cette photo et tous ses repères ?')) return; const next = photos.filter((_, i) => i !== idx); persist(next); setActive(a => Math.max(0, Math.min(a, next.length - 1))); setHighlight(null); setSelPin(null); };
+  const removePhoto = async (idx)=>{ if (!await askConfirm('Supprimer cette photo et tous ses repères ?')) return; const next = photos.filter((_, i) => i !== idx); persist(next); setActive(a => Math.max(0, Math.min(a, next.length - 1))); setHighlight(null); setSelPin(null); };
 
   const onImgClick = (e) => {
     if (!placing) return;
@@ -5456,9 +5512,9 @@ function RoomPlan({ locate, onLocateConsumed }) {
   };
   const switchRoom = (id) => { if (id === plan.active) return; persist({ ...plan, active: id }); setSel(null); setOpenItem(null); setHi(null); setSearch(''); };
   const renameRoom = () => { const n = window.prompt('Nom de la pièce :', activeRoom.name); if (n != null && n.trim()) patchRoom({ name: n.trim() }); };
-  const removeRoom = () => {
+  const removeRoom = async ()=>{
     if (plan.rooms.length <= 1) { window.alert('Il faut garder au moins une pièce.'); return; }
-    if (!window.confirm('Supprimer la pièce « ' + activeRoom.name + ' » et tout son contenu ?')) return;
+    if (!await askConfirm('Supprimer la pièce « ' + activeRoom.name + ' » et tout son contenu ?')) return;
     const rooms = plan.rooms.filter(r => r.id !== activeRoom.id);
     persist({ ...plan, rooms, active: rooms[0].id }); setSel(null); setOpenItem(null); setHi(null); setSearch('');
   };
@@ -5568,7 +5624,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     for (let c = 0; c < nc; c++) for (let r = nr - 1; r >= 0; r--) { const key = r + '_' + c; if (!slots[key] || !slots[key].length) { slots[key] = [String(n)]; n++; } }
     updateItem(it.id, { slots });
   };
-  const clearGrid = (it) => { if (!window.confirm('Vider toutes les cases de cette grille ?')) return; updateItem(it.id, { slots: {} }); };
+  const clearGrid = async (it)=>{ if (!await askConfirm('Vider toutes les cases de cette grille ?')) return; updateItem(it.id, { slots: {} }); };
   // Poser une boîte : on l'EMPILE à la prochaine place libre (bas→haut d'une
   // colonne jusqu'au plafond, puis colonne suivante). Si tout est plein, on
   // ajoute automatiquement une colonne. Toujours bien aligné, dans l'ordre.
@@ -5780,7 +5836,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     }
     setStackSrc(null); setPutOnSrc(null); setSel(id);
   };
-  const removeItem = (id) => { if (!window.confirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
+  const removeItem = async (id)=>{ if (!await askConfirm('Supprimer ce meuble et son rangement ?')) return; setItems(list => list.filter(it => it.id !== id)); setSel(null); setOpenItem(null); };
   const dupItem = (it) => { const id = 'f' + Date.now(); const copy = { ...it, id, slots: {}, x: Math.max(0, Math.min(room.w - it.w, it.x + 1)), y: Math.max(0, Math.min(room.h - it.h, it.y + 1)) }; setItems(list => [...list, copy]); setSel(id); };
 
   const onDown = (e, it) => { e.stopPropagation(); setSel(it.id); const p = e.touches ? e.touches[0] : e; drag.current = { id: it.id, sx: p.clientX, sy: p.clientY, ox: it.x, oy: it.y, moved: false }; };
@@ -5929,7 +5985,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
         </div>
       )}
       {/* Bandeau « empiler par toucher » actif */}
-      {stackSrc && (() => { const s = items.find(o => o.id === stackSrc); return (
+      {stackSrc && (()=>{ const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 10, background: `${C.accent}14` }}>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text }}>👆 Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
           <button onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 700, padding: '5px 10px', cursor: 'pointer' }}>Annuler</button>
@@ -5958,7 +6014,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
               <button onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
               {(selItem.lvl || 0) > 0 && <button onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-              <button onClick={() => { const n = (window.prompt('Numéro de cette boîte :', selItem.num || '') || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+              <button onClick={()=>{ const n = (window.prompt('Numéro de cette boîte :', selItem.num || '') || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
             </div>
           )}
           {/* Personnalisation : couleur + hauteur */}
@@ -5968,14 +6024,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
-            {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={() => { const e = (window.prompt('Emoji du meuble :', emojiOf(selItem)) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
+            {!(FURN_TYPES[selItem.type] || {}).box && <button onClick={()=>{ const e = (window.prompt('Emoji du meuble :', emojiOf(selItem)) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji" style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', fontSize: 13, padding: '2px 7px', cursor: 'pointer' }}>{emojiOf(selItem)}</button>}
             {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && <>
               <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
               {[['Bas', 0.5], ['Moyen', 1.0], ['Haut', 1.8]].map(([l, v]) => (<button key={l} onClick={() => updateItem(selItem.id, { h3d: v })} style={{ border: `1px solid ${Math.abs(h3dOf(selItem) - v) < 0.01 ? C.accent : C.border}`, borderRadius: 6, background: Math.abs(h3dOf(selItem) - v) < 0.01 ? `${C.accent}18` : 'transparent', color: C.text, fontSize: 10.5, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>{l}</button>))}
             </>}
           </div>
           {/* GRILLE personnalisable : nb de colonnes, de rangées, taille des cases */}
-          {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (() => {
+          {(FURN_TYPES[selItem.type] || {}).build === 'grille' && (()=>{
             const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
             const cellCm = Math.round((selItem.cell || 0.5) * 100);
             return (
@@ -5992,7 +6048,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             );
           })()}
           {/* PILE de boîtes : nb de boîtes (±) + hauteur par colonne + renuméroter */}
-          {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (() => {
+          {(FURN_TYPES[selItem.type] || {}).build === 'pile' && (()=>{
             const stepBtn = { border: `1px solid ${C.border}`, borderRadius: 6, background: C.card, color: C.text, fontSize: 13, fontWeight: 800, width: 26, height: 26, cursor: 'pointer', lineHeight: 1 };
             const nums = pileNums(selItem), total = nums.length, rows = Math.max(1, selItem.rows || 5), cols = Math.max(1, Math.ceil(total / rows));
             return (
@@ -6016,7 +6072,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <button onClick={() => updateItem(selItem.id, { h: Math.min(room.h, selItem.h + 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️+</button>
             <button onClick={() => updateItem(selItem.id, { h: Math.max(1, selItem.h - 1) })} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>↕️−</button>
           </>}
-          <button onClick={() => { const n = window.prompt('Nom du meuble :', selItem.name); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>✎</button>
+          <button onClick={()=>{ const n = window.prompt('Nom du meuble :', selItem.name); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>✎</button>
           <button onClick={() => dupItem(selItem)} title="Dupliquer" style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 700, padding: '7px 10px', cursor: 'pointer' }}>⧉</button>
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}>🗑</button>
         </div>
@@ -6040,14 +6096,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: colorOf(opened) + '22', border: `2px solid ${colorOf(opened)}`, borderRadius: 8, padding: 8 }}>
               {Array.from({ length: opened.rows }).map((_, r) => (
                 <div key={r} style={{ display: 'flex', gap: 6 }}>
-                  {Array.from({ length: opened.cols }).map((_, c) => {
+                  {Array.from({ length: opened.cols }).map((_, c)=>{
                     const cell = r + '_' + c; const arr = (opened.slots && opened.slots[cell]) || [];
                     const cellHi = hi && hi.itemId === opened.id && hi.cell === cell;
                     return (
                       <div key={c} onClick={() => cellAdd(opened, cell)} style={{ flex: 1, minHeight: 52, borderRadius: 6, border: `1.5px ${cellHi ? 'solid #e5484d' : 'dashed ' + C.border}`, background: cellHi ? '#e5484d18' : C.card, padding: 4, display: 'flex', flexWrap: 'wrap', gap: 3, alignContent: 'flex-start', cursor: 'pointer' }}>
                         {arr.length === 0 && <span style={{ margin: 'auto', color: C.muted, fontSize: 16 }}>＋</span>}
                         {arr.map((n, i) => (
-                          <span key={i} onClick={e => { e.stopPropagation(); if (window.confirm(`Retirer le N°${n} de cette case ?`)) cellRemove(opened, cell, n); }} style={{ background: C.accent, color: '#fff', borderRadius: 5, fontSize: 11, fontWeight: 800, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
+                          <span key={i} onClick={async (e) => { e.stopPropagation(); if (await askConfirm({ title:`Retirer le N°${n} de cette case ?`, ok:'Retirer', danger:true })) cellRemove(opened, cell, n); }} style={{ background: C.accent, color: '#fff', borderRadius: 5, fontSize: 11, fontWeight: 800, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
                         ))}
                       </div>
                     );
@@ -6511,14 +6567,14 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
     const file=e.target.files[0];
     if(!file) return;
     const reader=new FileReader();
-    reader.onload=(ev)=>{
+    reader.onload=async (ev)=>{
       try{
         const data=JSON.parse(ev.target.result);
         if(!data.catalog&&!data.sales){
           toast('❌ Fichier invalide : pas de données détectées');
           return;
         }
-        if(window.confirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} paires\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
+        if(await askConfirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} paires\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
           onImport(data);
         }
       }catch(err){
@@ -6877,14 +6933,14 @@ function VintedAccounts({ accounts, setAccounts }) {
   // compte est bloqué/fermé définitivement. On garde son étiquette au cas où.
   const [removing, setRemoving] = useState(null);
   const disconnectAccount = async (acc) => {
-    if (!window.confirm(`Déconnecter « ${accountName(acc)} » de l'application ?\n\nSes tokens seront supprimés. Un compte encore actif dans Chrome pourra revenir au prochain passage sur Vinted ; un compte bloqué ne reviendra pas.`)) return;
+    if (!await askConfirm(`Déconnecter « ${accountName(acc)} » de l'application ?\n\nSes tokens seront supprimés. Un compte encore actif dans Chrome pourra revenir au prochain passage sur Vinted ; un compte bloqué ne reviendra pas.`)) return;
     // TON CHOIX : ses ventes passées comptent-elles encore dans ton chiffre
     // d'affaires ? (C'est bien de l'argent que tu as gagné — mais tu peux
     // vouloir sortir un compte bloqué de tes stats.) Mémorisé par pseudo, car
     // c'est ce que portent les emails de vente.
     const login = String(acc.login || '').trim().toLowerCase();
     if (login) {
-      const keep = window.confirm(
+      const keep = await askConfirm(
         `Garder le chiffre d'affaires passé de « ${accountName(acc)} » dans tes statistiques ?\n\n` +
         `OK = OUI, ses ventes continuent d'être comptées (c'est de l'argent réellement gagné).\n` +
         `Annuler = NON, on le sort complètement des stats.`
@@ -7190,8 +7246,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
     setShowAdd(false);
   };
 
-  const deletePair = (id) => {
-    if (!window.confirm('Supprimer cette paire de l\'inventaire ?')) return;
+  const deletePair = async (id)=>{
+    if (!await askConfirm('Supprimer cette paire de l\'inventaire ?')) return;
     persist(inventory.filter(p => p.id !== id));
   };
 
@@ -8601,10 +8657,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return null;
   };
   const isPairLost = (num) => !!(num && pairsLost[String(num)]);
-  const markPairLost = (num, o) => {
+  const markPairLost = async (num, o)=>{
     const n = String(num || '').trim(); if (!n) return;
     const cell = garageCellOf(garageGrid, n);
-    const ok = window.confirm(
+    const ok = await askConfirm(
       `Déclarer la paire N°${n} PERDUE ?\n\n` +
       `• Son numéro sera libéré (plus compté en stock).\n` +
       (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
@@ -8719,9 +8775,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Applique la reprise : l'annonce en ligne récupère l'ancien numéro, et le
   // numéro auto tout juste créé est rendu (il n'a jamais été écrit sur une boîte).
-  const applyReprise = (r) => {
+  const applyReprise = async (r)=>{
     const oldNum = String(r.orphan.e.numero), autoNum2 = String(r.current.numero);
-    if (!window.confirm(`Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, sera rendu.`)) return;
+    if (!await askConfirm(`Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, sera rendu.`)) return;
     setNumeros(prev => {
       const u = { ...prev };
       u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
@@ -10014,7 +10070,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbl && lbl.pdfB64) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
       const mins = Math.max(0, Math.round(age));
-      if (age<60 && window.confirm(`📄 Tamponner en 1 clic le bordereau téléchargé il y a ${mins} min, avec le N°${numero} (${title}) ?\n\nOK = oui (auto) · Annuler = choisir un fichier`)) {
+      if (age<60 && await askConfirm(`📄 Tamponner en 1 clic le bordereau téléchargé il y a ${mins} min, avec le N°${numero} (${title}) ?\n\nOK = oui (auto) · Annuler = choisir un fichier`)) {
         try { await processBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; } catch(_){}
       }
     }
@@ -10589,7 +10645,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {hidden ? (
                   <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
                 ) : st==='cancelled' ? (
-                  <button type="button" onClick={()=>{ if(window.confirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:10,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}>🗑</button>
+                  <button type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:10,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}>🗑</button>
                 ) : (
                   <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>🚫</button>
                 )}
@@ -10866,7 +10922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       }
                       fetchEmailTracking().then(setTracking);
                     }} title="Renommer ce point relais (permet de le localiser sur la carte)" style={{flexShrink:0,fontSize:15,color:C.muted,padding:'4px 6px'}}>✎</span>}
-                    <span onClick={(ev)=>{ ev.stopPropagation(); if(window.confirm(`Retirer « ${lieu} » de la carte ?`)){ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); } }} title="Retirer ce point" style={{flexShrink:0,fontSize:15,color:C.muted,padding:'4px 6px'}}>✕</span>
+                    <span onClick={async (ev)=>{ ev.stopPropagation(); if(await askConfirm(`Retirer « ${lieu} » de la carte ?`)){ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); } }} title="Retirer ce point" style={{flexShrink:0,fontSize:15,color:C.muted,padding:'4px 6px'}}>✕</span>
                   </button>
                   {/* Les colis qui attendent à ce point (défilables si nombreux) */}
                   {isOpen&&<div style={{borderTop:`1px solid ${C.accent}33`,maxHeight:300,overflowY:'auto'}}>
@@ -11003,7 +11059,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {b.numero && <span title="Numéro de la paire (lien avec la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'2px 7px'}}>N°{b.numero}</span>}
                   <span style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{b.price?`${b.price} €`:'—'}</span>
                   <button type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}>✎</button>
-                  <button type="button" onClick={()=>{ if(window.confirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}>🗑</button>
+                  <button type="button" onClick={async ()=>{ if(await askConfirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}>🗑</button>
                 </div>
               );})}
             </div>
@@ -11171,7 +11227,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,fontWeight:700,color:C.danger}}>Compte « {accNameOf(a)} » bloqué par Vinted</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1}}>Ses annonces ont été retirées automatiquement (le compte ne répond plus). Tu peux le déconnecter définitivement.</div>
                 </div>
-                <button type="button" onClick={()=>{ if(window.confirm(`Déconnecter « ${accNameOf(a)} » ? Ses tokens seront supprimés de l'app.`)){ deleteVintedAccount(a.vinted_user_id); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
+                <button type="button" onClick={async ()=>{ if(await askConfirm(`Déconnecter « ${accNameOf(a)} » ? Ses tokens seront supprimés de l'app.`)){ deleteVintedAccount(a.vinted_user_id); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
               </div>
             ))}
           </div>
@@ -11352,7 +11408,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:10,padding:'7px 11px'}}>
               <span style={{color:C.warn,fontWeight:600}}>✓ {hidden.length} annonce{hidden.length>1?'s':''} marquée{hidden.length>1?'s':''} vendue{hidden.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hidden.map(it=>it.title).join(' · ')}</span>
-              <button onClick={()=>{ if(window.confirm('Réafficher toutes les annonces marquées vendues ?')) hidden.forEach(it=>unmarkSold(it.id)); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
+              <button onClick={async ()=>{ if(await askConfirm('Réafficher toutes les annonces marquées vendues ?')) hidden.forEach(it=>unmarkSold(it.id)); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
             </div>
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
@@ -11504,7 +11560,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
                     {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
-                    <button type="button" onClick={()=>{ if(window.confirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:10,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
+                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:10,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
                     <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire (toute sa vie)" aria-label="Passeport de la paire" style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:15}}>📖</button>
                     {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
@@ -11754,7 +11810,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{display:'inline-block',fontSize:11,fontWeight:600,marginTop:5,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,background:`${dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}14`,borderRadius:10,padding:'2px 8px'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"À poster aujourd'hui":dl.days===1?'À poster demain':'À poster avant'} {dl.text}</div> : null; })()}
                       {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:11,fontWeight:600,marginTop:5,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
                     </div>
-                    <button type="button" onClick={()=>{ if(window.confirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }} title="Masquer ce bordereau" aria-label="Masquer ce bordereau" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:17,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}>✕</button>
+                    <button type="button" onClick={async ()=>{ if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }} title="Masquer ce bordereau" aria-label="Masquer ce bordereau" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:17,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}>✕</button>
                   </div>
                   {/* ACTIONS : une hiérarchie claire au lieu de 5 boutons de même
                       poids qui se bousculaient. L'action principale (Imprimer)
@@ -12608,7 +12664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🗺️ Ma tournée</div><div style={{fontSize:12,color:C.muted}}>{avail.length} colis · {points.length} point{points.length>1?'s':''} relais — le plus chargé en premier.</div></div>
-              {avail.length>0 && <button type="button" onClick={()=>{ if(window.confirm('Marquer TOUS ces colis comme récupérés ?')){ markAllCollected(avail); setTourneeOpen(false); } }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:999,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
+              {avail.length>0 && <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer TOUS ces colis comme récupérés ?')){ markAllCollected(avail); setTourneeOpen(false); } }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:999,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
               <button type="button" onClick={()=>setTourneeOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
@@ -13359,7 +13415,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
       <RegimeSetting/>
       <div style={{height:10}}/>
-      <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={()=>{ if(window.confirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
+      <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Notifications</div>
       <PushSetting/>
@@ -13820,8 +13876,8 @@ export default function App() {
     reader.readAsDataURL(file);
     e.target.value='';
   };
-  const resetLogo = () => {
-    if(window.confirm('Remettre le logo Cancale par défaut ?')){
+  const resetLogo = async ()=>{
+    if(await askConfirm('Remettre le logo Cancale par défaut ?')){
       setCustomLogo(null);
       try{ localStorage.removeItem('vinted_custom_logo'); cloudPush(); }catch(_){}
     }
@@ -14408,6 +14464,9 @@ export default function App() {
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
       <Toaster/>
+      {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
+          retomberait silencieusement sur la boîte grise du navigateur. */}
+      <ConfirmHost/>
       {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
           derrière au défilement au lieu de buter sur un bandeau plein. */}
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',
@@ -14697,13 +14756,13 @@ export default function App() {
               const cat=Array.isArray(data.keys.vinted_catalog)?data.keys.vinted_catalog.length:0;
               const sal=Array.isArray(data.keys.vinted_sales)?data.keys.vinted_sales.length:0;
               const num=data.keys.vinted_annonce_numeros?Object.keys(data.keys.vinted_annonce_numeros).length:0;
-              if(!window.confirm(`Restaurer cette sauvegarde complète ?\n\n📦 Catalogue : ${cat}\n💸 Ventes : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques au total\n\n⚠ Tes données actuelles seront REMPLACÉES, puis l'app se rechargera.`)) return;
+              if(!await askConfirm(`Restaurer cette sauvegarde complète ?\n\n📦 Catalogue : ${cat}\n💸 Ventes : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques au total\n\n⚠ Tes données actuelles seront REMPLACÉES, puis l'app se rechargera.`)) return;
               await applyAndReload(entries); return;
             }
             // Ancien format (compat) : { catalog, sales, garageGrid }
             if(data && (data.catalog||data.sales||data.garageGrid)){
               let msg='Importer cet ancien fichier ?\n\n'; if(data.catalog)msg+=`📦 Catalogue : ${data.catalog.length} paires\n`; if(data.sales)msg+=`💸 Ventes : ${data.sales.length}\n`; msg+='\n⚠ Tes données actuelles seront REMPLACÉES, puis l\'app se rechargera.';
-              if(!window.confirm(msg)) return;
+              if(!await askConfirm(msg)) return;
               const entries=[]; if(data.catalog)entries.push(['vinted_catalog',data.catalog]); if(data.sales)entries.push(['vinted_sales',data.sales]); if(data.garageGrid)entries.push(['vinted_garage_grid',data.garageGrid]);
               await applyAndReload(entries); return;
             }
