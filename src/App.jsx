@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v60/00 · prix d achat';
+const BUILD_ID = 'v61/00 · rapide';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -316,7 +316,7 @@ let AUTH_SETTINGS = null;
 const loadAuthSettings = async () => {
   try {
     const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
-    if (r.ok) AUTH_SETTINGS = await r.json();
+    if (r.ok) { AUTH_SETTINGS = await r.json(); _emitAuth(); }  // réveille l'écran de connexion
   } catch (_) {}
   return AUTH_SETTINGS;
 };
@@ -464,10 +464,22 @@ const ensureLocalOwner = (uid) => {
 // Restaure la session au démarrage, et renouvelle le jeton s'il a expiré.
 let AUTH_REDIRECT = null;   // résultat du retour OAuth / lien email, lu par l'écran de connexion
 const authBoot = async () => {
-  // AVANT tout : savoir si la base sait cloisonner, et ce qu'elle accepte
-  // comme moyens de connexion. Les deux en parallèle, c'est le chemin critique
-  // avant le premier affichage.
-  await Promise.all([detectSchema(), MULTI_USER ? loadAuthSettings() : Promise.resolve()]);
+  // ⚠️ NE PAS BLOQUER LE PREMIER AFFICHAGE SUR LE RÉSEAU.
+  // Avant, on attendait DEUX appels réseau ici : l'app restait sur un écran
+  // vide tant que Supabase n'avait pas répondu — mesuré à plus de 13 s dès que
+  // la connexion traîne. C'est ça, « le chargement est beaucoup trop long ».
+  // • Les moyens de connexion (Google/Discord) ne servent qu'à dessiner deux
+  //   boutons sur l'écran de connexion : on les charge SANS attendre, et
+  //   `loadAuthSettings` redessine l'écran quand la réponse arrive.
+  // • `detectSchema` décide comment on ÉCRIT (cloisonné ou non) : on l'attend,
+  //   mais avec une limite de temps, sinon un réseau qui pend fige l'app.
+  //   Au-delà, on garde le comportement d'aujourd'hui (non cloisonné), qui est
+  //   le repli sûr décrit dans CLAUDE.md.
+  if (MULTI_USER) loadAuthSettings();
+  await Promise.race([
+    detectSchema(),
+    new Promise(r => setTimeout(r, 4000)),
+  ]);
   if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   // Retour de Google / Discord / d'un lien email : ça prime sur tout le reste.
   try { AUTH_REDIRECT = await consumeAuthRedirect(); } catch (_) { AUTH_REDIRECT = null; }
@@ -825,8 +837,31 @@ const onBusy = (fn) => { _busySubs.add(fn); fn(_busy > 0); return () => _busySub
 const busyStart = () => { _busy++; _emitBusy(); };
 const busyEnd = () => { _busy = Math.max(0, _busy - 1); _emitBusy(); };
 
+// ── UNE LIGNE MOISSONNÉE N'EST TÉLÉCHARGÉE QU'UNE FOIS ────────────────────
+// Mesuré au chronomètre : au démarrage, l'app demandait 24 fois les lignes
+// « annonces » de 8 comptes (chacune pèse ~765 Ko) et 32 fois les commandes —
+// 42 Mo et 102 requêtes pour afficher un écran, soit ~14 s avant que la barre
+// du bas apparaisse. Plusieurs écrans demandent les mêmes lignes en même temps.
+// Ce cache partage la requête EN COURS (pas seulement le résultat) : deux
+// appels simultanés ne provoquent qu'un seul aller-retour.
+const _rowCache = new Map();          // clé -> { at, promesse }
+const ROW_TTL_MS = 60 * 1000;
+const cachedRow = (cle, chercher) => {
+  const e = _rowCache.get(cle);
+  if (e && (Date.now() - e.at) < ROW_TTL_MS) return e.promesse;
+  const promesse = chercher().catch(err => { _rowCache.delete(cle); throw err; });
+  _rowCache.set(cle, { at: Date.now(), promesse });
+  return promesse;
+};
+const viderCacheLignes = () => _rowCache.clear();   // bouton « Synchroniser »
+
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
+  if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
+  return cachedRow(`h:${uid}:${type}`, () => fetchHarvestBrut(uid, type, opts));
+};
+
+const fetchHarvestBrut = async (uid, type, opts = {}) => {
   busyStart();
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data,updated_at,cap:data->>capturedAt`, {
@@ -849,14 +884,39 @@ const fetchHarvest = async (uid, type, opts = {}) => {
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
 const fetchEmailBordereaux = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=id,data`, {
+    // ⚠️ SURTOUT PAS `select=data` : chaque bordereau embarque son PDF en
+    // base64 (deux fois : brut + tamponné). Mesuré, 51 bordereaux = 6 Mo dont
+    // 99 % de PDF — et la liste était chargée deux fois, soit 12 Mo pour
+    // afficher des titres. On ne prend que les champs utiles : 21 Ko.
+    // Le PDF est récupéré à la demande, au moment d'imprimer (fetchBordPdf).
+    const champs = ['uid','type','suivi','modele','numero','taille','account','article',
+                    'filename','posKnown','dateLimite','receivedAt','transaction']
+                   .map(c => `${c}:data->>${c}`).join(',');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=id,${champs}`, {
       headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
-    return rows.map(r => r.data).filter(d => d && d.pdfB64) // on ne garde que ceux avec un PDF
+    // `filename` est présent exactement quand un PDF l'est (vérifié : 50/50,
+    // aucun écart) — il sert donc de témoin sans télécharger le PDF.
+    return rows.filter(r => r && r.filename && r.filename !== 'None')
+      .map(r => ({ ...r, _row: r.id, hasPdf: true }))
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
+};
+// Le PDF d'UN bordereau, à la demande (impression / tamponnage).
+const fetchBordPdf = async (rowId) => {
+  if (!rowId) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=pdfB64:data->>pdfB64,pdfTamponneB64:data->>pdfTamponneB64`, {
+      headers: sbAuth(),
+    });
+    if (!res.ok) return null;
+    const r = (await res.json())[0];
+    if (!r) return null;
+    const net = (v) => (v && v !== 'None') ? v : null;
+    return { pdfB64: net(r.pdfB64), pdfTamponneB64: net(r.pdfTamponneB64) };
+  } catch (_) { return null; }
 };
 // Suivi colis reçu par EMAIL (Mondial Relay / Chronopost) : lignes email_track_*
 // = { carrier, suivi, status, statusLabel, subject, receivedAt }.
@@ -1248,27 +1308,35 @@ const b64ToBytes = (b64) => {
 // les achats). On classe par le nom de la clé pour être robuste au libellé exact.
 const fetchHarvestOrders = async (uid, side, opts = {}) => {
   if (!uid) return null;
+  // Même mutualisation que fetchHarvest : la requête ramène les DEUX côtés
+  // (ventes + achats) de ce compte, donc deux appels différents partagent
+  // le même aller-retour au lieu d'en faire deux.
+  if (opts.force) _rowCache.delete(`o:${uid}`);
+  const rows = await cachedRow(`o:${uid}`, () => fetchHarvestOrdersBrut(uid));
+  if (!rows) return null;
+  const wantSold = /sold|sell/i.test(String(side || ''));
+  for (const r of rows) {
+    const key = String(r.id).replace(`harvest_${uid}_orders_`, '');
+    const isSold = /sold|sell/i.test(key);
+    const isBought = /bought|buy|purchas/i.test(key);
+    if ((wantSold && isSold) || (!wantSold && isBought)) {
+      const ts = harvestTs(r);
+      if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
+      const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
+      if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
+      return r.data?.payload || null;
+    }
+  }
+  return null;
+};
+
+const fetchHarvestOrdersBrut = async (uid) => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data,updated_at,cap:data->>capturedAt`, {
       headers: sbAuth(),
     });
     if (!res.ok) return null;
-    const rows = await res.json();
-    const wantSold = side === 'sold';
-    for (const r of rows) {
-      const key = String(r.id).replace(`harvest_${uid}_orders_`, '');
-      const isSold = /sold|sell/i.test(key);
-      const isBought = /bought|buy|purchas/i.test(key);
-      if ((wantSold && isSold) || (!wantSold && isBought)) {
-        // Même garde-fou de fraîcheur que fetchHarvest (voir son commentaire).
-        const ts = harvestTs(r);
-        if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
-        const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
-        if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
-        return r.data?.payload || null;
-      }
-    }
-    return null;
+    return await res.json();          // le tri ventes/achats se fait au-dessus
   } catch (_) { return null; }
 };
 // Récupère le dernier bordereau (PDF) capté par l'extension pour ce compte
@@ -10285,11 +10353,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [batchBusy, setBatchBusy] = useState(false);
   const batchBordereaux = async () => {
     if (batchBusy) return;
-    const pending = (emailBords || []).filter(b => b.pdfB64 && !isBordDone(b));
+    const pending = (emailBords || []).filter(b => b.hasPdf && !isBordDone(b));
     if (!pending.length) { toast('Aucun bordereau à imprimer (tous sont déjà marqués imprimés).'); return; }
     setBatchBusy(true);
     try {
-      const items = pending.map(b => ({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: b64ToBytes(b.pdfB64) })).filter(it => it.pdfBuf);
+      // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
+      // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
+      const items = [];
+      for (const b of pending) {
+        const pdf = await fetchBordPdf(b._row);
+        const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
+        if (buf) items.push({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: buf });
+      }
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false));
       setBordResult({ ...r, batch: true });
     } catch(err){ toast('Erreur : ' + String(err)); }
@@ -12026,7 +12101,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(()=>{
           if (emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des bordereaux…</div>;
           if (!Array.isArray(emailBords)) return null;
-          const withPdf = emailBords.filter(b=>b.pdfB64);
+          const withPdf = emailBords.filter(b=>b.hasPdf);
           const pending = withPdf.filter(b=>!isBordDone(b));
           const done = withPdf.length - pending.length;
           return (
@@ -12106,7 +12181,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {/* Impression EN LOT : tamponne tous les bordereaux non imprimés et les
                 met à la suite dans un seul PDF à imprimer d'un coup. */}
-            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.pdfB64&&!isBordDone(b)).length; return nPending>=1 ? (
+            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.hasPdf&&!isBordDone(b)).length; return nPending>=1 ? (
               <button type="button" onClick={batchBordereaux} disabled={batchBusy}
                 title="Tamponne tous les bordereaux non imprimés et les met à la suite dans un seul PDF à imprimer d'un coup"
                 style={{width:'100%',border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'12px',cursor:batchBusy?'default':'pointer',fontSize:15,fontWeight:600,marginBottom:10,opacity:batchBusy?0.6:1}}>
@@ -12178,8 +12253,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const sec = { flexShrink:0, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
                     return (<>
                       <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12}}>
-                        <button type="button" onClick={()=>{
-                          const bytes=b64ToBytes(b.pdfB64); if(!bytes){toast('PDF illisible.');return;}
+                        <button type="button" onClick={async ()=>{
+                          const pdf=await fetchBordPdf(b._row);
+                          const bytes=pdf&&pdf.pdfB64?b64ToBytes(pdf.pdfB64):null; if(!bytes){toast('PDF illisible.');return;}
                           processBordereau(numForBord(b), b.modele||b.article||'', bytes);
                         }} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer</button>
                         {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}

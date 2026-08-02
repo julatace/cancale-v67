@@ -577,3 +577,39 @@ Mesuré sur 60 annonces : marque détectée 113/119, taille **119/119** ; 8 anno
 
 ### Reste ouvert
 - `vinted_stock_vinted` : **1815 entrées** encore synchronisées à chaque sauvegarde pour un écran retiré (13 Ko dans la ligne `main`). À arbitrer avec Julien avant de purger — c'est son historique.
+
+---
+
+## 23. Session août 2026 (suite) — ⚡ LE DÉMARRAGE : 13 s → 0,26 s
+
+« Le chargement des données c'est beaucoup trop long. » Mesuré au banc (section 20) avant de toucher à quoi que ce soit :
+
+| | avant | après |
+|---|---|---|
+| barre du bas visible | **13 090 ms** | **261 ms** |
+| requêtes Supabase | 102 | 62 |
+| données téléchargées | **42 Mo** | **1,28 Mo** |
+
+### 1. La vraie cause des 13 s : `authBoot` attendait le réseau
+`authBoot` faisait `await Promise.all([detectSchema(), loadAuthSettings()])` **avant le premier rendu**. Tant que Supabase n'avait pas répondu, l'écran restait vide. C'était ça, la lenteur — pas le volume (le chiffre ne bougeait pas entre 42 Mo et 1,28 Mo).
+- `loadAuthSettings()` ne sert qu'à dessiner les boutons Google/Discord de l'écran de connexion → **lancé sans être attendu**, il appelle `_emitAuth()` en arrivant pour redessiner.
+- `detectSchema()` décide comment on **écrit** → toujours attendu, mais avec `Promise.race` à **4 s** ; au-delà on garde le repli sûr (non cloisonné). Un réseau qui pend ne fige plus l'app.
+
+⚠️ **Ne jamais remettre un `await` réseau sur le chemin du premier rendu.**
+
+### 2. 42 Mo → 1,28 Mo
+- **Les PDF des bordereaux** : `fetchEmailBordereaux` faisait `select=data`, or chaque ligne embarque le PDF en base64 **deux fois** (brut + tamponné) — 51 bordereaux = 6 Mo dont **99 % de PDF**, chargés **deux fois** = 12 Mo pour afficher des titres. On projette maintenant les 13 champs utiles (**21 Ko**) ; `fetchBordPdf(rowId)` va chercher le PDF **à l'impression**. `filename` sert de témoin « ce bordereau a un PDF » (vérifié : 50/50, aucun écart).
+- **Requêtes en double** : les mêmes lignes moissonnées étaient demandées 24× (annonces) et 32× (commandes) au démarrage. `cachedRow(clé, fn)` partage **la requête en cours**, pas seulement le résultat (TTL 60 s, vidé par « Synchroniser »). 24 → 8.
+- **Moisson allégée à la source** (extension `alleger()` dans `storeHarvestRow`) : Vinted renvoie toutes les variantes de photos, traductions, blocs promo. On ne garde que ce que `mapWardrobeItem` lit. Mesuré sur les vraies données, **tous les éléments conservés** :
+
+| | avant | après |
+|---|---|---|
+| annonces | 7,09 Mo | 0,15 Mo (−98 %) |
+| ventes | 0,69 Mo | 0,24 Mo (−65 %) |
+| achats | 0,79 Mo | 0,29 Mo (−64 %) |
+| messages | 0,74 Mo | 0,10 Mo (−86 %) |
+
+Les anciennes lignes restent lisibles (on enlève des champs, on n'en renomme aucun) et s'allègent à la prochaine moisson. **Extension 4.24.0 — à recharger dans Chrome.**
+
+### Vérifié
+Rendu réel avec les données allégées : Annonces (96 pour shop_cancale), Ventes, Achats (3 colis, code 077831), Bordereaux (6 à imprimer / 50 reçus) — identiques à avant, zéro erreur.
