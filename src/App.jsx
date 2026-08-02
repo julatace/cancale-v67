@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v43/02 · 🔑connexion';
+const BUILD_ID = 'v44/00 · 👻disparues';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -2483,10 +2483,18 @@ function AuthScreen() {
           </button>
 
           <div style={{display:mode==='newpw'?'none':'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'}}>
-            <button type="button" onClick={()=>{ setMode(mode==='up'?'in':'up'); setErr(''); setInfo(''); }}
-              style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-              {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
-            </button>
+            {/* ⚠️ INSCRIPTIONS FERMÉES tant que la base ne sépare pas les
+                vendeurs. Sinon la première personne qui crée un compte tombe
+                directement dans les données de Julien : son garage, ses ventes,
+                sa comptabilité. Le lien réapparaît seul après la migration. */}
+            {(CLOISONNE || mode==='up') ? (
+              <button type="button" onClick={()=>{ setMode(mode==='up'?'in':'up'); setErr(''); setInfo(''); }}
+                style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
+              </button>
+            ) : (
+              <span style={{fontSize:12,color:C.muted,fontWeight:500}}>Inscriptions bientôt ouvertes</span>
+            )}
             {mode!=='reset' && (
               <button type="button" onClick={()=>{ setMode('reset'); setErr(''); setInfo(''); }}
                 style={{border:'none',background:'transparent',color:C.muted,fontSize:12.5,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
@@ -7479,6 +7487,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [renumOpen, setRenumOpen] = useState(false); // modale « Renuméroter à la suite »
+  const [dispOpen, setDispOpen] = useState(false);   // panneau « annonces disparues sans vente »
   const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
   // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
   const garageSpotOf = (num) => {
@@ -8261,6 +8270,71 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // compte est fermé) → on les retire, comme celles d'un compte masqué à la main.
   // ⚠️ C'est CETTE liste que doivent utiliser la grille ET le bandeau de stats :
   // sinon le compteur annonce un nombre que la grille ne montre pas.
+  // Paires déclarées PERDUES (litige, ou annonce disparue qu'on retire du stock).
+  // ⚠️ Déclarée ICI et pas plus bas : `disparues` la lit pendant le rendu, et un
+  // useState déclaré après aurait planté l'app (variable pas encore initialisée).
+  const [pairsLost, setPairsLost] = useState(() => load('vinted_pairs_lost', {}));
+
+  // ── ANNONCES DISPARUES SANS VENTE (compte masqué / annonce retirée) ───────
+  // Vinted masque parfois un compte entier pendant plusieurs jours. Ses annonces
+  // s'évaporent de la moisson : elles ne sont ni vendues, ni supprimées par toi.
+  // Sans traitement, ces paires restent « numérotées » dans le vide — on ne sait
+  // plus si elles sont vendues, perdues ou juste invisibles.
+  //
+  // Règle : une paire est « disparue » si elle a un numéro, qu'elle n'est plus
+  // dans le wardrobe, qu'AUCUNE vente ne lui correspond, et que son compte a
+  // bien répondu au dernier chargement (sinon c'est juste un chargement raté).
+  // On ne décide rien à sa place : on la SIGNALE, et c'est toi qui tranches.
+  const disparues = useMemo(() => {
+    if (!listings.items || !sales.items) return [];
+    const onlineIds = new Set(); const presentAcc = new Set();
+    for (const it of listings.items) { onlineIds.add(String(it.id)); const u = String(it._acc?.vinted_user_id || ''); if (u) presentAcc.add(u); }
+    // Numéros qui correspondent à une vente (à n'importe quel stade) : ces
+    // paires sont parties normalement, elles n'ont rien à faire ici.
+    const vendus = new Set();
+    for (const o of (sales.items || [])) {
+      const e = saleOv[String(o.transaction_id)];
+      const n = String((e && e.numero) || '').trim().toLowerCase(); if (n) vendus.add(n);
+      const t = normTitle(o.title || ''); if (t) vendus.add('t:' + t);
+    }
+    const out = [];
+    for (const k in numeros) {
+      const e = numeros[k]; const raw = String((e && e.numero) || '').trim();
+      if (!raw) continue;
+      if (onlineIds.has(String(k))) continue;                       // toujours en ligne
+      if (!presentAcc.has(String((e && e.accountId) || ''))) continue; // compte pas rafraîchi
+      if (soldManual.has(String(k))) continue;                      // marquée vendue à la main
+      if (emailSoldIds.has(String(k))) continue;                    // vendue d'après les emails
+      if (vendus.has(raw.toLowerCase())) continue;                  // numéro porté par une vente
+      if (vendus.has('t:' + normTitle(e.title || ''))) continue;    // même titre qu'une vente
+      if (pairsLost[raw]) continue;                                 // déjà déclarée perdue
+      out.push({ id: String(k), e, numero: raw });
+    }
+    out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, sales.items, numeros, saleOv, soldManual, emailSoldIds, pairsLost]);
+
+  // Compte entièrement muet : il a des paires numérotées mais renvoie ZÉRO
+  // annonce. C'est la signature d'un compte masqué par Vinted (ou fermé).
+  const comptesMuets = useMemo(() => {
+    if (!listings.items) return [];
+    const parAcc = {};
+    for (const it of listings.items) { const u = String(it._acc?.vinted_user_id || ''); if (u) parAcc[u] = (parAcc[u] || 0) + 1; }
+    const attendus = {};
+    for (const k in numeros) { const u = String(numeros[k]?.accountId || ''); if (u) attendus[u] = (attendus[u] || 0) + 1; }
+    const out = [];
+    for (const u in attendus) {
+      if (parAcc[u]) continue;                       // il répond → rien à signaler
+      if (acctOff(u)) continue;                      // déjà masqué à la main / bloqué
+      const acc = accounts.find(a => String(a.vinted_user_id) === u);
+      if (!acc) continue;                            // compte déconnecté, pas notre sujet
+      out.push({ uid: u, acc, nb: attendus[u] });
+    }
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, numeros, accounts, hiddenAccts, blockedAccts]);
+
   const annBase = useMemo(
     () => (listings.items || []).filter(it => !acctOffOf(it) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id)))),
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -8321,8 +8395,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (/suspend|v[ée]rification/i.test(s)) return 'suspendue';
     return null;
   };
-  // Paires déclarées PERDUES à la suite d'un litige (numéro libéré).
-  const [pairsLost, setPairsLost] = useState(() => load('vinted_pairs_lost', {}));
   const isPairLost = (num) => !!(num && pairsLost[String(num)]);
   const markPairLost = (num, o) => {
     const n = String(num || '').trim(); if (!n) return;
@@ -10830,6 +10902,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         <ScreenHead icon="tag" title="Annonces en ligne" desc="Tes annonces actuellement en vente. Donne un numéro et un prix d'achat à chaque paire : c'est ce qui rend ton bénéfice et ton garage justes."/>
         <NoAcc/>
+        {/* COMPTE MUET : il a des paires numérotées mais ne renvoie plus AUCUNE
+            annonce. C'est la signature d'un masquage par Vinted. On le dit tout
+            de suite, sinon on croit avoir perdu son stock. */}
+        {comptesMuets.map(m=>(
+          <div key={m.uid} style={{marginBottom:12,border:`1px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:12,padding:'11px 13px'}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.text}}>🙈 {accNameOf(m.acc)} ne renvoie plus aucune annonce</div>
+            <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
+              {m.nb} paire{m.nb>1?'s':''} numérotée{m.nb>1?'s':''} sur ce compte, et zéro annonce en ligne. C'est ce qui arrive quand <b>Vinted masque un compte</b> quelques jours. Tes numéros et tes prix d'achat sont conservés — ils reviendront tels quels. Rien à faire, sauf si le compte est fermé pour de bon : dans ce cas masque-le (puce du compte plus bas) ou déconnecte-le dans Paramètres.
+            </div>
+          </div>
+        ))}
+        {/* ANNONCES DISPARUES SANS VENTE : ni vendues, ni en ligne. Masquées par
+            Vinted, ou retirées à la main. On les sort de « en ligne » (déjà fait
+            par annBase) et on te laisse décider de leur sort. */}
+        {disparues.length>0 && (()=>{
+          const [ouvert, setOuvert] = [dispOpen, setDispOpen];
+          return (
+          <div style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'11px 13px'}}>
+            <button type="button" onClick={()=>setOuvert(v=>!v)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit'}}>
+              <span style={{fontSize:15}}>👻</span>
+              <span style={{flex:1,minWidth:0}}>
+                <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{disparues.length} annonce{disparues.length>1?'s':''} disparue{disparues.length>1?'s':''} sans vente</span>
+                <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Plus en ligne, et aucune vente correspondante. Masquées par Vinted, ou retirées.</span>
+              </span>
+              <span style={{color:C.muted,fontSize:17}}>{ouvert?'▾':'▸'}</span>
+            </button>
+            {ouvert && (
+              <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
+                {disparues.slice(0,40).map(d=>(
+                  <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
+                    <div style={{width:34,height:34,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden'}}>
+                      {d.e.photo && <img src={d.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{d.numero} · {d.e.title||'—'}</div>
+                      <div style={{fontSize:10.5,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? '🏠 rangée au garage' : 'pas au garage'}</div>
+                    </div>
+                    <button type="button" title="La paire n'est plus à vendre : on libère son numéro pour une autre paire."
+                      onClick={()=>{ setPairsLost(prev=>{ const u={...prev,[d.numero]:{ at:new Date().toISOString(), title:d.e.title||'' }}; save('vinted_pairs_lost',u); return u; }); toast(`N°${d.numero} retirée du stock`); }}
+                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                      Retirer
+                    </button>
+                  </div>
+                ))}
+                {disparues.length>40 && <div style={{fontSize:11,color:C.muted,paddingTop:6}}>… et {disparues.length-40} autres.</div>}
+                <div style={{fontSize:10.5,color:C.muted,marginTop:6,lineHeight:1.5}}>
+                  « Retirer » libère le numéro pour une autre paire. Si l'annonce revient (compte démasqué), elle retrouvera son numéro d'origine grâce à la reconnaissance par photo.
+                </div>
+              </div>
+            )}
+          </div>
+          );
+        })()}
         {/* Compte bloqué par Vinted : détecté à la synchro (401/403). Ses annonces
             sont retirées automatiquement — on te dit lequel et tu peux le retirer. */}
         {blockedList.length>0 && (
@@ -12590,9 +12715,23 @@ function LeboncoinScreen() {
     const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
     const pd = (postedRows && postedRows[0] && postedRows[0].data) || {};
     const posted = new Set((pd.ids || []).map(String));
+    // MÊMES RÈGLES DE COMPTE QUE LE RESTE DE L'APP : un compte Vinted masqué ou
+    // détecté bloqué ne doit pas alimenter la file Leboncoin (ses annonces sont
+    // périmées). Et une paire déclarée retirée du stock n'a plus rien à publier.
+    const offAcc = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+    const lost = main.vinted_pairs_lost || {};
     const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
     const online = []; const onlineIds = new Set(); const seen = new Set();
-    for (const r of listRows) { const p = (r.data && r.data.payload) || {}; for (const it of (p.items || [])) { const oid = String(it.id); if (it.is_closed || it.is_hidden || it.is_draft) continue; onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid); online.push({ id: oid, title: it.title }); } }
+    for (const r of listRows) {
+      const uid = String(r.id).split('_')[1];
+      if (offAcc.has(uid)) continue;
+      const p = (r.data && r.data.payload) || {};
+      for (const it of (p.items || [])) { const oid = String(it.id); if (it.is_closed || it.is_hidden || it.is_draft) continue; onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid); online.push({ id: oid, title: it.title }); }
+    }
+    // Comptes Leboncoin réellement vus dans le navigateur (captés par l'extension).
+    const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+    const lbcAccounts = Object.values(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).filter(Boolean)
+      .sort((a, b) => String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
     // Annonces Leboncoin réellement captées (par l'extension). On s'en sert pour
     // reconnaître TOUT SEUL ce qui est déjà en ligne là-bas, via la référence
     // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
@@ -12619,6 +12758,7 @@ function LeboncoinScreen() {
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       if (!num || String(num).trim() === '') continue;
+      if (lost[String(num).trim()]) continue;                        // paire retirée du stock
       if (posted.has(o.id) || posted.has(String(num))) continue;
       if (vKeys(o.id, o.title).some(k => refToAd.has(k))) { autoMatched++; continue; } // déjà sur LBC
       queue.push({ numero: String(num), title: o.title || (e && e.title) || '' });
@@ -12640,7 +12780,10 @@ function LeboncoinScreen() {
       removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '' });
     }
     removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-    setData({ queue, removals, unlinked, liveAds, autoMatched, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    // Répartition des annonces LBC par compte (plusieurs comptes possibles).
+    const parCompte = {};
+    for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
+    setData({ queue, removals, unlinked, liveAds, autoMatched, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -12655,7 +12798,38 @@ function LeboncoinScreen() {
         <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>🟠 Leboncoin</h2>
         <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>Vue d'ensemble de tes annonces croisées sur Leboncoin. La <b>publication</b> se fait via l'extension VRM sur leboncoin.fr (bouton « 🚀 Tout préparer »). Ici tu suis juste l'état.</div>
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file de publication est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : photos téléchargées, texte copié, formulaire pré-rempli — tu valides.</div>
+
+      {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
+          l'extension a réellement vus connectés dans le navigateur, avec le
+          nombre d'annonces rattachées à chacun. Sans ça, impossible de savoir
+          depuis quel compte republier. */}
+      {data && (data.lbcAccounts || []).length > 0 && (
+        <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 16, padding: '13px 15px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Comptes Leboncoin détectés</div>
+          {data.lbcAccounts.map(a => {
+            const nb = ((data.parCompte || {})[String(a.id)] || []).length;
+            const vu = a.seenAt ? new Date(a.seenAt) : null;
+            const jours = vu ? Math.floor((Date.now() - vu.getTime()) / 86400000) : null;
+            return (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
+                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: '#ff6e1418', color: '#ff6e14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+                  {String(a.name || '?').slice(0, 1).toUpperCase()}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || `#${a.id}`}</span>
+                  <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
+                    {nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+            Un compte apparaît ici dès que tu ouvres Leboncoin avec l'extension active, connecté dessus.
+          </div>
+        </div>
+      )}
       {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
         {/* Compteur / offre */}
         <Card>

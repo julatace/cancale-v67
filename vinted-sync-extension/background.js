@@ -294,7 +294,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
-          if (msg.action === 'lbcCapture' && Array.isArray(msg.listings)) { await storeLbcListings(msg.url, msg.listings); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcCapture') {
+            if (Array.isArray(msg.listings) && msg.listings.length) await storeLbcListings(msg.url, msg.listings);
+            if (msg.account && msg.account.id) await storeLbcAccount(msg.account);
+            sendResponse({ ok: true }); return;
+          }
           if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body); sendResponse({ ok: true }); return; }
           if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -1145,6 +1149,18 @@ async function storeLbcListings(url, listings) {
     const merged = Object.assign({}, prev);
     for (const l of listings) { if (l && l.id) merged[String(l.id)] = Object.assign({}, merged[String(l.id)], l, { seenAt: new Date().toISOString() }); }
     await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
+  } catch (_) {}
+}
+// COMPTES LEBONCOIN connectes. Julien en a plusieurs : on garde la liste des
+// comptes reellement vus dans le navigateur, avec la date de derniere vue. L'app
+// s'en sert pour dire depuis quel compte publier, et pour repartir les annonces.
+async function storeLbcAccount(acc) {
+  try {
+    const prevRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+    const prev = (prevRows && prevRows[0] && prevRows[0].data && prevRows[0].data.accounts) || {};
+    const merged = Object.assign({}, prev);
+    merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], acc, { seenAt: new Date().toISOString() });
+    await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
   } catch (_) {}
 }
 // RECON : on garde un échantillon des réponses Leboncoin (chemins d'API + un bout

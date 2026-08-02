@@ -73,6 +73,12 @@
                 images: (node.images && (node.images.urls || node.images.thumb_urls)) || node.image_urls || [],
                 category: (node.category_name || node.category_id || ''),
                 status: node.status || node.ad_status || '',
+                // COMPTE LEBONCOIN proprietaire de l'annonce. Julien peut avoir
+                // plusieurs comptes LBC : sans cette info, toutes les annonces
+                // se melangeaient dans un seul tas et on ne savait plus laquelle
+                // republier depuis quel compte.
+                lbcUser: String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || ''),
+                lbcUserName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || ''),
               });
             }
           }
@@ -82,8 +88,30 @@
         listings = found;
       }
     } catch (_) {}
-    if (listings.length) {
-      send({ action: 'lbcCapture', url: location.href, listings });
+    // Qui est connecte sur cette page ? Leboncoin met la session dans
+    // __NEXT_DATA__. On le remonte pour que l'app sache quels comptes LBC sont
+    // reellement branches, et lequel a servi a publier quoi.
+    let account = null;
+    try {
+      const el = document.getElementById('__NEXT_DATA__');
+      if (el && el.textContent) {
+        const data = JSON.parse(el.textContent);
+        const walk = (node, depth) => {
+          if (account || !node || depth > 8 || typeof node !== 'object') return;
+          if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1); return; }
+          const id = node.user_id || node.userId || node.store_id;
+          const name = node.pseudo || node.pseudonym || node.name || node.email;
+          if (id && name && (node.email || node.pseudo || node.pseudonym)) {
+            account = { id: String(id), name: String(name), seenAt: new Date().toISOString() };
+            return;
+          }
+          for (const k in node) if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1);
+        };
+        walk(data, 0);
+      }
+    } catch (_) {}
+    if (listings.length || account) {
+      send({ action: 'lbcCapture', url: location.href, listings, account });
     }
   }
   const host = document.createElement('div');
