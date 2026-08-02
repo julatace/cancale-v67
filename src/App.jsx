@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v38/01 · 🛍️achats';
+const BUILD_ID = 'v38/02 · 📋listes';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -9473,13 +9473,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             return (
-              <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:8}}>
-               <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>👟</span>}
+              // Carte de vente : même vocabulaire visuel que les achats et le
+              // reste de l'app (rayon 16, ombre, photo 56, titre plus lisible).
+              <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'11px 12px'}}>
+               <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                <div style={{width:56,height:56,borderRadius:11,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
+                  <div style={{fontSize:13.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
                   <div style={{fontSize:10,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
@@ -9525,7 +9527,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                </div>
                {/* Barre de progression de la vente : À expédier · Expédiée · Livrée · Encaissée */}
-               {!hidden && (()=>{ const vs=venteStage(o); if(vs.step<=0) return null; return (
+               {/* Comme pour les achats : la barre ne sert que tant que la vente
+                   AVANCE. Sur une vente encaissée (étape finale), elle est toute
+                   verte, n'apprend rien et double la hauteur de la ligne. */}
+               {!hidden && (()=>{ const vs=venteStage(o); if(vs.step<=0 || vs.step>=4) return null; return (
                  <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}>
                    {[['À expédier',1],['Expédiée',2],['Livrée',3],['Encaissée',4]].map(([lbl,idx])=>{
                      const done=vs.step>=idx, cur2=vs.step===idx;
@@ -10540,11 +10545,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
                 const age = conv.unread ? daysSince(conv.updated_at) : null;
                 return (
-                  <button key={(conv.id||i)+'_'+conv._acc.vinted_user_id} type="button" onClick={()=>openConversation(conv)} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',borderRadius:10,border:`1px solid ${conv.unread?(C.warn+'88'):C.border}`,background:conv.unread?`${C.warn}0c`:C.card,cursor:'pointer',textAlign:'left',width:'100%'}}>
-                    {photo?<img src={photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:<div style={{width:40,height:40,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:16}}>💬</div>}
+                  // Conversation : photo ronde (c'est une personne, pas un objet),
+                  // pseudo mis en avant et carte alignée sur le reste de l'app.
+                  <button key={(conv.id||i)+'_'+conv._acc.vinted_user_id} type="button" onClick={()=>openConversation(conv)} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 12px',borderRadius:16,border:`1px solid ${conv.unread?(C.warn+'88'):C.border}`,background:conv.unread?`${C.warn}0c`:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',fontFamily:'inherit'}}>
+                    {photo?<img src={photo} alt="" style={{width:46,height:46,borderRadius:999,objectFit:'cover',flexShrink:0}}/>:<div style={{width:46,height:46,borderRadius:999,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:18}}>💬</div>}
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.opposite_user?.login||'Conversation'}</div>
-                      <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{conv.description||''}</div>
+                      <div style={{fontSize:13.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}}>{conv.opposite_user?.login||'Conversation'}</div>
+                      <div style={{fontSize:11.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>{conv.description||''}</div>
                       <div style={{marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><AcctTag acc={conv._acc} name={accNameOf(conv._acc)}/>{conv.unread && <span style={{fontSize:10,color:C.warn,fontWeight:800}}>⏳ à répondre{age!=null&&age>=1?` · ${age}j`:''}</span>}</div>
                     </div>
                     <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
