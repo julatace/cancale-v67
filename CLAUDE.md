@@ -678,3 +678,19 @@ Défaut réel, reproduit au banc (écran 320 px, zoom « Grand ») : sur Ventes 
 **Tentative annulée** : `main div, main span, … { min-width: 0 }`. Ça règle bien le cas « `1593,30 €` dans une case de 85 px », mais `min-width:0` **autorise aussi** un conteneur flex à s'effondrer à ~0 px — donc ça n'a pas créé le texte vertical (il préexiste) mais ça ne le soigne pas et ça fragilise le reste. Seul `overflow-wrap: break-word` est conservé (sûr).
 
 ➡️ **La bonne correction est locale** : poser `minWidth:0` sur LE conteneur qui doit rétrécir + `overflow:hidden; textOverflow:ellipsis` sur son enfant texte. À faire carte par carte, en vérifiant au banc à 320 px / zoom Grand. Reste à faire : la carte « colis à retirer » (Achats) et les lignes de vente.
+
+### Porte-monnaie : le vrai montant existe, l'app affichait une estimation
+Julien : « les montants en attente n'ont pas l'air de correspondre ».
+
+Vinted expose le solde de chaque porte-monnaie, et l'extension le capte déjà (lignes `harvest_{uid}_billing`, quand tu ouvres ton porte-monnaie) :
+```
+main   = disponible        escrow = BLOQUÉ (l'argent « en attente »)
+199082413 : 7,95 € / 57,23 €     3171228253 : 0 € / 29,00 €
+```
+Total réel bloqué : **86,23 €**. La carte « Argent en route » de l'écran Ventes affichait **≈ 1204 €** — elle additionnait toutes les ventes dont le statut n'est pas « finalisée », or beaucoup de ventes anciennes gardent ce statut alors que l'argent a déjà été versé.
+
+- La carte utilise désormais **`walletEscrow`** (solde réellement bloqué) dès qu'il est connu, et le dit : « Bloqué chez Vinted · lu sur N porte-monnaie ».
+- À défaut, elle affiche l'estimation **en l'annonçant comme telle**, avec la marche à suivre (« ouvre une fois ton porte-monnaie sur Vinted »).
+- `walletEscrow` était chargé **uniquement** à l'ouverture de la modale Trésorerie ; il l'est maintenant aussi sur Ventes / Ma journée (lecture Supabase légère).
+
+⚠️ 5 comptes sur 7 ont une ligne `billing` **vide** (`{}`) : Julien n'a pas ouvert leur porte-monnaie. Le total réel ne couvre donc que les comptes visités — c'est écrit sur la carte, pas masqué.

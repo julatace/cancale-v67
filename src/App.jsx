@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v63/00 · ventes≠achats';
+const BUILD_ID = 'v63/01 · porte-monnaie';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -9775,6 +9775,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
   const [showTreasury, setShowTreasury] = useState(false);
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
+  // Le solde réel des porte-monnaie sert AUSSI à la carte « argent en route »
+  // de l'écran Ventes, pas seulement à la modale Trésorerie : sans ça la carte
+  // retombait sur une estimation très éloignée du vrai montant bloqué.
+  // Lecture Supabase légère, une seule fois.
+  useEffect(() => {
+    if (walletEscrow !== null) return;
+    if (curSub !== 'ventes' && curSub !== 'journee') return;
+    fetchWalletEscrow().then(w => { if (w) setWalletEscrow(w); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub]);
+
   const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow().then(setWalletEscrow); };
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
@@ -10681,7 +10692,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:11,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
                 </div>
               </div>
-              <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>Ventes pas encore finalisées par l'acheteur — Vinted te verse l'argent une fois le colis reçu et validé. Estimation d'après tes ventes en cours.</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
+                ? <>Montant <b>réellement bloqué</b> par Vinted, lu sur {reel.accounts} porte-monnaie{reel.accounts>1?'x':''}. Ouvre ton porte-monnaie sur les autres comptes pour les inclure.</>
+                : <>Estimation d'après tes ventes en cours. Ouvre une fois ton porte-monnaie sur Vinted : l'app affichera ensuite le montant exact.</>}</div>
             </div>
           );
         })()}
