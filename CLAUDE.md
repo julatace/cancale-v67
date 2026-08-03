@@ -768,3 +768,26 @@ Julien : « il n'y a pas de QR code Mondial Relay, c'est que Chronopost. Si on v
 
 ### Leçon (la quatrième de cette session)
 Un chiffre à zéro n'est pas forcément une panne : ça peut être le comportement normal du système observé. Avant de conclure « l'extraction échoue », demander **comment ça marche en vrai** — Julien le savait, moi non.
+---
+
+## 28. Session août 2026 (suite) — RETRAIT PAR TRANSPORTEUR, une seule règle
+
+« Fais ça avec Mondial Relay, Chronopost, UPS, Vinted Go, tout, à la perfection. »
+
+Chaque transporteur a SA façon de remettre le colis. Vérifié sur les 61 vrais colis :
+| transporteur | colis | QR | code | méthode réelle |
+|---|---|---|---|---|
+| Mondial Relay | 39 | **0** | 15 | **CODE** + point relais |
+| Chronopost | 15 | **11** | 1 | **QR** (image hébergée) |
+| Vinted Go | 3 | 2 | 0 | QR |
+| Colissimo | 3 | 0 | 0 | domicile (rien à retirer) |
+| Shop2Shop | 1 | 0 | 0 | code |
+
+### La règle unique : `CARRIERS[x].retrait` + `retraitMode(t)`
+Chaque transporteur porte un champ **`retrait`** : `'qr'` (Chronopost), `'code'` (Mondial Relay, Relais Colis, Shop2Shop, InPost, Amazon, GLS), `'auto'` (Vinted Go, UPS, DPD, DHL, FedEx — QR si fourni sinon code), `'home'` (Colissimo — livraison).
+
+**`retraitMode(t)`** croise cette préférence avec ce qu'on a REÇU et renvoie `{mode:'qr'|'code'|'numero'|'home', …}`. Si le transporteur préfère un QR qu'on n'a pas, il retombe sur le code, jamais sur un QR fabriqué (cf. section 17). Testé unitairement sur 9 cas, chacun résout au bon mode.
+
+La modale de retrait (`openQrView`) et son texte de consigne dérivent **uniquement** de `retraitMode` — plus aucune logique QR/code éparpillée. Le message est par transporteur : « Chronopost — présente le QR », « Mondial Relay fonctionne au CODE », « La Poste livre à ton adresse : rien à retirer ».
+
+⚠️ **Ne jamais afficher un QR pour Mondial Relay** : il n'en met aucun dans ses emails (Julien : « c'est que Chronopost »), le QR MR vit dans leur app, inaccessible.

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v65/01 · retrait juste';
+const BUILD_ID = 'v66/00 · retrait par transporteur';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1175,20 +1175,45 @@ const trackUrl = (carrier, suivi) => {
 // points = [{ key, lat, lon, count }] ; tap sur une épingle → onSelect(key).
 // Transporteurs : couleur de marque + code court. Badges maison (pas les logos
 // officiels — évite tout souci de droits, et reste net et professionnel).
+// `retrait` = COMMENT on récupère le colis chez ce transporteur. Vérifié sur les
+// 61 vrais colis de Julien (août 2026) — chaque transporteur a SA méthode, et
+// afficher la mauvaise fait perdre du temps au comptoir :
+//   'qr'   → un vrai QR (image hébergée). Chronopost : 11 QR sur 15.
+//   'code' → un code de retrait + pièce d'identité. Mondial Relay : 0 QR, on
+//            présente le CODE. (Julien : « il n'y a pas de QR MR, c'est que Chrono ».)
+//   'auto' → QR si le transporteur en fournit un, sinon le code (Vinted Go, UPS).
+//   'home' → livraison à domicile : rien à présenter au comptoir (Colissimo).
 const CARRIERS = {
-  mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#E2001A', fg: '#fff' },
-  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#00A0E3', fg: '#fff' },
-  ups:          { name: 'UPS',           short: 'UPS', bg: '#3C2415', fg: '#FFB500' },
-  vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff' },
-  relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#E30613', fg: '#fff' },
-  colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111' },
-  amazon:       { name: 'Amazon',        short: 'AZ', bg: '#232F3E', fg: '#FF9900' },
-  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#00B2A9', fg: '#fff' },
-  inpost:       { name: 'InPost',        short: 'IP', bg: '#FFCD00', fg: '#111' },
-  dpd:          { name: 'DPD',           short: 'DPD', bg: '#DC0032', fg: '#fff' },
-  gls:          { name: 'GLS',           short: 'GLS', bg: '#0A5B9A', fg: '#FFD200' },
-  dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#D40511' },
-  fedex:        { name: 'FedEx',         short: 'FX', bg: '#4D148C', fg: '#FF6600' },
+  mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#E2001A', fg: '#fff', retrait: 'code' },
+  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#00A0E3', fg: '#fff', retrait: 'qr'   },
+  ups:          { name: 'UPS',           short: 'UPS', bg: '#3C2415', fg: '#FFB500', retrait: 'auto' },
+  vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff', retrait: 'auto' },
+  relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#E30613', fg: '#fff', retrait: 'code' },
+  colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
+  amazon:       { name: 'Amazon',        short: 'AZ', bg: '#232F3E', fg: '#FF9900', retrait: 'code' },
+  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#00B2A9', fg: '#fff', retrait: 'code' },
+  inpost:       { name: 'InPost',        short: 'IP', bg: '#FFCD00', fg: '#111', retrait: 'code' },
+  dpd:          { name: 'DPD',           short: 'DPD', bg: '#DC0032', fg: '#fff', retrait: 'auto' },
+  gls:          { name: 'GLS',           short: 'GLS', bg: '#0A5B9A', fg: '#FFD200', retrait: 'code' },
+  dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#D40511', retrait: 'auto' },
+  fedex:        { name: 'FedEx',         short: 'FX', bg: '#4D148C', fg: '#FF6600', retrait: 'auto' },
+};
+// Ce qu'il faut présenter au comptoir pour CE colis, selon son transporteur ET
+// ce qu'on a réellement reçu. Une seule règle, utilisée partout (modale de
+// retrait, carte relais). Renvoie { mode:'qr'|'code'|'numero'|'home', ... }.
+const retraitMode = (t) => {
+  const c = CARRIERS[carrierKey(t && t.carrier)] || {};
+  const qr = (t && (t.qrB64 || t.qrUrl)) || null;
+  const code = (t && t.code && String(t.code).trim()) || '';
+  const pref = c.retrait || 'auto';
+  if (pref === 'home') return { mode: 'home', carrier: c.name || 'Transporteur' };
+  if (pref === 'qr'   && qr)   return { mode: 'qr',   qr, code, carrier: c.name };
+  if (pref === 'code' && code) return { mode: 'code', code, carrier: c.name };
+  if (pref === 'auto') { if (qr) return { mode: 'qr', qr, code, carrier: c.name }; if (code) return { mode: 'code', code, carrier: c.name }; }
+  // Le transporteur préfère un mode qu'on n'a pas reçu : on prend ce qu'on a.
+  if (qr)   return { mode: 'qr',   qr, code, carrier: c.name || 'Transporteur' };
+  if (code) return { mode: 'code', code, carrier: c.name || 'Transporteur' };
+  return { mode: 'numero', carrier: c.name || 'Transporteur' };
 };
 const carrierKey = (raw) => {
   const s = String(raw || '').toLowerCase();
@@ -8129,12 +8154,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // « juste une retranscription », et ça fait perdre du temps au relais.
   // Quand il n'y a pas de vrai QR, la bonne réponse est le code, en gros.
   const openQrView = async (t) => {
+    // UNE seule règle décide quoi présenter au comptoir, selon le transporteur
+    // (retraitMode) — plus de logique QR/code éparpillée ici.
+    const r = retraitMode(t);
     const base = {
       title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '',
-      carrier: t.carrier || '', lieu: cleanLieu(t.lieu).display || '', _t: t,
+      carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
+      mode: r.mode, _t: t,
     };
-    if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
-    if (t.qrUrl) { setQrView({ ...base, img: t.qrUrl, real: true, hosted: true }); return; }
+    if (r.mode === 'qr' && t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
+    if (r.mode === 'qr' && t.qrUrl) { setQrView({ ...base, img: t.qrUrl, real: true, hosted: true }); return; }
     setQrView({ ...base, img: null, real: false });
   };
   // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
@@ -13471,11 +13500,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {qrView.lieu && <div style={{fontSize:12.5,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>📍 {qrView.lieu}</div>}
             {qrView.suivi && (qrView.img || qrView.code) && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
             <div style={{fontSize:11,color:'#999',textAlign:'center',lineHeight:1.4}}>
-              {qrView.real
-                ? 'QR officiel — présente-le au comptoir.'
-                : qrView.code
-                  ? `${qrView.carrier==='mondialrelay'?'Mondial Relay fonctionne au CODE, pas au QR' : 'Pas de QR pour ce colis'} : donne ce code au comptoir, avec ta pièce d'identité.`
-                  : 'Ni QR ni code reçus pour ce colis : donne le numéro ci-dessus et ta pièce d\'identité.'}
+              {(()=>{ const cn=qrView.carrierName||carrierName(qrView.carrier);
+                if(qrView.mode==='home') return `${cn} livre à ton adresse : rien à retirer au comptoir.`;
+                if(qrView.real) return `QR ${cn} — présente-le au comptoir, le scan suffit.`;
+                if(qrView.code) return `${cn} fonctionne au CODE (pas de QR). Donne ce code au comptoir avec ta pièce d'identité.`;
+                return `Ni QR ni code reçus. Donne le numéro ci-dessus et ta pièce d'identité à ${cn}.`; })()}
             </div>
             {/* Mondial Relay ne met AUCUN QR dans ses emails : il vit dans leur
                 application. Plutôt que de faire semblant, on ouvre leur suivi —
