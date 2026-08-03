@@ -17,7 +17,15 @@
   const APP_URL = 'https://cancale-v67-ten.vercel.app';
   let DATA = null;
   let open = false;
-  let tab = 'paire'; // paire | relance | sansnum
+  let tab = 'paire'; // paire | relance | dorment | sansnum | republier
+  // ── File de republication ASSISTÉE ─────────────────────────────────────────
+  // repubSel = les annonces cochées. repubRun = le défilement une-par-une en
+  // cours ({ queue:[ids], idx }). ⚠️ AUCUNE automatisation : le panneau OUVRE
+  // l'annonce, c'est TOI qui republies sur Vinted, puis tu passes à la suivante.
+  // Pas de file qui s'exécute seule, pas de délai, pas de requête envoyée à ta
+  // place — c'est ce qui protège tes comptes.
+  const repubSel = new Set();
+  let repubRun = null;
 
   const eur = (v) => (v == null || v === '' ? null : Number(v));
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
@@ -258,13 +266,15 @@
       </div>
       <div class="vrm-tabs">
         <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
+        <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
         <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
-        <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Qui dorment 😴</button>
+        <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Dorment 😴</button>
         <button class="vrm-tab ${tab === 'sansnum' ? 'on' : ''}" data-t="sansnum">Sans N°</button>
       </div>
       <div id="vrm-body">${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'paire' ? renderPaire()
+        : tab === 'republier' ? renderRepublier()
         : tab === 'dorment' ? renderList(DATA.sleeping, sleepEmpty(), 'En ligne depuis 30 jours et plus (date lue sur la page de l&#39;annonce). À baisser ou republier — par toi.')
         : tab === 'relance' ? renderList(DATA.relance, 'Rien à relancer : tes annonces accrochent bien. 👌', 'Beaucoup vues mais peu mises en favori <b>par rapport à tes autres annonces</b> → le prix est sans doute trop haut. Ouvre-les et baisse le prix toi-même.')
         : renderList(DATA.noNum, 'Toutes tes annonces ont un N°. 👌', 'Ces annonces n\'ont pas encore de numéro dans ton app.')
@@ -274,6 +284,74 @@
       </div>`;
     panel.querySelector('.vrm-close').onclick = () => toggle(false);
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
+    if (tab === 'republier') wireRepublier();
+  }
+
+  // ── ONGLET REPUBLIER : sélection + défilement UNE-PAR-UNE ────────────────────
+  // Tu coches les annonces à remettre en avant, puis « Commencer » : le panneau
+  // t'OUVRE chaque annonce à ton clic, une à la fois. Tu republies toi-même sur
+  // Vinted (bouton natif) et tu passes à la suivante. Rien ne part tout seul.
+  function renderRepublier() {
+    const list = (DATA && DATA.online) || [];
+    if (!list.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant. Ouvre ta boutique Vinted une fois pour les capter.</div>`;
+    // Mode défilement : une annonce à la fois.
+    if (repubRun) {
+      const total = repubRun.queue.length;
+      const done = repubRun.idx;
+      if (done >= total) {
+        return `<div class="vrm-card" style="text-align:center">
+            <div style="font-size:15px;font-weight:800;margin-bottom:4px">✓ Terminé</div>
+            <div class="vrm-m">${total} annonce${total > 1 ? 's' : ''} passée${total > 1 ? 's' : ''} en revue.</div>
+            <button class="vrm-go" data-act="stop" style="margin-top:10px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:8px 14px;font-weight:800;cursor:pointer">Fermer la file</button>
+          </div>`;
+      }
+      const o = (DATA.byId && DATA.byId[repubRun.queue[done]]) || null;
+      if (!o) { repubRun.idx++; return renderRepublier(); }
+      return `
+        <div class="vrm-m" style="margin-bottom:8px">Annonce <b>${done + 1}</b> / ${total} — republie-la sur Vinted, puis <b>Suivante</b>.</div>
+        ${card(o, o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : '')}
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="vrm-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
+          <button class="vrm-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
+        </div>
+        <div style="text-align:center;margin-top:8px"><button class="vrm-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
+    }
+    // Mode sélection : la liste avec des cases à cocher.
+    const rows = list.slice(0, 200).map(o => `
+      <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
+        <input type="checkbox" class="vrm-chk" data-id="${esc(o.id)}" ${repubSel.has(o.id) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
+        ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0">
+          <div class="vrm-t">${o.numero ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : ''}${esc(o.title)}</div>
+          <div class="vrm-m">${fmt(o.price)}${o.ageDays != null ? ` · ${o.ageDays} j` : ''}</div>
+        </div>
+      </label>`).join('');
+    return `
+      <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="vrm-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
+        <button class="vrm-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
+      </div>
+      <div style="max-height:38vh;overflow:auto;margin-bottom:8px">${rows}</div>
+      <button class="vrm-go" data-act="start" ${repubSel.size ? '' : 'disabled'} style="width:100%;border:none;background:${repubSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:${repubSel.size ? 'pointer' : 'default'}">Commencer (${repubSel.size})</button>`;
+  }
+
+  function wireRepublier() {
+    panel.querySelectorAll('.vrm-chk').forEach(c => {
+      c.onchange = () => { const id = c.dataset.id; if (c.checked) repubSel.add(id); else repubSel.delete(id); render(); };
+    });
+    panel.querySelectorAll('.vrm-go').forEach(b => {
+      b.onclick = () => {
+        const act = b.dataset.act;
+        const list = (DATA && DATA.online) || [];
+        if (act === 'all') { list.forEach(o => repubSel.add(o.id)); render(); }
+        else if (act === 'none') { repubSel.clear(); render(); }
+        else if (act === 'start') { if (!repubSel.size) return; repubRun = { queue: list.filter(o => repubSel.has(o.id)).map(o => o.id), idx: 0 }; render(); }
+        else if (act === 'stop') { repubRun = null; render(); }
+        else if (act === 'open') { const o = DATA.byId[repubRun.queue[repubRun.idx]]; if (o && o.url) window.open(o.url, '_blank', 'noopener'); }
+        else if (act === 'next') { repubRun.idx++; render(); }
+      };
+    });
   }
 
   function load() {

@@ -689,7 +689,16 @@ export default async function handler(req, res) {
     // acheté ton article »). On archive l'email comme justificatif d'achat
     // (texte + PDF joint éventuel) pour le registre d'achats.
     const achText = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 2000)}`;
-    if (/(?:tu as|vous avez)\s+achet|merci pour (?:ton|votre) achat|confirmation d['']achat|(?:ton|votre)?\s*re[çc]u pour (?:la |ta |votre )?commande|ta commande|r[ée]capitulatif de (?:ta |votre )?commande/i.test(achText)) {
+    // ⚠️ GARDE-FOU vente↔achat (bug signalé par Julien : une VENTE tombait en
+    // achat). Les emails côté VENDEUR contiennent aussi « ta commande »
+    // (« Prépare ta commande », « ta commande est à expédier ») → l'ancien motif
+    // « ta commande » nu attrapait des ventes. On EXCLUT donc explicitement tout
+    // signal vendeur avant de classer en achat, et on ne garde plus que des
+    // formulations d'ACHETEUR sans ambiguïté (« tu as acheté », « reçu pour ta
+    // commande »…). Le « ta commande » nu et le « récapitulatif de commande »
+    // (envoyés aussi au vendeur) sont retirés.
+    const cotéVendeur = /vendu|a\s+achet[ée]\s+ton\s+article|pr[ée]pare\s+ta\s+commande|[àa]\s+exp[ée]dier|bordereau\s+d['’]envoi|ton\s+article/i.test(achText);
+    if (!cotéVendeur && /(?:tu as|vous avez)\s+achet|merci pour (?:ton|votre) achat|confirmation d['']achat|(?:ton|votre)?\s*re[çc]u pour (?:la |ta |votre )?commande/i.test(achText)) {
       const prix = (achText.match(/(\d+[,.]\d{2})\s*€/) || [])[1] || '';
       const article = ((achText.match(/commande\s*[«"“]\s*([^»"”\n]{2,70})\s*[»"”]/i) || achText.match(/(?:achet[ée]e?\s*:?\s*|article\s*:?\s*)[«"“']?([^«»"”'\n]{4,70})/i) || [])[1] || '').trim();
       const transaction = (achText.match(/transaction\s*:?\s*#?(\d{6,})/i) || [])[1] || '';

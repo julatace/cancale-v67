@@ -9534,8 +9534,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const depuisEmails = type === 'sold'
         ? ordersFromEmailSales(await fetchEmailSales(), accounts)
         : ordersFromEmailAchats(await fetchEmailAchats(), accounts);
+      // ⚠️ GARDE-FOU vente↔achat (bug signalé par Julien : une VENTE apparaissait
+      // dans les achats). La cause racine est corrigée à la source (email-inbound),
+      // mais une ligne email_achat déjà mal rangée resterait visible. Ici, côté
+      // achats, on écarte un achat VENU D'UN EMAIL dont le titre + le prix
+      // correspondent EXACTEMENT à une de tes VENTES : on n'achète et ne revend
+      // pas la même paire au même prix → c'est le même événement mal classé. Les
+      // vrais achats moissonnés (vrai n° de transaction) ne sont jamais touchés.
+      const ventesKeys = type === 'purchased'
+        ? new Set((sales.items || []).map(cle))
+        : null;
       for (const o of depuisEmails) {
         const k = cle(o); if (vus.has(k)) continue;
+        if (ventesKeys && o._fromEmail && ventesKeys.has(k)) continue; // vente mal classée en achat
         vus.add(k); out.push(o); anyOk = true;
       }
     } catch (_) {}

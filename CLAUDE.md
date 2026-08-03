@@ -851,3 +851,21 @@ Onglet Republier : note moyenne + file par priorité + cartes (score, problèmes
 
 ### Reste du cahier des charges (pas fait, honnête)
 Analyse **photo** par vision IA (module 6), CRM client détaillé (module 9), mémoire IA de stratégie (module 11), abonnements Free/Pro/Business (module 14) : non faits — soit ils dépendent d'un LLM vision/branché, soit c'est un chantier à part. À reprendre brique par brique une fois l'IA active en prod.
+
+---
+
+## 32. Session août 2026 (suite) — Republication ASSISTÉE dans l'extension + ⚠️ refus tenus
+
+### ⚠️ Ce que Julien a redemandé et que je REFUSE (final, comme les refus précédents)
+Julien veut republier ses annonces **en masse depuis l'extension**, et a explicitement demandé une **file d'attente qui s'exécute seule avec des délais aléatoires (10-20 s)** entre chaque republication, « faire à ma place ». **Refusé.** Un délai aléatoire n'a qu'un seul but : **tromper la détection bot de Vinted**. Republier 20 annonces en rafale (même présent, même depuis son navigateur) = la signature exacte que Vinted sanctionne — c'est ce qui a **bloqué `vanessa5723`**. Ce n'est PAS une question de coût. Refus constant : pas d'auto-republication en file/minuterie, pas de délais « faussement humains », pas d'envoi de messages automatisé, pas de modification de photos pour esquiver la détection de doublon.
+
+### Ce qui a été construit à la place (sûr, dans l'extension — v4.27.0)
+Onglet **« Republier ♻️ »** dans le panneau VRM sur Vinted (`vinted-panel.js`, `renderRepublier`/`wireRepublier`) :
+- liste des annonces **en ligne** (lues via `buildPanelData().online`, 0 requête Vinted) avec **cases à cocher** ; « tout cocher / décocher » ;
+- bouton **« Commencer (N) »** → **défilement UNE-PAR-UNE** (`repubRun = {queue, idx}`) : le panneau **ouvre** chaque annonce sur Vinted (`window.open`), **Julien republie lui-même** (bouton natif Vinted), puis **« Suivante ▶ »**. 
+- **Aucune requête envoyée à sa place, aucune file auto, aucun délai.** C'est ce qui le rend sûr. Les vendues ne sont pas listées (on ne republie pas une paire vendue — sauf litige, à voir plus tard).
+
+### ⚠️ Bug vente↔achat corrigé (encore) — « Adidas spezial North high 35 » (une VENTE) tombait dans les Achats
+Cause racine dans **`api/email-inbound.js`** : la branche ACHAT (2b, AVANT la branche vente) matchait le motif **« ta commande » nu** — or les emails **côté vendeur** disent aussi « ta commande » (« Prépare ta commande », « ta commande est à expédier »). Une vente était donc classée `email_achat_*`.
+- **Source** : ajout d'un garde-fou `cotéVendeur` (`/vendu|a acheté ton article|prépare ta commande|à expédier|bordereau d'envoi|ton article/i`) qui EXCLUT tout signal vendeur avant de classer en achat ; motifs « ta commande » nu et « récapitulatif de commande » retirés (envoyés aussi au vendeur).
+- **Nettoyage des lignes déjà mal rangées** (App.jsx `loadOrders`, filet emails achats) : on écarte un achat **venu d'un email** (`_fromEmail`) dont **titre + prix** correspondent EXACTEMENT à une **vente** (`sales.items`) — on n'achète/revend pas la même paire au même prix. Les vrais achats moissonnés (vrai n° de transaction) ne sont jamais touchés. Vérifié au banc : Ventes/Achats, zéro erreur.
