@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v65/00 · lignes propres';
+const BUILD_ID = 'v65/01 · retrait juste';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -13474,9 +13474,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {qrView.real
                 ? 'QR officiel — présente-le au comptoir.'
                 : qrView.code
-                  ? `${qrView.carrier==='mondialrelay'?'Mondial Relay ne scanne pas de QR' : 'Pas de QR pour ce colis'} : donne ce code au comptoir, avec ta pièce d'identité.`
+                  ? `${qrView.carrier==='mondialrelay'?'Mondial Relay fonctionne au CODE, pas au QR' : 'Pas de QR pour ce colis'} : donne ce code au comptoir, avec ta pièce d'identité.`
                   : 'Ni QR ni code reçus pour ce colis : donne le numéro ci-dessus et ta pièce d\'identité.'}
             </div>
+            {/* Mondial Relay ne met AUCUN QR dans ses emails : il vit dans leur
+                application. Plutôt que de faire semblant, on ouvre leur suivi —
+                c'est de là qu'on récupère le QR quand on en veut un. */}
+            {qrView.suivi && (
+              <a href={trackUrl(qrView.carrier, qrView.suivi)} target="_blank" rel="noreferrer"
+                style={{textDecoration:'none',border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'9px 16px'}}>
+                {qrView.carrier==='mondialrelay' ? '📱 Ouvrir Mondial Relay (QR)' : '🔍 Suivre le colis'}
+              </a>
+            )}
             <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:12,background:'#111',color:'#fff',fontSize:15,fontWeight:600,padding:'11px 22px',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
           </div>
         </div>

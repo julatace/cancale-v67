@@ -383,7 +383,7 @@ Deux dégâts, longtemps invisibles :
 | `email_track_*` | 61 — 0 `qrB64`, **11 `qrUrl` (tous Chronopost)**, 16 codes de retrait |
 | lieu de retrait | **48/61 vides**, 11 mal découpés (« ® MAISON DE LA PRESSE … SUPER PRATIQUE Retr ») |
 
-### PAS RÉSOLU — il faut un email d'exemple
+### PAS RÉSOLU — il faut un email d'exemple (⚠️ voir la correction en section 27)
 Le QR authentique n'est **jamais** capté (0/61) et le point relais est vide 48 fois sur 61. Le code d'extraction (`api/email-inbound.js`, `extractQr` + parsing `lieu`) existe et l'app affiche déjà le vrai QR quand il est là (`qrB64` → `qrUrl` → repli généré). **Le problème est en amont, dans le découpage de l'email.** Écrire des regex sans voir le HTML réel serait deviner. ➡️ Demander à Julien de **transférer un email Mondial Relay « colis disponible » brut** pour caler l'extraction sur du vrai.
 
 ---
@@ -747,3 +747,24 @@ Vérifié en capture : titre coupé net, pastilles qui passent à la ligne, prix
 1. `flexWrap:'wrap'` sur la rangée → ce qui ne rentre pas descend au lieu d'écraser ;
 2. `flex:'1 1 <plancher>px'` sur le bloc texte → il ne peut plus tomber à 0 ;
 3. `flexShrink:0` sur les pastilles/pastilles-prix, `nowrap+ellipsis` sur chaque ligne de texte.
+
+
+---
+
+## 27. ⚠️ CORRECTION — il n'y a PAS de QR Mondial Relay à extraire
+
+Julien : « il n'y a pas de QR code Mondial Relay, c'est que Chronopost. Si on veut un QR c'est directement dans l'app Mondial Relay. »
+
+**Il a raison, et ça invalide une demande que j'ai répétée plusieurs fois.** Je réclamais un email Mondial Relay brut « pour finir l'extraction du QR » — **ce QR n'existe pas dans l'email**. Les chiffres le disaient déjà (39 colis Mondial Relay, **0 QR**, 15 codes de retrait) : j'ai lu ça comme « extraction ratée » alors que c'était **le fonctionnement normal du transporteur**.
+
+| transporteur | mécanisme de retrait |
+|---|---|
+| **Mondial Relay** | **CODE de retrait** + pièce d'identité. Le QR, si on en veut un, est dans **leur application**. |
+| **Chronopost** | QR en image hébergée (`qrUrl`), 11 sur 15 |
+
+➡️ La modale de retrait propose désormais un bouton **« 📱 Ouvrir Mondial Relay (QR) »** (via `trackUrl`) plutôt que de faire semblant d'en fabriquer un, et le texte dit « Mondial Relay fonctionne au CODE, pas au QR ».
+
+**Ce qui reste vraiment ouvert** : le **point relais** (nom/adresse), vide dans 48 emails sur 61. Là, un email brut aiderait encore — mais **uniquement pour le lieu**, plus pour le QR.
+
+### Leçon (la quatrième de cette session)
+Un chiffre à zéro n'est pas forcément une panne : ça peut être le comportement normal du système observé. Avant de conclure « l'extraction échoue », demander **comment ça marche en vrai** — Julien le savait, moi non.
