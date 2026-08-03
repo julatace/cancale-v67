@@ -824,7 +824,15 @@ async function pageActiveFetch() {
         const sold = await get('/api/v2/my_orders?type=sold&page=1&per_page=100');
         const bought = await get('/api/v2/my_orders?type=purchased&page=1&per_page=100');
         const inbox = await get('/api/v2/inbox?page=1&per_page=30');
-        return { who: who || null, listings: listings || null, sold: sold || null, bought: bought || null, inbox: inbox || null };
+        // PORTE-MONNAIE. Julien : « l'extension n'a pas moyen de capter tout
+        // Vinted sans que j'aie besoin de tout ouvrir ? » — si, justement.
+        // Le solde (dispo + BLOQUE) vient de /users/{id}/payouts. Sans ca, il
+        // fallait ouvrir le porte-monnaie de chaque compte a la main pour que
+        // la capture passive le voie : 5 comptes sur 7 n'avaient donc aucun
+        // solde. Un appel de plus, depuis SON navigateur, sur une page ou il
+        // est deja connecte — c'est le meme profil de trafic qu'une visite.
+        const wallet = pid ? await get('/api/v2/users/' + pid + '/payouts') : null;
+        return { who: who || null, listings: listings || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null };
       },
     });
     out = res && res[0] && res[0].result;
@@ -845,6 +853,8 @@ async function pageActiveFetch() {
   if (plein(out.sold, 'my_orders')) { await storeHarvestRow(uid, 'orders_sold', out.sold, domain); stored = true; }
   if (plein(out.bought, 'my_orders')) { await storeHarvestRow(uid, 'orders_purchased', out.bought, domain); stored = true; }
   if (plein(out.inbox, 'conversations')) { await storeHarvestRow(uid, 'inbox', out.inbox, domain); stored = true; }
+  // Le solde n'est pas une liste : on le range des qu'il porte un montant.
+  if (out.wallet && (out.wallet.main || out.wallet.escrow)) { await storeHarvestRow(uid, 'billing', out.wallet, domain); stored = true; }
   if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
   return stored;
 }

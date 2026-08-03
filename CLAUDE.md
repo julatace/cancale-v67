@@ -724,3 +724,14 @@ Vérifié en capture à 320 px / zoom Grand : les trois lignes se coupent propre
 
 ### Reste à faire (mesuré, pas corrigé)
 La **ligne de vente elle-même** se chevauche encore à 320 px en zoom Grand (le prix passe par-dessus « achat ? »). Même méthode : `flexShrink:0` sur ce qui ne doit pas rétrécir, largeur plancher sur le bloc texte, vérification en capture.
+
+### « L'extension n'a pas moyen de capter tout Vinted sans que j'ouvre tout ? » — si
+Il y a **deux modes** dans l'extension, et la confusion venait de là :
+- **capture PASSIVE** (`inject.js`) : elle ne voit que ce que la page charge déjà. Zéro requête ajoutée, donc invisible — mais elle ne connaît que les écrans réellement ouverts. C'est pour ça que 5 porte-monnaie sur 7 étaient vides.
+- **moisson ACTIVE** (`activeFetchAll` dans `background.js`) : l'extension appelle elle-même les endpoints **depuis le navigateur de Julien**, sur un onglet vinted.fr où il est déjà connecté. Même IP, même session, même empreinte qu'une visite normale — c'est le mode discret voulu (section 5), à l'opposé du proxy Vercel.
+
+Elle allait déjà chercher : `users/current`, le dressing (toutes les pages), `my_orders` ventes + achats, `inbox`. **Il manquait le porte-monnaie.**
+
+➡️ Ajout de **`/api/v2/users/{profileId}/payouts`** (endpoint trouvé dans les lignes `harvest_*_wreq_*` déjà captées) → rangé en `harvest_{uid}_billing` dès qu'il porte un montant. Julien n'a plus besoin d'ouvrir le porte-monnaie de chaque compte. **Extension 4.26.0.**
+
+⚠️ Le solde n'est **pas** une liste : le garde-fou `plein(o, cle)` ne s'applique pas, on teste `main || escrow`.
