@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v63/01 · porte-monnaie';
+const BUILD_ID = 'v64/00 · lisible';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -11107,12 +11107,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {g.colis.map((t,i)=>{
                     const code=okCode(t.code);
                     return (
-                      <div key={i} style={{display:'flex',gap:11,alignItems:'center',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                      <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
                         <span style={{fontSize:22,flexShrink:0}}>📦</span>
-                        <div style={{flex:1,minWidth:0}}>
+                        <div style={{flex:'1 1 150px',minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                           <div style={{fontSize:11,fontWeight:600,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}{g.guessed?<span style={{color:C.muted,fontWeight:600}}> (relais habituel)</span>:''}</div>
-                          <div style={{fontSize:11,color:C.muted,marginTop:1}}>{code?'Donne ce code au comptoir 👉':'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
+                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{code?'Donne ce code au comptoir 👉':'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
                         </div>
                         {code && (
                           <div style={{flexShrink:0,textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 13px'}}>

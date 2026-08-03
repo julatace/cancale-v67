@@ -694,3 +694,15 @@ Total réel bloqué : **86,23 €**. La carte « Argent en route » de l'écran 
 - `walletEscrow` était chargé **uniquement** à l'ouverture de la modale Trésorerie ; il l'est maintenant aussi sur Ventes / Ma journée (lecture Supabase légère).
 
 ⚠️ 5 comptes sur 7 ont une ligne `billing` **vide** (`{}`) : Julien n'a pas ouvert leur porte-monnaie. Le total réel ne couvre donc que les comptes visités — c'est écrit sur la carte, pas masqué.
+
+### Carte « colis à retirer » : débordement corrigé LOCALEMENT
+Le pire cas mesuré (écran 320 px, zoom « Grand ») : « Donne ce code au comptoir » s'écrivait **une lettre par ligne**. Cause : la pastille du code (`flexShrink:0`, 22 px, padding) + l'emoji + les espacements mangeaient toute la largeur, et le bloc texte (`flex:1;minWidth:0`) s'effondrait à ~0 px.
+
+Trois corrections **sur cette carte uniquement** :
+1. la rangée passe en `flexWrap:'wrap'` → sur écran étroit la pastille du code **descend à la ligne** au lieu d'écraser le texte ;
+2. le bloc texte passe de `flex:1` à **`flex:'1 1 150px'`** → il ne peut plus tomber sous une largeur lisible ;
+3. la 3ᵉ ligne reçoit `whiteSpace:nowrap; overflow:hidden; textOverflow:ellipsis` comme ses deux voisines (elle ne les avait pas, d'où le retour à la ligne caractère par caractère).
+
+Vérifié en capture à 320 px / zoom Grand : les trois lignes se coupent proprement, le code reste lisible en 22 px.
+
+⚠️ **Le compteur « textes qui débordent » du banc est trompeur** : `scrollWidth > clientWidth` est **exactement** ce que produit un `text-overflow:ellipsis` volontaire. Il sert à LOCALISER les candidats, pas à valider — **toujours regarder la capture d'écran** avant de conclure.
