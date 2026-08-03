@@ -9539,19 +9539,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const depuisEmails = type === 'sold'
         ? ordersFromEmailSales(await fetchEmailSales(), accounts)
         : ordersFromEmailAchats(await fetchEmailAchats(), accounts);
-      // ⚠️ GARDE-FOU vente↔achat (bug signalé par Julien : une VENTE apparaissait
-      // dans les achats). La cause racine est corrigée à la source (email-inbound),
-      // mais une ligne email_achat déjà mal rangée resterait visible. Ici, côté
-      // achats, on écarte un achat VENU D'UN EMAIL dont le titre + le prix
-      // correspondent EXACTEMENT à une de tes VENTES : on n'achète et ne revend
-      // pas la même paire au même prix → c'est le même événement mal classé. Les
-      // vrais achats moissonnés (vrai n° de transaction) ne sont jamais touchés.
-      const ventesKeys = type === 'purchased'
-        ? new Set((sales.items || []).map(cle))
+      // ⚠️ GARDE-FOU vente↔achat RENFORCÉ (Julien : « il y a encore des ventes
+      // dans les achats »). La cause racine est corrigée à la source
+      // (email-inbound), mais des lignes email_achat déjà mal rangées restent
+      // visibles. L'ancien filtre exigeait titre ET prix identiques — trop
+      // strict : quand la vente était elle-même mal classée, l'email de vente
+      // n'existait pas et le prix de l'achat parsé différait de la vraie vente
+      // moissonnée → aucune correspondance. On écarte désormais un achat VENU
+      // D'UN EMAIL dès que son TITRE correspond à une de tes VENTES (moissonnées
+      // ou email) ou à une de tes ANNONCES en ligne — c'est TON stock, donc tu
+      // le vends, tu ne l'achètes pas. Les vrais achats moissonnés (vrai n° de
+      // transaction, pas _fromEmail) ne sont JAMAIS touchés. Julien réécrit ses
+      // titres à la revente → une collision de titre = quasi toujours le même
+      // article mal classé, pas un vrai achat.
+      const venteTitres = type === 'purchased'
+        ? new Set([...(sales.items || []), ...(listings.items || [])].map(o => normTitle(o.title)).filter(Boolean))
         : null;
       for (const o of depuisEmails) {
         const k = cle(o); if (vus.has(k)) continue;
-        if (ventesKeys && o._fromEmail && ventesKeys.has(k)) continue; // vente mal classée en achat
+        if (venteTitres && o._fromEmail && venteTitres.has(normTitle(o.title))) continue; // vente (ou annonce) mal classée en achat
         vus.add(k); out.push(o); anyOk = true;
       }
     } catch (_) {}
@@ -13618,7 +13624,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🔎 Audit d'inventaire</div><div style={{fontSize:12,color:C.muted}}>Réconcilie tes numéros avec le garage, les annonces et les ventes.</div></div>
               <button type="button" onClick={()=>setAuditOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
-            <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
+            <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>
               {nothing && <div style={{fontSize:13,color:INV_STATUS.online.color,fontWeight:600,textAlign:'center',padding:'24px 0'}}>✓ Tout est cohérent, rien à signaler !</div>}
               <Section icon="👻" color={C.danger} title="Paires perdues" desc="Numérotées mais ni en ligne, ni vendues, ni au garage → probablement égarées." items={ghosts} render={Row}/>
               <Section icon="📦" color={C.warn} title="Vendues mais encore au garage" desc="À sortir du garage : elles sont vendues mais toujours rangées." items={soldStored} render={Row}/>
@@ -13715,7 +13721,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <button type="button" onClick={()=>{setRepubEdit(null);setRepubForm(null);}} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
-            <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
+            <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>
               {/* Comparaison de score avant → après */}
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px',marginBottom:14}}>
                 <div style={{textAlign:'center'}}>

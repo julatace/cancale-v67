@@ -332,8 +332,8 @@
         <button class="vrm-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
         <button class="vrm-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
       </div>
-      <div style="max-height:38vh;overflow:auto;margin-bottom:8px">${rows}</div>
-      <button class="vrm-go" data-act="start" ${repubSel.size ? '' : 'disabled'} style="width:100%;border:none;background:${repubSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:${repubSel.size ? 'pointer' : 'default'}">Commencer (${repubSel.size})</button>`;
+      <div style="margin-bottom:8px">${rows}</div>
+      <button class="vrm-go" data-act="start" ${repubSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${repubSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${repubSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Commencer (${repubSel.size})</button>`;
   }
 
   function wireRepublier() {
