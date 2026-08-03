@@ -1087,7 +1087,23 @@ const ordersFromEmailAchats = (mails, accounts) => {
     parCle.set(String(a.vinted_user_id), a);
     if (a.login) parCle.set(String(a.login).toLowerCase(), a);
   });
-  return (mails || []).map(m => {
+  // ⚠️ VÉRIFIÉ SUR LES VRAIES DONNÉES (47 lignes email_achat en base) : seules
+  // 11 sont de VRAIS achats (« Ton reçu pour la commande … »). Les 36 autres
+  // sont des emails de STATUT mal classés par l'ancien tri, et qui polluaient
+  // les Achats :
+  //   • « … - Confirmation requise » (Vinted demande de confirmer la conformité —
+  //     c'est un email lié à une VENTE, pas un achat) ;
+  //   • « Commande mise à jour pour … » (simple changement de statut) ;
+  //   • « Retourne ta commande d'ici … » (retour).
+  // On ne garde donc QUE les lignes dont le sujet est un vrai reçu d'achat. Le
+  // tri à la source (email-inbound) ne les crée plus, mais les anciennes lignes
+  // restent en base : ce filtre les écarte à l'affichage.
+  const estVraiAchat = (m) => {
+    const s = String(m.subject || '').toLowerCase();
+    if (/confirmation requise|mise à jour|mis à jour|retourne ta commande|à expédier|pr[ée]pare ta commande|vendu/i.test(s)) return false;
+    return /re[çc]u pour (?:la |ta |votre )?commande|tu as achet|as achet[ée]|merci pour (?:ton|votre) achat|confirmation d['']achat/i.test(s);
+  };
+  return (mails || []).filter(estVraiAchat).map(m => {
     const titre = String(m.article || '').trim();
     if (!titre) return null;
     const montant = parseFloat(String(m.prix || '').replace(',', '.'));
@@ -9539,25 +9555,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const depuisEmails = type === 'sold'
         ? ordersFromEmailSales(await fetchEmailSales(), accounts)
         : ordersFromEmailAchats(await fetchEmailAchats(), accounts);
-      // ⚠️ GARDE-FOU vente↔achat RENFORCÉ (Julien : « il y a encore des ventes
-      // dans les achats »). La cause racine est corrigée à la source
-      // (email-inbound), mais des lignes email_achat déjà mal rangées restent
-      // visibles. L'ancien filtre exigeait titre ET prix identiques — trop
-      // strict : quand la vente était elle-même mal classée, l'email de vente
-      // n'existait pas et le prix de l'achat parsé différait de la vraie vente
-      // moissonnée → aucune correspondance. On écarte désormais un achat VENU
-      // D'UN EMAIL dès que son TITRE correspond à une de tes VENTES (moissonnées
-      // ou email) ou à une de tes ANNONCES en ligne — c'est TON stock, donc tu
-      // le vends, tu ne l'achètes pas. Les vrais achats moissonnés (vrai n° de
-      // transaction, pas _fromEmail) ne sont JAMAIS touchés. Julien réécrit ses
-      // titres à la revente → une collision de titre = quasi toujours le même
-      // article mal classé, pas un vrai achat.
-      const venteTitres = type === 'purchased'
-        ? new Set([...(sales.items || []), ...(listings.items || [])].map(o => normTitle(o.title)).filter(Boolean))
+      // Filet anti-doublon (léger) : on écarte un achat venu d'un email dont le
+      // titre ET le prix correspondent exactement à une vente — c'est le même
+      // événement. Le vrai tri vente/achat se fait désormais À LA SOURCE
+      // (ordersFromEmailAchats ne garde que les vrais reçus d'achat, vérifié sur
+      // les 47 lignes réelles), donc ce filtre n'est plus qu'une ceinture de
+      // sécurité et ne doit pas être trop agressif (ne pas jeter un vrai achat
+      // qui porterait par hasard le même titre qu'une annonce).
+      const ventesKeys = type === 'purchased'
+        ? new Set((sales.items || []).map(cle))
         : null;
       for (const o of depuisEmails) {
         const k = cle(o); if (vus.has(k)) continue;
-        if (venteTitres && o._fromEmail && venteTitres.has(normTitle(o.title))) continue; // vente (ou annonce) mal classée en achat
+        if (ventesKeys && o._fromEmail && ventesKeys.has(k)) continue;
         vus.add(k); out.push(o); anyOk = true;
       }
     } catch (_) {}
