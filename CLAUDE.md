@@ -791,3 +791,17 @@ Chaque transporteur porte un champ **`retrait`** : `'qr'` (Chronopost), `'code'`
 La modale de retrait (`openQrView`) et son texte de consigne dérivent **uniquement** de `retraitMode` — plus aucune logique QR/code éparpillée. Le message est par transporteur : « Chronopost — présente le QR », « Mondial Relay fonctionne au CODE », « La Poste livre à ton adresse : rien à retirer ».
 
 ⚠️ **Ne jamais afficher un QR pour Mondial Relay** : il n'en met aucun dans ses emails (Julien : « c'est que Chronopost »), le QR MR vit dans leur app, inaccessible.
+
+---
+
+## 29. Session août 2026 (suite) — ⚠️ « Impossible de charger » après 12 h d'inactivité
+
+Découvert en rendu réel : l'écran **Messages** (et potentiellement Annonces/Ventes) affichait « Impossible de charger ces données » alors que les conversations étaient **parfaitement présentes** en base — juste capturées il y a 19 h.
+
+**Cause** : `HARVEST_MAX_AGE_MS` (12 h). Une fois passé ce délai, `fetchHarvest` renvoyait `null` (« trop vieille »), l'app croyait la ligne absente, tentait le proxy (bloqué / vide en profil discret) → état d'erreur. Donc **dès que Julien n'ouvrait pas Vinted pendant une demi-journée, ses messages passaient en erreur** — et ça relançait un appel proxy par compte, le trafic qu'on fuit.
+
+**Le seuil de 12 h n'était piloté par personne** : aucun appelant ne passait `opts.maxAgeMs`, c'était un rejet aveugle par défaut.
+
+➡️ **On ne jette plus une moisson datée.** `fetchHarvest` / `fetchHarvestOrders` ont leur défaut passé de `HARVEST_MAX_AGE_MS` à `0` (pas d'expiration). Une donnée un peu vieille **s'affiche** (mieux qu'une erreur), la fraîcheur reste connue (`_harvestSeen`, popup, badge) et **« Synchroniser »** (`opts.force`) rafraîchit. Un appelant qui exigerait de la fraîcheur peut encore passer `opts.maxAgeMs` explicitement. Constante `HARVEST_MAX_AGE_MS` supprimée.
+
+Vérifié : Messages passe de « Impossible de charger » à 29 conversations affichées (pseudo, article, prix, compte), **zéro appel proxy**.

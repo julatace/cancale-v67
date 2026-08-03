@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v66/00 · retrait par transporteur';
+const BUILD_ID = 'v67/00 · données datées OK';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -819,7 +819,8 @@ const harvestTs = (row) => {
   const u = Date.parse((row && row.updated_at) || '');
   return isNaN(u) ? NaN : u;
 };
-const HARVEST_MAX_AGE_MS = 12 * 3600 * 1000; // 12 h
+// (HARVEST_MAX_AGE_MS retiré : on n'expire plus une moisson par défaut — voir
+// fetchHarvest. Une donnée datée s'affiche, « Synchroniser » rafraîchit.)
 // Âge de la dernière moisson lue, par uid+type → sert à AFFICHER la date des
 // données dans l'UI (« données du 7 juil. ») au lieu de laisser croire au direct.
 const _harvestSeen = {};
@@ -873,8 +874,15 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     if (!row) return null;
     const ts = harvestTs(row);
     if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
-    // Trop vieille → on répond « rien capté », l'appelant ira chercher le direct.
-    const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
+    // ⚠️ ON NE JETTE PLUS une moisson « trop vieille » par défaut. Ça faisait
+    // afficher « Impossible de charger » (Messages, Annonces…) dès que Julien
+    // n'avait pas ouvert Vinted depuis 12 h — alors que ses conversations, ses
+    // annonces étaient parfaitement là, juste un peu datées. Pire, ça relançait
+    // un appel proxy par compte (le trafic qu'on fuit). Une donnée un peu vieille
+    // vaut TOUJOURS mieux qu'une erreur : on l'affiche, la fraîcheur reste connue
+    // (_harvestSeen, popup, badge) et « Synchroniser » (opts.force) rafraîchit.
+    // Un appelant qui exige de la fraîcheur peut encore passer opts.maxAgeMs.
+    const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
     if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
     return row.data?.payload || null;
   } catch (_) { return null; }
@@ -1347,7 +1355,8 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
     if ((wantSold && isSold) || (!wantSold && isBought)) {
       const ts = harvestTs(r);
       if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
-      const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : HARVEST_MAX_AGE_MS;
+      // Même principe : une moisson datée s'affiche au lieu de disparaître.
+      const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
       if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
       return r.data?.payload || null;
     }
