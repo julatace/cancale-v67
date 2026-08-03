@@ -735,3 +735,15 @@ Elle allait déjà chercher : `users/current`, le dressing (toutes les pages), `
 ➡️ Ajout de **`/api/v2/users/{profileId}/payouts`** (endpoint trouvé dans les lignes `harvest_*_wreq_*` déjà captées) → rangé en `harvest_{uid}_billing` dès qu'il porte un montant. Julien n'a plus besoin d'ouvrir le porte-monnaie de chaque compte. **Extension 4.26.0.**
 
 ⚠️ Le solde n'est **pas** une liste : le garde-fou `plein(o, cle)` ne s'applique pas, on teste `main || escrow`.
+
+### Ligne de vente : dernier débordement corrigé
+La rangée (photo 56 px + bloc texte + prix) n'avait pas `flexWrap` : à 320 px en zoom Grand, le bloc texte était comprimé jusqu'au chevauchement (« 18,00 € » par-dessus « achat ? »).
+- rangée → `flexWrap:'wrap'` ;
+- bloc texte → `flex:'1 1 140px'` (plancher lisible).
+
+Vérifié en capture : titre coupé net, pastilles qui passent à la ligne, prix et boutons chacun à leur place.
+
+**Le schéma est le même partout, il est maintenant validé sur 3 cartes** :
+1. `flexWrap:'wrap'` sur la rangée → ce qui ne rentre pas descend au lieu d'écraser ;
+2. `flex:'1 1 <plancher>px'` sur le bloc texte → il ne peut plus tomber à 0 ;
+3. `flexShrink:0` sur les pastilles/pastilles-prix, `nowrap+ellipsis` sur chaque ligne de texte.
