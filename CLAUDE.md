@@ -661,3 +661,20 @@ Aujourd'hui l'app **déduit** les litiges du statut de vente (`saleOutcome` : re
 
 ### ⚠️ Trou comblé dans l'allègement (section 23)
 `alleger()` n'était appliqué que dans `storeHarvestRow` — or la **capture passive** (inject → background, ligne ~217) écrit **en direct** sans passer par cette fonction. La moisson faite en naviguant restait donc énorme (7 Mo d'annonces) alors que la moisson active était allégée. `alleger()` est maintenant appelé sur les deux voies. Un type inconnu (litiges…) passe inchangé — vérifié.
+
+---
+
+## 25. Session août 2026 (suite) — ventes/achats jamais mélangés + un défaut d'affichage localisé
+
+### Confusion ventes ↔ achats : la ligne « générique » en était la cause
+Quand Vinted charge `/my_orders` **sans** paramètre `?type=`, la réponse **mélange ventes et achats**. L'extension la rangeait quand même (`harvest_{uid}_orders_all`), et l'app avait un repli `fetchHarvest(uid,'orders')` utilisé **pour les deux** — donc des achats pouvaient s'afficher dans les ventes.
+
+- **Extension** : une réponse `/my_orders` sans `?type=` n'est plus rangée du tout (`return null` dans `matchHarvest`).
+- **App** : le repli générique est supprimé. On n'accepte plus que les lignes explicitement `orders_sold` ou `orders_purchased`. (Mesuré : la ligne générique était vide, ce repli ne rapportait rien et ne pouvait que tromper.)
+
+### ⚠️ Débordements : NE PAS corriger par une règle CSS globale
+Défaut réel, reproduit au banc (écran 320 px, zoom « Grand ») : sur Ventes et Achats, ~8 textes débordent de leur carte, et l'encart du code de retrait s'effondre au point d'écrire « Donne ce code au comptoir » **une lettre par ligne**.
+
+**Tentative annulée** : `main div, main span, … { min-width: 0 }`. Ça règle bien le cas « `1593,30 €` dans une case de 85 px », mais `min-width:0` **autorise aussi** un conteneur flex à s'effondrer à ~0 px — donc ça n'a pas créé le texte vertical (il préexiste) mais ça ne le soigne pas et ça fragilise le reste. Seul `overflow-wrap: break-word` est conservé (sûr).
+
+➡️ **La bonne correction est locale** : poser `minWidth:0` sur LE conteneur qui doit rétrécir + `overflow:hidden; textOverflow:ellipsis` sur son enfant texte. À faire carte par carte, en vérifiant au banc à 320 px / zoom Grand. Reste à faire : la carte « colis à retirer » (Achats) et les lignes de vente.

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v62/02 · litiges';
+const BUILD_ID = 'v63/00 · ventes≠achats';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1646,7 +1646,13 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   //    achats/ventes par le type d'URL capté ; repli sur l'ancienne clé générique.
   //    opts.force = on saute la moisson (bouton "Synchroniser") pour le dernier état.
   if (page === 1 && !opts.force) {
-    const h = (await fetchHarvestOrders(account.vinted_user_id, type)) || (await fetchHarvest(account.vinted_user_id, 'orders'));
+    // ⚠️ PAS de repli sur la ligne générique `harvest_{uid}_orders` : elle est
+    // écrite quand Vinted charge /my_orders SANS préciser ?type=, donc elle
+    // contient un MÉLANGE ventes + achats. S'en servir affichait des achats
+    // dans les ventes (et l'inverse). On n'accepte que les lignes explicitement
+    // « sold » ou « purchased ». Mesuré : la ligne générique est vide de toute
+    // façon, ce repli ne rapportait rien et ne pouvait que tromper.
+    const h = await fetchHarvestOrders(account.vinted_user_id, type);
     // ⚠️ Une moisson VIDE n'est pas une réponse. Une liste vide veut dire « la
     // page n'a pas encore été ouverte / la session a expiré », pas « aucune
     // vente ». En la prenant pour argent comptant, l'onglet Ventes affichait

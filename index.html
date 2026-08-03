@@ -89,6 +89,16 @@
     @keyframes cancaleSheet{from{transform:translateY(100%)}to{transform:none}}
     main > *{animation:cancaleEnter .24s ease both;}
 
+    /* 7bis) DÉBORDEMENTS — ⚠️ NE PAS mettre `min-width:0` en règle GLOBALE.
+       Essayé, mesuré, ANNULÉ : ça enlève bien le plancher qui fait déborder un
+       enfant de flex, mais du coup certains conteneurs s'effondrent à ~0 px et
+       le texte se coupe UNE LETTRE PAR LIGNE (constaté sur l'écran Achats :
+       « Donne ce code au comptoir » en colonne verticale). Le `min-width:0`
+       doit être posé sur LE conteneur précis qui doit rétrécir, avec un enfant
+       en `overflow:hidden; text-overflow:ellipsis` — jamais en arrosage.
+       Seul le retour à la ligne des mots trop longs est sûr globalement : */
+    main { overflow-wrap: break-word; }
+
     /* 8) IMAGES : jamais déformées, et fondu à l'arrivée plutôt qu'un « pop ». */
     img{max-width:100%;}
     @keyframes cancaleFadeIn{from{opacity:0}to{opacity:1}}

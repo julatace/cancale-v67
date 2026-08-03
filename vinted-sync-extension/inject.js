@@ -69,7 +69,11 @@
       // (ex: my_orders?type=sold -> "orders_sold"), sinon elles s'ecraseraient.
       if (type === 'orders') {
         const t = /[?&]type=([^&]+)/.exec(url);
-        type = 'orders_' + (t ? decodeURIComponent(t[1]) : 'all');
+        // Sans ?type=, la reponse MELANGE ventes et achats : la ranger
+        // produirait une ligne ambigue que l'app ne peut pas departager (elle
+        // affichait alors des achats dans les ventes). On ne la garde pas.
+        if (!t) return null;
+        type = 'orders_' + decodeURIComponent(t[1]);
       }
       return { type, id: m[1] || null };
     }
