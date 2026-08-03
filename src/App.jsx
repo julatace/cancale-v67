@@ -4678,17 +4678,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           </button>
         ))}
       </div>
-      
-      {/* Recherche */}
-      <div style={{display:'flex',gap:6,alignItems:'center'}}>
-        <Input value={searchInput}
-          onChange={e=>setSearchInput(e.target.value)}
-          onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="🔍 N° paire, date de vente, acheteur, n° facture..."
-          style={{flex:1,minWidth:120}}/>
-        <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
-        {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
-      </div>
+      {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
+          identique, faisait doublon.) */}
       {search.trim()&&<div style={{fontSize:11,color:C.warn,marginTop:6}}>🔍 Recherche active dans toutes les factures.</div>}
       
       {/* Tableau factures */}
@@ -8100,7 +8091,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const spot = garageSpotOf(num); const atG = inGarage(num) || !!spot;
     steps.push({ icon:'🏠', label: atG?'Rangée au garage':'Pas encore rangée', detail: spot?`${spot.room} · ${spot.kind}`:(atG?'':'à ranger'), done:atG });
     // 4) En ligne
-    if (it) { const age = listedAgeDays(it); steps.push({ icon:'🟢', label:'En ligne', detail:[it.price!=null?`${it.price} ${cur(it.currency)}`:null, age!=null?`depuis ${age} j`:null, it.views!=null?`👁 ${it.views}`:null, it.favourites!=null?`❤️ ${it.favourites}`:null].filter(Boolean).join(' · '), done:true }); }
+    if (it) { const age = listedAgeDays(it); steps.push({ icon:'🟢', label:'En ligne', detail:[prix(it.price,it.currency)||null, age!=null?`depuis ${age} j`:null, it.views!=null?`👁 ${it.views}`:null, it.favourites!=null?`❤️ ${it.favourites}`:null].filter(Boolean).join(' · '), done:true }); }
     // 5) Vente
     const sold = (sales.items||[]).find(o=>{ const ee=effEntry(o); return ee && num && String(ee.numero)===String(num); });
     if (sold) { const st=classifyOrderStatus(sold.status); const sp=sold.price?.amount!=null?Number(sold.price.amount):null; steps.push({ icon: st==='cancelled'?'✖️':'💸', label: st==='cancelled'?'Vente annulée':(st==='completed'?'Vendue':'Vente en cours'), detail:[sp!=null?`${sp.toFixed(0)} €`:null, sold.date?`le ${new Date(sold.date).toLocaleDateString('fr-FR')}`:null].filter(Boolean).join(' '), done:st==='completed' }); }
@@ -10685,6 +10676,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // « 15 038 € » (espace fine des milliers), lisible et jamais tronqué.
   const fmtE0 = (n)=> (n==null?'—':Math.round(Number(n)).toLocaleString('fr-FR')+' €');
   const cur = (c)=> c==='EUR'?'€':(c||'');
+  // Prix Vinted formaté proprement : l'API renvoie « 88.0 » / « 95.0 » (chaîne),
+  // qui s'affichait tel quel (« 88.0 € »). On formate en français sans zéro
+  // inutile : « 88 € », « 158,99 € ».
+  const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{maximumFractionDigits:2})} ${cur(c)}`;
 
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
@@ -12239,7 +12234,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </a>
                 <div style={{padding:'8px 10px 6px'}}>
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}>
-                    <div style={{fontSize:17,fontWeight:700,color:C.text}}>{it.price!=null?`${it.price} ${cur(it.currency)}`:''}</div>
+                    <div style={{fontSize:17,fontWeight:700,color:C.text}}>{prix(it.price,it.currency)}</div>
                     {(()=>{
                       // Marge potentielle = prix en ligne − prix d'achat − boost.
                       // Le prix d'achat vient du champ ci-dessous, sinon du mémo par N°.
@@ -12359,7 +12354,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {r.hasDraft && <span title="Une nouvelle version est prête" style={{fontSize:10.5,fontWeight:600,color:INV_STATUS.online.color,background:INV_STATUS.online.color+'18',borderRadius:8,padding:'1px 7px'}}>✍️ v2 prête{r.draftScore!=null?` · ${r.draftScore}/100`:''}</span>}
                       </div>
                       <div style={{fontSize:13,fontWeight:600,color:C.text,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'(sans titre)'}</div>
-                      <div style={{fontSize:11.5,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.price!=null?`${it.price} ${cur(it.currency)}`:null,it.brand,it.size].filter(Boolean).join(' · ')}</div>
+                      <div style={{fontSize:11.5,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[prix(it.price,it.currency)||null,it.brand,it.size].filter(Boolean).join(' · ')}</div>
                       {r.problems.length>0 && (
                         <div style={{marginTop:6,display:'flex',flexWrap:'wrap',gap:5}}>
                           {r.problems.slice(0,4).map((p,i)=>(<span key={i} style={{fontSize:10.5,fontWeight:500,color:C.danger,background:C.danger+'12',borderRadius:8,padding:'1px 7px'}}>{p}</span>))}
@@ -12416,10 +12411,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const total  = (convs.items||[]).filter(c=>!acctOffOf(c)).length;
           const inboxUrl = 'https://www.vinted.fr/inbox';
           return (
-            <div style={{border:`1px solid ${nonLus?C.accent:C.border}`,background:nonLus?`${C.accent}0e`:C.card,borderRadius:16,padding:'16px 16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:13}}>
-              <span style={{fontSize:26}}>{nonLus?'✉️':'📭'}</span>
-              <div style={{flex:'1 1 140px',minWidth:0}}>
-                <div style={{fontSize:16,fontWeight:700,color:nonLus?C.accent:C.text,lineHeight:1.2}}>
+            <div style={{border:`1px solid ${nonLus?C.accent:C.border}`,background:nonLus?`${C.accent}0e`:C.card,borderRadius:16,padding:'16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+              <span style={{fontSize:26,flexShrink:0}}>{nonLus?'✉️':'📭'}</span>
+              <div style={{flex:'1 1 165px',minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:nonLus?C.accent:C.text,lineHeight:1.2}}>
                   {nonLus>0 ? `${nonLus} nouveau${nonLus>1?'x':''} message${nonLus>1?'s':''}` : 'Aucun nouveau message'}
                 </div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>
@@ -12427,7 +12422,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </div>
               <a href={inboxUrl} target="_blank" rel="noreferrer"
-                style={{flexShrink:0,textDecoration:'none',border:'none',borderRadius:12,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
+                style={{flex:'1 1 130px',textAlign:'center',textDecoration:'none',border:'none',borderRadius:12,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
                 {nonLus>0?'Répondre sur Vinted':'Ouvrir Vinted'}
               </a>
             </div>
@@ -13676,7 +13671,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   style={{display:'flex',gap:10,alignItems:'center',border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?`${C.accent}0e`:C.card,borderRadius:10,padding:'7px 9px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:20,height:20,borderRadius:6,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{sel?'✓':''}</div>
                   <div style={{width:38,height:38,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}</div>
-                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:11,color:C.muted}}>{[it.size,it.price!=null?`${it.price} ${cur(it.currency)}`:null].filter(Boolean).join(' · ')}</div></div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:11,color:C.muted}}>{[it.size,prix(it.price,it.currency)||null].filter(Boolean).join(' · ')}</div></div>
                   {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')} €</div>}
                 </button>
                 );
