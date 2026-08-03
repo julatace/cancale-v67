@@ -706,3 +706,21 @@ Trois corrections **sur cette carte uniquement** :
 Vérifié en capture à 320 px / zoom Grand : les trois lignes se coupent proprement, le code reste lisible en 22 px.
 
 ⚠️ **Le compteur « textes qui débordent » du banc est trompeur** : `scrollWidth > clientWidth` est **exactement** ce que produit un `text-overflow:ellipsis` volontaire. Il sert à LOCALISER les candidats, pas à valider — **toujours regarder la capture d'écran** avant de conclure.
+
+---
+
+## 26. Session août 2026 (suite) — ⚠️ UN PLANTAGE QUE J'AVAIS LIVRÉ, et la leçon
+
+**`reel is not defined`** : en v63/01, mon édition de la carte « Argent en route » a posé le texte utilisant `reel` mais **la déclaration `const reel = …` n'a jamais été écrite** (le script d'édition a échoué son assertion et s'est arrêté après avoir déjà appliqué une partie). L'app **plantait à l'écran Ventes dès qu'il y a des ventes en cours**.
+
+**Pourquoi le test ne l'a pas vu** : mon test de fumée tourne **sans données** — or la carte retourne `null` quand il n'y a aucune vente en cours. Elle n'était donc jamais rendue.
+
+➡️ **Un test de fumée à vide ne prouve rien sur les écrans conditionnels.** Tout changement dans un bloc `{(()=>{ … })()}` doit être vérifié **au banc avec les vraies données** (section 20), pas seulement au build ni sur une app vide.
+
+### Débordements corrigés (carte par carte, méthode validée)
+- **Carte « colis à retirer »** (section 24) : `flexWrap` sur la rangée, `flex:'1 1 150px'` sur le bloc texte, `nowrap+ellipsis` sur la 3ᵉ ligne.
+- **Pastilles des lignes de vente** : elles n'avaient pas `flexShrink:0`, donc elles étaient **écrasées à 0 px** au lieu de passer à la ligne (la rangée a pourtant `flexWrap`). 6 pastilles corrigées (date, étape de vente, garage, litiges).
+- **`StatBox`** : un montant se coupait au milieu (« 1593,3 » puis « 0 € »). La valeur passe en `whiteSpace:nowrap` + `clamp(15px, 5.2vw, 20px)` : elle rétrécit un peu plutôt que de se casser en deux.
+
+### Reste à faire (mesuré, pas corrigé)
+La **ligne de vente elle-même** se chevauche encore à 320 px en zoom Grand (le prix passe par-dessus « achat ? »). Même méthode : `flexShrink:0` sur ce qui ne doit pas rétrécir, largeur plancher sur le bloc texte, vérification en capture.
