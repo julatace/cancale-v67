@@ -757,11 +757,25 @@ const save = (k,v) => {
 // serverless "/api/vinted-proxy" (necessaire pour contourner le CORS).
 const fetchVintedAccounts = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
-      headers: sbAuth(),
-    });
+    const [res, blk] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() }),
+    ]);
     if (!res.ok) return [];
-    return await res.json();
+    let list = await res.json();
+    // ⚠️ COMPTES SUPPRIMÉS DÉFINITIVEMENT (liste vrm_blocked_accounts) : ils ne
+    // doivent JAMAIS réapparaître, même si l'extension les re-capte tant qu'ils
+    // sont connectés dans Chrome (cas shop_cancale, qui « revenait tout le
+    // temps »). On les retire ici ET on supprime la ligne re-créée dans la table
+    // (best-effort) pour que ça reste propre à chaque chargement.
+    let blocked = new Set();
+    try { const b = blk.ok ? await blk.json() : []; ((b[0] && b[0].data && b[0].data.uids) || []).forEach(u => blocked.add(String(u))); } catch (_) {}
+    if (blocked.size) {
+      const reappeared = list.filter(a => blocked.has(String(a.vinted_user_id)));
+      list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
+      reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
+    }
+    return list;
   } catch (_) { return []; }
 };
 

@@ -166,6 +166,22 @@ async function activeAccountId(domain) {
   return p && p.account_id ? String(p.account_id) : null;
 }
 
+// ⚠️ COMPTES SUPPRIMÉS DÉFINITIVEMENT (liste vrm_blocked_accounts en base).
+// Tant qu'un compte reste connecté dans Chrome, l'extension le re-capte à
+// chaque cycle → il « revenait tout le temps » (cas shop_cancale). On lit donc
+// cette liste et on NE capte JAMAIS un compte bloqué (et on nettoie sa ligne).
+let _blockedAccts = null, _blockedAt = 0;
+async function blockedAccounts() {
+  if (_blockedAccts && Date.now() - _blockedAt < 300000) return _blockedAccts;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: await sbHeaders() });
+    const rows = res.ok ? await res.json() : [];
+    _blockedAccts = new Set((((rows[0] && rows[0].data && rows[0].data.uids) || [])).map(String));
+    _blockedAt = Date.now();
+  } catch (_) { if (!_blockedAccts) _blockedAccts = new Set(); }
+  return _blockedAccts;
+}
+
 async function captureDomain(domain) {
   const access = await getCookie(domain, 'access_token_web');
   if (!access) return null;
@@ -174,6 +190,12 @@ async function captureDomain(domain) {
   const payload = jwtPayload(access);
   const uid = payload && payload.account_id ? String(payload.account_id) : null;
   if (!uid) return null;
+  // Compte supprimé définitivement : on ne le re-capte pas et on efface une
+  // éventuelle ligne restante, puis on s'arrête là.
+  if ((await blockedAccounts()).has(uid)) {
+    try { await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, { method: 'DELETE', headers: await sbHeaders() }); } catch (_) {}
+    return null;
+  }
   const row = {
     vinted_user_id: uid,
     domain,
