@@ -805,3 +805,21 @@ Découvert en rendu réel : l'écran **Messages** (et potentiellement Annonces/V
 ➡️ **On ne jette plus une moisson datée.** `fetchHarvest` / `fetchHarvestOrders` ont leur défaut passé de `HARVEST_MAX_AGE_MS` à `0` (pas d'expiration). Une donnée un peu vieille **s'affiche** (mieux qu'une erreur), la fraîcheur reste connue (`_harvestSeen`, popup, badge) et **« Synchroniser »** (`opts.force`) rafraîchit. Un appelant qui exigerait de la fraîcheur peut encore passer `opts.maxAgeMs` explicitement. Constante `HARVEST_MAX_AGE_MS` supprimée.
 
 Vérifié : Messages passe de « Impossible de charger » à 29 conversations affichées (pseudo, article, prix, compte), **zéro appel proxy**.
+
+---
+
+## 30. Session août 2026 (suite) — Messages = juste « il y a du nouveau »
+
+Demande de Julien : « améliore, limite enlève les messages, tu mets juste qu'il y en a de nouveaux mais c'est tout ».
+
+L'onglet Messages **ne déroule plus la liste des conversations**. À la place, une **seule carte de résumé** (`curSub==='messages'`, ~ligne 12139) :
+- `nonLus` = conversations non lues de comptes actifs (`!acctOffOf(c) && c.unread`) → titre « X nouveaux messages » / « Aucun nouveau message » ;
+- `total` = conversations en tout → sous-titre « X conversations en tout » ;
+- un lien **« Répondre sur Vinted »** (`https://www.vinted.fr/inbox`, `target=_blank`) — répondre depuis l'app reste impossible (section 5).
+- La section **⚡ Réponses rapides** (modèles copiables) est **conservée** au-dessus.
+
+Le sous-titre du `ScreenHead` est passé de « Les conversations… en lecture » à « On te dit juste s'il y a du nouveau ».
+
+⚠️ **`msgAcc` (sélecteur de compte) et `openConversation` (modale de lecture) ne sont plus appelés** par cet onglet — laissés en place (aucune erreur, la modale `openConversation` sert peut-être ailleurs) mais l'onglet ne s'en sert plus. Le calcul du delta de notification (`vintedNotif`, bandeau d'ouverture) est indépendant et **inchangé** : il lit toujours la moisson des conversations, pas cet écran.
+
+Vérifié en rendu réel (banc section 20, écran 400 px) : « 36 nouveaux messages / 213 conversations en tout » + bouton, réponses rapides au-dessus, **zéro erreur de page**. `BUILD_ID = v68/00`.

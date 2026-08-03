@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v67/00 · données datées OK';
+const BUILD_ID = 'v68/00 · messages = juste le nouveau';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -12115,7 +12115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
-        <ScreenHead icon="chat" title="Messages" desc="Les conversations de tes comptes Vinted, en lecture. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
+        <ScreenHead icon="chat" title="Messages" desc="On te dit juste s'il y a du nouveau. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
         <NoAcc/>
         {/* Réponses rapides : modèles copiables en 1 clic (répondre se fait sur Vinted). */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
@@ -12139,49 +12139,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6}}>Clique un message pour le <b>copier</b>, puis colle-le dans la conversation Vinted.</div>
         </div>
-        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-          <button onClick={()=>setMsgAcc('all')} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc==='all'?C.accent:C.border}`,background:msgAcc==='all'?C.accent:'transparent',color:msgAcc==='all'?'#fff':C.text,fontSize:12,fontWeight:500,cursor:'pointer'}}>Tous</button>
-          {accounts.map(acc=>(
-            <button key={acc.vinted_user_id} onClick={()=>setMsgAcc(acc.vinted_user_id)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${msgAcc===acc.vinted_user_id?acctColor(acc.vinted_user_id):C.border}`,background:msgAcc===acc.vinted_user_id?acctColor(acc.vinted_user_id):'transparent',color:msgAcc===acc.vinted_user_id?'#fff':C.text,fontSize:12,fontWeight:500,cursor:'pointer'}}>{accNameOf(acc)}</button>
-          ))}
-        </div>
-        {convs.loading && <Skeleton variant="row" count={5}/>}
+        {/* ── RÉSUMÉ, PAS LA LISTE ──────────────────────────────────────────
+            Julien : « enlève les messages, mets juste qu'il y en a de nouveaux ».
+            On ne déroule plus toutes les conversations : une seule carte dit
+            combien de messages non lus, et un bouton emmène répondre sur Vinted
+            (répondre depuis l'app n'est pas possible, cf. section 5). */}
+        {convs.loading && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
-        {(() => {
-          const daysSince = (d)=>{ if(!d) return null; const t=new Date(d); if(isNaN(t)) return null; return Math.floor((Date.now()-t.getTime())/86400000); };
-          // Bandeau « acheteurs en attente » retiré à la demande de Julien (inutile) :
-          // on liste simplement toutes les conversations du compte sélectionné.
-          // Un compte masqué/bloqué ne montre plus ses conversations (cohérence
-          // avec Ventes/Achats/Annonces : un compte déconnecté disparaît partout).
-          const shown = (convs.items||[]).filter(c=>!acctOffOf(c)).filter(c=>msgAcc==='all'||c._acc.vinted_user_id===msgAcc);
-          return (<>
-            {convs.items && !convs.error && shown.length===0 && (
-              <EmptyState icon="💬" title="Aucune conversation"
-                desc="Les échanges avec tes acheteurs s'affichent ici dès que l'extension les a captés."/>
-            )}
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {shown.map((conv,i)=>{
-                const photo = conv.opposite_user?.photo?.url || conv.item_photos?.[0]?.url;
-                const age = conv.unread ? daysSince(conv.updated_at) : null;
-                return (
-                  // Conversation : photo ronde (c'est une personne, pas un objet),
-                  // pseudo mis en avant et carte alignée sur le reste de l'app.
-                  <button key={(conv.id||i)+'_'+conv._acc.vinted_user_id} type="button" onClick={()=>openConversation(conv)} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 12px',borderRadius:16,border:`1px solid ${conv.unread?(C.warn+'88'):C.border}`,background:conv.unread?`${C.warn}0c`:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',fontFamily:'inherit'}}>
-                    {photo?<img src={photo} alt="" style={{width:46,height:46,borderRadius:999,objectFit:'cover',flexShrink:0}}/>:<div style={{width:46,height:46,borderRadius:999,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:20}}>💬</div>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}}>{conv.opposite_user?.login||'Conversation'}</div>
-                      <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>{conv.description||''}</div>
-                      <div style={{marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><AcctTag acc={conv._acc} name={accNameOf(conv._acc)}/>{conv.unread && <span style={{fontSize:11,color:C.warn,fontWeight:600}}>⏳ à répondre{age!=null&&age>=1?` · ${age}j`:''}</span>}</div>
-                    </div>
-                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
-                      <span style={{fontSize:11,color:C.muted}}>{conv.updated_at?new Date(conv.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
-                      {conv.unread && <span style={{width:9,height:9,borderRadius:999,background:C.warn}}/>}
-                    </div>
-                  </button>
-                );
-              })}
+        {convs.items && !convs.error && (()=>{
+          const nonLus = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
+          const total  = (convs.items||[]).filter(c=>!acctOffOf(c)).length;
+          const inboxUrl = 'https://www.vinted.fr/inbox';
+          return (
+            <div style={{border:`1px solid ${nonLus?C.accent:C.border}`,background:nonLus?`${C.accent}0e`:C.card,borderRadius:16,padding:'16px 16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:13}}>
+              <span style={{fontSize:26}}>{nonLus?'✉️':'📭'}</span>
+              <div style={{flex:'1 1 140px',minWidth:0}}>
+                <div style={{fontSize:16,fontWeight:700,color:nonLus?C.accent:C.text,lineHeight:1.2}}>
+                  {nonLus>0 ? `${nonLus} nouveau${nonLus>1?'x':''} message${nonLus>1?'s':''}` : 'Aucun nouveau message'}
+                </div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+                  {total>0 ? `${total} conversation${total>1?'s':''} en tout` : 'Tes échanges apparaîtront ici'}
+                </div>
+              </div>
+              <a href={inboxUrl} target="_blank" rel="noreferrer"
+                style={{flexShrink:0,textDecoration:'none',border:'none',borderRadius:12,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
+                {nonLus>0?'Répondre sur Vinted':'Ouvrir Vinted'}
+              </a>
             </div>
-          </>);
+          );
         })()}
       </>)}
 
