@@ -73,7 +73,15 @@
         // produirait une ligne ambigue que l'app ne peut pas departager (elle
         // affichait alors des achats dans les ventes). On ne la garde pas.
         if (!t) return null;
-        type = 'orders_' + decodeURIComponent(t[1]);
+        const raw = decodeURIComponent(t[1]).toLowerCase();
+        // ⚠️ On NE range QUE les deux clefs canoniques : orders_sold (ventes) et
+        // orders_purchased (achats). Le param ?type=bought renvoie chez certains
+        // comptes les VENTES (verifie en base) : rangee en "orders_bought", cette
+        // ligne faisait afficher des ventes dans les achats. On l'ignore, ainsi
+        // que tout autre type inconnu.
+        if (/sold|sell/.test(raw)) type = 'orders_sold';
+        else if (raw === 'purchased' || raw === 'purchases') type = 'orders_purchased';
+        else return null;
       }
       return { type, id: m[1] || null };
     }
@@ -331,8 +339,10 @@
         }
         try { localStorage.setItem(CK, String((cur + BATCH) % wardrobeIds.length)); } catch (_) {}
       }
-      // 3) ventes + achats.
-      for (const t of ['sold', 'bought']) {
+      // 3) ventes + achats. ⚠️ « purchased » et PAS « bought » : ?type=bought
+      // renvoie chez certains comptes les ventes (verifie en base), ce qui
+      // faisait afficher des ventes dans les achats.
+      for (const t of ['sold', 'purchased']) {
         await new Promise(r => setTimeout(r, jitter(600, 1500)));
         const o = await apiGet(`/api/v2/my_orders?type=${t}&page=1&per_page=100`);
         if (o) sendHarvest(`/api/v2/my_orders?type=${t}`, o);

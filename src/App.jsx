@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v70/00 · achats = Vinted only, shop_cancale supprimé';
+const BUILD_ID = 'v71/00 · fix ventes-dans-achats (orders_bought)';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1382,18 +1382,23 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
   const rows = await cachedRow(`o:${uid}`, () => fetchHarvestOrdersBrut(uid));
   if (!rows) return null;
   const wantSold = /sold|sell/i.test(String(side || ''));
+  // ⚠️ On lit UNIQUEMENT la clé canonique `orders_sold` ou `orders_purchased`
+  // — JAMAIS `orders_bought`. Vérifié en base : l'extension crée parfois une
+  // ligne `orders_bought` dont le CONTENU est en réalité tes VENTES (bug de
+  // capture). L'ancien code l'acceptait comme « achats » (regex bought|buy) et,
+  // comme elle passe avant `orders_purchased`, elle affichait TES VENTES DANS
+  // LES ACHATS (bug signalé par Julien, capture d'écran à l'appui). Tous les
+  // comptes ont bien `orders_purchased` + `orders_sold`, donc n'ignorer que
+  // `orders_bought` ne vide rien.
+  const targetId = `harvest_${uid}_orders_${wantSold ? 'sold' : 'purchased'}`;
   for (const r of rows) {
-    const key = String(r.id).replace(`harvest_${uid}_orders_`, '');
-    const isSold = /sold|sell/i.test(key);
-    const isBought = /bought|buy|purchas/i.test(key);
-    if ((wantSold && isSold) || (!wantSold && isBought)) {
-      const ts = harvestTs(r);
-      if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
-      // Même principe : une moisson datée s'affiche au lieu de disparaître.
-      const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
-      if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
-      return r.data?.payload || null;
-    }
+    if (String(r.id) !== targetId) continue;
+    const ts = harvestTs(r);
+    if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
+    // Même principe : une moisson datée s'affiche au lieu de disparaître.
+    const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
+    if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
+    return r.data?.payload || null;
   }
   return null;
 };
