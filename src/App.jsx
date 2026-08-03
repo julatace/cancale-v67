@@ -9554,9 +9554,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       noteAcctLive(acc.vinted_user_id, res, force);
       return { acc, res };
     }));
+    // ⚠️ TRANSFERTS ENTRE TES PROPRES COMPTES (vérifié en base) : tu vends une
+    // paire depuis un compte et tu la rachètes avec un autre. Vinted la compte
+    // comme un ACHAT, mais c'est TA paire (elle porte ton numéro « nXXXX » et/ou
+    // la même transaction apparaît dans tes ventes) — ce n'est pas un vrai achat.
+    // Pour les ACHATS, on écarte donc : (a) une commande dont la transaction est
+    // AUSSI une de tes ventes, (b) une commande dont le titre porte TON numéro.
+    const soldTxns = type === 'purchased'
+      ? new Set((sales.items || []).map(o => String(o.transaction_id)))
+      : null;
+    const porteMonNumero = (t) => /\bn\s?\d{3,4}\b/i.test(String(t || ''));
     const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
     for (const { acc, res } of results) {
-      if (res.ok) { anyOk=true; for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } } }
+      if (res.ok) { anyOk=true; for (const o of res.items) {
+        const id = String(o.transaction_id);
+        if (seen.has(id)) continue;
+        if (type === 'purchased' && (soldTxns.has(id) || porteMonNumero(o.title))) continue; // transfert entre tes comptes, pas un achat
+        seen.add(id); out.push({ ...o, _acc: acc });
+      } }
       else { anyErr=true; failed.push(accNameOf(acc)); }
     }
     // ⚠️ SOURCE UNIQUE = VINTED VIA L'EXTENSION (choix de Julien, août 2026).
