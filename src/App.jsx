@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v68/00 · messages = juste le nouveau';
+const BUILD_ID = 'v69/00 · atelier de republication + IA';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -533,6 +533,10 @@ const SYNC_KEYS = [
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
+  // Atelier de republication : brouillons de nouvelles versions d'annonces
+  // (titre/description/prix préparés, avec l'historique des versions). Synchronisé
+  // pour retrouver son travail sur un autre appareil.
+  'vinted_annonce_drafts',
   // Dérivé (annonces vendues d'après les emails) : partagé pour que le tableau
   // de bord compte exactement comme l'onglet Annonces, même sur un autre appareil.
   'vinted_annonces_email_sold',
@@ -2481,6 +2485,8 @@ const ICON_PATHS = {
   trash:  <><path d="M4.5 6.5h15"/><path d="M9.5 6.5V4.8a1.3 1.3 0 0 1 1.3-1.3h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7"/><path d="M6.5 6.5 7.4 19a1.6 1.6 0 0 0 1.6 1.5h6a1.6 1.6 0 0 0 1.6-1.5l.9-12.5"/><path d="M10.5 10v6.5M13.5 10v6.5"/></>,
   close:  <><path d="m6 6 12 12M18 6 6 18"/></>,
   pencil: <><path d="M4 20.2h4l10-10a2.8 2.8 0 0 0-4-4l-10 10v4Z"/><path d="m14.5 5.5 4 4"/></>,
+  // Atelier de republication (« ✨ ») : une étincelle + une petite touche.
+  spark:  <><path d="M12 3.2 13.7 9l5.8 1.7L13.7 12.4 12 18.2l-1.7-5.8L4.5 10.7 10.3 9 12 3.2Z"/><path d="M18.5 4v3M20 5.5h-3"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
 // trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
@@ -2509,6 +2515,7 @@ const BOTTOM_TABS=[
   {id:'journee',      icon:'sun',     emoji:'☀️',label:'Ma journée'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Stats'},
   {id:'cat_annonces', icon:'tag',     emoji:'🟢',label:'Annonces'},
+  {id:'cat_repub',    icon:'spark',   emoji:'✨',label:'Republier'},
   {id:'cat_ventes',   icon:'cash',    emoji:'💸',label:'Ventes'},
   {id:'cat_achats',   icon:'bag',     emoji:'🛍️',label:'Achats'},
   {id:'cat_bord',     icon:'doc',     emoji:'📄',label:'Bordereaux'},
@@ -8036,6 +8043,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [linkPickFor, setLinkPickFor] = useState(null); // bordereau en cours de liaison manuelle
   const [linkSearch, setLinkSearch] = useState('');
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
+  // ── Atelier de republication ──────────────────────────────────────────────
+  // Brouillons de nouvelles versions d'annonces : clé = id d'annonce wardrobe,
+  // valeur = { title, desc, price, versions:[{title,desc,price,at,scoreBefore,scoreAfter}], updatedAt }.
+  const [drafts, setDrafts] = useState(() => load('vinted_annonce_drafts', {}));
+  const [repubEdit, setRepubEdit] = useState(null);   // { it } → modale d'édition d'une nouvelle version
+  const [repubForm, setRepubForm] = useState(null);   // { title, desc, price } en cours d'édition
+  const [repubAi, setRepubAi] = useState({ busy:false, why:'', reason:'' }); // état de la rédaction IA
+  const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
+  const saveDrafts = (updater) => setDrafts(prev => { const next = typeof updater==='function' ? updater(prev) : updater; save('vinted_annonce_drafts', next); return next; });
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [renumOpen, setRenumOpen] = useState(false); // modale « Renuméroter à la suite »
   const [dispOpen, setDispOpen] = useState(false);   // panneau « annonces disparues sans vente »
@@ -9349,6 +9365,145 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros]);
 
+  // ── ATELIER DE REPUBLICATION ────────────────────────────────────────────────
+  // Prix « du marché » pour une paire : la médiane des annonces EN LIGNE de même
+  // marque + même taille (au moins 2 pour être crédible), sinon null. Sert à
+  // dire « ton prix est au-dessus/en-dessous des paires comparables ». C'est du
+  // RÉEL (tes propres annonces), pas une estimation inventée d'un marché externe.
+  const peerPrice = (it) => {
+    if (!it.brand) return null;
+    const bs = (it.brand || '').toLowerCase(), sz = (it.size || '');
+    const peers = annBase
+      .filter(o => o.id !== it.id && o.price != null && (o.brand || '').toLowerCase() === bs && (o.size || '') === sz)
+      .map(o => Number(o.price)).filter(v => v > 0).sort((a, b) => a - b);
+    if (peers.length < 2) return null;
+    return peers[Math.floor(peers.length / 2)];
+  };
+
+  // Note d'annonce sur 100 — 100 % CALCULÉE, jamais inventée. On PART de 100 et
+  // on retire des points pour chaque défaut RÉELLEMENT constaté (champ présent) :
+  // titre pauvre, fiche incomplète, paire qui dort, engagement faible. Un champ
+  // absent (Vinted ne le donne pas) ne retire jamais de points → pas de faux
+  // procès. Renvoie aussi la liste des problèmes et des conseils concrets.
+  const scoreAnnonce = (it, override) => {
+    const title = String((override && override.title != null ? override.title : it.title) || '');
+    const price = (override && override.price != null && override.price !== '') ? Number(override.price) : (it.price != null ? Number(it.price) : null);
+    // Description : on ne connaît PAS le texte actuel de l'annonce (l'extension ne
+    // garde que sa longueur, descLen). Donc tant que Julien n'a pas TAPÉ une
+    // description dans le brouillon, on garde la longueur d'origine — sinon la
+    // « nouvelle version » démarrerait toujours pénalisée « pas de description »
+    // et paraîtrait pire que l'actuelle, ce qui est faux et décourageant.
+    const descLen = (override && override.desc != null && String(override.desc).trim().length > 0) ? String(override.desc).trim().length : it.descLen;
+    const words = title.trim().split(/\s+/).filter(Boolean);
+    const age = listedAgeDays(it);
+    const views = it.views, favs = it.favourites;
+    const problems = [], advice = [];
+    let score = 100;
+    // — Titre (jusqu'à −34) : c'est ce que l'acheteur lit en premier.
+    if (words.length < 3) { score -= 20; problems.push('titre très court'); advice.push('Titre = marque + modèle + taille + état'); }
+    else if (words.length < 5) { score -= 9; advice.push('Enrichis le titre (modèle, coloris, état)'); }
+    if (it.brand && !new RegExp('\\b' + (it.brand.split(/\s+/)[0] || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(title)) { score -= 6; advice.push(`Mets « ${it.brand} » dans le titre`); }
+    if (!/(\b3\d\b|\b4\d\b|\bt\.?\s?\d|taille|pointure)/i.test(title) && !it.size) { score -= 5; problems.push('taille absente du titre'); advice.push('Ajoute la taille dans le titre'); }
+    if (!/(neuf|comme neuf|très bon|tres bon|bon état|bon etat|excellent|tbe|bon)/i.test(title)) { score -= 3; advice.push("Précise l'état dans le titre"); }
+    // — Fiche (jusqu'à −29) : ce qui rassure et fait cliquer « acheter ».
+    if (it.photoCount != null && it.photoCount < 3) { score -= (it.photoCount <= 1 ? 15 : 8); problems.push(it.photoCount <= 1 ? '1 seule photo' : `${it.photoCount} photos`); advice.push('Ajoute des photos (semelle, étiquette, défauts)'); }
+    if (!it.brand) { score -= 5; problems.push('marque manquante'); }
+    if (!it.size) { score -= 5; problems.push('taille manquante'); }
+    if (descLen != null && descLen < 20) { score -= (descLen === 0 ? 11 : 6); problems.push(descLen === 0 ? 'pas de description' : 'description courte'); advice.push("Décris l'état, la matière, la pointure"); }
+    // — Âge / engagement (jusqu'à −37) : la seule preuve que l'annonce « marche ».
+    if (age != null) {
+      if (age >= 90) { score -= 22; problems.push(`en ligne depuis ${age} j`); advice.push('Republie : elle repart en tête de liste'); }
+      else if (age >= 60) { score -= 15; problems.push(`dort depuis ${age} j`); advice.push('Republie ou baisse le prix'); }
+      else if (age >= 30) { score -= 8; problems.push(`dort depuis ${age} j`); }
+    }
+    if (views != null) {
+      if (views >= 30 && (favs ?? 0) === 0) { score -= 11; problems.push(`${views} vues, 0 favori`); advice.push('Beaucoup vue mais 0 favori → baisse le prix ou refais la 1ʳᵉ photo'); }
+      else if (views >= 60 && favs != null && views > 0 && favs / views < 0.03) { score -= 6; problems.push(`${views} vues pour ${favs} ❤️`); }
+      else if (views < 5 && age != null && age >= 14) { score -= 6; problems.push('très peu vue'); advice.push('Republie pour lui redonner de la visibilité'); }
+    }
+    // Prix vs paires comparables (info, petit poids) :
+    const peer = peerPrice(it);
+    if (peer != null && price != null && price > peer * 1.25) { score -= 5; problems.push(`prix > paires similaires (~${peer} €)`); advice.push(`Aligne-toi vers ${peer} €`); }
+    score = Math.max(1, Math.min(100, Math.round(score)));
+    const cls = score >= 80 ? 'top' : score >= 55 ? 'mid' : 'low';
+    return { score, cls, problems, advice, peer, age };
+  };
+
+  // La liste de l'atelier : chaque annonce en ligne avec sa note, triée du plus
+  // gros POTENTIEL D'AMÉLIORATION au plus faible (les pires d'abord = le plus à
+  // gagner). C'est « voici les annonces qui ont le plus gros potentiel ».
+  const repubList = useMemo(() => {
+    const out = annBase.map(it => {
+      const sc = scoreAnnonce(it);
+      const d = drafts[it.id];
+      const draftScore = d ? scoreAnnonce(it, { title: d.title, desc: d.desc, price: d.price }).score : null;
+      return { it, ...sc, hasDraft: !!d, draftScore, gain: 100 - sc.score };
+    });
+    out.sort((a, b) => a.score - b.score || (b.it.price ?? 0) - (a.it.price ?? 0));
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, numeros, drafts, listingDates]);
+
+  const repubStats = useMemo(() => {
+    const n = repubList.length;
+    const avg = n ? Math.round(repubList.reduce((s, r) => s + r.score, 0) / n) : 0;
+    const low = repubList.filter(r => r.cls === 'low').length;
+    const mid = repubList.filter(r => r.cls === 'mid').length;
+    const top = repubList.filter(r => r.cls === 'top').length;
+    return { n, avg, low, mid, top };
+  }, [repubList]);
+
+  // Ouvre l'éditeur de nouvelle version pour une annonce. Pré-remplit avec le
+  // brouillon existant s'il y en a un, sinon avec l'annonce actuelle.
+  const openRepub = (it) => {
+    const d = drafts[it.id];
+    setRepubForm(d ? { title: d.title || '', desc: d.desc || '', price: d.price != null ? String(d.price) : (it.price != null ? String(it.price) : '') }
+                   : { title: it.title || '', desc: '', price: it.price != null ? String(it.price) : '' });
+    setRepubAi({ busy: false, why: '', reason: '' });
+    setRepubEdit({ it });
+  };
+
+  // Demande à l'IA de réécrire titre + description. Sans clé branchée, l'app le
+  // dit et garde ce que tu as tapé (on ne fabrique rien). La clé perso éventuelle
+  // (Réglages) est envoyée depuis ton appareil, jamais stockée sur le serveur.
+  const aiRewrite = async () => {
+    if (!repubEdit) return;
+    const it = repubEdit.it;
+    setRepubAi({ busy: true, why: '', reason: '' });
+    try {
+      const key = load('vrm_ai_key', '') || undefined;
+      const r = await fetch('/api/ai', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: repubForm.title || it.title, brand: it.brand, size: it.size, condition: it.condition, price: repubForm.price || it.price, desc: repubForm.desc, key }),
+      });
+      const j = await r.json();
+      if (j && j.ok) {
+        setRepubForm(f => ({ ...f, title: j.title || f.title, desc: j.desc || f.desc }));
+        setRepubAi({ busy: false, why: j.why || 'Titre et description réécrits.', reason: '' });
+      } else {
+        setRepubAi({ busy: false, why: '', reason: (j && j.reason) || 'error' });
+      }
+    } catch {
+      setRepubAi({ busy: false, why: '', reason: 'network' });
+    }
+  };
+
+  // Enregistre la nouvelle version en brouillon + garde l'historique des versions.
+  const saveRepub = () => {
+    if (!repubEdit) return;
+    const it = repubEdit.it;
+    const before = scoreAnnonce(it).score;
+    const after = scoreAnnonce(it, { title: repubForm.title, desc: repubForm.desc, price: repubForm.price }).score;
+    saveDrafts(prev => {
+      const old = prev[it.id];
+      const versions = (old && old.versions) ? old.versions.slice(-9) : [];
+      versions.push({ title: repubForm.title, desc: repubForm.desc, price: repubForm.price, at: Date.now(), scoreBefore: before, scoreAfter: after });
+      return { ...prev, [it.id]: { title: repubForm.title, desc: repubForm.desc, price: repubForm.price, versions, updatedAt: Date.now() } };
+    });
+    setRepubEdit(null); setRepubForm(null);
+    toast('Nouvelle version enregistrée. Applique-la sur Vinted quand tu veux.');
+  };
+
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
   const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; _persistAcctCache(); };
 
@@ -9556,8 +9711,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!error) putCache('convs', out);
     setConvs({ loading:false, items: out, error });
   };
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if (curSub==='messages' && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
@@ -12113,6 +12268,78 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       </>)}
 
+      {/* ── ATELIER DE REPUBLICATION ─────────────────────────────────────────
+          « Voici les annonces qui ont le plus gros potentiel d'amélioration. »
+          Note calculée par annonce, file de travail par priorité, éditeur de
+          nouvelle version (avec rédaction IA optionnelle) et comparaison de
+          score avant/après. Tout le calcul est RÉEL ; la rédaction IA ne
+          s'allume qu'avec une clé branchée. */}
+      {curSub==='republication' && (<>
+        <ScreenHead icon="spark" title="Atelier de republication" desc="Retravaille tes annonces qui vendent mal : l'app note chacune, te dit quoi améliorer, et prépare une nouvelle version. Tu valides et tu l'appliques sur Vinted."/>
+        <NoAcc/>
+        {listings.loading && <Skeleton variant="card" count={6}/>}
+        {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
+        {listings.items && !listings.error && repubList.length===0 && (
+          <EmptyState icon="✨" title="Aucune annonce à retravailler" desc="Tes annonces en ligne apparaîtront ici avec leur note et des conseils d'amélioration."/>
+        )}
+        {listings.items && !listings.error && repubList.length>0 && (()=>{
+          const CL = { low:{c:C.danger,lbl:'À retravailler'}, mid:{c:C.warn,lbl:'Potentiel élevé'}, top:{c:INV_STATUS.online.color,lbl:'Très performante'} };
+          const shown = repubBucket==='all' ? repubList : repubList.filter(r=>r.cls===repubBucket);
+          return (<>
+            {/* Bandeau de synthèse */}
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+              <div style={{flex:'1 1 120px',minWidth:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'10px 12px',boxShadow:C.shadow||'none'}}>
+                <div style={{fontSize:11,color:C.muted,fontWeight:500}}>Note moyenne</div>
+                <div style={{fontSize:22,fontWeight:700,color:repubStats.avg>=80?INV_STATUS.online.color:repubStats.avg>=55?C.warn:C.danger,whiteSpace:'nowrap'}}>{repubStats.avg}<span style={{fontSize:13,color:C.muted}}>/100</span></div>
+              </div>
+              <div style={{flex:'1 1 120px',minWidth:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'10px 12px',boxShadow:C.shadow||'none'}}>
+                <div style={{fontSize:11,color:C.muted,fontWeight:500}}>À retravailler</div>
+                <div style={{fontSize:22,fontWeight:700,color:repubStats.low?C.danger:C.muted,whiteSpace:'nowrap'}}>{repubStats.low}<span style={{fontSize:13,color:C.muted}}> / {repubStats.n}</span></div>
+              </div>
+            </div>
+            {/* File de travail par priorité */}
+            <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+              {[['all','Toutes',repubStats.n],['low','🔴 Haute',repubStats.low],['mid','🟠 Moyenne',repubStats.mid],['top','🟢 OK',repubStats.top]].map(([k,lbl,n])=>(
+                <button key={k} onClick={()=>setRepubBucket(k)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${repubBucket===k?C.accent:C.border}`,background:repubBucket===k?C.accent:'transparent',color:repubBucket===k?'#fff':C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{lbl} · {n}</button>
+              ))}
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {shown.map(r=>{
+                const it=r.it; const meta=CL[r.cls];
+                const num=(numeros[it.id]||{}).numero||'';
+                return (
+                  <div key={it._acc.vinted_user_id+'_'+it.id} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'11px 12px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                    <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none'}}>
+                      <div style={{width:60,height:76,borderRadius:12,overflow:'hidden',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {it.photo?<img src={it.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:24}}>👟</span>}
+                      </div>
+                    </a>
+                    <div style={{flex:'1 1 150px',minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span title="Note calculée à partir du titre, de la fiche, de l'âge et de l'engagement" style={{flexShrink:0,fontSize:13,fontWeight:700,color:'#fff',background:meta.c,borderRadius:999,padding:'2px 9px',whiteSpace:'nowrap'}}>{r.score}/100</span>
+                        <span style={{fontSize:11,fontWeight:600,color:meta.c}}>{meta.lbl}</span>
+                        {r.hasDraft && <span title="Une nouvelle version est prête" style={{fontSize:10.5,fontWeight:600,color:INV_STATUS.online.color,background:INV_STATUS.online.color+'18',borderRadius:8,padding:'1px 7px'}}>✍️ v2 prête{r.draftScore!=null?` · ${r.draftScore}/100`:''}</span>}
+                      </div>
+                      <div style={{fontSize:13,fontWeight:600,color:C.text,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'(sans titre)'}</div>
+                      <div style={{fontSize:11.5,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.price!=null?`${it.price} ${cur(it.currency)}`:null,it.brand,it.size].filter(Boolean).join(' · ')}</div>
+                      {r.problems.length>0 && (
+                        <div style={{marginTop:6,display:'flex',flexWrap:'wrap',gap:5}}>
+                          {r.problems.slice(0,4).map((p,i)=>(<span key={i} style={{fontSize:10.5,fontWeight:500,color:C.danger,background:C.danger+'12',borderRadius:8,padding:'1px 7px'}}>{p}</span>))}
+                        </div>
+                      )}
+                      {r.problems.length===0 && <div style={{marginTop:6,fontSize:11,color:INV_STATUS.online.color,fontWeight:500}}>✓ Rien à signaler — annonce solide</div>}
+                      <div style={{marginTop:8}}>
+                        <button type="button" onClick={()=>openRepub(it)} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,padding:'7px 13px',cursor:'pointer',fontFamily:'inherit'}}>✍️ {r.hasDraft?'Revoir la version':'Nouvelle version'}</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>);
+        })()}
+      </>)}
+
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" desc="On te dit juste s'il y a du nouveau. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
@@ -13426,6 +13653,95 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
+      {/* ── Éditeur de nouvelle version d'annonce (atelier de republication) ── */}
+      {repubEdit && repubForm && (()=>{
+        const it = repubEdit.it;
+        const before = scoreAnnonce(it);
+        const after = scoreAnnonce(it, { title: repubForm.title, desc: repubForm.desc, price: repubForm.price });
+        const d = drafts[it.id];
+        const versions = (d && d.versions) ? d.versions : [];
+        const gain = after.score - before.score;
+        const aiKey = load('vrm_ai_key', '');
+        const reasonMsg = {
+          'no-key': "L'IA n'est pas encore branchée. Ajoute ta clé dans Réglages → Assistant IA (ou côté Vercel) et la rédaction automatique s'allumera. En attendant, tes suggestions calculées restent affichées.",
+          'api-error': "L'IA a refusé la requête (clé invalide ou quota). Vérifie ta clé dans Réglages.",
+          'parse': "L'IA a répondu, mais dans un format inattendu. Réessaie.",
+          'network': "Connexion à l'IA impossible pour l'instant. Réessaie dans un instant.",
+          'error': "Une erreur est survenue. Réessaie.",
+        };
+        return (
+        <div onClick={()=>{setRepubEdit(null);setRepubForm(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'90vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{width:48,height:60,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {it.photo?<img src={it.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.text}}>✍️ Nouvelle version</div>
+                <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.title||'Annonce'}</div>
+              </div>
+              <button type="button" onClick={()=>{setRepubEdit(null);setRepubForm(null);}} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
+              {/* Comparaison de score avant → après */}
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px',marginBottom:14}}>
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:500}}>Actuelle</div>
+                  <div style={{fontSize:24,fontWeight:700,color:before.score>=80?INV_STATUS.online.color:before.score>=55?C.warn:C.danger}}>{before.score}</div>
+                </div>
+                <span style={{fontSize:20,color:C.muted}}>→</span>
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:500}}>Nouvelle</div>
+                  <div style={{fontSize:24,fontWeight:700,color:after.score>=80?INV_STATUS.online.color:after.score>=55?C.warn:C.danger}}>{after.score}</div>
+                </div>
+                {gain!==0 && <span style={{fontSize:13,fontWeight:700,color:gain>0?INV_STATUS.online.color:C.danger,background:(gain>0?INV_STATUS.online.color:C.danger)+'18',borderRadius:999,padding:'2px 9px'}}>{gain>0?`+${gain}`:gain}</span>}
+              </div>
+              {/* Bouton IA */}
+              <button type="button" onClick={aiRewrite} disabled={repubAi.busy} style={{width:'100%',border:`1px solid ${C.accent}`,borderRadius:12,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:700,padding:'11px',cursor:repubAi.busy?'default':'pointer',fontFamily:'inherit',opacity:repubAi.busy?0.6:1,marginBottom:8}}>{repubAi.busy?'⏳ L\'IA rédige…':'🤖 Rédiger avec l\'IA'}</button>
+              {repubAi.why && <div style={{fontSize:12,color:INV_STATUS.online.color,background:INV_STATUS.online.color+'10',borderRadius:10,padding:'8px 10px',marginBottom:10}}>✨ {repubAi.why}</div>}
+              {repubAi.reason && <div style={{fontSize:12,color:C.muted,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:10,lineHeight:1.45}}>{reasonMsg[repubAi.reason]||reasonMsg.error}</div>}
+              {/* Champs */}
+              <div style={{fontSize:11,color:C.muted,fontWeight:600,margin:'6px 0 4px'}}>TITRE</div>
+              <input value={repubForm.title} onChange={ev=>setRepubForm(f=>({...f,title:ev.target.value}))} placeholder="Marque + modèle + taille + état" style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C.text,background:C.card,fontFamily:'inherit',outline:'none'}}/>
+              <div style={{fontSize:10.5,color:repubForm.title.length>70?C.danger:C.muted,marginTop:3,textAlign:'right'}}>{repubForm.title.length}/70</div>
+              <div style={{fontSize:11,color:C.muted,fontWeight:600,margin:'8px 0 4px'}}>DESCRIPTION</div>
+              <textarea value={repubForm.desc} onChange={ev=>setRepubForm(f=>({...f,desc:ev.target.value}))} rows={5} placeholder="État, matière, pointure, défauts éventuels…" style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C.text,background:C.card,fontFamily:'inherit',outline:'none',resize:'vertical'}}/>
+              <div style={{fontSize:11,color:C.muted,fontWeight:600,margin:'8px 0 4px'}}>PRIX (€)</div>
+              <input value={repubForm.price} onChange={ev=>setRepubForm(f=>({...f,price:ev.target.value}))} inputMode="decimal" placeholder="Prix de vente" style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C.text,background:C.card,fontFamily:'inherit',outline:'none'}}/>
+              {after.peer!=null && <div style={{fontSize:11.5,color:C.muted,marginTop:5}}>💡 Paires similaires (même marque·taille) autour de <b>{after.peer} €</b>.</div>}
+              {/* Conseils calculés */}
+              {before.advice.length>0 && (
+                <div style={{marginTop:14}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}}>CE QUI PEUT ÊTRE AMÉLIORÉ</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                    {before.advice.map((a,i)=>(<div key={i} style={{fontSize:12.5,color:C.text,display:'flex',gap:7,alignItems:'flex-start'}}><span style={{color:C.accent}}>•</span><span style={{flex:1,minWidth:0}}>{a}</span></div>))}
+                  </div>
+                </div>
+              )}
+              {/* Historique des versions */}
+              {versions.length>0 && (
+                <div style={{marginTop:16}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}}>HISTORIQUE ({versions.length})</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                    {versions.slice().reverse().map((v,i)=>(
+                      <div key={i} style={{fontSize:12,color:C.muted,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 10px'}}>
+                        <div style={{color:C.text,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.title||'(sans titre)'}</div>
+                        <div style={{marginTop:2}}>{new Date(v.at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · note {v.scoreBefore}→{v.scoreAfter} · {v.price?`${v.price} €`:'prix inchangé'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',gap:8,alignItems:'center'}}>
+              <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour y appliquer cette version" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:12.5,fontWeight:600,padding:'11px 13px'}}>↗ Vinted</a>
+              <button type="button" onClick={saveRepub} style={{flex:1,border:'none',borderRadius:12,background:C.accent,color:'#fff',fontSize:14,fontWeight:700,padding:'11px',cursor:'pointer',fontFamily:'inherit'}}>Enregistrer la version</button>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
       {/* ── Passeport de la paire : toute la vie d'une paire sur une frise ── */}
       {passportFor && (()=>{
         const { it, e, num } = passportFor;
@@ -13957,6 +14273,9 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <Row icon="cash" title="Anciennes ventes" desc="Les ventes historiques de l'ancienne appli." onClick={()=>setTab('sales')}/>
       <Row icon="tag" title="Stock Vinted (ancien)" desc="L'ancienne liste de numéros en ligne." onClick={()=>setTab('stockvinted')}/>
 
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Assistant IA</div>
+      <AiKeySetting/>
+
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
       <RegimeSetting/>
       <div style={{height:10}}/>
@@ -14304,6 +14623,38 @@ function PushSetting() {
 // Réglage du régime fiscal : détermine comment le rapport comptable présente les
 // chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
 // régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
+// Clé de l'assistant IA. ⚠️ VOLONTAIREMENT PAS dans SYNC_KEYS : c'est un secret,
+// il ne doit jamais partir dans la ligne Supabase partagée. Il reste sur CET
+// appareil. Le mieux reste la variable d'environnement Vercel (AI_API_KEY) —
+// ce champ est le raccourci « je veux tester tout de suite » pour Julien.
+function AiKeySetting() {
+  const [key, setKey] = useState(() => load('vrm_ai_key', ''));
+  const [ready, setReady] = useState(null); // null = inconnu, true/false = clé serveur présente ?
+  const [show, setShow] = useState(false);
+  useEffect(() => { fetch('/api/ai').then(r=>r.json()).then(j=>setReady(!!(j&&j.ready))).catch(()=>setReady(false)); }, []);
+  const commit = (v) => { setKey(v); if (v.trim()) save('vrm_ai_key', v.trim()); else localStorage.removeItem('vrm_ai_key'); };
+  const on = ready || (key && key.trim());
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Rédaction d'annonces par l'IA</div>
+        <span style={{fontSize:11,fontWeight:600,color:on?INV_STATUS.online.color:C.muted,background:(on?INV_STATUS.online.color:C.muted)+'18',borderRadius:999,padding:'1px 8px'}}>{on?'branchée':'non branchée'}</span>
+      </div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
+        Sert à réécrire titres et descriptions dans l'atelier <b>Republier ✨</b>. {ready
+          ? "La clé est configurée côté serveur (Vercel) — rien à faire ici."
+          : "Colle ta clé Anthropic (commence par « sk-ant- ») ou, mieux, ajoute-la sur Vercel (variable AI_API_KEY). Elle reste sur cet appareil et n'est jamais synchronisée."}
+      </div>
+      {!ready && (
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <input type={show?'text':'password'} value={key} onChange={e=>commit(e.target.value)} placeholder="sk-ant-…" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+          <button type="button" onClick={()=>setShow(s=>!s)} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.muted,fontSize:12,fontWeight:600,padding:'8px 10px',cursor:'pointer',fontFamily:'inherit'}}>{show?'Cacher':'Voir'}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RegimeSetting() {
   const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
   const [tva, setTva] = useState(() => Number(load('vinted_tva', 20)) || 20);
@@ -14389,7 +14740,7 @@ export default function App() {
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
-    const TABS_OK=['dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
+    const TABS_OK=['dashboard','cat_annonces','cat_repub','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
     const goto=(search)=>{ try{ const t=new URLSearchParams(search).get('tab'); if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -15458,7 +15809,7 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_repub:'republication',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
       </main>

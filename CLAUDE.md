@@ -823,3 +823,31 @@ Le sous-titre du `ScreenHead` est passé de « Les conversations… en lecture �
 ⚠️ **`msgAcc` (sélecteur de compte) et `openConversation` (modale de lecture) ne sont plus appelés** par cet onglet — laissés en place (aucune erreur, la modale `openConversation` sert peut-être ailleurs) mais l'onglet ne s'en sert plus. Le calcul du delta de notification (`vintedNotif`, bandeau d'ouverture) est indépendant et **inchangé** : il lit toujours la moisson des conversations, pas cet écran.
 
 Vérifié en rendu réel (banc section 20, écran 400 px) : « 36 nouveaux messages / 213 conversations en tout » + bouton, réponses rapides au-dessus, **zéro erreur de page**. `BUILD_ID = v68/00`.
+
+---
+
+## 31. Session août 2026 (suite) — Atelier de republication + première brique IA (RESELL AI)
+
+Julien a envoyé un « cahier des charges niveau startup » (RESELL AI, 15 modules) puis, en priorité, le **module Republication intelligente**. Constat posé avec lui : **~10 des 15 modules existent déjà dans VRM** (dashboard, stock/ERP, rapport financier, conseils prix/qui-dorment, multi-plateforme LBC…). Ce qui manquait vraiment = **une vraie IA branchée** (les modules « l'IA explique / réécrit / score » ont tous besoin d'un LLM). Décision : construire l'**atelier de republication** en entier, dont tout le **calcul est réel**, et poser la **tuyauterie IA** pour la rédaction (optionnelle, sans clé → dégradation propre).
+
+### Nouvel onglet « Republier ✨ » (`cat_repub` → `only='republication'`)
+Un onglet dédié dans `BOTTOM_TABS`, rendu par `Comptabilite` comme les autres catégories. Icône au trait `spark` ajoutée à `ICON_PATHS`.
+
+### Note d'annonce — `scoreAnnonce(it, override?)` — 100 % CALCULÉE
+Part de 100, **retire** des points pour chaque défaut RÉELLEMENT constaté (champ présent) : titre pauvre (mots, marque/taille absentes, état), fiche incomplète (`photoCount<3`, marque/taille manquante, `descLen<20`), âge (`listedAgeDays` : dort 30/60/90 j), engagement (vues sans favori, peu vue), prix vs paires comparables (`peerPrice` = médiane même marque+taille EN LIGNE, ≥2 paires). **Un champ absent ne retire jamais de point** (pas de faux procès). Renvoie `{score, cls:'top'|'mid'|'low', problems[], advice[], peer, age}`. `cls` : ≥80 top / 55-79 mid / <55 low.
+- `repubList` (useMemo) = toutes les annonces `annBase` notées, **triées pire→meilleur** (« voici les annonces avec le plus gros potentiel »). Placé APRÈS `annBase`/`peerPrice`/`scoreAnnonce` (piège TDZ, cf. §19).
+- File de travail : chips Toutes / 🔴 Haute (low) / 🟠 Moyenne (mid) / 🟢 OK (top) + bandeau note moyenne / à retravailler.
+
+### Éditeur de nouvelle version (`repubEdit`/`repubForm`, modale)
+Titre + description + prix. **Comparaison de score en direct** (Actuelle → Nouvelle, +/−). Conseils calculés (`before.advice`). **Historique des versions** (`vinted_annonce_drafts`, clé = id d'annonce → `{title,desc,price,versions[],updatedAt}`, **synchronisé**). Bouton « Enregistrer la version » + lien « ↗ Vinted » (l'app ne publie pas ; Julien applique sur Vinted — pas d'écriture Vinted auto, cf. §5).
+- ⚠️ **Piège corrigé** : le brouillon pré-remplit la description à VIDE, or l'extension ne garde que `descLen` (pas le texte). Sans garde-fou, la « nouvelle version » démarrait pénalisée « pas de description » et paraissait **pire** que l'actuelle (−11). Correctif : dans `scoreAnnonce`, tant que la description du brouillon est vide, on garde `it.descLen` d'origine. Vérifié au banc : 51 → 51 tant qu'on ne change rien.
+
+### Brique IA — `api/ai.js` (serverless) + `aiRewrite` (app)
+Réécrit titre + description à partir des VRAIES caractéristiques (consigne stricte : **ne rien inventer**). Modèle par défaut `claude-haiku-4-5-20251001` (`AI_MODEL` configurable). **Clé jamais dans le repo/l'extension** : lue depuis `AI_API_KEY` (env Vercel, recommandé) sinon depuis une clé perso locale (`vrm_ai_key`, **PAS dans SYNC_KEYS** — secret par appareil). Sans clé → `{ok:false, reason:'no-key'}` : l'app le dit, garde les suggestions calculées, ne fabrique rien. Réglages → **Assistant IA** (`AiKeySetting`) : statut « branchée / non branchée » (ping GET `/api/ai`) + champ clé si pas d'env serveur.
+- **Pour activer la rédaction IA** : ajouter `AI_API_KEY` (clé Anthropic `sk-ant-…`) dans les variables d'environnement Vercel du projet, OU la coller dans Réglages → Assistant IA.
+
+### Vérifié au banc (section 20, données réelles, 400 px)
+Onglet Republier : note moyenne + file par priorité + cartes (score, problèmes détectés, bouton). Éditeur : comparaison de score, champs, conseils, bouton IA (avec fallback « non branchée »). **Zéro erreur de page.** `BUILD_ID = v69/00`.
+
+### Reste du cahier des charges (pas fait, honnête)
+Analyse **photo** par vision IA (module 6), CRM client détaillé (module 9), mémoire IA de stratégie (module 11), abonnements Free/Pro/Business (module 14) : non faits — soit ils dépendent d'un LLM vision/branché, soit c'est un chantier à part. À reprendre brique par brique une fois l'IA active en prod.
