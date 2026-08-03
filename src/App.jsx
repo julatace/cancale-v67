@@ -9545,32 +9545,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (res.ok) { anyOk=true; for (const o of res.items) { const id = String(o.transaction_id); if (!seen.has(id)) { seen.add(id); out.push({ ...o, _acc: acc }); } } }
       else { anyErr=true; failed.push(accNameOf(acc)); }
     }
-    // FILET EMAILS (ventes seulement) : on complète avec les ventes annoncées
-    // par email et que ni la moisson ni le proxy n'ont rendues. Doublon écarté
-    // sur « même titre + même prix ». Les emails ne remplacent jamais une vraie
-    // commande (elle porte le vrai statut et le vrai n° de transaction).
-    try {
-      const cle = (o) => normTitle(o.title) + '@' + Math.round(Number(o.price?.amount) || 0);
-      const vus = new Set(out.map(cle));
-      const depuisEmails = type === 'sold'
-        ? ordersFromEmailSales(await fetchEmailSales(), accounts)
-        : ordersFromEmailAchats(await fetchEmailAchats(), accounts);
-      // Filet anti-doublon (léger) : on écarte un achat venu d'un email dont le
-      // titre ET le prix correspondent exactement à une vente — c'est le même
-      // événement. Le vrai tri vente/achat se fait désormais À LA SOURCE
-      // (ordersFromEmailAchats ne garde que les vrais reçus d'achat, vérifié sur
-      // les 47 lignes réelles), donc ce filtre n'est plus qu'une ceinture de
-      // sécurité et ne doit pas être trop agressif (ne pas jeter un vrai achat
-      // qui porterait par hasard le même titre qu'une annonce).
-      const ventesKeys = type === 'purchased'
-        ? new Set((sales.items || []).map(cle))
-        : null;
-      for (const o of depuisEmails) {
-        const k = cle(o); if (vus.has(k)) continue;
-        if (ventesKeys && o._fromEmail && ventesKeys.has(k)) continue;
-        vus.add(k); out.push(o); anyOk = true;
-      }
-    } catch (_) {}
+    // ⚠️ SOURCE UNIQUE = VINTED VIA L'EXTENSION (choix de Julien, août 2026).
+    // On NE reconstruit PLUS les ventes/achats à partir des emails
+    // (ordersFromEmailSales / ordersFromEmailAchats) : c'était la source des
+    // erreurs de classement (des emails de statut « Confirmation requise » /
+    // « Commande mise à jour » finissaient en faux achats). La moisson de
+    // l'extension porte la classification de Vinted lui-même (orders_sold vs
+    // orders_purchased) — c'est LA vérité. Un onglet peut être momentanément
+    // vide si l'extension n'a pas encore moissonné : « Synchroniser » force, et
+    // il suffit de repasser sur vinted.fr avec l'extension.
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
@@ -15253,12 +15236,20 @@ export default function App() {
           if(hiddenTx.has(String(o.transaction_id))) continue;
           const st=classifyOrderStatus(o.status);
           const amt0=(o.price?.amount!=null?Number(o.price.amount):0);
+          const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
+          const inMonth=okD&&d.getFullYear()*100+d.getMonth()===ym;
           if(st==='pending'){ enCours++; enAttente+=amt0; }
-          if(st==='completed'){
-            caEncaisse+=amt0;
-            if(o.date){ const d=new Date(o.date); if(!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym){ caMois+=amt0; ventesMois++; } }
+          if(st==='completed'){ caEncaisse+=amt0; }
+          // CA + ventes DU MOIS = ventes FAITES ce mois (par DATE de vente), hors
+          // annulées — qu'elles soient déjà finalisées ou encore en cours. Une
+          // vente ne devient « finalisée » que ~2 semaines après (validation
+          // acheteur) : compter uniquement les finalisées donnait ~0 € pour le
+          // mois en cours. SOURCE = moisson Vinted (extension), plus d'emails.
+          if(st!=='cancelled' && inMonth){
+            caMois+=amt0; ventesMois++;
+            if(d.getDate()===now.getDate()){ caJour+=amt0; ventesJour++; }
           }
-          if(st==='cancelled'){ let inMonth=true; if(o.date){ const d=new Date(o.date); inMonth=!isNaN(d)&&d.getFullYear()*100+d.getMonth()===ym; } if(inMonth) refunded.push({ acct:String(a.login||'').toLowerCase(), amount:amt0, title:normTitle(o.title||'') }); }
+          if(st==='cancelled' && inMonth){ refunded.push({ acct:String(a.login||'').toLowerCase(), amount:amt0, title:normTitle(o.title||'') }); }
         }}
         // « En ligne » compte EXACTEMENT ce que montre l'onglet Annonces : on
         // retire les paires marquées vendues à la main et celles auto-retirées
@@ -15288,50 +15279,10 @@ export default function App() {
         }
         pairesStock=seen.size;
       }catch(_){/* plan illisible → 0 */}
-      // CA + ventes du mois basés sur les EMAILS DE VENTE (source complète, la
-      // même que le widget) → app et widget affichent le même chiffre. On écrase
-      // le calcul « harvest » (extension) qui pouvait être partiel/incohérent.
-      try{
-        const ymStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-        const todayStr=`${ymStr}-${String(now.getDate()).padStart(2,'0')}`;
-        const rs=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`,{headers:sbAuth()});
-        // Comptes dont les ventes COMPTENT : ceux encore liés à l'app, et non
-        // masqués/bloqués. Un compte DÉCONNECTÉ ne doit plus peser dans le CA —
-        // avant, ses emails de vente continuaient d'être comptés (ex. 54 € d'un
-        // compte retiré restaient dans le chiffre du mois).
-        const liveLogins=new Set();
-        for(const a of vintedAccounts){
-          if(skipAcc(a.vinted_user_id)) continue;
-          const l=String(a.login||'').trim().toLowerCase(); if(l) liveLogins.add(l);
-        }
-        // Comptes retirés dont TU as choisi de garder le CA (au moment de la
-        // déconnexion) : leurs ventes continuent de compter.
-        (load('vinted_ca_keep_removed',[])||[]).forEach(l=>{ const t=String(l||'').trim().toLowerCase(); if(t) liveLogins.add(t); });
-        if(rs.ok){ const rows=await rs.json(); let cm=0,vm=0; for(const r of rows){ const d=r.data; if(!d||String(d.receivedAt||'').slice(0,7)!==ymStr) continue;
-          const acct=String(d.account||'').toLowerCase();
-          // Vente rattachée à un compte identifié qui n'est plus actif → exclue.
-          // Une vente SANS compte identifié est conservée (on ne peut pas
-          // prouver qu'elle est à écarter, et la jeter sous-estimerait le CA).
-          if(acct && liveLogins.size && !liveLogins.has(acct)) continue;
-          const desig=String(d.designation||d.article||'');
-          const p=parseFloat(String(d.prix||'').replace(',','.'));
-          // REMBOURSÉE ? Un email de vente dit qu'une vente a eu lieu, mais si
-          // Vinted l'a ensuite REMBOURSÉE, ce n'est plus du CA. On croise avec les
-          // ventes annulées (statut Vinted frais, plus haut) par compte + montant
-          // (ou titre), consommation 1:1 → jamais retiré deux fois.
-          const ri=refunded.findIndex(x=> x.acct===acct && ( (isFinite(p)&&Math.abs(x.amount-p)<0.5) || (x.title&&x.title===normTitle(desig)) ));
-          if(ri>=0){ refunded.splice(ri,1); continue; } // remboursée → hors CA / hors compteur
-          // LOT / BUNDLE : « Lot 7 articles » = 7 paires vendues en une transaction.
-          // Le CA garde le montant total (vrai encaissement), mais on compte le
-          // NOMBRE D'ARTICLES pour les ventes → le prix de vente moyen n'est plus
-          // faussé par un gros montant unique.
-          const lm=/(\d+)\s*articles?/i.exec(desig);
-          const nItems=(/lot/i.test(desig)&&lm)?Math.max(1,parseInt(lm[1],10)):1;
-          vm+=nItems; if(!isNaN(p)&&p>0) cm+=p;
-          // Vendu AUJOURD'HUI ?
-          if(String(d.receivedAt||'').slice(0,10)===todayStr){ ventesJour+=nItems; if(!isNaN(p)&&p>0) caJour+=p; }
-        } if(vm>0){ caMois=cm; ventesMois=vm; } }
-      }catch(_){}
+      // (Ancien recalcul du CA du mois à partir des emails email_sale : SUPPRIMÉ.
+      // Toutes les données viennent maintenant de la moisson Vinted/extension —
+      // choix de Julien, août 2026. Le CA/ventes du mois est calculé plus haut
+      // par date de vente sur la moisson, ce qui est complet et sans emails.)
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce

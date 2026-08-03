@@ -869,3 +869,24 @@ Onglet **« Republier ♻️ »** dans le panneau VRM sur Vinted (`vinted-panel.
 Cause racine dans **`api/email-inbound.js`** : la branche ACHAT (2b, AVANT la branche vente) matchait le motif **« ta commande » nu** — or les emails **côté vendeur** disent aussi « ta commande » (« Prépare ta commande », « ta commande est à expédier »). Une vente était donc classée `email_achat_*`.
 - **Source** : ajout d'un garde-fou `cotéVendeur` (`/vendu|a acheté ton article|prépare ta commande|à expédier|bordereau d'envoi|ton article/i`) qui EXCLUT tout signal vendeur avant de classer en achat ; motifs « ta commande » nu et « récapitulatif de commande » retirés (envoyés aussi au vendeur).
 - **Nettoyage des lignes déjà mal rangées** (App.jsx `loadOrders`, filet emails achats) : on écarte un achat **venu d'un email** (`_fromEmail`) dont **titre + prix** correspondent EXACTEMENT à une **vente** (`sales.items`) — on n'achète/revend pas la même paire au même prix. Les vrais achats moissonnés (vrai n° de transaction) ne sont jamais touchés. Vérifié au banc : Ventes/Achats, zéro erreur.
+
+---
+
+## 33. ⚠️ Session août 2026 (suite) — SOURCE UNIQUE = VINTED VIA L'EXTENSION (annule le « CA = email_sale » de §10)
+
+Demande explicite de Julien : « toutes les données à partir de maintenant tu les récupères dans Vinted avec l'extension ». Motif : les reconstructions par emails produisaient des **erreurs de classement** que la moisson n'a pas (Vinted classe lui-même achat vs vente).
+
+**Vérifié EN DIRECT sur la vraie base** (clé anon publique, lecture REST — c'est comme ça qu'on arrête de deviner) :
+- `email_achat_*` : **47 lignes, seulement 11 vrais achats** (« Ton reçu pour la commande … »). Les 36 autres = emails de STATUT (16 « Confirmation requise », 18 « Commande mise à jour », 2 « Retourne ta commande ») mal classés → polluaient les Achats. Ex. « Adidas Spezial North high 35 » (que Julien signalait comme une vente) n'existait NI dans `orders_purchased` NI dans `orders_sold` moissonnés : uniquement dans ces emails « Confirmation requise ».
+- `harvest_*_orders_purchased` : **434 vrais achats, dont 106 Adidas Spezial** — Julien en achète énormément pour revendre, c'est NORMAL d'en voir beaucoup dans les Achats.
+- CA du mois en cours : `orders_sold` **finalisés** = 0 € en août (une vente ne se finalise qu'~2 semaines après). Par **DATE de vente** (hors annulées) = **17 ventes / 437,60 €**, alors que `email_sale` n'en voyait que 12 / 308,60 €. Donc la moisson par date est **plus complète** que les emails.
+
+### Ce qui a changé dans `App.jsx`
+1. **`loadOrders` (ventes ET achats)** : le **filet emails est SUPPRIMÉ**. Les onglets Ventes/Achats ne lisent plus QUE la moisson (`fetchVintedOrders` → harvest, classification Vinted). Un onglet peut être momentanément vide si l'extension n'a pas encore moissonné → « Synchroniser » force, ou repasser sur vinted.fr.
+2. **`ordersFromEmailAchats`** garde un garde-fou `estVraiAchat` (sujet = vrai reçu d'achat) au cas où il resservirait, mais il n'est plus appelé par `loadOrders`.
+3. **CA/ventes du mois (`liveStats`, dashboard)** : ⚠️ **ANNULE §10/§15/§21** qui prenaient `email_sale`. Désormais calculé sur la **moisson `orders_sold` par DATE de vente** (hors annulées), y compris les ventes pas encore finalisées — sinon le mois en cours affichait ~0 €. `ventesJour`/`caJour` idem. Le recalcul email a été retiré.
+
+⚠️ **Ne pas revenir aux emails pour les ventes/achats/CA** sans raison forte : c'était la source des faux achats. Les emails restent utilisés pour ce que la moisson ne donne pas (bordereaux PDF, suivi colis, factures Gmail/Apps Script — §3), pas pour classer achats/ventes.
+
+### Reste (pas fait, à voir avec Julien)
+- `api/widget.js` : lit encore `email_sale` pour son propre calcul du mois. Le widget devrait lire `widget_stats` (publié par l'app, désormais harvest). À aligner si le chiffre du widget diverge.
