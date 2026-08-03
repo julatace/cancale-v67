@@ -2345,14 +2345,19 @@ function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
 }
 function StatBox({label,value,color=C.text,sub=null}) {
+  // ⚠️ Un montant ne doit JAMAIS se couper (« 150… » au lieu de « 15037,88 € »,
+  // constaté sur Ventes : trois cases par ligne + un montant à 5 chiffres ne
+  // rentraient pas et l'ellipse mangeait le nombre). L'ancienne taille fixe
+  // (clamp 15-20 px) tronquait. On adapte donc la taille à la LONGUEUR de la
+  // valeur : plus c'est long, plus ça rétrécit, jusqu'à un plancher lisible —
+  // comme ça le nombre s'affiche toujours en entier.
+  const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
+  const L = txt ? txt.length : 0;
+  const fs = !L ? 20 : L <= 5 ? 20 : L <= 7 ? 16 : L <= 9 ? 13 : L <= 11 ? 11.5 : 10.5;
   return (
     <Card style={{flex:1,minWidth:110}}>
       <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>{label}</div>
-      {/* Un montant ne doit JAMAIS se couper au milieu (« 1593,3 » puis « 0 € »
-          sur la ligne suivante — constaté à 320 px en zoom Grand). On interdit
-          la coupure et on laisse la valeur rétrécir un peu si la case est
-          étroite : illisible vaut mieux coupé en deux. */}
-      <div style={{fontSize:'clamp(15px, 5.2vw, 20px)',fontWeight:600,color,lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
+      <div style={{fontSize:fs,fontWeight:600,color,lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
       {sub&&<div style={{fontSize:11,color:C.muted,marginTop:3}}>{sub}</div>}
     </Card>
   );
@@ -7246,10 +7251,19 @@ function VintedAccounts({ accounts, setAccounts }) {
       const next = keep ? [...new Set([...cur, login])] : cur.filter(x => x !== login);
       save('vinted_ca_keep_removed', next);
     }
+    // ⚠️ On MASQUE aussi le compte de façon permanente (vinted_accounts_hidden,
+    // clé synchronisée). Supprimer la ligne Supabase ne suffit pas : un compte
+    // encore connecté dans Chrome est RE-CAPTURÉ par l'extension au prochain
+    // passage sur Vinted, et il revenait dans les annonces + les stats (plainte
+    // de Julien : « je l'ai supprimé mais il est toujours là »). Le masque, lui,
+    // survit à la re-capture (il est posé sur l'uid, pas sur la ligne du compte)
+    // → annonces ET stats l'excluent pour de bon (skipAcc / acctOff).
+    const uid = String(acc.vinted_user_id);
+    setHiddenAccts(prev => { const n = new Set(prev); n.add(uid); save('vinted_accounts_hidden', [...n]); return n; });
     setRemoving(acc.vinted_user_id);
     const ok = await deleteVintedAccount(acc.vinted_user_id);
     setRemoving(null);
-    if (!ok) { toast('Échec de la déconnexion. Réessaie.'); return; }
+    if (!ok) { toast('Retiré des annonces et des stats. (La ligne du compte reviendra peut-être, mais il restera masqué partout.)'); }
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
   };
 
@@ -10665,6 +10679,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   const fmtE = (n)=> (n==null?'—':Number(n).toFixed(2).replace('.',',')+' €');
+  // Montant ARRONDI à l'euro pour les cartes-titres (CA, coût, bénéfice…) : sur
+  // une case étroite « 15037,88 € » débordait et se coupait (« 15037,… »). Les
+  // centimes n'apportent rien sur un total de plusieurs milliers ; on affiche
+  // « 15 038 € » (espace fine des milliers), lisible et jamais tronqué.
+  const fmtE0 = (n)=> (n==null?'—':Math.round(Number(n)).toLocaleString('fr-FR')+' €');
   const cur = (c)=> c==='EUR'?'€':(c||'');
 
   // Export CSV des ventes (pour compta / déclarations).
@@ -10932,11 +10951,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
-            <StatBox label="CA finalisé" value={fmtE(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
-            {totals.nbAttente>0 && <StatBox label="💰 En attente" value={fmtE(totals.enAttente)} color={C.warn} sub={`${totals.nbAttente} en cours · porte-monnaie`}/>}
-            <StatBox label="Coût d'achat" value={fmtE(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
-            {totals.frais>0 && <StatBox label="Boosts" value={fmtE(totals.frais)} sub="mises en avant"/>}
-            <StatBox label="Bénéfice net" value={fmtE(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût')}/>
+            <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            {totals.nbAttente>0 && <StatBox label="💰 En attente" value={fmtE0(totals.enAttente)} color={C.warn} sub={`${totals.nbAttente} en cours · porte-monnaie`}/>}
+            <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
+            {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
+            {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
+                « bénéfice » vaut mécaniquement le CA (coût = 0) — c'est FAUX, et
+                l'afficher en gros trompe (plainte de Julien : « les données ne
+                sont plus fiables »). Donc : 0 prix d'achat → on n'affiche pas un
+                faux bénéfice, on dit qu'il manque les prix d'achat. Prix connus
+                en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
+            {totals.nbCout===0
+              ? <StatBox label="Bénéfice net" value="n/d" color={C.muted} sub="saisis tes prix d'achat"/>
+              : <StatBox label="Bénéfice net" value={fmtE0(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.nbCout<totals.nb?`sur ${totals.nbCout}/${totals.nb} avec prix d'achat`:(totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût'))}/>}
           </div>
         )}
         {/* Boosts détectés automatiquement (facturation Vinted captée par
@@ -11997,12 +12024,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const col = lab.col();
                   const recu = isRetourRecu(r.o);
                   return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'7px 9px'}}>
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'7px 9px'}}>
                       <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:10,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
                       <div style={{width:34,height:34,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {r.o.photo_url?<img src={r.o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                       </div>
-                      <div style={{flex:1,minWidth:0}}>
+                      <div style={{flex:'1 1 120px',minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
                         <div style={{fontSize:11,fontWeight:500,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
                           <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'📦 Reçue — à republier':lab.txt}</span>
@@ -15414,7 +15441,7 @@ export default function App() {
       }
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       if(noNumCount>0)   items.push({icon:'🔢', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
-      if(sleepCount>0)   items.push({icon:'😴', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui dort → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
+      if(sleepCount>0)   items.push({icon:'😴', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF si l'échéance de déclaration approche (≤ 14 j) ou est passée.
       try{
         const due=nextUrssafDeadline(load('vinted_urssaf_freq','trimestriel'));
