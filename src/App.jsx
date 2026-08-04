@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v71/00 · fix ventes-dans-achats (orders_bought)';
+const BUILD_ID = 'v72/00 · marque/taille des annonces lues correctement';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -1943,8 +1943,14 @@ const mapWardrobeItem = (it) => ({
        || it.photos?.[0]?.url || it.photos?.[0]?.thumbnails?.[0]?.url || null,
   url: it.url || null,
   // Champs "à la Vinted" pour un affichage proche du site.
-  brand: it.brand_title || it.brand?.title || null,
-  size: it.size_title || it.size?.title || null,
+  // ⚠️ Vinted renvoie la marque/taille TANTÔT en objet ({title}), TANTÔT en
+  // simple chaîne ("Nike", "38") — vérifié en base : la moisson porte
+  // `brand:"Nike"`, `size:"38"`. L'ancien code ne lisait que `.title` → il
+  // voyait null et affichait « marque manquante / taille manquante » sur TOUTES
+  // les annonces (faux), ce qui plombait les conseils de republication et le
+  // rapprochement de prix. On accepte donc les deux formes.
+  brand: it.brand_title || (typeof it.brand === 'string' ? it.brand : (it.brand && it.brand.title)) || null,
+  size: it.size_title || (typeof it.size === 'string' ? it.size : (it.size && it.size.title)) || null,
   condition: it.status || null,
   // Engagement (défensif : présent sur la plupart des articles wardrobe, mais on
   // ne suppose rien — n'affiché que si c'est bien un nombre). Précieux pour un
