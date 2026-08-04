@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v72/00 · marque/taille des annonces lues correctement';
+const BUILD_ID = 'v73/00 · dashboard rempli + offres dans Ma journée';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -3518,10 +3518,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
         <StatCard icon="📦" label="Paires en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.accent} sub="numéros au garage"/>
         <StatCard icon="💰" label="Valeur stock" value={fmt(liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue)} color={C.warn} sub="prix d'achat des annonces en ligne"/>
-        <StatCard icon="✅" label="Vendues" value={totalSold} color={C.danger}/>
+        {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
+            vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
+        <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.danger} sub="finalisées, tous comptes"/>
         <StatCard icon="💸" label="CA encaissé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="finalisé, tous comptes"/>
-        <StatCard icon="📈" label="Bénéfice net" value={fmt(profit)} color={profit>=0?C.accent:C.danger} sub="argent reçu uniquement"/>
-        <StatCard icon="🎯" label="Taux marge" value={`${avgMargin}%`} color={C.blue} sub="bénéf / CA"/>
+        {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
+            afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
+        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'n/d':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?"saisis tes prix d'achat":'argent reçu uniquement'}/>
+        <StatCard icon="🎯" label="Taux marge" value={liveStats&&liveStats.caEncaisse!=null?'n/d':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?'prix d\'achat manquants':'bénéf / CA'}/>
       </div>
 
       {/* Mois en cours */}
@@ -3530,17 +3534,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           📅 Mois en cours — {moisCourant.nom}
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
+          {/* Chiffres du mois pris sur la MOISSON Vinted (comme « Vinted en
+              direct »), plus le vieux catalogue archivé qui était vide. */}
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>CA du mois</div>
-            <div style={{fontSize:22,fontWeight:600,color:C.text,letterSpacing:-0.5}}>{fmt(moisCourant.ca)}</div>
+            <div style={{fontSize:22,fontWeight:600,color:C.text,letterSpacing:-0.5}}>{fmt(liveStats&&liveStats.caMois!=null?liveStats.caMois:moisCourant.ca)}</div>
           </div>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice du mois</div>
-            <div style={{fontSize:22,fontWeight:600,color:moisCourant.profit>=0?C.accent:C.danger,letterSpacing:-0.5}}>{fmt(moisCourant.profit)}</div>
+            <div style={{fontSize:22,fontWeight:600,color:C.muted,letterSpacing:-0.5}}>{liveStats&&liveStats.caMois!=null?'n/d':fmt(moisCourant.profit)}</div>
           </div>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Ventes</div>
-            <div style={{fontSize:22,fontWeight:600,color:C.muted,letterSpacing:-0.5}}>{moisCourant.count}</div>
+            <div style={{fontSize:22,fontWeight:600,color:C.muted,letterSpacing:-0.5}}>{liveStats&&liveStats.ventesMois!=null?liveStats.ventesMois:moisCourant.count}</div>
           </div>
         </div>
       </Card>
@@ -3614,12 +3620,23 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
       {/* Stats secondaires */}
       <div>
         <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,marginBottom:10,paddingLeft:4}}>Détails</div>
+        {/* Ces cartes venaient du vieux catalogue (vide) → toutes à 0 (plainte de
+            Julien). « Vente moyenne » se calcule sur la moisson (CA encaissé /
+            nb ventes finalisées). Le « × moyen » et le « bénéf. moyen »
+            dépendent des prix d'achat (non saisis) → n/d honnête plutôt qu'un 0
+            trompeur. */}
+        {(()=>{
+          const hv = liveStats && liveStats.soldTotal!=null;
+          const venteMoy = hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale;
+          return (
         <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-          <StatCard icon="⭐" label="× moyen" value={`×${avgX}`} color={C.warn}/>
-          <StatCard icon="💵" label="Vente moyenne" value={fmt(avgSale)} color={C.text}/>
-          <StatCard icon="✨" label="Bénéf. moyen / vente" value={fmt(avgProfit)} color={C.accent}/>
-          <StatCard icon="📅" label="CA / jour actif" value={fmt(avgDayCA)} color={C.blue} sub={`${days.length} jours`}/>
+          <StatCard icon="⭐" label="× moyen" value={hv?'n/d':`×${avgX}`} color={C.muted} sub={hv?"prix d'achat manquants":undefined}/>
+          <StatCard icon="💵" label="Vente moyenne" value={fmt(venteMoy)} color={C.text} sub={hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:undefined}/>
+          <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'n/d':fmt(avgProfit)} color={C.muted} sub={hv?"prix d'achat manquants":undefined}/>
+          <StatCard icon="📅" label="CA / jour actif" value={hv?'n/d':fmt(avgDayCA)} color={C.muted} sub={hv?'—':`${days.length} jours`}/>
         </div>
+          );
+        })()}
       </div>
 
       {/* Records */}
@@ -9769,7 +9786,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if (curSub==='messages' && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='messages'||curSub==='journee') && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
@@ -10879,6 +10896,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ))}
               </div>
             )}
+
+            {/* 🏷️ OFFRES REÇUES (demande de Julien) — une offre = presque une
+                vente, plus utile qu'un simple « réponds aux messages ». L'email
+                d'offre ne porte pas de photo, alors on la retrouve en associant
+                le titre de l'offre à une de tes annonces en ligne. Répondre se
+                fait sur Vinted (l'app n'envoie pas de message, cf. §5). */}
+            {!loading && (offers||[]).length>0 && (()=>{
+              const recent=(offers||[]).filter(o=>{const d=o.receivedAt?new Date(o.receivedAt).getTime():0; return d>=Date.now()-14*86400000;})
+                .sort((a,b)=>new Date(b.receivedAt||0)-new Date(a.receivedAt||0)).slice(0,6);
+              if(!recent.length) return null;
+              // Photo : l'offre n'en porte pas → on la retrouve sur une annonce en
+              // ligne du même titre, sinon sur une vente moissonnée (qui a la vraie
+              // photo Vinted). Sinon rien (placeholder honnête).
+              const photoFor=(t)=>{const n=normTitle(t||''); if(!n) return null;
+                const inList=(listings.items||[]).find(it=>normTitle(it.title)===n); if(inList&&inList.photo) return inList.photo;
+                const inSold=(sales.items||[]).find(o=>normTitle(o.title)===n); if(inSold) return inSold.photo_url||(inSold.photo&&inSold.photo.url)||null;
+                return null;};
+              return (
+                <div style={{marginTop:16}}>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.6,marginBottom:8}}>🏷️ Offres reçues ({recent.length})</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    {recent.map((o,i)=>{
+                      const ph=photoFor(o.article);
+                      return (
+                        <a key={i} href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',gap:11,padding:'9px 11px',borderRadius:14,border:`1px solid ${C.border}`,background:C.card,textDecoration:'none',boxShadow:C.shadow||'none'}}>
+                          <div style={{width:44,height:44,borderRadius:10,overflow:'hidden',background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{ph?<img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>🏷️</span>}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.article||'Article'}</div>
+                            <div style={{fontSize:11,color:C.muted,marginTop:1}}>{o.montant?`Offre : ${o.montant}`:'Offre reçue'}{o.receivedAt?` · ${new Date(o.receivedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`:''}</div>
+                          </div>
+                          <span style={{flexShrink:0,fontSize:11,fontWeight:600,color:C.accent}}>Répondre ›</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Trésorerie : l'argent qui arrive (motivation, non-action). */}
             {!loading && inRouteSum>0 && (
@@ -15231,7 +15286,7 @@ export default function App() {
       // caMois = CA finalisé du mois en cours · caEncaisse = CA finalisé TOUS mois
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
-      let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, ok=false;
+      let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, soldTotal=0, ok=false;
       // VENTES DU JOUR : nombre de paires vendues aujourd'hui + leur montant.
       // ⚠️ C'est bien la VENTE (le moment où ça part), pas l'argent viré sur ton
       // compte — les deux sont décalés de plusieurs jours chez Vinted.
@@ -15279,7 +15334,7 @@ export default function App() {
           const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
           const inMonth=okD&&d.getFullYear()*100+d.getMonth()===ym;
           if(st==='pending'){ enCours++; enAttente+=amt0; }
-          if(st==='completed'){ caEncaisse+=amt0; }
+          if(st==='completed'){ caEncaisse+=amt0; soldTotal++; }
           // CA + ventes DU MOIS = ventes FAITES ce mois (par DATE de vente), hors
           // annulées — qu'elles soient déjà finalisées ou encore en cours. Une
           // vente ne devient « finalisée » que ~2 semaines après (validation
@@ -15324,7 +15379,7 @@ export default function App() {
       // choix de Julien, août 2026. Le CA/ventes du mois est calculé plus haut
       // par date de vente sur la moisson, ce qui est complet et sans emails.)
       if(!stop && ok){
-        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour});
+        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
         // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
