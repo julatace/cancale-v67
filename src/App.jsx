@@ -9541,8 +9541,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // brouillon existant s'il y en a un, sinon avec l'annonce actuelle.
   const openRepub = (it) => {
     const d = drafts[it.id];
-    setRepubForm(d ? { title: d.title || '', desc: d.desc || '', price: d.price != null ? String(d.price) : (it.price != null ? String(it.price) : '') }
-                   : { title: it.title || '', desc: '', price: it.price != null ? String(it.price) : '' });
+    // Prix propre : l'API renvoie « 73.0 » → on affiche « 73 » (Number enlève le .0).
+    const px = (v) => (v == null || v === '' || isNaN(Number(v))) ? '' : String(Number(v));
+    setRepubForm(d ? { title: d.title || '', desc: d.desc || '', price: d.price != null ? px(d.price) : px(it.price) }
+                   : { title: it.title || '', desc: '', price: px(it.price) });
     setRepubAi({ busy: false, why: '', reason: '' });
     setRepubEdit({ it });
   };
@@ -13931,7 +13933,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           'network': "Connexion à l'IA impossible pour l'instant. Réessaie dans un instant.",
           'error': "Une erreur est survenue. Réessaie.",
         };
-        return (
+        // ⚠️ createPortal vers document.body : sinon la fenêtre est piégée dans
+        // le contexte d'empilement de <main> et la BARRE DU BAS passe par-dessus
+        // → le bouton « Enregistrer » (en bas) est caché et on ne peut pas
+        // « descendre » jusqu'à lui (bug signalé par Julien).
+        return createPortal(
         <div onClick={()=>{setRepubEdit(null);setRepubForm(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'90vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -14000,8 +14006,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={saveRepub} style={{flex:1,border:'none',borderRadius:12,background:C.accent,color:'#fff',fontSize:14,fontWeight:700,padding:'11px',cursor:'pointer',fontFamily:'inherit'}}>Enregistrer la version</button>
             </div>
           </div>
-        </div>
-        );
+        </div>, document.body);
       })()}
 
       {/* ── Passeport de la paire : toute la vie d'une paire sur une frise ── */}
