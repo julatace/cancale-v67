@@ -24,13 +24,19 @@ self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = { body: event.data ? event.data.text() : '' }; }
   const title = data.title || 'VRM';
-  event.waitUntil(self.registration.showNotification(title, {
+  const opts = {
     body: data.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag: data.tag || 'vrm',
+    renotify: true,            // même tag : re-sonne au lieu de rester silencieux
+    vibrate: [80, 40, 80],     // petite vibration (Android) pour attirer l'œil
     data: { url: data.url || '/' },
-  }));
+  };
+  // Notification RICHE : si le serveur a joint la photo de l'article, on
+  // l'affiche en grand (rendu bien plus pro qu'un texte seul).
+  if (data.image) opts.image = data.image;
+  event.waitUntil(self.registration.showNotification(title, opts));
 });
 
 self.addEventListener('notificationclick', event => {
@@ -47,6 +53,29 @@ self.addEventListener('notificationclick', event => {
       }
     }
     await clients.openWindow(url);
+  })());
+});
+
+// ── ⚠️ RENOUVELLEMENT AUTO DE L'ABONNEMENT PUSH ──────────────────────────────
+// Apple/Chrome font TOURNER le jeton d'abonnement (« subscription ») de temps en
+// temps. Sans écouter cet événement, l'ancien jeton devient muet et les
+// notifications s'arrêtent SANS erreur visible — c'est exactement le « je reçois
+// plus de notif » de Julien. Ici on se ré-abonne tout seul et on renvoie le
+// nouveau jeton au serveur.
+const VAPID_PUBLIC = 'BBQbRWE86gwZClx3buB8J2JJrd-Kg7aYR-HJqev811KmNnTxLxOAwxFhwF8MfvzHp1-K4tnmjFfQZxVaoB7psi8';
+function vapidKey(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const s = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(s); const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey(VAPID_PUBLIC) });
+      await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: sub.toJSON() }) });
+    } catch (_) { /* ré-abonnement impossible : l'app le refera à la prochaine ouverture */ }
   })());
 });
 

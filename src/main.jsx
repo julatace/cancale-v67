@@ -15,7 +15,25 @@ if ('serviceWorker' in navigator) {
     reloading = true; window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((reg) => { try { reg.update(); } catch (_) {} }).catch(() => {});
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      try { reg.update(); } catch (_) {}
+      // ⚠️ RAFRAÎCHIR L'ABONNEMENT PUSH À CHAQUE OUVERTURE. Le jeton d'abonnement
+      // tourne (surtout iOS) et l'ancien devient muet → « je ne reçois plus de
+      // notif ». Si la permission est accordée : on récupère l'abonnement
+      // courant (ou on le recrée s'il a disparu) et on renvoie le jeton FRAIS au
+      // serveur. Silencieux, ne redemande jamais la permission.
+      try {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          const VAPID = 'BBQbRWE86gwZClx3buB8J2JJrd-Kg7aYR-HJqev811KmNnTxLxOAwxFhwF8MfvzHp1-K4tnmjFfQZxVaoB7psi8';
+          const key = (b64) => { const pad = '='.repeat((4 - (b64.length % 4)) % 4); const s = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(s); const a = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) a[i] = raw.charCodeAt(i); return a; };
+          reg.pushManager.getSubscription().then((sub) => {
+            const send = (s) => fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: s.toJSON() }) }).catch(() => {});
+            if (sub) return send(sub);
+            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(VAPID) }).then(send).catch(() => {});
+          }).catch(() => {});
+        }
+      } catch (_) {}
+    }).catch(() => {});
   });
 }
 
