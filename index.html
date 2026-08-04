@@ -87,6 +87,10 @@
     /* Feuille de confirmation : elle monte depuis le bas, comme une feuille iOS,
        au lieu d'apparaître d'un coup au milieu de l'écran. */
     @keyframes cancaleSheet{from{transform:translateY(100%)}to{transform:none}}
+    /* Wrapped (rétrospective plein écran) : chaque carte entre en fondu + léger
+       zoom, et la barre de progression de la story se remplit. */
+    @keyframes wrapPop{from{opacity:0;transform:scale(.92) translateY(12px)}to{opacity:1;transform:none}}
+    @keyframes wrapBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
     main > *{animation:cancaleEnter .24s ease both;}
 
     /* 7bis) DÉBORDEMENTS — ⚠️ NE PAS mettre `min-width:0` en règle GLOBALE.

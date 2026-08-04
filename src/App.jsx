@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v73/00 · dashboard rempli + offres dans Ma journée';
+const BUILD_ID = 'v74/00 · Wrapped plein écran animé';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -2402,6 +2403,18 @@ function StatBox({label,value,color=C.text,sub=null}) {
       {sub&&<div style={{fontSize:11,color:C.muted,marginTop:3}}>{sub}</div>}
     </Card>
   );
+}
+// Nombre qui « compte » de 0 à sa valeur, façon Wrapped. Se relance à chaque
+// changement de `value` (donc à chaque carte de l'histoire). rAF + easing cubic.
+function CountUp({ value, format, duration = 950, style }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const to = Number(value) || 0; let raf; const start = (typeof performance!=='undefined'?performance.now():Date.now());
+    const tick = (t) => { const now = t || (typeof performance!=='undefined'?performance.now():Date.now()); const p = Math.min(1, (now - start) / duration); const e = 1 - Math.pow(1 - p, 3); setN(to * e); if (p < 1) raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [value, duration]);
+  return <span style={style}>{format ? format(n) : Math.round(n).toLocaleString('fr-FR')}</span>;
 }
 function PieChartSVG({data,size=160}){
   const total=data.reduce((s,d)=>s+d.v,0);
@@ -10153,7 +10166,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // ── Wrapped du vendeur : rétrospective annuelle façon Spotify Wrapped ──
   const [showWrapped, setShowWrapped] = useState(false);
+  const [wrapStep, setWrapStep] = useState(0); // carte courante de l'histoire Wrapped
   const [wrappedYear, setWrappedYear] = useState(() => new Date().getFullYear());
+  // ⚠️ APRÈS wrappedYear (piège TDZ §19 : un effet qui lit wrappedYear dans ses
+  // deps avant sa déclaration plante au rendu — « Cannot access before init »).
+  useEffect(()=>{ if(showWrapped) setWrapStep(0); }, [showWrapped, wrappedYear]);
   const wrapped = useMemo(() => {
     const yr = wrappedYear;
     const items = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='completed' && o.date && new Date(o.date).getFullYear()===yr);
@@ -11072,6 +11089,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ventes — l'essentiel était enterré. On les regroupe derrière un seul
             bouton, fermé par défaut : l'écran va droit au but, l'analyse reste
             à un tap. */}
+        {/* 🎉 WRAPPED — la rétrospective plein écran (existait mais n'était reliée
+            à aucun bouton, donc invisible). Entrée festive et bien visible. */}
+        {(totals.nb>0) && (
+          <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
+            style={{width:'100%',display:'flex',alignItems:'center',gap:12,border:'none',borderRadius:16,padding:'14px 16px',marginBottom:12,cursor:'pointer',fontFamily:'inherit',color:'#fff',background:'linear-gradient(120deg,#6a3cff,#a936ff 55%,#ff4fa3)',boxShadow:'0 6px 18px rgba(140,60,255,0.35)'}}>
+            <span style={{fontSize:26}}>🎉</span>
+            <span style={{flex:1,textAlign:'left'}}>
+              <span style={{display:'block',fontSize:15,fontWeight:800,letterSpacing:-0.3}}>Ton Wrapped {new Date().getFullYear()}</span>
+              <span style={{display:'block',fontSize:12,opacity:0.9,fontWeight:500}}>Ta rétrospective animée — appuie pour la vivre</span>
+            </span>
+            <span style={{fontSize:20,fontWeight:800}}>›</span>
+          </button>
+        )}
         {(totals.nb>0) && (
           <div style={{marginBottom:12}}>
             <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
@@ -13473,61 +13503,125 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
-      {/* ── Wrapped du vendeur : rétrospective annuelle ── */}
+      {/* ── Wrapped du vendeur : histoire plein écran façon Spotify Wrapped ── */}
       {showWrapped && (()=>{
-        const w = wrapped; const eur0 = n => `${Math.round(n)} €`;
-        const Tile = ({emoji,big,label,sub}) => (
-          <div style={{background:'rgba(255,255,255,0.12)',borderRadius:16,padding:'14px 14px',display:'flex',flexDirection:'column',gap:2}}>
-            <div style={{fontSize:20}}>{emoji}</div>
-            <div style={{fontSize:22,fontWeight:700,color:'#fff',lineHeight:1.1,letterSpacing:-0.5}}>{big}</div>
-            <div style={{fontSize:11,color:'rgba(255,255,255,0.85)',fontWeight:500}}>{label}</div>
-            {sub && <div style={{fontSize:11,color:'rgba(255,255,255,0.7)'}}>{sub}</div>}
+        const w = wrapped;
+        const eur0 = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
+        // On ne garde QUE les cartes qui ont une donnée réelle (pas d'invention).
+        const cards = [];
+        cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:64,lineHeight:1,marginBottom:14}}>🎉</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:2,textTransform:'uppercase'}}>Ton année</div>
+            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1}}>{w.yr}</div>
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.9)',fontWeight:500,marginTop:14}}>Prête à revivre ta saison de revente ? 👉</div>
           </div>
-        );
-        return (
-        <div onClick={()=>setShowWrapped(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1360,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:520,maxHeight:'90vh',borderRadius:'20px 20px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',background:'linear-gradient(160deg,#7a5cff 0%,#b14cff 55%,#ff5ca8 100%)'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,padding:'16px 18px',flexShrink:0}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:20,fontWeight:700,color:'#fff',letterSpacing:-0.5}}>🎉 Ton année {w.yr}</div>
-                <div style={{fontSize:12,color:'rgba(255,255,255,0.85)',fontWeight:500}}>Shop Cancale35 · rétrospective</div>
-              </div>
-              {w.years.length>1 && (
-                <select value={w.yr} onChange={e=>setWrappedYear(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'6px 10px',fontSize:12,fontWeight:600,background:'rgba(255,255,255,0.2)',color:'#fff',cursor:'pointer'}}>
-                  {w.years.map(y=><option key={y} value={y} style={{color:'#111'}}>{y}</option>)}
-                </select>
-              )}
-              <button type="button" onClick={()=>setShowWrapped(false)} style={{border:'none',background:'rgba(255,255,255,0.2)',color:'#fff',width:32,height:32,borderRadius:999,fontSize:20,cursor:'pointer',lineHeight:1}}>×</button>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:'0 16px 20px'}}>
-              {w.nb===0 ? <div style={{color:'#fff',textAlign:'center',padding:'40px 0',fontSize:15,fontWeight:500}}>Aucune vente finalisée en {w.yr}.</div> : (<>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-                  <Tile emoji="👟" big={w.nb} label="paires vendues"/>
-                  <Tile emoji="💰" big={eur0(w.ca)} label="chiffre d'affaires"/>
-                  {w.benefNb>0 && <Tile emoji="📈" big={eur0(w.benef)} label="bénéfice net" sub={`sur ${w.benefNb} paires chiffrées`}/>}
-                  <Tile emoji="🏷️" big={eur0(w.avg)} label="prix de vente moyen"/>
-                  {w.topBrand && <Tile emoji="⭐" big={w.topBrand[0]} label="marque star" sub={`${w.topBrand[1]} vendues`}/>}
-                  {w.bestMonth && <Tile emoji="📅" big={w.bestMonth.nom} label="mois record" sub={eur0(w.bestMonth.v)}/>}
-                  {w.streak>1 && <Tile emoji="🔥" big={`${w.streak} j`} label="plus longue série" sub="jours d'affilée avec une vente"/>}
-                  {w.fastest && <Tile emoji="⚡" big={`${w.fastest.j} j`} label="vente la plus rapide" sub={w.fastest.num?`N°${w.fastest.num}`:''}/>}
-                  {w.slowest && <Tile emoji="🐌" big={`${w.slowest.j} j`} label="la plus patiente" sub={w.slowest.num?`N°${w.slowest.num}`:''}/>}
-                </div>
-                {w.bestPair && (
-                  <div style={{background:'rgba(255,255,255,0.16)',borderRadius:16,padding:14,display:'flex',gap:12,alignItems:'center'}}>
-                    <div style={{width:52,height:52,borderRadius:12,overflow:'hidden',background:'rgba(0,0,0,0.2)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👑</span>}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:11,color:'rgba(255,255,255,0.85)',fontWeight:600,textTransform:'uppercase',letterSpacing:1}}>👑 Paire de l'année</div>
-                      <div style={{fontSize:15,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
-                      <div style={{fontSize:12,color:'#fff',fontWeight:600}}>+{eur0(w.bestPair.m)} de bénéfice</div>
-                    </div>
-                  </div>
-                )}
-                <div style={{textAlign:'center',color:'rgba(255,255,255,0.8)',fontSize:11,marginTop:14,fontWeight:500}}>Continue comme ça 🚀</div>
-              </>)}
-            </div>
+        )});
+        if(w.nb>0) cards.push({ bg:'linear-gradient(160deg,#0f6bff 0%,#22c1e0 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:6}}>👟</div>
+            <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,display:'block'}}/>
+            <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>paires vendues</div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque paire, une petite victoire. 💪</div>
           </div>
-        </div>
-        );
+        )});
+        cards.push({ bg:'linear-gradient(160deg,#0a8f5b 0%,#3ad07f 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:6}}>💰</div>
+            <CountUp value={w.ca} format={eur0} style={{fontSize:72,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1,display:'block'}}/>
+            <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:8}}>de chiffre d'affaires</div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Prix de vente moyen : <b>{eur0(w.avg)}</b></div>
+          </div>
+        )});
+        if(w.topBrand) cards.push({ bg:'linear-gradient(160deg,#ff7a00 0%,#ff3d54 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:6}}>⭐</div>
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta marque star</div>
+            <div style={{fontSize:52,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
+            <div style={{fontSize:16,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> paires vendues</div>
+          </div>
+        )});
+        if(w.bestMonth) cards.push({ bg:'linear-gradient(160deg,#c2179c 0%,#7a3cff 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:6}}>📅</div>
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ton mois record</div>
+            <div style={{fontSize:56,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1,marginTop:6}}>{w.bestMonth.nom}</div>
+            <div style={{fontSize:20,color:'#fff',fontWeight:700,marginTop:10}}>{eur0(w.bestMonth.v)}</div>
+          </div>
+        )});
+        if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Paire de l'année</div>
+            <div style={{width:130,height:130,borderRadius:20,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
+            <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
+            <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
+          </div>
+        )});
+        if(w.fastest) cards.push({ bg:'linear-gradient(160deg,#00b4d8 0%,#0a6bff 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:6}}>⚡</div>
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Vente éclair</div>
+            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
+            <div style={{fontSize:15,color:'#fff',fontWeight:500,marginTop:10,padding:'0 24px'}}>entre la mise en ligne et la vente{w.fastest.num?` · N°${w.fastest.num}`:''}</div>
+          </div>
+        )});
+        if(w.streak>1) cards.push({ bg:'linear-gradient(160deg,#ff3d54 0%,#ff8a00 100%)', body:(
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:48,marginBottom:6}}>🔥</div>
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta plus longue série</div>
+            <div style={{fontSize:88,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
+            <div style={{fontSize:18,color:'#fff',fontWeight:600}}>jours d'affilée avec une vente</div>
+          </div>
+        )});
+        cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', last:true, body:(
+          <div style={{textAlign:'center',width:'100%'}}>
+            <div style={{fontSize:52,marginBottom:10}}>🚀</div>
+            <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>Quelle année, Julien !</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>paires vendues</div></div>
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
+              {w.topBrand && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.topBrand[0]}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>marque star</div></div>}
+              {w.bestMonth && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.bestMonth.nom}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>mois record</div></div>}
+            </div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:18,fontWeight:500}}>On remet ça l'année prochaine ? 👊</div>
+          </div>
+        )});
+        const step = Math.min(wrapStep, cards.length-1);
+        const cur = cards[step];
+        const next = ()=>{ if(step>=cards.length-1) setShowWrapped(false); else setWrapStep(step+1); };
+        const prev = ()=>{ if(step>0) setWrapStep(step-1); };
+        if(w.nb===0){
+          // ⚠️ createPortal vers document.body : sinon l'overlay est « piégé »
+          // dans le contexte d'empilement de <main> et la barre du haut / du bas
+          // passent PAR-DESSUS (peu importe le z-index). Le portail l'en sort.
+          return createPortal(
+            <div onClick={()=>setShowWrapped(false)} style={{position:"fixed",inset:0,zIndex:5000,background:"linear-gradient(160deg,#6a3cff,#ff4fa3)",display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+              <div style={{textAlign:'center',color:'#fff'}}><div style={{fontSize:48}}>🎉</div><div style={{fontSize:18,fontWeight:600,marginTop:10}}>Aucune vente finalisée en {w.yr}.</div><div style={{fontSize:13,opacity:0.85,marginTop:6}}>Reviens en fin d'année pour ta rétrospective !</div></div>
+            </div>, document.body);
+        }
+        return createPortal(
+        <div style={{position:"fixed",inset:0,zIndex:5000,background:cur.bg,transition:'background .5s ease',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          {/* Barres de progression façon story */}
+          <div style={{display:'flex',gap:4,padding:'calc(12px + env(safe-area-inset-top)) 12px 8px'}}>
+            {cards.map((c,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:999,background:'rgba(255,255,255,0.3)',overflow:'hidden'}}><div style={{height:'100%',width:i<step?'100%':i===step?'100%':'0%',background:'#fff',transformOrigin:'left',animation:i===step?'wrapBar 0.5s ease both':'none'}}/></div>))}
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'2px 16px 0'}}>
+            <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>🎉 Wrapped {w.yr}</div>
+            {w.years.length>1 && step===0 && (
+              <select value={w.yr} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedYear(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'5px 10px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
+                {w.years.map(y=><option key={y} value={y} style={{color:'#111'}}>{y}</option>)}
+              </select>
+            )}
+            <button type="button" onClick={()=>setShowWrapped(false)} aria-label="Fermer" style={{border:'none',background:'rgba(255,255,255,0.22)',color:'#fff',width:32,height:32,borderRadius:999,fontSize:20,cursor:'pointer',lineHeight:1,flexShrink:0}}>×</button>
+          </div>
+          {/* Contenu de la carte + zones tactiles (gauche = précédent, droite = suivant) */}
+          <div style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 22px'}}>
+            <div key={step} style={{width:'100%',maxWidth:460,animation:'wrapPop .45s cubic-bezier(.2,.7,.2,1) both'}}>{cur.body}</div>
+            <div onClick={prev} style={{position:'absolute',left:0,top:0,bottom:0,width:'32%',cursor:'pointer'}} aria-label="Précédent"/>
+            <div onClick={next} style={{position:'absolute',right:0,top:0,bottom:0,width:'68%',cursor:'pointer'}} aria-label="Suivant"/>
+          </div>
+          <div style={{textAlign:'center',padding:'0 0 calc(18px + env(safe-area-inset-bottom))',fontSize:12,color:'rgba(255,255,255,0.8)',fontWeight:500}}>{cur.last?'Touche pour fermer':'Touche pour continuer →'}</div>
+        </div>, document.body);
       })()}
 
       {/* ── Planificateur de tournée : colis à retirer groupés par point relais ── */}
