@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v75/00 · notifs auto-renouvelées + Wrapped';
+const BUILD_ID = 'v76/00 · Wrapped mois/année + offres traitées';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -534,6 +534,9 @@ const SYNC_KEYS = [
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
+  // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
+  // « Ma journée ». Clé = receivedAt|article. Synchronisé entre appareils.
+  'vinted_offers_done',
   // Atelier de republication : brouillons de nouvelles versions d'annonces
   // (titre/description/prix préparés, avec l'historique des versions). Synchronisé
   // pour retrouver son travail sur un autre appareil.
@@ -8122,6 +8125,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ── Atelier de republication ──────────────────────────────────────────────
   // Brouillons de nouvelles versions d'annonces : clé = id d'annonce wardrobe,
   // valeur = { title, desc, price, versions:[{title,desc,price,at,scoreBefore,scoreAfter}], updatedAt }.
+  // Offres traitées à la main (bouton « ✓ Répondu ») : mémorisées par clé
+  // receivedAt|article pour ne plus les afficher dans Ma journée.
+  const [offersDone, setOffersDone] = useState(() => new Set(load('vinted_offers_done', []) || []));
+  const offerKey = (o) => `${o.receivedAt||''}|${normTitle(o.article||'')}`;
+  const markOfferDone = (o) => setOffersDone(prev => { const n = new Set(prev); n.add(offerKey(o)); save('vinted_offers_done', [...n]); return n; });
   const [drafts, setDrafts] = useState(() => load('vinted_annonce_drafts', {}));
   const [repubEdit, setRepubEdit] = useState(null);   // { it } → modale d'édition d'une nouvelle version
   const [repubForm, setRepubForm] = useState(null);   // { title, desc, price } en cours d'édition
@@ -10168,12 +10176,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showWrapped, setShowWrapped] = useState(false);
   const [wrapStep, setWrapStep] = useState(0); // carte courante de l'histoire Wrapped
   const [wrappedYear, setWrappedYear] = useState(() => new Date().getFullYear());
+  const [wrappedMode, setWrappedMode] = useState('month'); // 'month' | 'year' — récap du mois ou de l'année
+  const [wrappedMonth, setWrappedMonth] = useState(() => new Date().getMonth());
   // ⚠️ APRÈS wrappedYear (piège TDZ §19 : un effet qui lit wrappedYear dans ses
   // deps avant sa déclaration plante au rendu — « Cannot access before init »).
-  useEffect(()=>{ if(showWrapped) setWrapStep(0); }, [showWrapped, wrappedYear]);
+  useEffect(()=>{ if(showWrapped) setWrapStep(0); }, [showWrapped, wrappedYear, wrappedMode, wrappedMonth]);
   const wrapped = useMemo(() => {
-    const yr = wrappedYear;
-    const items = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='completed' && o.date && new Date(o.date).getFullYear()===yr);
+    const yr = wrappedYear; const mode = wrappedMode; const mo = wrappedMonth;
+    const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    const inPeriod = (d) => d.getFullYear()===yr && (mode==='year' || d.getMonth()===mo);
+    // ⚠️ On compte par DATE de vente (hors annulées), PAS seulement les
+    // finalisées — sinon le mois EN COURS est vide (une vente ne se finalise
+    // qu'~2 semaines après). Même logique que le CA du mois du tableau de bord.
+    const items = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && o.date && inPeriod(new Date(o.date)));
     let ca=0, benef=0, benefNb=0; const brands={}; const monthsCA=Array(12).fill(0); const dates=new Set();
     let fastest=null, slowest=null, bestPair=null;
     for (const o of items) {
@@ -10185,14 +10200,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(e&&e.numberedAt){ const j=(d-new Date(e.numberedAt))/86400000; if(j>=0&&j<3650){ if(!fastest||j<fastest.j) fastest={j:Math.round(j),title:o.title,num:e&&e.numero}; if(!slowest||j>slowest.j) slowest={j:Math.round(j),title:o.title,num:e&&e.numero}; } }
     }
     const topBrand = Object.entries(brands).sort((a,b)=>b[1]-a[1])[0] || null;
-    const moisNoms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-    let bestMonth=null; monthsCA.forEach((v,i)=>{ if(v>0 && (!bestMonth||v>bestMonth.v)) bestMonth={i,v}; });
+    // « Mois record » n'a de sens qu'en mode ANNÉE (comparer les 12 mois).
+    let bestMonth=null; if(mode==='year') monthsCA.forEach((v,i)=>{ if(v>0 && (!bestMonth||v>bestMonth.v)) bestMonth={i,v}; });
     const dayNums=[...dates].map(s=>{ const [Y,M,D]=s.split('-').map(Number); return Math.floor(new Date(Y,M,D).getTime()/86400000); }).sort((a,b)=>a-b);
     let streak=dayNums.length?1:0, run=1; for(let i=1;i<dayNums.length;i++){ if(dayNums[i]===dayNums[i-1]+1){ run++; streak=Math.max(streak,run);} else if(dayNums[i]!==dayNums[i-1]) run=1; }
-    const years=[...new Set((sales.items||[]).filter(o=>o.date&&classifyOrderStatus(o.status)==='completed').map(o=>new Date(o.date).getFullYear()))].sort((a,b)=>b-a);
-    return { yr, nb:items.length, ca, benef, benefNb, bestPair, topBrand, bestMonth:bestMonth?{nom:moisNoms[bestMonth.i],v:bestMonth.v}:null, fastest, slowest, avg: items.length?ca/items.length:0, streak, years };
+    const years=[...new Set((sales.items||[]).filter(o=>o.date&&classifyOrderStatus(o.status)!=='cancelled').map(o=>new Date(o.date).getFullYear()))].sort((a,b)=>b-a);
+    const periodLabel = mode==='month' ? `${moisNoms[mo]} ${yr}` : String(yr);
+    return { yr, mode, mo, moisNoms, periodLabel, nb:items.length, ca, benef, benefNb, bestPair, topBrand, bestMonth:bestMonth?{nom:moisNoms[bestMonth.i],v:bestMonth.v}:null, fastest, slowest, avg: items.length?ca/items.length:0, streak, years };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, wrappedYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, wrappedYear, wrappedMode, wrappedMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
   // ── Stats de sourcing : quelles marques / tailles rapportent le plus ──
   // Agrège les ventes finalisées (hors masquées) par marque et par taille :
@@ -10920,12 +10936,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 le titre de l'offre à une de tes annonces en ligne. Répondre se
                 fait sur Vinted (l'app n'envoie pas de message, cf. §5). */}
             {!loading && (offers||[]).length>0 && (()=>{
-              const recent=(offers||[]).filter(o=>{const d=o.receivedAt?new Date(o.receivedAt).getTime():0; return d>=Date.now()-14*86400000;})
-                .sort((a,b)=>new Date(b.receivedAt||0)-new Date(a.receivedAt||0)).slice(0,6);
+              // OFFRE ACCEPTÉE = l'article est désormais VENDU (elle sort d'elle-même
+              // dès que la vente est moissonnée). + offres marquées « répondu » à la
+              // main. + on ne garde que les 14 derniers jours (une offre expire vite).
+              const soldTitles = new Set((sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled').map(o=>normTitle(o.title)).filter(Boolean));
+              const recent=(offers||[]).filter(o=>{
+                const d=o.receivedAt?new Date(o.receivedAt).getTime():0;
+                if(d < Date.now()-14*86400000) return false;
+                if(offersDone.has(offerKey(o))) return false;                 // « ✓ Répondu » à la main
+                if(soldTitles.has(normTitle(o.article||''))) return false;    // acceptée → vendue
+                return true;
+              }).sort((a,b)=>new Date(b.receivedAt||0)-new Date(a.receivedAt||0)).slice(0,6);
               if(!recent.length) return null;
               // Photo : l'offre n'en porte pas → on la retrouve sur une annonce en
-              // ligne du même titre, sinon sur une vente moissonnée (qui a la vraie
-              // photo Vinted). Sinon rien (placeholder honnête).
+              // ligne du même titre, sinon sur une vente moissonnée (vraie photo
+              // Vinted). Sinon rien (placeholder honnête).
               const photoFor=(t)=>{const n=normTitle(t||''); if(!n) return null;
                 const inList=(listings.items||[]).find(it=>normTitle(it.title)===n); if(inList&&inList.photo) return inList.photo;
                 const inSold=(sales.items||[]).find(o=>normTitle(o.title)===n); if(inSold) return inSold.photo_url||(inSold.photo&&inSold.photo.url)||null;
@@ -10937,14 +10962,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {recent.map((o,i)=>{
                       const ph=photoFor(o.article);
                       return (
-                        <a key={i} href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',gap:11,padding:'9px 11px',borderRadius:14,border:`1px solid ${C.border}`,background:C.card,textDecoration:'none',boxShadow:C.shadow||'none'}}>
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 11px',borderRadius:14,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',flexWrap:'wrap'}}>
                           <div style={{width:44,height:44,borderRadius:10,overflow:'hidden',background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{ph?<img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>🏷️</span>}</div>
-                          <div style={{flex:1,minWidth:0}}>
+                          <div style={{flex:'1 1 130px',minWidth:0}}>
                             <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.article||'Article'}</div>
                             <div style={{fontSize:11,color:C.muted,marginTop:1}}>{o.montant?`Offre : ${o.montant}`:'Offre reçue'}{o.receivedAt?` · ${new Date(o.receivedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`:''}</div>
                           </div>
-                          <span style={{flexShrink:0,fontSize:11,fontWeight:600,color:C.accent}}>Répondre ›</span>
-                        </a>
+                          <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',fontSize:11.5,fontWeight:700,color:'#fff',background:C.accent,borderRadius:10,padding:'7px 11px'}}>Répondre</a>
+                          <button type="button" onClick={()=>markOfferDone(o)} title="J'ai répondu / traité cette offre" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>✓ Répondu</button>
+                        </div>
                       );
                     })}
                   </div>
@@ -13512,9 +13538,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:64,lineHeight:1,marginBottom:14}}>🎉</div>
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:2,textTransform:'uppercase'}}>Ton année</div>
-            <div style={{fontSize:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1}}>{w.yr}</div>
-            <div style={{fontSize:14,color:'rgba(255,255,255,0.9)',fontWeight:500,marginTop:14}}>Prête à revivre ta saison de revente ? 👉</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:2,textTransform:'uppercase'}}>{w.mode==='month'?'Ton mois':'Ton année'}</div>
+            <div style={{fontSize:w.mode==='month'?52:76,fontWeight:800,color:'#fff',letterSpacing:-2,lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
+            {w.mode==='month' && <div style={{fontSize:20,fontWeight:700,color:'rgba(255,255,255,0.9)'}}>{w.yr}</div>}
+            <div style={{fontSize:14,color:'rgba(255,255,255,0.9)',fontWeight:500,marginTop:14}}>Prêt à revivre {w.mode==='month'?'ton mois':'ta saison'} ? 👉</div>
           </div>
         )});
         if(w.nb>0) cards.push({ bg:'linear-gradient(160deg,#0f6bff 0%,#22c1e0 100%)', body:(
@@ -13576,7 +13603,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         cards.push({ bg:'linear-gradient(160deg,#6a3cff 0%,#a936ff 50%,#ff4fa3 100%)', last:true, body:(
           <div style={{textAlign:'center',width:'100%'}}>
             <div style={{fontSize:52,marginBottom:10}}>🚀</div>
-            <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>Quelle année, Julien !</div>
+            <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{w.mode==='month'?'Quel mois, Julien !':'Quelle année, Julien !'}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>paires vendues</div></div>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
@@ -13596,7 +13623,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // passent PAR-DESSUS (peu importe le z-index). Le portail l'en sort.
           return createPortal(
             <div onClick={()=>setShowWrapped(false)} style={{position:"fixed",inset:0,zIndex:5000,background:"linear-gradient(160deg,#6a3cff,#ff4fa3)",display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-              <div style={{textAlign:'center',color:'#fff'}}><div style={{fontSize:48}}>🎉</div><div style={{fontSize:18,fontWeight:600,marginTop:10}}>Aucune vente finalisée en {w.yr}.</div><div style={{fontSize:13,opacity:0.85,marginTop:6}}>Reviens en fin d'année pour ta rétrospective !</div></div>
+              <div style={{textAlign:'center',color:'#fff'}}><div style={{fontSize:48}}>🎉</div><div style={{fontSize:18,fontWeight:600,marginTop:10}}>Aucune vente finalisée · {w.periodLabel}.</div><div style={{fontSize:13,opacity:0.85,marginTop:6}}>{w.mode==='month'?'Choisis un autre mois en haut.':'Reviens plus tard pour ta rétrospective !'}</div></div>
             </div>, document.body);
         }
         return createPortal(
@@ -13606,12 +13633,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {cards.map((c,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:999,background:'rgba(255,255,255,0.3)',overflow:'hidden'}}><div style={{height:'100%',width:i<step?'100%':i===step?'100%':'0%',background:'#fff',transformOrigin:'left',animation:i===step?'wrapBar 0.5s ease both':'none'}}/></div>))}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'2px 16px 0'}}>
-            <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>🎉 Wrapped {w.yr}</div>
-            {w.years.length>1 && step===0 && (
-              <select value={w.yr} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedYear(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'5px 10px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
-                {w.years.map(y=><option key={y} value={y} style={{color:'#111'}}>{y}</option>)}
-              </select>
-            )}
+            <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>🎉 Wrapped · {w.periodLabel}</div>
+            {step===0 && (<>
+              {/* Bascule Mois / Année (sur la carte d'intro). stopPropagation
+                  pour ne pas déclencher le « touche pour continuer ». */}
+              <div onClick={e=>e.stopPropagation()} style={{display:'flex',background:'rgba(255,255,255,0.2)',borderRadius:999,padding:2}}>
+                {[['month','Mois'],['year','Année']].map(([m,lbl])=>(
+                  <button key={m} type="button" onClick={()=>setWrappedMode(m)} style={{border:'none',borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:700,cursor:'pointer',background:w.mode===m?'#fff':'transparent',color:w.mode===m?'#7a3cff':'#fff'}}>{lbl}</button>
+                ))}
+              </div>
+              {w.mode==='month' && (
+                <select value={w.mo} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedMonth(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'5px 8px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
+                  {w.moisNoms.map((nm,i)=><option key={i} value={i} style={{color:'#111'}}>{nm}</option>)}
+                </select>
+              )}
+              {w.mode==='year' && w.years.length>1 && (
+                <select value={w.yr} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedYear(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'5px 10px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
+                  {w.years.map(y=><option key={y} value={y} style={{color:'#111'}}>{y}</option>)}
+                </select>
+              )}
+            </>)}
             <button type="button" onClick={()=>setShowWrapped(false)} aria-label="Fermer" style={{border:'none',background:'rgba(255,255,255,0.22)',color:'#fff',width:32,height:32,borderRadius:999,fontSize:20,cursor:'pointer',lineHeight:1,flexShrink:0}}>×</button>
           </div>
           {/* Contenu de la carte + zones tactiles (gauche = précédent, droite = suivant) */}
