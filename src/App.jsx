@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v78/00 · Argent en attente unifié + colis à retirer (union) + photos';
+const BUILD_ID = 'v79/00 · Photo de la paire dans la modale de retrait (QR/code)';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -8434,9 +8434,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // UNE seule règle décide quoi présenter au comptoir, selon le transporteur
     // (retraitMode) — plus de logique QR/code éparpillée ici.
     const r = retraitMode(t);
+    // Photo de la paire (savoir laquelle on va chercher / si on l'a déjà retirée) :
+    // les achats moissonnés portent la vraie photo Vinted → on la retrouve par titre.
+    const pt = normTitle(t.artTitle || t.article || t.modele || '');
+    const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && (o.photo || o.photo_url)) || {}) : {};
     const base = {
       title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '',
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
+      photo: t.photo || ph.photo || ph.photo_url || null,
       mode: r.mode, _t: t,
     };
     if (r.mode === 'qr' && t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
@@ -14273,6 +14278,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {qrView && (
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:20,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+            {qrView.photo && <img src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:12,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
             {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
                 pas, on bascule sur le code — surtout pas sur un QR fabriqué. */}
