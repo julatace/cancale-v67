@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v79/00 · Photo de la paire dans la modale de retrait (QR/code)';
+const BUILD_ID = 'v80/00 · Achats hors Vinted : relier à une annonce (remplit le N°)';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -12013,6 +12013,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {offOpen && (
             <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:9,background:C.bg,borderRadius:12,padding:'12px',border:`1px solid ${C.border}`}}>
               <Field label="Désignation"><input value={offDraft.title} onChange={e=>setOffDraft(d=>({...d,title:e.target.value}))} placeholder="ex : Nike P-6000 argenté 38" style={inp} autoFocus/></Field>
+              {/* Relier directement à une annonce EN LIGNE : remplit son N° tout
+                  seul → plus besoin de le retenir, et le prix payé arrive au bon
+                  endroit dans le calcul de bénéfice (utile pour un vrai pro qui
+                  source ailleurs mais revend sur Vinted). */}
+              {(()=>{ const opts = annBase.filter(it=>String((numeros[it.id]||{}).numero||'').trim()).sort((a,b)=>Number((numeros[a.id]||{}).numero)-Number((numeros[b.id]||{}).numero)); return opts.length>0 ? (
+                <Field label="Relier à une annonce en ligne (remplit le N°)">
+                  <select value="" onChange={e=>{ const it=annBase.find(x=>String(x.id)===e.target.value); if(!it) return; const nn=String((numeros[it.id]||{}).numero||''); setOffDraft(d=>({...d, numero:nn||d.numero, title:d.title.trim()?d.title:(it.title||'')})); }} style={inp}>
+                    <option value="">— optionnel : choisir une de tes annonces —</option>
+                    {opts.map(it=>{ const nn=(numeros[it.id]||{}).numero; return <option key={it.id} value={String(it.id)}>N°{nn} · {(it.title||'').slice(0,40)}</option>; })}
+                  </select>
+                </Field>
+              ) : null; })()}
               <div style={{display:'flex',gap:9}}>
                 <Field label="Prix payé €"><input value={offDraft.price} onChange={e=>setOffDraft(d=>({...d,price:e.target.value}))} inputMode="decimal" placeholder="0" style={inp}/></Field>
                 <Field label="N° de la paire"><input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.replace(/[^\d]/g,'')}))} inputMode="numeric" placeholder={String(nextNumero)} style={inp}/></Field>
