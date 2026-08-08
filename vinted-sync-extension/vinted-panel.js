@@ -739,34 +739,45 @@
     });
   }
 
-  // ── ONGLET ACHATS : colis à retirer (point relais / bureau de poste) ─────────
-  // Liste les achats dont le statut Vinted dit « déposé en point relais ». Un
-  // bouton « ✓ Récupéré » les enlève (colis pris), annulable (« ↺ Remettre »).
-  // On lit la moisson (0 requête Vinted) et on écrit dans la ligne dédiée
-  // `panel_pickup_done` — jamais dans `main`, l'app s'aligne à sa synchro.
+  // ── ONGLET ACHATS : colis à retirer, AVEC LE CODE DE RETRAIT ─────────────────
+  // Source = les emails de suivi (seule source du code + point relais). Le code
+  // s'affiche en GROS pour le présenter au comptoir sans ouvrir l'app. Bouton
+  // « ✓ Récupéré » (annulable). On écrit dans la ligne dédiée
+  // `panel_colis_collected` — jamais dans `main` ; l'app s'aligne à sa synchro.
+  const CARRIER_NAMES = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', relaiscolis: 'Relais Colis', colissimo: 'Colissimo', shop2shop: 'Shop2Shop', inpost: 'InPost', ups: 'UPS', dpd: 'DPD', gls: 'GLS', dhl: 'DHL', fedex: 'FedEx', vinted: 'Vinted Go', autre: 'Colis' };
+  const cleanLieuLite = (s) => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return (t && t.length <= 70) ? t : ''; };
   function renderAchats() {
     const all = (DATA && DATA.pickups) || [];
-    const list = all.filter(p => !pickupDoneLocal.has(p.transaction));
-    const gotten = all.filter(p => pickupDoneLocal.has(p.transaction));
+    const list = all.filter(p => !pickupDoneLocal.has(p.key));
+    const gotten = all.filter(p => pickupDoneLocal.has(p.key));
     if (!list.length && !gotten.length) {
-      return `<div class="vrm-m">✓ Aucun colis à retirer pour l'instant.</div><div class="vrm-m" style="margin-top:6px">Ouvre tes achats sur Vinted pour capter les statuts, ou « 🔄 » en haut pour rafraîchir.</div>`;
+      return `<div class="vrm-m">✓ Aucun colis à retirer pour l'instant.</div><div class="vrm-m" style="margin-top:6px">Les colis « disponibles » (avec code de retrait) apparaissent ici dès que le mail du transporteur arrive.</div>`;
     }
-    const row = (p) => `
-      <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
-        ${p.photo ? `<img src="${esc(p.photo)}" alt="" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0">` : '<span style="font-size:22px;flex-shrink:0">📦</span>'}
-        <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title || 'Colis')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.status || 'à retirer')}${p.price != null ? ` · ${fmt(p.price)}` : ''}</div></div>
-        <button class="vrm-pk-done" data-k="${esc(p.transaction)}" title="Marquer récupéré → le retire de la liste" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Récupéré</button>
+    const row = (p) => {
+      const carrier = CARRIER_NAMES[p.carrier] || (p.carrier || 'Colis');
+      const lieu = cleanLieuLite(p.lieu);
+      return `
+      <div class="vrm-card" style="margin-bottom:8px;padding:9px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:20px;flex-shrink:0">📦</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title || 'Colis')}</div><div class="vrm-m">${esc(carrier)}${lieu ? ` · ${esc(lieu)}` : ''}</div></div>
+          <button class="vrm-pk-done" data-k="${esc(p.key)}" title="Marquer récupéré → le retire de la liste" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Récupéré</button>
+        </div>
+        ${p.code ? `<div style="margin-top:7px;text-align:center;background:#f2f7f4;border:1px dashed #0f6b4f;border-radius:10px;padding:8px"><div class="vrm-m" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Code de retrait</div><div style="font-weight:800;font-size:26px;letter-spacing:3px;color:#0f6b4f;font-variant-numeric:tabular-nums">${esc(p.code)}</div>${p.code2 ? `<div class="vrm-m" style="margin-top:2px">Code d'ouverture : <b>${esc(p.code2)}</b></div>` : ''}</div>`
+          : (p.qrUrl ? `<div class="vrm-m" style="margin-top:6px">📱 QR de retrait — présente-le au comptoir (dans l'app, onglet Achats).</div>`
+          : `<div class="vrm-m" style="margin-top:6px">Présente-toi au point relais avec une pièce d'identité.</div>`)}
       </div>`;
+    };
     const gotRow = (p) => `
       <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;opacity:.7">
         <span style="font-size:20px;flex-shrink:0">✓</span>
         <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:line-through">${esc(p.title || 'Colis')}</div></div>
-        <button class="vrm-pk-undo" data-k="${esc(p.transaction)}" title="Annuler : le remettre à retirer" style="flex-shrink:0;border:1px solid #b0b6bf;background:transparent;color:#556;border-radius:8px;padding:6px 9px;font-weight:700;font-size:12px;cursor:pointer">↺ Remettre</button>
+        <button class="vrm-pk-undo" data-k="${esc(p.key)}" title="Annuler : le remettre à retirer" style="flex-shrink:0;border:1px solid #b0b6bf;background:transparent;color:#556;border-radius:8px;padding:6px 9px;font-weight:700;font-size:12px;cursor:pointer">↺ Remettre</button>
       </div>`;
     return `
       ${list.length ? `<div class="vrm-m" style="font-weight:800;margin-bottom:6px">📦 ${list.length} colis à retirer</div>${list.slice(0, 60).map(row).join('')}` : ''}
       ${gotten.length ? `<div class="vrm-m" style="font-weight:700;margin:8px 0 6px;color:#0f6b4f">✅ ${gotten.length} récupéré${gotten.length > 1 ? 's' : ''}</div>${gotten.slice(0, 60).map(gotRow).join('')}` : ''}
-      <div class="vrm-m" style="margin-top:6px;opacity:.85">Le retrait (code / QR / point relais) reste dans l'app. Ici tu vides juste la liste quand c'est fait.</div>`;
+      <div class="vrm-m" style="margin-top:6px;opacity:.85">Mondial Relay = code + pièce d'identité. Chronopost = QR (dans l'app).</div>`;
   }
   function wireAchats() {
     panel.querySelectorAll('.vrm-pk-done').forEach(b => {

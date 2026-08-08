@@ -1034,17 +1034,17 @@ async function markBordDone(key, done) {
 }
 
 // « ✓ Récupéré » un colis à retirer depuis le panneau. Même principe que
-// markBordDone : ligne DÉDIÉE `panel_pickup_done` = { transaction_id: ts }, jamais
+// markBordDone : ligne DÉDIÉE `panel_colis_collected` = { colisKey: ts }, jamais
 // `main`. Le panneau la relit pour vider la liste ; l'app la LIT comme source de
-// « déjà récupéré » supplémentaire. Clé = transaction_id (comme `vinted_pickup_done`).
+// « déjà récupéré » supplémentaire. Clé = `suivi || subject` (comme `colisKey`).
 async function markPickupDone(key, done) {
   const k = String(key || '').trim();
   if (!k) return false;
-  const rows = await sbGet('app_data?id=eq.panel_pickup_done&select=data');
+  const rows = await sbGet('app_data?id=eq.panel_colis_collected&select=data');
   const cur = (rows && rows[0] && rows[0].data) || {};
   if (done === false) delete cur[k];
   else cur[k] = Date.now();
-  return await supabaseUpsert('app_data', [{ id: 'panel_pickup_done', data: cur }], 'id');
+  return await supabaseUpsert('app_data', [{ id: 'panel_colis_collected', data: cur }], 'id');
 }
 
 // ── ASSISTANT DE RÉPONSE (spec « Messaging Intelligence ») ───────────────────
@@ -1185,32 +1185,38 @@ async function buildPanelData() {
       });
     }
   }
-  // ── ACHATS À RETIRER (colis en point relais / bureau de poste) ──────────────
-  // Même règle que l'app (`isAtRelayStatus`) : achat dont le statut Vinted dit
-  // « déposé » + « point relais / bureau de poste ». On exclut ceux déjà marqués
-  // récupérés — par l'app (`vinted_pickup_done`, ligne main) OU depuis le panneau
-  // (`panel_pickup_done`, ligne dédiée). Clé = transaction_id (comme l'app).
-  const isAtRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
-  const pickupDoneApp = d.vinted_pickup_done || {};
-  const ppRows = await sbGet('app_data?id=eq.panel_pickup_done&select=data');
-  const pickupDonePanel = (ppRows && ppRows[0] && ppRows[0].data) || {};
-  const purchasedRows = await sbGet('app_data?id=like.harvest_*_orders_purchased&select=data') || [];
+  // ── ACHATS À RETIRER (colis en point relais) — AVEC LE CODE DE RETRAIT ───────
+  // Source = les emails de suivi `email_track_*` (transporteur → « colis
+  // disponible »), car c'est la SEULE source qui porte le CODE, le point relais et
+  // le QR. Les achats moissonnés (statut Vinted) n'ont pas de code, et les relier
+  // par titre serait une devinette (cf. §24 « plus aucune devinette »).
+  // Même règle que l'app (`isColisRetirable`) : status='available', dans les 14
+  // jours, ET (un lieu OU un code 3-8 chiffres). Clé = `suivi || subject`
+  // (`colisKey` de l'app). Exclut ceux déjà « retirés » — par l'app
+  // (`vrm_colis_collected`) OU depuis le panneau (`panel_colis_collected`).
+  const PICKUP_MAX_DAYS = 14;
+  const collectedApp = new Set((Array.isArray(d.vrm_colis_collected) ? d.vrm_colis_collected : []).map(String));
+  const pcRows = await sbGet('app_data?id=eq.panel_colis_collected&select=data');
+  const collectedPanel = new Set(Object.keys((pcRows && pcRows[0] && pcRows[0].data) || {}));
+  const trackRows = await sbGet("app_data?id=like.email_track_*&select=suivi:data->>suivi,subject:data->>subject,status:data->>status,code:data->>code,code2:data->>code2,lieu:data->>lieu,artTitle:data->>artTitle,carrier:data->>carrier,qrUrl:data->>qrUrl,receivedAt:data->>receivedAt") || [];
   const pickups = [];
   const seenPk = new Set();
-  for (const r of purchasedRows) {
-    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
-    for (const o of orders) {
-      if (!isAtRelay(o.status)) continue;
-      const tx = String(o.transaction_id || '');
-      if (!tx || seenPk.has(tx)) continue; seenPk.add(tx);
-      if (pickupDoneApp[tx] || pickupDonePanel[tx]) continue;
-      pickups.push({
-        transaction: tx, title: o.title || '', status: o.status || '',
-        photo: o.photo || o.photo_url || null,
-        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
-        url: `https://www.vinted.fr/member/transactions/${tx}`,
-      });
-    }
+  for (const t of trackRows) {
+    if (String(t.status || '') !== 'available') continue;
+    const code = String(t.code || '').trim();
+    const hasCode = /^\d{3,8}$/.test(code);
+    const hasLieu = !!String(t.lieu || '').trim();
+    if (!hasCode && !hasLieu) continue; // pas identifiable → écarté
+    const d2 = Date.parse(t.receivedAt || '');
+    if (!isNaN(d2) && (Date.now() - d2) / 86400000 > PICKUP_MAX_DAYS) continue; // trop vieux
+    const key = String(t.suivi || t.subject || '').trim();
+    if (!key || seenPk.has(key)) continue; seenPk.add(key);
+    if (collectedApp.has(key) || collectedPanel.has(key)) continue;
+    pickups.push({
+      key, title: t.artTitle || '', carrier: t.carrier || '',
+      code: hasCode ? code : '', code2: String(t.code2 || '').trim() || '',
+      lieu: String(t.lieu || '').trim(), qrUrl: t.qrUrl || '', suivi: String(t.suivi || '').trim(),
+    });
   }
   // ── CONVERSATIONS (inbox) : pour l'onglet Messages (relance guidée) ──────────
   // Tu sélectionnes des conversations, l'extension t'ouvre chacune une par une,

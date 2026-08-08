@@ -8804,19 +8804,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // retirer » sans attendre que Vinted mette à jour. Synchronisé.
   const [pickupDone, setPickupDone] = useState(() => load('vinted_pickup_done', {}));
   // Colis marqués « ✓ Récupéré » depuis le PANNEAU de l'extension (ligne dédiée
-  // `panel_pickup_done`, jamais `main`). Lecture seule, en source supplémentaire de
-  // « déjà récupéré » — même clé (transaction_id) que `vinted_pickup_done`.
-  const [panelPickupDone, setPanelPickupDone] = useState({});
+  // `panel_colis_collected`, jamais `main`). On les fond dans le set `collected`
+  // (même clé = colisKey) pour qu'ils disparaissent aussi de la liste « à retirer »
+  // de l'app. Lecture seule à l'ouverture : on n'enregistre rien tant que Julien
+  // ne touche à rien (pas de réécriture surprise du store).
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_pickup_done&select=data`, { headers: sbAuth() });
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_collected&select=data`, { headers: sbAuth() });
         if (!res.ok) return;
         const rows = await res.json();
         const data = (rows && rows[0] && rows[0].data) || {};
-        if (alive && data && typeof data === 'object') setPanelPickupDone(data);
-      } catch (_) { /* réseau : on garde {} */ }
+        const keys = Object.keys(data || {});
+        if (alive && keys.length) setCollected(prev => { const n = new Set(prev); keys.forEach(k => n.add(String(k))); return n; });
+      } catch (_) { /* réseau : on garde le set tel quel */ }
     })();
     return () => { alive = false; };
   }, []);
@@ -8855,7 +8857,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const buysBase = useMemo(() => (buys.items || []).filter(o => !acctOffOf(o)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts]);
-  const vintedToPickup = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)] && !panelPickupDone[String(o.transaction_id)]), [buysBase, pickupDone, panelPickupDone]);
+  const vintedToPickup = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
   // « Colis à retirer » = UN SEUL compteur, l'UNION des deux signaux, dédoublonnée
   // par titre : (1) email transporteur (porte le CODE de retrait) + (2) statut
   // Vinted « déposé en point relais ». ⚠️ Avant on prenait « email OU Vinted »
