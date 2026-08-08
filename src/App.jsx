@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v81/00 · Garage 3D : crée ton univers (5 ambiances en direct)';
+const BUILD_ID = 'v82/00 · Consigne Pickup : identifiant + code d\'ouverture captés';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -8481,7 +8481,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pt = normTitle(t.artTitle || t.article || t.modele || '');
     const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && (o.photo || o.photo_url)) || {}) : {};
     const base = {
-      title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', suivi: t.suivi || '',
+      title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', code2: t.code2 || '', suivi: t.suivi || '',
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
       photo: t.photo || ph.photo || ph.photo_url || null,
       mode: r.mode, _t: t,
@@ -14341,9 +14341,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 onError={qrView.hosted ? (()=>setQrView(v=>v?{...v,img:null,real:false,hosted:false}:v)) : undefined}
                 style={{width:'86%',maxWidth:300,aspectRatio:'1',objectFit:'contain',imageRendering:'pixelated'}}/>
             )}
+            {/* Consigne Pickup : DEUX codes — Identifiant + Code d'ouverture — à
+                saisir au casier (ou scanner le QR ci-dessus). */}
+            {qrView.code2 && (
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:9,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>Identifiant</div>
+                <div style={{fontSize:qrView.img?22:30,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:2,lineHeight:1.1}}>{qrView.code2}</div>
+              </div>
+            )}
             {qrView.code && (
               <div style={{textAlign:'center'}}>
-                <div style={{fontSize:9,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>Code de retrait</div>
+                <div style={{fontSize:9,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>{qrView.code2?"Code d'ouverture":'Code de retrait'}</div>
                 {/* Sans QR, LE code est ce qu'on présente au comptoir : il passe en grand. */}
                 <div style={{fontSize:qrView.img?32:44,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:3,lineHeight:1.1}}>{qrView.code}</div>
               </div>
@@ -14359,6 +14367,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:11,color:'#999',textAlign:'center',lineHeight:1.4}}>
               {(()=>{ const cn=qrView.carrierName||carrierName(qrView.carrier);
                 if(qrView.mode==='home') return `${cn} livre à ton adresse : rien à retirer au comptoir.`;
+                if(qrView.code2) return `Consigne Pickup : scanne le QR au casier, ou saisis l'identifiant + le code d'ouverture.`;
                 if(qrView.real) return `QR ${cn} — présente-le au comptoir, le scan suffit.`;
                 if(qrView.code) return `${cn} fonctionne au CODE (pas de QR). Donne ce code au comptoir avec ta pièce d'identité.`;
                 return `Ni QR ni code reçus. Donne le numéro ci-dessus et ta pièce d'identité à ${cn}.`; })()}

@@ -402,6 +402,18 @@ function parseCarrierEmail(mail, carrier) {
     // garde-fou : ne pas confondre avec un code postal
     if (m && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
   }
+  // ── Consigne Pickup / casier automatique (Chronopost Pickup) : le retrait se
+  //    fait avec DEUX codes — un « Identifiant » ET un « Code d'ouverture » — (et
+  //    parfois un QR « Pickup Pass »). Format RÉEL vu sur les emails de Julien
+  //    (août 2026). L'ancien parseur ne reconnaissait ni « code d'ouverture » ni
+  //    « identifiant » → aucun code affiché : c'est LE bug Chronopost signalé. ──
+  let code2 = null; // second code (identifiant du casier), en plus du code d'ouverture
+  {
+    const mOuv = all.match(/code\s+d['e’]?\s*ouverture\s*[:\-]?\s*(\d{3,8})/i);
+    const mId = all.match(/identifiant\s*[:\-]?\s*(\d{3,8})/i);
+    if (mOuv) code = mOuv[1];   // le code d'ouverture devient le code principal
+    if (mId) code2 = mId[1];    // l'identifiant l'accompagne (les DEUX servent au casier)
+  }
   // Titre de l'article (permet de retrouver la photo côté achats)
   const artTitle = ((all.match(/(?:article|commande|achat)\s*[:\-]\s*([^\n]{4,70})/i) || [])[1] || '').trim() || null;
 
@@ -435,8 +447,18 @@ function parseCarrierEmail(mail, carrier) {
     const m = all.match(pat);
     if (m) { lieu = m[1].trim().replace(/\s+/g, ' ').replace(/[.,;]\s*$/, ''); break; }
   }
+  // Consigne Pickup (casier automatique) : « Consigne Pickup <enseigne> » + adresse
+  // « RUE … 35260 CANCALE ». Format réel des emails de casier (août 2026).
+  if (!lieu) {
+    const mC = all.match(/consigne\s+pickup\s+([^\n]{3,50})/i);
+    if (mC) {
+      const nom = ('Consigne Pickup ' + mC[1]).replace(/\s{2,}/g, ' ').replace(/[.,;\s]+$/, '').trim();
+      const mA = all.match(/((?:\d{1,4}\s+)?(?:rue|avenue|av\.|boulevard|bd|impasse|chemin|place|route|all[ée]e)\s[^\n]{2,50}?\b\d{5}\s+[A-Za-zÀ-ÿ' -]{2,40})/i);
+      lieu = mA ? `${nom}, ${mA[1].replace(/\s{2,}/g, ' ').trim()}` : nom;
+    }
+  }
 
-  return { suivi, status, label, code, artTitle, lieu };
+  return { suivi, status, label, code, code2, artTitle, lieu };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -587,12 +609,13 @@ export default async function handler(req, res) {
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
-      if (!qr.qrB64 || !qr.qrUrl || !track.code || !track.lieu || !track.artTitle) {
+      if (!qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle) {
         const prev = await supabaseGetRow(rowId);
         if (prev) {
           if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
           if (!qr.qrUrl && prev.qrUrl) qr.qrUrl = prev.qrUrl;
           if (!track.code && prev.code) track.code = prev.code;
+          if (!track.code2 && prev.code2) track.code2 = prev.code2;
           if (!track.lieu && prev.lieu) track.lieu = prev.lieu;
           if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
         }
@@ -600,7 +623,7 @@ export default async function handler(req, res) {
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
-        code: track.code || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
+        code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         account: acc.login || '',
       } }]);
