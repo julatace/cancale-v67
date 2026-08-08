@@ -16,8 +16,18 @@
 
   const APP_URL = 'https://cancale-v67-ten.vercel.app';
   let DATA = null;
-  let open = false;
-  let tab = 'paire'; // paire | relance | dorment | sansnum | republier
+  // ── Mémoire de navigation du panneau (localStorage, partagé entre onglets
+  //    Vinted) : on garde OUVERT/FERMÉ et l'onglet actif d'une page à l'autre.
+  //    Sinon, dès que tu navigues (ou qu'un flux t'ouvre une annonce dans un
+  //    nouvel onglet), le panneau se refermait et repartait sur « Cette paire »,
+  //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
+  //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
+  //    aucune donnée ni action Vinted là-dedans.
+  const PANEL_TABS = ['paire', 'republier', 'reponse', 'expedier', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
+  const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
+  const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  let open = readLS('vrm_panel_open', '0') === '1';
+  let tab = (() => { const t = readLS('vrm_panel_tab', 'paire'); return PANEL_TABS.includes(t) ? t : 'paire'; })(); // paire | relance | dorment | sansnum | republier | reponse | expedier | messages | favoris
   // ── File de republication ASSISTÉE ─────────────────────────────────────────
   // repubSel = les annonces cochées. repubRun = le défilement une-par-une en
   // cours ({ queue:[ids], idx }). ⚠️ AUCUNE automatisation : le panneau OUVRE
@@ -253,7 +263,7 @@
 
   const panel = document.createElement('div');
   panel.id = 'vrm-panel';
-  panel.style.display = 'none';
+  panel.style.display = open ? 'block' : 'none'; // restauré depuis ta dernière position
   document.documentElement.appendChild(panel);
 
   const card = (o, extra) => `
@@ -304,6 +314,7 @@
   }
 
   function render() {
+    writeLS('vrm_panel_tab', tab); // garde l'onglet actif d'une page à l'autre
     const s = (DATA && DATA.stats) || { online: 0, relance: 0, noNum: 0, value: 0 };
     const fresh = (DATA && DATA.freshestAt) ? ` · capté ${esc(timeago(DATA.freshestAt))}` : '';
     panel.innerHTML = `
@@ -748,6 +759,7 @@
 
   function toggle(v) {
     open = v == null ? !open : v;
+    writeLS('vrm_panel_open', open ? '1' : '0'); // mémorise ouvert/fermé
     panel.style.display = open ? 'block' : 'none';
     // Rafraîchit à l'ouverture si les données datent de plus de 2 min (sinon on
     // garde le cache — pas de lecture Supabase à chaque petit aller-retour).
