@@ -1207,7 +1207,10 @@ async function buildPanelData() {
   const trackFresh = (rows) => { for (const r of (rows || [])) { const t = Date.parse((r.data && r.data.capturedAt) || '') || 0; if (t > freshestAt) freshestAt = t; } };
   trackFresh(lst); trackFresh(soldRows); trackFresh(inboxRows);
   const activity = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
-  return { online, relance, sleeping, noNum, toShip, bordsToPrint, convs, activity, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  // Réponses rapides déjà enregistrées dans l'app (synchronisées) → insérables en
+  // 1 tap depuis le panneau, sur une conversation.
+  const quickReplies = Array.isArray(d.vinted_quick_replies) ? d.vinted_quick_replies.slice(0, 20) : [];
+  return { online, relance, sleeping, noNum, toShip, bordsToPrint, convs, activity, quickReplies, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

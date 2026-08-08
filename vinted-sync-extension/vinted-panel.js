@@ -490,6 +490,13 @@
         : "L'IA n'a pas pu répondre pour l'instant. Réessaie dans un instant.";
       out += `<div class="vrm-m" style="margin-top:10px">${esc(why)}</div>`;
     }
+    // Réponses rapides (celles de ton app, synchronisées) : insérables en 1 tap.
+    const qr = (DATA && DATA.quickReplies) || [];
+    if (qr.length) {
+      out += `<div class="vrm-m" style="font-weight:700;margin:12px 0 5px">⚡ Tes réponses rapides</div><div style="display:flex;flex-direction:column;gap:5px">`
+        + qr.map((t, i) => `<button class="vrm-qr" data-i="${i}" title="Insérer dans Vinted" style="text-align:left;border:1px solid #e6eaee;background:#f8fafb;color:#14181f;border-radius:9px;padding:7px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t)}</button>`).join('')
+        + `</div>`;
+    }
     return out;
   }
 
@@ -534,6 +541,15 @@
         const how = insertReply(s.text); // insère dans le champ Vinted (ou copie si introuvable)
         const p = b.textContent; b.textContent = how === 'inserted' ? '✓ Inséré — relis puis Envoie' : '✓ Copié (champ introuvable)';
         setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1600);
+      };
+    });
+    panel.querySelectorAll('.vrm-qr').forEach(b => {
+      b.onclick = () => {
+        const t = ((DATA && DATA.quickReplies) || [])[Number(b.dataset.i)];
+        if (t == null) return;
+        const how = insertReply(String(t));
+        const p = b.textContent; b.textContent = how === 'inserted' ? '✓ Inséré — relis puis Envoie' : '✓ Copié';
+        setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1500);
       };
     });
   }
