@@ -346,6 +346,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
+          if (msg.action === 'convLastMessage') { const r = await convLastMessage(msg.convId); sendResponse(r); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -1028,6 +1029,29 @@ async function aiReply(message, article, price) {
     const j = await r.json().catch(() => ({}));
     return (j && typeof j === 'object') ? j : { ok: false, reason: 'network' };
   } catch (e) { return { ok: false, reason: 'network', detail: String(e) }; }
+}
+
+// Dernier message de l'ACHETEUR dans une conversation déjà captée
+// (harvest_{uid}_conv_{convId}) → pour pré-remplir l'assistant de réponse sans
+// que Julien copie-colle. On lit la donnée moissonnée (fiable), pas la page.
+async function convLastMessage(convId) {
+  try {
+    const rows = await sbGet(`app_data?id=like.harvest_*_conv_${encodeURIComponent(String(convId))}&select=data`) || [];
+    for (const r of rows) {
+      const conv = r.data && r.data.payload && r.data.payload.conversation;
+      if (!conv || !Array.isArray(conv.messages)) continue;
+      const oppId = conv.opposite_user && conv.opposite_user.id;
+      let last = null;
+      for (const m of conv.messages) {
+        if ((m.entity_type || '') !== 'message') continue;
+        const e = m.entity || {};
+        if (oppId != null && e.user_id !== oppId) continue; // uniquement les messages de l'acheteur
+        if (e.body) last = e.body;
+      }
+      if (last) return { ok: true, message: String(last).slice(0, 1000), article: conv.description || '' };
+    }
+    return { ok: false };
+  } catch (_) { return { ok: false }; }
 }
 
 async function buildPanelData() {

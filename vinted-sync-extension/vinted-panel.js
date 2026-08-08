@@ -81,6 +81,7 @@
   // Sur une page de conversation (/inbox/123…) : sert à mettre l'assistant de
   // réponse en avant automatiquement (contexte).
   const isConvPage = () => /\/inbox\/[\w-]+/.test(location.pathname);
+  const currentConvId = () => { const m = /\/inbox\/(\d+)/.exec(location.pathname); return m ? m[1] : null; };
 
   // ── DATE DE MISE EN LIGNE (« Ajouté il y a … », bas de l'annonce) ──────────
   // Vinted affiche l'ancienneté sur la page de l'annonce, mais ne la renvoie pas
@@ -463,8 +464,12 @@
   // envoies TOI-MÊME. ⚠️ Rien n'est envoyé automatiquement — c'est ce qui protège
   // ton compte (aucun comportement de robot).
   function renderReponse() {
+    // Sur une conversation : bouton pour LIRE tout seul le dernier message de
+    // l'acheteur (depuis la conversation déjà captée) — plus besoin de copier.
+    const readBtn = isConvPage() ? `<button id="vrm-rep-read" style="width:100%;margin-bottom:8px;border:1px dashed #09b1ba;background:#09b1ba0e;color:#09b1ba;border-radius:10px;padding:8px;font-weight:700;font-size:12.5px;cursor:pointer">📥 Lire le message de cette conversation</button>` : '';
     let out = `
-      <div class="vrm-m" style="margin-bottom:6px">Colle le message de l'acheteur : l'IA te propose des réponses. <b>Tu relis et tu envoies toi‑même</b> — rien ne part tout seul.</div>
+      <div class="vrm-m" style="margin-bottom:6px">${isConvPage() ? 'Récupère le message de l\'acheteur (ou colle-le), l\'IA propose des réponses.' : 'Colle le message de l\'acheteur : l\'IA te propose des réponses.'} <b>Tu relis et tu envoies toi‑même</b> — rien ne part tout seul.</div>
+      ${readBtn}
       <textarea id="vrm-rep-msg" placeholder="Message de l'acheteur…" style="width:100%;box-sizing:border-box;min-height:64px;border:1px solid #d7dde3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical">${esc(repMsg)}</textarea>
       <button id="vrm-rep-go" ${repBusy ? 'disabled' : ''} style="width:100%;margin-top:8px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:${repBusy ? 'default' : 'pointer'};opacity:${repBusy ? 0.6 : 1}">${repBusy ? '⏳ L\'IA réfléchit…' : '💬 Proposer des réponses'}</button>`;
     if (repResult && repResult.ok && Array.isArray(repResult.suggestions)) {
@@ -491,6 +496,15 @@
   function wireReponse() {
     const ta = panel.querySelector('#vrm-rep-msg');
     if (ta) ta.oninput = () => { repMsg = ta.value; }; // pas de re-render (on garde le focus)
+    const readB = panel.querySelector('#vrm-rep-read');
+    if (readB) readB.onclick = () => {
+      const cid = currentConvId(); if (!cid) return;
+      readB.textContent = '⏳ Lecture…';
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'convLastMessage', convId: cid }, (resp) => {
+        if (resp && resp.ok && resp.message) { repMsg = resp.message; render(); }
+        else { readB.textContent = '❌ Pas encore capté — ouvre le fil, patiente 2 s, réessaie'; setTimeout(() => { try { readB.textContent = '📥 Lire le message de cette conversation'; } catch (_) {} }, 2500); }
+      });
+    };
     const go = panel.querySelector('#vrm-rep-go');
     if (go) go.onclick = () => {
       const m = (repMsg || '').trim();
