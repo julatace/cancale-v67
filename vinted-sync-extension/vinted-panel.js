@@ -48,6 +48,8 @@
   let msgRun = null;
   const favSel = new Set();
   let favRun = null;
+  let dataBusy = false; // rafraîchissement des données en cours (icône ⏳)
+  let lastLoad = 0;     // horodatage du dernier chargement (pour rafraîchir à l'ouverture si périmé)
 
   const eur = (v) => (v == null || v === '' ? null : Number(v));
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
@@ -277,10 +279,12 @@
 
   function render() {
     const s = (DATA && DATA.stats) || { online: 0, relance: 0, noNum: 0, value: 0 };
+    const fresh = (DATA && DATA.freshestAt) ? ` · capté ${esc(timeago(DATA.freshestAt))}` : '';
     panel.innerHTML = `
       <button class="vrm-close" title="Fermer">✕</button>
+      <button class="vrm-refresh" title="Rafraîchir les données" style="position:absolute;top:9px;right:34px;border:none;background:transparent;font-size:14px;cursor:pointer;opacity:.7;padding:0;line-height:1">${dataBusy ? '⏳' : '🔄'}</button>
       <h3>VRM</h3>
-      <div class="vrm-sub">Tes infos, affichées sur Vinted. Les actions restent les tiennes.</div>
+      <div class="vrm-sub">Tes infos, affichées sur Vinted. Les actions restent les tiennes.${fresh}</div>
       <div class="vrm-stats">
         <div class="vrm-st"><b>${s.online}</b><span class="vrm-m">en ligne</span></div>
         <div class="vrm-st"><b>${s.relance || 0}</b><span class="vrm-m">à relancer</span></div>
@@ -319,6 +323,7 @@
         <a class="vrm-link" href="${APP_URL}" target="_blank" rel="noreferrer">Ouvrir l'app VRM ↗</a>
       </div>`;
     panel.querySelector('.vrm-close').onclick = () => toggle(false);
+    const rb = panel.querySelector('.vrm-refresh'); if (rb) rb.onclick = () => { if (!dataBusy) load(); };
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
@@ -630,22 +635,28 @@
 
   function load() {
     try {
+      dataBusy = true; render();
       chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'panelData' }, (resp) => {
+        dataBusy = false; lastLoad = Date.now();
         if (chrome.runtime.lastError) { DATA = { stats: {}, byId: {}, relance: [], sleeping: [], noNum: [] }; render(); return; }
         DATA = (resp && resp.ok) ? resp : { stats: {}, byId: {}, relance: [], sleeping: [], noNum: [] };
         render();
-        // Pastille : nombre de paires à relancer.
-        const n = (DATA.relance || []).length;
+        // Pastille = ce qui T'ATTEND concrètement : colis à expédier + messages
+        // non lus (les vraies actions), sinon les paires à relancer.
+        const st = DATA.stats || {};
+        const n = (st.toShip || 0) + (st.unread || 0) || (DATA.relance || []).length;
         const old = fab.querySelector('.vrm-badge'); if (old) old.remove();
         if (n > 0) { const b = document.createElement('span'); b.className = 'vrm-badge'; b.textContent = n > 99 ? '99+' : String(n); fab.appendChild(b); }
       });
-    } catch (_) { /* extension rechargée */ }
+    } catch (_) { dataBusy = false; /* extension rechargée */ }
   }
 
   function toggle(v) {
     open = v == null ? !open : v;
     panel.style.display = open ? 'block' : 'none';
-    if (open) { render(); if (!DATA) load(); }
+    // Rafraîchit à l'ouverture si les données datent de plus de 2 min (sinon on
+    // garde le cache — pas de lecture Supabase à chaque petit aller-retour).
+    if (open) { render(); if (!DATA || Date.now() - lastLoad > 120000) load(); }
   }
   fab.onclick = () => toggle();
 

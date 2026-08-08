@@ -1165,8 +1165,13 @@ async function buildPanelData() {
     unread: convs.filter(c => c.unread).length,
     favoris: online.filter(o => (o.favs || 0) > 0).length,
   };
+  // Fraîcheur : la capture la plus récente parmi les données lues → l'utilisateur
+  // sait si ses infos datent (et s'il doit repasser sur Vinted pour les capter).
+  let freshestAt = 0;
+  const trackFresh = (rows) => { for (const r of (rows || [])) { const t = Date.parse((r.data && r.data.capturedAt) || '') || 0; if (t > freshestAt) freshestAt = t; } };
+  trackFresh(lst); trackFresh(soldRows); trackFresh(inboxRows);
   const activity = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
-  return { online, relance, sleeping, noNum, toShip, convs, activity, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, convs, activity, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
