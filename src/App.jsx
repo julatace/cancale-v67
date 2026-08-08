@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v80/00 · Achats hors Vinted : relier à une annonce (remplit le N°)';
+const BUILD_ID = 'v81/00 · Garage 3D : crée ton univers (5 ambiances en direct)';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -5385,6 +5385,17 @@ const FURN_TYPES = {
   autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
 };
 const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
+// ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
+// que changer des COULEURS et des INTENSITÉS de lumière (0 risque de casser le
+// rendu), appliquées en direct sur la scène. « Clair » = exactement le rendu
+// d'origine (aucune régression). wall/floor à null = on garde la matière de base.
+const GARAGE_AMBIANCES = [
+  { id:'clair',  name:'Clair',        emoji:'☀️', bg:'#eef1f6', sky:'#fff3e0', ground:'#a6a290', hemi:0.92, ambient:0.20, sun:'#fff1dc', sunI:1.05, fill:'#dfe8ff', fillI:0.32, wall:null,      floor:null,      exposure:1.12 },
+  { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#efe6d8', sky:'#ffe4bd', ground:'#8a7a5a', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#e8ddc8', fillI:0.24, wall:'#e8ded0', floor:'#ffe7cf', exposure:1.15 },
+  { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#0e1220', sky:'#3a4a80', ground:'#0c0f18', hemi:0.55, ambient:0.16, sun:'#9fb8ff', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#161c2e', floor:'#242a40', exposure:1.28 },
+  { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#171310', sky:'#ffe6b8', ground:'#1c140c', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#fff0d0', fillI:0.30, wall:'#26201b', floor:'#5f4e3a', exposure:1.20 },
+  { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#d6d9dd', sky:'#e2e8ef', ground:'#9a9ea4', hemi:0.90, ambient:0.26, sun:'#f2f5ff', sunI:1.00, fill:'#dfe8ff', fillI:0.32, wall:'#c6cace', floor:'#c2c6ca', exposure:1.08 },
+];
 // VRAIE 3D (Three.js, chargé dynamiquement pour ne pas alourdir le bundle) :
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
@@ -5397,6 +5408,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   const cbRef = React.useRef({}); cbRef.current = { onCellTap, onPileTap, onSelect, onOpen, onMove }; // callbacks à jour
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [amb, setAmb] = useState(() => load('vrm_garage_ambiance', 'clair')); // univers 3D choisi (par appareil)
   const HSCALE = 1.5;
 
   useEffect(() => {
@@ -5423,8 +5435,8 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // Éclairage d'intérieur : lumière du ciel douce + soleil chaud (ombres nettes)
       // + une lumière d'appoint froide pour déboucher les ombres → rendu réaliste.
       try { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12; } catch (_) {}
-      scene.add(new THREE.HemisphereLight(0xfff3e0, 0xa6a290, 0.92)); // ciel chaud, sol neutre
-      scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+      const hemi = new THREE.HemisphereLight(0xfff3e0, 0xa6a290, 0.92); scene.add(hemi); // ciel chaud, sol neutre
+      const ambient = new THREE.AmbientLight(0xffffff, 0.2); scene.add(ambient);
       const dir = new THREE.DirectionalLight(0xfff1dc, 1.05); // soleil chaud
       dir.position.set(room.w * 0.55, Math.max(room.w, room.h) * 1.6, room.h * 0.6);
       dir.castShadow = true; dir.shadow.mapSize.set(2048, 2048); dir.shadow.radius = 3;
@@ -5450,7 +5462,8 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const shadowize = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
       // sol : parquet clair
       const floorTex = makeWood('#cbb089'); floorTex.repeat.set(Math.max(2, room.w / 1.4), Math.max(2, room.h / 1.4));
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 }));
+      const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 });
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), floorMat);
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
       // murs (orientés vers l'intérieur → les murs proches ne bouchent pas la vue)
       const wallH = Math.max(2.4, room.wallH || 3.4), wallMat = new THREE.MeshStandardMaterial({ color: room.wallColor || '#e4e8ee', roughness: 0.95, side: THREE.FrontSide });
@@ -5883,7 +5896,25 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView };
+      // ── AMBIANCE (univers façon jeu) : mute les couleurs/lumières EN DIRECT
+      //    (la boucle de rendu tourne en continu → effet immédiat), sans jamais
+      //    reconstruire la scène. Sûr : ce ne sont que des couleurs/intensités. ──
+      const baseWall = room.wallColor || '#e4e8ee';
+      const applyAmbiance = (id) => {
+        const a = GARAGE_AMBIANCES.find(x => x.id === id) || GARAGE_AMBIANCES[0];
+        try {
+          scene.background.set(a.bg);
+          hemi.color.set(a.sky); hemi.groundColor.set(a.ground); hemi.intensity = a.hemi;
+          ambient.intensity = a.ambient;
+          dir.color.set(a.sun); dir.intensity = a.sunI;
+          fill.color.set(a.fill); fill.intensity = a.fillI;
+          wallMat.color.set(a.wall || baseWall);
+          floorMat.color.set(a.floor || '#ffffff');
+          renderer.toneMappingExposure = a.exposure;
+        } catch (_) {}
+      };
+      applyAmbiance(load('vrm_garage_ambiance', 'clair'));
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
@@ -5916,6 +5947,17 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
     <div data-noswipe="1" style={{ position: 'relative', width: '100%', height: 420, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
       {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
+      {/* Univers / ambiance : change l'atmosphère de ton garage en direct. */}
+      {!loading && (
+        <div data-noswipe="1" style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
+          {GARAGE_AMBIANCES.map(a => (
+            <button key={a.id} type="button" onClick={() => { setAmb(a.id); save('vrm_garage_ambiance', a.id); try { st.current.applyAmbiance && st.current.applyAmbiance(a.id); } catch (_) {} }}
+              style={{ flexShrink: 0, border: `1px solid ${amb === a.id ? '#ffffff' : 'rgba(255,255,255,0.3)'}`, background: amb === a.id ? 'rgba(20,22,30,0.72)' : 'rgba(20,22,30,0.42)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit' }}>
+              {a.emoji} {a.name}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Contrôles de vue : tourner à gauche/droite + zoom (fiables sur mobile) */}
       {!loading && (() => {
         const btn = { width: 38, height: 38, borderRadius: 10, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.9)', color: '#1c1c22', fontSize: 17, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none' };
