@@ -233,10 +233,15 @@
     #vrm-panel .vrm-st{flex:1;min-width:72px;border:1px solid #e6e8ee;border-radius:10px;padding:7px 9px}
     #vrm-panel .vrm-st b{display:block;font-size:16px}
     #vrm-panel .vrm-close{float:right;border:none;background:transparent;cursor:pointer;font-size:16px;color:#889}
+    #vrm-panel .vrm-todo{border:1px solid #ffd7a8;background:#fff6ec;color:#9a5b16;border-radius:999px;padding:5px 10px;
+      font:700 11.5px system-ui,sans-serif;cursor:pointer}
+    #vrm-panel .vrm-todo:hover{background:#ffedd8}
     @media (prefers-color-scheme: dark){
       #vrm-panel{background:#161a20;color:#e8eef5}
       #vrm-panel .vrm-card,#vrm-panel .vrm-st{border-color:#2a3038}
       #vrm-panel .vrm-tab{background:#1e242c;border-color:#2a3038;color:#cfd8e3}
+      #vrm-panel .vrm-todo{background:#2a2113;border-color:#4a3a1c;color:#f0c88a}
+      #vrm-panel .vrm-todo:hover{background:#33280f}
     }`;
   document.documentElement.appendChild(style);
 
@@ -323,6 +328,15 @@
         <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Dorment 😴</button>
         <button class="vrm-tab ${tab === 'sansnum' ? 'on' : ''}" data-t="sansnum">Sans N°</button>
       </div>
+      ${(() => {
+        const st2 = (DATA && DATA.stats) || {};
+        const chips = [
+          st2.toPrint ? `<button class="vrm-todo" data-t="expedier">🖨️ ${st2.toPrint} à imprimer</button>` : '',
+          st2.toShip ? `<button class="vrm-todo" data-t="expedier">📄 ${st2.toShip} à générer</button>` : '',
+          st2.unread ? `<button class="vrm-todo" data-t="messages">💬 ${st2.unread} message${st2.unread > 1 ? 's' : ''}</button>` : ''
+        ].filter(Boolean).join('');
+        return chips ? `<div class="vrm-todos" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px">${chips}</div>` : '';
+      })()}
       <div id="vrm-body">${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'paire' ? renderPaire()
@@ -346,6 +360,7 @@
     panel.querySelector('.vrm-close').onclick = () => toggle(false);
     const rb = panel.querySelector('.vrm-refresh'); if (rb) rb.onclick = () => { if (!dataBusy) load(); };
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
+    panel.querySelectorAll('.vrm-todo').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
     if (tab === 'expedier') wireExpedier();
