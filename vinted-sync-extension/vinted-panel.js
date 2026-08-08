@@ -26,6 +26,12 @@
   // place — c'est ce qui protège tes comptes.
   const repubSel = new Set();
   let repubRun = null;
+  // ── Assistant de RÉPONSE (Messaging Intelligence) : tu colles le message de
+  //    l'acheteur, l'IA propose des réponses ; tu relis et tu envoies TOI-MÊME
+  //    sur Vinted (rien n'est envoyé automatiquement). État gardé entre rendus.
+  let repMsg = '';
+  let repResult = null;
+  let repBusy = false;
 
   const eur = (v) => (v == null || v === '' ? null : Number(v));
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
@@ -267,6 +273,7 @@
       <div class="vrm-tabs">
         <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
         <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
+        <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
         <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
         <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Dorment 😴</button>
         <button class="vrm-tab ${tab === 'sansnum' ? 'on' : ''}" data-t="sansnum">Sans N°</button>
@@ -275,6 +282,7 @@
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'paire' ? renderPaire()
         : tab === 'republier' ? renderRepublier()
+        : tab === 'reponse' ? renderReponse()
         : tab === 'dorment' ? renderList(DATA.sleeping, sleepEmpty(), 'En ligne depuis 30 jours et plus (date lue sur la page de l&#39;annonce). À baisser ou republier — par toi.')
         : tab === 'relance' ? renderList(DATA.relance, 'Rien à relancer : tes annonces accrochent bien. 👌', 'Beaucoup vues mais peu mises en favori <b>par rapport à tes autres annonces</b> → le prix est sans doute trop haut. Ouvre-les et baisse le prix toi-même.')
         : renderList(DATA.noNum, 'Toutes tes annonces ont un N°. 👌', 'Ces annonces n\'ont pas encore de numéro dans ton app.')
@@ -285,6 +293,60 @@
     panel.querySelector('.vrm-close').onclick = () => toggle(false);
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
     if (tab === 'republier') wireRepublier();
+    if (tab === 'reponse') wireReponse();
+  }
+
+  // ── ONGLET RÉPONSE : aide à répondre aux acheteurs (Messaging Intelligence) ──
+  // Tu colles le message de l'acheteur, l'IA propose 3 à 5 réponses naturelles
+  // (tons variés). Tu cliques « Copier », tu colles dans Vinted, tu ajustes et tu
+  // envoies TOI-MÊME. ⚠️ Rien n'est envoyé automatiquement — c'est ce qui protège
+  // ton compte (aucun comportement de robot).
+  function renderReponse() {
+    let out = `
+      <div class="vrm-m" style="margin-bottom:6px">Colle le message de l'acheteur : l'IA te propose des réponses. <b>Tu relis et tu envoies toi‑même</b> — rien ne part tout seul.</div>
+      <textarea id="vrm-rep-msg" placeholder="Message de l'acheteur…" style="width:100%;box-sizing:border-box;min-height:64px;border:1px solid #d7dde3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical">${esc(repMsg)}</textarea>
+      <button id="vrm-rep-go" ${repBusy ? 'disabled' : ''} style="width:100%;margin-top:8px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:${repBusy ? 'default' : 'pointer'};opacity:${repBusy ? 0.6 : 1}">${repBusy ? '⏳ L\'IA réfléchit…' : '💬 Proposer des réponses'}</button>`;
+    if (repResult && repResult.ok && Array.isArray(repResult.suggestions)) {
+      out += `<div class="vrm-m" style="margin-top:10px">Intention : <b>${esc(repResult.intent || '—')}</b>${repResult.confidence ? ` · confiance ${repResult.confidence}%` : ''}</div>`;
+      out += repResult.suggestions.map((s, i) => `
+        <div class="vrm-card" style="margin-top:6px">
+          <div class="vrm-m" style="text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:3px">${esc(s.tone || 'réponse')}</div>
+          <div style="font-size:13px;line-height:1.45">${esc(s.text)}</div>
+          <button class="vrm-copy" data-i="${i}" style="margin-top:6px;border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier</button>
+        </div>`).join('');
+    } else if (repResult && !repResult.ok) {
+      const why = repResult.reason === 'no-key' ? "L'assistant IA n'est pas branché : ajoute la clé AI_API_KEY côté serveur (Vercel), puis réessaie."
+        : repResult.reason === 'no-message' ? "Colle d'abord le message de l'acheteur."
+        : "L'IA n'a pas pu répondre pour l'instant. Réessaie dans un instant.";
+      out += `<div class="vrm-m" style="margin-top:10px">${esc(why)}</div>`;
+    }
+    return out;
+  }
+
+  function wireReponse() {
+    const ta = panel.querySelector('#vrm-rep-msg');
+    if (ta) ta.oninput = () => { repMsg = ta.value; }; // pas de re-render (on garde le focus)
+    const go = panel.querySelector('#vrm-rep-go');
+    if (go) go.onclick = () => {
+      const m = (repMsg || '').trim();
+      if (!m) { repResult = { ok: false, reason: 'no-message' }; render(); return; }
+      repBusy = true; repResult = null; render();
+      // Contexte article : le titre de l'annonce si on est sur une page article.
+      let art = '';
+      try { const h = document.querySelector('h1'); art = (h && h.textContent || '').trim().slice(0, 120); } catch (_) {}
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'aiReply', message: m, article: art }, (resp) => {
+        repBusy = false; repResult = resp || { ok: false, reason: 'network' }; render();
+      });
+    };
+    panel.querySelectorAll('.vrm-copy').forEach(b => {
+      b.onclick = () => {
+        const i = Number(b.dataset.i);
+        const s = repResult && repResult.suggestions && repResult.suggestions[i];
+        if (!s) return;
+        try { navigator.clipboard.writeText(s.text); } catch (_) {}
+        const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1000);
+      };
+    });
   }
 
   // ── ONGLET REPUBLIER : sélection + défilement UNE-PAR-UNE ────────────────────

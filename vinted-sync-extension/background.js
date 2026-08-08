@@ -333,6 +333,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'panelData') { const r = await buildPanelData(); sendResponse({ ok: true, ...r }); return; }
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
+          if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -996,6 +997,24 @@ async function saveItemDetail(id, detail) {
     readAt: new Date().toISOString(),
   };
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+}
+
+// ── ASSISTANT DE RÉPONSE (spec « Messaging Intelligence ») ───────────────────
+// Le panneau relaie le message de l'acheteur ; on le passe à /api/ai (mode
+// reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
+// RIEN sur Vinted : Julien relit, choisit, adapte et envoie LUI-MÊME (assistance
+// stricte, conforme). La clé de l'IA reste côté serveur (Vercel), jamais ici.
+const VRM_APP_API = 'https://cancale-v67-ten.vercel.app';
+async function aiReply(message, article, price) {
+  try {
+    const r = await fetch(`${VRM_APP_API}/api/ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'reply', message: String(message || '').slice(0, 1000), article: String(article || '').slice(0, 160), price }),
+    });
+    const j = await r.json().catch(() => ({}));
+    return (j && typeof j === 'object') ? j : { ok: false, reason: 'network' };
+  } catch (e) { return { ok: false, reason: 'network', detail: String(e) }; }
 }
 
 async function buildPanelData() {
