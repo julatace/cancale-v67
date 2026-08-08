@@ -1287,7 +1287,8 @@ async function buildPanelData() {
   // Mis à jour quand Julien ouvre l'app : on montre la fraîcheur, pas de bluff.
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
-  return { online, relance, sleeping, noNum, toShip, pickups, bordsToPrint, convs, activity, quickReplies, appStats, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
+  return { online, relance, sleeping, noNum, toShip, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
