@@ -61,6 +61,9 @@
     const m = /\/items\/(\d+)/.exec(location.pathname);
     return m ? m[1] : null;
   };
+  // Sur une page de conversation (/inbox/123…) : sert à mettre l'assistant de
+  // réponse en avant automatiquement (contexte).
+  const isConvPage = () => /\/inbox\/[\w-]+/.test(location.pathname);
 
   // ── DATE DE MISE EN LIGNE (« Ajouté il y a … », bas de l'annonce) ──────────
   // Vinted affiche l'ancienneté sur la page de l'annonce, mais ne la renvoie pas
@@ -672,7 +675,11 @@
     if (location.pathname !== lastPath) {
       lastPath = location.pathname;
       onPage();
-      if (open && tab === 'paire') render();
+      // Contexte : en ARRIVANT sur une conversation, on met l'assistant de
+      // réponse en avant (tu n'as qu'à coller le message de l'acheteur). On ne
+      // force jamais en sortant — c'est juste un coup de pouce à l'arrivée.
+      if (open && isConvPage() && tab !== 'reponse' && tab !== 'messages') { tab = 'reponse'; render(); }
+      else if (open && tab === 'paire') render();
     }
   }, 800);
 
