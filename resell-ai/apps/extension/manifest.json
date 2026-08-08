@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "RESELL AI — Assistant (assistance seule)",
+  "version": "0.1.0",
+  "description": "Suggère des réponses et des conseils de prix pendant que tu vends. N'envoie rien, ne poste rien : tu cliques pour insérer, tu valides et tu envoies toi-même.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["http://localhost:8787/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.vinted.fr/*", "https://*.vinted.com/*", "http://localhost/*"],
+      "js": ["content.js"],
+      "css": ["panel.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_title": "RESELL AI" }
+}
