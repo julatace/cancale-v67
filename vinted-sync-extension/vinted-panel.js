@@ -56,6 +56,23 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const timeago = (t) => { const s = Math.max(0, (Date.now() - Number(t || 0)) / 1000); return s < 60 ? "à l'instant" : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : s < 86400 ? `il y a ${Math.floor(s / 3600)} h` : `il y a ${Math.floor(s / 86400)} j`; };
 
+  // Champ de réponse de la conversation Vinted (le plus grand textarea /
+  // contenteditable visible). Sert à INSÉRER la réponse rédigée par l'IA — c'est
+  // toujours TOI qui relis et qui cliques « Envoyer » sur Vinted (rien n'est
+  // envoyé automatiquement).
+  function findReplyField() {
+    const sel = 'textarea, [contenteditable="true"], input[type="text"]';
+    const nodes = [...document.querySelectorAll(sel)].filter(n => n.offsetParent !== null && !panel.contains(n));
+    return nodes.sort((a, b) => (b.clientWidth * b.clientHeight) - (a.clientWidth * a.clientHeight))[0] || null;
+  }
+  function insertReply(text) {
+    const f = findReplyField();
+    if (!f) { try { navigator.clipboard.writeText(text); } catch (_) {} return 'copied'; }
+    if (f.isContentEditable) { f.focus(); try { document.execCommand('insertText', false, text); } catch (_) { f.textContent = text; } }
+    else { f.focus(); f.value = text; f.dispatchEvent(new Event('input', { bubbles: true })); }
+    return 'inserted';
+  }
+
   // Id de l'annonce affichée si on est sur une page article (/items/123456-titre).
   const currentItemId = () => {
     const m = /\/items\/(\d+)/.exec(location.pathname);
@@ -298,7 +315,7 @@
         <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
         <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
         <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
-        <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">À expédier 📄${DATA && DATA.stats && DATA.stats.toShip ? ` (${DATA.stats.toShip})` : ''}</button>
+        <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">Bordereaux 📄${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` (${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)})` : ''}</button>
         <button class="vrm-tab ${tab === 'messages' ? 'on' : ''}" data-t="messages">Messages 💬${DATA && DATA.stats && DATA.stats.unread ? ` (${DATA.stats.unread})` : ''}</button>
         <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">Favoris ❤️</button>
         <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
@@ -456,8 +473,12 @@
         <div class="vrm-card" style="margin-top:6px">
           <div class="vrm-m" style="text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:3px">${esc(s.tone || 'réponse')}</div>
           <div style="font-size:13px;line-height:1.45">${esc(s.text)}</div>
-          <button class="vrm-copy" data-i="${i}" style="margin-top:6px;border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier</button>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="vrm-insert" data-i="${i}" style="border:none;background:#09b1ba;color:#fff;border-radius:8px;padding:5px 12px;font-weight:800;font-size:12px;cursor:pointer">↳ Insérer sur Vinted</button>
+            <button class="vrm-copy" data-i="${i}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier</button>
+          </div>
         </div>`).join('');
+      out += `<div class="vrm-m" style="margin-top:8px;opacity:.85">« Insérer » met le texte dans le champ de réponse de Vinted — <b>tu relis et tu cliques Envoyer toi-même</b>. Rien n'est envoyé automatiquement.</div>`;
     } else if (repResult && !repResult.ok) {
       const why = repResult.reason === 'no-key' ? "L'assistant IA n'est pas branché : ajoute la clé AI_API_KEY côté serveur (Vercel), puis réessaie."
         : repResult.reason === 'no-message' ? "Colle d'abord le message de l'acheteur."
@@ -491,6 +512,16 @@
         const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1000);
       };
     });
+    panel.querySelectorAll('.vrm-insert').forEach(b => {
+      b.onclick = () => {
+        const i = Number(b.dataset.i);
+        const s = repResult && repResult.suggestions && repResult.suggestions[i];
+        if (!s) return;
+        const how = insertReply(s.text); // insère dans le champ Vinted (ou copie si introuvable)
+        const p = b.textContent; b.textContent = how === 'inserted' ? '✓ Inséré — relis puis Envoie' : '✓ Copié (champ introuvable)';
+        setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1600);
+      };
+    });
   }
 
   // ── ONGLET « À EXPÉDIER » : bordereaux pilotés par TA sélection ─────────────
@@ -501,10 +532,10 @@
   // sélection qui pilote, TON clic qui génère : tu es l'auteur.
   const shipKey = (t) => t.transaction || t.url;
   function renderExpedier() {
+    const toPrint = (DATA && DATA.bordsToPrint) || [];
     const list = (DATA && DATA.toShip) || [];
     const pending = list.filter(t => !t.hasBord);
     const done = list.filter(t => t.hasBord);
-    if (!list.length) return `<div class="vrm-m">Aucune vente à expédier captée. Ouvre tes ventes sur Vinted une fois pour les capter.</div>`;
 
     // Mode défilement : une vente à la fois (piloté par ta sélection).
     if (shipRun) {
@@ -530,25 +561,41 @@
         <div style="text-align:center;margin-top:8px"><button class="vrm-ship-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
     }
 
-    // Mode sélection.
-    if (!pending.length) {
-      return `<div class="vrm-m">✓ Aucun bordereau en attente.</div>${done.length ? `<div class="vrm-m" style="margin-top:8px">${done.length} déjà capté${done.length > 1 ? 's' : ''}.</div>` : ''}`;
+    if (!toPrint.length && !pending.length) {
+      return `<div class="vrm-m">✓ Rien à imprimer ni à générer pour l'instant.${done.length ? ` (${done.length} bordereau${done.length > 1 ? 'x' : ''} déjà traité${done.length > 1 ? 's' : ''}.)` : ''}</div><div class="vrm-m" style="margin-top:6px">Ouvre tes ventes / bordereaux sur Vinted pour les capter.</div>`;
     }
-    const rows = pending.map(t => { const k = shipKey(t); return `
-      <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
-        <input type="checkbox" class="vrm-ship-chk" data-k="${esc(k)}" ${shipSel.has(k) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
-        ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
-        <div style="flex:1;min-width:0"><div class="vrm-t">${esc(t.title || 'Vente')}</div><div class="vrm-m">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
-      </label>`; }).join('');
-    return `
-      <div class="vrm-m" style="margin-bottom:8px">Coche les bordereaux à <b>générer</b>. Tu les génères <b>un par un, toi-même</b> : l'extension t'ouvre chaque vente, tu cliques « Générer » sur Vinted, elle capte le PDF. <b>C'est TA sélection qui pilote.</b></div>
-      <div style="display:flex;gap:6px;margin-bottom:8px">
-        <button class="vrm-ship-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
-        <button class="vrm-ship-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
-      </div>
-      <div style="margin-bottom:8px">${rows}</div>
-      <button class="vrm-ship-go" data-act="start" ${shipSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${shipSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${shipSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Générer ma sélection (${shipSel.size})</button>
-      ${done.length ? `<div class="vrm-m" style="margin-top:8px">✓ ${done.length} déjà capté${done.length > 1 ? 's' : ''}.</div>` : ''}`;
+
+    // 1) BORDEREAUX À IMPRIMER — le N° de la paire + le titre, comme dans l'app.
+    //    L'impression (avec le N° tamponné sur le PDF) se fait dans l'app en 1 tap.
+    const printSection = toPrint.length ? `
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">🖨️ ${toPrint.length} bordereau${toPrint.length > 1 ? 'x' : ''} à imprimer</div>
+      ${toPrint.slice(0, 60).map(b => `
+        <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
+          <span style="flex-shrink:0;min-width:36px;text-align:center;font-weight:800;color:${b.numero ? '#0f6b4f' : '#c53030'};background:${b.numero ? 'rgba(15,107,79,.1)' : 'rgba(197,48,48,.1)'};border-radius:8px;padding:5px 6px;font-size:12px">${b.numero ? ('N°' + esc(b.numero)) : 'N° ?'}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title || 'Bordereau')}</div>${b.dateLimite ? `<div class="vrm-m">à envoyer avant ${esc(b.dateLimite)}</div>` : ''}</div>
+        </div>`).join('')}
+      <a href="${APP_URL}/?tab=cat_bord" target="_blank" rel="noreferrer" style="display:block;text-align:center;text-decoration:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;margin-bottom:14px">🖨️ Imprimer dans l'app ↗</a>` : '';
+
+    // 2) À GÉNÉRER D'ABORD — ventes sans bordereau, sélection pilotée par toi.
+    let genSection = '';
+    if (pending.length) {
+      const rows = pending.map(t => { const k = shipKey(t); return `
+        <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
+          <input type="checkbox" class="vrm-ship-chk" data-k="${esc(k)}" ${shipSel.has(k) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
+          ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
+          <div style="flex:1;min-width:0"><div class="vrm-t">${esc(t.title || 'Vente')}</div><div class="vrm-m">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
+        </label>`; }).join('');
+      genSection = `
+        <div class="vrm-m" style="font-weight:800;margin:2px 0 6px">📄 ${pending.length} bordereau${pending.length > 1 ? 'x' : ''} à générer d'abord</div>
+        <div class="vrm-m" style="margin-bottom:8px">Coche, puis « Générer ma sélection » : l'extension t'ouvre chaque vente, <b>tu</b> cliques « Générer » sur Vinted, elle capte le PDF.</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button class="vrm-ship-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
+          <button class="vrm-ship-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
+        </div>
+        <div style="margin-bottom:8px">${rows}</div>
+        <button class="vrm-ship-go" data-act="start" ${shipSel.size ? '' : 'disabled'} style="width:100%;border:none;background:${shipSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${shipSel.size ? 'pointer' : 'default'}">Générer ma sélection (${shipSel.size})</button>`;
+    }
+    return printSection + genSection;
   }
 
   function wireExpedier() {
@@ -647,7 +694,7 @@
         // Pastille = ce qui T'ATTEND concrètement : colis à expédier + messages
         // non lus (les vraies actions), sinon les paires à relancer.
         const st = DATA.stats || {};
-        const n = (st.toShip || 0) + (st.unread || 0) || (DATA.relance || []).length;
+        const n = (st.toPrint || 0) + (st.toShip || 0) + (st.unread || 0) || (DATA.relance || []).length;
         const old = fab.querySelector('.vrm-badge'); if (old) old.remove();
         if (n > 0) { const b = document.createElement('span'); b.className = 'vrm-badge'; b.textContent = n > 99 ? '99+' : String(n); fab.appendChild(b); }
       });

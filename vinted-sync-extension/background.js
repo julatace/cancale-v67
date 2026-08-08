@@ -1148,6 +1148,17 @@ async function buildPanelData() {
     }
   }
   convs.sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
+  // ── BORDEREAUX À IMPRIMER : reçus par email (avec PDF), pas encore imprimés/
+  //    expédiés/masqués, avec le N° de la paire + le titre (comme dans l'app). ──
+  const bp = await sbGet("app_data?id=like.email_bord_*&select=numero:data->>numero,modele:data->>modele,article:data->>article,transaction:data->>transaction,suivi:data->>suivi,filename:data->>filename,dateLimite:data->>dateLimite") || [];
+  const bPrinted = d.vinted_bords_printed || {};
+  const bShipped = d.vinted_bords_shipped || {};
+  const bHidden = d.vinted_bords_hidden || {};
+  const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+  const bordsToPrint = bp
+    .filter(b => b.filename) // a bien un PDF
+    .map(b => ({ numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
+    .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key]);
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
   // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
   const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)
@@ -1162,6 +1173,7 @@ async function buildPanelData() {
     withDesc: online.filter(o => o.hasDesc).length,
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
     toShip: toShip.filter(t => !t.hasBord).length,
+    toPrint: bordsToPrint.length,
     unread: convs.filter(c => c.unread).length,
     favoris: online.filter(o => (o.favs || 0) > 0).length,
   };
@@ -1171,7 +1183,7 @@ async function buildPanelData() {
   const trackFresh = (rows) => { for (const r of (rows || [])) { const t = Date.parse((r.data && r.data.capturedAt) || '') || 0; if (t > freshestAt) freshestAt = t; } };
   trackFresh(lst); trackFresh(soldRows); trackFresh(inboxRows);
   const activity = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
-  return { online, relance, sleeping, noNum, toShip, convs, activity, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, bordsToPrint, convs, activity, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
