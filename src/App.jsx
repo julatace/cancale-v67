@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v82/00 · Consigne Pickup : identifiant + code d\'ouverture captés';
+const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -10066,6 +10066,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
   useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
+  // #9 — RAFRAÎCHISSEMENT AUTO EN REVENANT SUR L'APP. Tu navigues sur Vinted
+  // (l'extension moissonne pendant ce temps), tu reviens sur l'app → l'onglet
+  // courant RELIT la dernière moisson tout seul, sans « Synchroniser ». On relit
+  // la moisson Supabase (léger) : force=false → 0 appel Vinted (pas de trafic
+  // depuis l'IP Vercel, cf. profil discret). Gardé à ≥ 20 s d'absence pour ne pas
+  // recharger à chaque micro-changement de focus.
+  useEffect(() => {
+    let hiddenAt = 0;
+    const onVis = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (!hiddenAt || Date.now() - hiddenAt < 20000 || !accounts.length) { hiddenAt = 0; return; }
+      hiddenAt = 0;
+      viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
+      try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
+      if (curSub === 'ventes' || curSub === 'journee') loadOrders('sold', setSales);
+      if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys); fetchEmailTracking().then(setTracking); }
+      if (curSub === 'annonces' || curSub === 'republication' || curSub === 'journee') loadListings();
+      if (curSub === 'messages' || curSub === 'journee') loadConvs();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  /* eslint-disable-next-line */ }, [curSub, accounts.length]);
   // Achat correspondant à un suivi : par titre d'article extrait de l'email.
   const buyForTrack = (t) => {
     const items = buysBase;
