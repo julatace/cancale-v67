@@ -23,7 +23,7 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['paire', 'republier', 'reponse', 'expedier', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
+  const PANEL_TABS = ['paire', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   let open = readLS('vrm_panel_open', '0') === '1';
@@ -51,6 +51,11 @@
   // ta place — c'est ce geste (un script qui clique) que Vinted sanctionne.
   const shipSel = new Set();
   let shipRun = null;
+  // Bordereaux marqués « ✓ Traité » pendant cette session : on les garde visibles
+  // dans une petite section « Traités » avec un « ↺ Remettre » (annulation), au
+  // lieu de les faire disparaître d'un coup. Après un rechargement, la moisson les
+  // exclut d'elle-même (buildPanelData lit panel_bords_done).
+  const bordDoneLocal = new Set();
   // Mêmes files pilotées par TA sélection pour : répondre aux messages, et
   // relancer les personnes qui ont mis en favori (offre native Vinted). Tu
   // sélectionnes, l'extension t'ouvre chaque élément, TU agis (réponds / proposes),
@@ -59,6 +64,8 @@
   let msgRun = null;
   const favSel = new Set();
   let favRun = null;
+  // Colis marqués « ✓ Récupéré » cette session (annulables tant que pas rechargé).
+  const pickupDoneLocal = new Set();
   let dataBusy = false; // rafraîchissement des données en cours (icône ⏳)
   let lastLoad = 0;     // horodatage du dernier chargement (pour rafraîchir à l'ouverture si périmé)
 
@@ -344,6 +351,7 @@
         <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
         <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
         <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">Bordereaux 📄${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` (${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)})` : ''}</button>
+        <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">Achats 📦${DATA && DATA.stats && DATA.stats.toPickup ? ` (${DATA.stats.toPickup})` : ''}</button>
         <button class="vrm-tab ${tab === 'messages' ? 'on' : ''}" data-t="messages">Messages 💬${DATA && DATA.stats && DATA.stats.unread ? ` (${DATA.stats.unread})` : ''}</button>
         <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">Favoris ❤️</button>
         <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
@@ -355,6 +363,7 @@
         const chips = [
           st2.toPrint ? `<button class="vrm-todo" data-t="expedier">🖨️ ${st2.toPrint} à imprimer</button>` : '',
           st2.toShip ? `<button class="vrm-todo" data-t="expedier">📄 ${st2.toShip} à générer</button>` : '',
+          st2.toPickup ? `<button class="vrm-todo" data-t="achats">📦 ${st2.toPickup} à retirer</button>` : '',
           st2.unread ? `<button class="vrm-todo" data-t="messages">💬 ${st2.unread} message${st2.unread > 1 ? 's' : ''}</button>` : ''
         ].filter(Boolean).join('');
         return chips ? `<div class="vrm-todos" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px">${chips}</div>` : '';
@@ -365,6 +374,7 @@
         : tab === 'republier' ? renderRepublier()
         : tab === 'reponse' ? renderReponse()
         : tab === 'expedier' ? renderExpedier()
+        : tab === 'achats' ? renderAchats()
         : tab === 'messages' ? renderMessages()
         : tab === 'favoris' ? renderFavoris()
         : tab === 'dorment' ? renderList(DATA.sleeping, sleepEmpty(), 'En ligne depuis 30 jours et plus (date lue sur la page de l&#39;annonce). À baisser ou republier — par toi.')
@@ -386,6 +396,7 @@
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
     if (tab === 'expedier') wireExpedier();
+    if (tab === 'achats') wireAchats();
     if (tab === 'messages') wireMessages();
     if (tab === 'favoris') wireFavoris();
   }
@@ -599,7 +610,9 @@
   // sélection qui pilote, TON clic qui génère : tu es l'auteur.
   const shipKey = (t) => t.transaction || t.url;
   function renderExpedier() {
-    const toPrint = (DATA && DATA.bordsToPrint) || [];
+    const toPrintAll = (DATA && DATA.bordsToPrint) || [];
+    const toPrint = toPrintAll.filter(b => !bordDoneLocal.has(b.key)); // encore à faire
+    const justDone = toPrintAll.filter(b => bordDoneLocal.has(b.key)); // traités (annulables)
     const list = (DATA && DATA.toShip) || [];
     const pending = list.filter(t => !t.hasBord);
     const done = list.filter(t => t.hasBord);
@@ -628,7 +641,7 @@
         <div style="text-align:center;margin-top:8px"><button class="vrm-ship-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
     }
 
-    if (!toPrint.length && !pending.length) {
+    if (!toPrint.length && !pending.length && !justDone.length) {
       return `<div class="vrm-m">✓ Rien à imprimer ni à générer pour l'instant.${done.length ? ` (${done.length} bordereau${done.length > 1 ? 'x' : ''} déjà traité${done.length > 1 ? 's' : ''}.)` : ''}</div><div class="vrm-m" style="margin-top:6px">Ouvre tes ventes / bordereaux sur Vinted pour les capter.</div>`;
     }
 
@@ -643,6 +656,18 @@
           <button class="vrm-bord-done" data-k="${esc(b.key)}" title="Marquer traité → le retire de la liste (colis fait)" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Traiter</button>
         </div>`).join('')}
       <a href="${APP_URL}/?tab=cat_bord" target="_blank" rel="noreferrer" style="display:block;text-align:center;text-decoration:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;margin-bottom:14px">🖨️ Imprimer dans l'app ↗</a>` : '';
+
+    // 1bis) TRAITÉS À L'INSTANT — annulables (« ↺ Remettre ») tant que tu n'as pas
+    //       rechargé. Sécurise le clic par erreur sur « ✓ Traiter ».
+    const doneSection = justDone.length ? `
+      <div class="vrm-m" style="font-weight:700;margin:4px 0 6px;color:#0f6b4f">✅ ${justDone.length} traité${justDone.length > 1 ? 's' : ''}</div>
+      ${justDone.slice(0, 60).map(b => `
+        <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;opacity:.7">
+          <span style="flex-shrink:0;min-width:36px;text-align:center;font-weight:800;color:#0f6b4f;background:rgba(15,107,79,.1);border-radius:8px;padding:5px 6px;font-size:12px">${b.numero ? ('N°' + esc(b.numero)) : '✓'}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:line-through">${esc(b.title || 'Bordereau')}</div></div>
+          <button class="vrm-bord-undo" data-k="${esc(b.key)}" title="Annuler : le remettre dans la liste" style="flex-shrink:0;border:1px solid #b0b6bf;background:transparent;color:#556;border-radius:8px;padding:6px 9px;font-weight:700;font-size:12px;cursor:pointer">↺ Remettre</button>
+        </div>`).join('')}
+      <div style="margin-bottom:14px"></div>` : '';
 
     // 2) À GÉNÉRER D'ABORD — ventes sans bordereau, sélection pilotée par toi.
     let genSection = '';
@@ -663,22 +688,37 @@
         <div style="margin-bottom:8px">${rows}</div>
         <button class="vrm-ship-go" data-act="start" ${shipSel.size ? '' : 'disabled'} style="width:100%;border:none;background:${shipSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${shipSel.size ? 'pointer' : 'default'}">Générer ma sélection (${shipSel.size})</button>`;
     }
-    return printSection + genSection;
+    return printSection + doneSection + genSection;
   }
 
   function wireExpedier() {
     // « ✓ Traiter » un bordereau : on l'enregistre (ligne panel_bords_done) et on
-    // le retire tout de suite de la liste (optimiste). L'app s'aligne à sa synchro.
+    // le déplace en « Traités » (annulable). On NE mute PAS DATA.bordsToPrint pour
+    // garder l'info et permettre « ↺ Remettre ». L'app s'aligne à sa synchro.
     panel.querySelectorAll('.vrm-bord-done').forEach(b => {
       b.onclick = () => {
         const k = b.dataset.k; if (!k) return;
         b.disabled = true; b.textContent = '⏳';
         chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'markBordDone', key: k, done: true }, (resp) => {
           if (resp && resp.ok) {
-            if (DATA && Array.isArray(DATA.bordsToPrint)) DATA.bordsToPrint = DATA.bordsToPrint.filter(x => String(x.key) !== String(k));
+            bordDoneLocal.add(k);
             if (DATA && DATA.stats) DATA.stats.toPrint = Math.max(0, (DATA.stats.toPrint || 1) - 1);
             render();
           } else { try { b.disabled = false; b.textContent = '✓ Traiter'; } catch (_) {} }
+        });
+      };
+    });
+    // « ↺ Remettre » : annule le « traité » (retire la clé de panel_bords_done).
+    panel.querySelectorAll('.vrm-bord-undo').forEach(b => {
+      b.onclick = () => {
+        const k = b.dataset.k; if (!k) return;
+        b.disabled = true; b.textContent = '⏳';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'markBordDone', key: k, done: false }, (resp) => {
+          if (resp && resp.ok) {
+            bordDoneLocal.delete(k);
+            if (DATA && DATA.stats) DATA.stats.toPrint = (DATA.stats.toPrint || 0) + 1;
+            render();
+          } else { try { b.disabled = false; b.textContent = '↺ Remettre'; } catch (_) {} }
         });
       };
     });
@@ -695,6 +735,64 @@
         else if (act === 'stop') { shipRun = null; render(); }
         else if (act === 'open') { const t = shipRun && shipRun.queue[shipRun.idx]; if (t && t.url) window.open(t.url, '_blank', 'noopener'); }
         else if (act === 'next') { if (shipRun) { shipRun.idx++; render(); } }
+      };
+    });
+  }
+
+  // ── ONGLET ACHATS : colis à retirer (point relais / bureau de poste) ─────────
+  // Liste les achats dont le statut Vinted dit « déposé en point relais ». Un
+  // bouton « ✓ Récupéré » les enlève (colis pris), annulable (« ↺ Remettre »).
+  // On lit la moisson (0 requête Vinted) et on écrit dans la ligne dédiée
+  // `panel_pickup_done` — jamais dans `main`, l'app s'aligne à sa synchro.
+  function renderAchats() {
+    const all = (DATA && DATA.pickups) || [];
+    const list = all.filter(p => !pickupDoneLocal.has(p.transaction));
+    const gotten = all.filter(p => pickupDoneLocal.has(p.transaction));
+    if (!list.length && !gotten.length) {
+      return `<div class="vrm-m">✓ Aucun colis à retirer pour l'instant.</div><div class="vrm-m" style="margin-top:6px">Ouvre tes achats sur Vinted pour capter les statuts, ou « 🔄 » en haut pour rafraîchir.</div>`;
+    }
+    const row = (p) => `
+      <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
+        ${p.photo ? `<img src="${esc(p.photo)}" alt="" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0">` : '<span style="font-size:22px;flex-shrink:0">📦</span>'}
+        <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title || 'Colis')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.status || 'à retirer')}${p.price != null ? ` · ${fmt(p.price)}` : ''}</div></div>
+        <button class="vrm-pk-done" data-k="${esc(p.transaction)}" title="Marquer récupéré → le retire de la liste" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Récupéré</button>
+      </div>`;
+    const gotRow = (p) => `
+      <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px;opacity:.7">
+        <span style="font-size:20px;flex-shrink:0">✓</span>
+        <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:line-through">${esc(p.title || 'Colis')}</div></div>
+        <button class="vrm-pk-undo" data-k="${esc(p.transaction)}" title="Annuler : le remettre à retirer" style="flex-shrink:0;border:1px solid #b0b6bf;background:transparent;color:#556;border-radius:8px;padding:6px 9px;font-weight:700;font-size:12px;cursor:pointer">↺ Remettre</button>
+      </div>`;
+    return `
+      ${list.length ? `<div class="vrm-m" style="font-weight:800;margin-bottom:6px">📦 ${list.length} colis à retirer</div>${list.slice(0, 60).map(row).join('')}` : ''}
+      ${gotten.length ? `<div class="vrm-m" style="font-weight:700;margin:8px 0 6px;color:#0f6b4f">✅ ${gotten.length} récupéré${gotten.length > 1 ? 's' : ''}</div>${gotten.slice(0, 60).map(gotRow).join('')}` : ''}
+      <div class="vrm-m" style="margin-top:6px;opacity:.85">Le retrait (code / QR / point relais) reste dans l'app. Ici tu vides juste la liste quand c'est fait.</div>`;
+  }
+  function wireAchats() {
+    panel.querySelectorAll('.vrm-pk-done').forEach(b => {
+      b.onclick = () => {
+        const k = b.dataset.k; if (!k) return;
+        b.disabled = true; b.textContent = '⏳';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'markPickupDone', key: k, done: true }, (resp) => {
+          if (resp && resp.ok) {
+            pickupDoneLocal.add(k);
+            if (DATA && DATA.stats) DATA.stats.toPickup = Math.max(0, (DATA.stats.toPickup || 1) - 1);
+            render();
+          } else { try { b.disabled = false; b.textContent = '✓ Récupéré'; } catch (_) {} }
+        });
+      };
+    });
+    panel.querySelectorAll('.vrm-pk-undo').forEach(b => {
+      b.onclick = () => {
+        const k = b.dataset.k; if (!k) return;
+        b.disabled = true; b.textContent = '⏳';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'markPickupDone', key: k, done: false }, (resp) => {
+          if (resp && resp.ok) {
+            pickupDoneLocal.delete(k);
+            if (DATA && DATA.stats) DATA.stats.toPickup = (DATA.stats.toPickup || 0) + 1;
+            render();
+          } else { try { b.disabled = false; b.textContent = '↺ Remettre'; } catch (_) {} }
+        });
       };
     });
   }
@@ -787,7 +885,7 @@
         // Pastille = ce qui T'ATTEND concrètement : colis à expédier + messages
         // non lus (les vraies actions), sinon les paires à relancer.
         const st = DATA.stats || {};
-        const n = (st.toPrint || 0) + (st.toShip || 0) + (st.unread || 0) || (DATA.relance || []).length;
+        const n = (st.toPrint || 0) + (st.toShip || 0) + (st.toPickup || 0) + (st.unread || 0) || (DATA.relance || []).length;
         const old = fab.querySelector('.vrm-badge'); if (old) old.remove();
         if (n > 0) { const b = document.createElement('span'); b.className = 'vrm-badge'; b.textContent = n > 99 ? '99+' : String(n); fab.appendChild(b); }
       });

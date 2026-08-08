@@ -348,6 +348,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
           if (msg.action === 'convLastMessage') { const r = await convLastMessage(msg.convId); sendResponse(r); return; }
           if (msg.action === 'markBordDone' && msg.key) { const ok = await markBordDone(msg.key, msg.done); sendResponse({ ok }); return; }
+          if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -1032,6 +1033,20 @@ async function markBordDone(key, done) {
   return await supabaseUpsert('app_data', [{ id: 'panel_bords_done', data: cur }], 'id');
 }
 
+// « ✓ Récupéré » un colis à retirer depuis le panneau. Même principe que
+// markBordDone : ligne DÉDIÉE `panel_pickup_done` = { transaction_id: ts }, jamais
+// `main`. Le panneau la relit pour vider la liste ; l'app la LIT comme source de
+// « déjà récupéré » supplémentaire. Clé = transaction_id (comme `vinted_pickup_done`).
+async function markPickupDone(key, done) {
+  const k = String(key || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_pickup_done&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (done === false) delete cur[k];
+  else cur[k] = Date.now();
+  return await supabaseUpsert('app_data', [{ id: 'panel_pickup_done', data: cur }], 'id');
+}
+
 // ── ASSISTANT DE RÉPONSE (spec « Messaging Intelligence ») ───────────────────
 // Le panneau relaie le message de l'acheteur ; on le passe à /api/ai (mode
 // reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
@@ -1170,6 +1185,33 @@ async function buildPanelData() {
       });
     }
   }
+  // ── ACHATS À RETIRER (colis en point relais / bureau de poste) ──────────────
+  // Même règle que l'app (`isAtRelayStatus`) : achat dont le statut Vinted dit
+  // « déposé » + « point relais / bureau de poste ». On exclut ceux déjà marqués
+  // récupérés — par l'app (`vinted_pickup_done`, ligne main) OU depuis le panneau
+  // (`panel_pickup_done`, ligne dédiée). Clé = transaction_id (comme l'app).
+  const isAtRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+  const pickupDoneApp = d.vinted_pickup_done || {};
+  const ppRows = await sbGet('app_data?id=eq.panel_pickup_done&select=data');
+  const pickupDonePanel = (ppRows && ppRows[0] && ppRows[0].data) || {};
+  const purchasedRows = await sbGet('app_data?id=like.harvest_*_orders_purchased&select=data') || [];
+  const pickups = [];
+  const seenPk = new Set();
+  for (const r of purchasedRows) {
+    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    for (const o of orders) {
+      if (!isAtRelay(o.status)) continue;
+      const tx = String(o.transaction_id || '');
+      if (!tx || seenPk.has(tx)) continue; seenPk.add(tx);
+      if (pickupDoneApp[tx] || pickupDonePanel[tx]) continue;
+      pickups.push({
+        transaction: tx, title: o.title || '', status: o.status || '',
+        photo: o.photo || o.photo_url || null,
+        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
+        url: `https://www.vinted.fr/member/transactions/${tx}`,
+      });
+    }
+  }
   // ── CONVERSATIONS (inbox) : pour l'onglet Messages (relance guidée) ──────────
   // Tu sélectionnes des conversations, l'extension t'ouvre chacune une par une,
   // TU réponds toi-même (aucun message envoyé automatiquement).
@@ -1221,6 +1263,7 @@ async function buildPanelData() {
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
     toShip: toShip.filter(t => !t.hasBord).length,
     toPrint: bordsToPrint.length,
+    toPickup: pickups.length,
     unread: convs.filter(c => c.unread).length,
     favoris: online.filter(o => (o.favs || 0) > 0).length,
   };
@@ -1233,7 +1276,7 @@ async function buildPanelData() {
   // Réponses rapides déjà enregistrées dans l'app (synchronisées) → insérables en
   // 1 tap depuis le panneau, sur une conversation.
   const quickReplies = Array.isArray(d.vinted_quick_replies) ? d.vinted_quick_replies.slice(0, 20) : [];
-  return { online, relance, sleeping, noNum, toShip, bordsToPrint, convs, activity, quickReplies, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, pickups, bordsToPrint, convs, activity, quickReplies, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
