@@ -36,6 +36,7 @@
   const eur = (v) => (v == null || v === '' ? null : Number(v));
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const timeago = (t) => { const s = Math.max(0, (Date.now() - Number(t || 0)) / 1000); return s < 60 ? "à l'instant" : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : s < 86400 ? `il y a ${Math.floor(s / 3600)} h` : `il y a ${Math.floor(s / 86400)} j`; };
 
   // Id de l'annonce affichée si on est sur une page article (/items/123456-titre).
   const currentItemId = () => {
@@ -274,6 +275,7 @@
         <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
         <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
         <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
+        <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">À expédier 📄${DATA && DATA.stats && DATA.stats.toShip ? ` (${DATA.stats.toShip})` : ''}</button>
         <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
         <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Dorment 😴</button>
         <button class="vrm-tab ${tab === 'sansnum' ? 'on' : ''}" data-t="sansnum">Sans N°</button>
@@ -283,10 +285,16 @@
         : tab === 'paire' ? renderPaire()
         : tab === 'republier' ? renderRepublier()
         : tab === 'reponse' ? renderReponse()
+        : tab === 'expedier' ? renderExpedier()
         : tab === 'dorment' ? renderList(DATA.sleeping, sleepEmpty(), 'En ligne depuis 30 jours et plus (date lue sur la page de l&#39;annonce). À baisser ou republier — par toi.')
         : tab === 'relance' ? renderList(DATA.relance, 'Rien à relancer : tes annonces accrochent bien. 👌', 'Beaucoup vues mais peu mises en favori <b>par rapport à tes autres annonces</b> → le prix est sans doute trop haut. Ouvre-les et baisse le prix toi-même.')
         : renderList(DATA.noNum, 'Toutes tes annonces ont un N°. 👌', 'Ces annonces n\'ont pas encore de numéro dans ton app.')
       }</div>
+      ${(DATA && DATA.activity && DATA.activity.length) ? `
+        <div style="margin-top:10px;border-top:1px solid rgba(0,0,0,.08);padding-top:8px">
+          <div class="vrm-m" style="font-weight:700;margin-bottom:4px">🟢 Activité récente</div>
+          ${DATA.activity.slice(0, 5).map(a => `<div class="vrm-m" style="display:flex;justify-content:space-between;gap:8px;padding:1px 0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.text)}</span><span style="flex-shrink:0;opacity:.65">${esc(timeago(a.t))}</span></div>`).join('')}
+        </div>` : ''}
       <div style="margin-top:10px;text-align:center">
         <a class="vrm-link" href="${APP_URL}" target="_blank" rel="noreferrer">Ouvrir l'app VRM ↗</a>
       </div>`;
@@ -347,6 +355,33 @@
         const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1000);
       };
     });
+  }
+
+  // ── ONGLET « À EXPÉDIER » : le bordereau à générer (ASSISTANCE, pas d'auto) ──
+  // On te liste les ventes dont le bordereau n'est pas encore capté, avec un
+  // bouton UN TAP qui t'ouvre au bon endroit sur Vinted. ⚠️ On NE clique PAS le
+  // bouton « générer » à ta place : c'est ce motif (l'extension qui agit sans toi)
+  // qui fait bloquer les comptes. Tu génères d'un clic, et l'extension capte le
+  // PDF automatiquement (il apparaît ensuite dans « Activité récente » + l'app).
+  function renderExpedier() {
+    const list = (DATA && DATA.toShip) || [];
+    const pending = list.filter(t => !t.hasBord);
+    const done = list.filter(t => t.hasBord);
+    if (!list.length) return `<div class="vrm-m">Aucune vente à expédier captée. Ouvre tes ventes sur Vinted une fois pour les capter.</div>`;
+    const cardShip = (t) => `
+      <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-top:6px">
+        ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0" />` : '<span style="font-size:22px;flex-shrink:0">📦</span>'}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title || 'Vente')}</div>
+          <div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div>
+        </div>
+        <a href="${esc(t.url)}" target="_blank" rel="noreferrer" style="flex-shrink:0;text-decoration:none;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:8px 11px;font-weight:800;font-size:12px">📄 Générer</a>
+      </div>`;
+    let out = pending.length
+      ? `<div class="vrm-m" style="margin-bottom:6px"><b>${pending.length}</b> bordereau${pending.length > 1 ? 'x' : ''} à générer. Un tap t'ouvre au bon endroit ; tu génères, l'extension capte le PDF. <b>Rien n'est cliqué à ta place.</b></div>${pending.map(cardShip).join('')}`
+      : `<div class="vrm-m">✓ Tout est à jour, aucun bordereau en attente.</div>`;
+    if (done.length) out += `<div class="vrm-m" style="margin-top:10px">✓ ${done.length} bordereau${done.length > 1 ? 'x' : ''} déjà capté${done.length > 1 ? 's' : ''}.</div>`;
+    return out;
   }
 
   // ── ONGLET REPUBLIER : sélection + défilement UNE-PAR-UNE ────────────────────

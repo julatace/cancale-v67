@@ -216,7 +216,19 @@ async function captureAllAccounts() {
     if (uid) results.push({ domain: d, uid });
   }
   try { chrome.storage.local.set({ lastSync: Date.now(), lastAccounts: results }); } catch (_) {}
+  if (results.length) logActivity(`🔑 ${results.length} compte${results.length > 1 ? 's' : ''} synchronisé${results.length > 1 ? 's' : ''}`);
   return results;
+}
+
+// ── JOURNAL D'ACTIVITÉ (l'« interface quand je fais des actions ») ───────────
+// Petit fil des dernières choses faites par l'extension, montré dans le panneau
+// VRM. Anneau de 15 événements dans chrome.storage.local (léger, local).
+async function logActivity(text) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
+    cur.unshift({ t: Date.now(), text: String(text || '').slice(0, 90) });
+    await chrome.storage.local.set({ vrmActivity: cur.slice(0, 15) });
+  } catch (_) {}
 }
 
 // --- Capture passive des donnees ------------------------------------------
@@ -430,6 +442,7 @@ async function storeLabel(domain, url, b64) {
   if (!uid) return;
   const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64 };
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
+  logActivity('📄 Bordereau capté (prêt à imprimer)');
 }
 // Range le dernier REÇU / FACTURE officiel Vinted (PDF) consulte, pour la compta pro.
 async function storeReceipt(domain, url, b64) {
@@ -1087,6 +1100,33 @@ async function buildPanelData() {
                    .map(o => ({ ...o, ratio: (o.favs || 0) / o.views }));
   }
   const noNum = online.filter(o => !o.numero);
+  // ── VENTES À EXPÉDIER : le bordereau à générer (assistance, pas d'auto-clic) ──
+  // On lit les ventes moissonnées au statut « bordereau envoyé au vendeur » /
+  // « paiement validé », et on te les liste avec un bouton UN TAP « Générer ». On
+  // NE clique PAS à ta place sur Vinted (ce motif fait bloquer les comptes) : tu
+  // ouvres, tu génères d'un clic, et l'extension capte le PDF automatiquement.
+  const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+  const soldRows = await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || [];
+  const bordRows = await sbGet("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
+  const bordTxns = new Set(bordRows.map(b => String(b.transaction || '')).filter(Boolean));
+  const toShip = [];
+  const seenTx = new Set();
+  for (const r of soldRows) {
+    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    for (const o of orders) {
+      if (!awaitingShip(o.status)) continue;
+      const tx = String(o.transaction_id || '');
+      if (tx && seenTx.has(tx)) continue; if (tx) seenTx.add(tx);
+      toShip.push({
+        transaction: tx, title: o.title || '', status: o.status || '',
+        photo: o.photo || o.photo_url || null,
+        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
+        conv: o.conversation_id != null ? String(o.conversation_id) : null,
+        url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : (o.conversation_id ? `https://www.vinted.fr/inbox/${o.conversation_id}` : 'https://www.vinted.fr/member/transactions?type=sold'),
+        hasBord: tx ? bordTxns.has(tx) : false,
+      });
+    }
+  }
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
   // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
   const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)
@@ -1100,8 +1140,10 @@ async function buildPanelData() {
     noNum: noNum.length,
     withDesc: online.filter(o => o.hasDesc).length,
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
+    toShip: toShip.filter(t => !t.hasBord).length,
   };
-  return { online, relance, sleeping, noNum, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  const activity = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
+  return { online, relance, sleeping, noNum, toShip, activity, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
