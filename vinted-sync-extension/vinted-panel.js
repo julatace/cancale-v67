@@ -32,6 +32,14 @@
   let repMsg = '';
   let repResult = null;
   let repBusy = false;
+  // ── File de BORDEREAUX pilotée par TA sélection ────────────────────────────
+  // shipSel = ventes cochées. shipRun = défilement une-par-une ({queue, idx}).
+  // Même principe que la republication : TU sélectionnes, l'extension t'ouvre
+  // chaque vente, TU cliques « Générer le bordereau » sur Vinted (bouton natif),
+  // elle capte le PDF, puis « Suivante ». L'extension n'appuie JAMAIS le bouton à
+  // ta place — c'est ce geste (un script qui clique) que Vinted sanctionne.
+  const shipSel = new Set();
+  let shipRun = null;
 
   const eur = (v) => (v == null || v === '' ? null : Number(v));
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
@@ -302,6 +310,7 @@
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
+    if (tab === 'expedier') wireExpedier();
   }
 
   // ── ONGLET RÉPONSE : aide à répondre aux acheteurs (Messaging Intelligence) ──
@@ -357,31 +366,80 @@
     });
   }
 
-  // ── ONGLET « À EXPÉDIER » : le bordereau à générer (ASSISTANCE, pas d'auto) ──
-  // On te liste les ventes dont le bordereau n'est pas encore capté, avec un
-  // bouton UN TAP qui t'ouvre au bon endroit sur Vinted. ⚠️ On NE clique PAS le
-  // bouton « générer » à ta place : c'est ce motif (l'extension qui agit sans toi)
-  // qui fait bloquer les comptes. Tu génères d'un clic, et l'extension capte le
-  // PDF automatiquement (il apparaît ensuite dans « Activité récente » + l'app).
+  // ── ONGLET « À EXPÉDIER » : bordereaux pilotés par TA sélection ─────────────
+  // Tu coches les bordereaux à générer, tu lances : l'extension t'ouvre chaque
+  // vente UNE PAR UNE ; TU cliques « Générer le bordereau » sur Vinted, elle capte
+  // le PDF, puis « Suivante ». ⚠️ L'extension n'appuie JAMAIS le bouton à ta place
+  // (ce geste — un script qui clique — est ce que Vinted sanctionne). C'est TA
+  // sélection qui pilote, TON clic qui génère : tu es l'auteur.
+  const shipKey = (t) => t.transaction || t.url;
   function renderExpedier() {
     const list = (DATA && DATA.toShip) || [];
     const pending = list.filter(t => !t.hasBord);
     const done = list.filter(t => t.hasBord);
     if (!list.length) return `<div class="vrm-m">Aucune vente à expédier captée. Ouvre tes ventes sur Vinted une fois pour les capter.</div>`;
-    const cardShip = (t) => `
-      <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-top:6px">
-        ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0" />` : '<span style="font-size:22px;flex-shrink:0">📦</span>'}
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title || 'Vente')}</div>
-          <div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div>
+
+    // Mode défilement : une vente à la fois (piloté par ta sélection).
+    if (shipRun) {
+      const total = shipRun.queue.length, i = shipRun.idx;
+      if (i >= total) {
+        return `<div class="vrm-card" style="text-align:center">
+            <div style="font-size:15px;font-weight:800;margin-bottom:4px">✓ Terminé</div>
+            <div class="vrm-m">${total} vente${total > 1 ? 's' : ''} passée${total > 1 ? 's' : ''}. Les bordereaux générés sont captés tout seuls (voir « Activité »).</div>
+            <button class="vrm-ship-go" data-act="stop" style="margin-top:10px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:8px 14px;font-weight:800;cursor:pointer">Fermer</button>
+          </div>`;
+      }
+      const t = shipRun.queue[i];
+      return `
+        <div class="vrm-m" style="margin-bottom:8px">Vente <b>${i + 1}</b> / ${total} — ouvre-la, clique <b>Générer le bordereau</b> sur Vinted, puis <b>Suivante</b>. L'extension capte le PDF.</div>
+        <div class="vrm-card" style="display:flex;gap:8px;align-items:center">
+          ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0" />` : '<span style="font-size:24px;flex-shrink:0">📦</span>'}
+          <div style="flex:1;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title || 'Vente')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || '')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
         </div>
-        <a href="${esc(t.url)}" target="_blank" rel="noreferrer" style="flex-shrink:0;text-decoration:none;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:8px 11px;font-weight:800;font-size:12px">📄 Générer</a>
-      </div>`;
-    let out = pending.length
-      ? `<div class="vrm-m" style="margin-bottom:6px"><b>${pending.length}</b> bordereau${pending.length > 1 ? 'x' : ''} à générer. Un tap t'ouvre au bon endroit ; tu génères, l'extension capte le PDF. <b>Rien n'est cliqué à ta place.</b></div>${pending.map(cardShip).join('')}`
-      : `<div class="vrm-m">✓ Tout est à jour, aucun bordereau en attente.</div>`;
-    if (done.length) out += `<div class="vrm-m" style="margin-top:10px">✓ ${done.length} bordereau${done.length > 1 ? 'x' : ''} déjà capté${done.length > 1 ? 's' : ''}.</div>`;
-    return out;
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="vrm-ship-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
+          <button class="vrm-ship-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
+        </div>
+        <div style="text-align:center;margin-top:8px"><button class="vrm-ship-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
+    }
+
+    // Mode sélection.
+    if (!pending.length) {
+      return `<div class="vrm-m">✓ Aucun bordereau en attente.</div>${done.length ? `<div class="vrm-m" style="margin-top:8px">${done.length} déjà capté${done.length > 1 ? 's' : ''}.</div>` : ''}`;
+    }
+    const rows = pending.map(t => { const k = shipKey(t); return `
+      <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
+        <input type="checkbox" class="vrm-ship-chk" data-k="${esc(k)}" ${shipSel.has(k) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
+        ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0"><div class="vrm-t">${esc(t.title || 'Vente')}</div><div class="vrm-m">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
+      </label>`; }).join('');
+    return `
+      <div class="vrm-m" style="margin-bottom:8px">Coche les bordereaux à <b>générer</b>. Tu les génères <b>un par un, toi-même</b> : l'extension t'ouvre chaque vente, tu cliques « Générer » sur Vinted, elle capte le PDF. <b>C'est TA sélection qui pilote.</b></div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="vrm-ship-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
+        <button class="vrm-ship-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
+      </div>
+      <div style="margin-bottom:8px">${rows}</div>
+      <button class="vrm-ship-go" data-act="start" ${shipSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${shipSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${shipSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Générer ma sélection (${shipSel.size})</button>
+      ${done.length ? `<div class="vrm-m" style="margin-top:8px">✓ ${done.length} déjà capté${done.length > 1 ? 's' : ''}.</div>` : ''}`;
+  }
+
+  function wireExpedier() {
+    panel.querySelectorAll('.vrm-ship-chk').forEach(c => {
+      c.onchange = () => { const k = c.dataset.k; if (c.checked) shipSel.add(k); else shipSel.delete(k); render(); };
+    });
+    panel.querySelectorAll('.vrm-ship-go').forEach(b => {
+      b.onclick = () => {
+        const act = b.dataset.act;
+        const pending = ((DATA && DATA.toShip) || []).filter(t => !t.hasBord);
+        if (act === 'all') { pending.forEach(t => shipSel.add(shipKey(t))); render(); }
+        else if (act === 'none') { shipSel.clear(); render(); }
+        else if (act === 'start') { if (!shipSel.size) return; shipRun = { queue: pending.filter(t => shipSel.has(shipKey(t))), idx: 0 }; render(); }
+        else if (act === 'stop') { shipRun = null; render(); }
+        else if (act === 'open') { const t = shipRun && shipRun.queue[shipRun.idx]; if (t && t.url) window.open(t.url, '_blank', 'noopener'); }
+        else if (act === 'next') { if (shipRun) { shipRun.idx++; render(); } }
+      };
+    });
   }
 
   // ── ONGLET REPUBLIER : sélection + défilement UNE-PAR-UNE ────────────────────
