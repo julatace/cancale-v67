@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v77/00 · Éditeur photo (recadrer/zoomer) + fix égress widget';
+const BUILD_ID = 'v78/00 · Argent en attente unifié + colis à retirer (union) + photos';
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -8792,6 +8792,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts]);
   const vintedToPickup = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
+  // « Colis à retirer » = UN SEUL compteur, l'UNION des deux signaux, dédoublonnée
+  // par titre : (1) email transporteur (porte le CODE de retrait) + (2) statut
+  // Vinted « déposé en point relais ». ⚠️ Avant on prenait « email OU Vinted »
+  // (le premier écrasait l'autre) → l'accueil affichait « 1 colis » alors qu'il y
+  // en avait 2 (plainte de Julien). `emailList` = colis avec code/lieu (affichés
+  // avec leur code) ; `extra` = colis vus par Vinted mais dont le code n'est pas
+  // encore arrivé par email. Utilisé À L'IDENTIQUE par Ma journée ET l'onglet Achats.
+  const pickupUnion = useMemo(() => {
+    const emailList = (tracking || []).filter(t => isColisRetirable(t, collected));
+    const seen = new Set(emailList.map(t => normTitle(t.artTitle || t.article || t.modele || '')).filter(Boolean));
+    const extra = vintedToPickup.filter(o => { const n = normTitle(o.title || ''); return !n || !seen.has(n); });
+    return { emailList, extra, total: emailList.length + extra.length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracking, collected, vintedToPickup]);
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !isHidden(o) && isAwaitingShipStatus(o.status)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
@@ -10996,7 +11010,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         const jobs=[];
         if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_bord',prio:late>0?0:1});
-        const pickupCount=(tracking||[]).filter(isRetirable).length||vintedToPickup.length; // même compte que l'onglet Achats
+        const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
         if(pickupCount) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${pickupCount} colis`,sub:'Déposés en point relais — récupère-les avec ton code',tab:'cat_achats',prio:2});
         if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(repriceList.length) jobs.push({icon:'🏷️',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
@@ -11148,17 +11162,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
             })()}
 
-            {/* Trésorerie : l'argent qui arrive (motivation, non-action). */}
-            {!loading && inRouteSum>0 && (
+            {/* Argent EN ATTENTE = ce que Vinted te doit. UNE seule notion,
+                cohérente partout : le VRAI solde bloqué du porte-monnaie quand on
+                le connaît (capté par l'extension), sinon une estimation annoncée
+                comme telle. Fini le « argent en route » qui divergeait du
+                porte-monnaie (plainte de Julien). */}
+            {(()=>{
+              const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
+              const val=escrow?escrow.total:inRouteSum;
+              if(loading||val<=0) return null;
+              return (
               <div style={{marginTop:16,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:16,border:`1px solid ${C.accent}33`,background:`${C.accent}0c`}}>
                 <div style={{fontSize:26}}>💶</div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en route</div>
-                  <div style={{fontSize:20,fontWeight:700,color:C.accent}}>≈ {inRouteSum.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en attente{escrow?'':' (estimation)'}</div>
+                  <div style={{fontSize:20,fontWeight:700,color:C.accent}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
                 </div>
                 <button type="button" onClick={()=>onNav && onNav('cat_ventes')} style={{border:'none',background:'transparent',color:C.accent,fontSize:22,fontWeight:700,cursor:'pointer'}}>›</button>
               </div>
-            )}
+              );
+            })()}
 
             {accounts.length===0 && (
               <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
@@ -11220,7 +11243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{display:'flex',alignItems:'center',gap:11}}>
                 <span style={{fontSize:22}}>💶</span>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Bloqué chez Vinted':'Argent en route (estimation)'}</div>
+                  <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}</div>
                   <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
@@ -11254,7 +11277,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
-            {totals.nbAttente>0 && <StatBox label="💰 En attente" value={fmtE0(totals.enAttente)} color={C.warn} sub={`${totals.nbAttente} en cours · porte-monnaie`}/>}
+            {totals.nbAttente>0 && (()=>{ const esc=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null; return <StatBox label="💰 En attente" value={fmtE0(esc?esc.total:totals.enAttente)} color={C.warn} sub={esc?`bloqué · ${esc.accounts} porte-monnaie`:`${totals.nbAttente} en cours · estimation`}/>; })()}
             <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
             {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
@@ -11626,16 +11649,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             « Y aller ». Source = emails transporteur (qui portent le code), et non
             plus le statut Vinted (qui n'a pas les codes). La carte est en option. */}
         {(()=>{
-          const avail = (tracking||[]).filter(isRetirable);
+          const avail = pickupUnion.emailList;   // colis avec CODE/lieu (email transporteur)
+          const extra = pickupUnion.extra;       // colis « déposé » (statut Vinted) sans code encore
           const okCode = (c) => { const s = String(c||'').trim(); return /^\d{3,8}$/.test(s) ? s : null; };
-          if (!avail.length) {
-            return vintedToPickup.length>0 ? (
-              <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:3}}>📦 {vintedToPickup.length} colis à retirer</div>
-                <div style={{fontSize:12,color:C.muted}}>Le code de retrait arrive par email dès que le colis est au point relais.</div>
-              </div>
-            ) : null;
-          }
+          if (!avail.length && !extra.length) return null;
+          // Photo de la paire par titre : les achats moissonnés portent la vraie
+          // photo Vinted → on la montre à côté du code de retrait (savoir quelle
+          // paire on va chercher / si on l'a déjà retirée).
+          const photoByTitle = {};
+          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=o.photo||o.photo_url; if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
+          const thumb = (src) => src
+            ? <img src={src} alt="" loading="lazy" style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
+            : <span style={{fontSize:22,flexShrink:0}}>📦</span>;
           // Point relais HABITUEL par transporteur : certains emails ne contiennent
           // pas l'adresse du relais (juste un lien « juste ici »). On déduit alors
           // le relais le plus fréquent de CE transporteur (ex. Mondial Relay →
@@ -11648,7 +11673,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
-                <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>📦 {avail.length} colis à retirer</div>
+                <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>📦 {pickupUnion.total} colis à retirer</div>
                 <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{border:`1px solid ${C.accent}`,background:showRelais?C.accent:'transparent',color:showRelais?'#fff':C.accent,borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🗺️ {showRelais?'Masquer la carte':'Carte'}</button>
               </div>
               {Object.entries(groups).map(([nom,g])=>(
@@ -11665,7 +11690,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const code=okCode(t.code);
                     return (
                       <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
-                        <span style={{fontSize:22,flexShrink:0}}>📦</span>
+                        {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                           <div style={{fontSize:11,fontWeight:600,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}{g.guessed?<span style={{color:C.muted,fontWeight:600}}> (relais habituel)</span>:''}</div>
@@ -11683,6 +11708,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   })}
                 </div>
               ))}
+              {/* Colis vus « déposés » par Vinted mais dont le CODE n'est pas
+                  encore arrivé par email → on les montre quand même (sinon le
+                  compteur dirait 2 et la liste n'en montrerait qu'1). */}
+              {extra.length>0 && (
+                <div style={{marginBottom:12}}>
+                  {avail.length>0 && <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:8}}>📍 En point relais — code à venir</div>}
+                  {extra.map((o,i)=>(
+                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                      {thumb(o.photo||o.photo_url||photoByTitle[normTitle(o.title||'')])}
+                      <div style={{flex:'1 1 150px',minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Déposé en point relais (Vinted) · le code arrive par email</div>
+                      </div>
+                      <button type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'8px 11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{fontSize:11,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — ou ça se met à jour tout seul.</div>
             </div>
           );
@@ -15695,6 +15738,13 @@ export default function App() {
       // Toutes les données viennent maintenant de la moisson Vinted/extension —
       // choix de Julien, août 2026. Le CA/ventes du mois est calculé plus haut
       // par date de vente sur la moisson, ce qui est complet et sans emails.)
+      // Argent EN ATTENTE pour le widget = le VRAI solde bloqué du porte-monnaie
+      // (même source que l'app : fetchWalletEscrow), pas l'estimation par somme
+      // des ventes en cours — sinon le widget afficherait un montant différent
+      // de l'app (exactement l'incohérence signalée par Julien). Repli sur
+      // l'estimation tant qu'aucun porte-monnaie n'a été capté.
+      let enAttenteReel=enAttente;
+      try{ const esc=await fetchWalletEscrow(); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
@@ -15704,7 +15754,7 @@ export default function App() {
           await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`,{
             method:'POST',
             headers:sbAuth({ 'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal' }),
-            body:JSON.stringify([withOwner({id:'widget_stats',data:{caMois:Math.round(caMois),ventesMois,enAttente:Math.round(enAttente),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock,updatedAt:new Date().toISOString()}})]),
+            body:JSON.stringify([withOwner({id:'widget_stats',data:{caMois:Math.round(caMois),ventesMois,enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock,updatedAt:new Date().toISOString()}})]),
           });
         }catch(_){}
       }
