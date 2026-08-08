@@ -1282,7 +1282,12 @@ async function buildPanelData() {
   // Réponses rapides déjà enregistrées dans l'app (synchronisées) → insérables en
   // 1 tap depuis le panneau, sur une conversation.
   const quickReplies = Array.isArray(d.vinted_quick_replies) ? d.vinted_quick_replies.slice(0, 20) : [];
-  return { online, relance, sleeping, noNum, toShip, pickups, bordsToPrint, convs, activity, quickReplies, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  // Chiffres PUBLIÉS PAR L'APP (ligne widget_stats) → on les affiche tels quels
+  // dans « Ma journée » pour ne jamais recalculer un CA qui divergerait de l'app.
+  // Mis à jour quand Julien ouvre l'app : on montre la fraîcheur, pas de bluff.
+  const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
+  const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
+  return { online, relance, sleeping, noNum, toShip, pickups, bordsToPrint, convs, activity, quickReplies, appStats, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

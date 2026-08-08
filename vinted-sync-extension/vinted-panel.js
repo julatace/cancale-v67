@@ -23,11 +23,11 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['paire', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
+  const PANEL_TABS = ['journee', 'paire', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   let open = readLS('vrm_panel_open', '0') === '1';
-  let tab = (() => { const t = readLS('vrm_panel_tab', 'paire'); return PANEL_TABS.includes(t) ? t : 'paire'; })(); // paire | relance | dorment | sansnum | republier | reponse | expedier | messages | favoris
+  let tab = (() => { const t = readLS('vrm_panel_tab', 'journee'); return PANEL_TABS.includes(t) ? t : 'journee'; })(); // journee | paire | relance | dorment | sansnum | republier | reponse | expedier | achats | messages | favoris
   // ── File de republication ASSISTÉE ─────────────────────────────────────────
   // repubSel = les annonces cochées. repubRun = le défilement une-par-une en
   // cours ({ queue:[ids], idx }). ⚠️ AUCUNE automatisation : le panneau OUVRE
@@ -287,6 +287,47 @@
       <div style="margin-top:7px"><a class="vrm-link" href="${esc(o.url)}" target="_blank" rel="noreferrer">Ouvrir l'annonce ↗</a></div>
     </div>`;
 
+  // ── ONGLET « MA JOURNÉE » : toute ta boutique en un coup d'œil, sur Vinted ────
+  // Les chiffres d'argent (CA du mois, argent bloqué, encaissé) viennent de la
+  // ligne `widget_stats` PUBLIÉE PAR L'APP → jamais recalculés ici, donc jamais un
+  // chiffre qui contredit l'app. On affiche leur fraîcheur honnêtement.
+  const eurInt = (v) => (v == null ? '—' : Number(v).toLocaleString('fr-FR') + ' €');
+  function renderJournee() {
+    const s = (DATA && DATA.stats) || {};
+    const a = (DATA && DATA.appStats) || null;
+    const heure = new Date().getHours();
+    const bonjour = heure < 18 ? 'Bonjour 👋' : 'Bonsoir 👋';
+    const todo = [
+      s.toPrint ? { t: 'expedier', ic: '🖨️', n: s.toPrint, lbl: 'à imprimer' } : null,
+      s.toShip ? { t: 'expedier', ic: '📄', n: s.toShip, lbl: 'à générer' } : null,
+      s.toPickup ? { t: 'achats', ic: '📦', n: s.toPickup, lbl: 'à retirer' } : null,
+      s.unread ? { t: 'messages', ic: '💬', n: s.unread, lbl: s.unread > 1 ? 'messages' : 'message' } : null,
+    ].filter(Boolean);
+    const tile = (label, val, color) => `<div class="vrm-st" style="flex:1 1 44%"><b style="color:${color || 'inherit'}">${val}</b><span class="vrm-m">${label}</span></div>`;
+    const money = a ? `
+      <div class="vrm-card" style="text-align:center;background:linear-gradient(135deg,#09b1ba0f,#09b1ba05);border-color:#09b1ba55">
+        <div class="vrm-m" style="text-transform:uppercase;font-size:10px;letter-spacing:.6px">Ce mois-ci</div>
+        <div style="font-weight:800;font-size:30px;color:#09b1ba;line-height:1.1;margin:2px 0">${eurInt(a.caMois)}</div>
+        <div class="vrm-m">${a.ventesMois != null ? `${a.ventesMois} vente${a.ventesMois > 1 ? 's' : ''}` : ''}</div>
+      </div>
+      <div class="vrm-stats" style="margin-top:8px">
+        ${tile('Argent bloqué', eurInt(a.enAttente), '#c98a1a')}
+        ${tile('Encaissé', eurInt(a.caEncaisse), '#0f6b4f')}
+      </div>`
+      : `<div class="vrm-card"><div class="vrm-m">Ouvre l'app une fois pour voir ton <b>CA du mois</b> et ton <b>argent bloqué</b> ici (ils sont calculés par l'app).</div></div>`;
+    const stockLine = `
+      <div class="vrm-stats" style="margin-top:8px">
+        ${tile('En ligne', s.online != null ? s.online : '—')}
+        ${tile('Valeur du stock', eurInt(s.value != null ? Math.round(s.value) : null))}
+      </div>`;
+    const todoBlock = todo.length ? `
+      <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">À faire aujourd'hui</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${todo.map(x => `<button class="vrm-todo" data-t="${x.t}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>`
+      : `<div class="vrm-card" style="margin-top:12px"><div class="vrm-m">✅ Rien d'urgent : tout est à jour. Beau boulot.</div></div>`;
+    const fresh = a && a.updatedAt ? `<div class="vrm-m" style="text-align:center;margin-top:8px;opacity:.7">Chiffres de l'app · ${esc(timeago(Date.parse(a.updatedAt)))}</div>` : '';
+    return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${stockLine}${todoBlock}${fresh}`;
+  }
+
   function renderPaire() {
     const id = currentItemId();
     if (!id) return `<div class="vrm-m">Ouvre une de tes annonces sur Vinted pour voir son N°, son prix d'achat et sa case au garage ici.</div>`;
@@ -347,6 +388,7 @@
         <div class="vrm-st"><b>${s.noNum}</b><span class="vrm-m">sans N°</span></div>
       </div>
       <div class="vrm-tabs">
+        <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">🏠 Ma journée</button>
         <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
         <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
         <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
@@ -370,6 +412,7 @@
       })()}
       <div id="vrm-body">${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
+        : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
         : tab === 'republier' ? renderRepublier()
         : tab === 'reponse' ? renderReponse()
@@ -763,7 +806,7 @@
           <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title || 'Colis')}</div><div class="vrm-m">${esc(carrier)}${lieu ? ` · ${esc(lieu)}` : ''}</div></div>
           <button class="vrm-pk-done" data-k="${esc(p.key)}" title="Marquer récupéré → le retire de la liste" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Récupéré</button>
         </div>
-        ${p.code ? `<div style="margin-top:7px;text-align:center;background:#f2f7f4;border:1px dashed #0f6b4f;border-radius:10px;padding:8px"><div class="vrm-m" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Code de retrait</div><div style="font-weight:800;font-size:26px;letter-spacing:3px;color:#0f6b4f;font-variant-numeric:tabular-nums">${esc(p.code)}</div>${p.code2 ? `<div class="vrm-m" style="margin-top:2px">Code d'ouverture : <b>${esc(p.code2)}</b></div>` : ''}</div>`
+        ${p.code ? `<div style="margin-top:7px;text-align:center;background:#f2f7f4;border:1px dashed #0f6b4f;border-radius:10px;padding:8px"><div class="vrm-m" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px">Code de retrait</div><div style="font-weight:800;font-size:26px;letter-spacing:3px;color:#0f6b4f;font-variant-numeric:tabular-nums">${esc(p.code)}</div>${p.code2 ? `<div class="vrm-m" style="margin-top:2px">Code d'ouverture : <b>${esc(p.code2)}</b></div>` : ''}<button class="vrm-pk-copy" data-c="${esc(p.code)}" style="margin-top:6px;border:1px solid #0f6b4f;background:transparent;color:#0f6b4f;border-radius:8px;padding:4px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier le code</button></div>`
           : (p.qrUrl ? `<div class="vrm-m" style="margin-top:6px">📱 QR de retrait — présente-le au comptoir (dans l'app, onglet Achats).</div>`
           : `<div class="vrm-m" style="margin-top:6px">Présente-toi au point relais avec une pièce d'identité.</div>`)}
       </div>`;
@@ -780,6 +823,13 @@
       <div class="vrm-m" style="margin-top:6px;opacity:.85">Mondial Relay = code + pièce d'identité. Chronopost = QR (dans l'app).</div>`;
   }
   function wireAchats() {
+    panel.querySelectorAll('.vrm-pk-copy').forEach(b => {
+      b.onclick = () => {
+        const c = b.dataset.c; if (!c) return;
+        try { navigator.clipboard.writeText(c); } catch (_) {}
+        const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1200);
+      };
+    });
     panel.querySelectorAll('.vrm-pk-done').forEach(b => {
       b.onclick = () => {
         const k = b.dataset.k; if (!k) return;
