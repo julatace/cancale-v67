@@ -541,6 +541,11 @@ const SYNC_KEYS = [
   // (titre/description/prix préparés, avec l'historique des versions). Synchronisé
   // pour retrouver son travail sur un autre appareil.
   'vinted_annonce_drafts',
+  // Factures PRO — plusieurs micro-entreprises. `vinted_entreprises` = liste des
+  // entités [{id, companyName, companyType, companyAddress, siret, footer}] ;
+  // `vinted_entreprise_active` = id de l'entité utilisée pour les nouvelles
+  // factures. Chaque facture porte son `entrepriseId` (numérotation par entité).
+  'vinted_entreprises','vinted_entreprise_active',
   // Dérivé (annonces vendues d'après les emails) : partagé pour que le tableau
   // de bord compte exactement comme l'onglet Annonces, même sur un autre appareil.
   'vinted_annonces_email_sold',
@@ -4239,7 +4244,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
 }
 
 /* ── Ventes ──────────────────────────────────────────── */
-function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
+function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entreprises,activeEnt}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [newRow,setNewRow]=useState({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
@@ -4474,7 +4479,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                       {(() => {
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
                         if(!inv) return <span style={{color:C.muted,fontSize:11}}>—</span>;
-                        return <button type="button" onClick={()=>generatePDF(inv,invoiceSettings||{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'})}
+                        return <button type="button" onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings||{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'}))}
                           title={`Voir la facture ${inv.number}`}
                           style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'monospace'}}>
                           📄 {inv.number}
@@ -4638,7 +4643,7 @@ function Door({h}) {
 }
 
 /* ── Factures ───────────────────────────────────────── */
-function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings}) {
+function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -4741,16 +4746,20 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   
-  // Numéro auto pour la prochaine facture
+  // Numéro auto pour la prochaine facture — SÉQUENCE PROPRE À L'ENTITÉ ACTIVE.
+  // Une facture sans `entrepriseId` appartient à la 1ʳᵉ entité (rétro-compat).
+  // Chaque micro-entreprise garde ainsi sa propre numérotation continue (légal).
+  const firstEntId=(Array.isArray(entreprises)&&entreprises[0]&&entreprises[0].id)||'ent_1';
+  const invBelongsToActive=(i)=>{ const eid=i.entrepriseId||firstEntId; return eid===(activeEnt||firstEntId); };
   const nextInvoiceNumber=useMemo(()=>{
     const year=new Date().getFullYear();
-    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`));
+    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`)&&invBelongsToActive(i));
     const maxNum=yearInvoices.reduce((mx,i)=>{
       const n=parseInt(i.number.split('-')[1],10);
       return isNaN(n)?mx:Math.max(mx,n);
     },0);
     return `${year}-${String(maxNum+1).padStart(6,'0')}`;
-  },[invoices]);
+  },[invoices,activeEnt,firstEntId]);
   
   // Set des productIds qui sont déjà dans Ventes (= comptabilisés)
   const accountedSet=useMemo(()=>{
@@ -4810,6 +4819,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const newInvoice={
       id:'inv_'+Date.now(),
       number:nextInvoiceNumber,
+      entrepriseId:activeEnt||firstEntId, // à quelle micro-entreprise cette facture appartient
       ...data,
       createdAt:new Date().toISOString(),
     };
@@ -4950,7 +4960,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,invoiceSettings)} color={C.blue} style={{marginRight:4}}>📄</Btn>
+                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
                 </tr>
@@ -4978,7 +4988,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       {showForm&&<InvoiceForm onClose={()=>setShowForm(false)} onSave={addInvoice} nextNumber={nextInvoiceNumber} catalog={catalog}/>}
       
       {/* Modale réglages */}
-      {showSettings&&<InvoiceSettings settings={invoiceSettings} setSettings={(s)=>{setInvoiceSettings(s);save('vinted_invoice_settings',s);}} onClose={()=>setShowSettings(false)}/>}
+      {showSettings&&<InvoiceSettings settings={invoiceSettings} setSettings={(s)=>{setInvoiceSettings(s);save('vinted_invoice_settings',s);}} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} onClose={()=>setShowSettings(false)}/>}
     </div>
   );
 }
@@ -5056,9 +5066,22 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
 }
 
 // Réglages personnalisables
-function InvoiceSettings({settings,setSettings,onClose}) {
-  const [data,setData]=useState(settings);
-  const save=()=>{setSettings(data);onClose();};
+// Réglages factures — gère PLUSIEURS micro-entreprises. Rétro-compatible : si une
+// seule entité, c'est exactement comme avant. `setSettings` continue de refléter
+// l'entité ACTIVE dans `vinted_invoice_settings` (pour tout code hérité qui le lit).
+function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,onClose}) {
+  const list = (Array.isArray(entreprises)&&entreprises.length) ? entreprises : [{id:'ent_1',...settings}];
+  const [sel,setSel]=useState(()=>{ const a=list.find(e=>e.id===activeEnt); return (a&&a.id)||list[0].id; });
+  const cur = list.find(e=>e.id===sel)||list[0];
+  const [data,setData]=useState(cur);
+  // Quand on change d'entité sélectionnée, charge ses champs dans le formulaire.
+  const pick=(id)=>{ setSel(id); const e=list.find(x=>x.id===id); if(e) setData(e); };
+  const mirror=(entList,activeId)=>{ const act=entList.find(e=>e.id===activeId)||entList[0]; if(act) setSettings({companyName:act.companyName||'',companyType:act.companyType||'',companyAddress:act.companyAddress||'',siret:act.siret||'',footer:act.footer||''}); };
+  const persist=(entList,activeId)=>{ setEntreprises(entList); if(activeId!==undefined){ setActiveEnt(activeId); } mirror(entList, activeId!==undefined?activeId:activeEnt); };
+  const saveCur=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next); onClose(); };
+  const addEnt=()=>{ const id='ent_'+Date.now(); const blank={id,companyName:'',companyType:'Entrepreneur individuel',companyAddress:'',siret:'',footer:'Merci pour votre achat !'}; const next=[...list,blank]; setEntreprises(next); setSel(id); setData(blank); };
+  const delEnt=()=>{ if(list.length<=1) return; const next=list.filter(e=>e.id!==sel); const newActive=(activeEnt===sel)?next[0].id:activeEnt; persist(next,newActive); const nsel=next[0].id; setSel(nsel); setData(next[0]); };
+  const makeActive=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next,sel); };
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
@@ -5066,14 +5089,30 @@ function InvoiceSettings({settings,setSettings,onClose}) {
           <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
+        {/* Sélecteur de micro-entreprise */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:5}}>Mes micro-entreprises</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {list.map(e=>(
+              <button key={e.id} type="button" onClick={()=>pick(e.id)}
+                style={{border:`1px solid ${e.id===sel?C.accent:C.border}`,background:e.id===sel?`${C.accent}18`:'transparent',color:e.id===sel?C.accent:C.text,borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                {e.id===activeEnt?'⭐ ':''}{e.companyName||'(sans nom)'}
+              </button>
+            ))}
+            <button type="button" onClick={addEnt} style={{border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
+          </div>
+          <div style={{fontSize:10.5,color:C.muted,marginTop:5}}>⭐ = entité utilisée pour les nouvelles factures. Chaque entité a sa propre numérotation.</div>
+        </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="Nom de l'entreprise"><Input value={data.companyName} onChange={e=>setData(d=>({...d,companyName:e.target.value}))}/></Field>
-          <Field label="Forme juridique"><Input value={data.companyType} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
-          <Field label="Adresse"><Input value={data.companyAddress} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
-          <Field label="SIRET"><Input value={data.siret} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
-          <Field label="Message de bas de page"><Input value={data.footer} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
+          <Field label="Nom de l'entreprise"><Input value={data.companyName||''} onChange={e=>setData(d=>({...d,companyName:e.target.value}))}/></Field>
+          <Field label="Forme juridique"><Input value={data.companyType||''} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
+          <Field label="Adresse"><Input value={data.companyAddress||''} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
+          <Field label="SIRET"><Input value={data.siret||''} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
+          <Field label="Message de bas de page"><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
+          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>⭐ Utiliser cette entité pour les nouvelles factures</Btn>}
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={save} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
+            <Btn onClick={saveCur} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
+            {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>🗑 Supprimer</Btn>}
             <Btn onClick={onClose} color={C.border}>Annuler</Btn>
           </div>
         </div>
@@ -5098,6 +5137,16 @@ function fmtDate(d) {
     if(isNaN(dt.getTime())) return d;
     return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
   } catch { return d; }
+}
+
+// Résout l'entité (micro-entreprise) à utiliser pour une facture : celle stockée
+// sur la facture (entrepriseId), sinon l'entité active, sinon la première. Retombe
+// toujours sur `fallback` (les réglages simples) — donc rétro-compatible.
+function entForInvoice(inv, entreprises, activeEnt, fallback) {
+  const list = Array.isArray(entreprises) && entreprises.length ? entreprises : [fallback];
+  if (inv && inv.entrepriseId) { const e = list.find(x => x && x.id === inv.entrepriseId); if (e) return e; }
+  const a = list.find(x => x && x.id === activeEnt); if (a) return a;
+  return list[0] || fallback;
 }
 
 // Génération du PDF (HTML imprimable qui s'ouvre dans une nouvelle fenêtre)
@@ -15458,6 +15507,19 @@ export default function App() {
     siret:'94135104100012',
     footer:'Merci pour votre achat !',
   }));
+  // ── Factures PRO : plusieurs micro-entreprises ─────────────────────────────
+  // On démarre TOUJOURS avec au moins une entité, amorcée depuis les réglages
+  // existants → l'app se comporte exactement comme avant tant que Julien n'ajoute
+  // pas de 2ᵉ entité. `activeEnt` = celle utilisée pour les nouvelles factures.
+  const [entreprises,setEntreprisesRaw]=useState(()=>{
+    const stored=load('vinted_entreprises',null);
+    if(Array.isArray(stored)&&stored.length) return stored;
+    const s=load('vinted_invoice_settings',{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'});
+    return [{id:'ent_1',...s}];
+  });
+  const setEntreprises=(v)=>{ setEntreprisesRaw(v); save('vinted_entreprises',v); };
+  const [activeEnt,setActiveEntRaw]=useState(()=>load('vinted_entreprise_active','ent_1'));
+  const setActiveEnt=(id)=>{ setActiveEntRaw(id); save('vinted_entreprise_active',id); };
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);
   const [syncStatus,setSyncStatus]=useState('idle'); // idle | saving | synced | error | loading
@@ -16396,8 +16458,8 @@ export default function App() {
           setStockVinted(u); save('vinted_stock_vinted',u);
           try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
         }}/>}
-        {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
-        {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
+        {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/>}
+        {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
