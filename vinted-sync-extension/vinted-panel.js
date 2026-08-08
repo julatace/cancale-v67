@@ -338,8 +338,17 @@
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">À faire aujourd'hui</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${todo.map(x => `<button class="vrm-todo" data-t="${x.t}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>`
       : `<div class="vrm-card" style="margin-top:12px"><div class="vrm-m">✅ Rien d'urgent : tout est à jour. Beau boulot.</div></div>`;
+    // Optimisation : opportunités déjà calculées (mêmes onglets), pour vendre plus.
+    const optim = [
+      s.relance ? { t: 'relance', ic: '💡', n: s.relance, lbl: 'à relancer' } : null,
+      s.sleeping ? { t: 'dorment', ic: '😴', n: s.sleeping, lbl: 'dorment' } : null,
+      s.noNum ? { t: 'sansnum', ic: '🔢', n: s.noNum, lbl: 'sans N°' } : null,
+    ].filter(Boolean);
+    const optimBlock = optim.length ? `
+      <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">Pour vendre plus</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${optim.map(x => `<button class="vrm-todo" data-t="${x.t}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>` : '';
     const fresh = a && a.updatedAt ? `<div class="vrm-m" style="text-align:center;margin-top:8px;opacity:.7">Chiffres de l'app · ${esc(timeago(Date.parse(a.updatedAt)))}</div>` : '';
-    return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${fresh}`;
+    return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${optimBlock}${fresh}`;
   }
 
   function renderPaire() {
