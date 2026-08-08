@@ -36,6 +36,7 @@
   // place — c'est ce qui protège tes comptes.
   const repubSel = new Set();
   let repubRun = null;
+  let repubQuery = ''; // filtre texte de la liste Republier (gardé entre rendus)
   // ── Assistant de RÉPONSE (Messaging Intelligence) : tu colles le message de
   //    l'acheteur, l'IA propose des réponses ; tu relis et tu envoies TOI-MÊME
   //    sur Vinted (rien n'est envoyé automatiquement). État gardé entre rendus.
@@ -703,7 +704,7 @@
     }
     // Mode sélection : la liste avec des cases à cocher.
     const rows = list.slice(0, 200).map(o => `
-      <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
+      <label class="vrm-card vrm-repub-row" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '')).toLowerCase())}" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
         <input type="checkbox" class="vrm-chk" data-id="${esc(o.id)}" ${repubSel.has(o.id) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
         ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
         <div style="flex:1;min-width:0">
@@ -713,6 +714,7 @@
       </label>`).join('');
     return `
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
+      ${list.length > 8 ? `<input id="vrm-repub-search" type="search" value="${esc(repubQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
         <button class="vrm-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
@@ -722,6 +724,15 @@
   }
 
   function wireRepublier() {
+    // Filtre local (sur le DOM, sans re-render → l'input garde le focus).
+    const si = panel.querySelector('#vrm-repub-search');
+    const applyFilter = () => {
+      const q = repubQuery.trim().toLowerCase();
+      panel.querySelectorAll('.vrm-repub-row').forEach(row => {
+        row.style.display = (!q || (row.dataset.s || '').includes(q)) ? '' : 'none';
+      });
+    };
+    if (si) { si.oninput = () => { repubQuery = si.value; applyFilter(); }; applyFilter(); }
     panel.querySelectorAll('.vrm-chk').forEach(c => {
       c.onchange = () => { const id = c.dataset.id; if (c.checked) repubSel.add(id); else repubSel.delete(id); render(); };
     });
