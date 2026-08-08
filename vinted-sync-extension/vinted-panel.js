@@ -287,6 +287,15 @@
     if (!o) return `<div class="vrm-m">Cette annonce n'est pas (encore) dans tes annonces en ligne captées.<br>Ouvre ta boutique une fois pour la capter.</div>`;
     const buy = eur(o.buyPrice), sell = eur(o.price);
     const marge = (buy != null && sell != null && !isNaN(buy)) ? sell - buy : null;
+    // Diagnostics IN-CONTEXTE : on réutilise EXACTEMENT les signaux déjà calculés
+    // pour les onglets « À relancer » et « Dorment » (même source → aucun chiffre
+    // qui contredit l'app). But : pendant que tu regardes l'annonce, on te dit tout
+    // de suite si elle mérite une baisse de prix ou une republication.
+    const inRelance = ((DATA && DATA.relance) || []).some(r => String(r.id) === String(id));
+    const dort = o.ageDays != null && o.ageDays >= 30;
+    let diag = '';
+    if (inRelance) diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:#fff6ec;color:#9a5b16;border:1px solid #ffd7a8">💡 <b>Très vue, peu de favoris</b> par rapport à tes autres annonces → le prix est sans doute trop haut. Baisse-le toi-même.</div>`;
+    if (dort) diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:#eef4ff;color:#2b5b9a;border:1px solid #c9dbf7">😴 <b>En ligne depuis ${o.ageDays} j</b> — pense à la republier ou à baisser le prix.</div>`;
     const extra = `<div class="vrm-m" style="margin-top:3px">
         ${o.buyPrice != null ? `Achat ${fmt(o.buyPrice)}` : '<b>Prix d\'achat non renseigné</b>'}
         ${marge != null ? ` · Marge <b>${fmt(marge)}</b>` : ''}
@@ -295,7 +304,7 @@
       <div class="vrm-m" style="margin-top:3px">
         ${o.hasDesc ? '✅ description enregistrée' : '⏳ description en cours de lecture…'}
         ${o.nPhotos ? ` · 📷 ${o.nPhotos} photo${o.nPhotos > 1 ? 's' : ''} gardées` : ''}
-      </div>`;
+      </div>${diag}`;
     return card(o, extra);
   }
 
