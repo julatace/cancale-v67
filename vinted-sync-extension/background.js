@@ -1127,6 +1127,27 @@ async function buildPanelData() {
       });
     }
   }
+  // ── CONVERSATIONS (inbox) : pour l'onglet Messages (relance guidée) ──────────
+  // Tu sélectionnes des conversations, l'extension t'ouvre chacune une par une,
+  // TU réponds toi-même (aucun message envoyé automatiquement).
+  const inboxRows = await sbGet('app_data?id=like.harvest_*_inbox&select=data') || [];
+  const convs = [];
+  const seenC = new Set();
+  for (const r of inboxRows) {
+    const arr = (r.data && r.data.payload && r.data.payload.conversations) || [];
+    for (const c of arr) {
+      const id = String(c.id || ''); if (!id || seenC.has(id)) continue; seenC.add(id);
+      const ou = c.opposite_user || {};
+      const ophoto = ou.photo && (ou.photo.url || ou.photo);
+      const iphoto = c.item_photos && c.item_photos[0] && (c.item_photos[0].url || c.item_photos[0]);
+      convs.push({
+        id, title: c.description || '', unread: !!c.unread,
+        login: ou.login || '', photo: ophoto || iphoto || null,
+        url: `https://www.vinted.fr/inbox/${id}`, updated: c.updated_at || null,
+      });
+    }
+  }
+  convs.sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
   // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
   const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)
@@ -1141,9 +1162,11 @@ async function buildPanelData() {
     withDesc: online.filter(o => o.hasDesc).length,
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
     toShip: toShip.filter(t => !t.hasBord).length,
+    unread: convs.filter(c => c.unread).length,
+    favoris: online.filter(o => (o.favs || 0) > 0).length,
   };
   const activity = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
-  return { online, relance, sleeping, noNum, toShip, activity, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, convs, activity, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

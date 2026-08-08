@@ -40,6 +40,14 @@
   // ta place — c'est ce geste (un script qui clique) que Vinted sanctionne.
   const shipSel = new Set();
   let shipRun = null;
+  // Mêmes files pilotées par TA sélection pour : répondre aux messages, et
+  // relancer les personnes qui ont mis en favori (offre native Vinted). Tu
+  // sélectionnes, l'extension t'ouvre chaque élément, TU agis (réponds / proposes),
+  // puis Suivante. Aucun message ni aucune offre envoyés automatiquement.
+  const msgSel = new Set();
+  let msgRun = null;
+  const favSel = new Set();
+  let favRun = null;
 
   const eur = (v) => (v == null || v === '' ? null : Number(v));
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
@@ -284,6 +292,8 @@
         <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
         <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
         <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">À expédier 📄${DATA && DATA.stats && DATA.stats.toShip ? ` (${DATA.stats.toShip})` : ''}</button>
+        <button class="vrm-tab ${tab === 'messages' ? 'on' : ''}" data-t="messages">Messages 💬${DATA && DATA.stats && DATA.stats.unread ? ` (${DATA.stats.unread})` : ''}</button>
+        <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">Favoris ❤️</button>
         <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
         <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Dorment 😴</button>
         <button class="vrm-tab ${tab === 'sansnum' ? 'on' : ''}" data-t="sansnum">Sans N°</button>
@@ -294,6 +304,8 @@
         : tab === 'republier' ? renderRepublier()
         : tab === 'reponse' ? renderReponse()
         : tab === 'expedier' ? renderExpedier()
+        : tab === 'messages' ? renderMessages()
+        : tab === 'favoris' ? renderFavoris()
         : tab === 'dorment' ? renderList(DATA.sleeping, sleepEmpty(), 'En ligne depuis 30 jours et plus (date lue sur la page de l&#39;annonce). À baisser ou republier — par toi.')
         : tab === 'relance' ? renderList(DATA.relance, 'Rien à relancer : tes annonces accrochent bien. 👌', 'Beaucoup vues mais peu mises en favori <b>par rapport à tes autres annonces</b> → le prix est sans doute trop haut. Ouvre-les et baisse le prix toi-même.')
         : renderList(DATA.noNum, 'Toutes tes annonces ont un N°. 👌', 'Ces annonces n\'ont pas encore de numéro dans ton app.')
@@ -311,6 +323,113 @@
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
     if (tab === 'expedier') wireExpedier();
+    if (tab === 'messages') wireMessages();
+    if (tab === 'favoris') wireFavoris();
+  }
+
+  // ── ONGLET MESSAGES : répondre, piloté par TA sélection (une-par-une) ────────
+  // Tu coches les conversations, l'extension t'ouvre chacune à ton clic ; tu
+  // réponds toi-même (l'onglet « Réponse ✍️ » peut te suggérer un texte). Aucun
+  // message n'est envoyé automatiquement.
+  function renderMessages() {
+    const list = (DATA && DATA.convs) || [];
+    if (!list.length) return `<div class="vrm-m">Aucune conversation captée. Ouvre ta messagerie Vinted une fois pour les capter.</div>`;
+    if (msgRun) {
+      const total = msgRun.queue.length, i = msgRun.idx;
+      if (i >= total) return `<div class="vrm-card" style="text-align:center"><div style="font-size:15px;font-weight:800;margin-bottom:4px">✓ Terminé</div><div class="vrm-m">${total} conversation${total > 1 ? 's' : ''} passée${total > 1 ? 's' : ''}.</div><button class="vrm-msg-go" data-act="stop" style="margin-top:10px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:8px 14px;font-weight:800;cursor:pointer">Fermer</button></div>`;
+      const c = msgRun.queue[i];
+      return `
+        <div class="vrm-m" style="margin-bottom:8px">Conversation <b>${i + 1}</b> / ${total} — ouvre-la, réponds (onglet <b>Réponse ✍️</b> pour un texte suggéré), puis <b>Suivante</b>.</div>
+        <div class="vrm-card" style="display:flex;gap:8px;align-items:center">
+          ${c.photo ? `<img src="${esc(c.photo)}" alt="" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0" />` : '<span style="font-size:24px;flex-shrink:0">💬</span>'}
+          <div style="flex:1;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.login || 'Acheteur')}${c.unread ? ' 🔴' : ''}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '')}</div></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="vrm-msg-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir ↗</button>
+          <button class="vrm-msg-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
+        </div>
+        <div style="text-align:center;margin-top:8px"><button class="vrm-msg-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
+    }
+    const rows = list.slice(0, 200).map(c => `
+      <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
+        <input type="checkbox" class="vrm-msg-chk" data-k="${esc(c.id)}" ${msgSel.has(c.id) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
+        ${c.photo ? `<img src="${esc(c.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0"><div class="vrm-t">${c.unread ? '🔴 ' : ''}${esc(c.login || 'Acheteur')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '')}</div></div>
+      </label>`).join('');
+    return `
+      <div class="vrm-m" style="margin-bottom:8px">Coche les conversations où <b>répondre</b>. Tu réponds <b>une par une, toi-même</b> (aucun envoi automatique). 🔴 = non lu.</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="vrm-msg-go" data-act="unread" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Cocher non lus</button>
+        <button class="vrm-msg-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
+      </div>
+      <div style="margin-bottom:8px">${rows}</div>
+      <button class="vrm-msg-go" data-act="start" ${msgSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${msgSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${msgSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Répondre à ma sélection (${msgSel.size})</button>`;
+  }
+  function wireMessages() {
+    panel.querySelectorAll('.vrm-msg-chk').forEach(c => { c.onchange = () => { const k = c.dataset.k; if (c.checked) msgSel.add(k); else msgSel.delete(k); render(); }; });
+    panel.querySelectorAll('.vrm-msg-go').forEach(b => {
+      b.onclick = () => {
+        const act = b.dataset.act;
+        const list = (DATA && DATA.convs) || [];
+        if (act === 'unread') { list.filter(c => c.unread).forEach(c => msgSel.add(c.id)); render(); }
+        else if (act === 'none') { msgSel.clear(); render(); }
+        else if (act === 'start') { if (!msgSel.size) return; msgRun = { queue: list.filter(c => msgSel.has(c.id)), idx: 0 }; render(); }
+        else if (act === 'stop') { msgRun = null; render(); }
+        else if (act === 'open') { const c = msgRun && msgRun.queue[msgRun.idx]; if (c && c.url) window.open(c.url, '_blank', 'noopener'); }
+        else if (act === 'next') { if (msgRun) { msgRun.idx++; render(); } }
+      };
+    });
+  }
+
+  // ── ONGLET FAVORIS : relancer ceux qui ont mis en favori, piloté par TA
+  //    sélection. Tu coches des annonces, l'extension t'ouvre chacune ; TU
+  //    utilises l'offre native Vinted « proposer une remise aux personnes qui ont
+  //    ajouté en favori ». Aucune offre ni message envoyés automatiquement.
+  function renderFavoris() {
+    const list = ((DATA && DATA.online) || []).filter(o => (o.favs || 0) > 0).sort((a, b) => (b.favs || 0) - (a.favs || 0));
+    if (!list.length) return `<div class="vrm-m">Aucune annonce avec des favoris captée. Ouvre ta boutique Vinted une fois pour capter les compteurs.</div>`;
+    if (favRun) {
+      const total = favRun.queue.length, i = favRun.idx;
+      if (i >= total) return `<div class="vrm-card" style="text-align:center"><div style="font-size:15px;font-weight:800;margin-bottom:4px">✓ Terminé</div><div class="vrm-m">${total} annonce${total > 1 ? 's' : ''} passée${total > 1 ? 's' : ''}.</div><button class="vrm-fav-go" data-act="stop" style="margin-top:10px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:8px 14px;font-weight:800;cursor:pointer">Fermer</button></div>`;
+      const o = favRun.queue[i];
+      return `
+        <div class="vrm-m" style="margin-bottom:8px">Annonce <b>${i + 1}</b> / ${total} — ouvre-la, propose une remise à tes <b>${o.favs} favori${o.favs > 1 ? 's' : ''}</b> (bouton Vinted « offre aux favoris »), puis <b>Suivante</b>.</div>
+        ${card(o, `<div class="vrm-m" style="margin-top:3px">❤️ ${o.favs} favori${o.favs > 1 ? 's' : ''}${o.views != null ? ` · 👁 ${o.views}` : ''}</div>`)}
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="vrm-fav-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir ↗</button>
+          <button class="vrm-fav-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
+        </div>
+        <div style="text-align:center;margin-top:8px"><button class="vrm-fav-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
+    }
+    const rows = list.slice(0, 200).map(o => `
+      <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
+        <input type="checkbox" class="vrm-fav-chk" data-k="${esc(o.id)}" ${favSel.has(o.id) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
+        ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0"><div class="vrm-t">${esc(o.title)}</div><div class="vrm-m">❤️ ${o.favs}${o.views != null ? ` · 👁 ${o.views}` : ''} · ${fmt(o.price)}</div></div>
+      </label>`).join('');
+    return `
+      <div class="vrm-m" style="margin-bottom:8px">Coche les annonces dont tu veux <b>relancer les favoris</b>. Une par une, tu proposes toi-même une remise via l'<b>offre native Vinted</b>. Aucun envoi automatique.</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="vrm-fav-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
+        <button class="vrm-fav-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
+      </div>
+      <div style="margin-bottom:8px">${rows}</div>
+      <button class="vrm-fav-go" data-act="start" ${favSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${favSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${favSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Relancer ma sélection (${favSel.size})</button>`;
+  }
+  function wireFavoris() {
+    panel.querySelectorAll('.vrm-fav-chk').forEach(c => { c.onchange = () => { const k = c.dataset.k; if (c.checked) favSel.add(k); else favSel.delete(k); render(); }; });
+    panel.querySelectorAll('.vrm-fav-go').forEach(b => {
+      b.onclick = () => {
+        const act = b.dataset.act;
+        const list = ((DATA && DATA.online) || []).filter(o => (o.favs || 0) > 0);
+        if (act === 'all') { list.forEach(o => favSel.add(o.id)); render(); }
+        else if (act === 'none') { favSel.clear(); render(); }
+        else if (act === 'start') { if (!favSel.size) return; favRun = { queue: list.filter(o => favSel.has(o.id)).sort((a, b) => (b.favs || 0) - (a.favs || 0)), idx: 0 }; render(); }
+        else if (act === 'stop') { favRun = null; render(); }
+        else if (act === 'open') { const o = favRun && favRun.queue[favRun.idx]; if (o && o.url) window.open(o.url, '_blank', 'noopener'); }
+        else if (act === 'next') { if (favRun) { favRun.idx++; render(); } }
+      };
+    });
   }
 
   // ── ONGLET RÉPONSE : aide à répondre aux acheteurs (Messaging Intelligence) ──
