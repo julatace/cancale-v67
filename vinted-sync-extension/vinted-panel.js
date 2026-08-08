@@ -640,6 +640,7 @@
         <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
           <span style="flex-shrink:0;min-width:36px;text-align:center;font-weight:800;color:${b.numero ? '#0f6b4f' : '#c53030'};background:${b.numero ? 'rgba(15,107,79,.1)' : 'rgba(197,48,48,.1)'};border-radius:8px;padding:5px 6px;font-size:12px">${b.numero ? ('N°' + esc(b.numero)) : 'N° ?'}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title || 'Bordereau')}</div>${b.dateLimite ? `<div class="vrm-m">à envoyer avant ${esc(b.dateLimite)}</div>` : ''}</div>
+          <button class="vrm-bord-done" data-k="${esc(b.key)}" title="Marquer traité → le retire de la liste (colis fait)" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Traiter</button>
         </div>`).join('')}
       <a href="${APP_URL}/?tab=cat_bord" target="_blank" rel="noreferrer" style="display:block;text-align:center;text-decoration:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;margin-bottom:14px">🖨️ Imprimer dans l'app ↗</a>` : '';
 
@@ -666,6 +667,21 @@
   }
 
   function wireExpedier() {
+    // « ✓ Traiter » un bordereau : on l'enregistre (ligne panel_bords_done) et on
+    // le retire tout de suite de la liste (optimiste). L'app s'aligne à sa synchro.
+    panel.querySelectorAll('.vrm-bord-done').forEach(b => {
+      b.onclick = () => {
+        const k = b.dataset.k; if (!k) return;
+        b.disabled = true; b.textContent = '⏳';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'markBordDone', key: k, done: true }, (resp) => {
+          if (resp && resp.ok) {
+            if (DATA && Array.isArray(DATA.bordsToPrint)) DATA.bordsToPrint = DATA.bordsToPrint.filter(x => String(x.key) !== String(k));
+            if (DATA && DATA.stats) DATA.stats.toPrint = Math.max(0, (DATA.stats.toPrint || 1) - 1);
+            render();
+          } else { try { b.disabled = false; b.textContent = '✓ Traiter'; } catch (_) {} }
+        });
+      };
+    });
     panel.querySelectorAll('.vrm-ship-chk').forEach(c => {
       c.onchange = () => { const k = c.dataset.k; if (c.checked) shipSel.add(k); else shipSel.delete(k); render(); };
     });

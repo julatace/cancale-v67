@@ -347,6 +347,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
           if (msg.action === 'convLastMessage') { const r = await convLastMessage(msg.convId); sendResponse(r); return; }
+          if (msg.action === 'markBordDone' && msg.key) { const ok = await markBordDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -1013,6 +1014,24 @@ async function saveItemDetail(id, detail) {
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
 }
 
+// ── « TRAITER » un bordereau DEPUIS LE PANNEAU ───────────────────────────────
+// Julien clique « ✓ Traiter » sur un bordereau à imprimer : on le mémorise dans
+// une ligne DÉDIÉE `panel_bords_done` (= { key: ts }). ⚠️ On n'écrit JAMAIS dans
+// la ligne `main` de l'app (un upsert y remplacerait TOUT le blob et pourrait
+// écraser une sauvegarde de l'app faite en parallèle). Cette ligne est un
+// « courrier » à sens unique : le panneau la lit pour cacher le bordereau tout
+// de suite (buildPanelData), et l'app la vide dans `vinted_bords_shipped` à son
+// chargement. La clé est la même que côté app (transaction || suivi || numero).
+async function markBordDone(key, done) {
+  const k = String(key || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_bords_done&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (done === false) delete cur[k];
+  else cur[k] = Date.now();
+  return await supabaseUpsert('app_data', [{ id: 'panel_bords_done', data: cur }], 'id');
+}
+
 // ── ASSISTANT DE RÉPONSE (spec « Messaging Intelligence ») ───────────────────
 // Le panneau relaie le message de l'acheteur ; on le passe à /api/ai (mode
 // reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
@@ -1178,11 +1197,15 @@ async function buildPanelData() {
   const bPrinted = d.vinted_bords_printed || {};
   const bShipped = d.vinted_bords_shipped || {};
   const bHidden = d.vinted_bords_hidden || {};
+  // Bordereaux « traités » depuis le panneau (ligne dédiée, pas encore drainée
+  // par l'app) → on les cache tout de suite, sans attendre la synchro de l'app.
+  const pdoneRows = await sbGet('app_data?id=eq.panel_bords_done&select=data');
+  const bDonePanel = (pdoneRows && pdoneRows[0] && pdoneRows[0].data) || {};
   const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
   const bordsToPrint = bp
     .filter(b => b.filename) // a bien un PDF
     .map(b => ({ numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
-    .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key]);
+    .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key] && !bDonePanel[b.key]);
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
   // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
   const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)

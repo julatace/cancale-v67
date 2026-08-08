@@ -8879,6 +8879,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const markBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev,[k]:1}; save('vinted_bords_shipped',u); return u; }); };
   const unmarkBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_shipped',u); return u; }); };
   const isBordShippedManual = (b) => !!bordsShipped[bordKey(b)];
+  // Bordereaux « traités » depuis le PANNEAU de l'extension (bouton « ✓ Traiter »
+  // sur Vinted). L'extension les écrit dans une ligne DÉDIÉE `panel_bords_done`
+  // (jamais dans `main` → aucun risque d'écraser une sauvegarde de l'app). Ici on
+  // la LIT seulement, en source de « déjà traité » supplémentaire — même clé que
+  // `bordKey` (transaction || suivi || numero). Lecture seule : pas de drain, pas
+  // de boucle, l'app ne réécrit rien.
+  const [panelBordsDone, setPanelBordsDone] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_bords_done&select=data`, { headers: sbAuth() });
+        if (!res.ok) return;
+        const rows = await res.json();
+        const data = (rows && rows[0] && rows[0].data) || {};
+        if (alive && data && typeof data === 'object') setPanelBordsDone(data);
+      } catch (_) { /* réseau : on garde {} */ }
+    })();
+    return () => { alive = false; };
+  }, []);
   // Mode expédition : colis coché « posté » à la main (par n° de transaction).
   // Synchronisé → suit d'un appareil à l'autre. Se résorbe tout seul quand le
   // statut Vinted rattrape (la vente n'est alors plus « à expédier »).
@@ -8897,7 +8917,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // liste alors que le colis n'était même pas préparé — on le croyait traité.
   // L'impression reste affichée (pastille « ✓ Imprimé »), mais elle ne retire
   // plus rien. Rien n'est jamais supprimé : « Voir » réaffiche les terminés.
-  const isBordDone = (b) => isBordShippedManual(b) || bordShipped(b);
+  const isBordDone = (b) => isBordShippedManual(b) || bordShipped(b) || !!panelBordsDone[bordKey(b)];
   const [listings, setListings] = useState({ loading:false, items:null });
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
