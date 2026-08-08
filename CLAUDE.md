@@ -890,3 +890,28 @@ Demande explicite de Julien : « toutes les données à partir de maintenant tu 
 
 ### Reste (pas fait, à voir avec Julien)
 - `api/widget.js` : lit encore `email_sale` pour son propre calcul du mois. Le widget devrait lire `widget_stats` (publié par l'app, désormais harvest). À aligner si le chiffre du widget diverge.
+
+---
+
+## 34. ⚠️ Session août 2026 (suite) — QUOTA SUPABASE EXPLOSÉ : le widget retéléchargeait les PDF
+
+Julien a reçu un mail Supabase : **org « cancale » a dépassé son quota de bande passante (égress) du mois — 5,74 Go sur 5,5 Go** (offre gratuite). Jusqu'au **24 août 2026**, Supabase **jette / limite les requêtes** → l'app charge mal, par intermittence.
+
+### Cause (trouvée en lisant le code, pas en devinant)
+`api/widget.js` (endpoint du **widget iPhone Scriptable**, rafraîchi TOUT SEUL 24h/24) **et** `api/ship-reminders.js` (cron quotidien) faisaient `select=data` sur les lignes `email_bord_*`. Or **chaque bordereau embarque son PDF en base64 DEUX fois** (brut + tamponné) — ~6 Mo au total pour ~50 bordereaux — alors que ces endpoints n'en lisent que `dateLimite`, `transaction`, `suivi`, `numero`.
+
+➡️ Le widget se rafraîchissant en permanence, ces **~6 Mo repartaient à chaque rafraîchissement** = plusieurs Go/mois = quota crevé **sans que Julien fasse quoi que ce soit**. C'est **exactement** le piège corrigé côté app en §23 (`fetchEmailBordereaux` projette 13 champs, 21 Ko), **jamais reporté dans ces deux endpoints serveur**.
+
+### Correctif
+Les deux endpoints projettent maintenant les 4 champs scalaires utiles :
+`select=dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero`
+→ **~6 Mo → ~1 Ko par appel**. (Syntaxe alias+flèche déjà éprouvée dans App.jsx, ex. `cap:data->>capturedAt`.)
+
+### ⚠️ Important — le correctif arrête l'hémorragie, il ne DÉBLOQUE pas le mois en cours
+Le quota du cycle est déjà dépassé → Supabase reste restreint **jusqu'au refill du 24 août**, correctif ou pas. Deux issues, à trancher avec Julien :
+1. **Attendre le 24** (gratuit) : le compteur repart à zéro, et grâce au correctif ça ne se reproduit plus.
+2. **Passer Supabase en Pro** (~25 $/mois) : débloque tout de suite + quota large. Décision argent de Julien.
+
+### Reste à surveiller (secondaire, pas corrigé)
+- `api/widget.js` fait encore `harvestOrders('sold')` + `('purchased')` en `select=data` (tableau `my_orders`) : ~0,5 Mo/appel après allègement (§23) — 12× plus léger que les PDF, donc pas le tueur, mais à garder à l'œil. Pour l'annuler complètement, il faudrait précalculer les compteurs « à expédier / à retirer » dans `widget_stats` (publié par l'app) au lieu de lire la moisson en direct — mais ça casse la propriété « se met à jour même app fermée » (§10). À ne faire que si l'égress reste trop haut après ce correctif.
+- **Leçon** : quand un correctif d'égress/perf est trouvé côté app, **vérifier tout de suite les endpoints `api/*.js`** qui lisent les mêmes lignes — ils ont leur propre code de lecture et ne bénéficient pas des corrections de `App.jsx`.
