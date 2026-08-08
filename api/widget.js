@@ -22,6 +22,20 @@ async function rows(like) {
     return r.ok ? (await r.json()).map(x => x.data).filter(Boolean) : [];
   } catch (_) { return []; }
 }
+// ⚠️ ÉGRESS SUPABASE — NE JAMAIS faire `select=data` sur `email_bord_*` : chaque
+// ligne embarque le PDF du bordereau en base64 (brut + tamponné = deux fois),
+// soit ~6 Mo au total pour ~50 bordereaux. Or ce widget se rafraîchit TOUT SEUL
+// 24h/24 → ces 6 Mo repartaient à CHAQUE rafraîchissement et faisaient exploser
+// le quota de bande passante Supabase (la même leçon qu'en §23 côté app, jamais
+// reportée ici). On ne projette que les 4 champs scalaires réellement lus plus
+// bas (date limite + clés d'identification) → l'appel passe de ~6 Mo à ~1 Ko.
+const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
+async function bordRows() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=${BORD_SELECT}`, { headers: HEADERS });
+    return r.ok ? await r.json() : [];
+  } catch (_) { return []; }
+}
 // Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
 // source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.
 async function harvestOrders(kind) {
@@ -75,7 +89,7 @@ export default async function handler(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   try {
     const [bords, sold, purchased, finals, sales, m, snap] = await Promise.all([
-      rows('email_bord_*'), harvestOrders('sold'), harvestOrders('purchased'), rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
+      bordRows(), harvestOrders('sold'), harvestOrders('purchased'), rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
     ]);
 
     const expected = m && m.vrm_widget_token ? String(m.vrm_widget_token) : '';

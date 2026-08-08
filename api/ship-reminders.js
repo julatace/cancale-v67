@@ -48,15 +48,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=data`, { headers: HEADERS });
+    // ⚠️ ÉGRESS : surtout PAS `select=data` — chaque bordereau embarque son PDF
+    // en base64 (deux fois), ~6 Mo au total pour ~50 lignes, alors qu'on ne lit
+    // que la date limite + les clés. On projette donc ces 4 champs scalaires
+    // (même correctif que dans api/widget.js et §23 côté app).
+    const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=${BORD_SELECT}`, { headers: HEADERS });
     const rows = r.ok ? await r.json() : [];
     const printed = (await getRow('main'))?.vinted_bords_printed || {};
     const key = (b) => String(b.transaction || b.suivi || b.numero || '');
 
     const today = parisDate(0), tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
-    for (const row of rows) {
-      const b = row.data; if (!b) continue;
+    for (const b of rows) {
+      if (!b) continue;
       if (printed[key(b)]) continue;          // déjà imprimé / expédié
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) overdue += 1;
