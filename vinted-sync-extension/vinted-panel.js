@@ -301,6 +301,7 @@
         ${marge != null ? ` · Marge <b>${fmt(marge)}</b>` : ''}
         ${o.cell ? ` · 🏠 case <b>${esc(o.cell)}</b>` : (o.numero ? ' · 🏠 pas rangée' : '')}
       </div>
+      ${o.buyPrice == null ? `<div style="margin-top:5px"><a class="vrm-link" href="${APP_URL}/?tab=cat_annonces" target="_blank" rel="noreferrer">➕ Renseigner le prix d'achat dans l'app${o.numero ? ` (cherche N°${esc(o.numero)})` : ''} ↗</a><div class="vrm-m" style="opacity:.8;margin-top:1px">Sans lui, la marge et le bénéfice sont faux.</div></div>` : ''}
       <div class="vrm-m" style="margin-top:3px">
         ${o.hasDesc ? '✅ description enregistrée' : '⏳ description en cours de lecture…'}
         ${o.nPhotos ? ` · 📷 ${o.nPhotos} photo${o.nPhotos > 1 ? 's' : ''} gardées` : ''}
