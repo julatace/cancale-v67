@@ -453,12 +453,14 @@
     if (dort) diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:#eef4ff;color:#2b5b9a;border:1px solid #c9dbf7">😴 <b>En ligne depuis ${o.ageDays} j</b> — pense à la republier ou à baisser le prix.</div>`;
     // Prix des paires comparables (même marque + taille EN LIGNE, ≥2 paires) —
     // calculé par l'extension sur ta propre moisson (0 requête). Purement indicatif.
+    let suggested = null; // prix conseillé (€ entier) quand l'écart est net
     if (o.peer != null && sell != null) {
       const pe = Number(o.peer);
       const cible = Math.round(pe); // prix conseillé = médiane des comparables, arrondie
-      const cmp = sell > pe * 1.15 ? { txt: `Ton prix est <b>au-dessus</b> de tes paires similaires → essaie <b>~${cible} €</b> pour accélérer la vente.`, bg: '#fff6ec', fg: '#9a5b16', bd: '#ffd7a8' }
-        : sell < pe * 0.85 ? { txt: `Ton prix est <b>en-dessous</b> de tes paires similaires → tu peux monter vers <b>~${cible} €</b>.`, bg: '#eefaf3', fg: '#0f6b4f', bd: '#bfe6d3' }
-        : { txt: `Ton prix est <b>dans la moyenne</b> de tes paires similaires. 👍`, bg: '#f2f5f8', fg: '#44515e', bd: '#e0e6ec' };
+      const cmp = sell > pe * 1.15 ? { txt: `Ton prix est <b>au-dessus</b> de tes paires similaires → essaie <b>~${cible} €</b> pour accélérer la vente.`, bg: '#fff6ec', fg: '#9a5b16', bd: '#ffd7a8', sug: true }
+        : sell < pe * 0.85 ? { txt: `Ton prix est <b>en-dessous</b> de tes paires similaires → tu peux monter vers <b>~${cible} €</b>.`, bg: '#eefaf3', fg: '#0f6b4f', bd: '#bfe6d3', sug: true }
+        : { txt: `Ton prix est <b>dans la moyenne</b> de tes paires similaires. 👍`, bg: '#f2f5f8', fg: '#44515e', bd: '#e0e6ec', sug: false };
+      if (cmp.sug) suggested = cible;
       diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:${cmp.bg};color:${cmp.fg};border:1px solid ${cmp.bd}">📊 Paires similaires en ligne (${esc(o.brand)} · ${esc(o.size)}) : <b>autour de ${fmt(pe)}</b> <span style="opacity:.75">(${o.peerN} paires)</span><br>${cmp.txt}</div>`;
     }
     const extra = `<div class="vrm-m" style="margin-top:3px">
@@ -470,7 +472,12 @@
       <div class="vrm-m" style="margin-top:3px">
         ${o.hasDesc ? '✅ description enregistrée' : '⏳ description en cours de lecture…'}
         ${o.nPhotos ? ` · 📷 ${o.nPhotos} photo${o.nPhotos > 1 ? 's' : ''} gardées` : ''}
-      </div>${diag}${o.numero ? `<div style="margin-top:6px"><button class="vrm-copy-line" data-c="N°${esc(o.numero)} · ${esc(o.title || '')}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier N° + titre</button></div>` : ''}`;
+      </div>${diag}
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+        <a class="vrm-link" href="https://www.vinted.fr/items/${esc(id)}/edit" target="_blank" rel="noreferrer" style="border:1px solid #09b1ba;background:#09b1ba;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:12px;text-decoration:none">✏️ Modifier sur Vinted ↗</a>
+        ${suggested != null ? `<button class="vrm-copy-line" data-c="${suggested}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier ${suggested} €</button>` : ''}
+        ${o.numero ? `<button class="vrm-copy-line" data-c="N°${esc(o.numero)} · ${esc(o.title || '')}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier N° + titre</button>` : ''}
+      </div>`;
     return card(o, extra);
   }
 
