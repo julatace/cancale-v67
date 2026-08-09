@@ -23,7 +23,8 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['journee', 'paire', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
+  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
+  let chaussuresQuery = ''; // filtre de l'onglet « Mes paires »
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   let open = readLS('vrm_panel_open', '0') === '1';
@@ -232,7 +233,7 @@
     #vrm-fab:hover{transform:scale(1.05)}
     #vrm-fab .vrm-badge{position:absolute;top:-4px;right:-4px;background:#e8590c;color:#fff;border-radius:999px;
       min-width:20px;height:20px;padding:0 5px;font:800 11px/20px system-ui,sans-serif;text-align:center}
-    #vrm-panel{position:fixed;right:18px;bottom:80px;z-index:2147483000;width:340px;max-height:74vh;overflow:auto;
+    #vrm-panel{position:fixed;right:18px;bottom:80px;z-index:2147483000;width:min(460px,94vw);max-height:82vh;overflow:auto;
       background:#fff;color:#111;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.3);
       font:13px/1.45 system-ui,-apple-system,sans-serif;padding:14px}
     #vrm-panel h3{margin:0 0 2px;font-size:15px;font-weight:800}
@@ -352,6 +353,39 @@
     return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${optimBlock}${fresh}`;
   }
 
+  // ── ONGLET « MES PAIRES » : la liste de toutes tes chaussures en ligne, en
+  //    grand (photo, N°, prix, marge, engagement, case garage). Lecture seule ;
+  //    un clic ouvre l'annonce sur Vinted. Recherche par titre/marque/N°.
+  function renderChaussures() {
+    const all = (DATA && DATA.online) || [];
+    if (!all.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant.<br>Ouvre ta boutique Vinted une fois pour les capter (0 requête ajoutée).</div>`;
+    const sorted = all.slice().sort((a, b) => { const na = a.numero != null && a.numero !== '' ? +a.numero : 1e9, nb = b.numero != null && b.numero !== '' ? +b.numero : 1e9; return na - nb || String(a.title || '').localeCompare(String(b.title || '')); });
+    const rows = sorted.slice(0, 300).map(o => {
+      const buy = eur(o.buyPrice), sell = eur(o.price);
+      const marge = (buy != null && sell != null && !isNaN(buy)) ? sell - buy : null;
+      const eng = [o.views != null ? `👁 ${o.views}` : '', o.favs != null ? `❤️ ${o.favs}` : '', o.ageDays != null ? `${o.ageDays} j` : '', o.cell ? `🏠 ${esc(o.cell)}` : ''].filter(Boolean).join(' · ');
+      return `
+      <a class="vrm-ch-row" href="${esc(o.url)}" target="_blank" rel="noreferrer" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '')).toLowerCase())}" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;border:1px solid #eceff3;border-radius:12px;padding:8px;margin-bottom:7px">
+        ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:58px;height:58px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:58px;height:58px;border-radius:10px;background:#eef1f4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px">👟</div>'}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.numero ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : ''}${esc(o.title || 'Annonce')}</div>
+          <div class="vrm-m" style="margin-top:2px">${fmt(o.price)}${buy != null ? ` · achat ${fmt(o.buyPrice)}` : ''}${marge != null ? ` · marge <b style="color:#0f6b4f">${fmt(marge)}</b>` : ''}</div>
+          ${eng ? `<div class="vrm-m" style="margin-top:1px">${eng}</div>` : ''}
+        </div>
+        <span style="flex-shrink:0;color:#09b1ba;font-size:16px">↗</span>
+      </a>`;
+    }).join('');
+    return `
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">👟 ${all.length} paire${all.length > 1 ? 's' : ''} en ligne</div>
+      ${all.length > 8 ? `<input id="vrm-ch-search" type="search" value="${esc(chaussuresQuery)}" placeholder="🔍 Filtrer (titre, marque, N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
+      ${rows}`;
+  }
+  function wireChaussures() {
+    const cs = panel.querySelector('#vrm-ch-search');
+    const apply = () => { const q = chaussuresQuery.trim().toLowerCase(); panel.querySelectorAll('.vrm-ch-row').forEach(r => { r.style.display = (!q || (r.dataset.s || '').includes(q)) ? 'flex' : 'none'; }); };
+    if (cs) { cs.oninput = () => { chaussuresQuery = cs.value; apply(); }; apply(); }
+  }
+
   function renderPaire() {
     const id = currentItemId();
     if (!id) return `<div class="vrm-m">Ouvre une de tes annonces sur Vinted pour voir son N°, son prix d'achat et sa case au garage ici.</div>`;
@@ -414,6 +448,7 @@
       <div class="vrm-tabs">
         <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">🏠 Ma journée</button>
         <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
+        <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">👟 Mes paires${DATA && DATA.stats && DATA.stats.online ? ` (${DATA.stats.online})` : ''}</button>
         <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
         <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
         <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">Bordereaux 📄${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` (${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)})` : ''}</button>
@@ -438,6 +473,7 @@
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
+        : tab === 'chaussures' ? renderChaussures()
         : tab === 'republier' ? renderRepublier()
         : tab === 'reponse' ? renderReponse()
         : tab === 'expedier' ? renderExpedier()
@@ -464,6 +500,7 @@
     panel.querySelectorAll('.vrm-copy-line').forEach(b => { b.onclick = () => { try { navigator.clipboard.writeText(b.dataset.c || ''); } catch (_) {} const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1000); }; });
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
+    if (tab === 'chaussures') wireChaussures();
     if (tab === 'expedier') wireExpedier();
     if (tab === 'achats') wireAchats();
     if (tab === 'messages') wireMessages();
