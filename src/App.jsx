@@ -5080,7 +5080,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
   const mirror=(entList,activeId)=>{ const act=entList.find(e=>e.id===activeId)||entList[0]; if(act) setSettings({companyName:act.companyName||'',companyType:act.companyType||'',companyAddress:act.companyAddress||'',siret:act.siret||'',footer:act.footer||''}); };
   const persist=(entList,activeId)=>{ setEntreprises(entList); if(activeId!==undefined){ setActiveEnt(activeId); } mirror(entList, activeId!==undefined?activeId:activeEnt); };
   const saveCur=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next); onClose(); };
-  const addEnt=()=>{ const id='ent_'+Date.now(); const blank={id,companyName:'',companyType:'Entrepreneur individuel',companyAddress:'',siret:'',footer:'Merci pour votre achat !'}; const next=[...list,blank]; setEntreprises(next); setSel(id); setData(blank); };
+  const addEnt=()=>{ const id='ent_'+Date.now(); const blank={id,companyName:'',companyType:'Entrepreneur individuel',companyAddress:'',siret:'',tvaMention:'TVA non applicable, art. 293 B du CGI',footer:'Merci pour votre achat !'}; const next=[...list,blank]; setEntreprises(next); setSel(id); setData(blank); };
   const delEnt=()=>{ if(list.length<=1) return; const next=list.filter(e=>e.id!==sel); const newActive=(activeEnt===sel)?next[0].id:activeEnt; persist(next,newActive); const nsel=next[0].id; setSel(nsel); setData(next[0]); };
   const makeActive=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next,sel); };
   return (
@@ -5109,6 +5109,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
           <Field label="Forme juridique"><Input value={data.companyType||''} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
           <Field label="Adresse"><Input value={data.companyAddress||''} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
           <Field label="SIRET"><Input value={data.siret||''} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
+          <Field label="Mention TVA (bas de facture)"><Input value={data.tvaMention!=null?data.tvaMention:'TVA non applicable, art. 293 B du CGI'} onChange={e=>setData(d=>({...d,tvaMention:e.target.value}))}/></Field>
           <Field label="Message de bas de page"><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
           {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>⭐ Utiliser cette entité pour les nouvelles factures</Btn>}
           <div style={{display:'flex',gap:8,marginTop:6}}>
@@ -5212,10 +5213,11 @@ td.right{text-align:right;}
   <tbody><tr><td>${inv.itemName||''}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td></tr></tbody>
 </table>
 <div class="totals">
-  <div class="row"><b>Sous-total (TTC) :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
+  <div class="row"><b>Sous-total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
   <div class="row total"><b>Total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
   <div class="row"><b>Montant payé :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
 </div>
+<div style="text-align:right;font-size:11px;color:#555;margin-top:6px;font-style:italic">${xmlEsc(settings.tvaMention||'TVA non applicable, art. 293 B du CGI')}</div>
 <div class="acquittee">Facture acquittée</div>
 <div class="remarques">
   <div class="label">Remarques :</div>
@@ -5278,7 +5280,7 @@ function factureCII(inv, ent){
       <ram:ApplicableTradeTax>
         <ram:CalculatedAmount>0.00</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
-        <ram:ExemptionReason>TVA non applicable, art. 293 B du CGI</ram:ExemptionReason>
+        <ram:ExemptionReason>${xmlEsc(ent.tvaMention||'TVA non applicable, art. 293 B du CGI')}</ram:ExemptionReason>
         <ram:BasisAmount>${total}</ram:BasisAmount>
         <ram:CategoryCode>E</ram:CategoryCode>
         <ram:RateApplicablePercent>0</ram:RateApplicablePercent>
