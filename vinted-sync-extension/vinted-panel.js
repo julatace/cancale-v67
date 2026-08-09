@@ -997,15 +997,35 @@
         <div style="text-align:center;margin-top:8px"><button class="vrm-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
     }
     // Mode sélection : la liste avec des cases à cocher.
-    const rows = list.slice(0, 200).map(o => `
+    // Priorité de republication : on remonte en haut ce qui en a le PLUS besoin —
+    // dort (😴), à relancer (💡), trop cher vs comparables (📊). Mêmes signaux que
+    // les onglets/Ma journée → aucune divergence. Chaque ligne dit POURQUOI.
+    const sleepIds = new Set(((DATA && DATA.sleeping) || []).map(o => String(o.id)));
+    const relIds = new Set(((DATA && DATA.relance) || []).map(o => String(o.id)));
+    const overOf = (o) => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15;
+    const reasonsOf = (o) => {
+      const r = [];
+      if (sleepIds.has(String(o.id))) r.push({ t: `😴 ${o.ageDays} j`, c: '#2b5b9a', bg: '#eef4ff', bd: '#c9dbf7' });
+      if (relIds.has(String(o.id))) r.push({ t: '💡 à relancer', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
+      if (overOf(o)) r.push({ t: '📊 trop cher', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
+      return r;
+    };
+    const prio = (o) => (sleepIds.has(String(o.id)) ? (o.ageDays || 30) : 0) + (relIds.has(String(o.id)) ? 200 : 0) + (overOf(o) ? 150 : 0);
+    const ordered = list.slice().sort((a, b) => prio(b) - prio(a));
+    const rows = ordered.slice(0, 200).map(o => {
+      const reasons = reasonsOf(o);
+      const badges = reasons.map(r => `<span style="display:inline-block;font-size:10px;font-weight:700;color:${r.c};background:${r.bg};border:1px solid ${r.bd};border-radius:999px;padding:1px 7px;margin-right:4px">${r.t}</span>`).join('');
+      return `
       <label class="vrm-card vrm-repub-row" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '')).toLowerCase())}" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
         <input type="checkbox" class="vrm-chk" data-id="${esc(o.id)}" ${repubSel.has(o.id) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
         ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
         <div style="flex:1;min-width:0">
           <div class="vrm-t">${o.numero ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : ''}${esc(o.title)}</div>
           <div class="vrm-m">${fmt(o.price)}${o.ageDays != null ? ` · ${o.ageDays} j` : ''}</div>
+          ${badges ? `<div style="margin-top:3px">${badges}</div>` : ''}
         </div>
-      </label>`).join('');
+      </label>`;
+    }).join('');
     return `
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
       ${list.length > 8 ? `<input id="vrm-repub-search" type="search" value="${esc(repubQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
