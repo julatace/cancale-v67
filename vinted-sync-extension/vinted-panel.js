@@ -927,6 +927,18 @@
         <button class="vrm-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
         <button class="vrm-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
       </div>
+      ${(() => {
+        // Cocher d'un coup les PRIORITÉS (mêmes listes que les onglets « Dorment »
+        // et « À relancer » → aucune divergence). Aide à republier ce qui rapporte
+        // le plus d'abord, sans rien automatiser.
+        const nS = ((DATA && DATA.sleeping) || []).length, nR = ((DATA && DATA.relance) || []).length;
+        if (!nS && !nR) return '';
+        return `<div class="vrm-m" style="margin-bottom:4px">Cocher en priorité :</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${
+          nS ? `<button class="vrm-go" data-act="psleep" style="border:1px solid #c9dbf7;background:#eef4ff;color:#2b5b9a;border-radius:999px;padding:5px 11px;font-weight:700;font-size:11.5px;cursor:pointer">😴 ${nS} qui dorment</button>` : ''
+        }${
+          nR ? `<button class="vrm-go" data-act="prelance" style="border:1px solid #ffd7a8;background:#fff6ec;color:#9a5b16;border-radius:999px;padding:5px 11px;font-weight:700;font-size:11.5px;cursor:pointer">💡 ${nR} à relancer</button>` : ''
+        }</div>`;
+      })()}
       <div style="margin-bottom:8px">${rows}</div>
       <button class="vrm-go" data-act="start" ${repubSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${repubSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${repubSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Commencer (${repubSel.size})</button>`;
   }
@@ -950,6 +962,8 @@
         const list = (DATA && DATA.online) || [];
         if (act === 'all') { list.forEach(o => repubSel.add(o.id)); render(); }
         else if (act === 'none') { repubSel.clear(); render(); }
+        else if (act === 'psleep') { ((DATA && DATA.sleeping) || []).forEach(o => o && o.id && repubSel.add(o.id)); render(); }
+        else if (act === 'prelance') { ((DATA && DATA.relance) || []).forEach(o => o && o.id && repubSel.add(o.id)); render(); }
         else if (act === 'start') { if (!repubSel.size) return; repubRun = { queue: list.filter(o => repubSel.has(o.id)).map(o => o.id), idx: 0 }; render(); }
         else if (act === 'stop') { repubRun = null; render(); }
         else if (act === 'open') { const o = DATA.byId[repubRun.queue[repubRun.idx]]; if (o && o.url) window.open(o.url, '_blank', 'noopener'); }
