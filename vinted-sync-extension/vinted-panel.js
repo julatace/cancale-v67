@@ -385,14 +385,24 @@
     const byNum = (a, b) => { const na = a.numero != null && a.numero !== '' ? +a.numero : 1e9, nb = b.numero != null && b.numero !== '' ? +b.numero : 1e9; return na - nb || String(a.title || '').localeCompare(String(b.title || '')); };
     // Un champ absent va en fin de liste (on ne le fait pas passer devant à tort).
     const desc = (f) => (a, b) => { const va = f(a), vb = f(b); if (va == null && vb == null) return byNum(a, b); if (va == null) return 1; if (vb == null) return -1; return vb - va; };
-    const sorters = { num: byNum, marge: desc(margeOf), vues: desc(o => o.views), favs: desc(o => o.favs), age: desc(o => o.ageDays), prix: desc(o => eur(o.price)) };
+    // Écart au marché = ton prix − médiane de tes paires comparables (o.peer).
+    // Positif = au-dessus du marché → candidate à une baisse (tri « Marché »).
+    const ecartMarche = (o) => { const p = eur(o.price), pe = o.peer; return (p != null && pe != null) ? p - Number(pe) : null; };
+    const sorters = { num: byNum, marge: desc(margeOf), vues: desc(o => o.views), favs: desc(o => o.favs), age: desc(o => o.ageDays), prix: desc(o => eur(o.price)), marche: desc(ecartMarche) };
     const sorted = all.slice().sort(sorters[chaussuresSort] || byNum);
-    const SORTS = [['num', 'N°'], ['marge', '💰 Marge'], ['vues', '👁 Vues'], ['favs', '❤️ Favoris'], ['age', '😴 Âge'], ['prix', '€ Prix']];
+    const SORTS = [['num', 'N°'], ['marge', '💰 Marge'], ['marche', '📊 Marché'], ['vues', '👁 Vues'], ['favs', '❤️ Favoris'], ['age', '😴 Âge'], ['prix', '€ Prix']];
     const sortChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${SORTS.map(([k, l]) => `<button class="vrm-chsort" data-sort="${k}" style="border:1px solid ${chaussuresSort === k ? '#09b1ba' : '#dde'};background:${chaussuresSort === k ? '#09b1ba' : '#fff'};color:${chaussuresSort === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}</button>`).join('')}</div>`;
     const rows = sorted.slice(0, 300).map(o => {
       const buy = eur(o.buyPrice), sell = eur(o.price);
       const marge = (buy != null && sell != null && !isNaN(buy)) ? sell - buy : null;
       const eng = [o.views != null ? `👁 ${o.views}` : '', o.favs != null ? `❤️ ${o.favs}` : '', o.ageDays != null ? `${o.ageDays} j` : '', o.cell ? `🏠 ${esc(o.cell)}` : ''].filter(Boolean).join(' · ');
+      // Repère marché : uniquement quand l'écart est net (>15%), sinon on n'encombre pas.
+      let peerTag = '';
+      if (o.peer != null && sell != null) {
+        const pe = Number(o.peer);
+        if (sell > pe * 1.15) peerTag = `<span style="color:#9a5b16">📊 au-dessus du marché (~${fmt(pe)})</span>`;
+        else if (sell < pe * 0.85) peerTag = `<span style="color:#0f6b4f">📊 sous le marché (~${fmt(pe)})</span>`;
+      }
       return `
       <a class="vrm-ch-row" href="${esc(o.url)}" target="_blank" rel="noreferrer" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '')).toLowerCase())}" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;border:1px solid #eceff3;border-radius:12px;padding:8px;margin-bottom:7px">
         ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:58px;height:58px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:58px;height:58px;border-radius:10px;background:#eef1f4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px">👟</div>'}
@@ -400,6 +410,7 @@
           <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.numero ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : ''}${esc(o.title || 'Annonce')}</div>
           <div class="vrm-m" style="margin-top:2px">${fmt(o.price)}${buy != null ? ` · achat ${fmt(o.buyPrice)}` : ''}${marge != null ? ` · marge <b style="color:#0f6b4f">${fmt(marge)}</b>` : ''}</div>
           ${eng ? `<div class="vrm-m" style="margin-top:1px">${eng}</div>` : ''}
+          ${peerTag ? `<div class="vrm-m" style="margin-top:1px;font-weight:600">${peerTag}</div>` : ''}
         </div>
         <span style="flex-shrink:0;color:#09b1ba;font-size:16px">↗</span>
       </a>`;
