@@ -23,9 +23,10 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
+  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris'];
   let chaussuresQuery = ''; // filtre de l'onglet « Mes paires »
   let chaussuresSort = 'num'; // tri : num | marge | vues | favs | age | prix
+  let chaussuresFilter = 'all'; // sous-vue : all | relance | sleep | nonum
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   let open = readLS('vrm_panel_open', '0') === '1';
@@ -343,13 +344,13 @@
       : `<div class="vrm-card" style="margin-top:12px"><div class="vrm-m">✅ Rien d'urgent : tout est à jour. Beau boulot.</div></div>`;
     // Optimisation : opportunités déjà calculées (mêmes onglets), pour vendre plus.
     const optim = [
-      s.relance ? { t: 'relance', ic: '💡', n: s.relance, lbl: 'à relancer' } : null,
-      s.sleeping ? { t: 'dorment', ic: '😴', n: s.sleeping, lbl: 'dorment' } : null,
-      s.noNum ? { t: 'sansnum', ic: '🔢', n: s.noNum, lbl: 'sans N°' } : null,
+      s.relance ? { f: 'relance', ic: '💡', n: s.relance, lbl: 'à relancer' } : null,
+      s.sleeping ? { f: 'sleep', ic: '😴', n: s.sleeping, lbl: 'dorment' } : null,
+      s.noNum ? { f: 'nonum', ic: '🔢', n: s.noNum, lbl: 'sans N°' } : null,
     ].filter(Boolean);
     const optimBlock = optim.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">Pour vendre plus</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${optim.map(x => `<button class="vrm-todo" data-t="${x.t}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>` : '';
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${optim.map(x => `<button class="vrm-todo" data-t="chaussures" data-filter="${x.f}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>` : '';
     const fresh = a && a.updatedAt ? `<div class="vrm-m" style="text-align:center;margin-top:8px;opacity:.7">Chiffres de l'app · ${esc(timeago(Date.parse(a.updatedAt)))}</div>` : '';
     return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${optimBlock}${fresh}`;
   }
@@ -358,8 +359,19 @@
   //    grand (photo, N°, prix, marge, engagement, case garage). Lecture seule ;
   //    un clic ouvre l'annonce sur Vinted. Recherche par titre/marque/N°.
   function renderChaussures() {
-    const all = (DATA && DATA.online) || [];
-    if (!all.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant.<br>Ouvre ta boutique Vinted une fois pour les capter (0 requête ajoutée).</div>`;
+    const online = (DATA && DATA.online) || [];
+    if (!online.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant.<br>Ouvre ta boutique Vinted une fois pour les capter (0 requête ajoutée).</div>`;
+    // Sous-vues (ex-onglets, maintenant fondus ici) : filtrent la même liste.
+    const relanceIds = new Set(((DATA && DATA.relance) || []).map(o => String(o.id)));
+    const sleepIds = new Set(((DATA && DATA.sleeping) || []).map(o => String(o.id)));
+    const noNumIds = new Set(((DATA && DATA.noNum) || []).map(o => String(o.id)));
+    const FILTERS = [['all', 'Toutes', online.length], ['relance', '💡 À relancer', relanceIds.size], ['sleep', '😴 Dorment', sleepIds.size], ['nonum', '🔢 Sans N°', noNumIds.size]];
+    const all = chaussuresFilter === 'relance' ? online.filter(o => relanceIds.has(String(o.id)))
+      : chaussuresFilter === 'sleep' ? online.filter(o => sleepIds.has(String(o.id)))
+      : chaussuresFilter === 'nonum' ? online.filter(o => noNumIds.has(String(o.id)))
+      : online;
+    const filterChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${FILTERS.map(([k, l, n]) => `<button class="vrm-chfilter" data-f="${k}" style="border:1px solid ${chaussuresFilter === k ? '#111' : '#dde'};background:${chaussuresFilter === k ? '#111' : '#fff'};color:${chaussuresFilter === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}${n ? ` ${n}` : ''}</button>`).join('')}</div>`;
+    if (!all.length) return `${filterChips}<div class="vrm-m" style="padding:6px 2px">Rien dans cette vue. 👌</div>`;
     const margeOf = (o) => { const b = eur(o.buyPrice), s = eur(o.price); return (b != null && s != null && !isNaN(b)) ? s - b : null; };
     const byNum = (a, b) => { const na = a.numero != null && a.numero !== '' ? +a.numero : 1e9, nb = b.numero != null && b.numero !== '' ? +b.numero : 1e9; return na - nb || String(a.title || '').localeCompare(String(b.title || '')); };
     // Un champ absent va en fin de liste (on ne le fait pas passer devant à tort).
@@ -384,12 +396,14 @@
       </a>`;
     }).join('');
     return `
-      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">👟 ${all.length} paire${all.length > 1 ? 's' : ''} en ligne</div>
+      ${filterChips}
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">👟 ${all.length} paire${all.length > 1 ? 's' : ''}${chaussuresFilter === 'all' ? ' en ligne' : ''}</div>
       ${sortChips}
       ${all.length > 8 ? `<input id="vrm-ch-search" type="search" value="${esc(chaussuresQuery)}" placeholder="🔍 Filtrer (titre, marque, N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
       ${rows}`;
   }
   function wireChaussures() {
+    panel.querySelectorAll('.vrm-chfilter').forEach(b => { b.onclick = () => { chaussuresFilter = b.dataset.f; render(); }; });
     panel.querySelectorAll('.vrm-chsort').forEach(b => { b.onclick = () => { chaussuresSort = b.dataset.sort; render(); }; });
     const cs = panel.querySelector('#vrm-ch-search');
     const apply = () => { const q = chaussuresQuery.trim().toLowerCase(); panel.querySelectorAll('.vrm-ch-row').forEach(r => { r.style.display = (!q || (r.dataset.s || '').includes(q)) ? 'flex' : 'none'; }); };
@@ -448,37 +462,17 @@
       <button class="vrm-close" title="Fermer">✕</button>
       <button class="vrm-refresh" title="Rafraîchir les données" style="position:absolute;top:9px;right:34px;border:none;background:transparent;font-size:14px;cursor:pointer;opacity:.7;padding:0;line-height:1">${dataBusy ? '⏳' : '🔄'}</button>
       <h3>VRM</h3>
-      <div class="vrm-sub">Tes infos, affichées sur Vinted. Les actions restent les tiennes.${fresh}</div>
-      <div class="vrm-stats">
-        <div class="vrm-st"><b>${s.online}</b><span class="vrm-m">en ligne</span></div>
-        <div class="vrm-st"><b>${s.relance || 0}</b><span class="vrm-m">à relancer</span></div>
-        <div class="vrm-st"><b>${s.sleeping || 0}</b><span class="vrm-m">dorment</span></div>
-        <div class="vrm-st"><b>${s.noNum}</b><span class="vrm-m">sans N°</span></div>
-      </div>
+      <div class="vrm-sub">Tes infos, sur Vinted.${fresh}</div>
       <div class="vrm-tabs">
         <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">🏠 Ma journée</button>
-        <button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">Cette paire</button>
-        <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">👟 Mes paires${DATA && DATA.stats && DATA.stats.online ? ` (${DATA.stats.online})` : ''}</button>
-        <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">Republier ♻️</button>
-        <button class="vrm-tab ${tab === 'reponse' ? 'on' : ''}" data-t="reponse">Réponse ✍️</button>
-        <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">Bordereaux 📄${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` (${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)})` : ''}</button>
-        <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">Achats 📦${DATA && DATA.stats && DATA.stats.toPickup ? ` (${DATA.stats.toPickup})` : ''}</button>
-        <button class="vrm-tab ${tab === 'messages' ? 'on' : ''}" data-t="messages">Messages 💬${DATA && DATA.stats && DATA.stats.unread ? ` (${DATA.stats.unread})` : ''}</button>
-        <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">Favoris ❤️</button>
-        <button class="vrm-tab ${tab === 'relance' ? 'on' : ''}" data-t="relance">À relancer 💡</button>
-        <button class="vrm-tab ${tab === 'dorment' ? 'on' : ''}" data-t="dorment">Dorment 😴</button>
-        <button class="vrm-tab ${tab === 'sansnum' ? 'on' : ''}" data-t="sansnum">Sans N°</button>
+        ${currentItemId() ? `<button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">👟 Cette paire</button>` : ''}
+        <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">👟 Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
+        <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">♻️ Republier</button>
+        <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">📄 Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
+        <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">📦 Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
+        <button class="vrm-tab ${tab === 'messages' || tab === 'reponse' ? 'on' : ''}" data-t="messages">💬 Messages${DATA && DATA.stats && DATA.stats.unread ? ` ${DATA.stats.unread}` : ''}</button>
+        <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">❤️ Favoris</button>
       </div>
-      ${(() => {
-        const st2 = (DATA && DATA.stats) || {};
-        const chips = [
-          st2.toPrint ? `<button class="vrm-todo" data-t="expedier">🖨️ ${st2.toPrint} à imprimer</button>` : '',
-          st2.toShip ? `<button class="vrm-todo" data-t="expedier">📄 ${st2.toShip} à générer</button>` : '',
-          st2.toPickup ? `<button class="vrm-todo" data-t="achats">📦 ${st2.toPickup} à retirer</button>` : '',
-          st2.unread ? `<button class="vrm-todo" data-t="messages">💬 ${st2.unread} message${st2.unread > 1 ? 's' : ''}</button>` : ''
-        ].filter(Boolean).join('');
-        return chips ? `<div class="vrm-todos" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px">${chips}</div>` : '';
-      })()}
       <div id="vrm-body">${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'journee' ? renderJournee()
@@ -490,9 +484,7 @@
         : tab === 'achats' ? renderAchats()
         : tab === 'messages' ? renderMessages()
         : tab === 'favoris' ? renderFavoris()
-        : tab === 'dorment' ? renderList(DATA.sleeping, sleepEmpty(), 'En ligne depuis 30 jours et plus (date lue sur la page de l&#39;annonce). À baisser ou republier — par toi.')
-        : tab === 'relance' ? renderList(DATA.relance, 'Rien à relancer : tes annonces accrochent bien. 👌', 'Beaucoup vues mais peu mises en favori <b>par rapport à tes autres annonces</b> → le prix est sans doute trop haut. Ouvre-les et baisse le prix toi-même.')
-        : renderList(DATA.noNum, 'Toutes tes annonces ont un N°. 👌', 'Ces annonces n\'ont pas encore de numéro dans ton app.')
+        : renderJournee()
       }</div>
       ${(DATA && DATA.activity && DATA.activity.length) ? `
         <div style="margin-top:10px;border-top:1px solid rgba(0,0,0,.08);padding-top:8px">
@@ -505,7 +497,7 @@
     panel.querySelector('.vrm-close').onclick = () => toggle(false);
     const rb = panel.querySelector('.vrm-refresh'); if (rb) rb.onclick = () => { if (!dataBusy) load(); };
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
-    panel.querySelectorAll('.vrm-todo').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
+    panel.querySelectorAll('.vrm-todo').forEach(b => { b.onclick = () => { if (b.dataset.filter) chaussuresFilter = b.dataset.filter; tab = b.dataset.t; render(); }; });
     // Bouton « copier » générique : copie son data-c (réutilisable partout).
     panel.querySelectorAll('.vrm-copy-line').forEach(b => { b.onclick = () => { try { navigator.clipboard.writeText(b.dataset.c || ''); } catch (_) {} const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1000); }; });
     if (tab === 'republier') wireRepublier();
@@ -547,6 +539,7 @@
         <div style="flex:1;min-width:0"><div class="vrm-t">${c.unread ? '🔴 ' : ''}${esc(c.login || 'Acheteur')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '')}</div></div>
       </label>`).join('');
     return `
+      <button class="vrm-msg-go" data-act="reponse" style="width:100%;margin-bottom:8px;border:1px dashed #09b1ba;background:#09b1ba0e;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;font-size:12.5px;cursor:pointer">✍️ Assistant de réponse (IA)</button>
       <div class="vrm-m" style="margin-bottom:8px">Coche les conversations où <b>répondre</b>. Tu réponds <b>une par une, toi-même</b> (aucun envoi automatique). 🔴 = non lu.</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-msg-go" data-act="unread" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Cocher non lus</button>
@@ -561,7 +554,8 @@
       b.onclick = () => {
         const act = b.dataset.act;
         const list = (DATA && DATA.convs) || [];
-        if (act === 'unread') { list.filter(c => c.unread).forEach(c => msgSel.add(c.id)); render(); }
+        if (act === 'reponse') { tab = 'reponse'; render(); }
+        else if (act === 'unread') { list.filter(c => c.unread).forEach(c => msgSel.add(c.id)); render(); }
         else if (act === 'none') { msgSel.clear(); render(); }
         else if (act === 'start') { if (!msgSel.size) return; msgRun = { queue: list.filter(c => msgSel.has(c.id)), idx: 0 }; render(); }
         else if (act === 'stop') { msgRun = null; render(); }
