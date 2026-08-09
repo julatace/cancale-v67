@@ -354,6 +354,7 @@
     // Optimisation : opportunités déjà calculées (mêmes onglets), pour vendre plus.
     const optim = [
       s.relance ? { f: 'relance', ic: '💡', n: s.relance, lbl: 'à relancer' } : null,
+      s.overMarket ? { f: 'over', ic: '📊', n: s.overMarket, lbl: 'trop cher' } : null,
       s.sleeping ? { f: 'sleep', ic: '😴', n: s.sleeping, lbl: 'dorment' } : null,
       s.noNum ? { f: 'nonum', ic: '🔢', n: s.noNum, lbl: 'sans N°' } : null,
     ].filter(Boolean);
@@ -374,8 +375,12 @@
     const relanceIds = new Set(((DATA && DATA.relance) || []).map(o => String(o.id)));
     const sleepIds = new Set(((DATA && DATA.sleeping) || []).map(o => String(o.id)));
     const noNumIds = new Set(((DATA && DATA.noNum) || []).map(o => String(o.id)));
-    const FILTERS = [['all', 'Toutes', online.length], ['relance', '💡 À relancer', relanceIds.size], ['sleep', '😴 Dorment', sleepIds.size], ['nonum', '🔢 Sans N°', noNumIds.size]];
+    // « Au-dessus du marché » : prix > +15 % de la médiane des paires comparables.
+    const isOver = (o) => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15;
+    const overCount = online.filter(isOver).length;
+    const FILTERS = [['all', 'Toutes', online.length], ['relance', '💡 À relancer', relanceIds.size], ['over', '📊 Trop cher', overCount], ['sleep', '😴 Dorment', sleepIds.size], ['nonum', '🔢 Sans N°', noNumIds.size]];
     const all = chaussuresFilter === 'relance' ? online.filter(o => relanceIds.has(String(o.id)))
+      : chaussuresFilter === 'over' ? online.filter(isOver)
       : chaussuresFilter === 'sleep' ? online.filter(o => sleepIds.has(String(o.id)))
       : chaussuresFilter === 'nonum' ? online.filter(o => noNumIds.has(String(o.id)))
       : online;

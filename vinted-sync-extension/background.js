@@ -1293,6 +1293,8 @@ async function buildPanelData() {
     toPickup: pickups.length,
     unread: convs.filter(c => c.unread).length,
     favoris: online.filter(o => (o.favs || 0) > 0).length,
+    // Paires sensiblement AU-DESSUS de leurs comparables (>15 %) → à baisser.
+    overMarket: online.filter(o => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15).length,
   };
   // Fraîcheur : la capture la plus récente parmi les données lues → l'utilisateur
   // sait si ses infos datent (et s'il doit repasser sur Vinted pour les capter).
