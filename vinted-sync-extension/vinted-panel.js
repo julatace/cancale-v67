@@ -409,16 +409,18 @@
         else if (sell < pe * 0.85) peerTag = `<span style="color:#0f6b4f">📊 sous le marché (~${fmt(pe)})</span>`;
       }
       return `
-      <a class="vrm-ch-row" href="${esc(o.url)}" target="_blank" rel="noreferrer" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '')).toLowerCase())}" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;border:1px solid #eceff3;border-radius:12px;padding:8px;margin-bottom:7px">
-        ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:58px;height:58px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:58px;height:58px;border-radius:10px;background:#eef1f4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px">👟</div>'}
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.numero ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : ''}${esc(o.title || 'Annonce')}</div>
-          <div class="vrm-m" style="margin-top:2px">${fmt(o.price)}${buy != null ? ` · achat ${fmt(o.buyPrice)}` : ''}${marge != null ? ` · marge <b style="color:#0f6b4f">${fmt(marge)}</b>` : ''}</div>
-          ${eng ? `<div class="vrm-m" style="margin-top:1px">${eng}</div>` : ''}
-          ${peerTag ? `<div class="vrm-m" style="margin-top:1px;font-weight:600">${peerTag}</div>` : ''}
-        </div>
-        <span style="flex-shrink:0;color:#09b1ba;font-size:16px">↗</span>
-      </a>`;
+      <div class="vrm-ch-row" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '')).toLowerCase())}" style="display:flex;gap:8px;align-items:stretch;border:1px solid #eceff3;border-radius:12px;padding:8px;margin-bottom:7px">
+        <a href="${esc(o.url)}" target="_blank" rel="noreferrer" style="flex:1;min-width:0;display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit">
+          ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:58px;height:58px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:58px;height:58px;border-radius:10px;background:#eef1f4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px">👟</div>'}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.numero ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : ''}${esc(o.title || 'Annonce')}</div>
+            <div class="vrm-m" style="margin-top:2px">${fmt(o.price)}${buy != null ? ` · achat ${fmt(o.buyPrice)}` : ''}${marge != null ? ` · marge <b style="color:#0f6b4f">${fmt(marge)}</b>` : ''}</div>
+            ${eng ? `<div class="vrm-m" style="margin-top:1px">${eng}</div>` : ''}
+            ${peerTag ? `<div class="vrm-m" style="margin-top:1px;font-weight:600">${peerTag}</div>` : ''}
+          </div>
+        </a>
+        <a href="https://www.vinted.fr/items/${esc(o.id)}/edit" target="_blank" rel="noreferrer" title="Modifier le prix sur Vinted" style="flex-shrink:0;align-self:center;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:#09b1ba14;color:#09b1ba;text-decoration:none;font-size:15px">✏️</a>
+      </div>`;
     }).join('');
     return `
       ${filterChips}
