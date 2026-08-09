@@ -1288,6 +1288,8 @@ async function buildPanelData() {
     noNum: noNum.length,
     withDesc: online.filter(o => o.hasDesc).length,
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
+    viewsTotal: online.reduce((s, o) => s + (o.views != null ? Number(o.views) || 0 : 0), 0),
+    favsTotal: online.reduce((s, o) => s + (o.favs != null ? Number(o.favs) || 0 : 0), 0),
     toShip: toShip.filter(t => !t.hasBord).length,
     toPrint: bordsToPrint.length,
     toPickup: pickups.length,

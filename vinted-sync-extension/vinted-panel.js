@@ -385,7 +385,8 @@
       <div class="vrm-stats" style="margin-top:8px">
         ${tile('En ligne', s.online != null ? s.online : '—')}
         ${tile('Valeur du stock', eurInt(s.value != null ? Math.round(s.value) : null))}
-      </div>`;
+      </div>
+      ${(s.viewsTotal != null || s.favsTotal != null) ? `<div class="vrm-m" style="text-align:center;margin-top:6px">👁 <b>${s.viewsTotal != null ? s.viewsTotal : '—'}</b> vues · ❤️ <b>${s.favsTotal != null ? s.favsTotal : '—'}</b> favoris <span style="opacity:.7">cumulés</span></div>` : ''}`;
     const todoBlock = todo.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">À faire aujourd'hui</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${todo.map(x => `<button class="vrm-todo" data-t="${x.t}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>`
