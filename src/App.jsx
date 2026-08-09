@@ -5352,9 +5352,18 @@ async function generateFacturXPdf(inv, ent){
     const W=595.28, M=50, dark=rgb(0.13,0.13,0.13), gray=rgb(0.42,0.42,0.42), green=rgb(0.15,0.66,0.36);
     const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=String(t==null?'':t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
     const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+' €';
+    // Logo (haut droite) — ton logo perso s'il existe, sinon celui par défaut.
+    try{
+      let logoSrc=LOGO_CANCALE;
+      try{ const c=localStorage.getItem('vinted_custom_logo'); if(c) logoSrc=JSON.parse(c); }catch(_){}
+      const m=/^data:image\/(png|jpe?g);base64,(.+)$/i.exec(String(logoSrc||''));
+      if(m){ const img=/png/i.test(m[1])?await pdf.embedPng(b64ToBytes(m[2])):await pdf.embedJpg(b64ToBytes(m[2])); const dim=img.scale(1); const h=62,w=h*(dim.width/dim.height||1); page.drawImage(img,{x:W-M-Math.min(w,90),y:762,width:Math.min(w,90),height:h}); }
+    }catch(_){}
     let y=792;
-    T('FACTURE',M,y,{s:26,b:true}); T('# '+(inv.number||''),W-M,y+9,{s:11,c:gray,right:true}); T('Date : '+fmtDate(inv.saleDate),W-M,y-5,{s:10,c:gray,right:true});
-    y-=48;
+    T('FACTURE',M,y,{s:26,b:true}); y-=20;
+    T('# '+(inv.number||''),M,y,{s:11,c:gray}); y-=15;
+    T('Date : '+fmtDate(inv.saleDate),M,y,{s:10,c:gray});
+    y-=34;
     const colB=W-M-210;
     T('DE :',M,y,{s:8.5,b:true,c:gray}); T('CLIENT :',colB,y,{s:8.5,b:true,c:gray}); y-=15;
     T(ent.companyName||'',M,y,{s:11,b:true}); T(inv.buyerName||inv.buyerEmail||'Client',colB,y,{s:11,b:true}); y-=13;
