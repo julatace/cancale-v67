@@ -4831,13 +4831,16 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // Export CSV/Excel
   const exportExcel=()=>{
     if(fullList.length===0){toast('Aucune facture à exporter');return;}
-    const headers=['N° Facture','Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
-    const rows=fullList.map(i=>[
-      i.number||'',i.saleDate||'',i.productId||'',i.itemName||'',
+    const multiEnt=Array.isArray(entreprises)&&entreprises.length>1;
+    const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
+    const rows=fullList.map(i=>{
+      const e=entForInvoice(i,entreprises,activeEnt,invoiceSettings);
+      return [
+      i.number||'',...(multiEnt?[e&&e.companyName||'',e&&e.siret||'']:[]),i.saleDate||'',i.productId||'',i.itemName||'',
       (i.sellPrice||'').toString().replace('.',','),
       i.buyerName||'',i.buyerEmail||'',i.buyerAddress||'',i.vintedNumber||'',
       accountedSet.has(String(i.productId).trim())?'Comptabilisée':'En attente',
-    ]);
+    ];});
     const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
     const url=URL.createObjectURL(blob);
