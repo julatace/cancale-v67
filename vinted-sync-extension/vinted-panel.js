@@ -376,7 +376,7 @@
       <div class="vrm-m" style="margin-top:3px">
         ${o.hasDesc ? '✅ description enregistrée' : '⏳ description en cours de lecture…'}
         ${o.nPhotos ? ` · 📷 ${o.nPhotos} photo${o.nPhotos > 1 ? 's' : ''} gardées` : ''}
-      </div>${diag}`;
+      </div>${diag}${o.numero ? `<div style="margin-top:6px"><button class="vrm-copy-line" data-c="N°${esc(o.numero)} · ${esc(o.title || '')}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier N° + titre</button></div>` : ''}`;
     return card(o, extra);
   }
 
@@ -459,6 +459,8 @@
     const rb = panel.querySelector('.vrm-refresh'); if (rb) rb.onclick = () => { if (!dataBusy) load(); };
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
     panel.querySelectorAll('.vrm-todo').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
+    // Bouton « copier » générique : copie son data-c (réutilisable partout).
+    panel.querySelectorAll('.vrm-copy-line').forEach(b => { b.onclick = () => { try { navigator.clipboard.writeText(b.dataset.c || ''); } catch (_) {} const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1000); }; });
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
     if (tab === 'expedier') wireExpedier();
