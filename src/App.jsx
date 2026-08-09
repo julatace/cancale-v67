@@ -4954,7 +4954,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
                   <td style={{padding:'8px',color:C.warn,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
-                  <td style={{padding:'8px',color:C.accent,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}</td>
+                  <td style={{padding:'8px',color:C.accent,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:9.5,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
