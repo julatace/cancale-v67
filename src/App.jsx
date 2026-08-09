@@ -4961,6 +4961,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
+                    <Btn small onClick={()=>downloadFacturX(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Export e-facture (Factur-X / XML EN16931)">🧾</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
                 </tr>
@@ -5227,6 +5228,82 @@ td.right{text-align:right;}
   const w=window.open('','_blank');
   w.document.write(html);
   w.document.close();
+}
+
+// ── FACTURATION ÉLECTRONIQUE (Factur-X / CII, profil EN16931 BASIC) ─────────
+// Génère le XML normalisé « Cross Industry Invoice » de la facture, importable
+// dans un outil de e-facturation (Indy, plateforme agréée…). Micro-entreprise en
+// franchise de TVA → taxe catégorie « E » (exonéré) + mention art. 293 B du CGI.
+// ⚠️ On produit le XML normalisé (la partie machine) ; l'assemblage en PDF/A-3
+// Factur-X (PDF + XML embarqué) reste une étape ultérieure. Rien n'est inventé :
+// tous les montants viennent de la facture, TVA à 0 (régime réel de Julien).
+function xmlEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])); }
+function factureCII(inv, ent){
+  const total=(+inv.sellPrice||0).toFixed(2);
+  const d=new Date(inv.saleDate); const ymd=isNaN(d)?String(inv.saleDate||'').replace(/-/g,''):`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  const siret=String(ent.siret||'').replace(/\s/g,'');
+  const buyer=inv.buyerName||inv.buyerEmail||'Client';
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+  <rsm:ExchangedDocumentContext>
+    <ram:GuidelineSpecifiedDocumentContextParameter><ram:ID>urn:cen.eu:en16931:2017</ram:ID></ram:GuidelineSpecifiedDocumentContextParameter>
+  </rsm:ExchangedDocumentContext>
+  <rsm:ExchangedDocument>
+    <ram:ID>${xmlEsc(inv.number)}</ram:ID>
+    <ram:TypeCode>380</ram:TypeCode>
+    <ram:IssueDateTime><udt:DateTimeString format="102">${xmlEsc(ymd)}</udt:DateTimeString></ram:IssueDateTime>
+  </rsm:ExchangedDocument>
+  <rsm:SupplyChainTradeTransaction>
+    <ram:IncludedSupplyChainTradeLineItem>
+      <ram:AssociatedDocumentLineDocument><ram:LineID>1</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>${xmlEsc(inv.itemName||'Article')}</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement><ram:NetPriceProductTradePrice><ram:ChargeAmount>${total}</ram:ChargeAmount></ram:NetPriceProductTradePrice></ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">1</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>E</ram:CategoryCode><ram:RateApplicablePercent>0</ram:RateApplicablePercent></ram:ApplicableTradeTax>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${total}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>
+    </ram:IncludedSupplyChainTradeLineItem>
+    <ram:ApplicableHeaderTradeAgreement>
+      <ram:SellerTradeParty>
+        <ram:Name>${xmlEsc(ent.companyName||'')}</ram:Name>
+        ${siret?`<ram:SpecifiedLegalOrganization><ram:ID schemeID="0002">${xmlEsc(siret)}</ram:ID></ram:SpecifiedLegalOrganization>`:''}
+        <ram:PostalTradeAddress><ram:CountryID>FR</ram:CountryID><ram:LineOne>${xmlEsc(ent.companyAddress||'')}</ram:LineOne></ram:PostalTradeAddress>
+      </ram:SellerTradeParty>
+      <ram:BuyerTradeParty><ram:Name>${xmlEsc(buyer)}</ram:Name>${inv.buyerAddress?`<ram:PostalTradeAddress><ram:CountryID>FR</ram:CountryID><ram:LineOne>${xmlEsc(inv.buyerAddress)}</ram:LineOne></ram:PostalTradeAddress>`:''}</ram:BuyerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+    <ram:ApplicableHeaderTradeDelivery/>
+    <ram:ApplicableHeaderTradeSettlement>
+      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+      <ram:ApplicableTradeTax>
+        <ram:CalculatedAmount>0.00</ram:CalculatedAmount>
+        <ram:TypeCode>VAT</ram:TypeCode>
+        <ram:ExemptionReason>TVA non applicable, art. 293 B du CGI</ram:ExemptionReason>
+        <ram:BasisAmount>${total}</ram:BasisAmount>
+        <ram:CategoryCode>E</ram:CategoryCode>
+        <ram:RateApplicablePercent>0</ram:RateApplicablePercent>
+      </ram:ApplicableTradeTax>
+      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <ram:LineTotalAmount>${total}</ram:LineTotalAmount>
+        <ram:TaxBasisTotalAmount>${total}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="EUR">0.00</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>${total}</ram:GrandTotalAmount>
+        <ram:DuePayableAmount>${total}</ram:DuePayableAmount>
+      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </ram:ApplicableHeaderTradeSettlement>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>`;
+}
+function downloadFacturX(inv, ent){
+  try{
+    const xml=factureCII(inv, ent);
+    const blob=new Blob([xml],{type:'application/xml'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'e-facture'}.xml`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){ try{toast('Export e-facture impossible : '+e.message);}catch(_){} }
 }
 
 /* ── Garage ──────────────────────────────────────────── */
