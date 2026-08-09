@@ -435,6 +435,15 @@
     let diag = '';
     if (inRelance) diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:#fff6ec;color:#9a5b16;border:1px solid #ffd7a8">💡 <b>Très vue, peu de favoris</b> par rapport à tes autres annonces → le prix est sans doute trop haut. Baisse-le toi-même.</div>`;
     if (dort) diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:#eef4ff;color:#2b5b9a;border:1px solid #c9dbf7">😴 <b>En ligne depuis ${o.ageDays} j</b> — pense à la republier ou à baisser le prix.</div>`;
+    // Prix des paires comparables (même marque + taille EN LIGNE, ≥2 paires) —
+    // calculé par l'extension sur ta propre moisson (0 requête). Purement indicatif.
+    if (o.peer != null && sell != null) {
+      const pe = Number(o.peer);
+      const cmp = sell > pe * 1.15 ? { txt: `Ton prix est <b>au-dessus</b> de tes paires similaires → une baisse peut accélérer la vente.`, bg: '#fff6ec', fg: '#9a5b16', bd: '#ffd7a8' }
+        : sell < pe * 0.85 ? { txt: `Ton prix est <b>en-dessous</b> de tes paires similaires → tu peux sans doute monter un peu.`, bg: '#eefaf3', fg: '#0f6b4f', bd: '#bfe6d3' }
+        : { txt: `Ton prix est <b>dans la moyenne</b> de tes paires similaires. 👍`, bg: '#f2f5f8', fg: '#44515e', bd: '#e0e6ec' };
+      diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:${cmp.bg};color:${cmp.fg};border:1px solid ${cmp.bd}">📊 Paires similaires en ligne (${esc(o.brand)} · ${esc(o.size)}) : <b>autour de ${fmt(pe)}</b> <span style="opacity:.75">(${o.peerN} paires)</span><br>${cmp.txt}</div>`;
+    }
     const extra = `<div class="vrm-m" style="margin-top:3px">
         ${o.buyPrice != null ? `Achat ${fmt(o.buyPrice)}` : '<b>Prix d\'achat non renseigné</b>'}
         ${marge != null ? ` · Marge <b>${fmt(marge)}</b>` : ''}

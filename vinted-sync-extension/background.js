@@ -1136,10 +1136,31 @@ async function buildPanelData() {
         numero, buyPrice: e && e.buyPrice != null ? e.buyPrice : null,
         cell: numero ? (cellByNum[numero] || null) : null,
         ageDays,
+        brand: String(it.brand_title || '').trim(),
+        size: String(it.size_title || '').trim(),
         hasDesc: !!(pageDetails[id] && pageDetails[id].description),
         nPhotos: (pageDetails[id] && (pageDetails[id].photos || []).length) || 0,
       });
     }
+  }
+  // ── PRIX DES PAIRES COMPARABLES (peer price) ────────────────────────────────
+  // Même logique que l'app (scoreAnnonce.peerPrice) : la MÉDIANE du prix des
+  // annonces EN LIGNE de MÊME marque + MÊME taille (≥2 paires, sinon on ne dit
+  // rien). Sert à repérer une paire au-dessus/en-dessous de ton propre marché,
+  // pendant que tu la regardes. 0 requête Vinted (calculé sur la moisson).
+  const peerGroups = {};
+  for (const o of online) {
+    const pr = o.price == null ? NaN : Number(o.price);
+    if (!o.brand || !o.size || isNaN(pr)) continue;
+    const k = (o.brand + '|' + o.size).toLowerCase();
+    (peerGroups[k] = peerGroups[k] || []).push(pr);
+  }
+  const median = (arr) => { const s = arr.slice().sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  for (const o of online) {
+    if (!o.brand || !o.size) { o.peer = null; o.peerN = 0; continue; }
+    const g = peerGroups[(o.brand + '|' + o.size).toLowerCase()] || [];
+    o.peer = g.length >= 2 ? median(g) : null; // ≥2 paires comparables sinon rien
+    o.peerN = g.length;
   }
   // « À relancer » : le signal FIABLE est le ratio favoris/vues, pas l'âge.
   // (Vinted ne donne pas la date de mise en ligne dans le dressing, et la date
