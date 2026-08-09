@@ -424,7 +424,21 @@
       : chaussuresFilter === 'nonum' ? online.filter(o => noNumIds.has(String(o.id)))
       : online;
     const filterChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${FILTERS.map(([k, l, n]) => `<button class="vrm-chfilter" data-f="${k}" style="border:1px solid ${chaussuresFilter === k ? '#111' : '#dde'};background:${chaussuresFilter === k ? '#111' : '#fff'};color:${chaussuresFilter === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}${n ? ` ${n}` : ''}</button>`).join('')}</div>`;
-    if (!all.length) return `${filterChips}<div class="vrm-m" style="padding:6px 2px">Rien dans cette vue. 👌</div>`;
+    // Bandeau « boutique en un coup d'œil » — calculé sur TOUTES les annonces en
+    // ligne (pas la vue filtrée), pour refléter le stock réel comme le bandeau
+    // Annonces de l'app. Champs captés défensivement : un absent ne fausse rien.
+    const vTot = online.reduce((s, o) => s + (eur(o.price) || 0), 0);
+    const viewsTot = online.reduce((s, o) => s + (o.views != null ? Number(o.views) || 0 : 0), 0);
+    const favsTot = online.reduce((s, o) => s + (o.favs != null ? Number(o.favs) || 0 : 0), 0);
+    const nEur = (n) => Math.round(n).toLocaleString('fr-FR') + ' €';
+    const statCell = (v, l) => `<div style="flex:1;min-width:64px;text-align:center"><div style="font-weight:800;font-size:15px;color:#0a323a">${v}</div><div class="vrm-m" style="font-size:10.5px;margin-top:1px">${l}</div></div>`;
+    const statsBanner = `<div style="display:flex;flex-wrap:wrap;gap:6px;background:linear-gradient(135deg,#f2fbfc,#eaf6f7);border:1px solid #d3ebed;border-radius:12px;padding:9px 8px;margin-bottom:8px">
+      ${statCell('👟 ' + online.length, 'en ligne')}
+      ${statCell(nEur(vTot), 'valeur')}
+      ${statCell('👁 ' + viewsTot, 'vues')}
+      ${statCell('❤️ ' + favsTot, 'favoris')}
+    </div>`;
+    if (!all.length) return `${statsBanner}${filterChips}<div class="vrm-m" style="padding:6px 2px">Rien dans cette vue. 👌</div>`;
     const margeOf = (o) => { const b = eur(o.buyPrice), s = eur(o.price); return (b != null && s != null && !isNaN(b)) ? s - b : null; };
     const byNum = (a, b) => { const na = a.numero != null && a.numero !== '' ? +a.numero : 1e9, nb = b.numero != null && b.numero !== '' ? +b.numero : 1e9; return na - nb || String(a.title || '').localeCompare(String(b.title || '')); };
     // Un champ absent va en fin de liste (on ne le fait pas passer devant à tort).
@@ -462,6 +476,7 @@
       </div>`;
     }).join('');
     return `
+      ${statsBanner}
       ${filterChips}
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">👟 ${all.length} paire${all.length > 1 ? 's' : ''}${chaussuresFilter === 'all' ? ' en ligne' : ''}</div>
       ${sortChips}
