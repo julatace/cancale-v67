@@ -269,8 +269,9 @@
     #vrm-panel #vrm-body{padding:12px 16px 0}
     #vrm-panel.vrm-big .vrm-tab{font-size:12.5px;padding:6px 12px}
     #vrm-panel.vrm-big h3{font-size:17px}
-    #vrm-panel h3{margin:0 0 2px;font-size:15px;font-weight:800}
-    #vrm-panel .vrm-sub{color:#667;font-size:11.5px;margin-bottom:9px}
+    #vrm-panel h3{margin:0 0 2px;font-size:15px;font-weight:800;letter-spacing:.3px;
+      background:linear-gradient(90deg,#0bbcc5,#0797a0);-webkit-background-clip:text;background-clip:text;color:transparent}
+    #vrm-panel .vrm-sub{color:#66707d;font-size:11.5px;margin-bottom:9px}
     #vrm-panel .vrm-tabs{display:flex;gap:6px;flex-wrap:wrap}
     #vrm-panel .vrm-tab{border:1px solid #dde;background:#fff;color:#334;border-radius:999px;padding:5px 10px;
       font:700 11.5px system-ui,sans-serif;cursor:pointer;transition:background .12s,border-color .12s}
@@ -282,16 +283,23 @@
     #vrm-panel .vrm-max{position:absolute;top:11px;right:60px;border:none;background:transparent;font-size:14px;
       cursor:pointer;opacity:.7;padding:0;line-height:1}
     #vrm-panel .vrm-max:hover{opacity:1}
-    #vrm-panel .vrm-card{border:1px solid #e6e8ee;border-radius:12px;padding:10px;margin-bottom:8px}
-    #vrm-panel .vrm-num{display:inline-block;background:#09b1ba;color:#fff;border-radius:8px;padding:2px 9px;font-weight:800}
+    #vrm-panel .vrm-card{border:1px solid #eceff4;border-radius:14px;padding:11px;margin-bottom:8px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+    #vrm-panel .vrm-num{display:inline-block;background:linear-gradient(135deg,#0bbcc5,#0797a0);color:#fff;border-radius:8px;padding:2px 9px;font-weight:800;box-shadow:0 1px 2px rgba(9,177,186,.3)}
     #vrm-panel .vrm-row{display:flex;gap:9px;align-items:center}
-    #vrm-panel .vrm-row img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee}
+    #vrm-panel .vrm-row img{width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#eee}
     #vrm-panel .vrm-t{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    #vrm-panel .vrm-m{color:#667;font-size:11px}
+    #vrm-panel .vrm-m{color:#66707d;font-size:11px}
     #vrm-panel a.vrm-link{color:#09b1ba;font-weight:800;text-decoration:none;font-size:11.5px}
-    #vrm-panel .vrm-stats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-    #vrm-panel .vrm-st{flex:1;min-width:72px;border:1px solid #e6e8ee;border-radius:10px;padding:7px 9px}
-    #vrm-panel .vrm-st b{display:block;font-size:16px}
+    #vrm-panel .vrm-stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+    #vrm-panel .vrm-st{flex:1;min-width:76px;border:1px solid #eceff4;border-radius:12px;padding:8px 10px;background:#fbfcfe;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+    #vrm-panel .vrm-st b{display:block;font-size:17px;letter-spacing:-.2px}
+    /* Rangées cliquables (Mes paires, etc.) : léger relief au survol. */
+    #vrm-panel .vrm-ch-row,#vrm-panel .vrm-repub-row,#vrm-panel .vrm-bord-row{transition:border-color .12s,box-shadow .12s,transform .06s}
+    #vrm-panel .vrm-ch-row:hover,#vrm-panel .vrm-repub-row:hover{border-color:#bfe4e6;box-shadow:0 3px 10px rgba(9,177,186,.10)}
+    /* Listes en 2 colonnes quand le panneau est agrandi (plus de paires d'un coup). */
+    #vrm-panel .vrm-grid{display:flex;flex-direction:column;gap:7px}
+    #vrm-panel.vrm-big .vrm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+    #vrm-panel .vrm-grid>*{margin-bottom:0!important}
     #vrm-panel .vrm-close{position:absolute;top:9px;right:12px;border:none;background:transparent;cursor:pointer;font-size:16px;color:#889;padding:0;line-height:1}
     #vrm-panel .vrm-close:hover{color:#334}
     #vrm-panel .vrm-todo{border:1px solid #ffd7a8;background:#fff6ec;color:#9a5b16;border-radius:999px;padding:5px 10px;
@@ -458,7 +466,7 @@
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">👟 ${all.length} paire${all.length > 1 ? 's' : ''}${chaussuresFilter === 'all' ? ' en ligne' : ''}</div>
       ${sortChips}
       ${all.length > 8 ? `<input id="vrm-ch-search" type="search" value="${esc(chaussuresQuery)}" placeholder="🔍 Filtrer (titre, marque, N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
-      ${rows}`;
+      <div class="vrm-grid">${rows}</div>`;
   }
   function wireChaussures() {
     panel.querySelectorAll('.vrm-chfilter').forEach(b => { b.onclick = () => { chaussuresFilter = b.dataset.f; render(); }; });
@@ -625,7 +633,7 @@
         <button class="vrm-msg-go" data-act="unread" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Cocher non lus</button>
         <button class="vrm-msg-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
       </div>
-      <div style="margin-bottom:8px">${rows}</div>
+      <div class="vrm-grid" style="margin-bottom:8px">${rows}</div>
       <button class="vrm-msg-go" data-act="start" ${msgSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${msgSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${msgSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Répondre à ma sélection (${msgSel.size})</button>`;
   }
   function wireMessages() {
@@ -677,7 +685,7 @@
         <button class="vrm-fav-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
         <button class="vrm-fav-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
       </div>
-      <div style="margin-bottom:8px">${rows}</div>
+      <div class="vrm-grid" style="margin-bottom:8px">${rows}</div>
       <button class="vrm-fav-go" data-act="start" ${favSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${favSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${favSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Relancer ma sélection (${favSel.size})</button>`;
   }
   function wireFavoris() {
@@ -876,7 +884,7 @@
           <button class="vrm-ship-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
           <button class="vrm-ship-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
         </div>
-        <div style="margin-bottom:8px">${rows}</div>
+        <div class="vrm-grid" style="margin-bottom:8px">${rows}</div>
         <button class="vrm-ship-go" data-act="start" ${shipSel.size ? '' : 'disabled'} style="width:100%;border:none;background:${shipSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${shipSel.size ? 'pointer' : 'default'}">Générer ma sélection (${shipSel.size})</button>`;
     }
     return printSection + doneSection + genSection;
@@ -1097,7 +1105,7 @@
           nR ? `<button class="vrm-go" data-act="prelance" style="border:1px solid #ffd7a8;background:#fff6ec;color:#9a5b16;border-radius:999px;padding:5px 11px;font-weight:700;font-size:11.5px;cursor:pointer">💡 ${nR} à relancer</button>` : ''
         }</div>`;
       })()}
-      <div style="margin-bottom:8px">${rows}</div>
+      <div class="vrm-grid" style="margin-bottom:8px">${rows}</div>
       <button class="vrm-go" data-act="start" ${repubSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${repubSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${repubSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Commencer (${repubSel.size})</button>`;
   }
 
