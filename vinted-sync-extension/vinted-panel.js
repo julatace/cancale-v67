@@ -77,6 +77,18 @@
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const timeago = (t) => { const s = Math.max(0, (Date.now() - Number(t || 0)) / 1000); return s < 60 ? "à l'instant" : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : s < 86400 ? `il y a ${Math.floor(s / 3600)} h` : `il y a ${Math.floor(s / 86400)} j`; };
+  // Conseil marché compact réutilisable (même règle partout : écart >15% vs médiane
+  // des paires comparables o.peer). Renvoie '' si pas d'écart net ou pas de peer.
+  const marketNote = (o) => {
+    const sell = eur(o && o.price), pe = (o && o.peer != null) ? Number(o.peer) : null;
+    if (pe == null || sell == null) return '';
+    const cible = Math.round(pe);
+    if (sell > pe * 1.15) return `<div class="vrm-m" style="margin-top:6px;padding:5px 8px;border-radius:8px;background:#fff6ec;color:#9a5b16;border:1px solid #ffd7a8">📊 Trop cher (marché ~${fmt(pe)}) → essaie <b>~${cible} €</b></div>`;
+    if (sell < pe * 0.85) return `<div class="vrm-m" style="margin-top:6px;padding:5px 8px;border-radius:8px;background:#eefaf3;color:#0f6b4f;border:1px solid #bfe6d3">📊 Sous le marché (~${fmt(pe)}) → tu peux monter vers <b>~${cible} €</b></div>`;
+    return '';
+  };
+  // Lien 1-tap vers la page d'édition Vinted d'une annonce (change prix/titre).
+  const editLink = (id) => `<a class="vrm-link" href="https://www.vinted.fr/items/${esc(id)}/edit" target="_blank" rel="noreferrer" style="border:1px solid #09b1ba;background:#09b1ba;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:12px;text-decoration:none">✏️ Modifier ↗</a>`;
 
   // Champ de réponse de la conversation Vinted (le plus grand textarea /
   // contenteditable visible). Sert à INSÉRER la réponse rédigée par l'IA — c'est
@@ -998,7 +1010,7 @@
       if (!o) { repubRun.idx++; return renderRepublier(); }
       return `
         <div class="vrm-m" style="margin-bottom:8px">Annonce <b>${done + 1}</b> / ${total} — republie-la sur Vinted, puis <b>Suivante</b>.</div>
-        ${card(o, o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : '')}
+        ${card(o, `${o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : ''}${marketNote(o)}<div style="margin-top:7px">${editLink(o.id)}</div>`)}
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="vrm-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
           <button class="vrm-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
