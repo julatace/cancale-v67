@@ -5208,7 +5208,7 @@ td.right{text-align:right;}
   </div>
   <div class="party" style="text-align:right">
     <div class="party-label">À :</div>
-    <div class="party-info"><b>${inv.buyerEmail||''}</b><br>${inv.buyerName||''}${inv.buyerAddress?', '+inv.buyerAddress:''}</div>
+    <div class="party-info"><b>${inv.buyerName||inv.buyerEmail||'Client'}</b>${inv.buyerAddress?'<br>'+inv.buyerAddress:''}${inv.buyerEmail&&inv.buyerName?'<br>'+inv.buyerEmail:''}</div>
   </div>
 </div>
 <table>
