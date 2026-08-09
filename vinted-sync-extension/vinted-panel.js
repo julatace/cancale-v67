@@ -236,14 +236,21 @@
     #vrm-fab .vrm-badge{position:absolute;top:-4px;right:-4px;background:#e8590c;color:#fff;border-radius:999px;
       min-width:20px;height:20px;padding:0 5px;font:800 11px/20px system-ui,sans-serif;text-align:center}
     #vrm-panel{position:fixed;right:18px;bottom:80px;z-index:2147483000;width:min(460px,94vw);max-height:82vh;overflow:auto;
-      background:#fff;color:#111;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.3);
-      font:13px/1.45 system-ui,-apple-system,sans-serif;padding:14px}
+      background:#fff;color:#111;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.3);border:1px solid #eef0f4;
+      font:13px/1.45 system-ui,-apple-system,sans-serif;padding:0}
+    #vrm-panel .vrm-head{position:sticky;top:0;z-index:6;background:#fff;padding:13px 14px 9px;
+      border-bottom:1px solid #eef0f4;border-radius:16px 16px 0 0}
+    #vrm-panel #vrm-body{padding:12px 14px 0}
     #vrm-panel h3{margin:0 0 2px;font-size:15px;font-weight:800}
-    #vrm-panel .vrm-sub{color:#667;font-size:11.5px;margin-bottom:10px}
-    #vrm-panel .vrm-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+    #vrm-panel .vrm-sub{color:#667;font-size:11.5px;margin-bottom:9px}
+    #vrm-panel .vrm-tabs{display:flex;gap:6px;flex-wrap:wrap}
     #vrm-panel .vrm-tab{border:1px solid #dde;background:#fff;color:#334;border-radius:999px;padding:5px 10px;
-      font:700 11.5px system-ui,sans-serif;cursor:pointer}
+      font:700 11.5px system-ui,sans-serif;cursor:pointer;transition:background .12s,border-color .12s}
+    #vrm-panel .vrm-tab:hover{border-color:#09b1ba;color:#09b1ba}
     #vrm-panel .vrm-tab.on{background:#09b1ba;border-color:#09b1ba;color:#fff}
+    #vrm-panel .vrm-refresh{position:absolute;top:11px;right:36px;border:none;background:transparent;font-size:14px;
+      cursor:pointer;opacity:.7;padding:0;line-height:1}
+    #vrm-panel .vrm-refresh:hover{opacity:1}
     #vrm-panel .vrm-card{border:1px solid #e6e8ee;border-radius:12px;padding:10px;margin-bottom:8px}
     #vrm-panel .vrm-num{display:inline-block;background:#09b1ba;color:#fff;border-radius:8px;padding:2px 9px;font-weight:800}
     #vrm-panel .vrm-row{display:flex;gap:9px;align-items:center}
@@ -254,12 +261,14 @@
     #vrm-panel .vrm-stats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
     #vrm-panel .vrm-st{flex:1;min-width:72px;border:1px solid #e6e8ee;border-radius:10px;padding:7px 9px}
     #vrm-panel .vrm-st b{display:block;font-size:16px}
-    #vrm-panel .vrm-close{float:right;border:none;background:transparent;cursor:pointer;font-size:16px;color:#889}
+    #vrm-panel .vrm-close{position:absolute;top:9px;right:12px;border:none;background:transparent;cursor:pointer;font-size:16px;color:#889;padding:0;line-height:1}
+    #vrm-panel .vrm-close:hover{color:#334}
     #vrm-panel .vrm-todo{border:1px solid #ffd7a8;background:#fff6ec;color:#9a5b16;border-radius:999px;padding:5px 10px;
       font:700 11.5px system-ui,sans-serif;cursor:pointer}
     #vrm-panel .vrm-todo:hover{background:#ffedd8}
     @media (prefers-color-scheme: dark){
-      #vrm-panel{background:#161a20;color:#e8eef5}
+      #vrm-panel{background:#161a20;color:#e8eef5;border-color:#2a3038}
+      #vrm-panel .vrm-head{background:#161a20;border-bottom-color:#2a3038}
       #vrm-panel .vrm-card,#vrm-panel .vrm-st{border-color:#2a3038}
       #vrm-panel .vrm-tab{background:#1e242c;border-color:#2a3038;color:#cfd8e3}
       #vrm-panel .vrm-todo{background:#2a2113;border-color:#4a3a1c;color:#f0c88a}
@@ -459,19 +468,21 @@
     const s = (DATA && DATA.stats) || { online: 0, relance: 0, noNum: 0, value: 0 };
     const fresh = (DATA && DATA.freshestAt) ? ` · capté ${esc(timeago(DATA.freshestAt))}` : '';
     panel.innerHTML = `
-      <button class="vrm-close" title="Fermer">✕</button>
-      <button class="vrm-refresh" title="Rafraîchir les données" style="position:absolute;top:9px;right:34px;border:none;background:transparent;font-size:14px;cursor:pointer;opacity:.7;padding:0;line-height:1">${dataBusy ? '⏳' : '🔄'}</button>
-      <h3>VRM</h3>
-      <div class="vrm-sub">Tes infos, sur Vinted.${fresh}</div>
-      <div class="vrm-tabs">
-        <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">🏠 Ma journée</button>
-        ${currentItemId() ? `<button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">👟 Cette paire</button>` : ''}
-        <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">👟 Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
-        <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">♻️ Republier</button>
-        <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">📄 Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
-        <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">📦 Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
-        <button class="vrm-tab ${tab === 'messages' || tab === 'reponse' ? 'on' : ''}" data-t="messages">💬 Messages${DATA && DATA.stats && DATA.stats.unread ? ` ${DATA.stats.unread}` : ''}</button>
-        <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">❤️ Favoris</button>
+      <div class="vrm-head">
+        <button class="vrm-close" title="Fermer">✕</button>
+        <button class="vrm-refresh" title="Rafraîchir les données">${dataBusy ? '⏳' : '🔄'}</button>
+        <h3>VRM</h3>
+        <div class="vrm-sub">Tes infos, sur Vinted.${fresh}</div>
+        <div class="vrm-tabs">
+          <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">🏠 Ma journée</button>
+          ${currentItemId() ? `<button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">👟 Cette paire</button>` : ''}
+          <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">👟 Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
+          <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">♻️ Republier</button>
+          <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">📄 Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
+          <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">📦 Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
+          <button class="vrm-tab ${tab === 'messages' || tab === 'reponse' ? 'on' : ''}" data-t="messages">💬 Messages${DATA && DATA.stats && DATA.stats.unread ? ` ${DATA.stats.unread}` : ''}</button>
+          <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">❤️ Favoris</button>
+        </div>
       </div>
       <div id="vrm-body">${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
