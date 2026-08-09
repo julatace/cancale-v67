@@ -1206,6 +1206,32 @@ async function buildPanelData() {
       });
     }
   }
+  // ── DERNIÈRES VENTES (lecture seule) : mêmes commandes moissonnées que l'app,
+  // mêmes règles de statut (classifyOrderStatus). On NE recalcule AUCUN total ici
+  // (le CA du mois reste celui publié par l'app, appStats) : c'est juste la liste
+  // « qu'est-ce que j'ai vendu récemment » pour éviter de rouvrir l'app. On exclut
+  // les annulées/remboursées (ce n'est pas de l'argent qui rentre).
+  const classifySale = (st) => /annul|cancel|refus|rembours/i.test(st || '') ? 'cancelled'
+    : /finalis/i.test(st || '') ? 'completed' : 'pending';
+  const salesFlat = [];
+  const seenSaleTx = new Set();
+  for (const r of soldRows) {
+    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    for (const o of orders) {
+      const tx = String(o.transaction_id || '');
+      if (tx && seenSaleTx.has(tx)) continue; if (tx) seenSaleTx.add(tx);
+      if (classifySale(o.status) === 'cancelled') continue;
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      salesFlat.push({
+        transaction: tx, title: o.title || '', status: o.status || '',
+        etat: classifySale(o.status),
+        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
+        ts: isNaN(ts) ? 0 : ts,
+        url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : 'https://www.vinted.fr/member/transactions?type=sold',
+      });
+    }
+  }
+  const recentSales = salesFlat.sort((a, b) => b.ts - a.ts).slice(0, 6);
   // ── ACHATS À RETIRER (colis en point relais) — AVEC LE CODE DE RETRAIT ───────
   // Source = les emails de suivi `email_track_*` (transporteur → « colis
   // disponible »), car c'est la SEULE source qui porte le CODE, le point relais et
@@ -1313,7 +1339,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, recentSales, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

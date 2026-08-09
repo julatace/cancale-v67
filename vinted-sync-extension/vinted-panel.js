@@ -401,8 +401,23 @@
     const optimBlock = optim.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">Pour vendre plus</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${optim.map(x => `<button class="vrm-todo" data-t="chaussures" data-filter="${x.f}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>` : '';
+    // Dernières ventes (lecture seule) : la liste des commandes moissonnées, mêmes
+    // règles de statut que l'app. Aucun total ici — le CA reste celui de l'app.
+    const rs = (DATA && DATA.recentSales) || [];
+    const etatLbl = { completed: '✅ finalisée', pending: '⏳ en cours' };
+    const salesBlock = rs.length ? `
+      <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">🧾 Dernières ventes</div>
+      <div style="border:1px solid #eceff3;border-radius:12px;overflow:hidden">
+        ${rs.map((v, i) => `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:8px;align-items:center;padding:8px 10px;text-decoration:none;color:inherit;${i ? 'border-top:1px solid #f0f2f5' : ''}">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title || 'Vente')}</div>
+            <div class="vrm-m" style="font-size:11px;margin-top:1px">${etatLbl[v.etat] || ''}${v.ts ? ` · ${esc(timeago(v.ts))}` : ''}</div>
+          </div>
+          <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#0f6b4f">${fmt(v.price)}</div>
+        </a>`).join('')}
+      </div>` : '';
     const fresh = a && a.updatedAt ? `<div class="vrm-m" style="text-align:center;margin-top:8px;opacity:.7">Chiffres de l'app · ${esc(timeago(Date.parse(a.updatedAt)))}</div>` : '';
-    return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${optimBlock}${fresh}`;
+    return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${optimBlock}${salesBlock}${fresh}`;
   }
 
   // ── ONGLET « MES PAIRES » : la liste de toutes tes chaussures en ligne, en
