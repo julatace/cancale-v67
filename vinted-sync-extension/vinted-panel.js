@@ -56,6 +56,7 @@
   // lieu de les faire disparaître d'un coup. Après un rechargement, la moisson les
   // exclut d'elle-même (buildPanelData lit panel_bords_done).
   const bordDoneLocal = new Set();
+  let bordQuery = ''; // filtre texte de la liste « bordereaux à imprimer »
   // Mêmes files pilotées par TA sélection pour : répondre aux messages, et
   // relancer les personnes qui ont mis en favori (offre native Vinted). Tu
   // sélectionnes, l'extension t'ouvre chaque élément, TU agis (réponds / proposes),
@@ -717,8 +718,9 @@
     //    L'impression (avec le N° tamponné sur le PDF) se fait dans l'app en 1 tap.
     const printSection = toPrint.length ? `
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">🖨️ ${toPrint.length} bordereau${toPrint.length > 1 ? 'x' : ''} à imprimer</div>
+      ${toPrint.length > 8 ? `<input id="vrm-bord-search" type="search" value="${esc(bordQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       ${toPrint.slice(0, 60).map(b => `
-        <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
+        <div class="vrm-card vrm-bord-row" data-s="${esc((((b.numero != null ? 'n°' + b.numero + ' ' : '') + (b.title || '')).toLowerCase()))}" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
           <span style="flex-shrink:0;min-width:36px;text-align:center;font-weight:800;color:${b.numero ? '#0f6b4f' : '#c53030'};background:${b.numero ? 'rgba(15,107,79,.1)' : 'rgba(197,48,48,.1)'};border-radius:8px;padding:5px 6px;font-size:12px">${b.numero ? ('N°' + esc(b.numero)) : 'N° ?'}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title || 'Bordereau')}</div>${b.dateLimite ? `<div class="vrm-m">à envoyer avant ${esc(b.dateLimite)}</div>` : ''}</div>
           <button class="vrm-bord-done" data-k="${esc(b.key)}" title="Marquer traité → le retire de la liste (colis fait)" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Traiter</button>
@@ -760,6 +762,10 @@
   }
 
   function wireExpedier() {
+    // Filtre local des bordereaux à imprimer (DOM, garde le focus ; persisté).
+    const bs = panel.querySelector('#vrm-bord-search');
+    const applyBordFilter = () => { const q = bordQuery.trim().toLowerCase(); panel.querySelectorAll('.vrm-bord-row').forEach(row => { row.style.display = (!q || (row.dataset.s || '').includes(q)) ? '' : 'none'; }); };
+    if (bs) { bs.oninput = () => { bordQuery = bs.value; applyBordFilter(); }; applyBordFilter(); }
     // « ✓ Traiter » un bordereau : on l'enregistre (ligne panel_bords_done) et on
     // le déplace en « Traités » (annulable). On NE mute PAS DATA.bordsToPrint pour
     // garder l'info et permettre « ↺ Remettre ». L'app s'aligne à sa synchro.
