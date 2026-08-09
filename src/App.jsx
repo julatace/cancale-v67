@@ -4964,7 +4964,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
-                    <Btn small onClick={()=>downloadFacturX(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Export e-facture (Factur-X / XML EN16931)">🧾</Btn>
+                    <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Facture électronique Factur-X (PDF + XML EN16931 embarqué)">🧾</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
                 </tr>
@@ -5309,6 +5309,89 @@ function downloadFacturX(inv, ent){
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),2000);
   }catch(e){ try{toast('Export e-facture impossible : '+e.message);}catch(_){} }
+}
+// XMP Factur-X (identification PDF/A-3 + schéma d'extension fx) — permet aux
+// outils (Indy…) de reconnaître la facture électronique embarquée.
+function facturxXMP(inv){
+  const t=xmlEsc('Facture '+(inv.number||''));
+  return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"><pdfaid:part>3</pdfaid:part><pdfaid:conformance>B</pdfaid:conformance></rdf:Description>
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title><rdf:Alt><rdf:li xml:lang="x-default">${t}</rdf:li></rdf:Alt></dc:title></rdf:Description>
+  <rdf:Description rdf:about="" xmlns:pdfaExtension="http://www.aiim.org/pdfa/ns/extension/" xmlns:pdfaSchema="http://www.aiim.org/pdfa/ns/schema#" xmlns:pdfaProperty="http://www.aiim.org/pdfa/ns/property#">
+   <pdfaExtension:schemas><rdf:Bag><rdf:li rdf:parseType="Resource">
+    <pdfaSchema:schema>Factur-X PDFA Extension Schema</pdfaSchema:schema>
+    <pdfaSchema:namespaceURI>urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#</pdfaSchema:namespaceURI>
+    <pdfaSchema:prefix>fx</pdfaSchema:prefix>
+    <pdfaSchema:property><rdf:Seq>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>DocumentFileName</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>Name of the embedded XML invoice file</pdfaProperty:description></rdf:li>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>DocumentType</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>INVOICE</pdfaProperty:description></rdf:li>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>Version</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>The version of the Factur-X standard</pdfaProperty:description></rdf:li>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>ConformanceLevel</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>The conformance level of the embedded XML</pdfaProperty:description></rdf:li>
+    </rdf:Seq></pdfaSchema:property>
+   </rdf:li></rdf:Bag></pdfaExtension:schemas>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#"><fx:DocumentType>INVOICE</fx:DocumentType><fx:DocumentFileName>factur-x.xml</fx:DocumentFileName><fx:Version>1.0</fx:Version><fx:ConformanceLevel>EN 16931</fx:ConformanceLevel></rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+}
+// Génère le VRAI fichier Factur-X : un PDF de la facture AVEC le XML EN16931
+// embarqué (nom normalisé `factur-x.xml`, relation « Alternative ») + le XMP
+// d'identification. Un seul fichier, lisible à l'œil ET par la machine.
+// ⚠️ Format Factur-X respecté (embarquement + XMP) ; la conformité PDF/A-3 stricte
+// (polices embarquées, profil ICC) n'est pas certifiée par un validateur ici.
+async function generateFacturXPdf(inv, ent){
+  try{
+    const { PDFDocument, StandardFonts, rgb, PDFName, AFRelationship } = await import('pdf-lib');
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([595.28, 841.89]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const W=595.28, M=50, dark=rgb(0.13,0.13,0.13), gray=rgb(0.42,0.42,0.42), green=rgb(0.15,0.66,0.36);
+    const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=String(t==null?'':t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
+    const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+' €';
+    let y=792;
+    T('FACTURE',M,y,{s:26,b:true}); T('# '+(inv.number||''),W-M,y+9,{s:11,c:gray,right:true}); T('Date : '+fmtDate(inv.saleDate),W-M,y-5,{s:10,c:gray,right:true});
+    y-=48;
+    const colB=W-M-210;
+    T('DE :',M,y,{s:8.5,b:true,c:gray}); T('CLIENT :',colB,y,{s:8.5,b:true,c:gray}); y-=15;
+    T(ent.companyName||'',M,y,{s:11,b:true}); T(inv.buyerName||inv.buyerEmail||'Client',colB,y,{s:11,b:true}); y-=13;
+    T(ent.companyType||'',M,y,{s:9,c:gray}); if(inv.buyerAddress) T(String(inv.buyerAddress).slice(0,46),colB,y,{s:9,c:gray}); y-=12;
+    T(String(ent.companyAddress||'').slice(0,52),M,y,{s:9,c:gray}); y-=12;
+    if(ent.siret) T('SIRET : '+ent.siret,M,y,{s:9,c:gray});
+    y-=36;
+    page.drawRectangle({x:M,y:y-5,width:W-2*M,height:20,color:rgb(0.95,0.96,0.97)});
+    T('Objet',M+6,y+1,{s:9,b:true}); T('Qté',350,y+1,{s:9,b:true}); T('P.U. HT',455,y+1,{s:9,b:true,right:true}); T('Montant',W-M-6,y+1,{s:9,b:true,right:true});
+    y-=22;
+    T(String(inv.itemName||'Article').slice(0,52),M+6,y,{s:10}); T('1',350,y,{s:10}); T(eur,455,y,{s:10,right:true}); T(eur,W-M-6,y,{s:10,right:true});
+    y-=8; page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.5,color:rgb(0.85,0.85,0.85)});
+    y-=22;
+    T('Total :',W-M-140,y,{s:12,b:true}); T(eur,W-M-6,y,{s:12,b:true,right:true}); y-=16;
+    T('Montant payé :',W-M-140,y,{s:9,c:gray}); T(eur,W-M-6,y,{s:9,c:gray,right:true}); y-=18;
+    T(ent.tvaMention||'TVA non applicable, art. 293 B du CGI',W-M-6,y,{s:9,c:gray,right:true}); y-=24;
+    T('Facture acquittée',W-M-6,y,{s:12,b:true,c:green,right:true}); y-=44;
+    if(inv.vintedNumber){ T('Transaction Vinted n°'+inv.vintedNumber,M,y,{s:9,c:gray}); y-=13; }
+    T(ent.footer||'Merci pour votre achat !',M,y,{s:9,c:gray});
+    T('Facture electronique - Factur-X (XML EN16931 embarque)',M,40,{s:7.5,c:gray});
+    // 1) XML normalisé embarqué sous le nom exact `factur-x.xml`.
+    const xml=factureCII(inv, ent);
+    const bytes=new TextEncoder().encode(xml);
+    await pdf.attach(bytes,'factur-x.xml',{ mimeType:'text/xml', description:'Facture electronique Factur-X', creationDate:new Date(), modificationDate:new Date(), afRelationship:AFRelationship.Alternative });
+    // 2) Métadonnées + XMP Factur-X (identification).
+    pdf.setTitle('Facture '+(inv.number||'')); pdf.setAuthor(ent.companyName||''); pdf.setSubject('Facture'); pdf.setProducer('VRM Cancale'); pdf.setCreator('VRM Cancale');
+    try{ const stream=pdf.context.stream(facturxXMP(inv),{Type:'Metadata',Subtype:'XML'}); const ref=pdf.context.register(stream); pdf.catalog.set(PDFName.of('Metadata'),ref); }catch(_){}
+    // Sans flux d'objets → /AF + `factur-x.xml` restent en objets simples, lisibles
+    // par les outils Factur-X (Indy, validateurs) sans décompression.
+    const out=await pdf.save({ useObjectStreams:false });
+    const blob=new Blob([out],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
 }
 
 /* ── Garage ──────────────────────────────────────────── */
