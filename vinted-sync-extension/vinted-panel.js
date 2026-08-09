@@ -455,8 +455,9 @@
     // calculé par l'extension sur ta propre moisson (0 requête). Purement indicatif.
     if (o.peer != null && sell != null) {
       const pe = Number(o.peer);
-      const cmp = sell > pe * 1.15 ? { txt: `Ton prix est <b>au-dessus</b> de tes paires similaires → une baisse peut accélérer la vente.`, bg: '#fff6ec', fg: '#9a5b16', bd: '#ffd7a8' }
-        : sell < pe * 0.85 ? { txt: `Ton prix est <b>en-dessous</b> de tes paires similaires → tu peux sans doute monter un peu.`, bg: '#eefaf3', fg: '#0f6b4f', bd: '#bfe6d3' }
+      const cible = Math.round(pe); // prix conseillé = médiane des comparables, arrondie
+      const cmp = sell > pe * 1.15 ? { txt: `Ton prix est <b>au-dessus</b> de tes paires similaires → essaie <b>~${cible} €</b> pour accélérer la vente.`, bg: '#fff6ec', fg: '#9a5b16', bd: '#ffd7a8' }
+        : sell < pe * 0.85 ? { txt: `Ton prix est <b>en-dessous</b> de tes paires similaires → tu peux monter vers <b>~${cible} €</b>.`, bg: '#eefaf3', fg: '#0f6b4f', bd: '#bfe6d3' }
         : { txt: `Ton prix est <b>dans la moyenne</b> de tes paires similaires. 👍`, bg: '#f2f5f8', fg: '#44515e', bd: '#e0e6ec' };
       diag += `<div class="vrm-m" style="margin-top:6px;padding:6px 8px;border-radius:8px;background:${cmp.bg};color:${cmp.fg};border:1px solid ${cmp.bd}">📊 Paires similaires en ligne (${esc(o.brand)} · ${esc(o.size)}) : <b>autour de ${fmt(pe)}</b> <span style="opacity:.75">(${o.peerN} paires)</span><br>${cmp.txt}</div>`;
     }
