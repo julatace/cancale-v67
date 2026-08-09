@@ -25,6 +25,7 @@
   //    aucune donnée ni action Vinted là-dedans.
   const PANEL_TABS = ['journee', 'paire', 'chaussures', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris', 'relance', 'dorment', 'sansnum'];
   let chaussuresQuery = ''; // filtre de l'onglet « Mes paires »
+  let chaussuresSort = 'num'; // tri : num | marge | vues | favs | age | prix
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   let open = readLS('vrm_panel_open', '0') === '1';
@@ -359,7 +360,14 @@
   function renderChaussures() {
     const all = (DATA && DATA.online) || [];
     if (!all.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant.<br>Ouvre ta boutique Vinted une fois pour les capter (0 requête ajoutée).</div>`;
-    const sorted = all.slice().sort((a, b) => { const na = a.numero != null && a.numero !== '' ? +a.numero : 1e9, nb = b.numero != null && b.numero !== '' ? +b.numero : 1e9; return na - nb || String(a.title || '').localeCompare(String(b.title || '')); });
+    const margeOf = (o) => { const b = eur(o.buyPrice), s = eur(o.price); return (b != null && s != null && !isNaN(b)) ? s - b : null; };
+    const byNum = (a, b) => { const na = a.numero != null && a.numero !== '' ? +a.numero : 1e9, nb = b.numero != null && b.numero !== '' ? +b.numero : 1e9; return na - nb || String(a.title || '').localeCompare(String(b.title || '')); };
+    // Un champ absent va en fin de liste (on ne le fait pas passer devant à tort).
+    const desc = (f) => (a, b) => { const va = f(a), vb = f(b); if (va == null && vb == null) return byNum(a, b); if (va == null) return 1; if (vb == null) return -1; return vb - va; };
+    const sorters = { num: byNum, marge: desc(margeOf), vues: desc(o => o.views), favs: desc(o => o.favs), age: desc(o => o.ageDays), prix: desc(o => eur(o.price)) };
+    const sorted = all.slice().sort(sorters[chaussuresSort] || byNum);
+    const SORTS = [['num', 'N°'], ['marge', '💰 Marge'], ['vues', '👁 Vues'], ['favs', '❤️ Favoris'], ['age', '😴 Âge'], ['prix', '€ Prix']];
+    const sortChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${SORTS.map(([k, l]) => `<button class="vrm-chsort" data-sort="${k}" style="border:1px solid ${chaussuresSort === k ? '#09b1ba' : '#dde'};background:${chaussuresSort === k ? '#09b1ba' : '#fff'};color:${chaussuresSort === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}</button>`).join('')}</div>`;
     const rows = sorted.slice(0, 300).map(o => {
       const buy = eur(o.buyPrice), sell = eur(o.price);
       const marge = (buy != null && sell != null && !isNaN(buy)) ? sell - buy : null;
@@ -377,10 +385,12 @@
     }).join('');
     return `
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">👟 ${all.length} paire${all.length > 1 ? 's' : ''} en ligne</div>
+      ${sortChips}
       ${all.length > 8 ? `<input id="vrm-ch-search" type="search" value="${esc(chaussuresQuery)}" placeholder="🔍 Filtrer (titre, marque, N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
       ${rows}`;
   }
   function wireChaussures() {
+    panel.querySelectorAll('.vrm-chsort').forEach(b => { b.onclick = () => { chaussuresSort = b.dataset.sort; render(); }; });
     const cs = panel.querySelector('#vrm-ch-search');
     const apply = () => { const q = chaussuresQuery.trim().toLowerCase(); panel.querySelectorAll('.vrm-ch-row').forEach(r => { r.style.display = (!q || (r.dataset.s || '').includes(q)) ? 'flex' : 'none'; }); };
     if (cs) { cs.oninput = () => { chaussuresQuery = cs.value; apply(); }; apply(); }
