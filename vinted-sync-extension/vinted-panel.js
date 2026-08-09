@@ -29,6 +29,8 @@
   let chaussuresFilter = 'all'; // sous-vue : all | relance | sleep | nonum
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  const readJSON = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } };
+  const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
   let open = readLS('vrm_panel_open', '0') === '1';
   let tab = (() => { const t = readLS('vrm_panel_tab', 'journee'); return PANEL_TABS.includes(t) ? t : 'journee'; })(); // journee | paire | relance | dorment | sansnum | republier | reponse | expedier | achats | messages | favoris
   // ── File de republication ASSISTÉE ─────────────────────────────────────────
@@ -40,6 +42,15 @@
   const repubSel = new Set();
   let repubRun = null;
   let repubQuery = ''; // filtre texte de la liste Republier (gardé entre rendus)
+  // ── Mémoire LOCALE des republications faites (par appareil, PAS d'action Vinted) :
+  //    {id: timestamp}. Sert à ne jamais te faire refaire une paire déjà republiée
+  //    récemment, à montrer ta progression, et à ranger en bas ce qui est fait.
+  //    Purement un aide-mémoire d'affichage : rien n'est envoyé à Vinted, rien n'est
+  //    écrit dans le cloud. Une paire redevient « à republier » après ~20 h.
+  const REPUB_FRESH_MS = 20 * 3600 * 1000;
+  let repubDone = readJSON('vrm_repub_done', {});
+  const isRepubRecent = (id) => { const t = repubDone[String(id)]; return t && (Date.now() - t) < REPUB_FRESH_MS; };
+  const markRepub = (id) => { repubDone[String(id)] = Date.now(); writeJSON('vrm_repub_done', repubDone); };
   // ── Assistant de RÉPONSE (Messaging Intelligence) : tu colles le message de
   //    l'acheteur, l'IA propose des réponses ; tu relis et tu envoies TOI-MÊME
   //    sur Vinted (rien n'est envoyé automatiquement). État gardé entre rendus.
@@ -1008,12 +1019,16 @@
       }
       const o = (DATA.byId && DATA.byId[repubRun.queue[done]]) || null;
       if (!o) { repubRun.idx++; return renderRepublier(); }
+      const pct = Math.round(done / total * 100);
       return `
-        <div class="vrm-m" style="margin-bottom:8px">Annonce <b>${done + 1}</b> / ${total} — republie-la sur Vinted, puis <b>Suivante</b>.</div>
+        <div class="vrm-m" style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px"><span>Annonce <b>${done + 1}</b> / ${total}</span><span style="opacity:.7">${done} republiée${done > 1 ? 's' : ''}</span></div>
+        <div style="height:7px;border-radius:999px;background:#e6eaee;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${pct}%;border-radius:999px;background:#09b1ba;transition:width .3s"></div></div>
+        <div class="vrm-m" style="margin-bottom:8px">Ouvre-la, <b>republie-la sur Vinted</b>, puis marque <b>✓ Republiée</b>.</div>
         ${card(o, `${o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : ''}${marketNote(o)}<div style="margin-top:7px">${editLink(o.id)}</div>`)}
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="vrm-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
-          <button class="vrm-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
+        <button class="vrm-go" data-act="open" style="width:100%;margin-top:8px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="vrm-go" data-act="done" style="flex:2;border:none;background:#0f6b4f;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">✓ Republiée</button>
+          <button class="vrm-go" data-act="next" style="flex:1;border:1px solid #dde;background:#fff;color:#556;border-radius:10px;padding:9px;font-weight:700;cursor:pointer">Passer</button>
         </div>
         <div style="text-align:center;margin-top:8px"><button class="vrm-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
     }
@@ -1026,13 +1041,17 @@
     const overOf = (o) => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15;
     const reasonsOf = (o) => {
       const r = [];
+      if (isRepubRecent(o.id)) r.push({ t: '✓ republiée', c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' });
       if (sleepIds.has(String(o.id))) r.push({ t: `😴 ${o.ageDays} j`, c: '#2b5b9a', bg: '#eef4ff', bd: '#c9dbf7' });
       if (relIds.has(String(o.id))) r.push({ t: '💡 à relancer', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
       if (overOf(o)) r.push({ t: '📊 trop cher', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
       return r;
     };
-    const prio = (o) => (sleepIds.has(String(o.id)) ? (o.ageDays || 30) : 0) + (relIds.has(String(o.id)) ? 200 : 0) + (overOf(o) ? 150 : 0);
+    // Déjà republiée récemment → tout en bas (gros malus), pour que tu voies
+    // d'abord ce qui reste à faire. Sinon priorité relance/trop cher/dort.
+    const prio = (o) => (isRepubRecent(o.id) ? -1e6 : 0) + (sleepIds.has(String(o.id)) ? (o.ageDays || 30) : 0) + (relIds.has(String(o.id)) ? 200 : 0) + (overOf(o) ? 150 : 0);
     const ordered = list.slice().sort((a, b) => prio(b) - prio(a));
+    const nDone = list.filter(o => isRepubRecent(o.id)).length;
     const rows = ordered.slice(0, 200).map(o => {
       const reasons = reasonsOf(o);
       const badges = reasons.map(r => `<span style="display:inline-block;font-size:10px;font-weight:700;color:${r.c};background:${r.bg};border:1px solid ${r.bd};border-radius:999px;padding:1px 7px;margin-right:4px">${r.t}</span>`).join('');
@@ -1049,6 +1068,7 @@
     }).join('');
     return `
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
+      ${nDone ? `<div class="vrm-m" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding:6px 9px;border-radius:8px;background:#eefaf3;color:#0f6b4f;border:1px solid #bfe6d3"><span>✓ <b>${nDone}</b> republiée${nDone > 1 ? 's' : ''} récemment (rangées en bas)</span><button class="vrm-go" data-act="resetdone" style="border:none;background:transparent;color:#0f6b4f;font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline;flex-shrink:0">Réinitialiser</button></div>` : ''}
       ${list.length > 8 ? `<input id="vrm-repub-search" type="search" value="${esc(repubQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
@@ -1091,9 +1111,11 @@
         else if (act === 'none') { repubSel.clear(); render(); }
         else if (act === 'psleep') { ((DATA && DATA.sleeping) || []).forEach(o => o && o.id && repubSel.add(o.id)); render(); }
         else if (act === 'prelance') { ((DATA && DATA.relance) || []).forEach(o => o && o.id && repubSel.add(o.id)); render(); }
+        else if (act === 'resetdone') { repubDone = {}; writeJSON('vrm_repub_done', repubDone); render(); }
         else if (act === 'start') { if (!repubSel.size) return; repubRun = { queue: list.filter(o => repubSel.has(o.id)).map(o => o.id), idx: 0 }; render(); }
         else if (act === 'stop') { repubRun = null; render(); }
         else if (act === 'open') { const o = DATA.byId[repubRun.queue[repubRun.idx]]; if (o && o.url) window.open(o.url, '_blank', 'noopener'); }
+        else if (act === 'done') { const id = repubRun && repubRun.queue[repubRun.idx]; if (id) { markRepub(id); repubSel.delete(String(id)); } repubRun.idx++; render(); }
         else if (act === 'next') { repubRun.idx++; render(); }
       };
     });
