@@ -32,6 +32,7 @@
   const readJSON = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } };
   const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
   let open = readLS('vrm_panel_open', '0') === '1';
+  let big = readLS('vrm_panel_big', '0') === '1'; // panneau agrandi (quasi plein écran)
   let tab = (() => { const t = readLS('vrm_panel_tab', 'journee'); return PANEL_TABS.includes(t) ? t : 'journee'; })(); // journee | paire | relance | dorment | sansnum | republier | reponse | expedier | achats | messages | favoris
   // ── File de republication ASSISTÉE ─────────────────────────────────────────
   // repubSel = les annonces cochées. repubRun = le défilement une-par-une en
@@ -258,12 +259,16 @@
     #vrm-fab:hover{transform:scale(1.05)}
     #vrm-fab .vrm-badge{position:absolute;top:-4px;right:-4px;background:#e8590c;color:#fff;border-radius:999px;
       min-width:20px;height:20px;padding:0 5px;font:800 11px/20px system-ui,sans-serif;text-align:center}
-    #vrm-panel{position:fixed;right:18px;bottom:80px;z-index:2147483000;width:min(460px,94vw);max-height:82vh;overflow:auto;
+    #vrm-panel{position:fixed;right:18px;bottom:80px;z-index:2147483000;width:min(540px,95vw);max-height:86vh;overflow:auto;
       background:#fff;color:#111;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.3);border:1px solid #eef0f4;
-      font:13px/1.45 system-ui,-apple-system,sans-serif;padding:0}
-    #vrm-panel .vrm-head{position:sticky;top:0;z-index:6;background:#fff;padding:13px 14px 9px;
+      font:13.5px/1.5 system-ui,-apple-system,sans-serif;padding:0}
+    /* Mode agrandi : quasi plein écran, pour piloter toute la boutique sans l'app. */
+    #vrm-panel.vrm-big{width:min(820px,97vw);height:min(92vh,940px);max-height:97vh;right:2vw;bottom:2vh}
+    #vrm-panel .vrm-head{position:sticky;top:0;z-index:6;background:#fff;padding:13px 16px 9px;
       border-bottom:1px solid #eef0f4;border-radius:16px 16px 0 0}
-    #vrm-panel #vrm-body{padding:12px 14px 0}
+    #vrm-panel #vrm-body{padding:12px 16px 0}
+    #vrm-panel.vrm-big .vrm-tab{font-size:12.5px;padding:6px 12px}
+    #vrm-panel.vrm-big h3{font-size:17px}
     #vrm-panel h3{margin:0 0 2px;font-size:15px;font-weight:800}
     #vrm-panel .vrm-sub{color:#667;font-size:11.5px;margin-bottom:9px}
     #vrm-panel .vrm-tabs{display:flex;gap:6px;flex-wrap:wrap}
@@ -274,6 +279,9 @@
     #vrm-panel .vrm-refresh{position:absolute;top:11px;right:36px;border:none;background:transparent;font-size:14px;
       cursor:pointer;opacity:.7;padding:0;line-height:1}
     #vrm-panel .vrm-refresh:hover{opacity:1}
+    #vrm-panel .vrm-max{position:absolute;top:11px;right:60px;border:none;background:transparent;font-size:14px;
+      cursor:pointer;opacity:.7;padding:0;line-height:1}
+    #vrm-panel .vrm-max:hover{opacity:1}
     #vrm-panel .vrm-card{border:1px solid #e6e8ee;border-radius:12px;padding:10px;margin-bottom:8px}
     #vrm-panel .vrm-num{display:inline-block;background:#09b1ba;color:#fff;border-radius:8px;padding:2px 9px;font-weight:800}
     #vrm-panel .vrm-row{display:flex;gap:9px;align-items:center}
@@ -529,6 +537,7 @@
       <div class="vrm-head">
         <button class="vrm-close" title="Fermer">✕</button>
         <button class="vrm-refresh" title="Rafraîchir les données">${dataBusy ? '⏳' : '🔄'}</button>
+        <button class="vrm-max" title="${big ? 'Réduire le panneau' : 'Agrandir le panneau'}">${big ? '🗕' : '🗖'}</button>
         <h3>VRM</h3>
         <div class="vrm-sub">Tes infos, sur Vinted.${fresh}</div>
         <div class="vrm-tabs">
@@ -563,8 +572,10 @@
       <div style="margin-top:10px;text-align:center">
         <a class="vrm-link" href="${APP_URL}" target="_blank" rel="noreferrer">Ouvrir l'app VRM ↗</a>
       </div>`;
+    panel.classList.toggle('vrm-big', big); // garde la taille en phase avec l'état
     panel.querySelector('.vrm-close').onclick = () => toggle(false);
     const rb = panel.querySelector('.vrm-refresh'); if (rb) rb.onclick = () => { if (!dataBusy) load(); };
+    const mb = panel.querySelector('.vrm-max'); if (mb) mb.onclick = () => { big = !big; writeLS('vrm_panel_big', big ? '1' : '0'); render(); };
     panel.querySelectorAll('.vrm-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
     panel.querySelectorAll('.vrm-todo').forEach(b => { b.onclick = () => { if (b.dataset.filter) chaussuresFilter = b.dataset.filter; tab = b.dataset.t; render(); }; });
     // Bouton « copier » générique : copie son data-c (réutilisable partout).
