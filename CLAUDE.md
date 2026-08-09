@@ -915,3 +915,49 @@ Le quota du cycle est déjà dépassé → Supabase reste restreint **jusqu'au r
 ### Reste à surveiller (secondaire, pas corrigé)
 - `api/widget.js` fait encore `harvestOrders('sold')` + `('purchased')` en `select=data` (tableau `my_orders`) : ~0,5 Mo/appel après allègement (§23) — 12× plus léger que les PDF, donc pas le tueur, mais à garder à l'œil. Pour l'annuler complètement, il faudrait précalculer les compteurs « à expédier / à retirer » dans `widget_stats` (publié par l'app) au lieu de lire la moisson en direct — mais ça casse la propriété « se met à jour même app fermée » (§10). À ne faire que si l'égress reste trop haut après ce correctif.
 - **Leçon** : quand un correctif d'égress/perf est trouvé côté app, **vérifier tout de suite les endpoints `api/*.js`** qui lisent les mêmes lignes — ils ont leur propre code de lecture et ne bénéficient pas des corrections de `App.jsx`.
+
+---
+
+## 35. Session août 2026 (suite) — Panneau « boutique en un coup d'œil » + factures pro/multi-entités + Factur-X + 3D fly-to
+
+Longue session. Beaucoup de petites briques sûres, deux gros chantiers finis. **Aucune modif ne casse le chemin existant** (tout est additif). ⚠️ Les changements **app** vivent sur la branche `claude/new-session-gzdgur` → **prod au déploiement de la branche** ; les changements **extension** demandent un **rechargement** (`chrome://extensions` → ⟳).
+
+### Extension (panneau VRM sur Vinted) — 4.40 → 4.50
+Principe tenu : **le panneau LIT et AFFICHE, il n'agit jamais sur Vinted** (aucune requête, aucun clic auto).
+- **4.40** bandeau « À faire » cliquable (chips → onglet concerné).
+- **4.41** le panneau garde sa **position** (ouvert/fermé + onglet) entre les pages (`vrm_panel_open`/`vrm_panel_tab`, localStorage).
+- **4.42** filtre de recherche dans Republier (DOM, garde le focus ; `repubQuery`).
+- **4.43** « Cette paire » : conseils **à relancer / dort** repris tels quels des onglets (mêmes signaux → jamais un chiffre qui contredit l'app).
+- **4.44** « Cette paire » sans prix d'achat → **lien 1-tap** vers l'app (`?tab=cat_annonces`).
+- **4.45** bouton **« ✓ Traiter »** sur les bordereaux à imprimer.
+- **4.46** « Traiter » **réversible** (section « Traités » + ↺ Remettre) + nouvel onglet **« Achats 📦 »** (colis à retirer).
+- **4.47** l'onglet Achats affiche **le CODE de retrait** en gros (source = emails `email_track_*`, la SEULE qui porte le code ; jamais deviné par titre).
+- **4.48** écran d'accueil **« Ma journée »** (CA du mois, argent bloqué, encaissé — lus depuis `widget_stats` publié par l'app, JAMAIS recalculés → zéro divergence) + à-faire cliquables. Bouton **📋 Copier le code**. Défaut d'accueil = `journee`.
+- **4.49** barre **objectif de CA** (lit `vinted_goal`).
+- **4.50** bloc **« Pour vendre plus »** (à relancer / dorment / sans N°).
+
+⚠️ **COHÉRENCE SANS CLOBBER — le motif à réutiliser :** pour qu'une action du panneau (Traiter un bordereau, « Récupéré » un colis) se répercute dans l'app **sans jamais écraser la ligne `main`** (un upsert y remplacerait tout le blob et pourrait effacer une sauvegarde de l'app faite en parallèle) :
+- l'extension écrit dans une **ligne DÉDIÉE** qu'elle est seule à écrire : **`panel_bords_done`** (bordereaux, clé = `transaction||suivi||numero` = `bordKey`) et **`panel_colis_collected`** (colis, clé = `suivi||subject` = `colisKey`) — read-merge-write sur SA propre ligne.
+- `buildPanelData` (background.js) relit ces lignes et filtre → le panneau se met à jour tout de suite.
+- **App.jsx LIT ces lignes en source « déjà fait » SUPPLÉMENTAIRE**, en lecture seule : `isBordDone` inclut `panelBordsDone[bordKey(b)]` ; un effet fond `panel_colis_collected` dans le set `collected` (colis). **Jamais de drain qui réécrit, jamais de boucle.** Sens app→panneau déjà en place (buildPanelData lit `vinted_bords_shipped`/`vrm_colis_collected`).
+- `buildPanelData` renvoie aussi `pickups` (email_track à retirer), `appStats` (ligne `widget_stats`), `goal` (`vinted_goal`).
+
+### Factures PRO — plusieurs micro-entreprises (App.jsx, additif, rétro-compatible)
+- **`vinted_entreprises`** (liste `[{id,companyName,companyType,companyAddress,siret,tvaMention,footer}]`) + **`vinted_entreprise_active`** (id), tous deux dans `SYNC_KEYS`. Amorcés depuis `vinted_invoice_settings` → **une seule entité = comportement identique à avant**.
+- `invoiceSettings` reste le **miroir de l'entité active** (tout code hérité qui le lit marche encore). `InvoiceSettings` (la modale) est devenue un **gestionnaire d'entités** (chips + Ajouter/Supprimer/⭐ active + champ « Mention TVA »).
+- Chaque facture porte `entrepriseId` (stampé à la création, à `activeEnt`). **Numérotation SÉQUENTIELLE PAR ENTITÉ** (`nextInvoiceNumber` filtre par entité ; facture sans `entrepriseId` = 1ʳᵉ entité). Exigence légale.
+- **`entForInvoice(inv, entreprises, activeEnt, fallback)`** (module-level) = LA résolution de l'entité d'une facture (celle stockée dessus, sinon active, sinon 1ʳᵉ). Utilisée par le PDF, le Factur-X, le CSV. Une vieille facture se régénère avec **sa** raison sociale, pas celle du moment.
+- PDF : **mention légale « TVA non applicable, art. 293 B du CGI »** ajoutée (obligatoire en micro, elle manquait) ; bloc client = **nom** en principal (avant : l'email en gras). Étiquette 🏢 entreprise sur les lignes + colonnes Entreprise/SIRET au CSV (si >1 entité).
+
+### Facturation électronique — Factur-X (le vrai fichier)
+- **`factureCII(inv, ent)`** = XML **Cross Industry Invoice EN16931** (profil BASIC), TVA catégorie `E` (exonéré) + `ExemptionReason` = la mention de l'entité. Bien-formé au `xmllint` (échappement `xmlEsc`).
+- **`generateFacturXPdf(inv, ent)`** (bouton 🧾) = **UN SEUL fichier Factur-X** : PDF de la facture (pdf-lib, avec logo) **+ le XML embarqué** sous le nom normalisé **`factur-x.xml`** (`AFRelationship=Alternative`, `/AF`) **+ XMP** d'identification (`pdfaid part=3` + schéma d'extension `fx` : DocumentType/FileName/Version/ConformanceLevel). Sauvé `useObjectStreams:false` → `/AF` + nom en clair, lisibles par les outils (Indy, validateurs). Vérifié au smoke-test pdf-lib.
+- **`downloadFacturX(inv, ent)`** (XML seul) existe encore mais n'est plus câblé à un bouton (le XML est dans le PDF).
+- ⚠️ **HONNÊTETÉ (dit à Julien, à redire) :** le **format** Factur-X est respecté, mais la **conformité PDF/A-3 stricte n'est PAS certifiée** (polices non embarquées, pas de profil ICC — il faudrait un validateur officiel + une police TTF embarquée). Surtout : l'**envoi légal passe par une Plateforme de Dématérialisation Partenaire (PDP) / Indy**, pas par l'app ; **Indy n'a pas d'API publique de push**. Et l'activité de Julien est **B2C (Vinted → particuliers)** → ce n'est **pas** l'e-invoicing Factur-X (B2B) qui s'applique mais l'**e-reporting**. **À confirmer avec son comptable / Indy** — ne pas présenter l'app comme une solution légale complète.
+
+### Garage 3D — « vol vers la boîte »
+- `Room3D` expose `flyTo(itemId)` : à la recherche d'un N°, la caméra **vole en douceur** (720 ms, ease, lerp position+target) jusqu'au meuble. Déclenché depuis l'effet de surlignage **seulement quand la cible change** (`flownRef`), try/catch (si ça rate, le garage reste utilisable). Les **ambiances** (`GARAGE_AMBIANCES`/`applyAmbiance`) étaient déjà là.
+- ❌ **Mode balade 1ʳᵉ personne : REFUSÉ par Julien (« c'est nul »)** — ne pas le construire.
+
+### ⚠️ NON VÉRIFIÉ AU BANC RÉEL (dette de test)
+Cette session s'est faite au **build + smoke-tests ciblés** (pdf-lib, xmllint), **PAS** au banc Playwright données réelles (§20). Le multi-entités touche l'écran Factures (usage quotidien) et n'a pas été rendu avec de vraies données. **Avant de déployer la branche, refaire un passage §20** sur Factures (créer/regénérer une facture, changer d'entité) et sur le Garage 3D. Rappel §26 : un build vert ne prouve rien sur un bloc conditionnel non rendu.
