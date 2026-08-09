@@ -5963,7 +5963,37 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         } catch (_) {}
       };
       applyAmbiance(load('vrm_garage_ambiance', 'clair'));
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance };
+      // « Vol vers la boîte » : quand tu cherches un N°, la caméra vole en douceur
+      // jusqu'au meuble qui le contient (au lieu de le surligner sans bouger la
+      // vue). Pure animation de caméra → si ça échoue, le garage reste utilisable.
+      let flyRAF = 0;
+      const flyTo = (itemId) => {
+        try {
+          const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
+          if (!g) return;
+          const box = new THREE.Box3().setFromObject(g);
+          if (box.isEmpty()) return;
+          const c = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const dist = Math.max(size.x, size.y, size.z, 0.6) * 2.1 + 1.4;
+          const destTgt = c.clone();
+          const destPos = new THREE.Vector3(c.x + dist * 0.35, c.y + dist * 0.55, c.z + dist);
+          const startPos = camera.position.clone(), startTgt = controls.target.clone();
+          const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now()), dur = 720;
+          const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          if (flyRAF) cancelAnimationFrame(flyRAF);
+          const step = () => {
+            const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            const k = Math.min(1, (now - t0) / dur), e = ease(k);
+            camera.position.lerpVectors(startPos, destPos, e);
+            controls.target.lerpVectors(startTgt, destTgt, e);
+            controls.update();
+            if (k < 1) flyRAF = requestAnimationFrame(step); else flyRAF = 0;
+          };
+          step();
+        } catch (_) {}
+      };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
@@ -5981,6 +6011,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   // ajout/suppression, N° rangés…) — SANS bouger la caméra (rebuild du groupe seul).
   useEffect(() => { dataRef.current.items = items; if (st.current.buildFurniture) { try { st.current.buildFurniture(); } catch (_) {} } }, [items]);
   // Surlignage : rouge = N° cherché, bleu = meuble sélectionné (édition).
+  const flownRef = useRef(null);
   useEffect(() => {
     const g = st.current.furnGroup; if (!g) return;
     g.children.forEach(grp => {
@@ -5989,6 +6020,11 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const col = isHi ? '#e5484d' : isSel ? '#2f7ae5' : '#000000', inten = isHi ? 0.55 : isSel ? 0.4 : 0;
       grp.traverse(m => { if (m.isMesh && m.material && m.material.emissive) { m.material.emissive.set(col); m.material.emissiveIntensity = inten; } });
     });
+    // Vole vers la boîte cherchée — seulement quand la CIBLE change (pas à chaque
+    // reconstruction de meubles), pour ne pas secouer la caméra sans raison.
+    const target = hi && hi.itemId ? hi.itemId : null;
+    if (target && target !== flownRef.current && st.current.flyTo) { st.current.flyTo(target); }
+    flownRef.current = target;
   }, [hi, sel, loading, items]);
 
   if (err) return fallback || <div style={{ fontSize: 12, color: C.muted, padding: 16 }}>3D indisponible sur cet appareil.</div>;
