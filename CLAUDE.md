@@ -976,3 +976,17 @@ On croyait le panneau (`vinted-panel.js`) non testable hors Chrome. FAUX : Playw
 - **Résultat de cette session** : 11 onglets (journee/paire/republier/reponse/expedier/achats/messages/favoris/relance/dorment/sansnum) + interactions (cocher priorités, `📋 Copier N°+titre`, `✓ Traiter`, `📋 code` + `✓ Récupéré`, filtre bordereaux) → **0 erreur app**. Capture Ma journée conforme (CA 320 €, objectif 64 %, badge FAB 6).
 - ⚠️ un `click` Playwright qui timeoute sur un élément **filtré (`display:none`)** est une erreur de TEST, pas de l'app — ne compter que `PAGEERROR`/`CONSOLE`.
 - Harnais jetable (scratch). **À refaire à chaque gros changement du panneau** — c'est le pendant §20 pour l'extension.
+
+---
+
+## 36. Session août 2026 (suite) — panneau extension « autosuffisant » : moins besoin de rouvrir l'app
+
+Objectif de Julien : « juste à regarder l'extension pour naviguer sur Vinted et gagner du temps ». Trois briques ajoutées au panneau VRM (`vinted-panel.js` + `background.js`), **toutes en lecture seule, cohérentes avec l'app (mêmes sources moissonnées, aucun total recalculé)**. Extension **4.68 → 4.71** (à recharger dans Chrome).
+
+- **4.69** — bandeau « boutique en un coup d'œil » en haut de **Mes paires** : `👟 N en ligne · valeur · 👁 vues · ❤️ favoris`, calculé sur **toutes** les annonces en ligne (`DATA.online`), comme le bandeau Annonces de l'app. Un champ absent ne fausse rien.
+- **4.70** — **engagement cumulé** (👁 vues / ❤️ favoris) sous les stats de stock de **Ma journée**. Nouveaux champs `stats.viewsTotal` / `stats.favsTotal` dans `buildPanelData` (mêmes `online` → aucun chiffre qui diverge).
+- **4.71** — liste **« 🧾 Dernières ventes »** sur **Ma journée** : nouveau tableau `recentSales` dans `buildPanelData`, tiré des commandes moissonnées `orders_sold`, **mêmes règles de statut que l'app** (`classifySale` = copie de `classifyOrderStatus` : `annul|cancel|refus|rembours`→annulée, `finalis`→finalisée). Annulées/remboursées exclues, tri par `Date.parse(o.date)` desc (l'app parse `o.date` pareil), top 6, dédup par `transaction_id`. Chaque ligne = titre + statut (✅ finalisée / ⏳ en cours) + date relative + prix, lien vers la transaction Vinted. **Aucun total ici** : le CA du mois reste celui de l'app (`appStats`/`widget_stats`).
+
+⚠️ Rappel cohérence tenu : le panneau **n'agit jamais** sur Vinted (0 requête, 0 clic auto), ne réécrit **jamais** la ligne `main`, et ne recalcule aucun CA/marge qui pourrait contredire l'app.
+
+Vérifié au banc extension (§35, faux `chrome` + Playwright, données synthétiques) : **0 erreur page/console** sur les 8 onglets ; captures Ma journée (engagement + Dernières ventes) et Mes paires (bandeau stats) conformes. Le seul « interactions: 1 » du harnais reste l'artefact de test connu (click Playwright qui timeoute sur un élément `display:none` filtré), **pas** une erreur d'app.
