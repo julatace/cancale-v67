@@ -1076,3 +1076,24 @@ Pas de nouveau drapeau : une facture n'arrive par email QUE pour un compte pro. 
 
 ### Vérifié
 `npm run build` OK. Banc app (Playwright, `dist` servi, Supabase mocké : `email_bord_*` = 1 bordereau N°12 + ligne `main` avec `vinted_invoices` productId=12) : la carte rend **« N°12 · Adidas Spezial · 🧾 Facture 2026-000042 »** et le bouton **« 🖨 Imprimer + facture »**, **0 PAGEERROR** (les 3 « erreurs » console = le 400 du sondage `select=owner` volontaire + resets réseau au teardown, pas l'app).
+
+---
+
+## 42. Session août 2026 (suite) — GLISSER-DÉFILER à la souris (ordinateur)
+
+Plainte de Julien : « sur l'ordi, je ne peux pas glisser avec la souris vers le bas, je suis obligé de prendre le curseur de droite et de descendre à la main. » Sur ordinateur, glisser la souris ne fait pas défiler (comportement natif du navigateur) — il fallait attraper la barre de défilement.
+
+### Correctif (App.jsx, conteneur racine, prolonge §14)
+Les gestes souris (§14) ne géraient que l'HORIZONTAL (balayage entre onglets). Ajout du **VERTICAL = glisser-défiler** : on décide la direction à la volée dans `onPointerMove` (souris uniquement) —
+- horizontal franc (`|dx|>25 && |dx|>|dy|*1.5`) → `slideTab` (inchangé) ;
+- vertical franc (`|dy|>8 && |dy|>=|dx|`) → **`window.scrollTo(0, sy + dy)`** : on attrape la page et on la fait défiler. `sy` = `window.scrollY` mémorisé au `pointerdown`.
+
+**Sens** : glisser vers le bas fait **descendre** la page (drag = barre de défilement, comme Julien l'a décrit — 1:1 avec la distance). Pendant le geste : `userSelect='none'` + `cursor='grabbing'`, remis à zéro au `pointerup`/`pointercancel`. Un mouvement < 8 px reste un clic/une sélection normale. Les champs (`INPUT/TEXTAREA/SELECT/contentEditable`) et les surfaces flottantes (`data-noswipe`/`position:fixed`, donc les modales à `overflow:auto`) sont **exclus** au `pointerdown` → elles gardent leur propre défilement, et la sélection dans un champ marche encore. Le tactile (mobile) est inchangé (jamais d'événement souris).
+
+⚠️ Contrepartie assumée (cohérente avec §14) : un glissé vertical franc **fait défiler au lieu de sélectionner** du texte hors champ — c'est un outil de travail, on privilégie le défilement ; les codes se copient déjà par bouton.
+
+### Vérifié
+`npm run build` OK. Banc app (`dist` servi, espaceur 2500 px injecté dans le conteneur de gestes pour rendre la page défilable, souris Playwright) : glisser vers le bas 300 px → `scrollY` 0→300 ; glisser vers le haut 250 px → 300→50 ; **0 PAGEERROR**. Direction et amplitude conformes.
+
+### Note portée : ordinateur d'abord pour l'extension + l'app
+Julien : « il n'y a pas d'extension sur iPhone, on se concentre sur l'ordinateur pour l'extension et l'app ». L'**extension** (panneau VRM) est **desktop only** (Chrome). L'**app** reste dispo **partout** (PWA mobile + web desktop) mais les gestes souris ci-dessus ciblent l'ordinateur ; le tactile mobile est intact.

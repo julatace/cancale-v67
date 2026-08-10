@@ -16433,33 +16433,44 @@ export default function App() {
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
       if(overlay){ swipeStart.current=null; return; }
-      swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
+      // On mémorise aussi la position de défilement au départ (`sy`) pour le
+      // GLISSER-DÉFILER à la souris (voir onPointerMove).
+      swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false,vert:false,sy:window.scrollY||window.pageYOffset||0};
       }}
-      // Dès que le geste part franchement de côté, on coupe la sélection de
-      // texte. Sans ça, glisser surlignait la page, et la sélection restée en
-      // place faisait échouer tous les gestes suivants : le balayage ne
-      // marchait qu'une fois. Un geste vertical ou oblique, lui, sélectionne
-      // normalement — c'est ce qui distingue « je navigue » de « je copie ».
+      // Deux gestes à la souris, décidés à la volée selon la direction :
+      //  • franchement HORIZONTAL → balayage entre onglets (comme au doigt) ;
+      //  • franchement VERTICAL → GLISSER-DÉFILER : on attrape la page et on la
+      //    fait défiler avec la souris (sur ordinateur, glisser ne scrollait pas,
+      //    il fallait attraper la barre de droite). Sens naturel de la molette :
+      //    glisser vers le bas fait DESCENDRE la page (comme la barre).
+      // Dans les deux cas on coupe la sélection de texte pendant le geste, sinon
+      // glisser surligne la page et la sélection restée en place casse les gestes
+      // suivants. Un petit mouvement (<8 px) reste un clic/une sélection normale.
       onPointerMove={e=>{
       const s=swipeStart.current; if(!s||!s.souris) return;
-      if(s.horiz) return;
       const dx=e.clientX-s.x, dy=e.clientY-s.y;
+      if(s.vert){ window.scrollTo(0, s.sy + dy); return; } // défilement en cours
+      if(s.horiz) return;                                   // balayage en cours
       if(Math.abs(dx)>25 && Math.abs(dx)>Math.abs(dy)*1.5){
       s.horiz=true;
       try{ document.body.style.userSelect='none'; window.getSelection().removeAllRanges(); }catch(_){}
+      } else if(Math.abs(dy)>8 && Math.abs(dy)>=Math.abs(dx)){
+      s.vert=true;
+      try{ document.body.style.userSelect='none'; window.getSelection().removeAllRanges(); document.body.style.cursor='grabbing'; }catch(_){}
+      window.scrollTo(0, s.sy + dy);
       }
       }}
       onPointerUp={e=>{
       const s=swipeStart.current;
       if(!s||!s.souris||e.pointerType!=='mouse') return;
       swipeStart.current=null;
-      try{ document.body.style.userSelect=''; }catch(_){}
-      // Un geste qui n'est jamais devenu horizontal, c'est une sélection.
-      if(!s.horiz) return;
+      try{ document.body.style.userSelect=''; document.body.style.cursor=''; }catch(_){}
+      if(s.vert) return;   // c'était un défilement, pas un balayage ni un clic
+      if(!s.horiz) return; // un geste jamais devenu horizontal = une sélection/un clic
       // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
       slideTab(e.clientX-s.x, e.clientY-s.y, 110);
       }}
-      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>>
+      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; document.body.style.cursor=''; }catch(_){} }}>>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
