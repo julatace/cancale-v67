@@ -1256,6 +1256,58 @@ async function buildPanelData() {
     }
   }
   const recentBuys = buysFlat.sort((a, b) => b.ts - a.ts).slice(0, 80);
+  // ── LITIGES / PAIRES QUI REVIENNENT (lecture seule) ─────────────────────────
+  // Source FIABLE et déjà présente : le STATUT des ventes moissonnées (comme
+  // `saleOutcome` de l'app — remboursement / retour / litige / suspension). C'est
+  // ce qui indique qu'une paire te revient, sans rien deviner.
+  // Enrichissement OPTIONNEL : les vraies réclamations captées passivement
+  // (`harvest_*_complaints`) portent parfois un MOTIF ; on l'attache par n° de
+  // transaction quand on le retrouve, sinon on n'invente rien.
+  const DISPUTE = [
+    { re: /rembours/i, kind: 'remboursement', label: '💸 Remboursé' },
+    { re: /retour/i, kind: 'retour', label: '📦 Retour initié' },
+    { re: /litige|r[ée]clam|dispute|complaint|probl[èe]me|signal/i, kind: 'litige', label: '⚠️ Litige' },
+    { re: /suspend/i, kind: 'suspendu', label: '⏸️ Suspendu' },
+  ];
+  // Motifs de réclamation captés, indexés par n° de transaction (défensif : la
+  // forme exacte de l'API complaints n'est pas garantie → on lit large, sans throw).
+  const complaintReasons = {};
+  try {
+    const compRows = await sbGet('app_data?id=like.harvest_*_complaints&select=data') || [];
+    const pick = (o, keys) => { for (const k of keys) { if (o && o[k] != null && o[k] !== '') return o[k]; } return null; };
+    for (const r of compRows) {
+      const pay = (r.data && r.data.payload) || {};
+      const arr = pay.complaints || pay.items || pay.entries || (Array.isArray(pay) ? pay : []);
+      if (!Array.isArray(arr)) continue;
+      for (const c of arr) {
+        if (!c || typeof c !== 'object') continue;
+        const tx = String(pick(c, ['transaction_id', 'transactionId']) || (c.transaction && c.transaction.id) || (c.order && c.order.id) || '');
+        const reason = pick(c, ['reason', 'reason_title', 'title', 'complaint_reason', 'label', 'status_title', 'kind_title']);
+        if (tx && reason) complaintReasons[tx] = String(reason).slice(0, 80);
+      }
+    }
+  } catch (_) { /* la forme de l'API complaints peut varier : on ignore proprement */ }
+  const disputes = [];
+  const seenDispTx = new Set();
+  for (const r of soldRows) {
+    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    for (const o of orders) {
+      const st = o.status || '';
+      const m = DISPUTE.find(d => d.re.test(st));
+      if (!m) continue;
+      const tx = String(o.transaction_id || '');
+      if (tx && seenDispTx.has(tx)) continue; if (tx) seenDispTx.add(tx);
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      disputes.push({
+        transaction: tx, title: o.title || '', status: st, kind: m.kind, label: m.label,
+        reason: (tx && complaintReasons[tx]) || null,
+        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
+        ts: isNaN(ts) ? 0 : ts,
+        url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : 'https://www.vinted.fr/member/transactions?type=sold',
+      });
+    }
+  }
+  disputes.sort((a, b) => b.ts - a.ts);
   // ── ACHATS À RETIRER (colis en point relais) — AVEC LE CODE DE RETRAIT ───────
   // Source = les emails de suivi `email_track_*` (transporteur → « colis
   // disponible »), car c'est la SEULE source qui porte le CODE, le point relais et
@@ -1347,6 +1399,7 @@ async function buildPanelData() {
     favoris: online.filter(o => (o.favs || 0) > 0).length,
     // Paires sensiblement AU-DESSUS de leurs comparables (>15 %) → à baisser.
     overMarket: online.filter(o => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15).length,
+    litiges: disputes.length,
   };
   // Fraîcheur : la capture la plus récente parmi les données lues → l'utilisateur
   // sait si ses infos datent (et s'il doit repasser sur Vinted pour les capter).
@@ -1363,7 +1416,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, recentSales, sales, recentBuys, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

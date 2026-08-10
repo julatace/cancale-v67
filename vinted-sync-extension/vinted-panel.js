@@ -23,7 +23,7 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'ventes', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris'];
+  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'ventes', 'republier', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris'];
   let chaussuresQuery = ''; // filtre de l'onglet « Mes paires »
   let chaussuresSort = 'num'; // tri : num | marge | vues | favs | age | prix
   let chaussuresFilter = 'all'; // sous-vue : all | relance | sleep | nonum
@@ -635,6 +635,7 @@
           <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">♻️ Republier</button>
           <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">📄 Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
           <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">📦 Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
+          <button class="vrm-tab ${tab === 'litiges' ? 'on' : ''}" data-t="litiges">⚠️ Litiges${DATA && DATA.stats && DATA.stats.litiges ? ` ${DATA.stats.litiges}` : ''}</button>
           <button class="vrm-tab ${tab === 'messages' || tab === 'reponse' ? 'on' : ''}" data-t="messages">💬 Messages${DATA && DATA.stats && DATA.stats.unread ? ` ${DATA.stats.unread}` : ''}</button>
           <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">❤️ Favoris</button>
         </div>
@@ -649,6 +650,7 @@
         : tab === 'reponse' ? renderReponse()
         : tab === 'expedier' ? renderExpedier()
         : tab === 'achats' ? renderAchats()
+        : tab === 'litiges' ? renderLitiges()
         : tab === 'messages' ? renderMessages()
         : tab === 'favoris' ? renderFavoris()
         : renderJournee()
@@ -1118,6 +1120,43 @@
         });
       };
     });
+  }
+
+  // ── ONGLET « LITIGES » : les paires qui te reviennent (lecture seule) ────────
+  // Source = le STATUT des ventes moissonnées (remboursement / retour / litige /
+  // suspension) — même signal que l'app (`saleOutcome`), rien de deviné. Le MOTIF
+  // vient des réclamations captées passivement quand il est disponible.
+  // Aucune action sur Vinted : chaque ligne renvoie à la transaction pour agir là-bas.
+  function renderLitiges() {
+    const all = (DATA && DATA.disputes) || [];
+    if (!all.length) {
+      return `<div class="vrm-m">✓ Aucun litige ni retour en cours. 👌</div>
+        <div class="vrm-m" style="margin-top:6px;opacity:.85">Une paire remboursée, retournée ou en litige apparaît ici automatiquement dès que Vinted change son statut (0 requête ajoutée). Ouvre ta page « Litiges » sur Vinted pour capter le motif détaillé.</div>`;
+    }
+    // Répartition par type (pour un résumé honnête en tête).
+    const byKind = {};
+    all.forEach(d => { byKind[d.kind] = (byKind[d.kind] || 0) + 1; });
+    const KIND_LBL = { remboursement: '💸 remboursées', retour: '📦 retours', litige: '⚠️ litiges', suspendu: '⏸️ suspendues' };
+    const resume = Object.keys(byKind).map(k => `${byKind[k]} ${KIND_LBL[k] || k}`).join(' · ');
+    const BG = { remboursement: '#fdeef0', retour: '#eef4ff', litige: '#fff6ec', suspendu: '#f2f5f8' };
+    const FG = { remboursement: '#b23a4e', retour: '#2b5b9a', litige: '#9a5b16', suspendu: '#44515e' };
+    const rows = all.slice(0, 200).map(d => `
+      <a href="${esc(d.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:9px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:9px 10px;margin-bottom:6px;text-decoration:none;color:inherit">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.title || 'Vente')}</div>
+          <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:5px;align-items:center">
+            <span style="flex-shrink:0;background:${BG[d.kind] || '#f2f5f8'};color:${FG[d.kind] || '#44515e'};border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700">${esc(d.label)}</span>
+            ${d.reason ? `<span class="vrm-m" style="font-size:11px">${esc(d.reason)}</span>` : ''}
+            ${d.ts ? `<span class="vrm-m" style="font-size:11px">· ${esc(timeago(d.ts))}</span>` : ''}
+          </div>
+        </div>
+        ${d.price != null ? `<div style="flex-shrink:0;font-weight:700;font-size:13px;color:#334">${fmt(d.price)}</div>` : ''}
+      </a>`).join('');
+    return `
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">⚠️ ${all.length} paire${all.length > 1 ? 's' : ''} qui te revien${all.length > 1 ? 'nent' : 't'}</div>
+      ${resume ? `<div class="vrm-m" style="margin-bottom:8px">${esc(resume)}</div>` : ''}
+      <div class="vrm-grid">${rows}</div>
+      <div class="vrm-m" style="margin-top:6px;opacity:.8">Déduit du statut Vinted de tes ventes. Agis directement sur Vinted (bouton sur la transaction).</div>`;
   }
 
   // ── ONGLET REPUBLIER : sélection + défilement UNE-PAR-UNE ────────────────────

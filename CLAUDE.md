@@ -1005,3 +1005,23 @@ Vérifié au banc extension (§35, faux `chrome` + Playwright, données synthét
 `buildPanelData` renvoie désormais aussi `sales`, `recentBuys` (en plus de `recentSales`). Le champ `date` des commandes est parsé comme dans l'app (`new Date(o.date)` / `Date.parse`), tri desc.
 
 Vérifié au banc extension (faux `chrome` + Playwright, données synthétiques) : **0 erreur app** ; Ventes = 14 lignes, en-tête CA app, filtre « En cours » → 5, recherche « nike » → 4 ; Achats = « Derniers achats » présent ; captures Ventes/Achats/Favoris conformes. Rappel : le « interactions: 1 » du harnais principal reste l'artefact connu (click Playwright sur élément `display:none` filtré), pas une erreur d'app.
+
+---
+
+## 38. Session août 2026 (suite) — onglet Litiges (paires qui reviennent), fait proprement
+
+« Fais ça parfaitement. » Nouvel onglet **« ⚠️ Litiges »** dans le panneau VRM (`vinted-panel.js` + `background.js`). Extension **4.73 → 4.74** (à recharger dans Chrome). Lecture seule, cohérent avec l'app.
+
+### Source (fiable AUJOURD'HUI, pas une promesse)
+- **Primaire = le STATUT des ventes moissonnées** (`orders_sold`), classé par `DISPUTE` (regex) en `remboursement` / `retour` / `litige` / `suspendu` — **le même signal que `saleOutcome` de l'app** (§21 : 61 remboursements, 3 retours…). Rien n'est deviné : c'est Vinted qui pose le statut. Marche immédiatement, même sans avoir ouvert l'écran Litiges.
+- **Enrichissement OPTIONNEL = le MOTIF** des vraies réclamations captées passivement (`harvest_*_complaints`, §24). ⚠️ La forme exacte de l'API `complaints` n'est **pas garantie** → lecture **défensive** (`payload.complaints || items || entries || []`, plusieurs noms de champ testés, `try/catch`, `.slice(80)`), indexée par n° de transaction. Si la forme diffère, **rien ne casse** et on affiche juste le litige sans motif. (Si Julien veut le motif à coup sûr, il faudra un exemple réel de réponse `complaints` pour caler les champs — même méthode que le point relais §15.)
+
+### Ce que `buildPanelData` renvoie en plus
+`disputes` (tri par date desc) + `stats.litiges`. Chaque entrée : `{transaction,title,status,kind,label,reason,price,ts,url}`.
+
+### UI (`renderLitiges`, aucune action Vinted)
+Badge sur l'onglet (`stats.litiges`), résumé par type (« 1 💸 remboursées · 1 📦 retours · 1 ⏸️ suspendues »), une carte par paire (pastille couleur par `kind`, motif si connu, date relative, prix), lien vers la transaction pour **agir sur Vinted**. Empty state honnête (« Aucun litige… apparaît ici dès que Vinted change le statut ; ouvre ta page Litiges pour le motif détaillé »).
+
+Placé dans `PANEL_TABS` entre Achats et Messages. Pas de wiring (liens seuls).
+
+Vérifié au banc extension (faux `chrome` + Playwright) : **0 erreur app** en état **peuplé** (3 litiges, badge « Litiges 3 », résumé, motif « Article non conforme » affiché) **et vide** (message d'attente). `node -c` OK sur les deux fichiers.
