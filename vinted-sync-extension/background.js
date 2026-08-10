@@ -348,6 +348,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
           if (msg.action === 'convLastMessage') { const r = await convLastMessage(msg.convId); sendResponse(r); return; }
           if (msg.action === 'markBordDone' && msg.key) { const ok = await markBordDone(msg.key, msg.done); sendResponse({ ok }); return; }
+          if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
           if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -1037,6 +1038,19 @@ async function markBordDone(key, done) {
 // markBordDone : ligne DÉDIÉE `panel_colis_collected` = { colisKey: ts }, jamais
 // `main`. Le panneau la relit pour vider la liste ; l'app la LIT comme source de
 // « déjà récupéré » supplémentaire. Clé = `suivi || subject` (comme `colisKey`).
+// Couper / réafficher un compte Vinted DEPUIS LE PANNEAU. Ligne DÉDIÉE
+// `panel_accounts_off` = { uid: true } — jamais `main` (un upsert y écraserait
+// tout le blob de l'app). `buildPanelData` la relit : le compte disparaît de
+// TOUTES les vues (annonces, ventes, achats, messages, litiges) tout de suite.
+async function setAccountOff(uid, off) {
+  const k = String(uid || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (off) cur[k] = true; else delete cur[k];
+  return await supabaseUpsert('app_data', [{ id: 'panel_accounts_off', data: cur }], 'id');
+}
+
 async function markPickupDone(key, done) {
   const k = String(key || '').trim();
   if (!k) return false;
@@ -1106,14 +1120,49 @@ async function buildPanelData() {
   // Descriptions/photos lues sur les pages d'annonce (pour Leboncoin + archive).
   const detRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
   const pageDetails = (detRows && detRows[0] && detRows[0].data) || {};
-  // Comptes MASQUÉS/déconnectés (app: vinted_accounts_hidden + liste bloquée) :
-  // on exclut TOUTES leurs données du panneau — sinon les paires d'un compte
-  // retiré continuaient de s'afficher (plainte de Julien).
-  const hiddenAcc = new Set((Array.isArray(d.vinted_accounts_hidden) ? d.vinted_accounts_hidden : []).map(String));
+  // Titre normalisé : sert au rapprochement par titre EXACT (jamais approximatif).
+  const normT = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // ── COMPTES : une seule règle d'exclusion, et tu peux couper un compte ICI ───
+  // Trois sources réunies dans `acctOff` :
+  //   • l'app (ligne main) : `vinted_accounts_hidden` + `vinted_accounts_blocked` ;
+  //   • les comptes supprimés définitivement (`vrm_blocked_accounts`) ;
+  //   • le panneau lui-même (`panel_accounts_off`, ligne DÉDIÉE) — pour couper un
+  //     compte depuis l'extension sans rouvrir l'app (demande de Julien : un
+  //     compte retiré continuait d'afficher ses paires).
+  const hiddenAcc = new Set([
+    ...(Array.isArray(d.vinted_accounts_hidden) ? d.vinted_accounts_hidden : []),
+    ...(Array.isArray(d.vinted_accounts_blocked) ? d.vinted_accounts_blocked : []),
+  ].map(String));
   let blockedAcc = new Set(); try { blockedAcc = await blockedAccounts(); } catch (_) {}
-  const acctOff = (uid) => { const k = String(uid == null ? '' : uid); return !!k && (hiddenAcc.has(k) || blockedAcc.has(k)); };
+  const offRows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
+  const offMap = (offRows && offRows[0] && offRows[0].data) || {};
+  const offPanel = new Set(Object.keys(offMap).filter(k => offMap[k]));
+  const acctOff = (uid) => { const k = String(uid == null ? '' : uid); return !!k && (hiddenAcc.has(k) || blockedAcc.has(k) || offPanel.has(k)); };
   const keepAcc = (r) => !acctOff(r && r.data && r.data.uid);
-  const lst = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []).filter(keepAcc);
+  // Nom lisible d'un compte : l'étiquette posée dans l'app, sinon le pseudo Vinted.
+  const accRows = await sbGet('vinted_accounts?select=vinted_user_id,login') || [];
+  const labels = (d.vinted_account_labels && typeof d.vinted_account_labels === 'object') ? d.vinted_account_labels : {};
+  const nameByUid = {};
+  for (const a of (accRows || [])) { const k = String(a.vinted_user_id || ''); if (k) nameByUid[k] = String(labels[k] || a.login || ('compte ' + k.slice(-4))); }
+  const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || (k ? 'compte ' + k.slice(-4) : ''); };
+  const lstAll = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []);
+  const soldAll = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []);
+  const lst = lstAll.filter(keepAcc);
+  const soldRows = soldAll.filter(keepAcc);
+  // Liste des comptes pour le panneau (avec le nb d'annonces en ligne) : tu vois
+  // exactement d'où viennent tes paires, et tu peux en couper un d'un clic.
+  const accountsSeen = {};
+  const noteAcct = (uid, n) => {
+    const k = String(uid || ''); if (!k) return;
+    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k) };
+    accountsSeen[k].online += n || 0;
+  };
+  for (const r of lstAll) {
+    const items = (r.data && r.data.payload && r.data.payload.items) || [];
+    noteAcct(r.data && r.data.uid, items.filter(it => !it.is_closed && !it.is_hidden && !it.is_draft).length);
+  }
+  for (const r of soldAll) noteAcct(r.data && r.data.uid, 0);
+  const accounts = Object.values(accountsSeen).sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || b.online - a.online);
   const online = [];
   const seen = new Set();
   for (const r of lst) {
@@ -1135,6 +1184,7 @@ async function buildPanelData() {
       const ageDays = ts ? Math.floor((Date.now() - ts) / 86400000) : null;
       const numero = e && e.numero ? String(e.numero) : null;
       online.push({
+        uid: String((r.data && r.data.uid) || ''), acct: acctName(r.data && r.data.uid),
         id, title: it.title || '', url: it.url || `https://www.vinted.fr/items/${id}`,
         price: (it.price && (it.price.amount != null ? it.price.amount : it.price)) ?? null,
         photo: (it.photo && it.photo.url) || (it.photos && it.photos[0] && it.photos[0].url) || null,
@@ -1149,6 +1199,32 @@ async function buildPanelData() {
         nPhotos: (pageDetails[id] && (pageDetails[id].photos || []).length) || 0,
       });
     }
+  }
+  // ── PAIRES VENDUES QUI TRAÎNENT ENCORE EN « EN LIGNE » ──────────────────────
+  // Demande de Julien : « une paire vendue, je veux qu'elle soit supprimée
+  // totalement de la liste en ligne ». Une moisson un peu datée garde l'annonce
+  // avec `is_closed:false` alors que la paire est partie. Deux sources SÛRES :
+  //   • la mémoire de l'app (`vinted_annonces_email_sold`, par ID d'annonce) ;
+  //   • une vente RÉCENTE (< 60 j) dont le titre est UNIQUE parmi les annonces en
+  //     ligne. Un titre en double ne retire jamais rien (§24 : pas de devinette —
+  //     sinon on effacerait une paire identique encore réellement en vente).
+  const emailSoldIds = new Set((Array.isArray(d.vinted_annonces_email_sold) ? d.vinted_annonces_email_sold : []).map(String));
+  const soldRecentTitles = new Set();
+  for (const r of soldRows) {
+    for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
+      if (/annul|cancel|refus|rembours/i.test(o.status || '')) continue;
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
+      const k = normT(o.title); if (k) soldRecentTitles.add(k);
+    }
+  }
+  const onlineTitleN = {};
+  for (const o of online) { const k = normT(o.title); if (k) onlineTitleN[k] = (onlineTitleN[k] || 0) + 1; }
+  let removedSold = 0;
+  for (let i = online.length - 1; i >= 0; i--) {
+    const o = online[i]; const k = normT(o.title);
+    const vendue = emailSoldIds.has(String(o.id)) || (k && onlineTitleN[k] === 1 && soldRecentTitles.has(k));
+    if (vendue) { online.splice(i, 1); removedSold++; }
   }
   // ── PRIX DES PAIRES COMPARABLES (peer price) ────────────────────────────────
   // Même logique que l'app (scoreAnnonce.peerPrice) : la MÉDIANE du prix des
@@ -1192,7 +1268,13 @@ async function buildPanelData() {
   // NE clique PAS à ta place sur Vinted (ce motif fait bloquer les comptes) : tu
   // ouvres, tu génères d'un clic, et l'extension capte le PDF automatiquement.
   const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
-  const soldRows = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []).filter(keepAcc);
+  const acctOfRow = (r) => ({ uid: String((r.data && r.data.uid) || ''), acct: acctName(r.data && r.data.uid) });
+  // ⚠️ LA PHOTO EST DÉJÀ DANS LA COMMANDE. `commandeMaigre` garde `photo` ({url}),
+  // mais on ne la lisait pas → la ligne de vente montrait un pictogramme alors que
+  // la vraie photo Vinted était là (plainte de Julien : « je n'ai pas la photo de
+  // ma paire »). C'est la source la PLUS sûre : elle vient de la commande
+  // elle-même — aucun rapprochement, donc aucun risque d'afficher une autre paire.
+  const photoDeCommande = (o) => (o && ((o.photo && (o.photo.url || (typeof o.photo === 'string' ? o.photo : null))) || o.photo_url)) || null;
   const bordRows = await sbGet("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
   const bordTxns = new Set(bordRows.map(b => String(b.transaction || '')).filter(Boolean));
   const toShip = [];
@@ -1204,8 +1286,8 @@ async function buildPanelData() {
       const tx = String(o.transaction_id || '');
       if (tx && seenTx.has(tx)) continue; if (tx) seenTx.add(tx);
       toShip.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
         transaction: tx, title: o.title || '', status: o.status || '',
-        photo: o.photo || o.photo_url || null,
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
         conv: o.conversation_id != null ? String(o.conversation_id) : null,
         url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : (o.conversation_id ? `https://www.vinted.fr/inbox/${o.conversation_id}` : 'https://www.vinted.fr/member/transactions?type=sold'),
@@ -1230,8 +1312,11 @@ async function buildPanelData() {
       if (classifySale(o.status) === 'cancelled') continue;
       const ts = o.date ? Date.parse(o.date) : NaN;
       salesFlat.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
         transaction: tx, title: o.title || '', status: o.status || '',
         etat: classifySale(o.status),
+        // « à expédier » = Vinted attend encore le colis (même règle que l'app).
+        aExpedier: awaitingShip(o.status),
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
         ts: isNaN(ts) ? 0 : ts,
         url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : 'https://www.vinted.fr/member/transactions?type=sold',
@@ -1255,6 +1340,7 @@ async function buildPanelData() {
       if (classifySale(o.status) === 'cancelled') continue;
       const ts = o.date ? Date.parse(o.date) : NaN;
       buysFlat.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
         transaction: tx, title: o.title || '', status: o.status || '',
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
         ts: isNaN(ts) ? 0 : ts,
@@ -1306,6 +1392,7 @@ async function buildPanelData() {
       if (tx && seenDispTx.has(tx)) continue; if (tx) seenDispTx.add(tx);
       const ts = o.date ? Date.parse(o.date) : NaN;
       disputes.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
         transaction: tx, title: o.title || '', status: st, kind: m.kind, label: m.label,
         reason: (tx && complaintReasons[tx]) || null,
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
@@ -1321,7 +1408,6 @@ async function buildPanelData() {
   // vendues) PAR TITRE EXACT, et UNIQUEMENT si le titre est unique — jamais de
   // devinette sur un titre en double (même garde que l'app §7/§24 `titleAmbiguous`).
   // La photo d'une annonce ENCORE en ligne prime (plus fraîche).
-  const normT = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const titleCount = {};
   const numByTitle = {};
   for (const id in numeros) {
@@ -1414,10 +1500,31 @@ async function buildPanelData() {
   const pdoneRows = await sbGet('app_data?id=eq.panel_bords_done&select=data');
   const bDonePanel = (pdoneRows && pdoneRows[0] && pdoneRows[0].data) || {};
   const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+  // ⚠️ VINTED FAIT FOI : si la vente liée (par n° de transaction) n'attend plus le
+  // colis, c'est que le colis est PARTI → le bordereau disparaît TOUT SEUL de la
+  // liste, sans que tu aies à cocher quoi que ce soit (demande de Julien : « tu
+  // vois bien que la paire a été expédiée, c'est débile de me faire cocher »).
+  // Même signal que `bordShipped` dans l'app (statut de la vente moissonnée).
+  const saleByTxn = {};
+  for (const r of soldRows) {
+    for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
+      const tx = String(o.transaction_id || ''); if (tx && !saleByTxn[tx]) saleByTxn[tx] = o;
+    }
+  }
+  const bordExpedie = (tx) => { const s = saleByTxn[String(tx || '')]; return !!s && !awaitingShip(s.status); };
   const bordsToPrint = bp
     .filter(b => b.filename) // a bien un PDF
     .map(b => ({ numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
-    .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key] && !bDonePanel[b.key]);
+    .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key] && !bDonePanel[b.key] && !bordExpedie(b.transaction));
+  // Le bordereau REMONTE SUR LA LIGNE DE VENTE (au lieu d'une liste à part) :
+  // chaque vente sait si son bordereau est prêt à imprimer, ou reste à générer.
+  const bordByTxn = {};
+  for (const b of bordsToPrint) { if (b.transaction) bordByTxn[String(b.transaction)] = b; }
+  for (const v of salesFlat) {
+    const b = v.transaction ? bordByTxn[String(v.transaction)] : null;
+    if (b) v.bord = { etat: 'print', numero: b.numero || '', key: b.key, dateLimite: b.dateLimite || '' };
+    else if (v.aExpedier && !(v.transaction && bordTxns.has(String(v.transaction)))) v.bord = { etat: 'generer' };
+  }
   // Photo du bordereau = par N° UNIQUEMENT (identité certaine, jamais par titre §24).
   for (const b of bordsToPrint) { if (b.numero && photoByNum[String(b.numero)]) b.photo = photoByNum[String(b.numero)]; b.pro = !!(b.numero && proNums.has(String(b.numero))); }
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
@@ -1459,7 +1566,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

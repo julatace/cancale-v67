@@ -29,6 +29,10 @@
   let chaussuresFilter = 'all'; // sous-vue : all | relance | sleep | nonum
   let ventesFilter = 'all'; // onglet Ventes : all | pending | completed
   let ventesQuery = ''; // recherche dans l'onglet Ventes (gardée entre rendus)
+  let ventesAcct = 'all';   // filtre par COMPTE Vinted (uid) sur les ventes
+  let ventesFrom = '';      // période : date de début (aaaa-mm-jj), vide = pas de borne
+  let ventesTo = '';        // période : date de fin
+  let chaussuresVue = 'online'; // « Mes paires » : online (en ligne) | sold (vendues)
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   const readJSON = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } };
@@ -294,7 +298,9 @@
       background:#fff;color:#111;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.3);border:1px solid #eef0f4;
       font:13.5px/1.5 system-ui,-apple-system,sans-serif;padding:0}
     /* Mode agrandi : quasi plein écran, pour piloter toute la boutique sans l'app. */
-    #vrm-panel.vrm-big{width:min(1080px,98vw);height:96vh;max-height:98vh;right:1vw;bottom:1vh}
+    /* Agrandi = QUASI TOUTE LA PAGE Vinted (demande de Julien : « essaye de
+       remplir toute la page »). Marges minimales, une seule colonne partout. */
+    #vrm-panel.vrm-big{width:calc(100vw - 24px);max-width:none;height:calc(100vh - 24px);max-height:none;right:12px;bottom:12px;border-radius:14px}
     #vrm-panel .vrm-head{position:sticky;top:0;z-index:6;background:#fff;padding:13px 16px 9px;
       border-bottom:1px solid #eef0f4;border-radius:16px 16px 0 0}
     #vrm-panel #vrm-body{padding:12px 16px 0}
@@ -325,9 +331,13 @@
     #vrm-panel .vrm-t{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     #vrm-panel .vrm-m{color:#66707d;font-size:11px}
     #vrm-panel a.vrm-link{color:#09b1ba;font-weight:800;text-decoration:none;font-size:11.5px}
-    #vrm-panel .vrm-stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-    #vrm-panel .vrm-st{flex:1;min-width:76px;border:1px solid #eceff4;border-radius:12px;padding:8px 10px;background:#fbfcfe;box-shadow:0 1px 2px rgba(16,24,40,.03)}
-    #vrm-panel .vrm-st b{display:block;font-size:17px;letter-spacing:-.2px}
+    /* UNE SEULE LIGNE PAR INFO (demande de Julien : plus rien côte à côte).
+       Chaque chiffre occupe toute la largeur : libellé à gauche, valeur à droite. */
+    #vrm-panel .vrm-stats{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+    #vrm-panel .vrm-st{display:flex;align-items:baseline;justify-content:space-between;gap:12px;width:100%;box-sizing:border-box;
+      border:1px solid #eceff4;border-radius:12px;padding:9px 12px;background:#fbfcfe;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+    #vrm-panel .vrm-st b{order:2;font-size:18px;letter-spacing:-.2px;white-space:nowrap;flex-shrink:0}
+    #vrm-panel .vrm-st .vrm-m{order:1;flex:1 1 auto;min-width:0;font-size:12px}
     /* Rangées cliquables (Mes paires, etc.) : léger relief au survol. */
     #vrm-panel .vrm-ch-row,#vrm-panel .vrm-repub-row,#vrm-panel .vrm-bord-row{transition:border-color .12s,box-shadow .12s,transform .06s}
     #vrm-panel .vrm-ch-row:hover,#vrm-panel .vrm-repub-row:hover{border-color:#bfe4e6;box-shadow:0 3px 10px rgba(9,177,186,.10)}
@@ -394,7 +404,7 @@
       s.toPickup ? { t: 'achats', ic: 'shopping-bag', n: s.toPickup, lbl: 'à retirer' } : null,
       s.unread ? { t: 'messages', ic: 'message-circle', n: s.unread, lbl: s.unread > 1 ? 'messages' : 'message' } : null,
     ].filter(Boolean);
-    const tile = (label, val, color) => `<div class="vrm-st" style="flex:1 1 44%"><b style="color:${color || 'inherit'}">${val}</b><span class="vrm-m">${label}</span></div>`;
+    const tile = (label, val, color) => `<div class="vrm-st"><b style="color:${color || 'inherit'}">${val}</b><span class="vrm-m">${label}</span></div>`;
     const money = a ? `
       <div class="vrm-card" style="text-align:center;background:linear-gradient(135deg,#09b1ba0f,#09b1ba05);border-color:#09b1ba55">
         <div class="vrm-m" style="text-transform:uppercase;font-size:10px;letter-spacing:.6px">Ce mois-ci</div>
@@ -457,7 +467,31 @@
         </a>`).join('')}
       </div>` : '';
     const fresh = a && a.updatedAt ? `<div class="vrm-m" style="text-align:center;margin-top:8px;opacity:.7">Chiffres de l'app · ${esc(timeago(Date.parse(a.updatedAt)))}</div>` : '';
-    return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${optimBlock}${salesBlock}${fresh}`;
+    return `<div class="vrm-m" style="font-weight:700;font-size:14px;margin-bottom:8px">${bonjour}</div>${money}${goalBlock}${stockLine}${todoBlock}${optimBlock}${salesBlock}${comptesBlock()}${fresh}`;
+  }
+
+  // ── COMPTES VINTED : afficher / masquer, DEPUIS L'EXTENSION ──────────────────
+  // Un compte masqué disparaît de TOUT le panneau (paires, ventes, achats,
+  // messages, litiges) — plus besoin de rouvrir l'app pour retirer un compte.
+  // Écrit dans une ligne DÉDIÉE (`panel_accounts_off`), jamais dans la ligne
+  // `main` de l'app : aucune sauvegarde de l'app ne peut être écrasée.
+  function comptesBlock() {
+    const accs = (DATA && DATA.accounts) || [];
+    if (accs.length < 2) return '';
+    const nOff = accs.filter(a => a.off).length;
+    const rows = accs.map(a => `
+      <div style="display:flex;gap:8px;align-items:center;padding:7px 2px;border-top:1px solid #f0f2f5">
+        <div style="flex:1 1 120px;min-width:0">
+          <div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${a.off ? 'opacity:.5;text-decoration:line-through' : ''}">${esc(a.name)}</div>
+          <div class="vrm-m" style="font-size:10.5px">${a.online} en ligne</div>
+        </div>
+        <button class="vrm-acct-off" data-uid="${esc(a.uid)}" data-off="${a.off ? '0' : '1'}" style="flex-shrink:0;border:1px solid ${a.off ? '#0f6b4f' : '#dde'};background:${a.off ? 'rgba(15,107,79,.08)' : '#fff'};color:${a.off ? '#0f6b4f' : '#556'};border-radius:8px;padding:5px 10px;font-weight:700;font-size:11px;cursor:pointer">${a.off ? '↺ Réafficher' : '✕ Masquer'}</button>
+      </div>`).join('');
+    return `<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? '' : ''}>
+      <summary style="cursor:pointer;font-weight:700;font-size:12.5px;list-style:none">👤 Mes comptes Vinted (${accs.length}${nOff ? ` · ${nOff} masqué${nOff > 1 ? 's' : ''}` : ''})</summary>
+      <div class="vrm-m" style="margin:5px 0 2px">Masque un compte que tu n'utilises plus : ses paires, ventes et messages disparaissent partout dans VRM.</div>
+      ${rows}
+    </details>`;
   }
 
   // ── ONGLET « MES PAIRES » : la liste de toutes tes chaussures en ligne, en
@@ -465,7 +499,20 @@
   //    un clic ouvre l'annonce sur Vinted. Recherche par titre/marque/N°.
   function renderChaussures() {
     const online = (DATA && DATA.online) || [];
-    if (!online.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant.<br>Ouvre ta boutique Vinted une fois pour les capter (0 requête ajoutée).</div>`;
+    const vendues = (DATA && DATA.sales) || [];
+    // ── LE filtre principal, celui que Julien demandait : EN LIGNE ou VENDU.
+    //    Deux gros boutons, rien d'autre à comprendre. Les tris/filtres fins
+    //    (à relancer, dorment, sans N°…) restent en dessous, en option.
+    const vueBtn = (k, l, n) => `<button class="vrm-chvue" data-v="${k}" style="flex:1;border:1px solid ${chaussuresVue === k ? '#0f172a' : '#dde'};background:${chaussuresVue === k ? '#0f172a' : '#fff'};color:${chaussuresVue === k ? '#fff' : '#334'};border-radius:11px;padding:9px;font-weight:800;font-size:12.5px;cursor:pointer">${l} ${n}</button>`;
+    const vueBar = `<div style="display:flex;gap:6px;margin-bottom:9px">${vueBtn('online', '👟 En ligne', online.length)}${vueBtn('sold', '💶 Vendues', vendues.length)}</div>`;
+    if (chaussuresVue === 'sold') {
+      if (!vendues.length) return `${vueBar}<div class="vrm-m">Aucune vente captée pour l'instant.<br>Ouvre « Mes ventes » sur Vinted une fois pour les capter.</div>`;
+      const parCompte = ventesAcct === 'all' ? vendues : vendues.filter(v => String(v.uid || '') === ventesAcct);
+      return `${vueBar}${acctChipsFor(vendues, ventesAcct, 'vrm-vacct')}
+        <div class="vrm-m" style="font-weight:800;margin-bottom:6px">💶 ${parCompte.length} paire${parCompte.length > 1 ? 's' : ''} vendue${parCompte.length > 1 ? 's' : ''}</div>
+        <div class="vrm-grid">${parCompte.slice(0, 200).map(v => venteRow(v)).join('')}</div>`;
+    }
+    if (!online.length) return `${vueBar}<div class="vrm-m">Aucune annonce en ligne captée pour l'instant.<br>Ouvre ta boutique Vinted une fois pour les capter (0 requête ajoutée).</div>`;
     // Sous-vues (ex-onglets, maintenant fondus ici) : filtrent la même liste.
     const relanceIds = new Set(((DATA && DATA.relance) || []).map(o => String(o.id)));
     const sleepIds = new Set(((DATA && DATA.sleeping) || []).map(o => String(o.id)));
@@ -487,14 +534,11 @@
     const viewsTot = online.reduce((s, o) => s + (o.views != null ? Number(o.views) || 0 : 0), 0);
     const favsTot = online.reduce((s, o) => s + (o.favs != null ? Number(o.favs) || 0 : 0), 0);
     const nEur = (n) => Math.round(n).toLocaleString('fr-FR') + ' €';
-    const statCell = (v, l) => `<div style="flex:1;min-width:64px;text-align:center"><div style="font-weight:800;font-size:15px;color:#0a323a">${v}</div><div class="vrm-m" style="font-size:10.5px;margin-top:1px">${l}</div></div>`;
-    const statsBanner = `<div style="display:flex;flex-wrap:wrap;gap:6px;background:linear-gradient(135deg,#f2fbfc,#eaf6f7);border:1px solid #d3ebed;border-radius:12px;padding:9px 8px;margin-bottom:8px">
-      ${statCell('👟 ' + online.length, 'en ligne')}
-      ${statCell(nEur(vTot), 'valeur')}
-      ${statCell('👁 ' + viewsTot, 'vues')}
-      ${statCell('❤️ ' + favsTot, 'favoris')}
+    // Une seule ligne de résumé (pas de tuiles côte à côte).
+    const statsBanner = `<div style="background:linear-gradient(135deg,#f2fbfc,#eaf6f7);border:1px solid #d3ebed;border-radius:12px;padding:9px 12px;margin-bottom:8px;font-size:12.5px;font-weight:700;color:#0a323a">
+      👟 ${online.length} en ligne · ${nEur(vTot)} · 👁 ${viewsTot} · ❤️ ${favsTot}
     </div>`;
-    if (!all.length) return `${statsBanner}${filterChips}<div class="vrm-m" style="padding:6px 2px">Rien dans cette vue. 👌</div>`;
+    if (!all.length) return `${vueBar}${statsBanner}${filterChips}<div class="vrm-m" style="padding:6px 2px">Rien dans cette vue. 👌</div>`;
     const margeOf = (o) => { const b = eur(o.buyPrice), s = eur(o.price); return (b != null && s != null && !isNaN(b)) ? s - b : null; };
     const byNum = (a, b) => { const na = a.numero != null && a.numero !== '' ? +a.numero : 1e9, nb = b.numero != null && b.numero !== '' ? +b.numero : 1e9; return na - nb || String(a.title || '').localeCompare(String(b.title || '')); };
     // Un champ absent va en fin de liste (on ne le fait pas passer devant à tort).
@@ -509,7 +553,7 @@
     const rows = sorted.slice(0, 300).map(o => {
       const buy = eur(o.buyPrice), sell = eur(o.price);
       const marge = (buy != null && sell != null && !isNaN(buy)) ? sell - buy : null;
-      const eng = [o.views != null ? `👁 ${o.views}` : '', o.favs != null ? `❤️ ${o.favs}` : '', o.ageDays != null ? `${o.ageDays} j` : '', o.cell ? `🏠 ${esc(o.cell)}` : ''].filter(Boolean).join(' · ');
+      const eng = [o.views != null ? `👁 ${o.views}` : '', o.favs != null ? `❤️ ${o.favs}` : '', o.ageDays != null ? `${o.ageDays} j` : '', o.cell ? `🏠 ${esc(o.cell)}` : '', o.acct ? esc(o.acct) : ''].filter(Boolean).join(' · ');
       // Repère marché : uniquement quand l'écart est net (>15%), sinon on n'encombre pas.
       let peerTag = '';
       if (o.peer != null && sell != null) {
@@ -518,7 +562,7 @@
         else if (sell < pe * 0.85) peerTag = `<span style="color:#0f6b4f">📊 sous le marché (~${fmt(pe)})</span>`;
       }
       return `
-      <div class="vrm-ch-row" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '')).toLowerCase())}" style="display:flex;gap:8px;align-items:stretch;border:1px solid #eceff3;border-radius:12px;padding:8px;margin-bottom:7px">
+      <div class="vrm-ch-row" data-s="${esc(((o.numero != null ? 'n°' + o.numero + ' ' : '') + (o.title || '') + ' ' + (o.acct || '')).toLowerCase())}" style="display:flex;gap:8px;align-items:stretch;border:1px solid #eceff3;border-radius:12px;padding:8px;margin-bottom:7px">
         <a href="${esc(o.url)}" target="_blank" rel="noreferrer" style="flex:1;min-width:0;display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit">
           ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:58px;height:58px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:58px;height:58px;border-radius:10px;background:#eef1f4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px">👟</div>'}
           <div style="flex:1;min-width:0">
@@ -532,6 +576,7 @@
       </div>`;
     }).join('');
     return `
+      ${vueBar}
       ${statsBanner}
       ${filterChips}
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">👟 ${all.length} paire${all.length > 1 ? 's' : ''}${chaussuresFilter === 'all' ? ' en ligne' : ''}</div>
@@ -540,6 +585,8 @@
       <div class="vrm-grid">${rows}</div>`;
   }
   function wireChaussures() {
+    panel.querySelectorAll('.vrm-chvue').forEach(b => { b.onclick = () => { chaussuresVue = b.dataset.v; render(); }; });
+    panel.querySelectorAll('.vrm-vacct').forEach(b => { b.onclick = () => { ventesAcct = b.dataset.a; render(); }; });
     panel.querySelectorAll('.vrm-chfilter').forEach(b => { b.onclick = () => { chaussuresFilter = b.dataset.f; render(); }; });
     panel.querySelectorAll('.vrm-chsort').forEach(b => { b.onclick = () => { chaussuresSort = b.dataset.sort; render(); }; });
     const cs = panel.querySelector('#vrm-ch-search');
@@ -559,39 +606,103 @@
     const eurI = (v) => (v == null ? '—' : Number(v).toLocaleString('fr-FR') + ' €');
     const head = a ? `
       <div class="vrm-stats" style="margin-bottom:8px">
-        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#09b1ba">${eurI(a.caMois)}</b><span class="vrm-m">CA du mois</span></div>
-        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#c98a1a">${eurI(a.enAttente)}</b><span class="vrm-m">Argent en attente</span></div>
-        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#0f6b4f">${eurI(a.caEncaisse)}</b><span class="vrm-m">Encaissé</span></div>
+        <div class="vrm-st"><b style="color:#09b1ba">${eurI(a.caMois)}</b><span class="vrm-m">CA du mois</span></div>
+        <div class="vrm-st"><b style="color:#c98a1a">${eurI(a.enAttente)}</b><span class="vrm-m">Argent en attente</span></div>
+        <div class="vrm-st"><b style="color:#0f6b4f">${eurI(a.caEncaisse)}</b><span class="vrm-m">Encaissé</span></div>
       </div>
       <div class="vrm-m" style="text-align:center;margin:-2px 0 8px;opacity:.7">Chiffres de l'app · ${a.updatedAt ? esc(timeago(Date.parse(a.updatedAt))) : ''}</div>` : '';
     if (!all.length) return `${head}<div class="vrm-m">Aucune vente captée pour l'instant.<br>Ouvre « Mes ventes » sur Vinted une fois pour les capter (0 requête ajoutée).</div>`;
-    const nPend = all.filter(v => v.etat === 'pending').length;
-    const nDone = all.filter(v => v.etat === 'completed').length;
-    const FILTERS = [['all', 'Toutes', all.length], ['pending', '⏳ En cours', nPend], ['completed', '✅ Finalisées', nDone]];
+    // 1) PÉRIODE (deux dates) — appliquée AVANT tout le reste, pour que les
+    //    compteurs des autres filtres correspondent à ce que tu vois vraiment.
+    const parDate = periodeFilter(all);
+    // 2) COMPTE — chips construites sur les comptes qui ont VRAIMENT une vente
+    //    dans la période (pas la liste théorique des comptes).
+    const acctChips = acctChipsFor(parDate, ventesAcct, 'vrm-vacct');
+    const parCompte = ventesAcct === 'all' ? parDate : parDate.filter(v => String(v.uid || '') === ventesAcct);
+    // 3) ÉTAT
+    const nPend = parCompte.filter(v => v.etat === 'pending').length;
+    const nDone = parCompte.filter(v => v.etat === 'completed').length;
+    const FILTERS = [['all', 'Toutes', parCompte.length], ['pending', '⏳ En cours', nPend], ['completed', '✅ Finalisées', nDone]];
     const filterChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${FILTERS.map(([k, l, n]) => `<button class="vrm-vfilter" data-f="${k}" style="border:1px solid ${ventesFilter === k ? '#111' : '#dde'};background:${ventesFilter === k ? '#111' : '#fff'};color:${ventesFilter === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}${n ? ` ${n}` : ''}</button>`).join('')}</div>`;
-    const list = ventesFilter === 'all' ? all : all.filter(v => v.etat === ventesFilter);
-    const etatLbl = { completed: '✅ finalisée', pending: '⏳ en cours' };
-    const rows = list.slice(0, 200).map(v => `
-      <div class="vrm-v-row" data-s="${esc((((v.numero != null ? 'n°' + v.numero + ' ' : '') + (v.title || '')).toLowerCase()))}" style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px">
+    const list = ventesFilter === 'all' ? parCompte : parCompte.filter(v => v.etat === ventesFilter);
+    if (!list.length) return `${head}${periodeBar()}${acctChips}${filterChips}<div class="vrm-m" style="padding:6px 2px">Aucune vente dans cette sélection.</div>`;
+    const rows = list.slice(0, 200).map(v => venteRow(v)).join('');
+    return `
+      ${head}
+      ${periodeBar()}
+      ${acctChips}
+      ${filterChips}
+      ${parCompte.length > 8 ? `<input id="vrm-v-search" type="search" value="${esc(ventesQuery)}" placeholder="🔍 Filtrer par titre ou N°…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
+      <div class="vrm-grid">${rows}</div>
+      <div class="vrm-m" style="margin-top:6px;opacity:.8">Ventes lues sur Vinted (annulées/remboursées exclues). Le total du mois reste celui de l'app.</div>`;
+  }
+
+  // ── UNE LIGNE DE VENTE, partout pareil (Ventes, Mes paires → Vendues) ────────
+  // Le BORDEREAU est SUR la ligne de la vente (demande de Julien : plus de liste
+  // séparée à cocher). Trois états possibles, tous certains :
+  //   • rien           → le colis est parti (Vinted l'a confirmé) : on n'affiche rien ;
+  //   • « à générer »  → Vinted attend le colis, pas encore de bordereau reçu ;
+  //   • « à imprimer » → le bordereau est arrivé par email, avec son N°.
+  const etatLbl = { completed: '✅ finalisée', pending: '⏳ en cours' };
+  function venteRow(v) {
+    const b = v.bord || null;
+    const bordPill = !b ? ''
+      : b.etat === 'print'
+        ? `<a href="${APP_URL}/?tab=cat_bord&print=bord" target="vrm_app" rel="noreferrer" title="Bordereau reçu — l'imprimer (avec la facture si compte pro)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border-radius:12px;background:#0f6b4f14;color:#0f6b4f;text-decoration:none;font-weight:800;font-size:15px">🖨️<span style="font-size:9px;font-weight:700">imprimer</span></a>`
+        : `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" title="Vinted attend le colis : ouvre la vente et clique « Générer le bordereau »" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border-radius:12px;background:#c98a1a14;color:#9a5b16;text-decoration:none;font-weight:800;font-size:15px">📄<span style="font-size:9px;font-weight:700">générer</span></a>`;
+    const sub = [etatLbl[v.etat] || '', v.ts ? timeago(v.ts) : '', v.acct || ''].filter(Boolean).join(' · ');
+    return `
+      <div class="vrm-v-row" data-s="${esc((((v.numero != null ? 'n°' + v.numero + ' ' : '') + (v.title || '') + ' ' + (v.acct || '')).toLowerCase()))}" style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px">
         <a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="flex:1;min-width:0;display:flex;gap:9px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:8px 10px;text-decoration:none;color:inherit">
           ${pairThumb(v, 46)}
-          <div style="flex:1;min-width:0">
+          <div style="flex:1 1 130px;min-width:0">
             <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(v)}${esc(v.title || 'Vente')}</div>
-            <div class="vrm-m" style="font-size:11px;margin-top:1px">${etatLbl[v.etat] || ''}${v.ts ? ` · ${esc(timeago(v.ts))}` : ''}</div>
+            <div class="vrm-m" style="font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sub)}</div>
+            ${b && b.etat === 'print' && b.dateLimite ? `<div class="vrm-m" style="font-size:11px;color:#9a5b16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">à envoyer avant ${esc(b.dateLimite)}</div>` : ''}
           </div>
           <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#0f6b4f">${fmt(v.price)}</div>
         </a>
-        ${v.pro ? `<a href="${APP_URL}/?tab=cat_bord" target="vrm_app" rel="noreferrer" title="Compte pro : imprimer le bordereau + la facture dans l'app" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:52px;border-radius:12px;background:#0797a014;color:#0797a0;text-decoration:none;font-weight:800;font-size:16px">🧾<span style="font-size:9px;font-weight:700">facture</span></a>` : ''}
-      </div>`).join('');
-    return `
-      ${head}
-      ${filterChips}
-      ${all.length > 8 ? `<input id="vrm-v-search" type="search" value="${esc(ventesQuery)}" placeholder="🔍 Filtrer par titre…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
-      <div class="vrm-grid">${rows}</div>
-      <div class="vrm-m" style="margin-top:6px;opacity:.8">Liste des ventes moissonnées (annulées/remboursées exclues). Le total du mois reste celui de l'app.</div>`;
+        ${bordPill}
+        ${v.pro ? `<a href="${APP_URL}/?tab=cat_bord" target="vrm_app" rel="noreferrer" title="Compte pro : facture disponible dans l'app" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:52px;border-radius:12px;background:#0797a014;color:#0797a0;text-decoration:none;font-weight:800;font-size:16px">🧾<span style="font-size:9px;font-weight:700">facture</span></a>` : ''}
+      </div>`;
   }
+
+  // Barre de PÉRIODE (deux dates) — une seule ligne, comme le reste du panneau.
+  function periodeBar() {
+    return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <span class="vrm-m" style="font-weight:700">Période</span>
+      <input id="vrm-v-from" type="date" value="${esc(ventesFrom)}" style="flex:1 1 120px;min-width:0;border:1px solid #d7dde3;border-radius:9px;padding:6px 8px;font:inherit;font-size:12px">
+      <span class="vrm-m">→</span>
+      <input id="vrm-v-to" type="date" value="${esc(ventesTo)}" style="flex:1 1 120px;min-width:0;border:1px solid #d7dde3;border-radius:9px;padding:6px 8px;font:inherit;font-size:12px">
+      ${(ventesFrom || ventesTo) ? `<button class="vrm-vdate" data-act="clear" style="flex-shrink:0;border:1px solid #dde;background:#fff;color:#556;border-radius:9px;padding:6px 9px;font-weight:700;font-size:11px;cursor:pointer">✕ tout</button>` : ''}
+    </div>`;
+  }
+  // Filtre par période sur `ts` (ms). Une date absente = pas de borne de ce côté.
+  function periodeFilter(list) {
+    const from = ventesFrom ? Date.parse(ventesFrom + 'T00:00:00') : null;
+    const to = ventesTo ? Date.parse(ventesTo + 'T23:59:59') : null;
+    if (from == null && to == null) return list;
+    return list.filter(v => { const t = Number(v.ts) || 0; if (!t) return false; if (from != null && t < from) return false; if (to != null && t > to) return false; return true; });
+  }
+  // Chips « par compte », construites sur les comptes réellement présents dans la
+  // liste (jamais un compte vide, jamais un compte masqué : il n'est plus dans DATA).
+  function acctChipsFor(list, cur, cls) {
+    const n = {};
+    for (const v of list) { const k = String(v.uid || ''); if (!k) continue; n[k] = (n[k] || 0) + 1; }
+    const uids = Object.keys(n);
+    if (uids.length < 2) return ''; // un seul compte → pas de chips inutiles
+    const nameOf = (uid) => { const a = ((DATA && DATA.accounts) || []).find(x => String(x.uid) === uid); return (a && a.name) || ('compte ' + uid.slice(-4)); };
+    const chip = (k, l, count) => `<button class="${cls}" data-a="${esc(k)}" style="border:1px solid ${cur === k ? '#111' : '#dde'};background:${cur === k ? '#111' : '#fff'};color:${cur === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${esc(l)} ${count}</button>`;
+    return `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${chip('all', 'Tous les comptes', list.length)}${uids.sort((a, b) => n[b] - n[a]).map(k => chip(k, nameOf(k), n[k])).join('')}</div>`;
+  }
+
   function wireVentes() {
     panel.querySelectorAll('.vrm-vfilter').forEach(b => { b.onclick = () => { ventesFilter = b.dataset.f; render(); }; });
+    panel.querySelectorAll('.vrm-vacct').forEach(b => { b.onclick = () => { ventesAcct = b.dataset.a; render(); }; });
+    const f = panel.querySelector('#vrm-v-from'), t = panel.querySelector('#vrm-v-to');
+    if (f) f.onchange = () => { ventesFrom = f.value || ''; render(); };
+    if (t) t.onchange = () => { ventesTo = t.value || ''; render(); };
+    panel.querySelectorAll('.vrm-vdate').forEach(b => { b.onclick = () => { ventesFrom = ''; ventesTo = ''; render(); }; });
     const vs = panel.querySelector('#vrm-v-search');
     const apply = () => { const q = ventesQuery.trim().toLowerCase(); panel.querySelectorAll('.vrm-v-row').forEach(r => { r.style.display = (!q || (r.dataset.s || '').includes(q)) ? 'flex' : 'none'; }); };
     if (vs) { vs.oninput = () => { ventesQuery = vs.value; apply(); }; apply(); }
@@ -713,6 +824,15 @@
     panel.querySelectorAll('.vrm-todo').forEach(b => { b.onclick = () => { if (b.dataset.filter) chaussuresFilter = b.dataset.filter; tab = b.dataset.t; render(); }; });
     // Bouton « copier » générique : copie son data-c (réutilisable partout).
     panel.querySelectorAll('.vrm-copy-line').forEach(b => { b.onclick = () => { try { navigator.clipboard.writeText(b.dataset.c || ''); } catch (_) {} const p = b.textContent; b.textContent = '✓ Copié !'; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1000); }; });
+    // Masquer / réafficher un compte (bloc « Mes comptes Vinted », Ma journée).
+    panel.querySelectorAll('.vrm-acct-off').forEach(b => {
+      b.onclick = () => {
+        const uid = b.dataset.uid; if (!uid) return;
+        const off = b.dataset.off === '1';
+        b.disabled = true; b.textContent = '⏳';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setAccountOff', uid, off }, () => { load(); });
+      };
+    });
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
     if (tab === 'chaussures') wireChaussures();
@@ -808,8 +928,8 @@
     const favTot = list.reduce((s, o) => s + (o.favs || 0), 0);
     return `
       <div class="vrm-stats" style="margin-bottom:8px">
-        <div class="vrm-st" style="flex:1 1 44%"><b style="color:#e2456b">❤️ ${favTot}</b><span class="vrm-m">favoris en attente</span></div>
-        <div class="vrm-st" style="flex:1 1 44%"><b>${list.length}</b><span class="vrm-m">annonce${list.length > 1 ? 's' : ''} likée${list.length > 1 ? 's' : ''}</span></div>
+        <div class="vrm-st"><b style="color:#e2456b">❤️ ${favTot}</b><span class="vrm-m">favoris en attente</span></div>
+        <div class="vrm-st"><b>${list.length}</b><span class="vrm-m">annonce${list.length > 1 ? 's' : ''} likée${list.length > 1 ? 's' : ''}</span></div>
       </div>
       <div class="vrm-m" style="margin-bottom:8px">Ces annonces ont été mises en <b>favori</b> par des acheteurs. Coche celles où tu veux <b>leur envoyer une petite remise</b> pour déclencher la vente. L'extension t'ouvre chaque annonce, tu cliques le bouton <b>« Proposer une remise »</b> de Vinted. Rien n'est envoyé automatiquement.</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -957,15 +1077,22 @@
           </div>`;
       }
       const t = shipRun.queue[i];
+      // État RÉEL du bordereau de cette vente, relu à chaque rendu : dès que tu as
+      // cliqué « Générer » sur Vinted, l'extension capte le PDF et la ligne passe
+      // au vert ici. Le bouton « J'ai généré » recharge pour te le confirmer.
+      const frais = ((DATA && DATA.toShip) || []).find(x => String(x.transaction || '') === String(t.transaction || ''));
+      const capte = !!(frais && frais.hasBord);
       return `
-        <div class="vrm-m" style="margin-bottom:8px">Vente <b>${i + 1}</b> / ${total} — ouvre-la, clique <b>Générer le bordereau</b> sur Vinted, puis <b>Suivante</b>. L'extension capte le PDF.</div>
-        <div class="vrm-card" style="display:flex;gap:8px;align-items:center">
+        <div class="vrm-m" style="margin-bottom:8px">Vente <b>${i + 1}</b> / ${total} — ouvre-la, clique <b>Générer le bordereau</b> sur Vinted. L'extension capte le PDF toute seule ; tu le retrouves dans « à imprimer ».</div>
+        <div class="vrm-card" style="display:flex;gap:8px;align-items:center;border-color:${capte ? '#0f6b4f' : '#eceff4'}">
           ${pairThumb(t, 42)}
-          <div style="flex:1;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(t)}${esc(t.title || 'Vente')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || '')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
+          <div style="flex:1 1 130px;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(t)}${esc(t.title || 'Vente')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || '')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
+          ${capte ? '<span style="flex-shrink:0;font-weight:800;color:#0f6b4f;font-size:12px">✓ bordereau capté</span>' : ''}
         </div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="vrm-ship-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
-          <button class="vrm-ship-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button class="vrm-ship-go" data-act="open" style="flex:1 1 140px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
+          <button class="vrm-ship-go" data-act="check" style="flex:1 1 140px;border:1px solid #0f6b4f;background:rgba(15,107,79,.06);color:#0f6b4f;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">J'ai généré → vérifier</button>
+          <button class="vrm-ship-go" data-act="next" style="flex:1 1 100%;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
         </div>
         <div style="text-align:center;margin-top:8px"><button class="vrm-ship-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
     }
@@ -977,6 +1104,7 @@
     // 1) BORDEREAUX À IMPRIMER — le N° de la paire + le titre, comme dans l'app.
     //    L'impression (avec le N° tamponné sur le PDF) se fait dans l'app en 1 tap.
     const printSection = toPrint.length ? `
+      <div class="vrm-m" style="margin-bottom:6px;opacity:.85">Les paires que Vinted a déjà vues partir <b>disparaissent toutes seules</b> de cette liste — rien à cocher.</div>
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">🖨️ ${toPrint.length} bordereau${toPrint.length > 1 ? 'x' : ''} à imprimer${(()=>{const n=toPrint.filter(b=>b.pro).length;return n?` · <span style="color:#0797a0">🧾 ${n} avec facture</span>`:'';})()}</div>
       ${toPrint.length > 8 ? `<input id="vrm-bord-search" type="search" value="${esc(bordQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       ${toPrint.slice(0, 60).map(b => `
@@ -1069,6 +1197,9 @@
         else if (act === 'start') { if (!shipSel.size) return; shipRun = { queue: pending.filter(t => shipSel.has(shipKey(t))), idx: 0 }; render(); }
         else if (act === 'stop') { shipRun = null; render(); }
         else if (act === 'open') { const t = shipRun && shipRun.queue[shipRun.idx]; if (t && t.url) window.open(t.url, '_blank', 'noopener'); }
+        // Relit les données : si tu viens de générer le bordereau sur Vinted,
+        // l'extension l'a capté et la ligne passe au vert. Aucun clic à ta place.
+        else if (act === 'check') { load(); }
         else if (act === 'next') { if (shipRun) { shipRun.idx++; render(); } }
       };
     });

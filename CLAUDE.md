@@ -1095,5 +1095,45 @@ Les gestes souris (§14) ne géraient que l'HORIZONTAL (balayage entre onglets).
 ### Vérifié
 `npm run build` OK. Banc app (`dist` servi, espaceur 2500 px injecté dans le conteneur de gestes pour rendre la page défilable, souris Playwright) : glisser vers le bas 300 px → `scrollY` 0→300 ; glisser vers le haut 250 px → 300→50 ; **0 PAGEERROR**. Direction et amplitude conformes.
 
+### ⚠️ ANNULÉ IMMÉDIATEMENT (Julien : « je veux pas swipe vers le bas »)
+Le glisser-défiler vertical à la souris a été **entièrement retiré** dès la session suivante. Le conteneur racine ne gère plus que le **balayage HORIZONTAL** entre onglets (§14). Ne pas le réintroduire.
+
 ### Note portée : ordinateur d'abord pour l'extension + l'app
 Julien : « il n'y a pas d'extension sur iPhone, on se concentre sur l'ordinateur pour l'extension et l'app ». L'**extension** (panneau VRM) est **desktop only** (Chrome). L'**app** reste dispo **partout** (PWA mobile + web desktop) mais les gestes souris ci-dessus ciblent l'ordinateur ; le tactile mobile est intact.
+
+---
+
+## 43. Session août 2026 (suite) — extension 4.78 → 4.84 : visuel pro, comptes, ventes, bordereaux
+
+### Livraison de l'extension (RÈGLE PERMANENTE)
+Julien : « donne-moi un zip, je veux qu'un seul dossier à chaque fois ». **Toujours** livrer un **zip qui se dézippe en UN dossier** (`cp -r vinted-sync-extension /tmp/vrm-extension && (cd /tmp && zip -rq out.zip vrm-extension)`), envoyé en pièce jointe. Ni fichiers en vrac (Chrome veut un dossier pour « Charger l'extension non empaquetée »), ni plusieurs pièces jointes.
+
+### 4.81 → 4.83 — refonte visuelle (« on dirait un jeu pour enfant »)
+- **Icônes Feather (MIT)** téléchargées et inlinées (`ICONS` + `svgi(name, sz)`) : la nav, les boutons d'en-tête et les chips « À faire / Pour vendre plus » n'ont plus un seul emoji. Palette **ardoise** (`#0f172a` sur l'onglet actif) au lieu du turquoise fluo.
+- Liens vers l'app en `target="vrm_app"` : cliquer 5 fois n'ouvre plus 5 onglets.
+- Filtre par **compte** amorcé (`keepAcc`) — mais Julien voyait toujours les paires d'un compte retiré : voir ci-dessous, ce n'était pas suffisant.
+
+### 4.84 — le lot « ça ne me sert à rien sinon » (tout vérifié au banc, 0 erreur)
+**1. La photo manquante sur les ventes — VRAIE CAUSE trouvée.** `commandeMaigre` garde bien `photo` ({url}) sur chaque commande moissonnée, mais `buildPanelData` **ne la lisait pas** : les lignes de vente n'avaient de photo que si `enrichPairs` retrouvait la paire par titre unique. Ajout de `photoDeCommande(o)` sur `sales` / `recentSales` / `recentBuys` / `disputes` / `toShip`. ⚠️ `toShip` lisait `o.photo` **brut** (un objet) → `pairThumb` rendait `[object Object]` ; corrigé aussi.
+
+**2. Comptes : on peut enfin en couper un DEPUIS l'extension.** `acctOff` réunit désormais **quatre** sources : `vinted_accounts_hidden`, `vinted_accounts_blocked` (ligne `main`), `vrm_blocked_accounts`, et **`panel_accounts_off`** — une ligne DÉDIÉE écrite par le panneau (`setAccountOff`, jamais `main`, même motif anti-clobber que `panel_bords_done`, §35). Bloc **« 👤 Mes comptes Vinted »** en bas de Ma journée : nom + nb en ligne + « ✕ Masquer / ↺ Réafficher ». Un compte masqué disparaît de **tout** le panneau. `DATA.accounts` porte `{uid,name,online,off}`, et chaque ligne (annonce, vente, achat, litige) porte `uid` + `acct`.
+
+**3. Paires vendues qui traînaient en « en ligne » — supprimées.** Deux sources sûres seulement : `vinted_annonces_email_sold` (par ID) **et** une vente de moins de 60 j dont le titre est **unique** parmi les annonces en ligne. ⚠️ Un titre en double ne retire **jamais** rien (§24 : pas de devinette — sinon on effacerait une paire identique encore en vente).
+
+**4. Ventes : tri par COMPTE et par PÉRIODE.** Chips de compte (construites sur les comptes réellement présents, ≥2 sinon rien) + deux champs date (`ventesFrom`/`ventesTo`, filtre sur `ts`). La période s'applique **avant** les autres filtres pour que les compteurs correspondent à ce qui est affiché.
+
+**5. Le BORDEREAU est SUR la ligne de vente** (Julien : « c'est totalement débile » d'avoir une liste séparée à cocher). `buildPanelData` pose `v.bord` = `{etat:'print'}` (bordereau reçu, N° connu) ou `{etat:'generer'}` (Vinted attend le colis, pas encore de bordereau). Pastille 🖨️ imprimer / 📄 générer directement sur la ligne.
+
+**6. Bordereaux déjà expédiés : ils disparaissent TOUT SEULS.** `bordExpedie(tx)` = la vente liée par transaction n'attend plus le colis → le bordereau sort de `bordsToPrint` **sans aucun clic**. C'est le même signal que `bordShipped` de l'app. Le « ✓ Traiter » manuel reste en secours.
+
+**7. File de génération : on confirme la capture.** Dans le défilement, la carte passe au vert « ✓ bordereau capté » dès que l'extension a le PDF, avec un bouton **« J'ai généré → vérifier »** qui relit les données. ⚠️ Toujours **aucun clic à sa place** sur Vinted.
+
+**8. Mise en page : une seule ligne par info.** Julien : « ne fais pas des trucs de gauche à droite ». `.vrm-stats` passe en **colonne** (libellé à gauche, valeur à droite, pleine largeur), le bandeau de « Mes paires » devient une ligne de texte, et le mode agrandi remplit la page (`calc(100vw - 24px)` × `calc(100vh - 24px)` — mesuré 1258×878 sur une fenêtre 1280×900).
+
+**9. « Mes paires » : le vrai filtre.** Deux gros boutons **👟 En ligne / 💶 Vendues** en tête d'onglet ; les tris fins (à relancer, trop cher, dorment, sans N°) restent en dessous, en option. La vue « Vendues » réutilise `venteRow` (photo, N°, compte, bordereau) — une seule définition de ligne de vente pour les deux onglets.
+
+### ⚠️ REFUS MAINTENU (Julien l'a redemandé, en insistant)
+Il veut que l'extension **modifie les photos** (inclinaison/rotation/degré) et **réécrive titre/description** de ses annonces **à sa place**, en masse. **Refusé, comme les fois précédentes (§32).** Faire tourner une photo de quelques degrés n'a qu'un seul usage : **tromper la détection de doublon de Vinted** pour republier — c'est exactement le motif qui a fait bloquer `vanessa5723`. Idem pour un clic automatique sur « Générer » : un script qui clique sur Vinted est LE geste sanctionné. Ce qui est fait à la place, et qui est sûr : l'atelier de republication de l'app (§31, scores + réécriture assistée, Julien applique lui-même), et le défilement une-par-une du panneau (§32).
+
+### Vérifié au banc extension (§35 : faux `chrome` + Playwright, données synthétiques 3 comptes)
+Comptes on/off rendus, Ventes = 3 lignes + chips compte (`Tous 3 / shop_cancale 2 / Shop Concale 1`), filtre compte → 1 ligne, période 7 j → 2 lignes, pastilles `🖨️ imprimer` + `📄 générer` présentes, Mes paires bascule En ligne 3 / Vendues 3, Bordereaux 1, panneau agrandi 1258×878, **0 erreur page/console** sur les 10 onglets. `node -c` OK sur les deux fichiers.
