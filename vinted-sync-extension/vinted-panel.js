@@ -946,7 +946,7 @@
     // 1) BORDEREAUX À IMPRIMER — le N° de la paire + le titre, comme dans l'app.
     //    L'impression (avec le N° tamponné sur le PDF) se fait dans l'app en 1 tap.
     const printSection = toPrint.length ? `
-      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">🖨️ ${toPrint.length} bordereau${toPrint.length > 1 ? 'x' : ''} à imprimer</div>
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">🖨️ ${toPrint.length} bordereau${toPrint.length > 1 ? 'x' : ''} à imprimer${(()=>{const n=toPrint.filter(b=>b.pro).length;return n?` · <span style="color:#0797a0">🧾 ${n} avec facture</span>`:'';})()}</div>
       ${toPrint.length > 8 ? `<input id="vrm-bord-search" type="search" value="${esc(bordQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       ${toPrint.slice(0, 60).map(b => `
         <div class="vrm-card vrm-bord-row" data-s="${esc((((b.numero != null ? 'n°' + b.numero + ' ' : '') + (b.title || '')).toLowerCase()))}" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">

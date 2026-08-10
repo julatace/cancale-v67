@@ -1412,7 +1412,7 @@ async function buildPanelData() {
     .map(b => ({ numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
     .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key] && !bDonePanel[b.key]);
   // Photo du bordereau = par N° UNIQUEMENT (identité certaine, jamais par titre §24).
-  for (const b of bordsToPrint) { if (b.numero && photoByNum[String(b.numero)]) b.photo = photoByNum[String(b.numero)]; }
+  for (const b of bordsToPrint) { if (b.numero && photoByNum[String(b.numero)]) b.photo = photoByNum[String(b.numero)]; b.pro = !!(b.numero && proNums.has(String(b.numero))); }
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
   // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
   const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)
