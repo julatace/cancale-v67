@@ -97,6 +97,27 @@
     : `<div style="width:${s}px;height:${s}px;border-radius:9px;background:#eef1f4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:${Math.round(s * 0.42)}px">👟</div>`; };
   // Badge N° (avant le titre) quand la paire a un numéro retrouvé. Réutilise .vrm-num.
   const numBadge = (o) => (o && o.numero != null && o.numero !== '') ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : '';
+  // ── Icônes au trait (Feather, MIT) : look pro, plus d'emojis dans la nav. ──
+  const ICONS = {
+    "home": '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>',
+    "eye": '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>',
+    "grid": '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>',
+    "trending-up": '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>',
+    "refresh-cw": '<polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>',
+    "printer": '<polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect>',
+    "shopping-bag": '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path>',
+    "alert-triangle": '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+    "message-circle": '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>',
+    "heart": '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>',
+    "settings": '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>',
+    "maximize-2": '<polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line>',
+    "minimize-2": '<polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line>',
+    "x": '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>',
+    "search": '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>',
+    "zap": '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>',
+    "tag": '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line>',
+  };
+  const svgi = (name, sz) => { const p = ICONS[name]; if (!p) return ''; const s = sz || 16; return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex-shrink:0">${p}</svg>`; };
   // Conseil marché compact réutilisable (même règle partout : écart >15% vs médiane
   // des paires comparables o.peer). Renvoie '' si pas d'écart net ou pas de peer.
   const marketNote = (o) => {
@@ -280,17 +301,21 @@
     #vrm-panel h3{margin:0 0 2px;font-size:15px;font-weight:800;letter-spacing:.3px;
       background:linear-gradient(90deg,#0bbcc5,#0797a0);-webkit-background-clip:text;background-clip:text;color:transparent}
     #vrm-panel .vrm-sub{color:#66707d;font-size:11.5px;margin-bottom:9px}
-    #vrm-panel .vrm-tabs{display:flex;gap:6px;flex-wrap:wrap}
-    #vrm-panel .vrm-tab{border:1px solid #dde;background:#fff;color:#334;border-radius:999px;padding:5px 10px;
-      font:700 11.5px system-ui,sans-serif;cursor:pointer;transition:background .12s,border-color .12s}
-    #vrm-panel .vrm-tab:hover{border-color:#09b1ba;color:#09b1ba}
-    #vrm-panel .vrm-tab.on{background:#09b1ba;border-color:#09b1ba;color:#fff}
-    #vrm-panel .vrm-refresh{position:absolute;top:11px;right:36px;border:none;background:transparent;font-size:14px;
-      cursor:pointer;opacity:.7;padding:0;line-height:1}
-    #vrm-panel .vrm-refresh:hover{opacity:1}
-    #vrm-panel .vrm-max{position:absolute;top:11px;right:60px;border:none;background:transparent;font-size:14px;
-      cursor:pointer;opacity:.7;padding:0;line-height:1}
-    #vrm-panel .vrm-max:hover{opacity:1}
+    #vrm-panel .vrm-tabs{display:flex;gap:5px;flex-wrap:wrap}
+    #vrm-panel .vrm-tab{display:inline-flex;align-items:center;gap:6px;border:1px solid #e6e9ef;background:#fff;color:#3a4452;border-radius:10px;padding:6px 11px;
+      font:600 11.5px system-ui,sans-serif;cursor:pointer;transition:background .12s,border-color .12s,color .12s,box-shadow .12s}
+    #vrm-panel .vrm-tab svg{opacity:.7}
+    #vrm-panel .vrm-tab:hover{border-color:#c7ccd6;color:#111827;background:#f7f8fa}
+    #vrm-panel .vrm-tab.on{background:#0f172a;border-color:#0f172a;color:#fff;box-shadow:0 2px 6px rgba(15,23,42,.22)}
+    #vrm-panel .vrm-tab.on svg{opacity:1}
+    #vrm-panel .vrm-refresh{position:absolute;top:12px;right:38px;border:none;background:transparent;
+      cursor:pointer;color:#8a929e;padding:0;line-height:0;display:flex}
+    #vrm-panel .vrm-refresh:hover{color:#0f172a}
+    #vrm-panel .vrm-spin{display:inline-flex;animation:vrmspin 1s linear infinite}
+    @keyframes vrmspin{to{transform:rotate(360deg)}}
+    #vrm-panel .vrm-max{position:absolute;top:12px;right:64px;border:none;background:transparent;
+      cursor:pointer;color:#8a929e;padding:0;line-height:0;display:flex}
+    #vrm-panel .vrm-max:hover{color:#0f172a}
     #vrm-panel .vrm-card{border:1px solid #eceff4;border-radius:14px;padding:11px;margin-bottom:8px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}
     #vrm-panel .vrm-num{display:inline-block;background:linear-gradient(135deg,#0bbcc5,#0797a0);color:#fff;border-radius:8px;padding:2px 9px;font-weight:800;box-shadow:0 1px 2px rgba(9,177,186,.3)}
     #vrm-panel .vrm-row{display:flex;gap:9px;align-items:center}
@@ -318,6 +343,10 @@
       #vrm-panel .vrm-head{background:#161a20;border-bottom-color:#2a3038}
       #vrm-panel .vrm-card,#vrm-panel .vrm-st{border-color:#2a3038}
       #vrm-panel .vrm-tab{background:#1e242c;border-color:#2a3038;color:#cfd8e3}
+      #vrm-panel .vrm-tab:hover{background:#252c35;border-color:#3a424d;color:#fff}
+      #vrm-panel .vrm-tab.on{background:#e8edf3;border-color:#e8edf3;color:#0f172a;box-shadow:none}
+      #vrm-panel .vrm-refresh,#vrm-panel .vrm-max,#vrm-panel .vrm-close{color:#8a929e}
+      #vrm-panel .vrm-refresh:hover,#vrm-panel .vrm-max:hover,#vrm-panel .vrm-close:hover{color:#e8eef5}
       #vrm-panel .vrm-todo{background:#2a2113;border-color:#4a3a1c;color:#f0c88a}
       #vrm-panel .vrm-todo:hover{background:#33280f}
     }`;
@@ -633,22 +662,22 @@
     const fresh = (DATA && DATA.freshestAt) ? ` · capté ${esc(timeago(DATA.freshestAt))}` : '';
     panel.innerHTML = `
       <div class="vrm-head">
-        <button class="vrm-close" title="Fermer">✕</button>
-        <button class="vrm-refresh" title="Rafraîchir les données">${dataBusy ? '⏳' : '🔄'}</button>
-        <button class="vrm-max" title="${big ? 'Réduire le panneau' : 'Agrandir le panneau'}">${big ? '🗕' : '🗖'}</button>
+        <button class="vrm-close" title="Fermer">${svgi('x', 16)}</button>
+        <button class="vrm-refresh" title="Rafraîchir les données">${dataBusy ? '<span class="vrm-spin">' + svgi('refresh-cw', 15) + '</span>' : svgi('refresh-cw', 15)}</button>
+        <button class="vrm-max" title="${big ? 'Réduire le panneau' : 'Agrandir le panneau'}">${big ? svgi('minimize-2', 15) : svgi('maximize-2', 15)}</button>
         <h3>VRM</h3>
         <div class="vrm-sub">Tes infos, sur Vinted.${fresh}</div>
         <div class="vrm-tabs">
-          <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">🏠 Ma journée</button>
-          ${currentItemId() ? `<button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">👟 Cette paire</button>` : ''}
-          <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">👟 Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
-          <button class="vrm-tab ${tab === 'ventes' ? 'on' : ''}" data-t="ventes">💶 Ventes</button>
-          <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">♻️ Republier</button>
-          <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">📄 Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
-          <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">📦 Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
-          <button class="vrm-tab ${tab === 'litiges' ? 'on' : ''}" data-t="litiges">⚠️ Litiges${DATA && DATA.stats && DATA.stats.litiges ? ` ${DATA.stats.litiges}` : ''}</button>
-          <button class="vrm-tab ${tab === 'messages' || tab === 'reponse' ? 'on' : ''}" data-t="messages">💬 Messages${DATA && DATA.stats && DATA.stats.unread ? ` ${DATA.stats.unread}` : ''}</button>
-          <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">❤️ Favoris</button>
+          <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">${svgi('home', 15)} Ma journée</button>
+          ${currentItemId() ? `<button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">${svgi('eye', 15)} Cette paire</button>` : ''}
+          <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">${svgi('grid', 15)} Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
+          <button class="vrm-tab ${tab === 'ventes' ? 'on' : ''}" data-t="ventes">${svgi('trending-up', 15)} Ventes</button>
+          <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">${svgi('refresh-cw', 15)} Republier</button>
+          <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">${svgi('printer', 15)} Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
+          <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">${svgi('shopping-bag', 15)} Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
+          <button class="vrm-tab ${tab === 'litiges' ? 'on' : ''}" data-t="litiges">${svgi('alert-triangle', 15)} Litiges${DATA && DATA.stats && DATA.stats.litiges ? ` ${DATA.stats.litiges}` : ''}</button>
+          <button class="vrm-tab ${tab === 'messages' || tab === 'reponse' ? 'on' : ''}" data-t="messages">${svgi('message-circle', 15)} Messages${DATA && DATA.stats && DATA.stats.unread ? ` ${DATA.stats.unread}` : ''}</button>
+          <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">${svgi('heart', 15)} Favoris</button>
         </div>
       </div>
       <div id="vrm-body">${
