@@ -887,17 +887,33 @@
           </div>
         </div>
         <div class="vrm-m" style="margin-top:6px;color:${coul};font-size:11.5px">${verdict}</div>
-        <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap">
-          <a href="${esc(of.url)}" target="_blank" rel="noreferrer" style="flex:1 1 130px;text-align:center;text-decoration:none;border:1px solid ${coul};background:${coul};color:#fff;border-radius:9px;padding:7px;font-weight:800;font-size:12px">Répondre sur Vinted ↗</a>
-          ${(!sansMin && !ok) ? `<button class="vrm-copy-line" data-c="${esc(String(of.min))}" style="flex-shrink:0;border:1px solid ${coul};background:transparent;color:${coul};border-radius:9px;padding:7px 11px;font-weight:800;font-size:12px;cursor:pointer">📋 ${fmt(of.min)}</button>` : ''}
-        </div>
+        ${agir(of, coul, ok, sansMin)}
       </div>`;
     };
     return `<div style="margin-bottom:10px">
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:6px">${svgi('dollar-sign', 14)} ${list.length} offre${list.length > 1 ? 's' : ''} à trancher</div>
       ${list.slice(0, 20).map(ligne).join('')}
-      <div class="vrm-m" style="font-size:10.5px;opacity:.8">Lu sur les conversations déjà captées. L'extension ne répond jamais à ta place — elle te dit quoi faire et prépare le chiffre.</div>
+      <div class="vrm-m" style="font-size:10.5px;opacity:.8">Un bouton = une réponse envoyée depuis ton navigateur, sur ton clic. Rien ne part tout seul : une offre acceptée est une vente ferme.</div>
     </div>`;
+  }
+  // Les trois réponses possibles, en un clic, sans quitter le panneau.
+  // On ne les propose QUE si l'offre porte ses deux identifiants certains
+  // (transaction + demande d'offre) : sinon on renvoie sur Vinted, comme avant.
+  function agir(of, coul, ok, sansMin) {
+    const lien = `<a href="${esc(of.url)}" target="_blank" rel="noreferrer" style="flex:1 1 120px;text-align:center;text-decoration:none;border:1px solid ${coul};background:transparent;color:${coul};border-radius:9px;padding:7px;font-weight:700;font-size:12px">Voir le fil ↗</a>`;
+    if (!of.tx || !of.oid || !of.uid) {
+      return `<div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap"><a href="${esc(of.url)}" target="_blank" rel="noreferrer" style="flex:1;text-align:center;text-decoration:none;border:1px solid ${coul};background:${coul};color:#fff;border-radius:9px;padding:7px;font-weight:800;font-size:12px">Répondre sur Vinted ↗</a></div>`;
+    }
+    const base = (bg, fg, bd) => `flex:1 1 96px;border:1px solid ${bd};background:${bg};color:${fg};border-radius:9px;padding:7px 6px;font:inherit;font-weight:800;font-size:12px;cursor:pointer`;
+    const d = `data-uid="${esc(of.uid)}" data-tx="${esc(of.tx)}" data-oid="${esc(of.oid)}" data-titre="${esc(of.title || '')}" data-prix="${esc(String(of.price))}"`;
+    // « Accepter » est mis en avant seulement quand l'offre passe ton plancher ;
+    // en dessous, c'est la contre-offre qui est en avant. Le bouton existe quand
+    // même dans les deux cas — c'est toi qui tranches, pas la couleur.
+    const acc = `<button class="vrm-offre" data-quoi="accept" ${d} style="${base(ok ? '#0f6b4f' : 'transparent', ok ? '#fff' : '#0f6b4f', '#0f6b4f')}">✅ Accepter ${fmt(of.price)}</button>`;
+    const con = (!sansMin && of.min != null) ? `<button class="vrm-offre" data-quoi="contre" data-montant="${esc(String(of.min))}" ${d} style="${base(!ok ? '#9a5b16' : 'transparent', !ok ? '#fff' : '#9a5b16', '#9a5b16')}">↩️ Contre ${fmt(of.min)}</button>` : '';
+    const ref = `<button class="vrm-offre" data-quoi="reject" ${d} style="${base('transparent', '#a33', '#d9b3b3')}">✕ Refuser</button>`;
+    return `<div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap">${acc}${con}${ref}${lien}</div>
+      <div class="vrm-m" style="margin-top:5px;font-size:10px;opacity:.75">Envoyé depuis ton navigateur, à ton clic.</div>`;
   }
 
   // L'ancienneté n'est connue que pour les annonces dont tu as ouvert la page.
@@ -982,6 +998,28 @@
     // Ouvrir le PDF d'un bordereau — présent sur plusieurs onglets (Ventes,
     // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
     panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });
+    // Répondre à une offre. Deux taps : le premier arme, le second envoie.
+    // Une offre acceptée est une VENTE FERME qu'on n'annule pas — un tap de
+    // travers dans une liste ne doit pas vendre une paire.
+    panel.querySelectorAll('.vrm-offre').forEach(b => {
+      b.onclick = () => {
+        if (b.dataset.arme !== '1') {
+          panel.querySelectorAll('.vrm-offre').forEach(x => { if (x.dataset.arme === '1') { x.dataset.arme = ''; x.innerHTML = x.dataset.lbl || x.innerHTML; } });
+          b.dataset.lbl = b.innerHTML; b.dataset.arme = '1';
+          b.innerHTML = 'Confirmer ?';
+          setTimeout(() => { try { if (b.dataset.arme === '1') { b.dataset.arme = ''; b.innerHTML = b.dataset.lbl; } } catch (_) {} }, 5000);
+          return;
+        }
+        b.dataset.arme = ''; b.disabled = true; b.innerHTML = '⏳';
+        chrome.runtime.sendMessage({
+          from: 'cancale-vpanel', action: 'offre', quoi: b.dataset.quoi,
+          uid: b.dataset.uid, tx: b.dataset.tx, oid: b.dataset.oid, prix: b.dataset.montant,
+        }, (r) => {
+          if (r && r.ok) { b.innerHTML = '✓ envoyé'; setTimeout(() => load(), 900); }
+          else { b.disabled = false; b.innerHTML = '❌ ' + ((r && r.error) || 'échec'); setTimeout(() => { try { b.innerHTML = b.dataset.lbl; } catch (_) {} }, 3500); }
+        });
+      };
+    });
     const minSave = panel.querySelector('#vrm-min-save');
     if (minSave) minSave.onclick = () => {
       const inp = panel.querySelector('#vrm-min-in');

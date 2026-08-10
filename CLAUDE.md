@@ -1177,3 +1177,40 @@ Demande : « sélectionner plusieurs conversations et prédéfinir un message qu
 ### Vérifié au banc extension (§35, faux `chrome` + Playwright, `window.open` espionné)
 Calendrier (31 jours, début→fin, filtres 3→2, raccourci 7 j, ✕ → 3), `bordPdf` demandé avec le bon `row` et **blob PDF réellement ouvert**, 1 bouton d'ouverture par bordereau, 3 offres rendues avec les 3 verdicts, message type sauvé + **collé dans le `<textarea>` de la page** (`colle === "Bonjour, la paire est disponible !"`), `setMinPrice` envoyé avec `{id:'1', amount:'42'}`. **0 erreur page/console.** `node -c` OK sur les deux fichiers.
 ⚠️ Piège de banc rencontré : `currentConvId()` exige un id **numérique** (`/inbox/(\d+)`) — tester avec `/inbox/c1` fait croire à tort que le bandeau ne s'affiche pas. Et le panneau doit être ouvert (`localStorage.vrm_panel_open='1'`) avant l'injection, sinon les clics tombent sur un panneau `display:none`.
+
+---
+
+## 45. Session août 2026 (suite) — répondre à une offre EN UN CLIC (4.86) + ⚠️ le refus de l'auto-acceptation
+
+### Ce que Julien a demandé, et ce qui a été fait
+« Je veux que ce soit l'extension qui accepte dès qu'un acheteur envoie l'offre quand je suis sur l'app. » Puis, devant le refus : « Sinon tu prends juste le contrôle de ma souris ? »
+
+**Construit** : les trois réponses (**Accepter / Contre-offre à ton plancher / Refuser**) **dans le panneau**, sur la ligne de l'offre. Un clic arme (« Confirmer ? », 5 s), le second envoie. Il n'ouvre plus la conversation.
+**Refusé** : le moteur qui répond **tout seul**, et a fortiori le pilotage de la souris (c'est le même geste en plus visible — cf. §43).
+
+### ⚠️ La vraie raison du refus n'est PAS que le risque de blocage
+Elle est ailleurs, et elle est technique : **accepter une offre engage une VENTE FERME qu'on n'annule pas**, et le champ qui dit « cette offre est encore en attente » **n'a jamais été observé**. Vérifié sur les 40 conversations captées : 21 `offer_request_message`, **toutes** en `status: 20` (« Offre acceptée ») ou `30` (« Refusée ») — **aucune offre ouverte** dans l'échantillon. Un moteur automatique aurait donc tranché sur un code inconnu, avec de l'argent réel au bout. Ce n'est pas une position de principe : c'est qu'on ne sait pas encore lire l'état.
+➡️ **Si l'auto-acceptation revient sur la table**, la première chose à faire est de capter une **offre réellement en attente** (ouvrir une conversation avec une offre en cours) et de relever son `status`. Sans ça, ne pas coder de moteur.
+
+### Les requêtes : CAPTÉES, jamais devinées
+`storeWriteReq` (déjà en place, §26) avait enregistré les vraies actions de Julien sur **5 comptes** :
+```
+accepter     PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/accept   (corps vide)
+refuser      PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/reject   (corps vide)
+contre-offre POST /api/v2/transactions/{tx}/offers   {"offer":{"price":"32","currency":"EUR"}}
+```
+C'est exactement à ça que sert cette ligne (« sert à l'app pour reproduire ensuite l'action exacte, sans deviner ») — **premier vrai usage**.
+
+### Forme RÉELLE d'une offre (relevée en base, à ne plus redécouvrir)
+`conversation.messages[].entity_type` :
+- **`offer_request_message`** = offre **de l'acheteur** → `entity = { price:{amount}, status, status_title, current, user_id, transaction_id, offer_request_id, original_price }`. **C'est la seule qui porte les deux identifiants.**
+- **`offer_message`** = **mes** offres (aucun id) — à ne pas confondre, c'était la cause d'un faux positif dans la première version.
+Filtres retenus : `current !== false`, `user_id === opposite_user.id` (sinon c'est moi), `status ∉ {20,30}`, `status_title` sans accept/refus/expir. L'article vient de **`conversation.transaction.item_id`** (identité certaine) ; le titre n'est qu'un repli, et seulement s'il est unique (§24).
+
+### Côté code
+- `background.js` : **`repondreOffre({uid,tx,oid,quoi,prix})`** → un `vintedSend` par appel, **déclenché uniquement par le message `offre` du panneau**. Aucun appel depuis un événement de fond, aucune minuterie. Journalisé dans l'activité.
+- `buildPanelData.offers` porte maintenant `tx` / `oid` / `uid`.
+- `vinted-panel.js` : `agir(of…)` rend les 3 boutons **seulement si `tx`+`oid`+`uid` sont présents** ; sinon on retombe sur « Répondre sur Vinted ↗ » (jamais de bouton qui enverrait une requête incomplète). Double tap obligatoire.
+
+### Vérifié au banc (§35)
+6 boutons sur les 2 offres identifiées, la 3ᵉ (sans ids) n'a que le lien Vinted ; 1ᵉʳ clic → « Confirmer ? » et **0 envoi** ; 2ᵉ clic → un seul message avec les bons `tx`/`oid`/`uid` ; contre-offre transmise avec le **prix plancher** (`prix:"40"`). **0 erreur page/console.**

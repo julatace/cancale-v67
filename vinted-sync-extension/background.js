@@ -350,6 +350,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'markBordDone' && msg.key) { const ok = await markBordDone(msg.key, msg.done); sendResponse({ ok }); return; }
           if (msg.action === 'bordPdf' && msg.row) { const r = await bordPdf(msg.row); sendResponse(r); return; }
           if (msg.action === 'setMinPrice' && msg.id) { const ok = await setMinPrice(msg.id, msg.amount); sendResponse({ ok }); return; }
+          // Une offre, sur TON clic uniquement (jamais en arrière-plan).
+          if (msg.action === 'offre') { const r = await repondreOffre(msg); sendResponse(r); return; }
           if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
           if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -1074,6 +1076,39 @@ async function setMinPrice(id, amount) {
   return await supabaseUpsert('app_data', [{ id: 'panel_min_prices', data: cur }], 'id');
 }
 
+// ── RÉPONDRE À UNE OFFRE, EN UN CLIC DEPUIS LE PANNEAU ──────────────────────
+// Julien voulait que ça parte tout seul dès qu'une offre arrive. Refusé, et la
+// raison n'est pas le risque de blocage : accepter une offre engage une VENTE
+// FERME qu'on n'annule pas, et le champ qui dit « cette offre est encore en
+// attente » n'a jamais été observé (aucune offre ouverte dans les conversations
+// captées — que des 20 « acceptée » et 30 « refusée »). Un moteur qui décide
+// seul sur un champ inconnu peut vendre une paire à n'importe quel prix.
+// Ici : un clic = une requête, et il vient de lui.
+//
+// Les deux routes viennent de SES propres actions, captées par `storeWriteReq`
+// sur 5 comptes (jamais devinées) :
+//   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/accept   (corps vide)
+//   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/reject   (corps vide)
+//   POST /api/v2/transactions/{tx}/offers  {"offer":{"price":"32","currency":"EUR"}}
+async function repondreOffre({ uid, tx, oid, quoi, prix }) {
+  if (!uid || !tx) return { ok: false, error: 'offre incomplète' };
+  if (quoi !== 'contre' && !oid) return { ok: false, error: 'offre incomplète' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) return { ok: false, error: 'compte introuvable' };
+  let r;
+  if (quoi === 'accept') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, null);
+  else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
+  else if (quoi === 'contre') {
+    const p = Number(prix);
+    if (!isFinite(p) || p <= 0) return { ok: false, error: 'prix invalide' };
+    r = await vintedSend(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { price: String(p), currency: 'EUR' } });
+  } else return { ok: false, error: 'action inconnue' };
+  const mot = quoi === 'accept' ? 'acceptée' : quoi === 'reject' ? 'refusée' : `contrée à ${prix} €`;
+  logActivity(r.ok ? `💶 Offre ${mot}` : `⚠️ Offre ${mot} : Vinted a refusé (${r.status})`);
+  return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+
 // Couper / réafficher un compte Vinted DEPUIS LE PANNEAU. Ligne DÉDIÉE
 // `panel_accounts_off` = { uid: true } — jamais `main` (un upsert y écraserait
 // tout le blob de l'app). `buildPanelData` la relit : le compte disparaît de
@@ -1572,9 +1607,10 @@ async function buildPanelData() {
   // (`harvest_*_conv_*`, donc celles que tu as ouvertes) : on y lit la dernière
   // demande d'offre et son montant. Si on ne trouve pas de montant, on n'affiche
   // RIEN (jamais de chiffre inventé).
-  // ⚠️ L'extension n'accepte, ne refuse et ne contre AUCUNE offre à ta place :
-  //    un script qui répond à Vinted, c'est le motif qui fait bloquer un compte
-  //    (§32). Elle prépare la décision, tu cliques sur Vinted.
+  // ⚠️ RIEN N'EST ENVOYÉ TOUT SEUL. Les boutons Accepter / Contre / Refuser du
+  //    panneau partent UNIQUEMENT sur ton clic, un clic = une requête. Pas de
+  //    moteur qui décide en arrière-plan : accepter une offre, c'est une vente
+  //    ferme qu'on n'annule pas.
   const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
   const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
   for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }
@@ -1593,22 +1629,41 @@ async function buildPanelData() {
       const p = (r.data && r.data.payload) || {};
       const c = p.conversation || p;
       const cid = String(c.id || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
+      // Forme RÉELLE, relevée sur les conversations en base (pas devinée) :
+      //   entity_type 'offer_request_message' = une offre DE L'ACHETEUR
+      //     → { price:{amount}, status, status_title, current, user_id,
+      //         transaction_id, offer_request_id }
+      //   entity_type 'offer_message'         = MES propres offres (sans id)
+      // Statuts observés : 20 = « Offre acceptée », 30 = « Refusée ».
+      // ⚠️ Aucune offre EN ATTENTE dans l'échantillon → le code « en attente »
+      //    est inconnu. On prend donc le problème à l'envers : on écarte ce
+      //    qu'on sait tranché, et c'est TON clic (plus Vinted, qui refuse une
+      //    offre déjà traitée) qui décide vraiment.
+      const opp = (c.opposite_user && c.opposite_user.id) != null ? c.opposite_user.id : null;
       let last = null;
       for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
-        if (!m || !/offer/i.test(String(m.entity_type || ''))) continue;
+        if (!m || m.entity_type !== 'offer_request_message') continue;
         const e = m.entity || {};
-        const px = nombre(e.offer_price != null ? e.offer_price : (e.price != null ? e.price : e.amount));
+        if (e.current === false) continue;                       // remplacée par une plus récente
+        if (opp != null && e.user_id !== opp) continue;          // c'est MOI qui l'ai faite
+        if (e.status === 20 || e.status === 30) continue;        // acceptée / refusée
+        if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
+        const px = nombre(e.price != null ? e.price : (e.offer_price != null ? e.offer_price : e.amount));
         if (px == null) continue;
-        last = { px, statut: String(e.status || e.offer_status || e.state || '') };
+        last = { px, tx: e.transaction_id != null ? String(e.transaction_id) : '', oid: e.offer_request_id != null ? String(e.offer_request_id) : '' };
       }
       if (!last) continue;
-      if (/accept|reject|refus|expir|cancel|annul|declin/i.test(last.statut)) continue; // déjà tranchée
       const titre = String(c.description || c.title || '');
+      // L'article vient de la transaction (identité certaine) ; le titre n'est
+      // qu'un repli d'affichage, et seulement s'il est unique (§24).
+      const itemId = String((c.transaction && c.transaction.item_id) || '');
       const key = normT(titre);
-      const cible = (key && onlineTitleN[key] === 1) ? online.find(o => normT(o.title) === key) : null;
+      const cible = (itemId && online.find(o => String(o.id) === itemId))
+        || ((key && onlineTitleN[key] === 1) ? online.find(o => normT(o.title) === key) : null);
       const min = cible && cible.minPrice != null ? Number(cible.minPrice) : null;
       offers.push({
         conv: cid, title: titre, price: last.px,
+        tx: last.tx, oid: last.oid, uid: String((r.data && r.data.uid) || ''),
         url: `https://www.vinted.fr/inbox/${cid}`,
         id: cible ? cible.id : null, numero: cible ? cible.numero : null,
         photo: cible ? cible.photo : null, prixVente: cible ? cible.price : null,
