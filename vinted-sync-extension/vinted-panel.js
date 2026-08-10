@@ -32,6 +32,8 @@
   let ventesAcct = 'all';   // filtre par COMPTE Vinted (uid) sur les ventes
   let ventesFrom = '';      // période : date de début (aaaa-mm-jj), vide = pas de borne
   let ventesTo = '';        // période : date de fin
+  let calOpen = false;      // le calendrier de période est-il déplié ?
+  let calMonth = 0;         // mois affiché par le calendrier (ms, 1er du mois)
   let chaussuresVue = 'online'; // « Mes paires » : online (en ligne) | sold (vendues)
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
@@ -48,6 +50,11 @@
   // place — c'est ce qui protège tes comptes.
   const repubSel = new Set();
   let repubRun = null;
+  let shipCheck = 0;        // dernier « J'ai généré → vérifier » (pour l'accusé de réception)
+  // Message TYPE préparé une fois, réutilisé sur chaque conversation cochée.
+  // Stocké en localStorage : la conversation s'ouvre dans un AUTRE onglet, donc
+  // un simple état mémoire ne suivrait pas.
+  let msgModele = readLS('vrm_msg_modele', '');
   let repubQuery = ''; // filtre texte de la liste Republier (gardé entre rendus)
   // ── Mémoire LOCALE des republications faites (par appareil, PAS d'action Vinted) :
   //    {id: timestamp}. Sert à ne jamais te faire refaire une paire déjà republiée
@@ -103,6 +110,14 @@
   const numBadge = (o) => (o && o.numero != null && o.numero !== '') ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : '';
   // ── Icônes au trait (Feather, MIT) : look pro, plus d'emojis dans la nav. ──
   const ICONS = {
+    "calendar": '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>',
+    "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>',
+    "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>',
+    "send": '<line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>',
+    "check-circle": '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>',
+    "edit-3": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>',
+    "dollar-sign": '<line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>',
+    "sliders": '<line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line>',
     "home": '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>',
     "eye": '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>',
     "grid": '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>',
@@ -402,6 +417,7 @@
       s.toPrint ? { t: 'expedier', ic: 'printer', n: s.toPrint, lbl: 'à imprimer' } : null,
       s.toShip ? { t: 'expedier', ic: 'printer', n: s.toShip, lbl: 'à générer' } : null,
       s.toPickup ? { t: 'achats', ic: 'shopping-bag', n: s.toPickup, lbl: 'à retirer' } : null,
+      s.offres ? { t: 'messages', ic: 'dollar-sign', n: s.offres, lbl: s.offres > 1 ? 'offres reçues' : 'offre reçue' } : null,
       s.unread ? { t: 'messages', ic: 'message-circle', n: s.unread, lbl: s.unread > 1 ? 'messages' : 'message' } : null,
     ].filter(Boolean);
     const tile = (label, val, color) => `<div class="vrm-st"><b style="color:${color || 'inherit'}">${val}</b><span class="vrm-m">${label}</span></div>`;
@@ -648,7 +664,7 @@
     const b = v.bord || null;
     const bordPill = !b ? ''
       : b.etat === 'print'
-        ? `<a href="${APP_URL}/?tab=cat_bord&print=bord" target="vrm_app" rel="noreferrer" title="Bordereau reçu — l'imprimer (avec la facture si compte pro)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border-radius:12px;background:#0f6b4f14;color:#0f6b4f;text-decoration:none;font-weight:800;font-size:15px">🖨️<span style="font-size:9px;font-weight:700">imprimer</span></a>`
+        ? `<button class="vrm-bord-dl" data-row="${esc(b.row || '')}" title="Ouvrir le bordereau (PDF) — prêt à imprimer" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border:0;border-radius:12px;background:#0f6b4f14;color:#0f6b4f;font:inherit;font-weight:800;font-size:15px;cursor:pointer">${svgi('printer', 16)}<span style="font-size:9px;font-weight:700">ouvrir</span></button>`
         : `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" title="Vinted attend le colis : ouvre la vente et clique « Générer le bordereau »" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border-radius:12px;background:#c98a1a14;color:#9a5b16;text-decoration:none;font-weight:800;font-size:15px">📄<span style="font-size:9px;font-weight:700">générer</span></a>`;
     const sub = [etatLbl[v.etat] || '', v.ts ? timeago(v.ts) : '', v.acct || ''].filter(Boolean).join(' · ');
     return `
@@ -667,14 +683,65 @@
       </div>`;
   }
 
-  // Barre de PÉRIODE (deux dates) — une seule ligne, comme le reste du panneau.
+  // ── PÉRIODE : un CALENDRIER qu'on clique (façon Airbnb) ─────────────────────
+  // Julien : « je veux cliquer un peu comme sur les calendriers Airbnb, telle
+  // date à telle date, qu'on n'ait pas besoin de remplir à chaque fois. »
+  // Un clic = date de début, deuxième clic = date de fin. Plus des raccourcis
+  // (7 jours / 30 jours / ce mois / mois dernier) parce que 90 % du temps c'est
+  // ça qu'on veut, sans toucher au calendrier.
+  const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const joli = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}`; };
+  // Raccourcis : [clé, libellé, calcul → {from,to}]
+  const RACCOURCIS = [
+    ['7', '7 jours', () => { const t = new Date(); const f = new Date(); f.setDate(f.getDate() - 6); return { from: iso(f), to: iso(t) }; }],
+    ['30', '30 jours', () => { const t = new Date(); const f = new Date(); f.setDate(f.getDate() - 29); return { from: iso(f), to: iso(t) }; }],
+    ['mois', 'Ce mois', () => { const t = new Date(); return { from: iso(new Date(t.getFullYear(), t.getMonth(), 1)), to: iso(t) }; }],
+    ['prec', 'Mois dernier', () => { const t = new Date(); const f = new Date(t.getFullYear(), t.getMonth() - 1, 1); return { from: iso(f), to: iso(new Date(t.getFullYear(), t.getMonth(), 0)) }; }],
+  ];
   function periodeBar() {
-    return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-      <span class="vrm-m" style="font-weight:700">Période</span>
-      <input id="vrm-v-from" type="date" value="${esc(ventesFrom)}" style="flex:1 1 120px;min-width:0;border:1px solid #d7dde3;border-radius:9px;padding:6px 8px;font:inherit;font-size:12px">
-      <span class="vrm-m">→</span>
-      <input id="vrm-v-to" type="date" value="${esc(ventesTo)}" style="flex:1 1 120px;min-width:0;border:1px solid #d7dde3;border-radius:9px;padding:6px 8px;font:inherit;font-size:12px">
-      ${(ventesFrom || ventesTo) ? `<button class="vrm-vdate" data-act="clear" style="flex-shrink:0;border:1px solid #dde;background:#fff;color:#556;border-radius:9px;padding:6px 9px;font-weight:700;font-size:11px;cursor:pointer">✕ tout</button>` : ''}
+    const label = (!ventesFrom && !ventesTo) ? 'Toute la période'
+      : (ventesFrom && ventesTo) ? `${joli(ventesFrom)} → ${joli(ventesTo)}`
+      : ventesFrom ? `à partir du ${joli(ventesFrom)}` : `jusqu'au ${joli(ventesTo)}`;
+    const actif = !!(ventesFrom || ventesTo);
+    const chips = RACCOURCIS.map(([k, l]) => `<button class="vrm-vquick" data-q="${k}" style="border:1px solid #dde;background:#fff;color:#334;border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}</button>`).join('');
+    return `<div style="margin-bottom:8px">
+      <button id="vrm-cal-toggle" style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:8px;border:1px solid ${actif ? '#0f172a' : '#d7dde3'};background:${actif ? '#0f172a' : '#fff'};color:${actif ? '#fff' : '#334'};border-radius:11px;padding:8px 11px;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;text-align:left">
+        <span style="flex-shrink:0;display:flex">${svgi('calendar', 15)}</span>
+        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(label)}</span>
+        ${actif ? `<span class="vrm-vdate" data-act="clear" title="Tout afficher" style="flex-shrink:0;opacity:.85;font-size:14px">✕</span>` : ''}
+      </button>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${chips}</div>
+      ${calOpen ? calendrier() : ''}
+    </div>`;
+  }
+  // Le calendrier lui-même. Lundi en premier (France). Les jours sans aucune
+  // vente restent cliquables : on filtre une période, pas une liste de dates.
+  function calendrier() {
+    const base = calMonth ? new Date(calMonth) : new Date();
+    const y = base.getFullYear(), m = base.getMonth();
+    const premier = new Date(y, m, 1);
+    const decal = (premier.getDay() + 6) % 7;         // lundi = 0
+    const nbJours = new Date(y, m + 1, 0).getDate();
+    const cases = [];
+    for (let i = 0; i < decal; i++) cases.push('<div></div>');
+    for (let j = 1; j <= nbJours; j++) {
+      const d = iso(new Date(y, m, j));
+      const deb = ventesFrom && d === ventesFrom, fin = ventesTo && d === ventesTo;
+      const dedans = ventesFrom && ventesTo && d > ventesFrom && d < ventesTo;
+      const bg = (deb || fin) ? '#0f172a' : dedans ? '#0f172a14' : 'transparent';
+      const col = (deb || fin) ? '#fff' : '#223';
+      cases.push(`<button class="vrm-cal-d" data-d="${d}" style="border:0;background:${bg};color:${col};border-radius:9px;padding:6px 0;font:inherit;font-weight:${(deb || fin) ? 700 : 500};font-size:12px;cursor:pointer">${j}</button>`);
+    }
+    const jours = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(x => `<div class="vrm-m" style="text-align:center;font-size:10px;font-weight:700">${x}</div>`).join('');
+    return `<div style="margin-top:8px;border:1px solid #eceff3;border-radius:12px;padding:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <button class="vrm-cal-nav" data-n="-1" style="border:1px solid #dde;background:#fff;border-radius:8px;padding:2px 8px;font:inherit;cursor:pointer">‹</button>
+        <div style="flex:1;text-align:center;font-weight:700;font-size:12.5px">${MOIS_FR[m]} ${y}</div>
+        <button class="vrm-cal-nav" data-n="1" style="border:1px solid #dde;background:#fff;border-radius:8px;padding:2px 8px;font:inherit;cursor:pointer">›</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${jours}${cases.join('')}</div>
+      <div class="vrm-m" style="margin-top:6px;font-size:10.5px">${!ventesFrom || ventesTo ? 'Clique la date de DÉBUT' : 'Clique la date de FIN'}</div>
     </div>`;
   }
   // Filtre par période sur `ts` (ms). Une date absente = pas de borne de ce côté.
@@ -699,10 +766,35 @@
   function wireVentes() {
     panel.querySelectorAll('.vrm-vfilter').forEach(b => { b.onclick = () => { ventesFilter = b.dataset.f; render(); }; });
     panel.querySelectorAll('.vrm-vacct').forEach(b => { b.onclick = () => { ventesAcct = b.dataset.a; render(); }; });
-    const f = panel.querySelector('#vrm-v-from'), t = panel.querySelector('#vrm-v-to');
-    if (f) f.onchange = () => { ventesFrom = f.value || ''; render(); };
-    if (t) t.onchange = () => { ventesTo = t.value || ''; render(); };
-    panel.querySelectorAll('.vrm-vdate').forEach(b => { b.onclick = () => { ventesFrom = ''; ventesTo = ''; render(); }; });
+    // Calendrier de période (clic début → clic fin, façon Airbnb).
+    const tog = panel.querySelector('#vrm-cal-toggle');
+    if (tog) tog.onclick = (e) => {
+      if (e.target.closest('.vrm-vdate')) { ventesFrom = ''; ventesTo = ''; calOpen = false; render(); return; }
+      calOpen = !calOpen;
+      if (calOpen && !calMonth) { const d = ventesFrom ? new Date(ventesFrom + 'T12:00:00') : new Date(); calMonth = new Date(d.getFullYear(), d.getMonth(), 1).getTime(); }
+      render();
+    };
+    panel.querySelectorAll('.vrm-cal-nav').forEach(b => { b.onclick = () => { const d = new Date(calMonth || Date.now()); calMonth = new Date(d.getFullYear(), d.getMonth() + Number(b.dataset.n), 1).getTime(); render(); }; });
+    panel.querySelectorAll('.vrm-cal-d').forEach(b => {
+      b.onclick = () => {
+        const d = b.dataset.d;
+        // Pas de début, ou plage déjà complète → on repart d'un début.
+        // Un clic AVANT le début en cours redémarre aussi (sinon on bloque).
+        if (!ventesFrom || ventesTo || d < ventesFrom) { ventesFrom = d; ventesTo = ''; }
+        else { ventesTo = d; calOpen = false; }
+        render();
+      };
+    });
+    panel.querySelectorAll('.vrm-vquick').forEach(b => {
+      b.onclick = () => {
+        const r = RACCOURCIS.find(x => x[0] === b.dataset.q);
+        if (!r) return;
+        const { from, to } = r[2]();
+        ventesFrom = from; ventesTo = to; calOpen = false;
+        calMonth = new Date(new Date(to + 'T12:00:00').getFullYear(), new Date(to + 'T12:00:00').getMonth(), 1).getTime();
+        render();
+      };
+    });
     const vs = panel.querySelector('#vrm-v-search');
     const apply = () => { const q = ventesQuery.trim().toLowerCase(); panel.querySelectorAll('.vrm-v-row').forEach(r => { r.style.display = (!q || (r.dataset.s || '').includes(q)) ? 'flex' : 'none'; }); };
     if (vs) { vs.oninput = () => { ventesQuery = vs.value; apply(); }; apply(); }
@@ -746,12 +838,66 @@
         ${o.hasDesc ? '✅ description enregistrée' : '⏳ description en cours de lecture…'}
         ${o.nPhotos ? ` · 📷 ${o.nPhotos} photo${o.nPhotos > 1 ? 's' : ''} gardées` : ''}
       </div>${diag}
+      ${minBloc(o)}
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
         <a class="vrm-link" href="https://www.vinted.fr/items/${esc(id)}/edit" target="_blank" rel="noreferrer" style="border:1px solid #09b1ba;background:#09b1ba;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:12px;text-decoration:none">✏️ Modifier sur Vinted ↗</a>
         ${suggested != null ? `<button class="vrm-copy-line" data-c="${suggested}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier ${suggested} €</button>` : ''}
         ${o.numero ? `<button class="vrm-copy-line" data-c="N°${esc(o.numero)} · ${esc(o.title || '')}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier N° + titre</button>` : ''}
       </div>`;
     return card(o, extra);
+  }
+
+  // ── PRIX MINIMUM ACCEPTÉ (par paire) ────────────────────────────────────────
+  // Julien : « sur chaque paire je mets un montant minimum que je peux accepter,
+  // et dès qu'une offre arrive… ». Le montant se pose ici, en 3 secondes.
+  // ⚠️ Ce que l'extension fait ensuite : elle TRANCHE POUR TOI (accepte / contre
+  // à X €) et te met le chiffre prêt à coller. Elle n'accepte PAS l'offre à ta
+  // place : répondre à Vinted par script, c'est le geste qui fait bloquer un
+  // compte (§32) — et une offre acceptée par erreur, c'est une vente à perte.
+  function minBloc(o) {
+    const v = o && o.minPrice != null ? o.minPrice : '';
+    return `<div class="vrm-card" style="margin-top:8px;padding:9px">
+      <div style="font-weight:800;font-size:12.5px;margin-bottom:5px;display:flex;align-items:center;gap:6px">${svgi('tag', 14)} Mon prix plancher</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="vrm-min-in" type="number" inputmode="decimal" min="0" step="0.5" value="${esc(String(v))}" placeholder="ex. 35" style="flex:1 1 90px;min-width:0;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:13px">
+        <span class="vrm-m" style="flex-shrink:0">€</span>
+        <button id="vrm-min-save" data-id="${esc(o.id)}" style="flex-shrink:0;border:none;background:#0f172a;color:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">Enregistrer</button>
+      </div>
+      <div class="vrm-m" style="margin-top:6px;font-size:10.5px">${v !== '' ? `Toute offre ≥ <b>${fmt(v)}</b> te sera signalée « à accepter », les autres avec une contre-offre prête.` : 'En dessous, on te proposera une contre-offre ; au-dessus, on te dira d\'accepter.'}</div>
+    </div>`;
+  }
+  // ── OFFRES REÇUES : la décision est déjà prise, il reste à cliquer ───────────
+  function renderOffres() {
+    const list = (DATA && DATA.offers) || [];
+    if (!list.length) return '';
+    const ligne = (of) => {
+      const ok = of.verdict === 'accepter';
+      const sansMin = of.verdict === 'sansmin';
+      const coul = sansMin ? '#44515e' : ok ? '#0f6b4f' : '#9a5b16';
+      const fond = sansMin ? '#f2f5f8' : ok ? '#eefaf3' : '#fff6ec';
+      const verdict = sansMin ? 'Pose ton prix plancher sur cette paire pour trancher d\'un coup d\'œil'
+        : ok ? `✅ <b>Accepte</b> — c\'est au-dessus de ton plancher (${fmt(of.min)})`
+        : `↩️ <b>Contre à ${fmt(of.min)}</b> — l\'offre est sous ton plancher`;
+      return `<div class="vrm-card" style="margin-bottom:6px;padding:8px;background:${fond}">
+        <div style="display:flex;gap:9px;align-items:center">
+          ${pairThumb(of, 40)}
+          <div style="flex:1 1 130px;min-width:0">
+            <div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(of)}${esc(of.title || 'Article')}</div>
+            <div class="vrm-m" style="font-size:11px">offre reçue <b>${fmt(of.price)}</b>${of.prixVente != null ? ` · en ligne à ${fmt(of.prixVente)}` : ''}</div>
+          </div>
+        </div>
+        <div class="vrm-m" style="margin-top:6px;color:${coul};font-size:11.5px">${verdict}</div>
+        <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap">
+          <a href="${esc(of.url)}" target="_blank" rel="noreferrer" style="flex:1 1 130px;text-align:center;text-decoration:none;border:1px solid ${coul};background:${coul};color:#fff;border-radius:9px;padding:7px;font-weight:800;font-size:12px">Répondre sur Vinted ↗</a>
+          ${(!sansMin && !ok) ? `<button class="vrm-copy-line" data-c="${esc(String(of.min))}" style="flex-shrink:0;border:1px solid ${coul};background:transparent;color:${coul};border-radius:9px;padding:7px 11px;font-weight:800;font-size:12px;cursor:pointer">📋 ${fmt(of.min)}</button>` : ''}
+        </div>
+      </div>`;
+    };
+    return `<div style="margin-bottom:10px">
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:6px">${svgi('dollar-sign', 14)} ${list.length} offre${list.length > 1 ? 's' : ''} à trancher</div>
+      ${list.slice(0, 20).map(ligne).join('')}
+      <div class="vrm-m" style="font-size:10.5px;opacity:.8">Lu sur les conversations déjà captées. L'extension ne répond jamais à ta place — elle te dit quoi faire et prépare le chiffre.</div>
+    </div>`;
   }
 
   // L'ancienneté n'est connue que pour les annonces dont tu as ouvert la page.
@@ -793,7 +939,7 @@
           <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">${svgi('heart', 15)} Favoris</button>
         </div>
       </div>
-      <div id="vrm-body">${
+      <div id="vrm-body">${modeleBandeau()}${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
@@ -833,6 +979,23 @@
         chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setAccountOff', uid, off }, () => { load(); });
       };
     });
+    // Ouvrir le PDF d'un bordereau — présent sur plusieurs onglets (Ventes,
+    // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
+    panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });
+    const minSave = panel.querySelector('#vrm-min-save');
+    if (minSave) minSave.onclick = () => {
+      const inp = panel.querySelector('#vrm-min-in');
+      const amount = inp ? inp.value : '';
+      minSave.disabled = true; minSave.textContent = '⏳';
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setMinPrice', id: minSave.dataset.id, amount }, () => { load(); });
+    };
+    const mg = panel.querySelector('#vrm-modele-go');
+    if (mg) mg.onclick = () => {
+      const how = insertReply(msgModele);
+      const p = mg.innerHTML;
+      mg.innerHTML = how === 'inserted' ? '✓ Collé — relis, puis appuie sur Envoyer' : '✓ Copié (champ Vinted introuvable)';
+      setTimeout(() => { try { mg.innerHTML = p; } catch (_) {} }, 2200);
+    };
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
     if (tab === 'chaussures') wireChaussures();
@@ -849,7 +1012,8 @@
   // message n'est envoyé automatiquement.
   function renderMessages() {
     const list = (DATA && DATA.convs) || [];
-    if (!list.length) return `<div class="vrm-m">Aucune conversation captée. Ouvre ta messagerie Vinted une fois pour les capter.</div>`;
+    const offres = renderOffres();
+    if (!list.length) return `${offres}<div class="vrm-m">Aucune conversation captée. Ouvre ta messagerie Vinted une fois pour les capter.</div>`;
     if (msgRun) {
       const total = msgRun.queue.length, i = msgRun.idx;
       if (i >= total) return `<div class="vrm-card" style="text-align:center"><div style="font-size:15px;font-weight:800;margin-bottom:4px">✓ Terminé</div><div class="vrm-m">${total} conversation${total > 1 ? 's' : ''} passée${total > 1 ? 's' : ''}.</div><button class="vrm-msg-go" data-act="stop" style="margin-top:10px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:8px 14px;font-weight:800;cursor:pointer">Fermer</button></div>`;
@@ -860,6 +1024,7 @@
           ${c.photo ? `<img src="${esc(c.photo)}" alt="" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0" />` : '<span style="font-size:24px;flex-shrink:0">💬</span>'}
           <div style="flex:1;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.login || 'Acheteur')}${c.unread ? ' 🔴' : ''}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '')}</div></div>
         </div>
+        ${msgModele.trim() ? `<div class="vrm-m" style="margin-top:8px;padding:7px 9px;border:1px dashed #0f172a44;border-radius:9px">✉️ Message type prêt : « ${esc(msgModele.slice(0, 90))}${msgModele.length > 90 ? '…' : ''} » — une fois la conversation ouverte, clique <b>Coller mon message type</b> en haut du panneau.</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="vrm-msg-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir ↗</button>
           <button class="vrm-msg-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
@@ -873,8 +1038,10 @@
         <div style="flex:1;min-width:0"><div class="vrm-t">${c.unread ? '🔴 ' : ''}${esc(c.login || 'Acheteur')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '')}</div></div>
       </label>`).join('');
     return `
+      ${offres}
       <button class="vrm-msg-go" data-act="reponse" style="width:100%;margin-bottom:8px;border:1px dashed #09b1ba;background:#09b1ba0e;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;font-size:12.5px;cursor:pointer">✍️ Assistant de réponse (IA)</button>
       <div class="vrm-m" style="margin-bottom:8px">Coche les conversations où <b>répondre</b>. Tu réponds <b>une par une, toi-même</b> (aucun envoi automatique). 🔴 = non lu.</div>
+      ${modeleBloc()}
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-msg-go" data-act="unread" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Cocher non lus</button>
         <button class="vrm-msg-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
@@ -882,7 +1049,39 @@
       <div class="vrm-grid" style="margin-bottom:8px">${rows}</div>
       <button class="vrm-msg-go" data-act="start" ${msgSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${msgSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${msgSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Répondre à ma sélection (${msgSel.size})</button>`;
   }
+  // ── LE MESSAGE TYPE (préparé une fois, inséré partout) ──────────────────────
+  // Julien : « prédéfinir un message qui sera envoyé par l'extension ».
+  // Ce qui est fait : tu l'écris ici, et sur CHAQUE conversation ouverte un
+  // bouton le colle dans le champ de Vinted — tu relis, tu appuies sur Envoyer.
+  // ⚠️ L'extension n'ENVOIE rien elle-même : un script qui poste des messages en
+  // série est exactement ce que Vinted sanctionne (§32). Coller le texte fait
+  // gagner tout le temps sans prendre ce risque.
+  function modeleBloc() {
+    const qr = ((DATA && DATA.quickReplies) || []).slice(0, 6);
+    const chips = qr.length ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${qr.map((t, i) => `<button class="vrm-msg-modele-qr" data-i="${i}" title="${esc(String(t))}" style="border:1px solid #dde;background:#fff;color:#334;border-radius:999px;padding:4px 9px;font-weight:600;font-size:11px;cursor:pointer;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(String(t).slice(0, 34))}${String(t).length > 34 ? '…' : ''}</button>`).join('')}</div>` : '';
+    return `<div class="vrm-card" style="margin-bottom:8px;padding:9px">
+      <div style="font-weight:800;font-size:12.5px;margin-bottom:5px;display:flex;align-items:center;gap:6px">${svgi('edit-3', 14)} Mon message type</div>
+      <textarea id="vrm-msg-modele" rows="3" placeholder="Bonjour ! Merci pour ton intérêt…" style="width:100%;box-sizing:border-box;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical">${esc(msgModele)}</textarea>
+      ${chips}
+      <div class="vrm-m" style="margin-top:6px;font-size:10.5px">Sur chaque conversation ouverte, un bouton le colle dans le champ Vinted. <b>C'est toi qui appuies sur Envoyer</b> — rien n'est envoyé tout seul.</div>
+    </div>`;
+  }
+  // Bandeau visible sur une page de conversation, quel que soit l'onglet du
+  // panneau : le message type est prêt, un clic le colle dans le champ Vinted.
+  function modeleBandeau() {
+    if (!msgModele.trim() || !currentConvId()) return '';
+    return `<button id="vrm-modele-go" style="width:100%;box-sizing:border-box;margin-bottom:8px;display:flex;align-items:center;gap:8px;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:11px;padding:9px 11px;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;text-align:left">
+      <span style="flex-shrink:0;display:flex">${svgi('send', 15)}</span>
+      <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Coller mon message type</span>
+    </button>`;
+  }
+
   function wireMessages() {
+    const mt = panel.querySelector('#vrm-msg-modele');
+    if (mt) mt.oninput = () => { msgModele = mt.value; writeLS('vrm_msg_modele', msgModele); }; // pas de re-render : on garde le focus
+    panel.querySelectorAll('.vrm-msg-modele-qr').forEach(b => {
+      b.onclick = () => { const t = ((DATA && DATA.quickReplies) || [])[Number(b.dataset.i)]; if (t == null) return; msgModele = String(t); writeLS('vrm_msg_modele', msgModele); render(); };
+    });
     panel.querySelectorAll('.vrm-msg-chk').forEach(c => { c.onchange = () => { const k = c.dataset.k; if (c.checked) msgSel.add(k); else msgSel.delete(k); render(); }; });
     panel.querySelectorAll('.vrm-msg-go').forEach(b => {
       b.onclick = () => {
@@ -1051,6 +1250,30 @@
     });
   }
 
+  // ── LE BORDEREAU, DONNÉ POUR DE VRAI ────────────────────────────────────────
+  // Julien : « je ne sais pas trop comment tu comptes me les donner. » Réponse :
+  // un clic, le PDF s'ouvre. L'extension va chercher le fichier déjà reçu par
+  // email (la version TAMPONNÉE avec le N° de la paire quand l'app l'a produite),
+  // et l'ouvre dans un onglet — prêt à imprimer, sans passer par l'app.
+  function ouvrirBordereau(row, btn) {
+    if (!row) return;
+    const avant = btn ? btn.innerHTML : '';
+    const dire = (t) => { if (!btn) return; btn.innerHTML = t; setTimeout(() => { try { btn.innerHTML = avant; btn.disabled = false; } catch (_) {} }, 2200); };
+    if (btn) { btn.innerHTML = '⏳'; btn.disabled = true; }
+    chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'bordPdf', row }, (r) => {
+      if (!r || !r.ok || !r.b64) { dire(r && r.reason === 'no-pdf' ? 'pas de PDF' : 'introuvable'); return; }
+      try {
+        const bin = atob(String(r.b64).replace(/^data:[^,]+,/, ''));
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([u8], { type: 'application/pdf' }));
+        window.open(url, '_blank', 'noopener');
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 60000);
+        if (btn) { btn.disabled = false; btn.innerHTML = avant; }
+      } catch (_) { dire('PDF illisible'); }
+    });
+  }
+
   // ── ONGLET « À EXPÉDIER » : bordereaux pilotés par TA sélection ─────────────
   // Tu coches les bordereaux à générer, tu lances : l'extension t'ouvre chaque
   // vente UNE PAR UNE ; TU cliques « Générer le bordereau » sur Vinted, elle capte
@@ -1082,6 +1305,8 @@
       // au vert ici. Le bouton « J'ai généré » recharge pour te le confirmer.
       const frais = ((DATA && DATA.toShip) || []).find(x => String(x.transaction || '') === String(t.transaction || ''));
       const capte = !!(frais && frais.hasBord);
+      // Le bordereau lui-même, s'il est déjà arrivé → on peut l'ouvrir ICI.
+      const bordIci = ((DATA && DATA.bordsToPrint) || []).find(x => String(x.transaction || '') === String(t.transaction || ''));
       return `
         <div class="vrm-m" style="margin-bottom:8px">Vente <b>${i + 1}</b> / ${total} — ouvre-la, clique <b>Générer le bordereau</b> sur Vinted. L'extension capte le PDF toute seule ; tu le retrouves dans « à imprimer ».</div>
         <div class="vrm-card" style="display:flex;gap:8px;align-items:center;border-color:${capte ? '#0f6b4f' : '#eceff4'}">
@@ -1089,6 +1314,8 @@
           <div style="flex:1 1 130px;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(t)}${esc(t.title || 'Vente')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || '')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
           ${capte ? '<span style="flex-shrink:0;font-weight:800;color:#0f6b4f;font-size:12px">✓ bordereau capté</span>' : ''}
         </div>
+        ${bordIci ? `<button class="vrm-bord-dl" data-row="${esc(bordIci.row || '')}" style="width:100%;margin-top:8px;border:none;background:#0f172a;color:#fff;border-radius:10px;padding:10px;font:inherit;font-weight:800;cursor:pointer">${svgi('printer', 15)} Ouvrir le bordereau (PDF)</button>` : ''}
+        ${(shipCheck && !capte) ? `<div class="vrm-m" style="margin-top:8px;color:#9a5b16">Pas encore reçu. Le bordereau arrive par email juste après la génération — laisse une minute puis « vérifier » à nouveau.</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
           <button class="vrm-ship-go" data-act="open" style="flex:1 1 140px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
           <button class="vrm-ship-go" data-act="check" style="flex:1 1 140px;border:1px solid #0f6b4f;background:rgba(15,107,79,.06);color:#0f6b4f;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">J'ai généré → vérifier</button>
@@ -1112,6 +1339,7 @@
           ${pairThumb(b, 42)}
           <span style="flex-shrink:0;min-width:36px;text-align:center;font-weight:800;color:${b.numero ? '#0f6b4f' : '#c53030'};background:${b.numero ? 'rgba(15,107,79,.1)' : 'rgba(197,48,48,.1)'};border-radius:8px;padding:5px 6px;font-size:12px">${b.numero ? ('N°' + esc(b.numero)) : 'N° ?'}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title || 'Bordereau')}</div>${b.dateLimite ? `<div class="vrm-m">à envoyer avant ${esc(b.dateLimite)}</div>` : ''}</div>
+          <button class="vrm-bord-dl" data-row="${esc(b.row || '')}" title="Ouvrir le PDF du bordereau (prêt à imprimer)" style="flex-shrink:0;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">${svgi('printer', 13)} Ouvrir</button>
           <button class="vrm-bord-done" data-k="${esc(b.key)}" title="Marquer traité → le retire de la liste (colis fait)" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Traiter</button>
         </div>`).join('')}
       <a href="${APP_URL}/?tab=cat_bord&print=bord" target="vrm_app" rel="noreferrer" title="Ouvre l'app et imprime TOUS les bordereaux d'un coup (tous les comptes), factures pro jointes" style="display:block;text-align:center;text-decoration:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;margin-bottom:14px">🖨️ Tout imprimer (dans l'app) ↗</a>` : '';
@@ -1199,8 +1427,8 @@
         else if (act === 'open') { const t = shipRun && shipRun.queue[shipRun.idx]; if (t && t.url) window.open(t.url, '_blank', 'noopener'); }
         // Relit les données : si tu viens de générer le bordereau sur Vinted,
         // l'extension l'a capté et la ligne passe au vert. Aucun clic à ta place.
-        else if (act === 'check') { load(); }
-        else if (act === 'next') { if (shipRun) { shipRun.idx++; render(); } }
+        else if (act === 'check') { shipCheck = Date.now(); load(); }
+        else if (act === 'next') { if (shipRun) { shipRun.idx++; shipCheck = 0; render(); } }
       };
     });
   }

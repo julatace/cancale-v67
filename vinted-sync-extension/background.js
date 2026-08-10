@@ -348,6 +348,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
           if (msg.action === 'convLastMessage') { const r = await convLastMessage(msg.convId); sendResponse(r); return; }
           if (msg.action === 'markBordDone' && msg.key) { const ok = await markBordDone(msg.key, msg.done); sendResponse({ ok }); return; }
+          if (msg.action === 'bordPdf' && msg.row) { const r = await bordPdf(msg.row); sendResponse(r); return; }
+          if (msg.action === 'setMinPrice' && msg.id) { const ok = await setMinPrice(msg.id, msg.amount); sendResponse({ ok }); return; }
           if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
           if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -1038,6 +1040,40 @@ async function markBordDone(key, done) {
 // markBordDone : ligne DÉDIÉE `panel_colis_collected` = { colisKey: ts }, jamais
 // `main`. Le panneau la relit pour vider la liste ; l'app la LIT comme source de
 // « déjà récupéré » supplémentaire. Clé = `suivi || subject` (comme `colisKey`).
+// ── LE BORDEREAU, EN VRAI, DEPUIS LE PANNEAU ────────────────────────────────
+// Julien : « je ne sais pas trop comment tu comptes me les donner, les
+// bordereaux ». Réponse : on va chercher le PDF déjà reçu par email (ligne
+// `email_bord_*`) et on le lui rend directement — la version TAMPONNÉE par
+// l'app (avec le N° de la paire imprimé dessus) si elle existe, sinon le PDF
+// brut de Vinted. Zéro requête vers Vinted, c'est un fichier qu'il a déjà.
+async function bordPdf(rowId) {
+  const id = String(rowId || '').trim();
+  if (!id) return { ok: false };
+  try {
+    const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(id)}&select=pdfB64:data->>pdfB64,pdfTamponneB64:data->>pdfTamponneB64,filename:data->>filename`);
+    const r = rows && rows[0];
+    if (!r) return { ok: false };
+    const net = (v) => (v && v !== 'None') ? v : null;
+    const b64 = net(r.pdfTamponneB64) || net(r.pdfB64);
+    if (!b64) return { ok: false, reason: 'no-pdf' };
+    return { ok: true, b64, tamponne: !!net(r.pdfTamponneB64), filename: net(r.filename) || 'bordereau.pdf' };
+  } catch (_) { return { ok: false }; }
+}
+
+// Prix MINIMUM accepté par paire (ligne dédiée `panel_min_prices`, jamais
+// `main`). Sert à trancher une offre reçue en un coup d'œil : au-dessus →
+// accepte, en dessous → contre-offre proposée. ⚠️ L'extension n'accepte ni ne
+// refuse rien à ta place sur Vinted (cf. refus §32) : elle te dit quoi faire.
+async function setMinPrice(id, amount) {
+  const k = String(id || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const n = Number(amount);
+  if (!isFinite(n) || n <= 0) delete cur[k]; else cur[k] = n;
+  return await supabaseUpsert('app_data', [{ id: 'panel_min_prices', data: cur }], 'id');
+}
+
 // Couper / réafficher un compte Vinted DEPUIS LE PANNEAU. Ligne DÉDIÉE
 // `panel_accounts_off` = { uid: true } — jamais `main` (un upsert y écraserait
 // tout le blob de l'app). `buildPanelData` la relit : le compte disparaît de
@@ -1147,8 +1183,15 @@ async function buildPanelData() {
   const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || (k ? 'compte ' + k.slice(-4) : ''); };
   const lstAll = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []);
   const soldAll = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []);
-  const lst = lstAll.filter(keepAcc);
-  const soldRows = soldAll.filter(keepAcc);
+  // ⚠️ LA PLUS FRAÎCHE CAPTURE GAGNE. Une même vente peut exister dans plusieurs
+  // lignes moissonnées (comptes, captures successives). Avant, on gardait la
+  // PREMIÈRE rencontrée — donc parfois un statut périmé : une paire déjà expédiée
+  // ressortait « à générer ». On trie par date de capture décroissante : le
+  // premier vu est le plus récent. On se base sur ce qu'on a capté, pas sur une
+  // déduction.
+  const parFraicheur = (a, b) => (Date.parse((b.data && b.data.capturedAt) || '') || 0) - (Date.parse((a.data && a.data.capturedAt) || '') || 0);
+  const lst = lstAll.filter(keepAcc).sort(parFraicheur);
+  const soldRows = soldAll.filter(keepAcc).sort(parFraicheur);
   // Liste des comptes pour le panneau (avec le nb d'annonces en ligne) : tu vois
   // exactement d'où viennent tes paires, et tu peux en couper un d'un clic.
   const accountsSeen = {};
@@ -1277,14 +1320,45 @@ async function buildPanelData() {
   const photoDeCommande = (o) => (o && ((o.photo && (o.photo.url || (typeof o.photo === 'string' ? o.photo : null))) || o.photo_url)) || null;
   const bordRows = await sbGet("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
   const bordTxns = new Set(bordRows.map(b => String(b.transaction || '')).filter(Boolean));
+  // ── ÉTAT DU COLIS : la capture la plus précise qu'on ait ────────────────────
+  // Le détail de transaction (`harvest_*_txn_*`) porte `shipment.status_title` —
+  // c'est Vinted qui le dit, pas une déduction de notre part. Quand ce détail est
+  // PLUS RÉCENT que la ligne de commande, il fait foi : une paire dont le colis
+  // est parti ne doit plus jamais apparaître « à générer » (plainte de Julien).
+  const txnEtat = {};
+  try {
+    const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data') || []).filter(keepAcc);
+    for (const r of txnRows) {
+      const p = (r.data && r.data.payload) || {};
+      const t = p.transaction || p;
+      const tx = String((t && t.id) || '');
+      if (!tx) continue;
+      const sh = (t && t.shipment) || {};
+      const st = String(sh.status_title || sh.status || t.status_title || t.status || '');
+      const cap = Date.parse((r.data && r.data.capturedAt) || '') || 0;
+      if (!st) continue;
+      if (!txnEtat[tx] || cap > txnEtat[tx].cap) txnEtat[tx] = { st, cap };
+    }
+  } catch (_) { /* la forme du détail de transaction peut varier : on ignore */ }
+  // « Encore à expédier » = ce que dit la capture LA PLUS RÉCENTE dont on dispose.
+  const encoreAExpedier = (tx, statutCommande, capCommande) => {
+    const d = tx ? txnEtat[String(tx)] : null;
+    if (d && d.cap >= (capCommande || 0)) return awaitingShip(d.st);
+    return awaitingShip(statutCommande);
+  };
   const toShip = [];
   const seenTx = new Set();
   for (const r of soldRows) {
     const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    const capR = Date.parse((r.data && r.data.capturedAt) || '') || 0;
     for (const o of orders) {
-      if (!awaitingShip(o.status)) continue;
-      const tx = String(o.transaction_id || '');
-      if (tx && seenTx.has(tx)) continue; if (tx) seenTx.add(tx);
+      const tx0 = String(o.transaction_id || '');
+      // ⚠️ On saute AUSSI les transactions déjà vues dans une capture plus
+      // fraîche : sans ça, une vieille ligne rouvrait une vente déjà traitée.
+      if (tx0 && seenTx.has(tx0)) continue;
+      if (!encoreAExpedier(tx0, o.status, capR)) { if (tx0) seenTx.add(tx0); continue; }
+      const tx = tx0;
+      if (tx) seenTx.add(tx);
       toShip.push({
         ...acctOfRow(r), photo: photoDeCommande(o),
         transaction: tx, title: o.title || '', status: o.status || '',
@@ -1306,6 +1380,7 @@ async function buildPanelData() {
   const seenSaleTx = new Set();
   for (const r of soldRows) {
     const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    const capR = Date.parse((r.data && r.data.capturedAt) || '') || 0;
     for (const o of orders) {
       const tx = String(o.transaction_id || '');
       if (tx && seenSaleTx.has(tx)) continue; if (tx) seenSaleTx.add(tx);
@@ -1316,7 +1391,9 @@ async function buildPanelData() {
         transaction: tx, title: o.title || '', status: o.status || '',
         etat: classifySale(o.status),
         // « à expédier » = Vinted attend encore le colis (même règle que l'app).
-        aExpedier: awaitingShip(o.status),
+        // (capture la plus récente, détail de transaction prioritaire — sinon une
+        // paire déjà expédiée ressortait « à générer »)
+        aExpedier: encoreAExpedier(tx, o.status, capR),
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
         ts: isNaN(ts) ? 0 : ts,
         url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : 'https://www.vinted.fr/member/transactions?type=sold',
@@ -1489,9 +1566,59 @@ async function buildPanelData() {
     }
   }
   convs.sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
+  // ── OFFRES REÇUES : trancher en un coup d'œil ───────────────────────────────
+  // Tu poses un PRIX MINIMUM sur une paire ; dès qu'une offre est captée, on te
+  // dit « accepte » ou « propose X € ». Source = les conversations DÉJÀ CAPTÉES
+  // (`harvest_*_conv_*`, donc celles que tu as ouvertes) : on y lit la dernière
+  // demande d'offre et son montant. Si on ne trouve pas de montant, on n'affiche
+  // RIEN (jamais de chiffre inventé).
+  // ⚠️ L'extension n'accepte, ne refuse et ne contre AUCUNE offre à ta place :
+  //    un script qui répond à Vinted, c'est le motif qui fait bloquer un compte
+  //    (§32). Elle prépare la décision, tu cliques sur Vinted.
+  const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
+  const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
+  for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }
+  const offers = [];
+  try {
+    const nombre = (v) => {
+      if (v == null) return null;
+      if (typeof v === 'number') return isFinite(v) ? v : null;
+      if (typeof v === 'object') return nombre(v.amount != null ? v.amount : v.value);
+      const n = Number(String(v).replace(',', '.').replace(/[^\d.]/g, ''));
+      return isFinite(n) ? n : null;
+    };
+    const convRows = (await sbGet('app_data?id=like.harvest_*_conv_*&select=id,data') || []).filter(keepAcc).sort(parFraicheur);
+    const vus = new Set();
+    for (const r of convRows) {
+      const p = (r.data && r.data.payload) || {};
+      const c = p.conversation || p;
+      const cid = String(c.id || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
+      let last = null;
+      for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+        if (!m || !/offer/i.test(String(m.entity_type || ''))) continue;
+        const e = m.entity || {};
+        const px = nombre(e.offer_price != null ? e.offer_price : (e.price != null ? e.price : e.amount));
+        if (px == null) continue;
+        last = { px, statut: String(e.status || e.offer_status || e.state || '') };
+      }
+      if (!last) continue;
+      if (/accept|reject|refus|expir|cancel|annul|declin/i.test(last.statut)) continue; // déjà tranchée
+      const titre = String(c.description || c.title || '');
+      const key = normT(titre);
+      const cible = (key && onlineTitleN[key] === 1) ? online.find(o => normT(o.title) === key) : null;
+      const min = cible && cible.minPrice != null ? Number(cible.minPrice) : null;
+      offers.push({
+        conv: cid, title: titre, price: last.px,
+        url: `https://www.vinted.fr/inbox/${cid}`,
+        id: cible ? cible.id : null, numero: cible ? cible.numero : null,
+        photo: cible ? cible.photo : null, prixVente: cible ? cible.price : null,
+        min, verdict: min == null ? 'sansmin' : (last.px >= min ? 'accepter' : 'contre'),
+      });
+    }
+  } catch (_) { /* la forme d'une conversation peut varier : on n'affiche rien plutôt que du faux */ }
   // ── BORDEREAUX À IMPRIMER : reçus par email (avec PDF), pas encore imprimés/
   //    expédiés/masqués, avec le N° de la paire + le titre (comme dans l'app). ──
-  const bp = await sbGet("app_data?id=like.email_bord_*&select=numero:data->>numero,modele:data->>modele,article:data->>article,transaction:data->>transaction,suivi:data->>suivi,filename:data->>filename,dateLimite:data->>dateLimite") || [];
+  const bp = await sbGet("app_data?id=like.email_bord_*&select=id,numero:data->>numero,modele:data->>modele,article:data->>article,transaction:data->>transaction,suivi:data->>suivi,filename:data->>filename,dateLimite:data->>dateLimite") || [];
   const bPrinted = d.vinted_bords_printed || {};
   const bShipped = d.vinted_bords_shipped || {};
   const bHidden = d.vinted_bords_hidden || {};
@@ -1505,16 +1632,19 @@ async function buildPanelData() {
   // liste, sans que tu aies à cocher quoi que ce soit (demande de Julien : « tu
   // vois bien que la paire a été expédiée, c'est débile de me faire cocher »).
   // Même signal que `bordShipped` dans l'app (statut de la vente moissonnée).
+  // `soldRows` est trié du plus frais au plus ancien → la première occurrence
+  // d'une transaction est sa capture la plus récente.
   const saleByTxn = {};
   for (const r of soldRows) {
+    const cap = Date.parse((r.data && r.data.capturedAt) || '') || 0;
     for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
-      const tx = String(o.transaction_id || ''); if (tx && !saleByTxn[tx]) saleByTxn[tx] = o;
+      const tx = String(o.transaction_id || ''); if (tx && !saleByTxn[tx]) saleByTxn[tx] = { o, cap };
     }
   }
-  const bordExpedie = (tx) => { const s = saleByTxn[String(tx || '')]; return !!s && !awaitingShip(s.status); };
+  const bordExpedie = (tx) => { const s = saleByTxn[String(tx || '')]; return !!s && !encoreAExpedier(tx, s.o.status, s.cap); };
   const bordsToPrint = bp
     .filter(b => b.filename) // a bien un PDF
-    .map(b => ({ numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
+    .map(b => ({ row: b.id, numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
     .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key] && !bDonePanel[b.key] && !bordExpedie(b.transaction));
   // Le bordereau REMONTE SUR LA LIGNE DE VENTE (au lieu d'une liste à part) :
   // chaque vente sait si son bordereau est prêt à imprimer, ou reste à générer.
@@ -1522,7 +1652,7 @@ async function buildPanelData() {
   for (const b of bordsToPrint) { if (b.transaction) bordByTxn[String(b.transaction)] = b; }
   for (const v of salesFlat) {
     const b = v.transaction ? bordByTxn[String(v.transaction)] : null;
-    if (b) v.bord = { etat: 'print', numero: b.numero || '', key: b.key, dateLimite: b.dateLimite || '' };
+    if (b) v.bord = { etat: 'print', row: b.row, numero: b.numero || '', key: b.key, dateLimite: b.dateLimite || '' };
     else if (v.aExpedier && !(v.transaction && bordTxns.has(String(v.transaction)))) v.bord = { etat: 'generer' };
   }
   // Photo du bordereau = par N° UNIQUEMENT (identité certaine, jamais par titre §24).
@@ -1543,6 +1673,7 @@ async function buildPanelData() {
     viewsTotal: online.reduce((s, o) => s + (o.views != null ? Number(o.views) || 0 : 0), 0),
     favsTotal: online.reduce((s, o) => s + (o.favs != null ? Number(o.favs) || 0 : 0), 0),
     toShip: toShip.filter(t => !t.hasBord).length,
+    offres: offers.length,
     toPrint: bordsToPrint.length,
     toPickup: pickups.length,
     unread: convs.filter(c => c.unread).length,
@@ -1566,7 +1697,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, offers, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

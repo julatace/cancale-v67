@@ -1137,3 +1137,43 @@ Il veut que l'extension **modifie les photos** (inclinaison/rotation/degré) et 
 
 ### Vérifié au banc extension (§35 : faux `chrome` + Playwright, données synthétiques 3 comptes)
 Comptes on/off rendus, Ventes = 3 lignes + chips compte (`Tous 3 / shop_cancale 2 / Shop Concale 1`), filtre compte → 1 ligne, période 7 j → 2 lignes, pastilles `🖨️ imprimer` + `📄 générer` présentes, Mes paires bascule En ligne 3 / Vendues 3, Bordereaux 1, panneau agrandi 1258×878, **0 erreur page/console** sur les 10 onglets. `node -c` OK sur les deux fichiers.
+
+---
+
+## 44. Session août 2026 (suite) — calendrier Airbnb, le bordereau DONNÉ, statut = capture la plus fraîche, offres, message type
+
+Extension **4.84 → 4.85** (à recharger dans Chrome — livrée en zip à dossier unique, cf. §43).
+
+### 1. Période = un CALENDRIER qu'on clique (plus deux champs à remplir)
+Julien : « je veux cliquer un peu comme sur les calendriers Airbnb, telle date à telle date ».
+`periodeBar()` est devenu un bouton pleine largeur (« 01/08 → 10/08 ») + 4 raccourcis (**7 jours / 30 jours / Ce mois / Mois dernier**) + `calendrier()` dépliable : mois navigable (‹ ›), lundi en premier, **1ᵉʳ clic = début, 2ᵉ = fin** (un clic avant le début en cours redémarre la sélection, sinon on se coince). État : `calOpen` / `calMonth`. Vérifié au banc : 3 ventes → 2 sur « ce mois », 2 sur « 7 jours », retour à 3 au ✕.
+
+### 2. ⚠️ « Tu te trompes sur deux paires » — LE STATUT VIENT DE LA CAPTURE LA PLUS FRAÎCHE
+Une paire vendue il y a 15 jours et une **déjà expédiée** apparaissaient encore « à générer ». Cause : une même transaction existe dans **plusieurs** lignes moissonnées (comptes, captures successives) et on gardait **la première rencontrée**, parfois périmée.
+- `soldRows` / `lstAll` sont maintenant **triés par `data.capturedAt` décroissant** (`parFraicheur`) → la première occurrence d'une transaction est la plus récente.
+- Nouveau **`txnEtat`** : les lignes `harvest_*_txn_*` (détail de transaction) portent `shipment.status_title` — la source la plus précise. **`encoreAExpedier(tx, statut, capture)`** privilégie ce détail dès qu'il est **plus récent** que la ligne de commande, sinon retombe sur le statut de la commande.
+- Utilisé par `toShip`, `salesFlat.aExpedier` **et** `bordExpedie` (les trois lisaient `awaitingShip(o.status)` chacun de leur côté). Une transaction écartée est quand même marquée vue → une vieille ligne ne peut plus la rouvrir.
+⚠️ **Aucune déduction ajoutée** (pas de « plus de 15 jours donc expédiée ») : on lit ce que Vinted a dit en dernier, c'est tout.
+
+### 3. Le bordereau, DONNÉ pour de vrai
+« Je ne sais pas trop comment tu comptes me les donner. » → nouvelle action **`bordPdf(rowId)`** (background) : lit `email_bord_*` et renvoie le PDF **tamponné** (avec le N°, quand l'app l'a produit) sinon le brut. Côté panneau, `ouvrirBordereau()` décode le base64 → `Blob` → **ouvre le PDF dans un onglet, prêt à imprimer**. Boutons `.vrm-bord-dl` (câblés une seule fois dans `render()`) : sur la **ligne de vente** (pastille « ouvrir »), sur chaque **bordereau à imprimer**, et dans le **défilement de génération**. `bordsToPrint[].row` + `v.bord.row` transportent l'id de ligne. Plus besoin de passer par l'app pour un bordereau.
+
+### 4. « Généré → vérifier » vérifie vraiment
+Le défilement relit les données (`load()`) **et le dit** : carte verte « ✓ bordereau capté » **avec le bouton d'ouverture du PDF** s'il est arrivé ; sinon message honnête « pas encore reçu — le bordereau arrive par email juste après la génération, réessaie dans une minute » (`shipCheck`, remis à zéro à « Suivante »).
+
+### 5. Offres : le prix plancher décide, TU cliques
+Demande : « un montant minimum par paire ; si l'offre est au-dessus ça accepte, sinon ça contre ».
+- **`panel_min_prices`** (ligne dédiée, jamais `main` — motif anti-clobber §35) + action `setMinPrice`. Saisie dans **« Cette paire » → Mon prix plancher**.
+- `buildPanelData.offers` : lit les conversations **déjà captées** (`harvest_*_conv_*`), prend la **dernière demande d'offre** (`entity_type` ~ `offer`) et son montant (lecture **défensive** : `offer_price`/`price`/`amount`, objet ou texte ; offre déjà acceptée/refusée/expirée ignorée). Rapprochement à l'annonce **par titre unique** seulement (§24). Sans montant trouvé → **rien affiché** (jamais de chiffre inventé).
+- Section **« N offres à trancher »** en tête de Messages + chip sur Ma journée (`stats.offres`) : verdict **✅ Accepte** (≥ plancher) / **↩️ Contre à X €** (avec bouton 📋 pour coller le chiffre) / « pose ton plancher ».
+⚠️ **REFUS TENU** : l'extension **n'accepte ni ne contre l'offre à ta place**. Répondre à Vinted par script est le geste sanctionné (§32), et une offre acceptée par erreur = une vente à perte. Elle tranche, elle prépare le chiffre, tu cliques.
+
+### 6. Message type pour plusieurs conversations
+Demande : « sélectionner plusieurs conversations et prédéfinir un message qui sera envoyé par l'extension ».
+- Bloc **« Mon message type »** (Messages) : zone de texte + chips reprises des **réponses rapides** de l'app. Stocké en `localStorage` (`vrm_msg_modele`) **parce que la conversation s'ouvre dans un autre onglet** — un état mémoire ne suivrait pas.
+- Sur **toute page de conversation**, un bandeau **« Coller mon message type »** (`modeleBandeau()`, au-dessus du corps du panneau, tous onglets) appelle `insertReply()` → le texte atterrit dans le champ Vinted. **C'est toi qui appuies sur Envoyer.**
+⚠️ **REFUS TENU** : pas d'envoi automatique en série (§32). Coller le texte enlève tout le travail sans prendre le risque.
+
+### Vérifié au banc extension (§35, faux `chrome` + Playwright, `window.open` espionné)
+Calendrier (31 jours, début→fin, filtres 3→2, raccourci 7 j, ✕ → 3), `bordPdf` demandé avec le bon `row` et **blob PDF réellement ouvert**, 1 bouton d'ouverture par bordereau, 3 offres rendues avec les 3 verdicts, message type sauvé + **collé dans le `<textarea>` de la page** (`colle === "Bonjour, la paire est disponible !"`), `setMinPrice` envoyé avec `{id:'1', amount:'42'}`. **0 erreur page/console.** `node -c` OK sur les deux fichiers.
+⚠️ Piège de banc rencontré : `currentConvId()` exige un id **numérique** (`/inbox/(\d+)`) — tester avec `/inbox/c1` fait croire à tort que le bandeau ne s'affiche pas. Et le panneau doit être ouvert (`localStorage.vrm_panel_open='1'`) avant l'injection, sinon les clics tombent sur un panneau `display:none`.
