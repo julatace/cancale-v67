@@ -13288,6 +13288,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const withPdf = emailBords.filter(b=>b.hasPdf);
           const pending = withPdf.filter(b=>!isBordDone(b));
           const done = withPdf.length - pending.length;
+          const proNb = pending.filter(b=>invForBord(b)).length; // comptes pro : facture jointe
           return (
             <div style={{border:`1px solid ${pending.length?C.accent:C.border}`,background:pending.length?`${C.accent}0e`:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -13296,7 +13297,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {pending.length>0 ? `📄 ${pending.length} bordereau${pending.length>1?'x':''} à imprimer` : '✅ Aucun bordereau à imprimer'}
                   </div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} colis fait{done>1?'s':''} ou confirmé{done>1?'s':''} par Vinted
+                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} colis fait{done>1?'s':''} ou confirmé{done>1?'s':''} par Vinted{proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}
                   </div>
                 </div>
                 {pending.length>0 && (
