@@ -23,10 +23,12 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris'];
+  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'ventes', 'republier', 'reponse', 'expedier', 'achats', 'messages', 'favoris'];
   let chaussuresQuery = ''; // filtre de l'onglet « Mes paires »
   let chaussuresSort = 'num'; // tri : num | marge | vues | favs | age | prix
   let chaussuresFilter = 'all'; // sous-vue : all | relance | sleep | nonum
+  let ventesFilter = 'all'; // onglet Ventes : all | pending | completed
+  let ventesQuery = ''; // recherche dans l'onglet Ventes (gardée entre rendus)
   const readLS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   const readJSON = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } };
@@ -507,6 +509,52 @@
     if (cs) { cs.oninput = () => { chaussuresQuery = cs.value; apply(); }; apply(); }
   }
 
+  // ── ONGLET « VENTES » : la liste des ventes moissonnées (mêmes commandes et
+  //    mêmes règles de statut que l'app, cf. `classifySale` dans buildPanelData).
+  //    ⚠️ COHÉRENCE : le CA du mois / argent bloqué / encaissé viennent d'`appStats`
+  //    (publiés par l'app) — on NE recalcule AUCUN de ces totaux ici, pour ne jamais
+  //    afficher un chiffre qui contredit l'app. La liste, elle, est lecture seule.
+  function renderVentes() {
+    const all = (DATA && DATA.sales) || [];
+    const a = (DATA && DATA.appStats) || null;
+    // En-tête chiffres = ceux de l'app, tels quels (aucun recalcul).
+    const eurI = (v) => (v == null ? '—' : Number(v).toLocaleString('fr-FR') + ' €');
+    const head = a ? `
+      <div class="vrm-stats" style="margin-bottom:8px">
+        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#09b1ba">${eurI(a.caMois)}</b><span class="vrm-m">CA du mois</span></div>
+        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#c98a1a">${eurI(a.enAttente)}</b><span class="vrm-m">Argent bloqué</span></div>
+        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#0f6b4f">${eurI(a.caEncaisse)}</b><span class="vrm-m">Encaissé</span></div>
+      </div>
+      <div class="vrm-m" style="text-align:center;margin:-2px 0 8px;opacity:.7">Chiffres de l'app · ${a.updatedAt ? esc(timeago(Date.parse(a.updatedAt))) : ''}</div>` : '';
+    if (!all.length) return `${head}<div class="vrm-m">Aucune vente captée pour l'instant.<br>Ouvre « Mes ventes » sur Vinted une fois pour les capter (0 requête ajoutée).</div>`;
+    const nPend = all.filter(v => v.etat === 'pending').length;
+    const nDone = all.filter(v => v.etat === 'completed').length;
+    const FILTERS = [['all', 'Toutes', all.length], ['pending', '⏳ En cours', nPend], ['completed', '✅ Finalisées', nDone]];
+    const filterChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${FILTERS.map(([k, l, n]) => `<button class="vrm-vfilter" data-f="${k}" style="border:1px solid ${ventesFilter === k ? '#111' : '#dde'};background:${ventesFilter === k ? '#111' : '#fff'};color:${ventesFilter === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}${n ? ` ${n}` : ''}</button>`).join('')}</div>`;
+    const list = ventesFilter === 'all' ? all : all.filter(v => v.etat === ventesFilter);
+    const etatLbl = { completed: '✅ finalisée', pending: '⏳ en cours' };
+    const rows = list.slice(0, 200).map(v => `
+      <a class="vrm-v-row" data-s="${esc(String(v.title || '').toLowerCase())}" href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:8px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:8px 10px;margin-bottom:6px;text-decoration:none;color:inherit">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title || 'Vente')}</div>
+          <div class="vrm-m" style="font-size:11px;margin-top:1px">${etatLbl[v.etat] || ''}${v.ts ? ` · ${esc(timeago(v.ts))}` : ''}</div>
+        </div>
+        <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#0f6b4f">${fmt(v.price)}</div>
+      </a>`).join('');
+    return `
+      ${head}
+      ${filterChips}
+      ${all.length > 8 ? `<input id="vrm-v-search" type="search" value="${esc(ventesQuery)}" placeholder="🔍 Filtrer par titre…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
+      <div class="vrm-grid">${rows}</div>
+      <div class="vrm-m" style="margin-top:6px;opacity:.8">Liste des ventes moissonnées (annulées/remboursées exclues). Le total du mois reste celui de l'app.</div>`;
+  }
+  function wireVentes() {
+    panel.querySelectorAll('.vrm-vfilter').forEach(b => { b.onclick = () => { ventesFilter = b.dataset.f; render(); }; });
+    const vs = panel.querySelector('#vrm-v-search');
+    const apply = () => { const q = ventesQuery.trim().toLowerCase(); panel.querySelectorAll('.vrm-v-row').forEach(r => { r.style.display = (!q || (r.dataset.s || '').includes(q)) ? 'flex' : 'none'; }); };
+    if (vs) { vs.oninput = () => { ventesQuery = vs.value; apply(); }; apply(); }
+  }
+
   function renderPaire() {
     const id = currentItemId();
     if (!id) return `<div class="vrm-m">Ouvre une de tes annonces sur Vinted pour voir son N°, son prix d'achat et sa case au garage ici.</div>`;
@@ -583,6 +631,7 @@
           <button class="vrm-tab ${tab === 'journee' ? 'on' : ''}" data-t="journee">🏠 Ma journée</button>
           ${currentItemId() ? `<button class="vrm-tab ${tab === 'paire' ? 'on' : ''}" data-t="paire">👟 Cette paire</button>` : ''}
           <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">👟 Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
+          <button class="vrm-tab ${tab === 'ventes' ? 'on' : ''}" data-t="ventes">💶 Ventes</button>
           <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">♻️ Republier</button>
           <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">📄 Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
           <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">📦 Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
@@ -595,6 +644,7 @@
         : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
         : tab === 'chaussures' ? renderChaussures()
+        : tab === 'ventes' ? renderVentes()
         : tab === 'republier' ? renderRepublier()
         : tab === 'reponse' ? renderReponse()
         : tab === 'expedier' ? renderExpedier()
@@ -622,6 +672,7 @@
     if (tab === 'republier') wireRepublier();
     if (tab === 'reponse') wireReponse();
     if (tab === 'chaussures') wireChaussures();
+    if (tab === 'ventes') wireVentes();
     if (tab === 'expedier') wireExpedier();
     if (tab === 'achats') wireAchats();
     if (tab === 'messages') wireMessages();
@@ -984,8 +1035,22 @@
     const all = (DATA && DATA.pickups) || [];
     const list = all.filter(p => !pickupDoneLocal.has(p.key));
     const gotten = all.filter(p => pickupDoneLocal.has(p.key));
+    // Derniers achats (lecture seule) : commandes moissonnées `orders_purchased`.
+    // On ne relabelle PAS le statut (pas d'invention) : titre + prix + date.
+    const buys = (DATA && DATA.recentBuys) || [];
+    const buysBlock = buys.length ? `
+      <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">🧾 Derniers achats</div>
+      <div style="border:1px solid #eceff3;border-radius:12px;overflow:hidden">
+        ${buys.slice(0, 40).map((v, i) => `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:8px;align-items:center;padding:8px 10px;text-decoration:none;color:inherit;${i ? 'border-top:1px solid #f0f2f5' : ''}">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title || 'Achat')}</div>
+            ${v.ts ? `<div class="vrm-m" style="font-size:11px;margin-top:1px">${esc(timeago(v.ts))}</div>` : ''}
+          </div>
+          <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#334">${fmt(v.price)}</div>
+        </a>`).join('')}
+      </div>` : '';
     if (!list.length && !gotten.length) {
-      return `<div class="vrm-m">✓ Aucun colis à retirer pour l'instant.</div><div class="vrm-m" style="margin-top:6px">Les colis « disponibles » (avec code de retrait) apparaissent ici dès que le mail du transporteur arrive.</div>`;
+      return `<div class="vrm-m">✓ Aucun colis à retirer pour l'instant.</div><div class="vrm-m" style="margin-top:6px">Les colis « disponibles » (avec code de retrait) apparaissent ici dès que le mail du transporteur arrive.</div>${buysBlock}`;
     }
     const row = (p) => {
       const carrier = CARRIER_NAMES[p.carrier] || (p.carrier || 'Colis');
@@ -1011,7 +1076,8 @@
     return `
       ${list.length ? `<div class="vrm-m" style="font-weight:800;margin-bottom:6px">📦 ${list.length} colis à retirer</div>${list.slice(0, 60).map(row).join('')}` : ''}
       ${gotten.length ? `<div class="vrm-m" style="font-weight:700;margin:8px 0 6px;color:#0f6b4f">✅ ${gotten.length} récupéré${gotten.length > 1 ? 's' : ''}</div>${gotten.slice(0, 60).map(gotRow).join('')}` : ''}
-      <div class="vrm-m" style="margin-top:6px;opacity:.85">Mondial Relay = code + pièce d'identité. Chronopost = QR (dans l'app).</div>`;
+      <div class="vrm-m" style="margin-top:6px;opacity:.85">Mondial Relay = code + pièce d'identité. Chronopost = QR (dans l'app).</div>
+      ${buysBlock}`;
   }
   function wireAchats() {
     panel.querySelectorAll('.vrm-pk-copy').forEach(b => {
