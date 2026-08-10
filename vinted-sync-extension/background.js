@@ -234,11 +234,37 @@ async function logActivity(text) {
 // --- Capture passive des donnees ------------------------------------------
 
 // Range une donnee moissonnee dans app_data sous une ligne dediee.
+// ⚠️ POURQUOI CE COMPTEUR EXISTE. Vérifié en base : `harvest_*_item_*` = ZÉRO
+// ligne, alors que `/api/v2/items/{id}` apparaît bien dans les chemins vus et que
+// tout le code de capture est en place. Donc l'appel part et rien n'arrive : il y
+// a une fuite quelque part entre inject.js et l'écriture. Trois sorties muettes
+// sur ce chemin (pas de compte actif, corps non-JSON, type inconnu) — impossible
+// de savoir laquelle sans mesurer. Ce compteur note CHAQUE passage et CHAQUE
+// abandon, par type. Aucune donnée personnelle : des nombres.
+// Conséquence concrète : sans fiche article, pas de description → « Republier »
+// obligerait à tout retaper. C'est le vrai blocage de cette fonction.
+const _diag = { n: {}, dernier: 0 };
+async function noterDiag(cle) {
+  try {
+    _diag.n[cle] = (_diag.n[cle] || 0) + 1;
+    // On n'écrit qu'une fois par minute (le compteur vit en mémoire entre-temps).
+    if (Date.now() - _diag.dernier < 60000) return;
+    _diag.dernier = Date.now();
+    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+    const cur = (rows && rows[0] && rows[0].data && rows[0].data.n) || {};
+    const n = { ...cur };
+    for (const k in _diag.n) n[k] = (n[k] || 0) + _diag.n[k];
+    _diag.n = {};
+    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { n, majAt: new Date().toISOString() } }], 'id');
+  } catch (_) {}
+}
+
 async function storeHarvest(domain, type, id, body) {
+  noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
-  if (!uid) return;
+  if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
   let parsed = null;
-  try { parsed = JSON.parse(body); } catch (_) { return; }
+  try { parsed = JSON.parse(body); } catch (_) { noterDiag(`abandon_json_${type || 'inconnu'}`); return; }
 
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
@@ -255,7 +281,10 @@ async function storeHarvest(domain, type, id, body) {
   parsed = alleger(type, parsed);
 
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
-  await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
+  const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
+  // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
+  // sinon « rien en base » resterait indiscernable de « jamais reçu ».
+  noterDiag(`${ecrit === false ? 'ecriture_ratee' : 'ecrit'}_${type || 'inconnu'}`);
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
@@ -361,6 +390,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           //    depuis un seul clic, c'est la rafale qu'on refuse partout ailleurs
           //    (§32/§43). Ici chaque requête correspond à un geste réel.
           if (msg.action === 'genererBord') { const r = await genererBordereau(msg.uid, msg.tx); sendResponse(r); return; }
+          // Lire la fiche d'une de TES annonces (description, catégorie) pour
+          // pouvoir la republier sans tout retaper. Lecture seule.
+          if (msg.action === 'capterAnnonce') { const r = await capterAnnonce(msg.uid, msg.itemId); sendResponse(r); return; }
           if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
           if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -1226,6 +1258,31 @@ async function repondreOffre({ uid, tx, oid, quoi, prix }) {
   return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
 
+// ── CAPTER LA FICHE D'UNE ANNONCE (pour pouvoir la republier) ───────────────
+// Sans la fiche, on n'a QUE le titre, le prix et la photo : pas la description,
+// pas la catégorie, pas les attributs. Or republier chez Vinted, c'est supprimer
+// puis RECRÉER — donc tout refournir. Sans description, « Republier » revient à
+// tout retaper à la main : la fonction ne peut pas être bonne.
+// La capture passive devrait s'en charger, mais elle ne range rien (0 ligne en
+// base, cf. `noterDiag`). En attendant de trouver la fuite, ce bouton va la
+// chercher franchement, pour UNE annonce, quand tu la regardes.
+// C'est une LECTURE de ta propre annonce, sur ton clic. Rien n'est modifié.
+async function capterAnnonce(uid, itemId) {
+  if (!itemId) return { ok: false, error: 'annonce inconnue' };
+  const accts = await getStoredAccounts();
+  let acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) acc = accts[0];
+  if (!acc) return { ok: false, error: 'aucun compte lié' };
+  // vintedGet renvoie { status, ok, json }.
+  const r = await vintedGet(acc, `/api/v2/items/${itemId}`);
+  if (!r || !r.ok || !r.json) return { ok: false, error: `Vinted a répondu ${r ? r.status : '—'}` };
+  try {
+    await storeHarvest(acc.domain || 'www.vinted.fr', 'item', String(itemId), JSON.stringify(r.json));
+  } catch (e) { return { ok: false, error: String(e).slice(0, 80) }; }
+  logActivity('📝 Fiche annonce captée (description)');
+  return { ok: true };
+}
+
 // ── GÉNÉRER LE BORDEREAU, À TA PLACE ────────────────────────────────────────
 // Julien : « je ne veux pas avoir à le faire ». Ici je le fais, et sans réserve :
 // générer un bordereau n'engage AUCUN argent et ne décide de rien. La vente est
@@ -1763,6 +1820,30 @@ async function buildPanelData() {
   //    panneau partent UNIQUEMENT sur ton clic, un clic = une requête. Pas de
   //    moteur qui décide en arrière-plan : accepter une offre, c'est une vente
   //    ferme qu'on n'annule pas.
+  // ── FICHES D'ANNONCE CAPTÉES → la DESCRIPTION, pour republier sans retaper ──
+  // Republier chez Vinted = supprimer + recréer (vérifié dans les requêtes
+  // captées : `POST /items/{id}/delete` puis `POST /item_upload/items`). Il faut
+  // donc refournir tout le texte. On le sert ici quand la fiche a été captée.
+  const fiches = {};
+  try {
+    const fRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data') || [])
+      .filter(r => /_item_\d+$/.test(String(r.id || '')));
+    for (const r of fRows) {
+      const p = (r.data && r.data.payload) || {};
+      const it = p.item || p;
+      const id = String(it.id || (String(r.id).match(/_item_(\d+)$/) || [])[1] || '');
+      if (!id) continue;
+      fiches[id] = {
+        desc: String(it.description || ''),
+        marque: String(it.brand || (it.brand_dto && it.brand_dto.title) || ''),
+        taille: String(it.size_title || it.size || ''),
+        etat: String(it.status || ''),
+        capAt: (r.data && r.data.capturedAt) || null,
+      };
+    }
+  } catch (_) { /* pas de fiche : Republier le dira honnêtement */ }
+  for (const o of online) { const f = fiches[String(o.id)]; if (f && f.desc) o.desc = f.desc; }
+
   const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
   const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
   for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }

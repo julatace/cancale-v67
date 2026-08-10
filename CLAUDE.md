@@ -1214,3 +1214,48 @@ Filtres retenus : `current !== false`, `user_id === opposite_user.id` (sinon c'e
 
 ### Vérifié au banc (§35)
 6 boutons sur les 2 offres identifiées, la 3ᵉ (sans ids) n'a que le lien Vinted ; 1ᵉʳ clic → « Confirmer ? » et **0 envoi** ; 2ᵉ clic → un seul message avec les bons `tx`/`oid`/`uid` ; contre-offre transmise avec le **prix plancher** (`prix:"40"`). **0 erreur page/console.**
+
+---
+
+## 46. Session août 2026 (suite) — ⚠️ DEUX CAPTURES QUI N'ONT JAMAIS RIEN RANGÉ (bordereau, fiche annonce)
+
+Méthode : avant de coder, **lire la base**. Deux plaintes de Julien (« les bordereaux ne servent à rien car tu ne les captes pas », « améliore republier ») avaient la même racine — une capture qui existe dans le code mais ne produit **aucune ligne**.
+
+| ligne attendue | en base | conséquence |
+|---|---|---|
+| `harvest_*_label_latest` (PDF du bordereau) | **0** | l'app dépend des emails, rien d'automatique |
+| `harvest_*_item_*` (fiche annonce) | **0** | pas de description → « Republier » = tout retaper |
+
+### 1. Bordereau : `inject.js` ne pouvait PAS le voir (4.88)
+`inject.js` n'observe que `fetch` et `XMLHttpRequest`. Vinted sert le bordereau par un **lien direct** : c'est le navigateur qui télécharge, sans JavaScript. La capture était donc structurellement aveugle — et l'URL du label n'apparaît nulle part ailleurs (ni dans les transactions captées : `shipment` = `{id,status,status_title,status_updated_at}`, ni dans `seen_urls`).
+➡️ **`chrome.downloads.onCreated`** (permission déjà dans le manifeste, jamais utilisée). On filtre PDF + origine/référent Vinted, on relit le fichier avec la session, on range via `storeLabel`. Bonus : `panel_label_urls` **apprend l'URL** du bordereau — la pièce qui manquait pour aller le chercher soi-même.
+⚠️ Un reçu/facture n'est pas un bordereau : même distinction que `inject.js` (`invoice|receipt|facture|billing`).
+
+### 2. Générer le bordereau : FAIT À SA PLACE (4.88)
+Requête captée par `storeWriteReq` sur 5 comptes :
+`PUT /api/v2/transactions/{tx}/shipment/order` → `{"seller_address_id":N,"drop_off_type":null,"label_type":null}`
+`adresseVendeur(uid)` relit le `seller_address_id` **dans la capture de CE compte** (il change par compte ; sans capture, on ne devine pas — on le dit). Bouton **« générer »** sur la ligne de vente.
+**Pourquoi celle-ci oui, alors que l'auto-acceptation d'offre non** : générer un bordereau **n'engage aucun argent** et ne décide de rien — la vente est faite, le colis doit partir, il n'y a ni prix ni choix. Accepter une offre, si.
+⚠️ Une version **« générer mes 25 sélectionnés »** a été écrite **puis retirée** : 25 PUT enchaînés sur un clic, c'est la rafale refusée partout ailleurs. **Un clic = un bordereau.**
+
+### 3. Fiche annonce : la fuite n'est PAS localisée — on l'instrumente (4.89)
+`/api/v2/items/{id}` **est bien appelé** (présent dans `seen_urls`, 4 fois) et tout le code existe (regex `item` dans `HARVEST`, moisson active par lots de 6 avec pauses, `content.js` relaie tout sans filtre, `storeHarvest` a la bonne clé). Pourtant : 0 ligne. Analyse statique épuisée sans conclusion.
+➡️ **`noterDiag(clé)`** compte chaque passage ET chaque **sortie muette** de `storeHarvest` (`recu_*`, `abandon_sans_compte_*`, `abandon_json_*`, `ecriture_ratee_*`, `ecrit_*`) dans la ligne **`panel_diag_capture`** (agrégé en mémoire, écrit au plus une fois par minute). Trois sorties silencieuses existaient, impossible de savoir laquelle sans mesurer.
+➡️ En attendant : **`capterAnnonce(uid, itemId)`** — bouton qui va lire la fiche de CETTE annonce (lecture seule, sur clic) et la range par `storeHarvest`, donc au même endroit.
+
+### 4. « Republier » enfin utile — le KIT (4.89)
+Ce que disent les requêtes captées : republier chez Vinted **n'est pas un bouton « remonter »** (ça n'existe pas), c'est `POST /api/v2/items/{id}/delete` **puis** `POST /api/v2/item_upload/items` avec tout le contenu. Donc republier = **retaper titre + description**, et **perdre les favoris et les vues** de l'annonce.
+`buildPanelData` sert désormais `o.desc` depuis les fiches captées. `kitRepub(o)` dans le défilement :
+- fiche captée → aperçu du texte + **📋 Titre / 📋 Description / 📋 Prix** (le presse-papier rend le texte EXACT, sauts de ligne compris) ;
+- fiche absente → encart orange honnête + bouton **« 📥 Récupérer le texte de cette annonce »**.
+
+⚠️ **Julien a raison sur la distinction masse vs unité** : republier UNE annonce sur son clic n'est pas une rafale, et n'a pas à être refusé. Ce qui reste refusé, c'est la file qui s'exécute seule et la rotation de photos pour tromper la détection de doublon (§32/§43).
+
+### Vérifié au banc (§35)
+Défilement Republier : annonce avec fiche → 3 boutons de copie, **la description copiée est identique à l'originale** (sauts de ligne compris) ; annonce sans fiche → encart + bouton, qui demande le bon `itemId`+`uid`. **0 erreur page/console.** `node --check` OK sur les deux fichiers.
+⚠️ Piège de banc : cocher une case **re-rend la liste** → un handle Playwright récupéré avant devient détaché. Re-sélectionner par `data-id` à chaque clic.
+
+### Ce qui reste ouvert
+- La **fuite de capture des fiches** : réponse attendue dans `panel_diag_capture` dès que Julien navigue avec la 4.89.
+- Le **code « offre en attente »** (§45) : toujours inconnu, `panel_offer_statuts` l'apprendra.
+- **Republier en un clic** (delete + recreate) : faisable en principe (les deux requêtes sont captées) mais suppose de **re-téléverser les photos** — chantier à part, à ne pas bricoler.

@@ -998,6 +998,17 @@
     // Ouvrir le PDF d'un bordereau — présent sur plusieurs onglets (Ventes,
     // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
     panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });
+    // Aller chercher le texte d'une annonce (lecture de ta propre annonce).
+    panel.querySelectorAll('.vrm-capt-annonce').forEach(b => {
+      b.onclick = () => {
+        const avant = b.textContent;
+        b.disabled = true; b.textContent = '⏳ lecture…';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'capterAnnonce', itemId: b.dataset.id, uid: b.dataset.uid }, (r) => {
+          if (r && r.ok) { b.textContent = '✓ texte récupéré'; setTimeout(() => load(), 900); }
+          else { b.disabled = false; b.textContent = '❌ ' + ((r && r.error) || 'échec'); setTimeout(() => { try { b.textContent = avant; } catch (_) {} }, 3500); }
+        });
+      };
+    });
     // Générer le bordereau — l'extension le fait, tu ne vas plus sur Vinted.
     // Un clic = un bordereau (pas de génération en rafale, cf. background.js).
     panel.querySelectorAll('.vrm-gen-bord').forEach(b => {
@@ -1624,6 +1635,35 @@
   // Tu coches les annonces à remettre en avant, puis « Commencer » : le panneau
   // t'OUVRE chaque annonce à ton clic, une à la fois. Tu republies toi-même sur
   // Vinted (bouton natif) et tu passes à la suivante. Rien ne part tout seul.
+  // ── LE KIT DE REPUBLICATION ─────────────────────────────────────────────────
+  // Chez Vinted, « republier » n'est PAS un bouton « remonter » : ça n'existe
+  // pas. Vérifié dans les requêtes captées — c'est `POST /items/{id}/delete`
+  // puis `POST /item_upload/items` avec TOUT le contenu à refournir. Donc quand
+  // tu republies, tu dois retaper le titre et la description.
+  // Ce bloc te les rend prêts à coller. Sans la fiche captée, on n'a que la
+  // longueur du texte, pas le texte : on te le dit et on va la chercher.
+  function kitRepub(o) {
+    if (!o) return '';
+    const bouton = (lbl, txt) => `<button class="vrm-copy-line" data-c="${esc(txt)}" style="flex:1 1 110px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:7px 9px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer">${lbl}</button>`;
+    if (!o.desc) {
+      return `<div class="vrm-card" style="margin-top:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
+        <div style="font-weight:800;font-size:12px;color:#9a5b16;margin-bottom:4px">Le texte de l'annonce n'est pas encore capté</div>
+        <div class="vrm-m" style="font-size:11px;margin-bottom:7px">Republier chez Vinted, c'est supprimer puis recréer : il faut refournir le titre et la description. Je vais les chercher pour toi.</div>
+        <button class="vrm-capt-annonce" data-id="${esc(o.id)}" data-uid="${esc(o.uid || '')}" style="width:100%;border:none;background:#9a5b16;color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">📥 Récupérer le texte de cette annonce</button>
+      </div>`;
+    }
+    const apercu = o.desc.length > 220 ? o.desc.slice(0, 220) + '…' : o.desc;
+    return `<div class="vrm-card" style="margin-top:8px;padding:9px">
+      <div style="font-weight:800;font-size:12px;margin-bottom:5px">Prêt à recoller</div>
+      <div class="vrm-m" style="font-size:11px;white-space:pre-wrap;max-height:110px;overflow:auto;background:#f7f9fb;border-radius:8px;padding:7px;margin-bottom:7px">${esc(apercu)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${bouton('📋 Titre', o.title || '')}
+        ${bouton('📋 Description', o.desc)}
+        ${o.price != null ? bouton('📋 Prix', String(o.price)) : ''}
+      </div>
+    </div>`;
+  }
+
   function renderRepublier() {
     const list = (DATA && DATA.online) || [];
     if (!list.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant. Ouvre ta boutique Vinted une fois pour les capter.</div>`;
@@ -1646,6 +1686,7 @@
         <div style="height:7px;border-radius:999px;background:#e6eaee;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${pct}%;border-radius:999px;background:#09b1ba;transition:width .3s"></div></div>
         <div class="vrm-m" style="margin-bottom:8px">Ouvre-la, <b>republie-la sur Vinted</b>, puis marque <b>✓ Republiée</b>.</div>
         ${card(o, `${o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : ''}${marketNote(o)}<div style="margin-top:7px">${editLink(o.id)}</div>`)}
+        ${kitRepub(o)}
         <button class="vrm-go" data-act="open" style="width:100%;margin-top:8px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button class="vrm-go" data-act="done" style="flex:2;border:none;background:#0f6b4f;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">✓ Republiée</button>
