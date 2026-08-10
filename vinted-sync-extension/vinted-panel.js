@@ -294,7 +294,7 @@
       background:#fff;color:#111;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.3);border:1px solid #eef0f4;
       font:13.5px/1.5 system-ui,-apple-system,sans-serif;padding:0}
     /* Mode agrandi : quasi plein écran, pour piloter toute la boutique sans l'app. */
-    #vrm-panel.vrm-big{width:min(820px,97vw);height:min(92vh,940px);max-height:97vh;right:2vw;bottom:2vh}
+    #vrm-panel.vrm-big{width:min(1080px,98vw);height:96vh;max-height:98vh;right:1vw;bottom:1vh}
     #vrm-panel .vrm-head{position:sticky;top:0;z-index:6;background:#fff;padding:13px 16px 9px;
       border-bottom:1px solid #eef0f4;border-radius:16px 16px 0 0}
     #vrm-panel #vrm-body{padding:12px 16px 0}
@@ -333,7 +333,7 @@
     #vrm-panel .vrm-ch-row:hover,#vrm-panel .vrm-repub-row:hover{border-color:#bfe4e6;box-shadow:0 3px 10px rgba(9,177,186,.10)}
     /* Listes en 2 colonnes quand le panneau est agrandi (plus de paires d'un coup). */
     #vrm-panel .vrm-grid{display:flex;flex-direction:column;gap:7px}
-    #vrm-panel.vrm-big .vrm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+    #vrm-panel.vrm-big .vrm-grid{display:flex;flex-direction:column;gap:8px}
     #vrm-panel .vrm-grid>*{margin-bottom:0!important}
     #vrm-panel .vrm-close{position:absolute;top:9px;right:12px;border:none;background:transparent;cursor:pointer;font-size:16px;color:#889;padding:0;line-height:1}
     #vrm-panel .vrm-close:hover{color:#334}
@@ -811,13 +811,13 @@
         <div class="vrm-st" style="flex:1 1 44%"><b style="color:#e2456b">❤️ ${favTot}</b><span class="vrm-m">favoris en attente</span></div>
         <div class="vrm-st" style="flex:1 1 44%"><b>${list.length}</b><span class="vrm-m">annonce${list.length > 1 ? 's' : ''} likée${list.length > 1 ? 's' : ''}</span></div>
       </div>
-      <div class="vrm-m" style="margin-bottom:8px">Coche les annonces dont tu veux <b>relancer les favoris</b>. Une par une, tu proposes toi-même une remise via l'<b>offre native Vinted</b>. Aucun envoi automatique.</div>
+      <div class="vrm-m" style="margin-bottom:8px">Ces annonces ont été mises en <b>favori</b> par des acheteurs. Coche celles où tu veux <b>leur envoyer une petite remise</b> pour déclencher la vente. L'extension t'ouvre chaque annonce, tu cliques le bouton <b>« Proposer une remise »</b> de Vinted. Rien n'est envoyé automatiquement.</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-fav-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
         <button class="vrm-fav-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
       </div>
       <div class="vrm-grid" style="margin-bottom:8px">${rows}</div>
-      <button class="vrm-fav-go" data-act="start" ${favSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${favSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${favSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Relancer ma sélection (${favSel.size})</button>`;
+      <button class="vrm-fav-go" data-act="start" ${favSel.size ? '' : 'disabled'} style="position:sticky;bottom:0;width:100%;border:none;background:${favSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${favSel.size ? 'pointer' : 'default'};box-shadow:0 -6px 14px rgba(0,0,0,.12)">Envoyer une remise aux favoris (${favSel.size})</button>`;
   }
   function wireFavoris() {
     panel.querySelectorAll('.vrm-fav-chk').forEach(c => { c.onchange = () => { const k = c.dataset.k; if (c.checked) favSel.add(k); else favSel.delete(k); render(); }; });

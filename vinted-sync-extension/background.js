@@ -1106,7 +1106,14 @@ async function buildPanelData() {
   // Descriptions/photos lues sur les pages d'annonce (pour Leboncoin + archive).
   const detRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
   const pageDetails = (detRows && detRows[0] && detRows[0].data) || {};
-  const lst = await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || [];
+  // Comptes MASQUÉS/déconnectés (app: vinted_accounts_hidden + liste bloquée) :
+  // on exclut TOUTES leurs données du panneau — sinon les paires d'un compte
+  // retiré continuaient de s'afficher (plainte de Julien).
+  const hiddenAcc = new Set((Array.isArray(d.vinted_accounts_hidden) ? d.vinted_accounts_hidden : []).map(String));
+  let blockedAcc = new Set(); try { blockedAcc = await blockedAccounts(); } catch (_) {}
+  const acctOff = (uid) => { const k = String(uid == null ? '' : uid); return !!k && (hiddenAcc.has(k) || blockedAcc.has(k)); };
+  const keepAcc = (r) => !acctOff(r && r.data && r.data.uid);
+  const lst = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []).filter(keepAcc);
   const online = [];
   const seen = new Set();
   for (const r of lst) {
@@ -1185,7 +1192,7 @@ async function buildPanelData() {
   // NE clique PAS à ta place sur Vinted (ce motif fait bloquer les comptes) : tu
   // ouvres, tu génères d'un clic, et l'extension capte le PDF automatiquement.
   const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
-  const soldRows = await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || [];
+  const soldRows = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []).filter(keepAcc);
   const bordRows = await sbGet("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
   const bordTxns = new Set(bordRows.map(b => String(b.transaction || '')).filter(Boolean));
   const toShip = [];
@@ -1237,7 +1244,7 @@ async function buildPanelData() {
   // ── DERNIERS ACHATS (lecture seule) : mêmes commandes moissonnées `orders_purchased`.
   // On NE relabelle PAS le statut (l'app classe les achats par statut, on ne veut
   // rien inventer) : juste titre + prix + date, exclus les annulés/remboursés.
-  const buyRows = await sbGet('app_data?id=like.harvest_*_orders_purchased&select=data') || [];
+  const buyRows = (await sbGet('app_data?id=like.harvest_*_orders_purchased&select=data') || []).filter(keepAcc);
   const buysFlat = [];
   const seenBuyTx = new Set();
   for (const r of buyRows) {
@@ -1378,7 +1385,7 @@ async function buildPanelData() {
   // ── CONVERSATIONS (inbox) : pour l'onglet Messages (relance guidée) ──────────
   // Tu sélectionnes des conversations, l'extension t'ouvre chacune une par une,
   // TU réponds toi-même (aucun message envoyé automatiquement).
-  const inboxRows = await sbGet('app_data?id=like.harvest_*_inbox&select=data') || [];
+  const inboxRows = (await sbGet('app_data?id=like.harvest_*_inbox&select=data') || []).filter(keepAcc);
   const convs = [];
   const seenC = new Set();
   for (const r of inboxRows) {
