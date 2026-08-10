@@ -116,6 +116,8 @@
     "search": '<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>',
     "zap": '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>',
     "tag": '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line>',
+    "moon": '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>',
+    "hash": '<line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line>',
   };
   const svgi = (name, sz) => { const p = ICONS[name]; if (!p) return ''; const s = sz || 16; return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex-shrink:0">${p}</svg>`; };
   // Conseil marché compact réutilisable (même règle partout : écart >15% vs médiane
@@ -335,8 +337,8 @@
     #vrm-panel .vrm-grid>*{margin-bottom:0!important}
     #vrm-panel .vrm-close{position:absolute;top:9px;right:12px;border:none;background:transparent;cursor:pointer;font-size:16px;color:#889;padding:0;line-height:1}
     #vrm-panel .vrm-close:hover{color:#334}
-    #vrm-panel .vrm-todo{border:1px solid #ffd7a8;background:#fff6ec;color:#9a5b16;border-radius:999px;padding:5px 10px;
-      font:700 11.5px system-ui,sans-serif;cursor:pointer}
+    #vrm-panel .vrm-todo{display:inline-flex;align-items:center;gap:5px;border:1px solid #ffd7a8;background:#fff6ec;color:#9a5b16;border-radius:999px;padding:5px 11px;
+      font:600 11.5px system-ui,sans-serif;cursor:pointer}
     #vrm-panel .vrm-todo:hover{background:#ffedd8}
     @media (prefers-color-scheme: dark){
       #vrm-panel{background:#161a20;color:#e8eef5;border-color:#2a3038}
@@ -387,10 +389,10 @@
     const heure = new Date().getHours();
     const bonjour = heure < 18 ? 'Bonjour 👋' : 'Bonsoir 👋';
     const todo = [
-      s.toPrint ? { t: 'expedier', ic: '🖨️', n: s.toPrint, lbl: 'à imprimer' } : null,
-      s.toShip ? { t: 'expedier', ic: '📄', n: s.toShip, lbl: 'à générer' } : null,
-      s.toPickup ? { t: 'achats', ic: '📦', n: s.toPickup, lbl: 'à retirer' } : null,
-      s.unread ? { t: 'messages', ic: '💬', n: s.unread, lbl: s.unread > 1 ? 'messages' : 'message' } : null,
+      s.toPrint ? { t: 'expedier', ic: 'printer', n: s.toPrint, lbl: 'à imprimer' } : null,
+      s.toShip ? { t: 'expedier', ic: 'printer', n: s.toShip, lbl: 'à générer' } : null,
+      s.toPickup ? { t: 'achats', ic: 'shopping-bag', n: s.toPickup, lbl: 'à retirer' } : null,
+      s.unread ? { t: 'messages', ic: 'message-circle', n: s.unread, lbl: s.unread > 1 ? 'messages' : 'message' } : null,
     ].filter(Boolean);
     const tile = (label, val, color) => `<div class="vrm-st" style="flex:1 1 44%"><b style="color:${color || 'inherit'}">${val}</b><span class="vrm-m">${label}</span></div>`;
     const money = a ? `
@@ -426,18 +428,18 @@
       ${(s.viewsTotal != null || s.favsTotal != null) ? `<div class="vrm-m" style="text-align:center;margin-top:6px">👁 <b>${s.viewsTotal != null ? s.viewsTotal : '—'}</b> vues · ❤️ <b>${s.favsTotal != null ? s.favsTotal : '—'}</b> favoris <span style="opacity:.7">cumulés</span></div>` : ''}`;
     const todoBlock = todo.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">À faire aujourd'hui</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${todo.map(x => `<button class="vrm-todo" data-t="${x.t}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>`
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${todo.map(x => `<button class="vrm-todo" data-t="${x.t}">${svgi(x.ic, 13)} ${x.n} ${x.lbl}</button>`).join('')}</div>`
       : `<div class="vrm-card" style="margin-top:12px"><div class="vrm-m">✅ Rien d'urgent : tout est à jour. Beau boulot.</div></div>`;
     // Optimisation : opportunités déjà calculées (mêmes onglets), pour vendre plus.
     const optim = [
-      s.relance ? { f: 'relance', ic: '💡', n: s.relance, lbl: 'à relancer' } : null,
-      s.overMarket ? { f: 'over', ic: '📊', n: s.overMarket, lbl: 'trop cher' } : null,
-      s.sleeping ? { f: 'sleep', ic: '😴', n: s.sleeping, lbl: 'dorment' } : null,
-      s.noNum ? { f: 'nonum', ic: '🔢', n: s.noNum, lbl: 'sans N°' } : null,
+      s.relance ? { f: 'relance', ic: 'zap', n: s.relance, lbl: 'à relancer' } : null,
+      s.overMarket ? { f: 'over', ic: 'trending-up', n: s.overMarket, lbl: 'trop cher' } : null,
+      s.sleeping ? { f: 'sleep', ic: 'moon', n: s.sleeping, lbl: 'dorment' } : null,
+      s.noNum ? { f: 'nonum', ic: 'hash', n: s.noNum, lbl: 'sans N°' } : null,
     ].filter(Boolean);
     const optimBlock = optim.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">Pour vendre plus</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${optim.map(x => `<button class="vrm-todo" data-t="chaussures" data-filter="${x.f}">${x.ic} ${x.n} ${x.lbl}</button>`).join('')}</div>` : '';
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${optim.map(x => `<button class="vrm-todo" data-t="chaussures" data-filter="${x.f}">${svgi(x.ic, 13)} ${x.n} ${x.lbl}</button>`).join('')}</div>` : '';
     // Dernières ventes (lecture seule) : la liste des commandes moissonnées, mêmes
     // règles de statut que l'app. Aucun total ici — le CA reste celui de l'app.
     const rs = (DATA && DATA.recentSales) || [];
