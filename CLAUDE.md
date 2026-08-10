@@ -1041,3 +1041,19 @@ Deux helpers réutilisables : `pairThumb(o, sz)` (vignette photo **ou** pictogra
 ⚠️ Une paire sans photo captée affiche le pictogramme 👟 (honnête) — la photo n'apparaît que quand `vinted_annonce_numeros` l'a (ou que l'annonce est encore en ligne). Rien n'est deviné.
 
 Vérifié au banc (faux `chrome` + Playwright, images `data:` inline qui rendent vraiment) : Ventes = 3 lignes, **2 vraies vignettes + 1 pictogramme** (paire sans photo), **3 badges N° corrects** (N°12/N°7/N°33), **0 erreur app**. Litiges + Ventes/Achats : 0 erreur. `node -c` OK sur les deux fichiers.
+
+---
+
+## 40. Session août 2026 (suite) — « argent en attente » + photos sur les Bordereaux
+
+Deux demandes de Julien. Extension **4.75 → 4.77** (à recharger dans Chrome).
+
+### 4.76 — « argent bloqué » → « argent en attente »
+Julien n'aime pas « bloqué ». Libellé renommé partout dans le panneau (Ma journée, onglet Ventes, état vide, commentaires). Le champ interne reste `enAttente` (aucune logique changée).
+
+### 4.77 — photo + N° de la paire sur les Bordereaux aussi
+Suite du §39. L'onglet Bordereaux montre maintenant la **vignette photo** de la paire :
+- **Bordereaux à imprimer** : photo retrouvée **par N° UNIQUEMENT** (`photoByNum` : numéro → photo depuis `vinted_annonce_numeros` + annonces en ligne). ⚠️ **Jamais par titre** — §24 l'interdit pour les bordereaux (risque d'envoyer la mauvaise paire). Le N° d'un bordereau vient de l'email/la transaction (certain), donc la photo l'est aussi. Pas de N° → pictogramme 👟 + pastille « N° ? » (inchangé).
+- **Ventes à générer / défilement** : `toShip` est maintenant enrichi (`enrichPairs(toShip)`, par titre unique comme les autres listes — ici pas de bordereau à tamponner, le risque est nul) → photo + badge N° via `pairThumb`/`numBadge`.
+
+Vérifié au banc : Bordereaux = 1 vraie vignette (N°12) + 1 pictogramme (paire sans N°), ligne « à générer » avec photo + N°8, **0 erreur app**. `node -c` OK sur les deux fichiers.

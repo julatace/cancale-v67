@@ -926,8 +926,8 @@
       return `
         <div class="vrm-m" style="margin-bottom:8px">Vente <b>${i + 1}</b> / ${total} — ouvre-la, clique <b>Générer le bordereau</b> sur Vinted, puis <b>Suivante</b>. L'extension capte le PDF.</div>
         <div class="vrm-card" style="display:flex;gap:8px;align-items:center">
-          ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0" />` : '<span style="font-size:24px;flex-shrink:0">📦</span>'}
-          <div style="flex:1;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title || 'Vente')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || '')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
+          ${pairThumb(t, 42)}
+          <div style="flex:1;min-width:0"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(t)}${esc(t.title || 'Vente')}</div><div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || '')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="vrm-ship-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
@@ -947,6 +947,7 @@
       ${toPrint.length > 8 ? `<input id="vrm-bord-search" type="search" value="${esc(bordQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       ${toPrint.slice(0, 60).map(b => `
         <div class="vrm-card vrm-bord-row" data-s="${esc((((b.numero != null ? 'n°' + b.numero + ' ' : '') + (b.title || '')).toLowerCase()))}" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
+          ${pairThumb(b, 42)}
           <span style="flex-shrink:0;min-width:36px;text-align:center;font-weight:800;color:${b.numero ? '#0f6b4f' : '#c53030'};background:${b.numero ? 'rgba(15,107,79,.1)' : 'rgba(197,48,48,.1)'};border-radius:8px;padding:5px 6px;font-size:12px">${b.numero ? ('N°' + esc(b.numero)) : 'N° ?'}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title || 'Bordereau')}</div>${b.dateLimite ? `<div class="vrm-m">à envoyer avant ${esc(b.dateLimite)}</div>` : ''}</div>
           <button class="vrm-bord-done" data-k="${esc(b.key)}" title="Marquer traité → le retire de la liste (colis fait)" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Traiter</button>
@@ -971,8 +972,8 @@
       const rows = pending.map(t => { const k = shipKey(t); return `
         <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
           <input type="checkbox" class="vrm-ship-chk" data-k="${esc(k)}" ${shipSel.has(k) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
-          ${t.photo ? `<img src="${esc(t.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
-          <div style="flex:1;min-width:0"><div class="vrm-t">${esc(t.title || 'Vente')}</div><div class="vrm-m">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
+          ${pairThumb(t, 40)}
+          <div style="flex:1;min-width:0"><div class="vrm-t">${numBadge(t)}${esc(t.title || 'Vente')}</div><div class="vrm-m">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
         </label>`; }).join('');
       genSection = `
         <div class="vrm-m" style="font-weight:800;margin:2px 0 6px">📄 ${pending.length} bordereau${pending.length > 1 ? 'x' : ''} à générer d'abord</div>

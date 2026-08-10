@@ -1329,8 +1329,14 @@ async function buildPanelData() {
     if (o.numero != null && numByTitle[key].numero == null) numByTitle[key].numero = String(o.numero);
   }
   const lookupPair = (title) => { const key = normT(title); if (!key || (titleCount[key] || 0) > 1) return null; return numByTitle[key] || null; };
+  // Photo par NUMÉRO (identité certaine) — pour les bordereaux, où le rapprochement
+  // par titre est INTERDIT (§24 : risque d'envoyer la mauvaise paire). Le N° d'un
+  // bordereau vient de l'email/la transaction (certain) ; on l'utilise pour la photo.
+  const photoByNum = {};
+  for (const id in numeros) { const e = numeros[id]; if (!e || e.numero == null || !e.photo) continue; const k = String(e.numero); if (!photoByNum[k]) photoByNum[k] = e.photo; }
+  for (const o of online) { if (o.numero != null && o.photo) photoByNum[String(o.numero)] = o.photo; } // annonce en ligne = photo fraîche
   const enrichPairs = (list) => { for (const o of (list || [])) { if (o.photo && o.numero != null) continue; const m = lookupPair(o.title); if (m) { if (!o.photo && m.photo) o.photo = m.photo; if (o.numero == null && m.numero != null) o.numero = m.numero; } } };
-  enrichPairs(sales); enrichPairs(recentSales); enrichPairs(recentBuys); enrichPairs(disputes);
+  enrichPairs(sales); enrichPairs(recentSales); enrichPairs(recentBuys); enrichPairs(disputes); enrichPairs(toShip);
   // ── ACHATS À RETIRER (colis en point relais) — AVEC LE CODE DE RETRAIT ───────
   // Source = les emails de suivi `email_track_*` (transporteur → « colis
   // disponible »), car c'est la SEULE source qui porte le CODE, le point relais et
@@ -1400,6 +1406,8 @@ async function buildPanelData() {
     .filter(b => b.filename) // a bien un PDF
     .map(b => ({ numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
     .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key] && !bDonePanel[b.key]);
+  // Photo du bordereau = par N° UNIQUEMENT (identité certaine, jamais par titre §24).
+  for (const b of bordsToPrint) { if (b.numero && photoByNum[String(b.numero)]) b.photo = photoByNum[String(b.numero)]; }
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
   // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
   const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)
