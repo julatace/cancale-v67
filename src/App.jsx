@@ -5342,17 +5342,20 @@ function facturxXMP(inv){
 // d'identification. Un seul fichier, lisible à l'œil ET par la machine.
 // ⚠️ Format Factur-X respecté (embarquement + XMP) ; la conformité PDF/A-3 stricte
 // (polices embarquées, profil ICC) n'est pas certifiée par un validateur ici.
-async function generateFacturXPdf(inv, ent){
-  try{
-    const { PDFDocument, StandardFonts, rgb, PDFName, AFRelationship } = await import('pdf-lib');
-    const pdf = await PDFDocument.create();
+// Construit les OCTETS du PDF Factur-X (facture + XML EN16931 embarqué) SANS le
+// télécharger — factorisé pour pouvoir aussi le fusionner avec un bordereau à
+// l'impression (voir printBordAndInvoice). generateFacturXPdf en dessous ne fait
+// que l'envelopper + déclencher le téléchargement.
+async function buildFacturXBytes(inv, ent){
+  const { PDFDocument, StandardFonts, rgb, PDFName, AFRelationship } = await import('pdf-lib');
+  const pdf = await PDFDocument.create();
+  {
     const page = pdf.addPage([595.28, 841.89]);
     const font = await pdf.embedFont(StandardFonts.Helvetica);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const W=595.28, M=50, dark=rgb(0.13,0.13,0.13), gray=rgb(0.42,0.42,0.42), green=rgb(0.15,0.66,0.36);
     const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=String(t==null?'':t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
     const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+' €';
-    // Logo (haut droite) — ton logo perso s'il existe, sinon celui par défaut.
     try{
       let logoSrc=LOGO_CANCALE;
       try{ const c=localStorage.getItem('vinted_custom_logo'); if(c) logoSrc=JSON.parse(c); }catch(_){}
@@ -5384,16 +5387,33 @@ async function generateFacturXPdf(inv, ent){
     if(inv.vintedNumber){ T('Transaction Vinted n°'+inv.vintedNumber,M,y,{s:9,c:gray}); y-=13; }
     T(ent.footer||'Merci pour votre achat !',M,y,{s:9,c:gray});
     T('Facture electronique - Factur-X (XML EN16931 embarque)',M,40,{s:7.5,c:gray});
-    // 1) XML normalisé embarqué sous le nom exact `factur-x.xml`.
     const xml=factureCII(inv, ent);
     const bytes=new TextEncoder().encode(xml);
     await pdf.attach(bytes,'factur-x.xml',{ mimeType:'text/xml', description:'Facture electronique Factur-X', creationDate:new Date(), modificationDate:new Date(), afRelationship:AFRelationship.Alternative });
-    // 2) Métadonnées + XMP Factur-X (identification).
     pdf.setTitle('Facture '+(inv.number||'')); pdf.setAuthor(ent.companyName||''); pdf.setSubject('Facture'); pdf.setProducer('VRM Cancale'); pdf.setCreator('VRM Cancale');
     try{ const stream=pdf.context.stream(facturxXMP(inv),{Type:'Metadata',Subtype:'XML'}); const ref=pdf.context.register(stream); pdf.catalog.set(PDFName.of('Metadata'),ref); }catch(_){}
-    // Sans flux d'objets → /AF + `factur-x.xml` restent en objets simples, lisibles
-    // par les outils Factur-X (Indy, validateurs) sans décompression.
-    const out=await pdf.save({ useObjectStreams:false });
+  }
+  return await pdf.save({ useObjectStreams:false });
+}
+// Lance l'impression d'un PDF (URL blob) sans clic : iframe caché + print().
+// Marche sur ordinateur (Chrome/Firefox/Edge). Sur iOS l'impression PDF via
+// iframe est bloquée → l'appelant garde le repli « Ouvrir → Partager → Imprimer ».
+const autoPrintUrl = (url) => {
+  try {
+    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+    if (isIOS) return false;
+    const ifr = document.createElement('iframe');
+    ifr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    ifr.src = url;
+    ifr.onload = () => { setTimeout(()=>{ try { ifr.contentWindow.focus(); ifr.contentWindow.print(); } catch(_){} }, 300); };
+    document.body.appendChild(ifr);
+    setTimeout(()=>{ try{ ifr.remove(); }catch(_){} }, 120000);
+    return true;
+  } catch(_) { return false; }
+};
+async function generateFacturXPdf(inv, ent){
+  try{
+    const out = await buildFacturXBytes(inv, ent);
     const blob=new Blob([out],{type:'application/pdf'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
@@ -11211,6 +11231,76 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
     } catch(err){ toast('Impossible de lire ce PDF : '+String(err)); }
   };
+  // ── FACTURE liée à un bordereau (comptes PRO uniquement) ────────────────────
+  // La facture vient des emails que l'app reçoit (pipeline Gmail/Apps Script §3) :
+  // s'il existe une facture pour ce bordereau, c'est une vente d'un COMPTE PRO →
+  // on la joint. Sinon (compte perso), pas de facture, rien à faire.
+  // Rapprochement PAR N° DE PAIRE (`productId` = N° tamponné sur le bordereau),
+  // désambiguïsé par le prix de la vente si un même N° a resservi. On ne devine
+  // jamais par titre (même règle §24).
+  const invForBord = (b) => {
+    const num = numForBord(b); if (!num) return null;
+    let invs = [];
+    try { invs = load('vinted_invoices', []) || []; } catch(_) { invs = []; }
+    const cands = invs.filter(i => String(i.productId || '').trim() === String(num));
+    if (!cands.length) return null;
+    if (cands.length === 1) return cands[0];
+    // Plusieurs factures pour ce N° (numéro réattribué au fil du temps) : on
+    // départage par le prix de la vente reliée, puis on prend la plus récente.
+    const so = b.transaction != null ? soldByTxn[String(b.transaction)] : null;
+    const price = so && so.price ? Number(so.price.amount != null ? so.price.amount : so.price) : null;
+    const scored = cands.slice().sort((a, z) => {
+      const pa = price != null ? -Math.abs((Number(a.sellPrice) || 0) - price) : 0;
+      const pz = price != null ? -Math.abs((Number(z.sellPrice) || 0) - price) : 0;
+      return (pz === pa ? 0 : (pa > pz ? -1 : 1)) || (new Date(z.createdAt || 0) - new Date(a.createdAt || 0));
+    });
+    return scored[0];
+  };
+  const entForBordInvoice = (inv) => {
+    if (!inv) return null;
+    let ents = [], active = null, settings = null;
+    try { ents = load('vinted_entreprises', []) || []; } catch(_) {}
+    try { active = load('vinted_entreprise_active', null); } catch(_) {}
+    try { settings = load('vinted_invoice_settings', null); } catch(_) {}
+    return entForInvoice(inv, ents, active, settings || { companyName:'Shop Cancale35', companyType:'Entrepreneur individuel', companyAddress:'80 rue de la vieille rivière 35260', siret:'94135104100012', footer:'Merci pour votre achat !' });
+  };
+  // Imprime le bordereau (tamponné) ET, pour un compte pro, la facture — dans UN
+  // seul PDF (bordereau puis facture), et lance directement l'impression.
+  const printBordAndInvoice = async (b) => {
+    try {
+      const pdf = await fetchBordPdf(b._row);
+      const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
+      if (!buf) { toast('PDF du bordereau illisible.'); return; }
+      const numero = numForBord(b), title = b.modele || b.article || '';
+      const { width, height } = await readPdfFirstPageSize(buf);
+      const pos = posForFormat(width, height);
+      const inv = invForBord(b);
+      const ent = inv ? entForBordInvoice(inv) : null;
+      const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+      const out = await PDFDocument.create();
+      // 1) le bordereau tamponné du N°
+      const src = await PDFDocument.load(buf);
+      const sBold = await src.embedFont(StandardFonts.HelveticaBold);
+      const sReg = await src.embedFont(StandardFonts.Helvetica);
+      drawBordereauStamp(src, rgb, sBold, sReg, numero, title, pos);
+      (await out.copyPages(src, src.getPageIndices())).forEach(p => out.addPage(p));
+      // 2) la facture pro (si elle existe)
+      let joined = false;
+      if (inv && ent) {
+        try { const fb = await buildFacturXBytes(inv, ent); const fsrc = await PDFDocument.load(fb); (await out.copyPages(fsrc, fsrc.getPageIndices())).forEach(p => out.addPage(p)); joined = true; } catch(_) {}
+      }
+      const bytes = await out.save();
+      const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+      const safeTitle = (title || '').replace(/[^\w\-]+/g, '_').slice(0, 40);
+      const filename = `bordereau${numero?'-N'+numero:''}${joined?'-facture':''}${safeTitle?'-'+safeTitle:''}.pdf`;
+      // Sur ordinateur : lance l'impression tout de suite (iframe caché). Sur
+      // iPhone (bloqué) : la modale « Ouvrir → Partager → Imprimer » prend le relais.
+      const printed = autoPrintUrl(url);
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+      if (!isIOS && !printed) { const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); }
+      setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed });
+    } catch(err){ toast('Erreur impression : '+String(err)); }
+  };
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
   // titre dans les annonces numérotées (si le titre n'est pas ambigu).
   // ── QUEL NUMÉRO PORTE CE BORDEREAU ? ──────────────────────────────────────
@@ -13319,6 +13409,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             {o && o._acc ? <AcctTag acc={o._acc} name={nom}/> : (nom ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{nom}</span> : null)}
                             {bits.length ? <span>{bits.join(' · ')}</span> : null}
+                            {(()=>{ const inv=invForBord(b); return inv ? <span title="Compte pro : une facture (reçue par email) est jointe à l'impression" style={{display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span> : null; })()}
                           </div>
                         );
                       })()}
@@ -13335,11 +13426,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const sec = { flexShrink:0, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
                     return (<>
                       <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12}}>
+                        {(()=>{ const hasInv=!!invForBord(b); return (
                         <button type="button" onClick={async ()=>{
+                          if (hasInv) { await printBordAndInvoice(b); return; }
                           const pdf=await fetchBordPdf(b._row);
                           const bytes=pdf&&pdf.pdfB64?b64ToBytes(pdf.pdfB64):null; if(!bytes){toast('PDF illisible.');return;}
                           processBordereau(numForBord(b), b.modele||b.article||'', bytes);
-                        }} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer</button>
+                        }} title={hasInv?'Génère le bordereau tamponné + la facture pro et lance l\'impression':'Génère le bordereau tamponné et lance l\'impression'} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{hasInv?' + facture':''}</button>
+                        ); })()}
                         {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}
                       </div>
                       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
@@ -13525,10 +13619,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
             <div style={{fontSize:32,marginBottom:6}}>✅</div>
-            <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:'Bordereau prêt'}</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>:<>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>:bordResult.printed?<>L'impression est <b>lancée</b>{bordResult.withInvoice?<> (bordereau <b>+ facture</b>)</>:null}. Si la fenêtre d'impression ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
-              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':'Ouvrir le bordereau'}</a>
+              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             {bordResult.batch && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
             <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>

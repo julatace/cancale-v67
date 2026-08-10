@@ -1057,3 +1057,22 @@ Suite du §39. L'onglet Bordereaux montre maintenant la **vignette photo** de la
 - **Ventes à générer / défilement** : `toShip` est maintenant enrichi (`enrichPairs(toShip)`, par titre unique comme les autres listes — ici pas de bordereau à tamponner, le risque est nul) → photo + badge N° via `pairThumb`/`numBadge`.
 
 Vérifié au banc : Bordereaux = 1 vraie vignette (N°12) + 1 pictogramme (paire sans N°), ligne « à générer » avec photo + N°8, **0 erreur app**. `node -c` OK sur les deux fichiers.
+
+---
+
+## 41. Session août 2026 (suite) — Bordereau + FACTURE (comptes pro) imprimés ensemble
+
+Demande de Julien : « pour les bordereaux tu mets ça à côté de la vente avec la facture pour les comptes pro, et après quand on met imprimé soit ça génère et ça imprime soit imprime directement. » Précisions (AskUserQuestion) : la facture vient **des emails que l'app reçoit** (pipeline Gmail/Apps Script §3), l'app génère **seulement pour les comptes pro** (les autres, inutile) ; « Imprimer » = **génère bordereau + facture puis lance l'impression** ; **dans l'app**. Changement **App.jsx** (pas l'extension) → déployé au push de la branche.
+
+### « Compte pro » = il existe une facture pour cette vente
+Pas de nouveau drapeau : une facture n'arrive par email QUE pour un compte pro. Donc **la présence d'une facture EST le signal pro**. `invForBord(b)` (dans `Comptabilite`) lit `vinted_invoices` (via `load`, lecture seule) et rapproche **par N° de paire** (`invoice.productId` === `numForBord(b)`, le N° tamponné, certain). Si un N° a resservi dans le temps → départage par le **prix de la vente reliée** (`soldByTxn`), puis la plus récente. **Jamais par titre** (règle §24). Compte perso (aucune facture) → rien, comme avant.
+
+### Impression combinée
+- `buildFacturXBytes(inv, ent)` = **refactor** de `generateFacturXPdf` : les octets du PDF facture (Factur-X, XML EN16931 embarqué) sans le télécharger. `generateFacturXPdf` n'en est plus qu'un wrapper (le bouton 🧾 des Factures marche pareil).
+- `printBordAndInvoice(b)` : tamponne le bordereau (N° via `drawBordereauStamp`), **fusionne** (pdf-lib `copyPages`) bordereau + facture dans **UN seul PDF**, puis `autoPrintUrl(url)` (iframe caché → `print()`, ordinateur) lance l'impression tout de suite. iPhone (print PDF bloqué) → repli modale « Ouvrir → Partager → Imprimer ». `entForInvoice` résout l'entité de la facture (§35).
+- Carte bordereau : pastille **🧾 Facture N°xxxx** quand une facture existe ; le bouton principal devient **« 🖨 Imprimer + facture »** (sinon « 🖨 Imprimer » classique, inchangé). Modale « Bordereau + facture prêts » / « impression lancée ».
+
+⚠️ `invForBord` s'exécute à chaque rendu de carte (pastille + bouton) : lecture `localStorage` légère, sûre. Le rapprochement par titre reste **interdit** ici comme pour la photo (§24/§39).
+
+### Vérifié
+`npm run build` OK. Banc app (Playwright, `dist` servi, Supabase mocké : `email_bord_*` = 1 bordereau N°12 + ligne `main` avec `vinted_invoices` productId=12) : la carte rend **« N°12 · Adidas Spezial · 🧾 Facture 2026-000042 »** et le bouton **« 🖨 Imprimer + facture »**, **0 PAGEERROR** (les 3 « erreurs » console = le 400 du sondage `select=owner` volontaire + resets réseau au teardown, pas l'app).
