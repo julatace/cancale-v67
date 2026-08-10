@@ -257,6 +257,9 @@ async function storeHarvest(domain, type, id, body) {
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
 
+  // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
+  if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
+
   // Le profil contient le vrai id de profil (different de l'account_id, utile
   // pour les annonces) et le login. Le vrai id reste disponible dans la ligne
   // harvest_{uid}_profile ci-dessus (l'app le lira). On met juste a jour le
@@ -418,6 +421,36 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeSeenUrls(domain, msg.paths);
   }
 });
+
+// ── DIAGNOSTIC : apprendre le code « offre EN ATTENTE » ─────────────────────
+// On sait lire une offre (`transaction_id`, `offer_request_id`, prix) mais PAS
+// reconnaître à coup sûr celle qui est encore ouverte : sur les 40 conversations
+// captées, les 21 offres étaient toutes en `status` 20 (acceptée) ou 30
+// (refusée). Tant que le code « en attente » est inconnu, on ne peut rien
+// décider automatiquement sans risquer de vendre une paire à n'importe quel prix.
+// Alors on APPREND, passivement : chaque fois qu'une conversation passe, on note
+// les couples status → libellé rencontrés. Zéro requête, zéro action.
+// Dès qu'une offre réellement en attente sera vue, son code sera dans cette ligne.
+async function noterStatutsOffres(parsed) {
+  try {
+    const c = (parsed && (parsed.conversation || parsed)) || {};
+    const msgs = Array.isArray(c.messages) ? c.messages : [];
+    const vus = {};
+    for (const m of msgs) {
+      if (!m || m.entity_type !== 'offer_request_message') continue;
+      const e = m.entity || {};
+      if (e.status == null) continue;
+      vus[String(e.status)] = String(e.status_title || '').trim() || '(sans libellé)';
+    }
+    if (!Object.keys(vus).length) return;
+    const rows = await sbGet('app_data?id=eq.panel_offer_statuts&select=data');
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const next = { ...(cur.statuts || {}), ...vus };
+    // Rien de nouveau → on n'écrit pas (inutile de repousser la même ligne).
+    if (JSON.stringify(next) === JSON.stringify(cur.statuts || {})) return;
+    await supabaseUpsert('app_data', [{ id: 'panel_offer_statuts', data: { statuts: next, majAt: new Date().toISOString() } }], 'id');
+  } catch (_) { /* purement diagnostique : ne doit jamais gêner la capture */ }
+}
 
 // Diagnostic : liste des CHEMINS d'API que le site appelle réellement (aucun
 // contenu, aucun paramètre). Sert à repérer tout de suite quand Vinted déplace
