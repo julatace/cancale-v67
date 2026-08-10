@@ -541,14 +541,17 @@
     const list = ventesFilter === 'all' ? all : all.filter(v => v.etat === ventesFilter);
     const etatLbl = { completed: '✅ finalisée', pending: '⏳ en cours' };
     const rows = list.slice(0, 200).map(v => `
-      <a class="vrm-v-row" data-s="${esc((((v.numero != null ? 'n°' + v.numero + ' ' : '') + (v.title || '')).toLowerCase()))}" href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:9px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:8px 10px;margin-bottom:6px;text-decoration:none;color:inherit">
-        ${pairThumb(v, 46)}
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(v)}${esc(v.title || 'Vente')}</div>
-          <div class="vrm-m" style="font-size:11px;margin-top:1px">${etatLbl[v.etat] || ''}${v.ts ? ` · ${esc(timeago(v.ts))}` : ''}</div>
-        </div>
-        <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#0f6b4f">${fmt(v.price)}</div>
-      </a>`).join('');
+      <div class="vrm-v-row" data-s="${esc((((v.numero != null ? 'n°' + v.numero + ' ' : '') + (v.title || '')).toLowerCase()))}" style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px">
+        <a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="flex:1;min-width:0;display:flex;gap:9px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:8px 10px;text-decoration:none;color:inherit">
+          ${pairThumb(v, 46)}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(v)}${esc(v.title || 'Vente')}</div>
+            <div class="vrm-m" style="font-size:11px;margin-top:1px">${etatLbl[v.etat] || ''}${v.ts ? ` · ${esc(timeago(v.ts))}` : ''}</div>
+          </div>
+          <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#0f6b4f">${fmt(v.price)}</div>
+        </a>
+        ${v.pro ? `<a href="${APP_URL}/?tab=cat_bord" target="_blank" rel="noreferrer" title="Compte pro : imprimer le bordereau + la facture dans l'app" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:52px;border-radius:12px;background:#0797a014;color:#0797a0;text-decoration:none;font-weight:800;font-size:16px">🧾<span style="font-size:9px;font-weight:700">facture</span></a>` : ''}
+      </div>`).join('');
     return `
       ${head}
       ${filterChips}
@@ -952,7 +955,7 @@
           <div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title || 'Bordereau')}</div>${b.dateLimite ? `<div class="vrm-m">à envoyer avant ${esc(b.dateLimite)}</div>` : ''}</div>
           <button class="vrm-bord-done" data-k="${esc(b.key)}" title="Marquer traité → le retire de la liste (colis fait)" style="flex-shrink:0;border:1px solid #0f6b4f;background:rgba(15,107,79,.08);color:#0f6b4f;border-radius:8px;padding:6px 9px;font-weight:800;font-size:12px;cursor:pointer">✓ Traiter</button>
         </div>`).join('')}
-      <a href="${APP_URL}/?tab=cat_bord" target="_blank" rel="noreferrer" style="display:block;text-align:center;text-decoration:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;margin-bottom:14px">🖨️ Imprimer dans l'app ↗</a>` : '';
+      <a href="${APP_URL}/?tab=cat_bord&print=bord" target="_blank" rel="noreferrer" title="Ouvre l'app et imprime TOUS les bordereaux d'un coup (tous les comptes), factures pro jointes" style="display:block;text-align:center;text-decoration:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;margin-bottom:14px">🖨️ Tout imprimer (dans l'app) ↗</a>` : '';
 
     // 1bis) TRAITÉS À L'INSTANT — annulables (« ↺ Remettre ») tant que tu n'as pas
     //       rechargé. Sécurise le clic par erreur sur « ✓ Traiter ».

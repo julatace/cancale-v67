@@ -1337,6 +1337,11 @@ async function buildPanelData() {
   for (const o of online) { if (o.numero != null && o.photo) photoByNum[String(o.numero)] = o.photo; } // annonce en ligne = photo fraîche
   const enrichPairs = (list) => { for (const o of (list || [])) { if (o.photo && o.numero != null) continue; const m = lookupPair(o.title); if (m) { if (!o.photo && m.photo) o.photo = m.photo; if (o.numero == null && m.numero != null) o.numero = m.numero; } } };
   enrichPairs(sales); enrichPairs(recentSales); enrichPairs(recentBuys); enrichPairs(disputes); enrichPairs(toShip);
+  // Compte PRO = il existe une facture (reçue par email) pour cette paire (§41).
+  // On marque `pro` sur les ventes dont le N° a une facture → bouton facture au panneau.
+  const proNums = new Set((Array.isArray(d.vinted_invoices) ? d.vinted_invoices : []).map(i => String((i && i.productId != null ? i.productId : '')).trim()).filter(Boolean));
+  const markPro = (list) => { for (const o of (list || [])) { o.pro = o.numero != null && proNums.has(String(o.numero)); } };
+  markPro(sales); markPro(recentSales);
   // ── ACHATS À RETIRER (colis en point relais) — AVEC LE CODE DE RETRAIT ───────
   // Source = les emails de suivi `email_track_*` (transporteur → « colis
   // disponible »), car c'est la SEULE source qui porte le CODE, le point relais et

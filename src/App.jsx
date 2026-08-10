@@ -698,6 +698,10 @@ const isCloudReady = () => _cloudReady;
 
 // Lecture locale (instantanee)
 const load = (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } };
+// Drapeau « imprimer tous les bordereaux » posé par un deep-link (?print=bord),
+// consommé une fois par l'écran Bordereaux quand les données sont chargées.
+// Sert au bouton « Tout imprimer (dans l'app) » du panneau d'extension.
+let _pendingBordPrint = false;
 
 // Recupere TOUT le contenu du cloud (au demarrage)
 const cloudLoad = async () => {
@@ -11369,6 +11373,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch(err){ toast('Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
+  // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
+  // bordereaux sont chargés, on lance l'impression groupée une seule fois.
+  React.useEffect(()=>{
+    if(only!=='bordereaux' || !_pendingBordPrint || !Array.isArray(emailBords)) return;
+    _pendingBordPrint=false;
+    const t=setTimeout(()=>{ try{ batchBordereaux(); }catch(_){} }, 400);
+    return ()=>clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[emailBords, only]);
   // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
   const adjustBordPlacement = () => {
     const r = bordResult; if(!r || !r.pdfBuf) return;
@@ -15724,7 +15737,7 @@ export default function App() {
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
     const TABS_OK=['dashboard','cat_annonces','cat_repub','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
-    const goto=(search)=>{ try{ const t=new URLSearchParams(search).get('tab'); if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
+    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
