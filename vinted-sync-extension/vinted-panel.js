@@ -64,7 +64,19 @@
   const REPUB_FRESH_MS = 20 * 3600 * 1000;
   let repubDone = readJSON('vrm_repub_done', {});
   const isRepubRecent = (id) => { const t = repubDone[String(id)]; return t && (Date.now() - t) < REPUB_FRESH_MS; };
-  const markRepub = (id) => { repubDone[String(id)] = Date.now(); writeJSON('vrm_repub_done', repubDone); };
+  // ⚠️ On mémorise AUSSI le N° et le titre : republier crée une NOUVELLE annonce
+  // (nouvel id), donc le numéro se détache de la paire. Sans ça, le N° repart
+  // dans le pool et peut être donné à une autre paire alors que la tienne occupe
+  // toujours sa boîte au garage (cf. background.js `marquerRepublie`).
+  const markRepub = (id) => {
+    repubDone[String(id)] = Date.now();
+    writeJSON('vrm_repub_done', repubDone);
+    const o = (DATA && DATA.byId && DATA.byId[String(id)]) || null;
+    try {
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'repubMarque',
+        id: String(id), numero: o && o.numero != null ? String(o.numero) : '', title: (o && o.title) || '' });
+    } catch (_) {}
+  };
   // ── Assistant de RÉPONSE (Messaging Intelligence) : tu colles le message de
   //    l'acheteur, l'IA propose des réponses ; tu relis et tu envoies TOI-MÊME
   //    sur Vinted (rien n'est envoyé automatiquement). État gardé entre rendus.
@@ -1635,6 +1647,30 @@
   // Tu coches les annonces à remettre en avant, puis « Commencer » : le panneau
   // t'OUVRE chaque annonce à ton clic, une à la fois. Tu republies toi-même sur
   // Vinted (bouton natif) et tu passes à la suivante. Rien ne part tout seul.
+  // ── LE N° À REMETTRE APRÈS UNE REPUBLICATION ────────────────────────────────
+  // Republier crée une nouvelle annonce : la paire perd son numéro, et ce numéro
+  // redevient « libre » alors que la chaussure occupe toujours sa boîte. Tant
+  // qu'on ne l'a pas remis, deux paires peuvent se retrouver dans la même case.
+  // Le panneau ne l'écrit pas lui-même (le numéro vit dans l'app) : il te dit
+  // exactement quoi remettre, et t'ouvre l'écran au bon endroit.
+  function renumBandeau() {
+    const list = (DATA && DATA.renumSuggest) || [];
+    if (!list.length) return '';
+    const ligne = (r) => `<div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+      ${r.photo ? `<img src="${esc(r.photo)}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0">` : ''}
+      <div style="flex:1 1 120px;min-width:0">
+        <div style="font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.title || 'Paire republiée')}</div>
+        <div class="vrm-m" style="font-size:11px">remets le <b>N°${esc(r.numero)}</b> sur la nouvelle annonce</div>
+      </div>
+      <a href="${APP_URL}/?tab=cat_annonces" target="vrm_app" rel="noreferrer" style="flex-shrink:0;text-decoration:none;border:1px solid #9a5b16;background:#9a5b16;color:#fff;border-radius:9px;padding:6px 10px;font-weight:800;font-size:11.5px">Ouvrir ↗</a>
+    </div>`;
+    return `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
+      <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} ${list.length} numéro${list.length > 1 ? 'x' : ''} à remettre</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">Republier recrée l'annonce : le N° s'est détaché. Tant qu'il n'est pas remis, il peut être donné à une autre paire — et deux chaussures finissent dans la même boîte.</div>
+      ${list.slice(0, 6).map(ligne).join('')}
+    </div>`;
+  }
+
   // ── LE KIT DE REPUBLICATION ─────────────────────────────────────────────────
   // Chez Vinted, « republier » n'est PAS un bouton « remonter » : ça n'existe
   // pas. Vérifié dans les requêtes captées — c'est `POST /items/{id}/delete`
@@ -1729,6 +1765,7 @@
       </label>`;
     }).join('');
     return `
+      ${renumBandeau()}
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
       ${nDone ? `<div class="vrm-m" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding:6px 9px;border-radius:8px;background:#eefaf3;color:#0f6b4f;border:1px solid #bfe6d3"><span>✓ <b>${nDone}</b> republiée${nDone > 1 ? 's' : ''} récemment (rangées en bas)</span><button class="vrm-go" data-act="resetdone" style="border:none;background:transparent;color:#0f6b4f;font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline;flex-shrink:0">Réinitialiser</button></div>` : ''}
       ${list.length > 8 ? `<input id="vrm-repub-search" type="search" value="${esc(repubQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}

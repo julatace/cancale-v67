@@ -1255,6 +1255,17 @@ Ce que disent les requêtes captées : republier chez Vinted **n'est pas un bout
 Défilement Republier : annonce avec fiche → 3 boutons de copie, **la description copiée est identique à l'originale** (sauts de ligne compris) ; annonce sans fiche → encart + bouton, qui demande le bon `itemId`+`uid`. **0 erreur page/console.** `node --check` OK sur les deux fichiers.
 ⚠️ Piège de banc : cocher une case **re-rend la liste** → un handle Playwright récupéré avant devient détaché. Re-sélectionner par `data-id` à chaque clic.
 
+### 5. ⚠️ REPUBLIER CASSE LE NUMÉRO DE LA PAIRE (4.90) — effet de bord jamais traité
+Republier = supprimer + recréer → **nouvel id d'annonce**. Or `vinted_annonce_numeros` est indexé **par id d'annonce** (§7). Donc après chaque republication :
+1. le N° reste accroché à une annonce qui n'existe plus ;
+2. la nouvelle annonce n'a plus de numéro ;
+3. **le pire** — le N° n'étant plus porté par aucune annonce en ligne, il redevient « libre » (§7, `freedNums`) et la numérotation auto peut le **donner à une autre paire**, alors que la chaussure occupe toujours cette boîte. C'est le « deux paires dans la même boîte » que §19 traite comme le risque n°1.
+
+- `markRepub(id)` envoie désormais `repubMarque {id, numero, title}` → **`panel_repub_pending`** (ligne dédiée, purge à 30 j).
+- `buildPanelData.renumSuggest` retrouve la nouvelle annonce, sous **trois** conditions strictes : le numéro n'est porté par **aucune** annonce en ligne (sinon il a déjà été réattribué), le titre est **exactement** le même, **unique** parmi les annonces en ligne, et la cible n'a pas déjà un numéro. Sinon : **aucune suggestion** (§24, jamais de devinette).
+- Bandeau orange en tête de Republier : « N numéros à remettre » + la paire + « remets le N°7 » + lien vers l'app.
+⚠️ **L'extension n'écrit PAS le numéro** : `vinted_annonce_numeros` vit dans la ligne `main`, que le panneau ne doit jamais réécrire (§35). Elle signale, Julien applique dans l'app. **Prochaine étape possible** : faire lire `panel_repub_pending` par `App.jsx` pour proposer le report en un tap (côté app, donc autorisé à écrire).
+
 ### Ce qui reste ouvert
 - La **fuite de capture des fiches** : réponse attendue dans `panel_diag_capture` dès que Julien navigue avec la 4.89.
 - Le **code « offre en attente »** (§45) : toujours inconnu, `panel_offer_statuts` l'apprendra.

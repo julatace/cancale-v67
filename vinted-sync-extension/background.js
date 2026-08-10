@@ -393,6 +393,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Lire la fiche d'une de TES annonces (description, catégorie) pour
           // pouvoir la republier sans tout retaper. Lecture seule.
           if (msg.action === 'capterAnnonce') { const r = await capterAnnonce(msg.uid, msg.itemId); sendResponse(r); return; }
+          // Tu viens de republier une paire : on retient son N° pour le
+          // retrouver sur la nouvelle annonce (cf. marquerRepublie).
+          if (msg.action === 'repubMarque') { const ok = await marquerRepublie(msg.id, msg.numero, msg.title); sendResponse({ ok }); return; }
           if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
           if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -1258,6 +1261,34 @@ async function repondreOffre({ uid, tx, oid, quoi, prix }) {
   return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
 
+// ── ⚠️ REPUBLIER CASSE LE NUMÉRO DE LA PAIRE ────────────────────────────────
+// Effet de bord jamais traité, et il est sérieux. Republier chez Vinted =
+// supprimer + recréer → la nouvelle annonce a un **nouvel id**. Or les numéros
+// vivent dans `vinted_annonce_numeros`, **indexés par id d'annonce** (§7). Donc
+// après une republication :
+//   1. le N° reste accroché à une annonce qui n'existe plus ;
+//   2. la nouvelle annonce n'a PLUS de numéro ;
+//   3. pire — le N° étant « libre » (plus aucune annonce en ligne ne le porte),
+//      la numérotation auto peut le **redonner à une autre paire**, alors que la
+//      tienne dort toujours dans cette boîte au garage. C'est exactement le
+//      « deux paires dans la même boîte » que §19 traite comme dangereux.
+// On mémorise donc ce qu'on republie, et on repère la nouvelle annonce ensuite.
+// ⚠️ L'extension N'ÉCRIT PAS le numéro elle-même : `vinted_annonce_numeros` vit
+// dans la ligne `main`, que le panneau ne doit jamais réécrire (§35). Elle
+// signale, tu appliques dans l'app.
+async function marquerRepublie(id, numero, title) {
+  if (!id) return false;
+  const rows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
+  const cur = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+  const items = { ...cur };
+  items[String(id)] = { numero: numero != null ? String(numero) : '', title: String(title || ''), t: Date.now() };
+  // On oublie au bout de 30 jours : passé ce délai, la nouvelle annonce a été
+  // captée depuis longtemps, ou la paire n'existe plus.
+  const limite = Date.now() - 30 * 86400000;
+  for (const k in items) if (!items[k] || (items[k].t || 0) < limite) delete items[k];
+  return await supabaseUpsert('app_data', [{ id: 'panel_repub_pending', data: { items, majAt: new Date().toISOString() } }], 'id');
+}
+
 // ── CAPTER LA FICHE D'UNE ANNONCE (pour pouvoir la republier) ───────────────
 // Sans la fiche, on n'a QUE le titre, le prix et la photo : pas la description,
 // pas la catégorie, pas les attributs. Or republier chez Vinted, c'est supprimer
@@ -1844,6 +1875,32 @@ async function buildPanelData() {
   } catch (_) { /* pas de fiche : Republier le dira honnêtement */ }
   for (const o of online) { const f = fiches[String(o.id)]; if (f && f.desc) o.desc = f.desc; }
 
+  // ── LE N° PERDU APRÈS UNE REPUBLICATION ─────────────────────────────────────
+  // Pour chaque paire republiée récemment, on cherche la NOUVELLE annonce et on
+  // te propose d'y remettre le numéro. Règles strictes, aucune devinette :
+  //   • le numéro ne doit plus être porté par AUCUNE annonce en ligne
+  //     (s'il l'est déjà, il a été réattribué : on ne touche à rien) ;
+  //   • la nouvelle annonce doit avoir EXACTEMENT le même titre, ce titre doit
+  //     être UNIQUE parmi les annonces en ligne, et elle ne doit pas déjà avoir
+  //     de numéro (même garde que §24 : un titre en double n'associe jamais rien).
+  const renumSuggest = [];
+  try {
+    const pRows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
+    const pend = (pRows && pRows[0] && pRows[0].data && pRows[0].data.items) || {};
+    const numsEnLigne = new Set(online.map(o => String(o.numero || '')).filter(Boolean));
+    for (const ancienId in pend) {
+      const p = pend[ancienId] || {};
+      if (!p.numero) continue;
+      if (numsEnLigne.has(String(p.numero))) continue;      // déjà repris ailleurs
+      const k = normT(p.title);
+      if (!k || onlineTitleN[k] !== 1) continue;            // titre absent ou ambigu
+      const cible = online.find(o => normT(o.title) === k && !o.numero && String(o.id) !== String(ancienId));
+      if (!cible) continue;
+      renumSuggest.push({ ancienId: String(ancienId), numero: String(p.numero), title: p.title,
+                          nouvelId: String(cible.id), photo: cible.photo || null, prix: cible.price });
+    }
+  } catch (_) { /* aucune suggestion plutôt qu'une fausse */ }
+
   const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
   const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
   for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }
@@ -1985,7 +2042,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, offers, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
