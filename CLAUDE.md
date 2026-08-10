@@ -1264,7 +1264,14 @@ Republier = supprimer + recréer → **nouvel id d'annonce**. Or `vinted_annonce
 - `markRepub(id)` envoie désormais `repubMarque {id, numero, title}` → **`panel_repub_pending`** (ligne dédiée, purge à 30 j).
 - `buildPanelData.renumSuggest` retrouve la nouvelle annonce, sous **trois** conditions strictes : le numéro n'est porté par **aucune** annonce en ligne (sinon il a déjà été réattribué), le titre est **exactement** le même, **unique** parmi les annonces en ligne, et la cible n'a pas déjà un numéro. Sinon : **aucune suggestion** (§24, jamais de devinette).
 - Bandeau orange en tête de Republier : « N numéros à remettre » + la paire + « remets le N°7 » + lien vers l'app.
-⚠️ **L'extension n'écrit PAS le numéro** : `vinted_annonce_numeros` vit dans la ligne `main`, que le panneau ne doit jamais réécrire (§35). Elle signale, Julien applique dans l'app. **Prochaine étape possible** : faire lire `panel_repub_pending` par `App.jsx` pour proposer le report en un tap (côté app, donc autorisé à écrire).
+⚠️ **L'extension n'écrit PAS le numéro** : `vinted_annonce_numeros` vit dans la ligne `main`, que le panneau ne doit jamais réécrire (§35). Elle signale seulement.
+
+### ⚠️ 6. ET J'AI FAILLI LIVRER UN DOUBLON — l'app le faisait DÉJÀ
+J'ai écrit côté `App.jsx` un panneau « N° à remettre après republication » (lecture de `panel_repub_pending`, `renumAFaire`, bouton d'application). **Le banc l'a démenti** : le panneau ne s'affichait pas… parce que le numéro **était déjà remis**, tout seul, avec un champ `repriseAt`.
+➡️ `numeroReprises` + l'effet **AUTO-REPRISE** existent depuis longtemps dans `App.jsx` (~l.9878) : quand une annonce republiée correspond **sans ambiguïté** à une paire orpheline (même titre + pointure), elle récupère son ancien numéro **sans aucun clic**, et `applyReprise` gère le cas manuel. Commentaire d'époque : « vérifié sur données réelles, 5 reprises justes, 2 cas piégeux laissés intacts ».
+**Mon ajout a été entièrement annulé** (`git checkout -- src/App.jsx`) : deux mécanismes qui écrivent des numéros, c'est exactement la violation d'« une seule règle par notion » (§11) — et le mien était moins testé.
+**Ce qui reste côté extension** : `panel_repub_pending` + le bandeau, **reformulé pour ne pas être une fausse alerte** — il dit désormais « l'app le remet toute seule à sa prochaine ouverture », ce qui est vrai et reste utile (entre la republication et l'ouverture de l'app, la paire est bien sans numéro).
+**Leçon (la même que §21) : avant d'ajouter un garde-fou, vérifier qu'il n'existe pas déjà.** Un banc qui « ne montre pas la fonction attendue » n'est pas forcément un bug du code — ici c'était la preuve que le problème était déjà résolu.
 
 ### Ce qui reste ouvert
 - La **fuite de capture des fiches** : réponse attendue dans `panel_diag_capture` dès que Julien navigue avec la 4.89.

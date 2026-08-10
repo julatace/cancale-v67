@@ -1664,9 +1664,9 @@
       </div>
       <a href="${APP_URL}/?tab=cat_annonces" target="vrm_app" rel="noreferrer" style="flex-shrink:0;text-decoration:none;border:1px solid #9a5b16;background:#9a5b16;color:#fff;border-radius:9px;padding:6px 10px;font-weight:800;font-size:11.5px">Ouvrir ↗</a>
     </div>`;
-    return `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
-      <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} ${list.length} numéro${list.length > 1 ? 'x' : ''} à remettre</div>
-      <div class="vrm-m" style="font-size:11px;margin-top:3px">Republier recrée l'annonce : le N° s'est détaché. Tant qu'il n'est pas remis, il peut être donné à une autre paire — et deux chaussures finissent dans la même boîte.</div>
+    return `<div class="vrm-card" style="margin-bottom:8px;padding:9px">
+      <div style="font-weight:800;font-size:12.5px;display:flex;align-items:center;gap:6px">${svgi('hash', 14)} ${list.length} paire${list.length > 1 ? 's' : ''} republiée${list.length > 1 ? 's' : ''} sans son N°</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">Republier recrée l'annonce, donc le numéro se détache. <b>L'app le remet toute seule</b> à sa prochaine ouverture (elle ne le fait que si la correspondance est certaine). Ouvre-la si tu veux vérifier.</div>
       ${list.slice(0, 6).map(ligne).join('')}
     </div>`;
   }
