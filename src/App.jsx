@@ -2143,10 +2143,10 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
 // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
 // [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
-const mergeAndDownloadBordereaux = async (items, resolvePos) => {
+const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const out = await PDFDocument.create();
-  let count = 0;
+  let count = 0, nInv = 0;
   for (const it of items) {
     try {
       const src = await PDFDocument.load(it.pdfBuf);
@@ -2161,20 +2161,26 @@ const mergeAndDownloadBordereaux = async (items, resolvePos) => {
       const pages = await out.copyPages(src, src.getPageIndices());
       pages.forEach(p => out.addPage(p));
       count++;
+      // Facture pro juste APRÈS son bordereau (comptes pro uniquement, §41).
+      if (it.invBytes) {
+        try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
+      }
     } catch (_) {}
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
   const bytes = await out.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const filename = `bordereaux-${count}-a-la-suite.pdf`;
+  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}-a-la-suite.pdf`;
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-  if (!isIOS) {
+  // « génère + lance l'impression » (ordinateur) ; sinon téléchargement.
+  const printed = opts.autoprint ? autoPrintUrl(url) : false;
+  if (!isIOS && !printed) {
     const a = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
   }
-  return { url, filename, count };
+  return { url, filename, count, nInv, printed };
 };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
@@ -11350,9 +11356,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const b of pending) {
         const pdf = await fetchBordPdf(b._row);
         const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
-        if (buf) items.push({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: buf });
+        if (!buf) continue;
+        // Compte pro (une facture existe pour cette vente) → on joint la facture
+        // juste après son bordereau dans le PDF groupé (§41).
+        let invBytes = null;
+        const inv = invForBord(b);
+        if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
+        items.push({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: buf, invBytes });
       }
-      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false));
+      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true });
       setBordResult({ ...r, batch: true });
     } catch(err){ toast('Erreur : ' + String(err)); }
     setBatchBusy(false);
@@ -13620,7 +13632,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
             <div style={{fontSize:32,marginBottom:6}}>✅</div>
             <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>:bordResult.printed?<>L'impression est <b>lancée</b>{bordResult.withInvoice?<> (bordereau <b>+ facture</b>)</>:null}. Si la fenêtre d'impression ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>L'impression est <b>lancée</b> ; si la fenêtre ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>L'impression est <b>lancée</b>{bordResult.withInvoice?<> (bordereau <b>+ facture</b>)</>:null}. Si la fenêtre d'impression ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
@@ -16433,44 +16445,34 @@ export default function App() {
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
       if(overlay){ swipeStart.current=null; return; }
-      // On mémorise aussi la position de défilement au départ (`sy`) pour le
-      // GLISSER-DÉFILER à la souris (voir onPointerMove).
-      swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false,vert:false,sy:window.scrollY||window.pageYOffset||0};
+      swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
       }}
-      // Deux gestes à la souris, décidés à la volée selon la direction :
-      //  • franchement HORIZONTAL → balayage entre onglets (comme au doigt) ;
-      //  • franchement VERTICAL → GLISSER-DÉFILER : on attrape la page et on la
-      //    fait défiler avec la souris (sur ordinateur, glisser ne scrollait pas,
-      //    il fallait attraper la barre de droite). Sens naturel de la molette :
-      //    glisser vers le bas fait DESCENDRE la page (comme la barre).
-      // Dans les deux cas on coupe la sélection de texte pendant le geste, sinon
-      // glisser surligne la page et la sélection restée en place casse les gestes
-      // suivants. Un petit mouvement (<8 px) reste un clic/une sélection normale.
+      // À la souris : UNIQUEMENT le balayage HORIZONTAL entre onglets. Le
+      // défilement vertical reste celui du navigateur (molette + barre) —
+      // pas de « glisser-défiler » (Julien n'en veut pas). Dès que le geste part
+      // franchement de côté, on coupe la sélection de texte (sinon glisser
+      // surligne la page et la sélection restée en place casse les gestes
+      // suivants). Un geste vertical ou oblique sélectionne/défile normalement.
       onPointerMove={e=>{
       const s=swipeStart.current; if(!s||!s.souris) return;
+      if(s.horiz) return;
       const dx=e.clientX-s.x, dy=e.clientY-s.y;
-      if(s.vert){ window.scrollTo(0, s.sy + dy); return; } // défilement en cours
-      if(s.horiz) return;                                   // balayage en cours
       if(Math.abs(dx)>25 && Math.abs(dx)>Math.abs(dy)*1.5){
       s.horiz=true;
       try{ document.body.style.userSelect='none'; window.getSelection().removeAllRanges(); }catch(_){}
-      } else if(Math.abs(dy)>8 && Math.abs(dy)>=Math.abs(dx)){
-      s.vert=true;
-      try{ document.body.style.userSelect='none'; window.getSelection().removeAllRanges(); document.body.style.cursor='grabbing'; }catch(_){}
-      window.scrollTo(0, s.sy + dy);
       }
       }}
       onPointerUp={e=>{
       const s=swipeStart.current;
       if(!s||!s.souris||e.pointerType!=='mouse') return;
       swipeStart.current=null;
-      try{ document.body.style.userSelect=''; document.body.style.cursor=''; }catch(_){}
-      if(s.vert) return;   // c'était un défilement, pas un balayage ni un clic
-      if(!s.horiz) return; // un geste jamais devenu horizontal = une sélection/un clic
+      try{ document.body.style.userSelect=''; }catch(_){}
+      // Un geste qui n'est jamais devenu horizontal, c'est une sélection/un clic.
+      if(!s.horiz) return;
       // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
       slideTab(e.clientX-s.x, e.clientY-s.y, 110);
       }}
-      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; document.body.style.cursor=''; }catch(_){} }}>>
+      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
