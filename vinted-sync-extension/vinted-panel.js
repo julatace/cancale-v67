@@ -348,7 +348,7 @@
     </div>`;
 
   // ── ONGLET « MA JOURNÉE » : toute ta boutique en un coup d'œil, sur Vinted ────
-  // Les chiffres d'argent (CA du mois, argent bloqué, encaissé) viennent de la
+  // Les chiffres d'argent (CA du mois, argent en attente, encaissé) viennent de la
   // ligne `widget_stats` PUBLIÉE PAR L'APP → jamais recalculés ici, donc jamais un
   // chiffre qui contredit l'app. On affiche leur fraîcheur honnêtement.
   const eurInt = (v) => (v == null ? '—' : Number(v).toLocaleString('fr-FR') + ' €');
@@ -371,10 +371,10 @@
         <div class="vrm-m">${a.ventesMois != null ? `${a.ventesMois} vente${a.ventesMois > 1 ? 's' : ''}` : ''}</div>
       </div>
       <div class="vrm-stats" style="margin-top:8px">
-        ${tile('Argent bloqué', eurInt(a.enAttente), '#c98a1a')}
+        ${tile('Argent en attente', eurInt(a.enAttente), '#c98a1a')}
         ${tile('Encaissé', eurInt(a.caEncaisse), '#0f6b4f')}
       </div>`
-      : `<div class="vrm-card"><div class="vrm-m">Ouvre l'app une fois pour voir ton <b>CA du mois</b> et ton <b>argent bloqué</b> ici (ils sont calculés par l'app).</div></div>`;
+      : `<div class="vrm-card"><div class="vrm-m">Ouvre l'app une fois pour voir ton <b>CA du mois</b> et ton <b>argent en attente</b> ici (ils sont calculés par l'app).</div></div>`;
     // Objectif de CA mensuel (fixé dans l'app) : barre de progression motivante.
     const goal = (DATA && DATA.goal) || 0;
     let goalBlock = '';
@@ -518,7 +518,7 @@
 
   // ── ONGLET « VENTES » : la liste des ventes moissonnées (mêmes commandes et
   //    mêmes règles de statut que l'app, cf. `classifySale` dans buildPanelData).
-  //    ⚠️ COHÉRENCE : le CA du mois / argent bloqué / encaissé viennent d'`appStats`
+  //    ⚠️ COHÉRENCE : le CA du mois / argent en attente / encaissé viennent d'`appStats`
   //    (publiés par l'app) — on NE recalcule AUCUN de ces totaux ici, pour ne jamais
   //    afficher un chiffre qui contredit l'app. La liste, elle, est lecture seule.
   function renderVentes() {
@@ -529,7 +529,7 @@
     const head = a ? `
       <div class="vrm-stats" style="margin-bottom:8px">
         <div class="vrm-st" style="flex:1 1 30%"><b style="color:#09b1ba">${eurI(a.caMois)}</b><span class="vrm-m">CA du mois</span></div>
-        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#c98a1a">${eurI(a.enAttente)}</b><span class="vrm-m">Argent bloqué</span></div>
+        <div class="vrm-st" style="flex:1 1 30%"><b style="color:#c98a1a">${eurI(a.enAttente)}</b><span class="vrm-m">Argent en attente</span></div>
         <div class="vrm-st" style="flex:1 1 30%"><b style="color:#0f6b4f">${eurI(a.caEncaisse)}</b><span class="vrm-m">Encaissé</span></div>
       </div>
       <div class="vrm-m" style="text-align:center;margin:-2px 0 8px;opacity:.7">Chiffres de l'app · ${a.updatedAt ? esc(timeago(Date.parse(a.updatedAt))) : ''}</div>` : '';
