@@ -990,3 +990,18 @@ Objectif de Julien : « juste à regarder l'extension pour naviguer sur Vinted e
 ⚠️ Rappel cohérence tenu : le panneau **n'agit jamais** sur Vinted (0 requête, 0 clic auto), ne réécrit **jamais** la ligne `main`, et ne recalcule aucun CA/marge qui pourrait contredire l'app.
 
 Vérifié au banc extension (§35, faux `chrome` + Playwright, données synthétiques) : **0 erreur page/console** sur les 8 onglets ; captures Ma journée (engagement + Dernières ventes) et Mes paires (bandeau stats) conformes. Le seul « interactions: 1 » du harnais reste l'artefact de test connu (click Playwright qui timeoute sur un élément `display:none` filtré), **pas** une erreur d'app.
+
+---
+
+## 37. Session août 2026 (suite) — onglet Ventes complet + derniers achats + pouls Favoris
+
+« Fait un truc de ouf, tout en même temps. » Gros lot cohérent sur le panneau VRM (`vinted-panel.js` + `background.js`), **tout en lecture seule, zéro divergence avec l'app**. Extension **4.71 → 4.73** (à recharger dans Chrome).
+
+- **4.72 — nouvel onglet « 💶 Ventes »** : liste des ventes moissonnées (`buildPanelData.sales`, top 80), filtres **Toutes / ⏳ En cours / ✅ Finalisées** (comptés depuis `etat`), recherche par titre, chaque ligne → transaction Vinted. ⚠️ L'en-tête **CA du mois / Argent bloqué / Encaissé** vient d'`appStats` (`widget_stats` publié par l'app) — **AUCUN total recalculé** dans le panneau (règle de cohérence tenue). Annulées/remboursées exclues. `classifySale` (copie de `classifyOrderStatus`) porte le statut.
+  - ⚠️ **Bénéfices volontairement PAS affichés** : les prix d'achat sont vides sur ~toutes les entrées (§22) → une colonne marge afficherait ~100 % de faux. On ne montre que ce qui est vrai.
+- **4.72 — onglet Achats enrichi** : liste **« 🧾 Derniers achats »** sous les colis à retirer (`buildPanelData.recentBuys`, commandes `orders_purchased` moissonnées, top 80). **Statut NON relabellé** (l'app classe les achats par statut ; on ne veut rien inventer) → titre + prix + date seulement, annulés/remboursés exclus.
+- **4.73 — pouls Favoris** : bandeau `❤️ N favoris en attente · M annonces likées` en haut de l'onglet Favoris (somme sur `online` filtré favs>0). Le flux de relance assistée (une-par-une, offre native Vinted, aucun envoi auto) est inchangé.
+
+`buildPanelData` renvoie désormais aussi `sales`, `recentBuys` (en plus de `recentSales`). Le champ `date` des commandes est parsé comme dans l'app (`new Date(o.date)` / `Date.parse`), tri desc.
+
+Vérifié au banc extension (faux `chrome` + Playwright, données synthétiques) : **0 erreur app** ; Ventes = 14 lignes, en-tête CA app, filtre « En cours » → 5, recherche « nike » → 4 ; Achats = « Derniers achats » présent ; captures Ventes/Achats/Favoris conformes. Rappel : le « interactions: 1 » du harnais principal reste l'artefact connu (click Playwright sur élément `display:none` filtré), pas une erreur d'app.

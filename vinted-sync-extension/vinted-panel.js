@@ -761,7 +761,12 @@
         ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
         <div style="flex:1;min-width:0"><div class="vrm-t">${esc(o.title)}</div><div class="vrm-m">❤️ ${o.favs}${o.views != null ? ` · 👁 ${o.views}` : ''} · ${fmt(o.price)}</div></div>
       </label>`).join('');
+    const favTot = list.reduce((s, o) => s + (o.favs || 0), 0);
     return `
+      <div class="vrm-stats" style="margin-bottom:8px">
+        <div class="vrm-st" style="flex:1 1 44%"><b style="color:#e2456b">❤️ ${favTot}</b><span class="vrm-m">favoris en attente</span></div>
+        <div class="vrm-st" style="flex:1 1 44%"><b>${list.length}</b><span class="vrm-m">annonce${list.length > 1 ? 's' : ''} likée${list.length > 1 ? 's' : ''}</span></div>
+      </div>
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces dont tu veux <b>relancer les favoris</b>. Une par une, tu proposes toi-même une remise via l'<b>offre native Vinted</b>. Aucun envoi automatique.</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-fav-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
