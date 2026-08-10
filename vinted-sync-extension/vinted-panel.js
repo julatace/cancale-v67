@@ -665,7 +665,7 @@
     const bordPill = !b ? ''
       : b.etat === 'print'
         ? `<button class="vrm-bord-dl" data-row="${esc(b.row || '')}" title="Ouvrir le bordereau (PDF) — prêt à imprimer" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border:0;border-radius:12px;background:#0f6b4f14;color:#0f6b4f;font:inherit;font-weight:800;font-size:15px;cursor:pointer">${svgi('printer', 16)}<span style="font-size:9px;font-weight:700">ouvrir</span></button>`
-        : `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" title="Vinted attend le colis : ouvre la vente et clique « Générer le bordereau »" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border-radius:12px;background:#c98a1a14;color:#9a5b16;text-decoration:none;font-weight:800;font-size:15px">📄<span style="font-size:9px;font-weight:700">générer</span></a>`;
+        : `<button class="vrm-gen-bord" data-uid="${esc(v.uid || '')}" data-tx="${esc(v.transaction || '')}" title="Générer le bordereau maintenant (c'est l'extension qui le fait)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border:0;border-radius:12px;background:#c98a1a14;color:#9a5b16;font:inherit;font-weight:800;font-size:15px;cursor:pointer">${svgi('file-text', 16)}<span style="font-size:9px;font-weight:700">générer</span></button>`;
     const sub = [etatLbl[v.etat] || '', v.ts ? timeago(v.ts) : '', v.acct || ''].filter(Boolean).join(' · ');
     return `
       <div class="vrm-v-row" data-s="${esc((((v.numero != null ? 'n°' + v.numero + ' ' : '') + (v.title || '') + ' ' + (v.acct || '')).toLowerCase()))}" style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px">
@@ -998,6 +998,25 @@
     // Ouvrir le PDF d'un bordereau — présent sur plusieurs onglets (Ventes,
     // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
     panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });
+    // Générer le bordereau — l'extension le fait, tu ne vas plus sur Vinted.
+    // Un clic = un bordereau (pas de génération en rafale, cf. background.js).
+    panel.querySelectorAll('.vrm-gen-bord').forEach(b => {
+      b.onclick = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (!b.dataset.uid || !b.dataset.tx) return;
+        const avant = b.innerHTML;
+        b.disabled = true; b.innerHTML = '<span style="font-size:11px">⏳</span>';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'genererBord', uid: b.dataset.uid, tx: b.dataset.tx }, (r) => {
+          if (r && r.ok) { b.innerHTML = '<span style="font-size:11px">✓ généré</span>'; setTimeout(() => load(), 1200); }
+          else {
+            b.disabled = false;
+            b.title = (r && r.error) || 'échec';
+            b.innerHTML = '<span style="font-size:10px">❌ voir ↗</span>';
+            setTimeout(() => { try { b.innerHTML = avant; } catch (_) {} }, 4000);
+          }
+        });
+      };
+    });
     // Répondre à une offre. Deux taps : le premier arme, le second envoie.
     // Une offre acceptée est une VENTE FERME qu'on n'annule pas — un tap de
     // travers dans une liste ne doit pas vendre une paire.

@@ -355,6 +355,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'setMinPrice' && msg.id) { const ok = await setMinPrice(msg.id, msg.amount); sendResponse({ ok }); return; }
           // Une offre, sur TON clic uniquement (jamais en arrière-plan).
           if (msg.action === 'offre') { const r = await repondreOffre(msg); sendResponse(r); return; }
+          // Générer un bordereau (formalité obligatoire, aucun argent engagé).
+          // ⚠️ UN CLIC = UN BORDEREAU, volontairement. Une version « générer mes
+          //    25 sélectionnés » a été écrite puis retirée : 25 PUT enchaînés
+          //    depuis un seul clic, c'est la rafale qu'on refuse partout ailleurs
+          //    (§32/§43). Ici chaque requête correspond à un geste réel.
+          if (msg.action === 'genererBord') { const r = await genererBordereau(msg.uid, msg.tx); sendResponse(r); return; }
           if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
           if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -485,6 +491,84 @@ async function storeLabel(domain, url, b64) {
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
   logActivity('📄 Bordereau capté (prêt à imprimer)');
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// CAPTURE DU BORDEREAU — PAR LES TÉLÉCHARGEMENTS DU NAVIGATEUR
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️ POURQUOI ÇA N'A JAMAIS MARCHÉ (vérifié en base : `harvest_*_label_latest`
+// = ZÉRO ligne, sur tous les comptes) : `inject.js` n'observe que `fetch` et
+// `XMLHttpRequest`. Or Vinted sert le bordereau par un LIEN DIRECT — le
+// navigateur le télécharge lui-même, sans passer par l'un ni par l'autre. La
+// capture ne pouvait donc rien voir, et l'URL du label n'apparaît nulle part
+// ailleurs (ni dans les transactions captées, ni dans `seen_urls`).
+//
+// La bonne porte, c'est `chrome.downloads` (permission déjà accordée, jamais
+// utilisée jusqu'ici) : elle voit TOUS les téléchargements, y compris ceux qui
+// ne passent pas par JavaScript. Pure observation : on ne déclenche rien.
+//
+// Double bénéfice : ça range enfin le PDF, ET ça APPREND l'URL du bordereau —
+// la pièce qui manquait pour aller le chercher soi-même plus tard.
+const LABEL_VU = 'panel_label_urls';   // ce qu'on a appris des URL de bordereaux
+
+async function noterUrlLabel(url, ok) {
+  try {
+    let hote = '', chemin = '';
+    try { const u = new URL(url); hote = u.hostname; chemin = u.pathname.replace(/\/\d{4,}/g, '/_id'); } catch (_) { return; }
+    const rows = await sbGet(`app_data?id=eq.${LABEL_VU}&select=data`);
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const vus = cur.vus || {};
+    const cle = `${hote}${chemin}`;
+    if (vus[cle] && vus[cle].ok === ok) return;              // rien de nouveau
+    vus[cle] = { ok, exemple: String(url).slice(0, 300), vuAt: new Date().toISOString() };
+    await supabaseUpsert('app_data', [{ id: LABEL_VU, data: { vus, majAt: new Date().toISOString() } }], 'id');
+  } catch (_) {}
+}
+
+// Un téléchargement vient de démarrer. Est-ce un bordereau Vinted ?
+async function capterTelechargement(item) {
+  try {
+    const url = String((item && (item.finalUrl || item.url)) || '');
+    if (!/^https:/i.test(url)) return;
+    const nom = String((item && item.filename) || '');
+    const mime = String((item && item.mime) || '');
+    const estPdf = /application\/pdf/i.test(mime) || /\.pdf(\?|$)/i.test(url) || /\.pdf$/i.test(nom);
+    if (!estPdf) return;
+    // Un PDF téléchargé depuis Vinted (ou par un lien venant de Vinted). Le
+    // label peut être hébergé par le transporteur : on accepte aussi un
+    // référent Vinted, sinon on raterait Mondial Relay / Chronopost.
+    const ref = String((item && item.referrer) || '');
+    const deVinted = /vinted\.(fr|com|it|de|net)/i.test(url) || /vinted\.(fr|com|it|de)/i.test(ref);
+    if (!deVinted) return;
+    // Un reçu / une facture n'est pas un bordereau (même distinction qu'inject.js).
+    const estRecu = /invoice|receipt|facture|re[çc]u|billing/i.test(url);
+    let b64 = null;
+    try {
+      // On relit le fichier depuis son URL, avec la session du navigateur.
+      // Si le lien est à usage unique ou hors permissions, on n'insiste pas :
+      // l'URL apprise sert quand même (c'est elle qui manquait).
+      const res = await fetch(url, { credentials: 'include' });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        if (buf.byteLength && buf.byteLength < 4000000) {
+          const bytes = new Uint8Array(buf);
+          let bin = '';
+          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+          b64 = btoa(bin);
+        }
+      }
+    } catch (_) { /* lien à usage unique, CORS, hors permissions… */ }
+    await noterUrlLabel(url, !!b64);
+    if (!b64) { logActivity('📄 Bordereau vu (URL apprise, PDF non relu)'); return; }
+    if (estRecu) await storeReceipt('www.vinted.fr', url, b64);
+    else await storeLabel('www.vinted.fr', url, b64);
+  } catch (_) {}
+}
+
+try {
+  if (chrome.downloads && chrome.downloads.onCreated) {
+    chrome.downloads.onCreated.addListener((item) => { capterTelechargement(item); });
+  }
+} catch (_) {}
+
 // Range le dernier REÇU / FACTURE officiel Vinted (PDF) consulte, pour la compta pro.
 async function storeReceipt(domain, url, b64) {
   const uid = await activeAccountId(domain);
@@ -1139,6 +1223,41 @@ async function repondreOffre({ uid, tx, oid, quoi, prix }) {
   } else return { ok: false, error: 'action inconnue' };
   const mot = quoi === 'accept' ? 'acceptée' : quoi === 'reject' ? 'refusée' : `contrée à ${prix} €`;
   logActivity(r.ok ? `💶 Offre ${mot}` : `⚠️ Offre ${mot} : Vinted a refusé (${r.status})`);
+  return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+
+// ── GÉNÉRER LE BORDEREAU, À TA PLACE ────────────────────────────────────────
+// Julien : « je ne veux pas avoir à le faire ». Ici je le fais, et sans réserve :
+// générer un bordereau n'engage AUCUN argent et ne décide de rien. La vente est
+// déjà conclue, le colis DOIT partir, l'étiquette est une formalité obligatoire
+// sans prix ni choix — rien à voir avec accepter une offre.
+//
+// La requête vient de SES actions, captée sur 5 comptes (`storeWriteReq`) :
+//   PUT /api/v2/transactions/{tx}/shipment/order
+//   {"seller_address_id":310525135,"drop_off_type":null,"label_type":null}
+// `seller_address_id` change par compte : on le relit dans la capture de CE
+// compte. Sans capture pour ce compte, on ne devine pas — on le dit.
+async function adresseVendeur(uid) {
+  try {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_wreq_api_v2_transactions_id_shipment_order&select=data`);
+    const body = rows && rows[0] && rows[0].data && rows[0].data.body;
+    if (!body) return null;
+    const j = typeof body === 'string' ? JSON.parse(body) : body;
+    const id = j && j.seller_address_id;
+    return id != null ? id : null;
+  } catch (_) { return null; }
+}
+
+async function genererBordereau(uid, tx) {
+  if (!uid || !tx) return { ok: false, error: 'vente incomplète' };
+  const adr = await adresseVendeur(uid);
+  if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
+  const accts = await getStoredAccounts();
+  const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) return { ok: false, error: 'compte introuvable' };
+  const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
+    { seller_address_id: adr, drop_off_type: null, label_type: null });
+  logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
 
