@@ -1308,6 +1308,29 @@ async function buildPanelData() {
     }
   }
   disputes.sort((a, b) => b.ts - a.ts);
+  // ── PHOTO + N° DE LA PAIRE sur les lignes ventes/achats/litiges ──────────────
+  // Les commandes moissonnées sont allégées (pas de photo). On retrouve la photo
+  // et le numéro dans `vinted_annonce_numeros` (gardé même pour les paires
+  // vendues) PAR TITRE EXACT, et UNIQUEMENT si le titre est unique — jamais de
+  // devinette sur un titre en double (même garde que l'app §7/§24 `titleAmbiguous`).
+  // La photo d'une annonce ENCORE en ligne prime (plus fraîche).
+  const normT = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const titleCount = {};
+  const numByTitle = {};
+  for (const id in numeros) {
+    const e = numeros[id]; if (!e) continue;
+    const key = normT(e.title); if (!key) continue;
+    titleCount[key] = (titleCount[key] || 0) + 1;
+    if (!numByTitle[key]) numByTitle[key] = { numero: e.numero != null ? String(e.numero) : null, photo: e.photo || null };
+  }
+  for (const o of online) {
+    const key = normT(o.title); if (!key || (titleCount[key] || 0) !== 1 || !numByTitle[key]) continue;
+    if (o.photo) numByTitle[key].photo = o.photo;               // photo fraîche
+    if (o.numero != null && numByTitle[key].numero == null) numByTitle[key].numero = String(o.numero);
+  }
+  const lookupPair = (title) => { const key = normT(title); if (!key || (titleCount[key] || 0) > 1) return null; return numByTitle[key] || null; };
+  const enrichPairs = (list) => { for (const o of (list || [])) { if (o.photo && o.numero != null) continue; const m = lookupPair(o.title); if (m) { if (!o.photo && m.photo) o.photo = m.photo; if (o.numero == null && m.numero != null) o.numero = m.numero; } } };
+  enrichPairs(sales); enrichPairs(recentSales); enrichPairs(recentBuys); enrichPairs(disputes);
   // ── ACHATS À RETIRER (colis en point relais) — AVEC LE CODE DE RETRAIT ───────
   // Source = les emails de suivi `email_track_*` (transporteur → « colis
   // disponible »), car c'est la SEULE source qui porte le CODE, le point relais et

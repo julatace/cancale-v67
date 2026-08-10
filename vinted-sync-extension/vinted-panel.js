@@ -91,6 +91,12 @@
   const fmt = (v) => { const n = eur(v); return n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + ' €'; };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const timeago = (t) => { const s = Math.max(0, (Date.now() - Number(t || 0)) / 1000); return s < 60 ? "à l'instant" : s < 3600 ? `il y a ${Math.floor(s / 60)} min` : s < 86400 ? `il y a ${Math.floor(s / 3600)} h` : `il y a ${Math.floor(s / 86400)} j`; };
+  // Vignette photo d'une paire (ou pictogramme si pas de photo captée). Taille au choix.
+  const pairThumb = (o, sz) => { const s = sz || 44; return (o && o.photo)
+    ? `<img src="${esc(o.photo)}" alt="" style="width:${s}px;height:${s}px;border-radius:9px;object-fit:cover;flex-shrink:0;background:#eee">`
+    : `<div style="width:${s}px;height:${s}px;border-radius:9px;background:#eef1f4;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:${Math.round(s * 0.42)}px">👟</div>`; };
+  // Badge N° (avant le titre) quand la paire a un numéro retrouvé. Réutilise .vrm-num.
+  const numBadge = (o) => (o && o.numero != null && o.numero !== '') ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : '';
   // Conseil marché compact réutilisable (même règle partout : écart >15% vs médiane
   // des paires comparables o.peer). Renvoie '' si pas d'écart net ou pas de peer.
   const marketNote = (o) => {
@@ -410,9 +416,10 @@
     const salesBlock = rs.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">🧾 Dernières ventes</div>
       <div style="border:1px solid #eceff3;border-radius:12px;overflow:hidden">
-        ${rs.map((v, i) => `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:8px;align-items:center;padding:8px 10px;text-decoration:none;color:inherit;${i ? 'border-top:1px solid #f0f2f5' : ''}">
+        ${rs.map((v, i) => `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:9px;align-items:center;padding:8px 10px;text-decoration:none;color:inherit;${i ? 'border-top:1px solid #f0f2f5' : ''}">
+          ${pairThumb(v, 42)}
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title || 'Vente')}</div>
+            <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(v)}${esc(v.title || 'Vente')}</div>
             <div class="vrm-m" style="font-size:11px;margin-top:1px">${etatLbl[v.etat] || ''}${v.ts ? ` · ${esc(timeago(v.ts))}` : ''}</div>
           </div>
           <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#0f6b4f">${fmt(v.price)}</div>
@@ -534,9 +541,10 @@
     const list = ventesFilter === 'all' ? all : all.filter(v => v.etat === ventesFilter);
     const etatLbl = { completed: '✅ finalisée', pending: '⏳ en cours' };
     const rows = list.slice(0, 200).map(v => `
-      <a class="vrm-v-row" data-s="${esc(String(v.title || '').toLowerCase())}" href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:8px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:8px 10px;margin-bottom:6px;text-decoration:none;color:inherit">
+      <a class="vrm-v-row" data-s="${esc((((v.numero != null ? 'n°' + v.numero + ' ' : '') + (v.title || '')).toLowerCase()))}" href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:9px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:8px 10px;margin-bottom:6px;text-decoration:none;color:inherit">
+        ${pairThumb(v, 46)}
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title || 'Vente')}</div>
+          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(v)}${esc(v.title || 'Vente')}</div>
           <div class="vrm-m" style="font-size:11px;margin-top:1px">${etatLbl[v.etat] || ''}${v.ts ? ` · ${esc(timeago(v.ts))}` : ''}</div>
         </div>
         <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#0f6b4f">${fmt(v.price)}</div>
@@ -1048,9 +1056,10 @@
     const buysBlock = buys.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">🧾 Derniers achats</div>
       <div style="border:1px solid #eceff3;border-radius:12px;overflow:hidden">
-        ${buys.slice(0, 40).map((v, i) => `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:8px;align-items:center;padding:8px 10px;text-decoration:none;color:inherit;${i ? 'border-top:1px solid #f0f2f5' : ''}">
+        ${buys.slice(0, 40).map((v, i) => `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:9px;align-items:center;padding:8px 10px;text-decoration:none;color:inherit;${i ? 'border-top:1px solid #f0f2f5' : ''}">
+          ${pairThumb(v, 42)}
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title || 'Achat')}</div>
+            <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(v)}${esc(v.title || 'Achat')}</div>
             ${v.ts ? `<div class="vrm-m" style="font-size:11px;margin-top:1px">${esc(timeago(v.ts))}</div>` : ''}
           </div>
           <div style="flex-shrink:0;font-weight:700;font-size:13px;color:#334">${fmt(v.price)}</div>
@@ -1142,8 +1151,9 @@
     const FG = { remboursement: '#b23a4e', retour: '#2b5b9a', litige: '#9a5b16', suspendu: '#44515e' };
     const rows = all.slice(0, 200).map(d => `
       <a href="${esc(d.url)}" target="_blank" rel="noreferrer" style="display:flex;gap:9px;align-items:center;border:1px solid #eceff3;border-radius:12px;padding:9px 10px;margin-bottom:6px;text-decoration:none;color:inherit">
+        ${pairThumb(d, 46)}
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.title || 'Vente')}</div>
+          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(d)}${esc(d.title || 'Vente')}</div>
           <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:5px;align-items:center">
             <span style="flex-shrink:0;background:${BG[d.kind] || '#f2f5f8'};color:${FG[d.kind] || '#44515e'};border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700">${esc(d.label)}</span>
             ${d.reason ? `<span class="vrm-m" style="font-size:11px">${esc(d.reason)}</span>` : ''}

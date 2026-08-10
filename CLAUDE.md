@@ -1025,3 +1025,19 @@ Badge sur l'onglet (`stats.litiges`), résumé par type (« 1 💸 remboursées 
 Placé dans `PANEL_TABS` entre Achats et Messages. Pas de wiring (liens seuls).
 
 Vérifié au banc extension (faux `chrome` + Playwright) : **0 erreur app** en état **peuplé** (3 litiges, badge « Litiges 3 », résumé, motif « Article non conforme » affiché) **et vide** (message d'attente). `node -c` OK sur les deux fichiers.
+
+---
+
+## 39. Session août 2026 (suite) — PHOTO + N° de la paire sur les lignes ventes/achats/litiges
+
+Demande de Julien : « je veux les photos des paires avec les numéros ». Les lignes Ventes / Litiges / Derniers achats / Dernières ventes ne montraient que le titre — parce que les commandes moissonnées (`orders_sold`/`orders_purchased`) sont **allégées** et **n'ont ni photo ni numéro** (`commandeMaigre`). Extension **4.74 → 4.75** (à recharger dans Chrome).
+
+### Comment on retrouve photo + N° (sans devinette)
+Dans `buildPanelData` : index `numByTitle` construit depuis **`vinted_annonce_numeros`** (qui garde `{numero, photo, title}` par paire, **même vendue**), **PAR TITRE EXACT** (`normT` = lowercase + espaces normalisés) et **UNIQUEMENT si le titre est unique** — un titre en double (`titleCount>1`) → **on n'associe rien** (même garde que l'app §7/§24 `titleAmbiguous`, jamais la photo/numéro d'une autre paire). La photo d'une annonce **encore en ligne** prime (plus fraîche). `enrichPairs()` pose `photo`/`numero` sur `sales`, `recentSales`, `recentBuys`, `disputes` quand un match unique existe ; sinon ils restent vides.
+
+### UI (`vinted-panel.js`)
+Deux helpers réutilisables : `pairThumb(o, sz)` (vignette photo **ou** pictogramme 👟 si pas de photo captée) et `numBadge(o)` (badge `N°X` avant le titre, réutilise `.vrm-num`). Ajoutés aux 4 listes (Ventes, Litiges, Derniers achats, Dernières ventes de Ma journée). La recherche Ventes indexe aussi le N° (`data-s`).
+
+⚠️ Une paire sans photo captée affiche le pictogramme 👟 (honnête) — la photo n'apparaît que quand `vinted_annonce_numeros` l'a (ou que l'annonce est encore en ligne). Rien n'est deviné.
+
+Vérifié au banc (faux `chrome` + Playwright, images `data:` inline qui rendent vraiment) : Ventes = 3 lignes, **2 vraies vignettes + 1 pictogramme** (paire sans photo), **3 badges N° corrects** (N°12/N°7/N°33), **0 erreur app**. Litiges + Ventes/Achats : 0 erreur. `node -c` OK sur les deux fichiers.
