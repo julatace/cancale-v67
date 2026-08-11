@@ -23,7 +23,7 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'ventes', 'republier', 'coffre', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris'];
+  const PANEL_TABS = ['journee', 'recherche', 'paire', 'chaussures', 'ventes', 'republier', 'coffre', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris'];
   // Le COFFRE, chargé à la demande (une requête, seulement quand tu ouvres l'onglet).
   let coffre = null, coffreBusy = false, coffreQuery = '', coffreOuvert = null;
   let chaussuresQuery = ''; // filtre de l'onglet « Mes paires »
@@ -1048,6 +1048,7 @@
           <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">${svgi('grid', 15)} Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
           <button class="vrm-tab ${tab === 'ventes' ? 'on' : ''}" data-t="ventes">${svgi('trending-up', 15)} Ventes</button>
           <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">${svgi('refresh-cw', 15)} Republier</button>
+          <button class="vrm-tab ${tab === 'recherche' ? 'on' : ''}" data-t="recherche">${svgi('search', 15)} Chercher</button>
           <button class="vrm-tab ${tab === 'coffre' ? 'on' : ''}" data-t="coffre">${svgi('archive', 15)} Coffre</button>
           <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">${svgi('printer', 15)} Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
           <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">${svgi('shopping-bag', 15)} Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
@@ -1064,6 +1065,7 @@
         : tab === 'ventes' ? renderVentes()
         : tab === 'republier' ? renderRepublier()
         : tab === 'coffre' ? renderCoffre()
+        : tab === 'recherche' ? renderRecherche()
         : tab === 'reponse' ? renderReponse()
         : tab === 'expedier' ? renderExpedier()
         : tab === 'achats' ? renderAchats()
@@ -1218,6 +1220,7 @@
     };
     if (tab === 'republier') wireRepublier();
     if (tab === 'coffre') wireCoffre();
+    if (tab === 'recherche') wireRecherche();
     if (tab === 'reponse') wireReponse();
     if (tab === 'chaussures') wireChaussures();
     if (tab === 'ventes') wireVentes();
@@ -1800,6 +1803,98 @@
   // affiche pour que tu les réenregistres.
   // Le bouton de sauvegarde des numéros — défini une fois, utilisé dans le
   // coffre plein ET dans le coffre vide.
+  // ══ RECHERCHE UNIVERSELLE + PASSEPORT DE LA PAIRE ════════════════════════════
+  // Un seul champ qui atteint TOUT : annonces en ligne, ventes, achats,
+  // bordereaux, conversations, coffre. Tape un N°, un bout de titre, une marque
+  // ou un pseudo d'acheteur — tu tombes dessus sans savoir dans quel onglet
+  // chercher. Et un clic ouvre le PASSEPORT : la vie complète de la paire,
+  // recomposée depuis les six sources.
+  // ⚠️ Le passeport rapproche par **NUMÉRO** (identité certaine) et, à défaut,
+  //    par titre EXACT. Jamais par ressemblance : afficher la vente d'une autre
+  //    paire serait pire que de ne rien afficher (§24).
+  let q = '', passeport = null;
+  const cont = (s, t) => String(s || '').toLowerCase().includes(t);
+  function renderRecherche() {
+    if (passeport) return renderPasseport(passeport);
+    const t = q.trim().toLowerCase();
+    const champ = `<input id="vrm-q" type="search" value="${esc(q)}" placeholder="N°, titre, marque, acheteur…" style="width:100%;box-sizing:border-box;margin-bottom:10px;border:1px solid #d7dde3;border-radius:11px;padding:11px 12px;font:inherit;font-size:14px">`;
+    // ⚠️ Un seul caractère suffit si c'est un CHIFFRE : « 7 » doit trouver la
+    //    paire N°7. Le seuil de deux caractères ne vaut que pour du texte.
+    if (t.length < 2 && !/^\d$/.test(t)) return `${champ}<div class="vrm-m">Tape un numéro, ou au moins deux lettres.<br><br>Ça cherche partout à la fois : tes annonces en ligne, tes ventes, tes achats, tes bordereaux, tes conversations et le coffre.</div>`;
+    const D = DATA || {};
+    const parNum = (o) => o && o.numero != null && String(o.numero).toLowerCase() === t.replace(/^n°?/, '');
+    const annonces = (D.online || []).filter(o => parNum(o) || cont(o.title, t) || cont(o.brand, t));
+    const ventes = (D.sales || []).filter(o => parNum(o) || cont(o.title, t) || cont(o.acct, t));
+    const achats = (D.recentBuys || []).filter(o => cont(o.title, t));
+    const bords = (D.bordsToPrint || []).filter(b => parNum(b) || cont(b.title, t));
+    const convs = (D.convs || []).filter(c => cont(c.login, t) || cont(c.title, t));
+    const coff = (coffre || []).filter(c => cont(c.title, t) || cont(c.brand, t));
+    const total = annonces.length + ventes.length + achats.length + bords.length + convs.length + coff.length;
+    if (!total) return `${champ}<div class="vrm-m">Rien trouvé pour « ${esc(q)} ».</div>`;
+    const groupe = (titre, items, rendu) => items.length ? `
+      <div class="vrm-m" style="font-weight:800;margin:8px 0 5px">${titre} · ${items.length}</div>
+      ${items.slice(0, 12).map(rendu).join('')}` : '';
+    const ligneAnn = (o) => `<div class="vrm-card vrm-pass" data-n="${esc(o.numero || '')}" data-t="${esc(o.title || '')}" style="display:flex;gap:9px;align-items:center;margin-bottom:5px;padding:8px;cursor:pointer">
+        ${pairThumb(o, 38)}<div style="flex:1 1 120px;min-width:0"><div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${numBadge(o)}${esc(o.title || '')}</div><div class="vrm-m" style="font-size:11px">${fmt(o.price)}${o.ageDays != null ? ` · ${o.ageDays} j` : ''}</div></div></div>`;
+    return `${champ}
+      <div class="vrm-m" style="margin-bottom:4px"><b>${total}</b> résultat${total > 1 ? 's' : ''}</div>
+      ${groupe('👟 En ligne', annonces, ligneAnn)}
+      ${groupe('💶 Ventes', ventes, ligneAnn)}
+      ${groupe('📦 Achats', achats, (o) => `<div class="vrm-card" style="display:flex;gap:9px;align-items:center;margin-bottom:5px;padding:8px">${pairThumb(o, 34)}<div style="flex:1 1 120px;min-width:0"><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.title || '')}</div><div class="vrm-m" style="font-size:11px">${o.price != null ? fmt(o.price) : ''}${o.ts ? ` · ${esc(timeago(o.ts))}` : ''}</div></div></div>`)}
+      ${groupe('🖨️ Bordereaux', bords, (b) => `<div class="vrm-card" style="display:flex;gap:9px;align-items:center;margin-bottom:5px;padding:8px">${pairThumb(b, 34)}<div style="flex:1;min-width:0"><div style="font-size:12px">${b.numero ? `N°${esc(b.numero)} · ` : ''}${esc(b.title || '')}</div></div>${b.row ? `<button class="vrm-bord-dl" data-row="${esc(b.row)}" style="flex-shrink:0;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-weight:700;font-size:11px;cursor:pointer">Ouvrir</button>` : ''}</div>`)}
+      ${groupe('💬 Conversations', convs, (c) => `<a href="${esc(c.url || '#')}" target="_blank" rel="noreferrer" class="vrm-card" style="display:flex;gap:9px;align-items:center;margin-bottom:5px;padding:8px;text-decoration:none;color:inherit"><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${c.unread ? '🔴 ' : ''}${esc(c.login || '')}</div><div class="vrm-m" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '')}</div></div></a>`)}
+      ${groupe('🗄️ Coffre', coff, (c) => `<div class="vrm-card vrm-coffre-row" data-id="${esc(c.id)}" style="display:flex;gap:9px;align-items:center;margin-bottom:5px;padding:8px;cursor:pointer">${c.photos && c.photos[0] ? `<img src="${esc(c.photos[0])}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover">` : ''}<div style="flex:1;min-width:0"><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || '')}</div><div class="vrm-m" style="font-size:11px">${c.desc ? 'texte enregistré' : 'sans texte'}</div></div></div>`)}`;
+  }
+
+  // Le PASSEPORT : toute la vie d'une paire sur un écran.
+  function renderPasseport(p) {
+    const D = DATA || {};
+    const num = String(p.n || ''), titre = String(p.t || '');
+    const memePaire = (o) => (num && String(o.numero || '') === num) || (!num && titre && String(o.title || '') === titre);
+    const ann = (D.online || []).find(memePaire) || null;
+    const ventes = (D.sales || []).filter(memePaire);
+    const bord = (D.bordsToPrint || []).find(memePaire) || null;
+    const coff = (coffre || []).find(c => (ann && String(c.id) === String(ann.id)) || String(c.title || '') === titre) || null;
+    const base = ann || ventes[0] || {};
+    const etape = (icone, titreL, detail, ok) => `<div style="display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-top:1px solid #eceff3">
+        <span style="flex-shrink:0;width:20px;text-align:center;opacity:${ok ? 1 : .35}">${icone}</span>
+        <div style="flex:1 1 120px;min-width:0"><div style="font-size:12.5px;font-weight:${ok ? 700 : 500};opacity:${ok ? 1 : .55}">${titreL}</div>${detail ? `<div class="vrm-m" style="font-size:11px">${detail}</div>` : ''}</div>
+      </div>`;
+    const marge = (base.buyPrice != null && base.price != null) ? Number(base.price) - Number(base.buyPrice) : null;
+    return `
+      <button id="vrm-pass-back" style="margin-bottom:8px;border:1px solid #dde;background:#fff;color:#334;border-radius:9px;padding:6px 10px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer">‹ Retour</button>
+      <div class="vrm-card" style="padding:10px">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+          ${pairThumb(base, 52)}
+          <div style="flex:1 1 130px;min-width:0">
+            <div style="font-weight:700;font-size:13px">${num ? `<span class="vrm-num">N°${esc(num)}</span> ` : ''}${esc(base.title || titre)}</div>
+            <div class="vrm-m" style="font-size:11px">${base.price != null ? fmt(base.price) : ''}${base.acct ? ` · ${esc(base.acct)}` : ''}</div>
+          </div>
+        </div>
+        ${etape('📦', base.buyPrice != null ? `Achetée ${fmt(base.buyPrice)}` : "Prix d'achat inconnu", base.buyPrice == null ? 'sans lui, la marge est fausse' : '', base.buyPrice != null)}
+        ${etape('🏠', ann && ann.cell ? `Rangée en case ${esc(ann.cell)}` : 'Pas rangée au garage', '', !!(ann && ann.cell))}
+        ${etape('👟', ann ? 'En ligne' : 'Plus en ligne', ann ? `${ann.ageDays != null ? `depuis ${ann.ageDays} j · ` : ''}${ann.views != null ? `👁 ${ann.views}` : ''}${ann.favs != null ? ` · ❤️ ${ann.favs}` : ''}` : '', !!ann)}
+        ${etape('🗄️', coff ? (coff.desc ? 'Texte et photos au coffre' : 'Au coffre (sans texte)') : 'Pas au coffre', coff && coff.photos ? `${coff.photos.length} photo${coff.photos.length > 1 ? 's' : ''}` : '', !!coff)}
+        ${etape('💶', ventes.length ? `Vendue ${fmt(ventes[0].price)}` : 'Pas encore vendue', ventes.length && ventes[0].ts ? esc(timeago(ventes[0].ts)) : '', !!ventes.length)}
+        ${etape('🖨️', bord ? 'Bordereau reçu' : (ventes.length ? 'Pas de bordereau en attente' : ''), bord && bord.dateLimite ? `à envoyer avant ${esc(bord.dateLimite)}` : '', !!bord)}
+        ${marge != null ? `<div style="border-top:1px solid #eceff3;margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-weight:700;font-size:12.5px">Marge</span>
+          <b style="font-size:15px;color:${marge >= 0 ? '#0f6b4f' : '#a33'}">${fmt(marge)}</b></div>` : ''}
+      </div>`;
+  }
+
+  function wireRecherche() {
+    const i = panel.querySelector('#vrm-q');
+    if (i) {
+      i.oninput = () => { q = i.value; render(); const n = panel.querySelector('#vrm-q'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
+      if (!passeport) i.focus();
+    }
+    panel.querySelectorAll('.vrm-pass').forEach(r => { r.onclick = () => { passeport = { n: r.dataset.n, t: r.dataset.t }; render(); }; });
+    const b = panel.querySelector('#vrm-pass-back'); if (b) b.onclick = () => { passeport = null; render(); };
+    // le coffre peut ne pas être encore chargé : on le demande en fond
+    if (coffre == null && !coffreBusy) { coffreBusy = true; chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'coffre' }, (r) => { coffreBusy = false; coffre = (r && r.ok && r.items) || []; render(); }); }
+  }
+
   // ── SANTÉ DE LA CAPTURE ─────────────────────────────────────────────────────
   // « Est-ce que ça capte ? » se voit ici, compte par compte, au lieu d'aller
   // lire la base. Un compte muet = session expirée : repasse dessus sur Vinted.

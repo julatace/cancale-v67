@@ -1343,3 +1343,11 @@ Rappel du constat (§22) : **0 prix d'achat sur 177 paires** → bénéfice, mar
 Ça retire la dépendance à une lecture manuelle de la base pour répondre à « est-ce que ça capte ? ».
 
 **Vérifié au banc** : badge orange avec l'ancienneté, santé rendue (frais 1 h / 2 j / jamais / 20 j) + compte muet détecté. **0 erreur.**
+
+### 4.98 — RECHERCHE UNIVERSELLE + PASSEPORT DE LA PAIRE
+Nouvel onglet **Chercher** : un seul champ qui atteint **six sources à la fois** — annonces en ligne, ventes, achats, bordereaux, conversations, coffre. Résultats groupés avec compteurs. On peut taper un N°, un bout de titre, une marque ou un pseudo d'acheteur. ⚠️ Le seuil de 2 caractères ne s'applique qu'au texte : **un seul chiffre suffit** (« 7 » doit trouver la paire N°7).
+
+**Le passeport** (clic sur un résultat) : toute la vie de la paire sur un écran, en étapes — achetée X € · rangée en case B3 · en ligne depuis 45 j (👁 120 · ❤️ 5) · texte et photos au coffre · vendue / pas encore · bordereau · **marge**. Les étapes non atteintes restent grisées, donc on voit d'un coup d'œil ce qui manque (typiquement le prix d'achat).
+⚠️ Le rapprochement se fait par **NUMÉRO** (identité certaine) et, à défaut, par **titre EXACT** — jamais par ressemblance : afficher la vente d'une autre paire serait pire que de ne rien afficher (§24).
+
+**Vérifié au banc** : « adidas » → 6 résultats répartis sur les 6 groupes ; « 7 » → la paire N°7 ; passeport rendu complet (achat 18 €, case B3, en ligne 45 j, coffre 2 photos, marge 22 €). **0 erreur.**
