@@ -2398,25 +2398,57 @@
   function doublonsBloc() {
     const on = (DATA && DATA.online) || [];
     if (on.length < 2) return '';
-    const par = new Map();
+    const normT = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    // Deux façons d'être en double, et la première est la plus grave :
+    //   • MÊME NUMÉRO → deux paires dans la même boîte. Certain, et ça marche
+    //     même si tu as retouché le titre en republiant (le cas que la
+    //     détection par titre ratait).
+    //   • MÊME TITRE sur le même compte → la republication classique.
+    const groupes = new Map();   // clé de paire → { raisons:Set, items:[] }
+    const ajoute = (liste, raison) => {
+      const cle = liste.map(o => o.id).sort().join('+');
+      const g = groupes.get(cle) || { raisons: new Set(), items: liste };
+      g.raisons.add(raison); groupes.set(cle, g);
+    };
+    const parNum = new Map(), parTitre = new Map();
     for (const o of on) {
-      const k = `${o.uid || ''}|${String(o.title || '').toLowerCase().replace(/\s+/g, ' ').trim()}`;
-      if (!k.endsWith('|')) { if (!par.has(k)) par.set(k, []); par.get(k).push(o); }
+      const n = String(o.numero || '').trim();
+      if (n) { if (!parNum.has(n)) parNum.set(n, []); parNum.get(n).push(o); }
+      const t = normT(o.title);
+      if (t) { const k = `${o.uid || ''}|${t}`; if (!parTitre.has(k)) parTitre.set(k, []); parTitre.get(k).push(o); }
     }
-    const groupes = [...par.values()].filter(g => g.length > 1);
-    if (!groupes.length) return '';
-    const n = groupes.reduce((s, g) => s + g.length - 1, 0);
-    const ligne = (g) => `<div style="margin-top:7px;border-top:1px solid #eceff3;padding-top:7px">
-      <div style="font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g[0].title || '')}</div>
-      <div class="vrm-m" style="font-size:11px;margin:2px 0 5px">${g.length} annonces identiques en ligne${g.some(o => o.numero) ? ` · N° ${g.filter(o => o.numero).map(o => o.numero).join(', ')}` : ''}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${g.map((o, i) => `<a href="${esc(o.url || '#')}" target="_blank" rel="noreferrer" style="flex:1 1 100px;text-align:center;text-decoration:none;border:1px solid ${i === 0 ? '#dde' : '#9a5b16'};background:${i === 0 ? '#fff' : '#9a5b16'};color:${i === 0 ? '#334' : '#fff'};border-radius:9px;padding:6px;font-weight:700;font-size:11px">${i === 0 ? 'Garder ↗' : 'Ouvrir pour supprimer ↗'}</a>`).join('')}
-      </div>
-    </div>`;
+    for (const [n, g] of parNum) if (g.length > 1) ajoute(g, `même N°${n}`);
+    for (const [, g] of parTitre) if (g.length > 1) ajoute(g, 'titre identique');
+    if (!groupes.size) return '';
+    // LAQUELLE GARDER : celle qui travaille le plus (favoris, puis vues), et à
+    // égalité la plus récente. Supprimer celle qui a l'engagement serait
+    // absurde — c'est justement l'erreur qu'on veut t'éviter.
+    const score = (o) => (Number(o.favs) || 0) * 1000 + (Number(o.views) || 0) - (Number(o.ageDays) || 0) / 1000;
+    const detail = (o) => [o.numero ? `N°${o.numero}` : null,
+                           o.ageDays != null ? `${o.ageDays} j` : null,
+                           o.views != null ? `👁 ${o.views}` : null,
+                           o.favs ? `❤️ ${o.favs}` : null].filter(Boolean).join(' · ');
+    const n = [...groupes.values()].reduce((s, g) => s + g.items.length - 1, 0);
+    const bloc = (g) => {
+      const l = g.items.slice().sort((a, b) => score(b) - score(a));
+      const garde = l[0];
+      return `<div style="margin-top:8px;border-top:1px solid #eceff3;padding-top:8px">
+        <div style="font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(garde.title || '')}</div>
+        <div class="vrm-m" style="font-size:10.5px;margin:2px 0 6px;color:#a33">${[...g.raisons].join(' · ')}</div>
+        ${l.map((o, i) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:5px">
+          ${pairThumb(o, 34)}
+          <div style="flex:1 1 100px;min-width:0">
+            <div style="font-size:11.5px;font-weight:${i === 0 ? 700 : 500}">${i === 0 ? '✅ à garder' : '🗑️ à supprimer'}</div>
+            <div class="vrm-m" style="font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(detail(o) || '—')}</div>
+          </div>
+          <a href="${esc(o.url || '#')}" target="_blank" rel="noreferrer" style="flex-shrink:0;text-decoration:none;border:1px solid ${i === 0 ? '#dde' : '#a33'};background:${i === 0 ? '#fff' : '#a33'};color:${i === 0 ? '#334' : '#fff'};border-radius:9px;padding:6px 10px;font-weight:700;font-size:11px">${i === 0 ? 'Voir ↗' : 'Supprimer ↗'}</a>
+        </div>`).join('')}
+      </div>`;
+    };
     return `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fdf0f0;border-color:#e9c3c3">
-      <div style="font-weight:800;font-size:12.5px;color:#a33;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} ${n} annonce${n > 1 ? 's' : ''} en double</div>
-      <div class="vrm-m" style="font-size:11px;margin-top:3px">Une republication où l'ancienne n'a pas été supprimée. Elles se partagent les vues, et si elles portent le même numéro, c'est la mauvaise paire qui part à l'expédition. Ouvre celle à supprimer et retire-la sur Vinted.</div>
-      ${groupes.slice(0, 5).map(ligne).join('')}
+      <div style="font-weight:800;font-size:12.5px;color:#a33;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} ${n} annonce${n > 1 ? 's' : ''} à retirer</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">Deux annonces pour la même paire : elles se partagent les vues, et si elles portent le même numéro, c'est la <b>mauvaise chaussure qui part à l'expédition</b>. On te dit laquelle garder — celle qui a le plus d'engagement — et laquelle retirer sur Vinted.</div>
+      ${[...groupes.values()].slice(0, 6).map(bloc).join('')}
     </div>`;
   }
 

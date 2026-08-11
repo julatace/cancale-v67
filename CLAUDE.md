@@ -1436,3 +1436,16 @@ Julien : « quand je republie, l'ancienne doit être supprimée, c'est impérati
 ⚠️ On ne signale QUE des titres **strictement identiques sur le même compte** : deux paires réellement jumelles en stock ne doivent pas déclencher une suppression.
 
 **Vérifié au banc** : deux annonces de même titre/compte → « 1 annonce en double », un lien « Garder » + un lien « Ouvrir pour supprimer ». **0 erreur.**
+
+### 5.06 — les doublons, détectés aussi par NUMÉRO + on dit laquelle garder
+La 5.05 ne groupait que par **titre strictement identique**. Or le cas le plus dangereux passe à travers : quand une annonce est republiée **avec un titre retouché**, les deux restent en ligne avec **le même N°** — donc deux paires dans la même boîte, et la mauvaise chaussure part à l'expédition (§19, risque n°1). Le titre change, le numéro non.
+
+`doublonsBloc()` groupe désormais sur **deux** critères, fusionnés par groupe (clé = ids triés, raisons cumulées) :
+- **même N°** parmi les annonces en ligne — attrape la republication retitrée ;
+- **titre identique sur le même compte** — le cas de la 5.05, conservé.
+
+**Et surtout il tranche** : au lieu de « Garder » sur la première venue (l'ordre de la liste, donc arbitraire), chaque groupe est classé par **engagement réel** — `favoris × 1000 + vues`, l'ancienneté départageant à égalité. La mieux engagée porte **« ✅ à garder »**, les autres **« 🗑️ à supprimer »**, chacune avec `N° · X j · 👁 · ❤️` sous les yeux : le choix se voit, il ne se devine pas. Le titre du bloc dit « N annonces à retirer » (le nombre d'annonces en trop), pas « N doublons ».
+
+⚠️ **La suppression reste manuelle** (§5.05, raison inchangée : irréversible, sans confirmation Vinted). Le panneau ouvre l'annonce, Julien clique.
+
+**Vérifié au banc** (paire à titre identique + paire à même N° et titres différents) : « 2 annonces à retirer », 2 × « à garder » / 2 × « à supprimer », les bonnes gardées (N°1 · 45 j · 👁 120 · ❤️ 5 conservée face à N°9 · 1 j · 👁 3). **0 erreur.**
