@@ -23,7 +23,9 @@
   //    te faisant perdre ta place au milieu d'un tri de bordereaux/messages.
   //    Le ✕ pose OUVERT=faux (respecté partout) ; c'est purement ta position,
   //    aucune donnée ni action Vinted là-dedans.
-  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'ventes', 'republier', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris'];
+  const PANEL_TABS = ['journee', 'paire', 'chaussures', 'ventes', 'republier', 'coffre', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris'];
+  // Le COFFRE, chargé à la demande (une requête, seulement quand tu ouvres l'onglet).
+  let coffre = null, coffreBusy = false, coffreQuery = '', coffreOuvert = null;
   let chaussuresQuery = ''; // filtre de l'onglet « Mes paires »
   let chaussuresSort = 'num'; // tri : num | marge | vues | favs | age | prix
   let chaussuresFilter = 'all'; // sous-vue : all | relance | sleep | nonum
@@ -122,6 +124,7 @@
   const numBadge = (o) => (o && o.numero != null && o.numero !== '') ? `<span class="vrm-num">N°${esc(o.numero)}</span> ` : '';
   // ── Icônes au trait (Feather, MIT) : look pro, plus d'emojis dans la nav. ──
   const ICONS = {
+    "archive": '<polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line>',
     "calendar": '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>',
     "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>',
     "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>',
@@ -960,6 +963,7 @@
           <button class="vrm-tab ${tab === 'chaussures' ? 'on' : ''}" data-t="chaussures">${svgi('grid', 15)} Mes paires${DATA && DATA.stats && DATA.stats.online ? ` ${DATA.stats.online}` : ''}</button>
           <button class="vrm-tab ${tab === 'ventes' ? 'on' : ''}" data-t="ventes">${svgi('trending-up', 15)} Ventes</button>
           <button class="vrm-tab ${tab === 'republier' ? 'on' : ''}" data-t="republier">${svgi('refresh-cw', 15)} Republier</button>
+          <button class="vrm-tab ${tab === 'coffre' ? 'on' : ''}" data-t="coffre">${svgi('archive', 15)} Coffre</button>
           <button class="vrm-tab ${tab === 'expedier' ? 'on' : ''}" data-t="expedier">${svgi('printer', 15)} Bordereaux${DATA && DATA.stats && ((DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)) ? ` ${(DATA.stats.toPrint || 0) + (DATA.stats.toShip || 0)}` : ''}</button>
           <button class="vrm-tab ${tab === 'achats' ? 'on' : ''}" data-t="achats">${svgi('shopping-bag', 15)} Achats${DATA && DATA.stats && DATA.stats.toPickup ? ` ${DATA.stats.toPickup}` : ''}</button>
           <button class="vrm-tab ${tab === 'litiges' ? 'on' : ''}" data-t="litiges">${svgi('alert-triangle', 15)} Litiges${DATA && DATA.stats && DATA.stats.litiges ? ` ${DATA.stats.litiges}` : ''}</button>
@@ -974,6 +978,7 @@
         : tab === 'chaussures' ? renderChaussures()
         : tab === 'ventes' ? renderVentes()
         : tab === 'republier' ? renderRepublier()
+        : tab === 'coffre' ? renderCoffre()
         : tab === 'reponse' ? renderReponse()
         : tab === 'expedier' ? renderExpedier()
         : tab === 'achats' ? renderAchats()
@@ -1077,6 +1082,7 @@
       setTimeout(() => { try { mg.innerHTML = p; } catch (_) {} }, 2200);
     };
     if (tab === 'republier') wireRepublier();
+    if (tab === 'coffre') wireCoffre();
     if (tab === 'reponse') wireReponse();
     if (tab === 'chaussures') wireChaussures();
     if (tab === 'ventes') wireVentes();
@@ -1647,6 +1653,113 @@
   // Tu coches les annonces à remettre en avant, puis « Commencer » : le panneau
   // t'OUVRE chaque annonce à ton clic, une à la fois. Tu republies toi-même sur
   // Vinted (bouton natif) et tu passes à la suivante. Rien ne part tout seul.
+  // ══ LE COFFRE ════════════════════════════════════════════════════════════════
+  // Tout ce que l'extension a enregistré de tes annonces : le texte complet et
+  // les liens des photos. Sert à trois choses que tu as demandées —
+  //   • un catalogue hors-ligne de tes annonces (36) ;
+  //   • recréer une annonce supprimée par erreur (32) ;
+  //   • recopier le texte existant pour republier (35) — pas de texte inventé,
+  //     c'est le tien, à l'identique.
+  // Les photos ne sont pas stockées en base (des centaines de Mo, cf. le quota
+  // crevé en août) : on garde leurs liens, et « Ouvrir les photos » te les
+  // affiche pour que tu les réenregistres.
+  function renderCoffre() {
+    if (coffre == null) {
+      if (!coffreBusy) { coffreBusy = true; chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'coffre' }, (r) => { coffreBusy = false; coffre = (r && r.ok && r.items) || []; render(); }); }
+      return `<div class="vrm-m">Ouverture du coffre…</div>`;
+    }
+    if (!coffre.length) {
+      return `<div class="vrm-m">Le coffre est encore vide.<br><br>Il se remplit tout seul en naviguant : dès que ton dressing se charge, chaque annonce en ligne y est enregistrée (titre, prix, marque, taille, photo). La <b>description</b> arrive quand tu ouvres l'annonce, ou avec le bouton « Récupérer le texte » de l'onglet Republier.</div>`;
+    }
+    const q = coffreQuery.trim().toLowerCase();
+    const list = q ? coffre.filter(c => (`${c.title} ${c.brand} ${c.size}`).toLowerCase().includes(q)) : coffre;
+    const avecTexte = coffre.filter(c => c.desc).length;
+    if (coffreOuvert) {
+      const c = coffre.find(x => String(x.id) === String(coffreOuvert));
+      if (c) return detailCoffre(c);
+    }
+    const ligne = (c) => `
+      <div class="vrm-card vrm-coffre-row" data-id="${esc(c.id)}" style="display:flex;gap:9px;align-items:center;margin-bottom:6px;padding:8px;cursor:pointer">
+        ${c.photos && c.photos[0] ? `<img src="${esc(c.photos[0])}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:40px;height:40px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
+        <div style="flex:1 1 130px;min-width:0">
+          <div style="font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title || 'Annonce')}</div>
+          <div class="vrm-m" style="font-size:11px">${c.price != null ? fmt(c.price) : ''}${c.brand ? ` · ${esc(c.brand)}` : ''}${c.size ? ` · ${esc(c.size)}` : ''}${c.desc ? '' : ' · <span style="color:#9a5b16">texte manquant</span>'}</div>
+        </div>
+        <span class="vrm-m" style="flex-shrink:0;font-size:11px">${(c.photos || []).length} 📷</span>
+      </div>`;
+    return `
+      <div class="vrm-m" style="margin-bottom:8px"><b>${coffre.length}</b> annonce${coffre.length > 1 ? 's' : ''} enregistrée${coffre.length > 1 ? 's' : ''} · ${avecTexte} avec leur description.<br>Même si une annonce disparaît de Vinted, elle reste ici.</div>
+      ${coffre.length > 8 ? `<input id="vrm-coffre-search" type="search" value="${esc(coffreQuery)}" placeholder="🔍 Chercher dans le coffre…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
+      <button id="vrm-coffre-export" style="width:100%;margin-bottom:8px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:8px;font:inherit;font-weight:700;font-size:12px;cursor:pointer">${svgi('download', 14)} Sauvegarder tout le coffre (fichier)</button>
+      ${list.slice(0, 150).map(ligne).join('')}
+      ${list.length > 150 ? `<div class="vrm-m">… et ${list.length - 150} autres</div>` : ''}`;
+  }
+
+  // Le détail d'une annonce archivée : tout est là, prêt à recoller.
+  function detailCoffre(c) {
+    const cp = (lbl, txt) => `<button class="vrm-copy-line" data-c="${esc(txt)}" style="flex:1 1 100px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:7px 9px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer">${lbl}</button>`;
+    // ⚠️ Les sections sont séparées par une LIGNE VIDE : ce bloc est fait pour
+    // être collé tel quel, et un titre collé à la description est illisible.
+    const carac = [c.brand ? `Marque : ${c.brand}` : '', c.size ? `Taille : ${c.size}` : '',
+                   c.etat ? `État : ${c.etat}` : '', c.price != null ? `Prix : ${c.price} €` : '']
+                   .filter(Boolean).join('\n');
+    const tout = [c.title, c.desc, carac].filter(x => String(x || '').trim()).join('\n\n');
+    return `
+      <button id="vrm-coffre-back" style="margin-bottom:8px;border:1px solid #dde;background:#fff;color:#334;border-radius:9px;padding:6px 10px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer">‹ Retour au coffre</button>
+      <div class="vrm-card" style="padding:9px">
+        <div style="display:flex;gap:9px;align-items:center;margin-bottom:8px">
+          ${c.photos && c.photos[0] ? `<img src="${esc(c.photos[0])}" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0">` : ''}
+          <div style="flex:1 1 130px;min-width:0">
+            <div style="font-weight:700;font-size:13px">${esc(c.title || 'Annonce')}</div>
+            <div class="vrm-m" style="font-size:11px">${c.price != null ? fmt(c.price) : ''}${c.brand ? ` · ${esc(c.brand)}` : ''}${c.size ? ` · ${esc(c.size)}` : ''}${c.etat ? ` · ${esc(c.etat)}` : ''}</div>
+          </div>
+        </div>
+        ${c.desc ? `<div class="vrm-m" style="font-size:11px;white-space:pre-wrap;max-height:150px;overflow:auto;background:#f7f9fb;border-radius:8px;padding:8px;margin-bottom:8px">${esc(c.desc)}</div>`
+                 : `<div class="vrm-m" style="font-size:11px;color:#9a5b16;margin-bottom:8px">La description n'est pas encore enregistrée. Ouvre l'annonce sur Vinted, ou utilise « Récupérer le texte » dans Republier.</div>`}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          ${cp('📋 Titre', c.title || '')}
+          ${c.desc ? cp('📋 Description', c.desc) : ''}
+          ${c.price != null ? cp('📋 Prix', String(c.price)) : ''}
+          ${cp('📋 Tout', tout)}
+        </div>
+        ${(c.photos || []).length ? `<button class="vrm-coffre-photos" data-id="${esc(c.id)}" style="width:100%;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${svgi('eye', 14)} Ouvrir les ${(c.photos || []).length} photos (pour les réenregistrer)</button>` : ''}
+        <a href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style="display:block;text-align:center;margin-top:6px;text-decoration:none;border:1px solid #0f6b4f;color:#0f6b4f;border-radius:9px;padding:9px;font-weight:800;font-size:12px">Recréer cette annonce sur Vinted ↗</a>
+      </div>`;
+  }
+
+  function wireCoffre() {
+    const s = panel.querySelector('#vrm-coffre-search');
+    if (s) s.oninput = () => { coffreQuery = s.value; render(); setTimeout(() => { const n = panel.querySelector('#vrm-coffre-search'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 0); };
+    panel.querySelectorAll('.vrm-coffre-row').forEach(r => { r.onclick = () => { coffreOuvert = r.dataset.id; render(); }; });
+    const back = panel.querySelector('#vrm-coffre-back'); if (back) back.onclick = () => { coffreOuvert = null; render(); };
+    panel.querySelectorAll('.vrm-coffre-photos').forEach(b => {
+      b.onclick = () => {
+        const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));
+        if (!c) return;
+        // Une seule page qui les montre toutes : tu fais « enregistrer » sur
+        // chacune. On n'ouvre pas 8 onglets d'un coup.
+        const html = `<!doctype html><meta charset="utf-8"><title>${esc(c.title || 'Photos')}</title>`
+          + `<body style="font-family:system-ui;margin:16px;background:#f6f8fa"><h2 style="font-size:16px">${esc(c.title || '')}</h2>`
+          + `<p style="color:#556;font-size:13px">Clic droit → « Enregistrer l'image sous… » sur chaque photo.</p>`
+          + (c.photos || []).map(u => `<img src="${esc(u)}" style="max-width:340px;border-radius:10px;margin:0 8px 8px 0;vertical-align:top">`).join('')
+          + `</body>`;
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+        window.open(url, '_blank', 'noopener');
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 60000);
+      };
+    });
+    const ex = panel.querySelector('#vrm-coffre-export');
+    if (ex) ex.onclick = () => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(coffre || [], null, 1)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `coffre-vrm-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 30000);
+      ex.textContent = '✓ Sauvegardé';
+      setTimeout(() => { try { render(); } catch (_) {} }, 1500);
+    };
+  }
+
   // ── LE N° À REMETTRE APRÈS UNE REPUBLICATION ────────────────────────────────
   // Republier crée une nouvelle annonce : la paire perd son numéro, et ce numéro
   // redevient « libre » alors que la chaussure occupe toujours sa boîte. Tant

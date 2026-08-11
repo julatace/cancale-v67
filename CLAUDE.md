@@ -1277,3 +1277,29 @@ J'ai écrit côté `App.jsx` un panneau « N° à remettre après republication 
 - La **fuite de capture des fiches** : réponse attendue dans `panel_diag_capture` dès que Julien navigue avec la 4.89.
 - Le **code « offre en attente »** (§45) : toujours inconnu, `panel_offer_statuts` l'apprendra.
 - **Republier en un clic** (delete + recreate) : faisable en principe (les deux requêtes sont captées) mais suppose de **re-téléverser les photos** — chantier à part, à ne pas bricoler.
+
+---
+
+## 47. Session août 2026 (suite) — LE COFFRE (annonces enregistrées en entier) + widget aligné
+
+### Widget : le CA du mois venait d'une AUTRE source que l'app
+`api/widget.js` calculait encore sur `email_sale_*` alors que l'app est passée à la moisson Vinted (§33 : les emails voyaient 12 ventes / 308 € là où la moisson en voit 17 / 437 €). Deux chiffres pour la même chose sur l'écran d'accueil.
+➡️ **Référence = `widget_stats`** (la photo publiée par l'app) : le widget affiche EXACTEMENT ce que montre l'app. Repli sur les emails **uniquement** si la photo manque ou date d'un autre mois (sinon le widget resterait bloqué sur le mois précédent tant que l'app n'est pas ouverte). Champ **`moneySource`** (`'app'` / `'emails'`) pour que le widget puisse le dire.
+
+### Le coffre (extension 4.92) — demande : « un cloud qui enregistre intégralement une annonce »
+Chaque annonce enregistrée **en entier** : titre, description, marque, taille, état, catégorie, prix, **URL des photos**. Une ligne par annonce : `coffre_{uid}_{itemId}`.
+- **⚠️ Les photos ne sont PAS stockées en base.** 119 annonces × plusieurs images = des centaines de Mo — exactement ce qui a crevé le quota d'égress (§34). On garde les **liens** (quelques Ko/annonce) ; le bouton « Ouvrir les N photos » construit une page locale (blob) avec toutes les images pour les réenregistrer.
+- **⚠️ Il ne dépend PAS de la capture de fiche** (`harvest_*_item_*`, qui ne range toujours rien) : il se construit avec le **dressing** (titre, prix, marque, taille, photo) et s'enrichit de la **description** quand une fiche arrive ou via « Récupérer le texte » (§46).
+- **`archiverLot(uid, items)` = UNE lecture + UNE écriture** pour tout le dressing. Une boucle unitaire aurait fait 200 lectures + 200 écritures à chaque chargement — la faute de §34. On saute aussi les lignes inchangées (titre, prix, nb photos, description identiques).
+- `archiverAnnonce` ne **dégrade jamais** un enregistrement riche : le dressing n'a pas la description, on complète, on n'écrase pas. `firstSavedAt` conservé.
+- Onglet **Coffre** : compteur (« N enregistrées · M avec leur description »), recherche, export JSON complet, détail par annonce avec **📋 Titre / Description / Prix / Tout** (le bloc « Tout » sépare les sections par une ligne vide — il est fait pour être collé), et « Recréer cette annonce sur Vinted ».
+
+Couvre les trois demandes : catalogue hors-ligne (36), restaurer une annonce supprimée (32), recopier le texte existant (35 — **le sien, à l'identique**, aucun texte inventé).
+
+### ⚠️ REFUS MAINTENU — modifier les photos pour passer une annonce sur un autre compte après un bannissement
+Demande explicite : « l'extension modifie photos etc et comme ça on peut passer une annonce d'un compte à un autre s'il est ban ». Refusé : la retouche d'image n'a ici qu'un usage, tromper la reconnaissance de Vinted pour **contourner une sanction**.
+**Argument factuel donné à Julien** (plus utile que le principe) : Vinted ne relie pas les comptes par les photos mais par **appareil / navigateur / adresse / moyen de paiement** — c'est comme ça que `vanessa5723` est tombé, avec des annonces différentes. Tourner une image ne change aucun de ces signaux : le compte suivant tombe aussi, et l'inventaire part avec.
+**Ce qui est proposé à la place et qui marche** : le coffre (garder textes + photos), le re-téléversement **à l'identique** sur un compte utilisé normalement, et le diagnostic « est-ce vraiment les photos ? » (beaucoup de vues + peu de favoris = c'est le PRIX, pas les images).
+
+### Vérifié au banc (§35)
+Onglet Coffre : 2 annonces, compteur « 1 avec leur description », détail complet, 4 boutons de copie, bloc « Tout » correctement séparé, page photos ouverte en blob, export. **0 erreur page/console.** `node --check` OK sur les deux fichiers.

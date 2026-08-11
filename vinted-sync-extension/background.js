@@ -289,6 +289,22 @@ async function storeHarvest(domain, type, id, body) {
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
 
+  // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
+  // URL des photos). C'est le moment où on en sait le plus sur cette annonce.
+  if (type === 'item' && id) {
+    try {
+      const f = (parsed && (parsed.item || parsed)) || {};
+      await archiverAnnonce(uid, { id, url: f.url || '', photo: null }, f);
+    } catch (_) {}
+  }
+  // Le dressing passe → on archive l'essentiel de chaque annonce en ligne.
+  // ⚠️ EN UN SEUL ALLER-RETOUR : une boucle d'archivage unitaire ferait 200
+  // lectures + 200 écritures à chaque chargement du dressing. C'est la faute
+  // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
+  if (type === 'listings') {
+    try { await archiverLot(uid, ((parsed && parsed.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+  }
+
   // Le profil contient le vrai id de profil (different de l'account_id, utile
   // pour les annonces) et le login. Le vrai id reste disponible dans la ligne
   // harvest_{uid}_profile ci-dessus (l'app le lira). On met juste a jour le
@@ -396,6 +412,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Tu viens de republier une paire : on retient son N° pour le
           // retrouver sur la nouvelle annonce (cf. marquerRepublie).
           if (msg.action === 'repubMarque') { const ok = await marquerRepublie(msg.id, msg.numero, msg.title); sendResponse({ ok }); return; }
+          // LE COFFRE : tout ce qui est enregistré, texte + liens des photos.
+          if (msg.action === 'coffre') {
+            const rows = await sbGet('app_data?id=like.coffre_*&select=id,data') || [];
+            const items = rows.map(r => r && r.data).filter(d => d && d.id)
+              .sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
+            sendResponse({ ok: true, items });
+            return;
+          }
           if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
           if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -1287,6 +1311,99 @@ async function marquerRepublie(id, numero, title) {
   const limite = Date.now() - 30 * 86400000;
   for (const k in items) if (!items[k] || (items[k].t || 0) < limite) delete items[k];
   return await supabaseUpsert('app_data', [{ id: 'panel_repub_pending', data: { items, majAt: new Date().toISOString() } }], 'id');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE COFFRE — chaque annonce enregistrée EN ENTIER, chez toi
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien : « faire un cloud avec la possibilité d'enregistrer
+// intégralement une annonce ». Ça protège son stock pour de vrai : si une
+// annonce disparaît (suppression par erreur, compte fermé, republication ratée),
+// il garde le texte ET les photos.
+//
+// ⚠️ CHOIX DE STOCKAGE — les photos ne vont PAS en base. 119 annonces × plusieurs
+// images = des centaines de Mo, et c'est très exactement ce qui a fait exploser
+// le quota d'égress en août (§34, le widget qui retéléchargeait les PDF). Le
+// coffre garde le TEXTE COMPLET + les URL des photos (quelques Ko par annonce) ;
+// les fichiers se téléchargent à la demande dans un dossier, chez lui.
+//
+// ⚠️ IL NE DÉPEND PAS de la capture de fiche (`harvest_*_item_*`), qui ne range
+// rien aujourd'hui pour une raison encore inconnue (cf. `noterDiag`). Il se
+// construit avec CE QU'ON A : la fiche si elle existe, sinon les données du
+// dressing (titre, prix, marque, taille, photo). Il s'enrichit tout seul ensuite.
+function coffreRecord(uid, it, fiche) {
+  const f = fiche || {};
+  const photos = [];
+  const push = (u) => { const s = String(u || ''); if (s && !photos.includes(s)) photos.push(s); };
+  if (Array.isArray(f.photos)) for (const p of f.photos) push(p && (p.full_size_url || p.url));
+  push(it && it.photo && (it.photo.url || it.photo));
+  return {
+    id: String((it && it.id) || f.id || ''),
+    uid: String(uid || ''),
+    title: String((f.title || (it && it.title) || '')),
+    desc: String(f.description || ''),
+    brand: String(f.brand || (f.brand_dto && f.brand_dto.title) || (it && it.brand_title) || ''),
+    size: String(f.size_title || (it && it.size_title) || ''),
+    etat: String(f.status || ''),
+    catalogId: f.catalog_id != null ? f.catalog_id : null,
+    price: (f.price && f.price.amount != null) ? f.price.amount
+         : ((it && it.price && it.price.amount != null) ? it.price.amount : (it && it.price) ?? null),
+    photos,
+    url: String((it && it.url) || f.url || ''),
+    savedAt: new Date().toISOString(),
+  };
+}
+
+async function archiverAnnonce(uid, it, fiche) {
+  try {
+    const rec = coffreRecord(uid, it, fiche);
+    if (!rec.id) return false;
+    // On ne REMPLACE pas un enregistrement riche par un pauvre : si le coffre a
+    // déjà la description et qu'on n'apporte que le dressing, on complète.
+    const rows = await sbGet(`app_data?id=eq.coffre_${rec.uid}_${rec.id}&select=data`);
+    const anc = (rows && rows[0] && rows[0].data) || null;
+    if (anc) {
+      if (!rec.desc && anc.desc) rec.desc = anc.desc;
+      if (!rec.brand && anc.brand) rec.brand = anc.brand;
+      if (!rec.size && anc.size) rec.size = anc.size;
+      if (!rec.etat && anc.etat) rec.etat = anc.etat;
+      if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
+      for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
+    } else rec.firstSavedAt = rec.savedAt;
+    return await supabaseUpsert('app_data', [{ id: `coffre_${rec.uid}_${rec.id}`, data: rec }], 'id');
+  } catch (_) { return false; }
+}
+
+// Archivage EN LOT (tout le dressing d'un compte) : une lecture, une écriture.
+// Ne dégrade jamais un enregistrement déjà riche (la description vient de la
+// fiche, le dressing ne l'a pas — on complète, on n'écrase pas).
+async function archiverLot(uid, items) {
+  if (!items || !items.length) return false;
+  const rows = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id,data`) || [];
+  const anciens = {};
+  for (const r of rows) { const d = r && r.data; if (d && d.id) anciens[String(d.id)] = d; }
+  const out = [];
+  for (const it of items.slice(0, 300)) {
+    const rec = coffreRecord(uid, it, null);
+    if (!rec.id) continue;
+    const anc = anciens[rec.id];
+    if (anc) {
+      if (!rec.desc && anc.desc) rec.desc = anc.desc;
+      if (!rec.brand && anc.brand) rec.brand = anc.brand;
+      if (!rec.size && anc.size) rec.size = anc.size;
+      if (!rec.etat && anc.etat) rec.etat = anc.etat;
+      if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
+      for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
+      // Rien de nouveau ? on ne réécrit pas cette ligne (égress inutile).
+      if (anc.title === rec.title && String(anc.price) === String(rec.price)
+          && (anc.photos || []).length === rec.photos.length && anc.desc === rec.desc) continue;
+    } else rec.firstSavedAt = rec.savedAt;
+    out.push({ id: `coffre_${uid}_${rec.id}`, data: rec });
+  }
+  if (!out.length) return true;
+  return await supabaseUpsert('app_data', out, 'id');
 }
 
 // ── CAPTER LA FICHE D'UNE ANNONCE (pour pouvoir la republier) ───────────────
