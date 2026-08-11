@@ -863,6 +863,37 @@
     return card(o, extra);
   }
 
+  // ── LE N° DE LA PAIRE, VISIBLE SUR LA PAGE VINTED ───────────────────────────
+  // Sur une de tes annonces, une pastille discrète en haut à gauche : le N° de
+  // la paire, sa case au garage, et sa marge si le prix d'achat est connu. Tu
+  // sais où aller chercher la chaussure sans rien ouvrir.
+  // ⚠️ Position FIXE, jamais insérée dans la mise en page de Vinted : le jour où
+  // ils changent leur HTML, une pastille flottante continue de marcher, une
+  // pastille greffée sur leur `<h1>` disparaît sans prévenir.
+  let badgeEl = null;
+  function majBadge() {
+    try {
+      const id = currentItemId();
+      const o = (id && DATA && DATA.byId && DATA.byId[id]) || null;
+      if (!o || !o.numero) { if (badgeEl) { badgeEl.remove(); badgeEl = null; } return; }
+      if (!badgeEl) {
+        badgeEl = document.createElement('div');
+        badgeEl.id = 'vrm-badge';
+        badgeEl.style.cssText = 'position:fixed;top:12px;left:12px;z-index:2147483646;background:#0f172a;color:#fff;'
+          + 'border-radius:12px;padding:7px 11px;font:600 13px/1.25 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
+          + 'box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;max-width:230px';
+        badgeEl.title = 'Ouvrir VRM sur cette paire';
+        badgeEl.onclick = () => { tab = 'paire'; toggle(true); };
+        document.documentElement.appendChild(badgeEl);
+      }
+      const marge = (o.buyPrice != null && o.price != null) ? (Number(o.price) - Number(o.buyPrice)) : null;
+      badgeEl.innerHTML = `<span style="font-size:15px;font-weight:800">N°${esc(o.numero)}</span>`
+        + (o.cell ? `<span style="opacity:.85"> · 🏠 ${esc(o.cell)}</span>` : '')
+        + (marge != null ? `<div style="font-size:11px;opacity:.8;margin-top:1px">marge ${esc(fmt(marge))}</div>`
+                         : `<div style="font-size:11px;opacity:.8;margin-top:1px">achat ?</div>`);
+    } catch (_) {}
+  }
+
   // ── LE PRIX D'ACHAT, LÀ OÙ TU REGARDES L'ANNONCE ────────────────────────────
   // Mesuré : 0 prix d'achat sur 177 paires — donc bénéfice, marge et rapport
   // comptable tournent tous avec un coût de zéro. La raison n'est pas la
@@ -996,6 +1027,7 @@
 
   function render() {
     writeLS('vrm_panel_tab', tab); // garde l'onglet actif d'une page à l'autre
+    majBadge();                    // pastille N° sur la page Vinted (voir majBadge)
     const s = (DATA && DATA.stats) || { online: 0, relance: 0, noNum: 0, value: 0 };
     const fresh = (DATA && DATA.freshestAt) ? ` · capté ${esc(timeago(DATA.freshestAt))}` : '';
     panel.innerHTML = `
@@ -1741,13 +1773,21 @@
   // Les photos ne sont pas stockées en base (des centaines de Mo, cf. le quota
   // crevé en août) : on garde leurs liens, et « Ouvrir les photos » te les
   // affiche pour que tu les réenregistres.
+  // Le bouton de sauvegarde des numéros — défini une fois, utilisé dans le
+  // coffre plein ET dans le coffre vide.
+  const boutonSaveNums = () => `<button id="vrm-save-nums" title="Tes numéros de boîte et prix d'achat, dans un fichier" style="flex:1 1 150px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:8px;font:inherit;font-weight:700;font-size:12px;cursor:pointer">${svgi('hash', 14)} Sauvegarder mes N°</button>`;
+
   function renderCoffre() {
     if (coffre == null) {
       if (!coffreBusy) { coffreBusy = true; chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'coffre' }, (r) => { coffreBusy = false; coffre = (r && r.ok && r.items) || []; render(); }); }
       return `<div class="vrm-m">Ouverture du coffre…</div>`;
     }
     if (!coffre.length) {
-      return `<div class="vrm-m">Le coffre est encore vide.<br><br>Il se remplit tout seul en naviguant : dès que ton dressing se charge, chaque annonce en ligne y est enregistrée (titre, prix, marque, taille, photo). La <b>description</b> arrive quand tu ouvres l'annonce, ou avec le bouton « Récupérer le texte » de l'onglet Republier.</div>`;
+      // ⚠️ La sauvegarde des N° reste proposée : elle ne dépend pas du coffre
+      // (elle lit tes numéros dans l'app), et c'est justement quand tout est
+      // vide qu'on a envie d'un filet.
+      return `<div class="vrm-m" style="margin-bottom:10px">Le coffre est encore vide.<br><br>Il se remplit tout seul en naviguant : dès que ton dressing se charge, chaque annonce en ligne y est enregistrée (titre, prix, marque, taille, photo). La <b>description</b> arrive quand tu ouvres l'annonce, ou avec le bouton « Récupérer le texte » de l'onglet Republier.</div>
+        ${boutonSaveNums()}`;
     }
     const q = coffreQuery.trim().toLowerCase();
     const list = q ? coffre.filter(c => (`${c.title} ${c.brand} ${c.size}`).toLowerCase().includes(q)) : coffre;
@@ -1768,7 +1808,10 @@
     return `
       <div class="vrm-m" style="margin-bottom:8px"><b>${coffre.length}</b> annonce${coffre.length > 1 ? 's' : ''} enregistrée${coffre.length > 1 ? 's' : ''} · ${avecTexte} avec leur description.<br>Même si une annonce disparaît de Vinted, elle reste ici.</div>
       ${coffre.length > 8 ? `<input id="vrm-coffre-search" type="search" value="${esc(coffreQuery)}" placeholder="🔍 Chercher dans le coffre…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
-      <button id="vrm-coffre-export" style="width:100%;margin-bottom:8px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:8px;font:inherit;font-weight:700;font-size:12px;cursor:pointer">${svgi('download', 14)} Sauvegarder tout le coffre (fichier)</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button id="vrm-coffre-export" style="flex:1 1 150px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:8px;font:inherit;font-weight:700;font-size:12px;cursor:pointer">${svgi('download', 14)} Sauvegarder le coffre</button>
+        ${boutonSaveNums()}
+      </div>
       ${list.slice(0, 150).map(ligne).join('')}
       ${list.length > 150 ? `<div class="vrm-m">… et ${list.length - 150} autres</div>` : ''}`;
   }
@@ -1921,6 +1964,25 @@
         setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 60000);
       };
     });
+    // Sauvegarde des numéros : le N° est ce qui est ÉCRIT sur la boîte, il ne se
+    // recalcule pas. Un fichier chez toi, c'est le seul vrai filet.
+    const sn = panel.querySelector('#vrm-save-nums');
+    if (sn) sn.onclick = () => {
+      const avant = sn.innerHTML;
+      sn.disabled = true; sn.textContent = '⏳';
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'sauvegardeNumeros' }, (r) => {
+        sn.disabled = false;
+        if (!r || !r.ok) { sn.textContent = '❌ échec'; setTimeout(() => { try { sn.innerHTML = avant; } catch (_) {} }, 2500); return; }
+        const n = Object.keys((r.data && r.data.vinted_annonce_numeros) || {}).length;
+        const url = URL.createObjectURL(new Blob([JSON.stringify(r.data, null, 1)], { type: 'application/json' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = `numeros-vrm-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 30000);
+        sn.textContent = `✓ ${n} N° sauvegardés`;
+        setTimeout(() => { try { sn.innerHTML = avant; } catch (_) {} }, 2500);
+      });
+    };
     const ex = panel.querySelector('#vrm-coffre-export');
     if (ex) ex.onclick = () => {
       const url = URL.createObjectURL(new Blob([JSON.stringify(coffre || [], null, 1)], { type: 'application/json' }));
@@ -2050,8 +2112,15 @@
         </div>
       </label>`;
     }).join('');
+    // Ton créneau réel, calculé sur TES ventes (jamais un conseil générique).
+    const mv = DATA && DATA.momentVente;
+    const bandeauMoment = mv ? `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#eefaf3;border-color:#bfe6d3">
+        <div style="font-weight:800;font-size:12.5px;color:#0f6b4f">Tes paires partent surtout le <u>${esc(mv.jour)}</u>, ${esc(mv.creneau)}</div>
+        <div class="vrm-m" style="font-size:11px;margin-top:2px">Sur ${mv.total} ventes datées : ${mv.nJour} un ${esc(mv.jour)}, ${mv.nCreneau} ${esc(mv.creneau)}. Republie juste avant ce créneau — ton annonce sera en haut quand les acheteurs regardent.</div>
+      </div>` : '';
     return `
       ${renumBandeau()}
+      ${bandeauMoment}
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
       ${nDone ? `<div class="vrm-m" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding:6px 9px;border-radius:8px;background:#eefaf3;color:#0f6b4f;border:1px solid #bfe6d3"><span>✓ <b>${nDone}</b> republiée${nDone > 1 ? 's' : ''} récemment (rangées en bas)</span><button class="vrm-go" data-act="resetdone" style="border:none;background:transparent;color:#0f6b4f;font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline;flex-shrink:0">Réinitialiser</button></div>` : ''}
       ${list.length > 8 ? `<input id="vrm-repub-search" type="search" value="${esc(repubQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}

@@ -1320,3 +1320,10 @@ Rappel du constat (§22) : **0 prix d'achat sur 177 paires** → bénéfice, mar
 - **Côté app** : effet gardé par `cloudReady` qui reporte chaque prix sur la paire via **`updatePair`** (donc le miroir `vinted_buyprice_by_num` est mis à jour aussi, §7). ⚠️ **N'écrase jamais un prix déjà saisi** — le panneau complète, il ne remplace pas.
 
 **Vérifié aux deux bancs** : panneau (3 candidats, 2 « suggéré », tap → `setBuyPrice{itemId,prix,tx,titre}`, saisie manuelle → 27 €, **0 erreur**) ; app (`dist` servi, `panel_buyprices` mocké → `vinted_annonce_numeros['77'].buyPrice === "18"`, **0 PAGEERROR** — les 3 lignes console sont le 400 volontaire de `select=owner` et les resets de fin de test).
+
+### 4.95 — pastille N° sur Vinted · créneau de vente réel · sauvegarde des numéros
+- **N° visible sur la page Vinted** (`majBadge`) : pastille fixe en haut à gauche sur une de tes annonces → `N°7 · 🏠 B3` + la marge (ou « achat ? »). Clic = ouvre « Cette paire ». ⚠️ **Position fixe, jamais greffée dans le HTML de Vinted** : une pastille flottante survit à leurs refontes, une pastille insérée dans leur `<h1>` disparaît sans prévenir. Appelée depuis `render()`.
+- **Le meilleur moment pour republier = TON historique** (`momentVente`, background) : répartition des ventes moissonnées par jour de semaine et par créneau (matin/après-midi/soir/nuit). ⚠️ **Rien n'est affiché en dessous de 20 ventes datées** — un « pic » sur 5 ventes n'est que du hasard, et un conseil inventé vaut moins que rien. Bandeau vert en tête de Republier.
+- **Sauvegarde des numéros** (`sauvegardeNumeros`) : lecture seule de `main` → fichier JSON (`vinted_annonce_numeros` + `vinted_buyprice_by_num` + garage). Le N° est ce qui est **écrit sur la boîte** : il ne se recalcule pas, un fichier chez lui est le seul vrai filet. ⚠️ Le bouton est proposé **aussi quand le coffre est vide** (il n'en dépend pas — c'est justement là qu'on veut un filet).
+
+**Vérifié au banc** : pastille rendue et visible (`N°7 · 🏠 B3 · marge 22,00 €`), bandeau créneau (« dimanche, en soirée · 41/180 »), téléchargement réel `numeros-vrm-AAAA-MM-JJ.json` avec 2 entrées et libellé « ✓ 2 N° sauvegardés ». **0 erreur.**

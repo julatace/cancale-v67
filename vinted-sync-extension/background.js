@@ -413,6 +413,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // retrouver sur la nouvelle annonce (cf. marquerRepublie).
           if (msg.action === 'repubMarque') { const ok = await marquerRepublie(msg.id, msg.numero, msg.title); sendResponse({ ok }); return; }
           if (msg.action === 'photoBytes') { const r = await photoBytes(msg.url); sendResponse(r); return; }
+          // Sauvegarde de tes numéros (et du garage) : lecture seule de `main`.
+          // Si un jour la ligne cloud est perdue, c'est ce fichier qui te sauve —
+          // le numéro est ce qu'il y a d'écrit sur la boîte, ça ne se recalcule pas.
+          if (msg.action === 'sauvegardeNumeros') {
+            const rows = await sbGet('app_data?id=eq.main&select=data');
+            const d = (rows && rows[0] && rows[0].data) || {};
+            sendResponse({ ok: true, data: {
+              exporteLe: new Date().toISOString(),
+              vinted_annonce_numeros: d.vinted_annonce_numeros || {},
+              vinted_buyprice_by_num: d.vinted_buyprice_by_num || {},
+              vinted_garage_grid: d.vinted_garage_grid || null,
+            } });
+            return;
+          }
           if (msg.action === 'achatsPour') { const items = await achatsPour(msg.title, msg.price); sendResponse({ ok: true, items }); return; }
           if (msg.action === 'setBuyPrice') { const ok = await setBuyPrice(msg.itemId, msg.prix, msg.tx, msg.titre); sendResponse({ ok }); return; }
           // LE COFFRE : tout ce qui est enregistré, texte + liens des photos.
@@ -2094,6 +2108,35 @@ async function buildPanelData() {
   //   • la nouvelle annonce doit avoir EXACTEMENT le même titre, ce titre doit
   //     être UNIQUE parmi les annonces en ligne, et elle ne doit pas déjà avoir
   //     de numéro (même garde que §24 : un titre en double n'associe jamais rien).
+  // ── QUAND TES PAIRES PARTENT-ELLES VRAIMENT ? ───────────────────────────────
+  // Le « meilleur moment pour republier » n'est pas un conseil générique trouvé
+  // sur un blog : c'est TON histoire. On répartit tes ventes par jour de semaine
+  // et par tranche horaire, et on te donne le créneau le plus chargé.
+  // ⚠️ On ne l'affiche qu'à partir de 20 ventes datées — en dessous, un « pic »
+  //    n'est que du hasard, et un conseil inventé vaut moins que rien.
+  let momentVente = null;
+  try {
+    const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const parJour = [0, 0, 0, 0, 0, 0, 0];
+    const parCreneau = { matin: 0, aprem: 0, soir: 0, nuit: 0 };
+    let n = 0;
+    for (const v of salesFlat) {
+      if (!v.ts) continue;
+      const d = new Date(v.ts);
+      if (isNaN(d.getTime())) continue;
+      parJour[d.getDay()] += 1;
+      const h = d.getHours();
+      parCreneau[h < 6 ? 'nuit' : h < 12 ? 'matin' : h < 18 ? 'aprem' : 'soir'] += 1;
+      n += 1;
+    }
+    if (n >= 20) {
+      const iJour = parJour.indexOf(Math.max(...parJour));
+      const cle = Object.keys(parCreneau).reduce((a, b) => (parCreneau[b] > parCreneau[a] ? b : a), 'soir');
+      const libelle = { matin: 'le matin', aprem: "l'après-midi", soir: 'en soirée', nuit: 'la nuit' }[cle];
+      momentVente = { jour: JOURS[iJour], creneau: libelle, nJour: parJour[iJour], nCreneau: parCreneau[cle], total: n };
+    }
+  } catch (_) { momentVente = null; }
+
   const renumSuggest = [];
   try {
     const pRows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
@@ -2263,7 +2306,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
