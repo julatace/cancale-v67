@@ -2120,6 +2120,7 @@
                 <button class="vrm-photo-edit" data-u="${esc(u)}" data-t="${esc(c.title || '')}" style="margin-top:3px;width:56px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:7px;padding:3px 0;font:inherit;font-weight:700;font-size:10px;cursor:pointer">✂️ ${i + 1}</button>
               </div>`).join('')}
           </div>
+          <button class="vrm-prep-photos" data-id="${esc(c.id)}" style="width:100%;border:none;background:#0f6b4f;color:#fff;border-radius:9px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer;margin-bottom:6px">📦 Préparer les ${(c.photos || []).length} photos (recadrées, prêtes à déposer)</button>
           <button class="vrm-coffre-photos" data-id="${esc(c.id)}" style="width:100%;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${svgi('eye', 14)} Voir les ${(c.photos || []).length} photos en grand</button>` : ''}
         <a href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style="display:block;text-align:center;margin-top:6px;text-decoration:none;border:1px solid #0f6b4f;color:#0f6b4f;border-radius:9px;padding:9px;font-weight:800;font-size:12px">Recréer cette annonce sur Vinted ↗</a>
       </div>`;
@@ -2200,6 +2201,49 @@
     setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
   }
 
+  // ── PRÉPARER LES PHOTOS D'UNE ANNONCE ───────────────────────────────────────
+  // Le vrai temps perdu quand on republie, ce n'est pas les clics : c'est
+  // récupérer chaque image, la recadrer, la renommer, puis la redéposer.
+  // Ici : un bouton, toutes les photos de la paire sortent recadrées au format
+  // portrait de Vinted (3:4), numérotées dans l'ordre, prêtes à glisser.
+  // ⚠️ Tout se passe CHEZ TOI : on lit les images (comme le ferait la page) et
+  //    on les redessine dans un canvas. **Aucune requête vers l'API Vinted**,
+  //    donc rien qui puisse ressembler à de l'automatisation.
+  // Le recadrage 3:4 « couvre » le cadre (pas de bandes blanches) et sort en
+  // 1200×1600, la taille que Vinted accepte sans recompresser bêtement.
+  async function preparerPhotos(photos, nomBase, btn) {
+    const total = (photos || []).length;
+    if (!total) return;
+    const dire = (t) => { if (btn) btn.innerHTML = t; };
+    let ok = 0;
+    for (let i = 0; i < total; i++) {
+      dire(`⏳ photo ${i + 1}/${total}…`);
+      try {
+        const r = await new Promise(res => chrome.runtime.sendMessage(
+          { from: 'cancale-vpanel', action: 'photoBytes', url: photos[i] }, res));
+        if (!r || !r.ok || !r.dataUrl) continue;
+        const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = r.dataUrl; });
+        const W = 1200, H = 1600;
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const x = c.getContext('2d');
+        x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+        const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);   // couvre le cadre
+        const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+        x.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
+        if (!blob) continue;
+        const u = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = u; a.download = `${nomBase}-${String(i + 1).padStart(2, '0')}.jpg`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => { try { URL.revokeObjectURL(u); } catch (_) {} }, 20000);
+        ok += 1;
+        await new Promise(res => setTimeout(res, 250));   // laisse le navigateur enregistrer
+      } catch (_) { /* une photo ratée n'arrête pas les autres */ }
+    }
+    dire(ok === total ? `✓ ${ok} photos prêtes` : `✓ ${ok}/${total} (les autres ont échoué)`);
+  }
+
   function wireCoffre() {
     panel.querySelectorAll('.vrm-photo-edit').forEach(b => {
       b.onclick = () => {
@@ -2216,6 +2260,15 @@
     if (s) s.oninput = () => { coffreQuery = s.value; render(); setTimeout(() => { const n = panel.querySelector('#vrm-coffre-search'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 0); };
     panel.querySelectorAll('.vrm-coffre-row').forEach(r => { r.onclick = () => { coffreOuvert = r.dataset.id; render(); }; });
     const back = panel.querySelector('#vrm-coffre-back'); if (back) back.onclick = () => { coffreOuvert = null; render(); };
+    panel.querySelectorAll('.vrm-prep-photos').forEach(b => {
+      b.onclick = () => {
+        const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));
+        if (!c || !(c.photos || []).length) return;
+        b.disabled = true;
+        const nom = (c.title || 'annonce').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'annonce';
+        preparerPhotos(c.photos, nom, b).then(() => { setTimeout(() => { try { b.disabled = false; render(); } catch (_) {} }, 2500); });
+      };
+    });
     panel.querySelectorAll('.vrm-coffre-photos').forEach(b => {
       b.onclick = () => {
         const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));

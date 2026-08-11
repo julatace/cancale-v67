@@ -1404,3 +1404,12 @@ Julien voulait l'envoi groupé de messages aux favoris, comme les autres extensi
 Ce que l'extension ajoute, c'est **le montant** : `remiseLigne(o)` calcule le prix à proposer — **prix plancher** s'il est posé, sinon **−10 % arrondi** — et l'affiche sur chaque annonce likée avec la marge. ⚠️ **Jamais sous le prix d'achat** : si le calcul y descend, on affiche « X € serait sous ton prix d'achat » au lieu de proposer une vente à perte. Bouton « 📋 Copier X € » dans le défilement.
 
 **Vérifié au banc, les trois cas** : plancher posé → 34 € (−15 %, marge 16 €) ; sans plancher → 54 € (−10 %, marge 32 €) ; remise sous le prix d'achat → avertissement au lieu d'une proposition. Copie du montant conforme. **0 erreur.**
+
+### 5.03 — LE PRÉPARATEUR DE PHOTOS (le vrai goulot de la republication)
+Constat posé avec Julien : quand on republie, le temps ne se perd pas dans les clics — le texte est déjà en un tap (coffre + gabarit, §4.89/5.01) — mais dans **les photos** : les récupérer une par une, les recadrer, les renommer, les redéposer.
+`preparerPhotos(photos, nomBase, btn)` : un bouton dans le détail du coffre → **toutes** les photos de la paire sortent recadrées en **1200×1600 (3:4, le portrait de Vinted)**, en « couvrant » le cadre (aucune bande blanche), nommées `titre-01.jpg`, `-02`, … dans l'ordre. Il ne reste qu'à les glisser dans le formulaire.
+- ⚠️ **Zéro requête vers l'API Vinted** : on lit les images (comme le ferait la page) et on les redessine dans un canvas, chez lui. Rien qui puisse ressembler à de l'automatisation.
+- Le rapatriement passe par `photoBytes` (background) — indispensable, une image CDN chargée dans un canvas depuis la page le rend *tainted* et l'export devient impossible (§4.93).
+- Une photo qui échoue n'arrête pas les autres ; le libellé rend compte (`✓ 2/3`). Pause de 250 ms entre deux téléchargements pour laisser le navigateur enregistrer.
+
+**Vérifié au banc** : 3 sources de formats différents (portrait, paysage, carré) → **3 fichiers** produits, tous en **1200×1600**, nommés `adidas-spezial-vert-taille-36-01/02/03.jpg`, libellé « ✓ 3 photos prêtes ». **0 erreur.**
