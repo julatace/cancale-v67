@@ -1351,3 +1351,26 @@ Nouvel onglet **Chercher** : un seul champ qui atteint **six sources à la fois*
 ⚠️ Le rapprochement se fait par **NUMÉRO** (identité certaine) et, à défaut, par **titre EXACT** — jamais par ressemblance : afficher la vente d'une autre paire serait pire que de ne rien afficher (§24).
 
 **Vérifié au banc** : « adidas » → 6 résultats répartis sur les 6 groupes ; « 7 » → la paire N°7 ; passeport rendu complet (achat 18 €, case B3, en ligne 45 j, coffre 2 photos, marge 22 €). **0 erreur.**
+
+## 48. Session août 2026 (suite) — ⚠️ 4.99 : GARDE-FOU ANTI-BLOCAGE sur les outils qui agissent
+
+Demande de Julien : « améliore les outils déjà là (republication, messages, favoris, acceptation des offres) **pour ne pas que je me fasse ban** ». Constat honnête : depuis 4.86–4.94, le panneau envoie de VRAIES requêtes (offre acceptée/refusée/contrée, bordereau généré, fiche lue) **sans aucun garde-fou**. Deux comportements très détectables passaient.
+
+### 1. ⚠️ LE PIRE — agir au nom d'un compte qui n'est pas celui connecté
+`vintedSend` utilise le jeton du compte VISÉ. Donc accepter une offre du compte B pendant que le navigateur est connecté au compte A envoyait une requête de B **depuis la session et l'empreinte de A** : c'est exactement le signal multi-comptes que Vinted sanctionne (§5 — la cause documentée du blocage de `vanessa5723`), et c'est le panneau qui le produisait.
+- **`garde(uid, acc)`** (background) compare le compte visé à `activeAccountId(domain)` et **refuse** avec un message clair.
+- **Mieux : on le dit AVANT le clic.** `buildPanelData` renvoie **`compteActif`** ; le panneau n'affiche plus les boutons Accepter/Contre/Refuser ni « générer » pour une ligne d'un autre compte — il affiche « bascule sur ce compte d'abord ».
+- ⚠️ Si le compte connecté est **indéterminable** (cookie absent), on **laisse passer** : bloquer sur une détection ratée casserait l'outil.
+
+### 2. La rafale
+Plafond dur de **20 actions par compte et par heure** (`compterAction`, anneau horodaté dans `chrome.storage.local` — local, aucun égress). Au-delà : refus explicite. ⚠️ Ce n'est **pas** un rythme « faussement humain » (toujours refusé, §32) : c'est une limite, pas un déguisement.
+
+### 3. Le message ne se perd plus
+Un refus du garde-fou remonte via `code` (`autre-compte` / `trop-d-actions`) et s'affiche dans un **bandeau en haut du panneau** (`bandeauAlerte`), au lieu d'être tronqué dans un libellé de bouton.
+
+Appliqué à **`repondreOffre`**, **`genererBordereau`** et **`capterAnnonce`** (une lecture reste une requête).
+
+**Vérifié au banc, dans les DEUX sens** — c'est le point important, un garde-fou qui bloque tout serait pire que rien :
+- navigateur sur le compte A, offre du compte B → **0 bouton d'action**, avertissement affiché, bordereau en « autre cpte » ;
+- navigateur sur le bon compte → **3 boutons d'offre + 1 bouton générer**, tout fonctionne normalement.
+**0 erreur** dans les deux cas.

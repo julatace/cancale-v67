@@ -1269,6 +1269,60 @@ async function setMinPrice(id, amount) {
   return await supabaseUpsert('app_data', [{ id: 'panel_min_prices', data: cur }], 'id');
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// GARDE-FOU ANTI-BLOCAGE — à passer AVANT toute action envoyée à Vinted
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien : « améliore tout ça pour ne pas que je me fasse ban ».
+// Les boutons du panneau envoient de vraies requêtes. Sans garde-fou, deux
+// comportements très détectables passaient :
+//
+// 1. ⚠️ AGIR AU NOM D'UN COMPTE QUI N'EST PAS CELUI CONNECTÉ. `vintedSend`
+//    utilise le jeton du compte visé — donc accepter une offre du compte B
+//    pendant que le navigateur est sur le compte A envoie une requête de B
+//    depuis la session/l'empreinte de A. C'est LE signal multi-comptes que
+//    Vinted sanctionne (§5, et c'est ce qui a fait tomber `vanessa5723`).
+//    ➡️ On refuse, et on dit de basculer sur le bon compte d'abord.
+//
+// 2. ⚠️ LA RAFALE. Un plafond par heure et par compte empêche qu'un clic
+//    répété (ou un bug) parte en série. Ce n'est PAS un déguisement de rythme
+//    « faussement humain » (toujours refusé, §32) : c'est une limite dure.
+//
+// Si on n'arrive pas à savoir quel compte est connecté (cookie absent), on
+// LAISSE PASSER : bloquer sur une détection ratée casserait l'outil.
+const ACTIONS_MAX_HEURE = 20;
+
+async function compteConnecte(domain) {
+  try { return await activeAccountId(domain || 'www.vinted.fr'); } catch (_) { return null; }
+}
+
+async function compterAction(uid) {
+  try {
+    const cle = 'vrmActions';
+    const cur = (await chrome.storage.local.get(cle))[cle] || {};
+    const t = Date.now(), ilYaUneHeure = t - 3600000;
+    const list = (cur[uid] || []).filter(x => x > ilYaUneHeure);
+    if (list.length >= ACTIONS_MAX_HEURE) return { ok: false, n: list.length };
+    list.push(t); cur[uid] = list;
+    await chrome.storage.local.set({ [cle]: cur });
+    return { ok: true, n: list.length };
+  } catch (_) { return { ok: true, n: 0 }; }
+}
+
+// Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
+async function garde(uid, acc) {
+  const actif = await compteConnecte(acc && acc.domain);
+  if (actif && String(actif) !== String(uid)) {
+    return { ok: false, code: 'autre-compte',
+             error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted avant d'agir (sinon Vinted voit deux comptes depuis la même session)" };
+  }
+  const c = await compterAction(String(uid));
+  if (!c.ok) {
+    return { ok: false, code: 'trop-d-actions',
+             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
+  }
+  return null;
+}
+
 // ── RÉPONDRE À UNE OFFRE, EN UN CLIC DEPUIS LE PANNEAU ──────────────────────
 // Julien voulait que ça parte tout seul dès qu'une offre arrive. Refusé, et la
 // raison n'est pas le risque de blocage : accepter une offre engage une VENTE
@@ -1289,6 +1343,7 @@ async function repondreOffre({ uid, tx, oid, quoi, prix }) {
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
+  const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
   let r;
   if (quoi === 'accept') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, null);
   else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
@@ -1529,6 +1584,7 @@ async function capterAnnonce(uid, itemId) {
   let acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) acc = accts[0];
   if (!acc) return { ok: false, error: 'aucun compte lié' };
+  const stop = await garde(acc.vinted_user_id, acc); if (stop) return stop;   // anti-blocage
   // vintedGet renvoie { status, ok, json }.
   const r = await vintedGet(acc, `/api/v2/items/${itemId}`);
   if (!r || !r.ok || !r.json) return { ok: false, error: `Vinted a répondu ${r ? r.status : '—'}` };
@@ -1568,6 +1624,7 @@ async function genererBordereau(uid, tx) {
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
+  const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
   const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
     { seller_address_id: adr, drop_off_type: null, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
@@ -2162,6 +2219,11 @@ async function buildPanelData() {
     }
   } catch (_) { /* diagnostic : ne doit jamais gêner le reste */ }
 
+  // Quel compte est RÉELLEMENT connecté dans ce navigateur ? Le panneau s'en
+  // sert pour ne PAS proposer d'agir au nom d'un autre compte (voir `garde`).
+  let compteActif = null;
+  try { compteActif = await compteConnecte('www.vinted.fr'); } catch (_) {}
+
   const renumSuggest = [];
   try {
     const pRows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
@@ -2331,7 +2393,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

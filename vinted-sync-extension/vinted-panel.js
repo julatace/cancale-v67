@@ -680,6 +680,10 @@
     const bordPill = !b ? ''
       : b.etat === 'print'
         ? `<button class="vrm-bord-dl" data-row="${esc(b.row || '')}" title="Ouvrir le bordereau (PDF) — prêt à imprimer" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border:0;border-radius:12px;background:#0f6b4f14;color:#0f6b4f;font:inherit;font-weight:800;font-size:15px;cursor:pointer">${svgi('printer', 16)}<span style="font-size:9px;font-weight:700">ouvrir</span></button>`
+        : (DATA && DATA.compteActif && v.uid && String(DATA.compteActif) !== String(v.uid))
+        // Compte non connecté → on n'offre pas le bouton : on renvoie sur Vinted.
+        // (Générer depuis la session d'un autre compte = signal multi-comptes.)
+        ? `<a href="${esc(v.url)}" target="_blank" rel="noreferrer" title="Vente d'un autre compte : bascule dessus sur Vinted" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border-radius:12px;background:#f2f5f8;color:#66707c;text-decoration:none;font-weight:800;font-size:15px">📄<span style="font-size:9px;font-weight:700">autre cpte</span></a>`
         : `<button class="vrm-gen-bord" data-uid="${esc(v.uid || '')}" data-tx="${esc(v.transaction || '')}" title="Générer le bordereau maintenant (c'est l'extension qui le fait)" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px;border:0;border-radius:12px;background:#c98a1a14;color:#9a5b16;font:inherit;font-weight:800;font-size:15px;cursor:pointer">${svgi('file-text', 16)}<span style="font-size:9px;font-weight:700">générer</span></button>`;
     const sub = [etatLbl[v.etat] || '', v.ts ? timeago(v.ts) : '', v.acct || ''].filter(Boolean).join(' · ');
     return `
@@ -1000,6 +1004,19 @@
   // (transaction + demande d'offre) : sinon on renvoie sur Vinted, comme avant.
   function agir(of, coul, ok, sansMin) {
     const lien = `<a href="${esc(of.url)}" target="_blank" rel="noreferrer" style="flex:1 1 120px;text-align:center;text-decoration:none;border:1px solid ${coul};background:transparent;color:${coul};border-radius:9px;padding:7px;font-weight:700;font-size:12px">Voir le fil ↗</a>`;
+    // ⚠️ ANTI-BLOCAGE : on ne propose PAS d'agir au nom d'un compte qui n'est
+    // pas celui connecté. Envoyer une requête du compte B depuis la session du
+    // compte A, c'est le signal multi-comptes que Vinted sanctionne (§5).
+    // On le dit AVANT le clic plutôt que de refuser après.
+    const actif = DATA && DATA.compteActif;
+    if (actif && of.uid && String(actif) !== String(of.uid)) {
+      const nom = ((DATA.accounts || []).find(a => String(a.uid) === String(of.uid)) || {}).name || 'un autre compte';
+      return `<div class="vrm-m" style="margin-top:7px;padding:7px 9px;border-radius:9px;background:#f2f5f8;border:1px solid #e0e6ec;font-size:11.5px">
+          Cette offre est sur <b>${esc(nom)}</b>, et ton navigateur est connecté ailleurs.
+          Bascule sur ce compte sur Vinted avant de répondre — agir depuis la mauvaise session, c'est ce qui fait repérer le multi-comptes.
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">${lien}</div>`;
+    }
     if (!of.tx || !of.oid || !of.uid) {
       return `<div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap"><a href="${esc(of.url)}" target="_blank" rel="noreferrer" style="flex:1;text-align:center;text-decoration:none;border:1px solid ${coul};background:${coul};color:#fff;border-radius:9px;padding:7px;font-weight:800;font-size:12px">Répondre sur Vinted ↗</a></div>`;
     }
@@ -1057,7 +1074,7 @@
           <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">${svgi('heart', 15)} Favoris</button>
         </div>
       </div>
-      <div id="vrm-body">${modeleBandeau()}${
+      <div id="vrm-body">${bandeauAlerte()}${modeleBandeau()}${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
@@ -1122,7 +1139,8 @@
         const avant = b.innerHTML;
         b.disabled = true; b.innerHTML = '<span style="font-size:11px">⏳</span>';
         chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'genererBord', uid: b.dataset.uid, tx: b.dataset.tx }, (r) => {
-          if (r && r.ok) { b.innerHTML = '<span style="font-size:11px">✓ généré</span>'; setTimeout(() => load(), 1200); }
+          if (r && r.ok) { alerte = null; b.innerHTML = '<span style="font-size:11px">✓ généré</span>'; setTimeout(() => load(), 1200); }
+          else if (r && r.code) { alerte = r.error; render(); }
           else {
             b.disabled = false;
             b.title = (r && r.error) || 'échec';
@@ -1149,7 +1167,8 @@
           from: 'cancale-vpanel', action: 'offre', quoi: b.dataset.quoi,
           uid: b.dataset.uid, tx: b.dataset.tx, oid: b.dataset.oid, prix: b.dataset.montant,
         }, (r) => {
-          if (r && r.ok) { b.innerHTML = '✓ envoyé'; setTimeout(() => load(), 900); }
+          if (r && r.ok) { alerte = null; b.innerHTML = '✓ envoyé'; setTimeout(() => load(), 900); }
+          else if (r && r.code) { alerte = r.error; render(); }   // garde-fou : message complet en haut
           else { b.disabled = false; b.innerHTML = '❌ ' + ((r && r.error) || 'échec'); setTimeout(() => { try { b.innerHTML = b.dataset.lbl; } catch (_) {} }, 3500); }
         });
       };
@@ -1813,6 +1832,12 @@
   //    par titre EXACT. Jamais par ressemblance : afficher la vente d'une autre
   //    paire serait pire que de ne rien afficher (§24).
   let q = '', passeport = null;
+  // Message d'alerte affiché en haut du panneau (refus du garde-fou anti-blocage).
+  let alerte = null;
+  const bandeauAlerte = () => alerte ? `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
+      <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} Action non envoyée</div>
+      <div class="vrm-m" style="font-size:11.5px;margin-top:3px">${esc(alerte)}</div>
+    </div>` : '';
   const cont = (s, t) => String(s || '').toLowerCase().includes(t);
   function renderRecherche() {
     if (passeport) return renderPasseport(passeport);
