@@ -9905,6 +9905,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { moves, nTotal: movable.length, nLocked: locked.size, nReserved: reserved.size, maxBefore, maxAfter };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, garageNums, sales.items, saleOv]);
+  // ── PRIX D'ACHAT POSÉS DEPUIS LE PANNEAU VINTED ───────────────────────────
+  // Mesuré : 0 prix d'achat sur 177 paires → bénéfice, marge et rapport
+  // comptable calculés avec un coût de ZÉRO. Le panneau de l'extension permet
+  // désormais de relier l'achat d'un tap pendant qu'on regarde l'annonce, et il
+  // l'écrit dans une ligne DÉDIÉE (`panel_buyprices`) : l'extension n'a pas le
+  // droit d'écrire la ligne `main` (§35). C'est donc ici qu'on le reporte sur la
+  // paire — via `updatePair`, qui met aussi à jour le miroir prix-par-numéro.
+  // On ne touche JAMAIS un prix déjà saisi : le panneau complète, il n'écrase pas.
+  const [panelBuy, setPanelBuy] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_buyprices&select=data`, { headers: sbAuth() });
+        if (!res.ok) return;
+        const rows = await res.json();
+        const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+        if (alive && items && typeof items === 'object') setPanelBuy(items);
+      } catch (_) { /* réseau : on garde {} */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    if (!cloudReady) return;                       // même garde que toute écriture auto
+    const ids = Object.keys(panelBuy || {});
+    if (!ids.length || !annBase.length) return;
+    for (const id of ids) {
+      const p = Number(panelBuy[id] && panelBuy[id].price);
+      if (!isFinite(p) || p < 0) continue;
+      const it = annBase.find(x => String(x.id) === String(id));
+      if (!it) continue;
+      const cur = numeros[it.id] || {};
+      if (cur.buyPrice != null && String(cur.buyPrice).trim() !== '') continue; // déjà saisi
+      updatePair(it, { buyPrice: String(p) });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelBuy, cloudReady, annBase, numeros]);
+
   // Applique le plan : réécrit les numéros, met à jour le miroir prix-par-numéro
   // (sinon le prix d'achat suivrait l'ancien numéro) et repart d'un historique
   // « used » propre = ce qui est réellement attribué après l'opération.

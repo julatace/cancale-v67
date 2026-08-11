@@ -1311,3 +1311,12 @@ Julien : « pour republier une annonce, je ne peux pas avoir les mêmes photos, 
 - ⚠️ **Une photo à la fois, réglages choisis par lui.** Ce n'est pas un outil qui retouche en masse : le refus porte sur l'automatisation qui altère des images pour esquiver une détection, pas sur un éditeur manuel — l'app en a déjà un depuis longtemps (« ✂️ Retoucher une photo »).
 
 **Vérifié au banc, éditeur RÉELLEMENT chargé** (le HTML de la page blob est capturé puis rendu dans un vrai onglet) : image dessinée (172 800 px non blancs), zoom + rotation + changement de format (360×480 → 360×360, libellé « Format : 1:1 »), et le **téléchargement produit un vrai fichier** (`photo-vrm-….jpg`, 28 Ko). **0 erreur** côté panneau ET côté éditeur.
+
+### 4.94 — LE PRIX D'ACHAT, relié d'un tap depuis l'annonce (le trou le plus coûteux)
+Rappel du constat (§22) : **0 prix d'achat sur 177 paires** → bénéfice, marge, « meilleure marque » et rapport comptable tournent tous avec un **coût de zéro**. La cause n'était pas la paresse : il fallait retrouver la bonne paire parmi ~700 achats classés par date.
+- **`achatsPour(titre, prixVente)` (background)** : score repris de `openPicker` de l'app, **mêmes poids** (titre identique +6, marque +4, taille +4, payé moins cher +1 ; à égalité le plus récent), seuil à 4, top 6. Lit les commandes `orders_purchased` moissonnées, annulées/remboursées exclues.
+- **UI dans « Cette paire »** (`achatBloc`) : encart orange « Prix d'achat manquant » → bouton « 🔎 Retrouver dans mes achats » → liste avec photo, date relative, prix, pastille **« suggéré »** au-dessus de 8. Un tap relie. Champ de saisie manuelle en secours. Une fois relié : « Acheté X € · marge Y » + bouton « Changer ».
+- **Écriture** : ligne dédiée **`panel_buyprices`** (l'extension n'écrit jamais `main`, §35). `buildPanelData` la relit aussi pour afficher le prix tout de suite.
+- **Côté app** : effet gardé par `cloudReady` qui reporte chaque prix sur la paire via **`updatePair`** (donc le miroir `vinted_buyprice_by_num` est mis à jour aussi, §7). ⚠️ **N'écrase jamais un prix déjà saisi** — le panneau complète, il ne remplace pas.
+
+**Vérifié aux deux bancs** : panneau (3 candidats, 2 « suggéré », tap → `setBuyPrice{itemId,prix,tx,titre}`, saisie manuelle → 27 €, **0 erreur**) ; app (`dist` servi, `panel_buyprices` mocké → `vinted_annonce_numeros['77'].buyPrice === "18"`, **0 PAGEERROR** — les 3 lignes console sont le 400 volontaire de `select=owner` et les resets de fin de test).

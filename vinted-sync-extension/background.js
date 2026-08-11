@@ -413,6 +413,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // retrouver sur la nouvelle annonce (cf. marquerRepublie).
           if (msg.action === 'repubMarque') { const ok = await marquerRepublie(msg.id, msg.numero, msg.title); sendResponse({ ok }); return; }
           if (msg.action === 'photoBytes') { const r = await photoBytes(msg.url); sendResponse(r); return; }
+          if (msg.action === 'achatsPour') { const items = await achatsPour(msg.title, msg.price); sendResponse({ ok: true, items }); return; }
+          if (msg.action === 'setBuyPrice') { const ok = await setBuyPrice(msg.itemId, msg.prix, msg.tx, msg.titre); sendResponse({ ok }); return; }
           // LE COFFRE : tout ce qui est enregistré, texte + liens des photos.
           if (msg.action === 'coffre') {
             const rows = await sbGet('app_data?id=like.coffre_*&select=id,data') || [];
@@ -1407,6 +1409,76 @@ async function archiverLot(uid, items) {
   return await supabaseUpsert('app_data', out, 'id');
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LE PRIX D'ACHAT — le trou le plus coûteux des données
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré en base : **0 prix d'achat renseigné sur 177 paires**. Conséquence :
+// tout le calcul de bénéfice tourne avec un coût de ZÉRO — marge ~100 %,
+// « meilleure marque » sans valeur, rapport comptable qui sous-estime les
+// charges. L'app le signale, donc rien n'est faussement affirmé, mais les
+// chiffres restent inexploitables.
+// Pourquoi il n'est jamais saisi : il fallait retrouver la bonne paire parmi
+// ~700 achats listés par date. Ici on renverse le problème — on propose les
+// candidats les plus probables pendant qu'il REGARDE l'annonce sur Vinted.
+//
+// Score (repris de `openPicker` dans l'app, mêmes poids → mêmes suggestions) :
+//   titre identique +6 · même marque +4 · même taille +4 · payé moins cher +1
+//   à score égal, le plus récent d'abord.
+// ⚠️ On ne devine JAMAIS tout seul : on propose, il tape. Un mauvais prix
+//    d'achat fausse la compta plus sûrement qu'une case vide.
+const motsClés = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9À-ÿ ]/gi, ' ').split(/\s+/).filter(w => w.length > 2);
+function extraireTaille(t) {
+  const m = /\b(\d{2}(?:[.,]5)?)\b/.exec(String(t || ''));
+  return m ? m[1].replace(',', '.') : '';
+}
+async function achatsPour(titre, prixVente) {
+  const out = [];
+  try {
+    const rows = (await sbGet('app_data?id=like.harvest_*_orders_purchased*&select=id,data') || []);
+    const vus = new Set();
+    const tNorm = String(titre || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const marqueRef = motsClés(titre)[0] || '';
+    const tailleRef = extraireTaille(titre);
+    const pv = Number(prixVente);
+    for (const r of rows) {
+      for (const o of (((r.data || {}).payload || {}).my_orders || [])) {
+        const tx = String(o.transaction_id || '');
+        if (tx && vus.has(tx)) continue; if (tx) vus.add(tx);
+        const t = String(o.title || '');
+        if (!t) continue;
+        if (/annul|cancel|refus|rembours/i.test(String(o.status || ''))) continue;
+        const prix = Number((o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? NaN);
+        let s = 0;
+        if (t.toLowerCase().replace(/\s+/g, ' ').trim() === tNorm) s += 6;
+        const mots = motsClés(t);
+        if (marqueRef && mots.includes(marqueRef)) s += 4;
+        const taille = extraireTaille(t);
+        if (tailleRef && taille && taille === tailleRef) s += 4;
+        if (isFinite(prix) && isFinite(pv) && prix < pv) s += 1;
+        if (s < 4) continue;                       // en dessous, ce n'est plus une suggestion
+        const ts = o.date ? Date.parse(o.date) : 0;
+        out.push({ tx, title: t, prix: isFinite(prix) ? prix : null, ts: isNaN(ts) ? 0 : ts, score: s,
+                   photo: (o.photo && (o.photo.url || o.photo)) || null });
+      }
+    }
+  } catch (_) { return []; }
+  return out.sort((a, b) => (b.score - a.score) || (b.ts - a.ts)).slice(0, 6);
+}
+
+// Le prix d'achat choisi va dans une ligne DÉDIÉE : l'extension n'écrit jamais
+// `main` (§35), c'est l'app qui le reportera sur la paire.
+async function setBuyPrice(itemId, prix, tx, titre) {
+  const k = String(itemId || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_buyprices&select=data');
+  const cur = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+  const items = { ...cur };
+  const n = Number(String(prix).replace(',', '.'));
+  if (!isFinite(n) || n < 0) delete items[k];
+  else items[k] = { price: n, tx: tx ? String(tx) : '', title: String(titre || ''), t: Date.now() };
+  return await supabaseUpsert('app_data', [{ id: 'panel_buyprices', data: { items, majAt: new Date().toISOString() } }], 'id');
+}
+
 // Rapatrie une photo (CDN Vinted) en data: URL.
 // ⚠️ POURQUOI PAR LE BACKGROUND : dans une page, une image du CDN chargée dans
 // un <canvas> le rend « tainted » (cross-origin) et l'export devient interdit —
@@ -2043,6 +2115,16 @@ async function buildPanelData() {
   const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
   const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
   for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }
+  // Prix d'achat posés depuis le panneau (ligne dédiée) → visibles tout de suite,
+  // sans attendre que l'app les reporte sur la paire.
+  try {
+    const bRows = await sbGet('app_data?id=eq.panel_buyprices&select=data');
+    const bItems = (bRows && bRows[0] && bRows[0].data && bRows[0].data.items) || {};
+    for (const o of online) {
+      const b = bItems[String(o.id)];
+      if (b && o.buyPrice == null && isFinite(Number(b.price))) o.buyPrice = Number(b.price);
+    }
+  } catch (_) {}
   const offers = [];
   try {
     const nombre = (v) => {

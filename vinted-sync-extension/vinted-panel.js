@@ -853,6 +853,7 @@
         ${o.hasDesc ? '✅ description enregistrée' : '⏳ description en cours de lecture…'}
         ${o.nPhotos ? ` · 📷 ${o.nPhotos} photo${o.nPhotos > 1 ? 's' : ''} gardées` : ''}
       </div>${diag}
+      ${achatBloc(o)}
       ${minBloc(o)}
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
         <a class="vrm-link" href="https://www.vinted.fr/items/${esc(id)}/edit" target="_blank" rel="noreferrer" style="border:1px solid #09b1ba;background:#09b1ba;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:12px;text-decoration:none">✏️ Modifier sur Vinted ↗</a>
@@ -860,6 +861,53 @@
         ${o.numero ? `<button class="vrm-copy-line" data-c="N°${esc(o.numero)} · ${esc(o.title || '')}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier N° + titre</button>` : ''}
       </div>`;
     return card(o, extra);
+  }
+
+  // ── LE PRIX D'ACHAT, LÀ OÙ TU REGARDES L'ANNONCE ────────────────────────────
+  // Mesuré : 0 prix d'achat sur 177 paires — donc bénéfice, marge et rapport
+  // comptable tournent tous avec un coût de zéro. La raison n'est pas la
+  // paresse : il fallait retrouver la bonne paire parmi ~700 achats classés par
+  // date. Ici l'extension propose les candidats les plus probables (même marque,
+  // même taille, payé moins cher) pendant que tu es SUR l'annonce. Un tap.
+  // ⚠️ Rien n'est associé tout seul : un faux prix d'achat fausse la compta plus
+  //    sûrement qu'une case vide.
+  let achatCands = null, achatPour = null, achatBusy = false;
+  function achatBloc(o) {
+    if (o.buyPrice != null) {
+      const marge = (o.price != null) ? (Number(o.price) - Number(o.buyPrice)) : null;
+      return `<div class="vrm-card" style="margin-top:8px;padding:9px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="flex:1 1 130px;min-width:0">
+            <div style="font-weight:800;font-size:12.5px">Acheté ${fmt(o.buyPrice)}</div>
+            ${marge != null ? `<div class="vrm-m" style="font-size:11px">marge <b style="color:${marge >= 0 ? '#0f6b4f' : '#a33'}">${fmt(marge)}</b></div>` : ''}
+          </div>
+          <button class="vrm-achat-clear" data-id="${esc(o.id)}" style="flex-shrink:0;border:1px solid #dde;background:#fff;color:#556;border-radius:9px;padding:6px 10px;font:inherit;font-weight:700;font-size:11px;cursor:pointer">Changer</button>
+        </div>
+      </div>`;
+    }
+    const cands = (achatPour === String(o.id) && achatCands) ? achatCands : null;
+    const liste = cands === null ? `<button class="vrm-achat-go" data-id="${esc(o.id)}" data-t="${esc(o.title || '')}" data-p="${esc(String(o.price ?? ''))}" style="width:100%;border:none;background:#0f172a;color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${achatBusy ? '⏳ recherche…' : '🔎 Retrouver dans mes achats'}</button>`
+      : (!cands.length ? `<div class="vrm-m" style="font-size:11px">Aucun achat ne correspond (même marque / même taille). Saisis le prix à la main ci-dessous.</div>`
+      : cands.map(c => `
+        <button class="vrm-achat-pick" data-id="${esc(o.id)}" data-prix="${esc(String(c.prix ?? ''))}" data-tx="${esc(c.tx || '')}" data-titre="${esc(c.title || '')}"
+          style="width:100%;display:flex;gap:8px;align-items:center;text-align:left;border:1px solid ${c.score >= 8 ? '#0f6b4f' : '#dde'};background:#fff;border-radius:10px;padding:7px 8px;margin-bottom:5px;font:inherit;cursor:pointer">
+          ${c.photo ? `<img src="${esc(c.photo)}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover;flex-shrink:0">` : '<span style="width:34px;flex-shrink:0;text-align:center">👟</span>'}
+          <span style="flex:1 1 110px;min-width:0;overflow:hidden">
+            <span style="display:block;font-weight:600;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</span>
+            <span class="vrm-m" style="font-size:10.5px">${c.ts ? esc(timeago(c.ts)) : ''}${c.score >= 8 ? ' · <b style="color:#0f6b4f">suggéré</b>' : ''}</span>
+          </span>
+          <b style="flex-shrink:0;font-size:12.5px;color:#0f6b4f">${c.prix != null ? fmt(c.prix) : '?'}</b>
+        </button>`).join(''));
+    return `<div class="vrm-card" style="margin-top:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
+      <div style="font-weight:800;font-size:12.5px;color:#9a5b16;margin-bottom:5px">Prix d'achat manquant</div>
+      <div class="vrm-m" style="font-size:11px;margin-bottom:7px">Sans lui, la marge et le bénéfice de cette paire sont faux.</div>
+      ${liste}
+      <div style="display:flex;gap:6px;align-items:center;margin-top:7px">
+        <input class="vrm-achat-in" data-id="${esc(o.id)}" type="number" inputmode="decimal" min="0" step="0.5" placeholder="ou saisis le prix" style="flex:1 1 90px;min-width:0;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:13px">
+        <span class="vrm-m" style="flex-shrink:0">€</span>
+        <button class="vrm-achat-save" data-id="${esc(o.id)}" style="flex-shrink:0;border:none;background:#9a5b16;color:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">OK</button>
+      </div>
+    </div>`;
   }
 
   // ── PRIX MINIMUM ACCEPTÉ (par paire) ────────────────────────────────────────
@@ -1066,6 +1114,36 @@
           else { b.disabled = false; b.innerHTML = '❌ ' + ((r && r.error) || 'échec'); setTimeout(() => { try { b.innerHTML = b.dataset.lbl; } catch (_) {} }, 3500); }
         });
       };
+    });
+    // Prix d'achat : chercher, choisir, saisir, effacer.
+    const enregistrerAchat = (id, prix, tx, titre, btn) => {
+      const avant = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setBuyPrice', itemId: id, prix, tx, titre }, () => {
+        achatCands = null; achatPour = null; load();
+        if (btn) { btn.disabled = false; btn.textContent = avant; }
+      });
+    };
+    panel.querySelectorAll('.vrm-achat-go').forEach(b => {
+      b.onclick = () => {
+        achatBusy = true; achatPour = b.dataset.id; render();
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'achatsPour', title: b.dataset.t, price: b.dataset.p }, (r) => {
+          achatBusy = false; achatCands = (r && r.ok && r.items) || []; render();
+        });
+      };
+    });
+    panel.querySelectorAll('.vrm-achat-pick').forEach(b => {
+      b.onclick = () => enregistrerAchat(b.dataset.id, b.dataset.prix, b.dataset.tx, b.dataset.titre, b);
+    });
+    panel.querySelectorAll('.vrm-achat-save').forEach(b => {
+      b.onclick = () => {
+        const inp = panel.querySelector(`.vrm-achat-in[data-id="${b.dataset.id}"]`);
+        if (!inp || !String(inp.value).trim()) return;
+        enregistrerAchat(b.dataset.id, inp.value, '', '', b);
+      };
+    });
+    panel.querySelectorAll('.vrm-achat-clear').forEach(b => {
+      b.onclick = () => enregistrerAchat(b.dataset.id, '', '', '', b);
     });
     const minSave = panel.querySelector('#vrm-min-save');
     if (minSave) minSave.onclick = () => {
