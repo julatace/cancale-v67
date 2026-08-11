@@ -1722,12 +1722,107 @@
           ${c.price != null ? cp('📋 Prix', String(c.price)) : ''}
           ${cp('📋 Tout', tout)}
         </div>
-        ${(c.photos || []).length ? `<button class="vrm-coffre-photos" data-id="${esc(c.id)}" style="width:100%;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${svgi('eye', 14)} Ouvrir les ${(c.photos || []).length} photos (pour les réenregistrer)</button>` : ''}
+        ${(c.photos || []).length ? `
+          <div class="vrm-m" style="font-size:11px;margin-bottom:5px">Vinted refuse un fichier identique quand tu recrées l'annonce : recadre chaque photo avant de la redéposer.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+            ${(c.photos || []).map((u, i) => `
+              <div style="flex:0 0 auto;text-align:center">
+                <img src="${esc(u)}" alt="" style="width:56px;height:56px;border-radius:8px;object-fit:cover;display:block;background:#eee">
+                <button class="vrm-photo-edit" data-u="${esc(u)}" data-t="${esc(c.title || '')}" style="margin-top:3px;width:56px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:7px;padding:3px 0;font:inherit;font-weight:700;font-size:10px;cursor:pointer">✂️ ${i + 1}</button>
+              </div>`).join('')}
+          </div>
+          <button class="vrm-coffre-photos" data-id="${esc(c.id)}" style="width:100%;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${svgi('eye', 14)} Voir les ${(c.photos || []).length} photos en grand</button>` : ''}
         <a href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style="display:block;text-align:center;margin-top:6px;text-decoration:none;border:1px solid #0f6b4f;color:#0f6b4f;border-radius:9px;padding:9px;font-weight:800;font-size:12px">Recréer cette annonce sur Vinted ↗</a>
       </div>`;
   }
 
+  // ── RETOUCHER UNE PHOTO DU COFFRE ───────────────────────────────────────────
+  // Julien : « pour republier, je ne peux pas avoir les mêmes photos, même si
+  // c'est le même article ». Vinted refuse un fichier identique quand tu
+  // supprimes puis recrées — donc il faut RECOMPOSER l'image.
+  // Ce que fait cet éditeur : tu recadres, tu zoomes, tu redresses, TOI, photo
+  // par photo. Le résultat est une image réellement différente — et le plus
+  // souvent meilleure (cadrage plus serré sur la chaussure).
+  // ⚠️ Ce n'est PAS un outil qui retouche en masse : une photo à la fois, tes
+  // réglages, ton téléchargement. Même principe que l'éditeur déjà présent dans
+  // l'app (« ✂️ Retoucher une photo »).
+  function ouvrirEditeurPhoto(dataUrl, titre) {
+    const html = `<!doctype html><meta charset="utf-8"><title>Retoucher — ${esc(titre || '')}</title>
+<body style="margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#e8edf3">
+<div style="max-width:760px;margin:0 auto;padding:18px">
+  <h1 style="font-size:16px;margin:0 0 4px">Retoucher la photo</h1>
+  <p style="color:#9fb0c3;font-size:12.5px;margin:0 0 14px">Recadre et redresse comme tu veux, puis enregistre. Vinted refuse un fichier identique : une image recomposée passe, et un cadrage plus serré vend mieux.</p>
+  <canvas id="c" width="360" height="480" style="background:#fff;border-radius:12px;max-width:100%;touch-action:none;cursor:grab"></canvas>
+  <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+    <label style="font-size:12.5px">Zoom <input id="z" type="range" min="1" max="3" step="0.01" value="1" style="width:100%"></label>
+    <label style="font-size:12.5px">Luminosité <input id="b" type="range" min="0.6" max="1.6" step="0.01" value="1" style="width:100%"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="rot" style="flex:1 1 120px;border:1px solid #33455c;background:#1b2739;color:#e8edf3;border-radius:9px;padding:10px;font:inherit;font-weight:700;cursor:pointer">↻ Tourner 90°</button>
+      <button id="ratio" style="flex:1 1 120px;border:1px solid #33455c;background:#1b2739;color:#e8edf3;border-radius:9px;padding:10px;font:inherit;font-weight:700;cursor:pointer">Format : 3:4</button>
+      <button id="dl" style="flex:1 1 100%;border:none;background:#0f6b4f;color:#fff;border-radius:9px;padding:12px;font:inherit;font-weight:800;cursor:pointer">⬇ Enregistrer la photo</button>
+    </div>
+    <p style="color:#9fb0c3;font-size:11.5px;margin:0">Glisse l'image pour la déplacer. Puis dépose le fichier enregistré dans ta nouvelle annonce Vinted.</p>
+  </div>
+</div>
+<script>
+(function(){
+  var img=new Image(); var zoom=1,bright=1,rot=0,off={x:0,y:0},drag=null;
+  var RAT=[[3,4],[1,1],[4,3]], ri=0;
+  var c=document.getElementById('c'), ctx=c.getContext('2d');
+  function size(){ var w=360,h=Math.round(360*RAT[ri][1]/RAT[ri][0]); c.width=w; c.height=h; }
+  function draw(){
+    ctx.save(); ctx.clearRect(0,0,c.width,c.height);
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
+    if(img.naturalWidth){
+      try{ ctx.filter='brightness('+bright+')'; }catch(e){}
+      var iw=img.naturalWidth, ih=img.naturalHeight;
+      if(rot%180!==0){ var t=iw; iw=ih; ih=t; }
+      var s=Math.max(c.width/iw, c.height/ih)*zoom;
+      ctx.translate(c.width/2+off.x, c.height/2+off.y);
+      ctx.rotate(rot*Math.PI/180);
+      ctx.drawImage(img, -img.naturalWidth*s/2, -img.naturalHeight*s/2, img.naturalWidth*s, img.naturalHeight*s);
+    }
+    ctx.restore();
+  }
+  img.onload=function(){ size(); draw(); };
+  img.src=${JSON.stringify(dataUrl)};
+  document.getElementById('z').oninput=function(e){ zoom=+e.target.value; draw(); };
+  document.getElementById('b').oninput=function(e){ bright=+e.target.value; draw(); };
+  document.getElementById('rot').onclick=function(){ rot=(rot+90)%360; draw(); };
+  document.getElementById('ratio').onclick=function(e){ ri=(ri+1)%RAT.length; e.target.textContent='Format : '+RAT[ri][0]+':'+RAT[ri][1]; size(); draw(); };
+  c.addEventListener('pointerdown',function(e){ drag={x:e.clientX-off.x,y:e.clientY-off.y}; c.setPointerCapture(e.pointerId); c.style.cursor='grabbing'; });
+  c.addEventListener('pointermove',function(e){ if(!drag)return; off={x:e.clientX-drag.x,y:e.clientY-drag.y}; draw(); });
+  c.addEventListener('pointerup',function(){ drag=null; c.style.cursor='grab'; });
+  document.getElementById('dl').onclick=function(){
+    var big=document.createElement('canvas'); var k=3;
+    big.width=c.width*k; big.height=c.height*k;
+    var bx=big.getContext('2d'); bx.scale(k,k);
+    var old=ctx; ctx=bx; draw(); ctx=old; draw();
+    big.toBlob(function(bl){
+      var u=URL.createObjectURL(bl); var a=document.createElement('a');
+      a.href=u; a.download='photo-vrm-'+Date.now()+'.jpg'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(u); },20000);
+    },'image/jpeg',0.92);
+  };
+})();
+<\/script></body>`;
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
+  }
+
   function wireCoffre() {
+    panel.querySelectorAll('.vrm-photo-edit').forEach(b => {
+      b.onclick = () => {
+        const avant = b.textContent;
+        b.disabled = true; b.textContent = '⏳';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'photoBytes', url: b.dataset.u }, (r) => {
+          b.disabled = false; b.textContent = avant;
+          if (r && r.ok && r.dataUrl) ouvrirEditeurPhoto(r.dataUrl, b.dataset.t || '');
+          else { b.textContent = '❌ ' + ((r && r.error) || 'échec'); setTimeout(() => { try { b.textContent = avant; } catch (_) {} }, 2500); }
+        });
+      };
+    });
     const s = panel.querySelector('#vrm-coffre-search');
     if (s) s.oninput = () => { coffreQuery = s.value; render(); setTimeout(() => { const n = panel.querySelector('#vrm-coffre-search'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 0); };
     panel.querySelectorAll('.vrm-coffre-row').forEach(r => { r.onclick = () => { coffreOuvert = r.dataset.id; render(); }; });

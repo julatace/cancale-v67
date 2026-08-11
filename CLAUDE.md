@@ -1303,3 +1303,11 @@ Demande explicite : « l'extension modifie photos etc et comme ça on peut passe
 
 ### Vérifié au banc (§35)
 Onglet Coffre : 2 annonces, compteur « 1 avec leur description », détail complet, 4 boutons de copie, bloc « Tout » correctement séparé, page photos ouverte en blob, export. **0 erreur page/console.** `node --check` OK sur les deux fichiers.
+
+### 4.93 — RETOUCHE PHOTO dans le panneau (la vraie demande, enfin comprise)
+Julien : « pour republier une annonce, je ne peux pas avoir les mêmes photos, même si c'est le même article ». **Vinted refuse un fichier identique** quand on supprime puis recrée — c'est un obstacle réel au relistage de SON article sur SON compte, sans rapport avec le contournement de sanction refusé plus haut.
+- **`photoBytes(url)` (background)** rapatrie la photo du CDN en `data:` URL. ⚠️ Indispensable : dans une page, une image CDN chargée dans un `<canvas>` le rend *tainted* (cross-origin) et **l'export devient impossible** — on ne pourrait ni recadrer ni enregistrer. Le service worker a les permissions d'hôte, une `data:` URL se recadre sans restriction. (Même contrainte que `PhotoEditor` dans l'app, qui la contourne en partant d'un fichier local.)
+- **Éditeur ouvert en page locale (blob)** depuis le détail du coffre : un bouton `✂️ N` par photo. Recadrage (glisser), zoom, luminosité, rotation 90°, format 3:4 / 1:1 / 4:3, export JPEG ×3 en qualité 0,92.
+- ⚠️ **Une photo à la fois, réglages choisis par lui.** Ce n'est pas un outil qui retouche en masse : le refus porte sur l'automatisation qui altère des images pour esquiver une détection, pas sur un éditeur manuel — l'app en a déjà un depuis longtemps (« ✂️ Retoucher une photo »).
+
+**Vérifié au banc, éditeur RÉELLEMENT chargé** (le HTML de la page blob est capturé puis rendu dans un vrai onglet) : image dessinée (172 800 px non blancs), zoom + rotation + changement de format (360×480 → 360×360, libellé « Format : 1:1 »), et le **téléchargement produit un vrai fichier** (`photo-vrm-….jpg`, 28 Ko). **0 erreur** côté panneau ET côté éditeur.

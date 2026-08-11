@@ -412,6 +412,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Tu viens de republier une paire : on retient son N° pour le
           // retrouver sur la nouvelle annonce (cf. marquerRepublie).
           if (msg.action === 'repubMarque') { const ok = await marquerRepublie(msg.id, msg.numero, msg.title); sendResponse({ ok }); return; }
+          if (msg.action === 'photoBytes') { const r = await photoBytes(msg.url); sendResponse(r); return; }
           // LE COFFRE : tout ce qui est enregistré, texte + liens des photos.
           if (msg.action === 'coffre') {
             const rows = await sbGet('app_data?id=like.coffre_*&select=id,data') || [];
@@ -1404,6 +1405,27 @@ async function archiverLot(uid, items) {
   }
   if (!out.length) return true;
   return await supabaseUpsert('app_data', out, 'id');
+}
+
+// Rapatrie une photo (CDN Vinted) en data: URL.
+// ⚠️ POURQUOI PAR LE BACKGROUND : dans une page, une image du CDN chargée dans
+// un <canvas> le rend « tainted » (cross-origin) et l'export devient interdit —
+// on ne pourrait ni recadrer ni enregistrer. Le service worker, lui, a les
+// permissions d'hôte : il récupère les octets, et une data: URL se recadre sans
+// aucune restriction.
+async function photoBytes(url) {
+  try {
+    if (!/^https:/i.test(String(url || ''))) return { ok: false };
+    const res = await fetch(url);
+    if (!res.ok) return { ok: false, error: `image ${res.status}` };
+    const buf = await res.arrayBuffer();
+    if (!buf.byteLength || buf.byteLength > 12000000) return { ok: false, error: 'image trop lourde' };
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const mime = res.headers.get('content-type') || 'image/jpeg';
+    return { ok: true, dataUrl: `data:${mime};base64,${btoa(bin)}` };
+  } catch (e) { return { ok: false, error: String(e).slice(0, 60) }; }
 }
 
 // ── CAPTER LA FICHE D'UNE ANNONCE (pour pouvoir la republier) ───────────────
