@@ -1449,3 +1449,17 @@ La 5.05 ne groupait que par **titre strictement identique**. Or le cas le plus d
 ⚠️ **La suppression reste manuelle** (§5.05, raison inchangée : irréversible, sans confirmation Vinted). Le panneau ouvre l'annonce, Julien clique.
 
 **Vérifié au banc** (paire à titre identique + paire à même N° et titres différents) : « 2 annonces à retirer », 2 × « à garder » / 2 × « à supprimer », les bonnes gardées (N°1 · 45 j · 👁 120 · ❤️ 5 conservée face à N°9 · 1 j · 👁 3). **0 erreur.**
+
+### 5.07 — REPUBLIER : les 4 gestes sur la MÊME carte (et l'ancienne qu'on n'oublie plus)
+Republier chez Vinted = **supprimer + recréer** (§46). Ça demande quatre gestes, et ils étaient **éparpillés** : le texte dans le défilement, les photos dans l'onglet Coffre, le formulaire pré-rempli ailleurs encore, et la suppression de l'ancienne **nulle part** — d'où les annonces en double que 5.05/5.06 rattrapent *après coup*. Tout est maintenant sur la carte de la paire en cours, numéroté 1→4 (`etapeRepub`).
+
+1. **Récupérer le texte** — `kitRepub` + `gabaritBloc` (existants), regroupés.
+2. **Préparer les photos** — `photosRepub(o)` : le bouton `preparerPhotos` (§5.03, recadrage 1200×1600) était **enfoui dans le Coffre** alors que c'est LE goulot. Il est là où on republie. ⚠️ Rapprochement **par ID d'annonce uniquement** (identité certaine, §24) — jamais par titre : préparer les photos d'une autre paire serait pire que rien. Pas de fiche au coffre → message honnête, **aucun bouton**.
+3. **Recréer l'annonce** — `recreerRepub(o)` arme `vrm_depot` et ouvre `/items/new` : le dépôt assisté (§5.04) part maintenant **directement de la file de republication**. Le coffre prime (seul à porter la description), l'annonce en ligne complète ce qui manque, rien n'est inventé.
+4. **Supprimer l'ancienne** — le rappel chiffré (« deux annonces avec le même N°7 ») + lien vers l'ancienne. ⚠️ La suppression reste SON clic sur Vinted (§5.05 : irréversible, sans confirmation Vinted).
+
+**« ✓ Republiée » demande maintenant une confirmation, et la question posée est la bonne** : *« L'ancienne est supprimée ? Confirmer »* (armement 8 s, `repubArm`). Marquer une paire republiée alors que l'ancienne est toujours en ligne, c'est exactement le doublon de numéro de §19. Le bouton « Ouvrir sur Vinted » a disparu : l'étape 4 ouvre déjà la même annonce.
+
+`wirePhotosEtDepot()` = **une seule définition** des boutons « préparer les photos » / « armer le dépôt », câblée depuis Republier ET depuis le Coffre (avant, `wireCoffre` avait sa propre copie).
+
+**Vérifié au banc** (§35) : les 4 étapes rendues dans l'ordre ; « 📦 Préparer les 2 photos » → 2 `photoBytes` + « ✓ 2 photos prêtes » ; dépôt armé avec titre/description/prix/marque/taille exacts + `/items/new` ouvert ; étape 4 = lien vers l'ancienne + « avec le même N° (N°7) » ; 1ᵉʳ clic sur ✓ Republiée → **0 envoi**, libellé « L'ancienne est supprimée ? Confirmer », 2ᵉ clic → `repubMarque` correct ; paire absente du coffre → message honnête, **0 bouton photos**. **0 erreur page/console.**

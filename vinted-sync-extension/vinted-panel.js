@@ -58,6 +58,10 @@
   // un simple état mémoire ne suivrait pas.
   let msgModele = readLS('vrm_msg_modele', '');
   let repubQuery = ''; // filtre texte de la liste Republier (gardé entre rendus)
+  // « ✓ Republiée » demande une confirmation, et la question posée est CELLE qui
+  // compte : l'ancienne annonce est-elle supprimée ? C'est le geste qu'on oublie
+  // (§5.05), et l'oublier met deux paires sur le même numéro.
+  let repubArm = null, repubArmT = 0;
   // ── Mémoire LOCALE des republications faites (par appareil, PAS d'action Vinted) :
   //    {id: timestamp}. Sert à ne jamais te faire refaire une paire déjà republiée
   //    récemment, à montrer ta progression, et à ranger en bas ce qui est fait.
@@ -2328,15 +2332,7 @@
       df.textContent = n ? `✓ ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''} — relis et publie` : '❌ champs introuvables — utilise les boutons copier';
       setTimeout(() => { try { df.textContent = '✍️ Remplir le formulaire'; } catch (_) {} }, 4000);
     };
-    panel.querySelectorAll('.vrm-prep-photos').forEach(b => {
-      b.onclick = () => {
-        const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));
-        if (!c || !(c.photos || []).length) return;
-        b.disabled = true;
-        const nom = (c.title || 'annonce').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'annonce';
-        preparerPhotos(c.photos, nom, b).then(() => { setTimeout(() => { try { b.disabled = false; render(); } catch (_) {} }, 2500); });
-      };
-    });
+    wirePhotosEtDepot();   // « 📦 Préparer les photos » — même bouton qu'en Republier
     panel.querySelectorAll('.vrm-coffre-photos').forEach(b => {
       b.onclick = () => {
         const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));
@@ -2554,6 +2550,61 @@
     </div>`;
   }
 
+  // ── LES 4 ÉTAPES D'UNE REPUBLICATION, SUR LA MÊME CARTE ─────────────────────
+  // Republier chez Vinted = supprimer + recréer (§46). Ça demande quatre gestes,
+  // et jusqu'ici ils étaient éparpillés : le texte ici, les photos dans le
+  // Coffre, le formulaire ailleurs, et la suppression de l'ancienne nulle part
+  // — d'où les annonces en double que la 5.05/5.06 doit rattraper après coup.
+  // Tout est maintenant sur la carte de la paire en cours, dans l'ordre.
+  const coffrePour = (o) => (coffre || []).find(c => String(c.id) === String(o && o.id)) || null;
+  const nomFichier = (t) => (String(t || 'annonce').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'annonce');
+  function etapeRepub(n, titre, corps, faite) {
+    return `<div class="vrm-card" style="margin-top:8px;padding:9px">
+      <div style="display:flex;gap:7px;align-items:center;margin-bottom:6px">
+        <span style="flex-shrink:0;width:19px;height:19px;border-radius:999px;background:${faite ? '#0f6b4f' : '#0f172a'};color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">${faite ? '✓' : n}</span>
+        <span style="font-weight:800;font-size:12.5px">${titre}</span>
+      </div>
+      ${corps}
+    </div>`;
+  }
+  // Étape 2 — LES PHOTOS. C'est le vrai goulot (§5.03) : Vinted refuse un
+  // fichier identique, donc chaque image doit être recomposée. Le bouton était
+  // enfoui dans le Coffre ; il est maintenant là où on republie.
+  // ⚠️ Rapprochement par ID d'annonce UNIQUEMENT (identité certaine, §24) :
+  //    jamais par titre — préparer les photos d'une AUTRE paire serait pire que
+  //    de ne rien proposer.
+  function photosRepub(o) {
+    if (coffre == null) {
+      if (!coffreBusy) { coffreBusy = true; chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'coffre' }, (r) => { coffreBusy = false; coffre = (r && r.ok && r.items) || []; render(); }); }
+      return `<div class="vrm-m" style="font-size:11px">Ouverture du coffre…</div>`;
+    }
+    const c = coffrePour(o);
+    const n = ((c && c.photos) || []).length;
+    if (!n) {
+      return `<div class="vrm-m" style="font-size:11px">Les photos de cette paire ne sont pas encore au coffre. Elles y arrivent toutes seules quand ton dressing se charge — repasse sur ta boutique Vinted, ou enregistre-les depuis l'annonce.</div>`;
+    }
+    return `<div class="vrm-m" style="font-size:11px;margin-bottom:6px">Vinted refuse un fichier identique quand tu recrées : les ${n} photos ressortent <b>recadrées en 1200×1600</b>, numérotées dans l'ordre, prêtes à glisser.</div>
+      <button class="vrm-prep-photos" data-id="${esc(c.id)}" style="width:100%;border:none;background:#0f6b4f;color:#fff;border-radius:9px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer">📦 Préparer les ${n} photo${n > 1 ? 's' : ''}</button>`;
+  }
+  // Étape 3 — LE FORMULAIRE. Le contenu part dans `vrm_depot` et le panneau le
+  // pose dans les champs sur /items/new (§5.04). Le coffre prime (il a la
+  // description) ; sinon on repart de ce qu'on connaît de l'annonce en ligne.
+  function recreerRepub(o) {
+    const c = coffrePour(o);
+    const desc = (c && c.desc) || o.desc || '';
+    return `<div class="vrm-m" style="font-size:11px;margin-bottom:6px">Ouvre le dépôt avec ${desc ? 'le titre, la description et le prix' : 'le titre et le prix'} déjà prêts. Marque, taille et catégorie restent à choisir dans les menus Vinted — <b>et c'est toi qui publies</b>.</div>
+      <button class="vrm-depot-repub" data-id="${esc(o.id)}" style="width:100%;border:1px solid #0f6b4f;background:#fff;color:#0f6b4f;border-radius:9px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer">✍️ Recréer l'annonce sur Vinted ↗</button>`;
+  }
+  // Étape 4 — SUPPRIMER L'ANCIENNE. Julien : « quand je republie, l'ancienne
+  // doit être supprimée, c'est impératif » — sinon deux annonces portent le même
+  // N° et la mauvaise chaussure part à l'expédition (§19, §5.05).
+  // ⚠️ La suppression reste SON clic sur Vinted : elle est irréversible et sans
+  //    confirmation côté Vinted. On la rappelle au bon moment, on ne la fait pas.
+  function supprimerRepub(o) {
+    return `<div class="vrm-m" style="font-size:11px;margin-bottom:6px">Sans ça, deux annonces identiques restent en ligne <b>avec le même N°${o.numero ? ` (N°${esc(o.numero)})` : ''}</b> : elles se partagent les vues, et au moment d'expédier tu ne sais plus laquelle est dans la boîte.</div>
+      ${o.url ? `<a href="${esc(o.url)}" target="_blank" rel="noopener" style="display:block;text-align:center;border:1px solid #b42318;background:#fff;color:#b42318;border-radius:9px;padding:10px;font-weight:800;font-size:12.5px;text-decoration:none">Ouvrir l'ancienne pour la supprimer ↗</a>` : ''}`;
+  }
+
   function renderRepublier() {
     const list = (DATA && DATA.online) || [];
     if (!list.length) return `<div class="vrm-m">Aucune annonce en ligne captée pour l'instant. Ouvre ta boutique Vinted une fois pour les capter.</div>`;
@@ -2574,14 +2625,15 @@
       return `
         <div class="vrm-m" style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px"><span>Annonce <b>${done + 1}</b> / ${total}</span><span style="opacity:.7">${done} republiée${done > 1 ? 's' : ''}</span></div>
         <div style="height:7px;border-radius:999px;background:#e6eaee;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${pct}%;border-radius:999px;background:#09b1ba;transition:width .3s"></div></div>
-        <div class="vrm-m" style="margin-bottom:8px">Ouvre-la, <b>republie-la sur Vinted</b>, puis marque <b>✓ Republiée</b>.</div>
+        <div class="vrm-m" style="margin-bottom:8px">Les 4 gestes d'une republication, dans l'ordre. <b>Tout se fait depuis cette carte.</b></div>
         ${card(o, `${o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : ''}${marketNote(o)}<div style="margin-top:7px">${editLink(o.id)}</div>`)}
         ${alerteMomentum(o)}
-        ${kitRepub(o)}
-        ${gabaritBloc(o)}
-        <button class="vrm-go" data-act="open" style="width:100%;margin-top:8px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
-        <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="vrm-go" data-act="done" style="flex:2;border:none;background:#0f6b4f;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">✓ Republiée</button>
+        ${etapeRepub(1, 'Récupérer le texte', `${kitRepub(o)}${gabaritBloc(o)}`)}
+        ${etapeRepub(2, 'Préparer les photos', photosRepub(o))}
+        ${etapeRepub(3, 'Recréer l\'annonce', recreerRepub(o))}
+        ${etapeRepub(4, 'Supprimer l\'ancienne', supprimerRepub(o))}
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="vrm-go" data-act="done" style="flex:2;border:none;background:${repubArm === String(o.id) ? '#b42318' : '#0f6b4f'};color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">${repubArm === String(o.id) ? 'L\'ancienne est supprimée ? Confirmer' : '✓ Republiée'}</button>
           <button class="vrm-go" data-act="next" style="flex:1;border:1px solid #dde;background:#fff;color:#556;border-radius:10px;padding:9px;font-weight:700;cursor:pointer">Passer</button>
         </div>
         <div style="text-align:center;margin-top:8px"><button class="vrm-go" data-act="stop" style="border:none;background:transparent;color:#889;font-size:11.5px;cursor:pointer;text-decoration:underline">Arrêter</button></div>`;
@@ -2678,8 +2730,49 @@
         else if (act === 'start') { if (!repubSel.size) return; repubRun = { queue: list.filter(o => repubSel.has(o.id)).map(o => o.id), idx: 0 }; render(); }
         else if (act === 'stop') { repubRun = null; render(); }
         else if (act === 'open') { const o = DATA.byId[repubRun.queue[repubRun.idx]]; if (o && o.url) window.open(o.url, '_blank', 'noopener'); }
-        else if (act === 'done') { const id = repubRun && repubRun.queue[repubRun.idx]; if (id) { markRepub(id); repubSel.delete(String(id)); } repubRun.idx++; render(); }
-        else if (act === 'next') { repubRun.idx++; render(); }
+        else if (act === 'done') {
+          // 1er clic = on ARME et on demande si l'ancienne est supprimée ;
+          // 2e clic = on valide. Une paire marquée « republiée » alors que
+          // l'ancienne est toujours en ligne, c'est le doublon de numéro.
+          const id = repubRun && repubRun.queue[repubRun.idx];
+          if (!id) return;
+          if (repubArm !== String(id) || Date.now() - repubArmT > 8000) { repubArm = String(id); repubArmT = Date.now(); render(); return; }
+          repubArm = null; markRepub(id); repubSel.delete(String(id)); repubRun.idx++; render();
+        }
+        else if (act === 'next') { repubArm = null; repubRun.idx++; render(); }
+      };
+    });
+    wirePhotosEtDepot();
+  }
+
+  // Les étapes 2 et 3 réutilisent les boutons du Coffre (préparer les photos,
+  // armer le dépôt) : une seule définition, câblée depuis les deux onglets.
+  function wirePhotosEtDepot() {
+    panel.querySelectorAll('.vrm-prep-photos').forEach(b => {
+      b.onclick = () => {
+        const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));
+        if (!c || !(c.photos || []).length) return;
+        b.disabled = true;
+        preparerPhotos(c.photos, nomFichier(c.title), b).then(() => { setTimeout(() => { try { b.disabled = false; render(); } catch (_) {} }, 2500); });
+      };
+    });
+    panel.querySelectorAll('.vrm-depot-repub').forEach(b => {
+      b.onclick = () => {
+        const o = (DATA && DATA.byId && DATA.byId[b.dataset.id]) || null;
+        const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));
+        if (!o && !c) return;
+        // Le coffre prime (seul à porter la description) ; l'annonce en ligne
+        // complète ce qui manque. Rien n'est inventé : que du déjà capté.
+        writeLS('vrm_depot', JSON.stringify({
+          title: (c && c.title) || (o && o.title) || '',
+          desc: (c && c.desc) || (o && o.desc) || '',
+          price: (c && c.price != null) ? c.price : (o ? o.price : null),
+          brand: (c && c.brand) || (o && o.brand) || '',
+          size: (c && c.size) || (o && o.size) || '',
+          etat: (c && c.etat) || (o && o.etat) || '',
+        }));
+        window.open('https://www.vinted.fr/items/new', '_blank', 'noopener');
+        b.textContent = '✓ ouvert — le panneau remplira le formulaire';
       };
     });
   }
