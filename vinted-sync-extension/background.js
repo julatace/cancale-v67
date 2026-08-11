@@ -2137,6 +2137,31 @@ async function buildPanelData() {
     }
   } catch (_) { momentVente = null; }
 
+  // ── SANTÉ DE LA CAPTURE, compte par compte ──────────────────────────────────
+  // Jusqu'ici, savoir « est-ce que ça capte ? » demandait d'aller lire la base à
+  // la main. Ça se voit maintenant dans le panneau : par compte, la date de la
+  // dernière moisson de chaque type. Un compte muet (session expirée) saute aux
+  // yeux au lieu de se traduire par des écrans vides inexpliqués.
+  const sante = [];
+  try {
+    const age = (iso) => { const t = Date.parse(iso || ''); return isNaN(t) ? null : t; };
+    const parUid = {};
+    const noter = (rows, cle) => {
+      for (const r of (rows || [])) {
+        const uid = String((r.data && r.data.uid) || '');
+        if (!uid) continue;
+        (parUid[uid] = parUid[uid] || {})[cle] = age(r.data && r.data.capturedAt);
+      }
+    };
+    noter(lst, 'annonces'); noter(soldRows, 'ventes'); noter(buyRows, 'achats'); noter(inboxRows, 'messages');
+    for (const a of accounts) {
+      const p = parUid[String(a.uid)] || {};
+      sante.push({ uid: a.uid, name: a.name, off: a.off, online: a.online,
+                   annonces: p.annonces || null, ventes: p.ventes || null,
+                   achats: p.achats || null, messages: p.messages || null });
+    }
+  } catch (_) { /* diagnostic : ne doit jamais gêner le reste */ }
+
   const renumSuggest = [];
   try {
     const pRows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
@@ -2306,7 +2331,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

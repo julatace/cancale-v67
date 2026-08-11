@@ -1336,3 +1336,10 @@ Rappel du constat (§22) : **0 prix d'achat sur 177 paires** → bénéfice, mar
 **Garde-fou momentum** (`alerteMomentum`, idée #17) : dans le défilement Republier, une annonce à ≥ 2 favoris ou ≥ 40 vues affiche un avertissement chiffré — republier la remet à zéro et les gens qui l'ont mise en favori la perdent de vue. Oriente vers la bonne action : **remise aux favoris** s'il y en a, **baisse de prix** si c'est très vu et peu mis en favori. ⚠️ On n'interdit rien : on met le chiffre sous les yeux avant un geste irréversible.
 
 **Vérifié au banc** : alerte rendue (« 5 favoris et 120 vues… propose-leur plutôt une remise »), **0 erreur**.
+
+### 4.97 — « paire qui dort » sur la page + écran Santé de la capture
+- **Badge d'annonce** : passe en orange et affiche « 😴 en ligne depuis X j » au-delà de 30 jours. Le signal arrive **sur la page de l'annonce**, au moment où l'action (baisser / republier) est possible.
+- **`sante` (background)** : par compte, date de la dernière moisson de chaque type (annonces / ventes / achats / messages), lue sur `capturedAt` des lignes déjà chargées → **aucune requête ajoutée**. Rendu en tête du Coffre : vert < 2 j, orange < 7 j, rouge au-delà ; un compte sans aucune capture affiche « la session a sans doute expiré, ouvre Vinted avec ce compte ».
+Ça retire la dépendance à une lecture manuelle de la base pour répondre à « est-ce que ça capte ? ».
+
+**Vérifié au banc** : badge orange avec l'ancienneté, santé rendue (frais 1 h / 2 j / jamais / 20 j) + compte muet détecté. **0 erreur.**

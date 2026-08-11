@@ -887,8 +887,13 @@
         document.documentElement.appendChild(badgeEl);
       }
       const marge = (o.buyPrice != null && o.price != null) ? (Number(o.price) - Number(o.buyPrice)) : null;
+      // Une paire qui dort se signale ICI, sur sa propre page : c'est le moment
+      // où tu peux agir (baisser, republier), pas trois écrans plus loin.
+      const dort = o.ageDays != null && o.ageDays >= 30;
+      badgeEl.style.background = dort ? '#9a5b16' : '#0f172a';
       badgeEl.innerHTML = `<span style="font-size:15px;font-weight:800">N°${esc(o.numero)}</span>`
         + (o.cell ? `<span style="opacity:.85"> · 🏠 ${esc(o.cell)}</span>` : '')
+        + (dort ? `<div style="font-size:11px;font-weight:700;margin-top:1px">😴 en ligne depuis ${o.ageDays} j</div>` : '')
         + (marge != null ? `<div style="font-size:11px;opacity:.8;margin-top:1px">marge ${esc(fmt(marge))}</div>`
                          : `<div style="font-size:11px;opacity:.8;margin-top:1px">achat ?</div>`);
     } catch (_) {}
@@ -1795,6 +1800,34 @@
   // affiche pour que tu les réenregistres.
   // Le bouton de sauvegarde des numéros — défini une fois, utilisé dans le
   // coffre plein ET dans le coffre vide.
+  // ── SANTÉ DE LA CAPTURE ─────────────────────────────────────────────────────
+  // « Est-ce que ça capte ? » se voit ici, compte par compte, au lieu d'aller
+  // lire la base. Un compte muet = session expirée : repasse dessus sur Vinted.
+  function santeBloc() {
+    const list = (DATA && DATA.sante) || [];
+    if (!list.length) return '';
+    const jour = 86400000;
+    const etat = (t) => {
+      if (!t) return { txt: 'jamais', c: '#a33' };
+      const j = (Date.now() - t) / jour;
+      return { txt: timeago(t), c: j < 2 ? '#0f6b4f' : j < 7 ? '#9a5b16' : '#a33' };
+    };
+    const ligne = (s) => {
+      const cases = [['annonces', s.annonces], ['ventes', s.ventes], ['achats', s.achats], ['messages', s.messages]];
+      const muet = cases.every(([, t]) => !t);
+      return `<div class="vrm-card" style="margin-bottom:6px;padding:8px${s.off ? ';opacity:.5' : ''}">
+        <div style="font-weight:700;font-size:12.5px">${esc(s.name || ('compte ' + String(s.uid).slice(-4)))}${s.off ? ' <span class="vrm-m">(masqué)</span>' : ''}${s.online ? ` <span class="vrm-m">· ${s.online} en ligne</span>` : ''}</div>
+        ${muet ? `<div class="vrm-m" style="font-size:11px;color:#a33;margin-top:3px">Rien de capté. La session a sans doute expiré : ouvre Vinted avec ce compte une fois.</div>`
+               : cases.map(([lbl, t]) => { const e = etat(t); return `<div class="vrm-m" style="display:flex;justify-content:space-between;gap:8px;font-size:11px"><span>${lbl}</span><b style="color:${e.c}">${esc(e.txt)}</b></div>`; }).join('')}
+      </div>`;
+    };
+    return `<div style="margin-bottom:10px">
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">Santé de la capture</div>
+      ${list.map(ligne).join('')}
+      <div class="vrm-m" style="font-size:10.5px;opacity:.8">Vert = frais du jour · orange = quelques jours · rouge = à réveiller.</div>
+    </div>`;
+  }
+
   const boutonSaveNums = () => `<button id="vrm-save-nums" title="Tes numéros de boîte et prix d'achat, dans un fichier" style="flex:1 1 150px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:8px;font:inherit;font-weight:700;font-size:12px;cursor:pointer">${svgi('hash', 14)} Sauvegarder mes N°</button>`;
 
   function renderCoffre() {
@@ -1806,7 +1839,7 @@
       // ⚠️ La sauvegarde des N° reste proposée : elle ne dépend pas du coffre
       // (elle lit tes numéros dans l'app), et c'est justement quand tout est
       // vide qu'on a envie d'un filet.
-      return `<div class="vrm-m" style="margin-bottom:10px">Le coffre est encore vide.<br><br>Il se remplit tout seul en naviguant : dès que ton dressing se charge, chaque annonce en ligne y est enregistrée (titre, prix, marque, taille, photo). La <b>description</b> arrive quand tu ouvres l'annonce, ou avec le bouton « Récupérer le texte » de l'onglet Republier.</div>
+      return `${santeBloc()}<div class="vrm-m" style="margin-bottom:10px">Le coffre est encore vide.<br><br>Il se remplit tout seul en naviguant : dès que ton dressing se charge, chaque annonce en ligne y est enregistrée (titre, prix, marque, taille, photo). La <b>description</b> arrive quand tu ouvres l'annonce, ou avec le bouton « Récupérer le texte » de l'onglet Republier.</div>
         ${boutonSaveNums()}`;
     }
     const q = coffreQuery.trim().toLowerCase();
@@ -1826,6 +1859,7 @@
         <span class="vrm-m" style="flex-shrink:0;font-size:11px">${(c.photos || []).length} 📷</span>
       </div>`;
     return `
+      ${santeBloc()}
       <div class="vrm-m" style="margin-bottom:8px"><b>${coffre.length}</b> annonce${coffre.length > 1 ? 's' : ''} enregistrée${coffre.length > 1 ? 's' : ''} · ${avecTexte} avec leur description.<br>Même si une annonce disparaît de Vinted, elle reste ici.</div>
       ${coffre.length > 8 ? `<input id="vrm-coffre-search" type="search" value="${esc(coffreQuery)}" placeholder="🔍 Chercher dans le coffre…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px">` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
