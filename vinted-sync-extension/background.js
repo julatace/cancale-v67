@@ -415,6 +415,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'photoBytes') { const r = await photoBytes(msg.url); sendResponse(r); return; }
           // Ce que Vinted peut voir de TOI, rendu visible pour que tu le pilotes.
           if (msg.action === 'empreinte') { const r = await empreinte(); sendResponse({ ok: true, ...r }); return; }
+          // Gabarit de description (ce que les autres extensions appellent
+          // « template ») : ton texte type, avec des variables remplies depuis
+          // les vraies caractéristiques de la paire. Aucune requête Vinted.
+          if (msg.action === 'gabarit') {
+            if (msg.set != null) {
+              await supabaseUpsert('app_data', [{ id: 'panel_gabarit', data: { texte: String(msg.set).slice(0, 4000), majAt: new Date().toISOString() } }], 'id');
+              sendResponse({ ok: true });
+              return;
+            }
+            const rows = await sbGet('app_data?id=eq.panel_gabarit&select=data');
+            sendResponse({ ok: true, texte: (rows && rows[0] && rows[0].data && rows[0].data.texte) || '' });
+            return;
+          }
           // Sauvegarde de tes numéros (et du garage) : lecture seule de `main`.
           // Si un jour la ligne cloud est perdue, c'est ce fichier qui te sauve —
           // le numéro est ce qu'il y a d'écrit sur la boîte, ça ne se recalcule pas.

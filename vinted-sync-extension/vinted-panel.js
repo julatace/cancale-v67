@@ -1120,6 +1120,16 @@
     // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
     panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });
     // Aller chercher le texte d'une annonce (lecture de ta propre annonce).
+    const gt = panel.querySelector('#vrm-gab');
+    if (gt) gt.oninput = () => { gabarit = gt.value; };   // pas de re-render : on garde le focus
+    const gs = panel.querySelector('#vrm-gab-save');
+    if (gs) gs.onclick = () => {
+      gs.disabled = true; gs.textContent = '⏳';
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'gabarit', set: gabarit || '' }, () => {
+        gs.disabled = false; gs.textContent = '✓ enregistré';
+        setTimeout(() => render(), 900);
+      });
+    };
     panel.querySelectorAll('.vrm-capt-annonce').forEach(b => {
       b.onclick = () => {
         const avant = b.textContent;
@@ -2246,6 +2256,37 @@
     </div>`;
   }
 
+  // ── LE GABARIT DE DESCRIPTION ───────────────────────────────────────────────
+  // C'est le « template » que vendent les autres extensions, et c'est la seule
+  // de leurs fonctions qui ne repose sur aucune automatisation risquée : ton
+  // texte type, écrit une fois, rempli avec les VRAIES caractéristiques de la
+  // paire. Variables reconnues : {titre} {marque} {taille} {etat} {prix}.
+  let gabarit = null, gabaritBusy = false;
+  const appliqueGabarit = (g, o) => String(g || '')
+    .replace(/\{titre\}/gi, o.title || '')
+    .replace(/\{marque\}/gi, o.brand || '')
+    .replace(/\{taille\}/gi, o.size || extraireTailleTxt(o.title) || '')
+    .replace(/\{etat\}/gi, o.etat || o.status || '')
+    .replace(/\{prix\}/gi, o.price != null ? String(o.price) : '');
+  const extraireTailleTxt = (t) => { const m = /\b(\d{2}(?:[.,]5)?)\b/.exec(String(t || '')); return m ? m[1] : ''; };
+  function gabaritBloc(o) {
+    if (gabarit == null) {
+      if (!gabaritBusy) { gabaritBusy = true; chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'gabarit' }, (r) => { gabaritBusy = false; gabarit = (r && r.texte) || ''; render(); }); }
+      return '';
+    }
+    const rendu = gabarit.trim() ? appliqueGabarit(gabarit, o || {}) : '';
+    return `<div class="vrm-card" style="margin-top:8px;padding:9px">
+      <div style="font-weight:800;font-size:12.5px;margin-bottom:4px">Mon gabarit de description</div>
+      <div class="vrm-m" style="font-size:10.5px;margin-bottom:5px">Variables : <code>{titre}</code> <code>{marque}</code> <code>{taille}</code> <code>{etat}</code> <code>{prix}</code></div>
+      <textarea id="vrm-gab" rows="3" placeholder="👟 {titre}&#10;&#10;📏 Taille {taille}&#10;{etat}&#10;&#10;Expédition rapide ☺️" style="width:100%;box-sizing:border-box;border:1px solid #d7dde3;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical">${esc(gabarit)}</textarea>
+      ${rendu ? `<div class="vrm-m" style="font-size:11px;white-space:pre-wrap;background:#f7f9fb;border-radius:8px;padding:7px;margin-top:6px">${esc(rendu)}</div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button id="vrm-gab-save" style="flex:1 1 100px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:7px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer">Enregistrer</button>
+        ${rendu ? `<button class="vrm-copy-line" data-c="${esc(rendu)}" style="flex:1 1 100px;border:none;background:#0f172a;color:#fff;border-radius:9px;padding:7px;font:inherit;font-weight:800;font-size:11.5px;cursor:pointer">📋 Copier pour cette paire</button>` : ''}
+      </div>
+    </div>`;
+  }
+
   // ── LE KIT DE REPUBLICATION ─────────────────────────────────────────────────
   // Chez Vinted, « republier » n'est PAS un bouton « remonter » : ça n'existe
   // pas. Vérifié dans les requêtes captées — c'est `POST /items/{id}/delete`
@@ -2299,6 +2340,7 @@
         ${card(o, `${o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : ''}${marketNote(o)}<div style="margin-top:7px">${editLink(o.id)}</div>`)}
         ${alerteMomentum(o)}
         ${kitRepub(o)}
+        ${gabaritBloc(o)}
         <button class="vrm-go" data-act="open" style="width:100%;margin-top:8px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button class="vrm-go" data-act="done" style="flex:2;border:none;background:#0f6b4f;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">✓ Republiée</button>

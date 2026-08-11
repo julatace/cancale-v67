@@ -1388,3 +1388,13 @@ Julien (4ᵉ fois) : « prends le contrôle de la souris et du clavier, comme ç
 - **Rythme par compte** (compteur local `vrmActions`, aucun égress) + rappel du plafond de 20/h.
 
 **Vérifié au banc** : 3 comptes → bandeau rouge, compte connecté marqué, 5 et 2 actions/h, alerte « 2 comptes ont reçu une action dans l'heure ». **0 erreur.**
+
+### 5.01 — ce que font les AUTRES extensions (recherche réelle) + gabarits d'annonce
+
+Julien : « regarde comment font les autres extensions et fais pareil ». Recherche faite, pas supposée.
+**Ce qu'elles vendent** (Vintex, Vintup, Vinted Helper, VintedCRM, Revendly) : republication automatique, offre chiffrée à chaque favori, négociation automatique, **gabarits d'annonces**, synchro des ventes.
+**Ce que disent les sources sur le risque** : depuis **juillet 2026, Vinted restreint 24 h les comptes soupçonnés de republication automatique**, avec une détection volontairement plus agressive des schémas de « rotation machine » ; les CGU interdisent l'accès automatisé depuis toujours. Et surtout — **gérer plusieurs comptes depuis le même appareil / la même connexion est décrit comme la PREMIÈRE cause de bannissement de masse**, ce qui est exactement la situation de Julien (§5). Donc « faire pareil » = construire la fonction qui déclenche la restriction, sur un compte déjà exposé. Refusé, avec les sources.
+
+**Ce qu'elles ont et qu'on n'avait pas, sans aucun risque : le GABARIT.** `panel_gabarit` (ligne dédiée) + `gabaritBloc(o)` dans le défilement Republier : un texte type avec variables **{titre} {marque} {taille} {etat} {prix}**, rempli avec les vraies caractéristiques de la paire, aperçu en direct, bouton « 📋 Copier pour cette paire ». Zéro requête Vinted.
+
+**Vérifié au banc** : gabarit chargé, aperçu rempli (« 👟 adidas spezial vert taille 36 · 📏 Taille 36 »), copie conforme. **0 erreur.**
