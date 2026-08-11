@@ -413,6 +413,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // retrouver sur la nouvelle annonce (cf. marquerRepublie).
           if (msg.action === 'repubMarque') { const ok = await marquerRepublie(msg.id, msg.numero, msg.title); sendResponse({ ok }); return; }
           if (msg.action === 'photoBytes') { const r = await photoBytes(msg.url); sendResponse(r); return; }
+          // Ce que Vinted peut voir de TOI, rendu visible pour que tu le pilotes.
+          if (msg.action === 'empreinte') { const r = await empreinte(); sendResponse({ ok: true, ...r }); return; }
           // Sauvegarde de tes numéros (et du garage) : lecture seule de `main`.
           // Si un jour la ligne cloud est perdue, c'est ce fichier qui te sauve —
           // le numéro est ce qu'il y a d'écrit sur la boîte, ça ne se recalcule pas.
@@ -1321,6 +1323,35 @@ async function garde(uid, acc) {
              error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
   }
   return null;
+}
+
+// ── CE QUE VINTED PEUT VOIR DE TOI ──────────────────────────────────────────
+// Le risque de blocage est invisible, donc impossible à piloter. On le montre.
+// Trois signaux, du plus lourd au plus léger — c'est l'ordre dans lequel Vinted
+// rapproche des comptes (§5) :
+//   1. combien de comptes vivent dans CE navigateur (le facteur décisif : même
+//      appareil, même empreinte — aucune automatisation n'y change quoi que ce
+//      soit, c'est ce qui a fait tomber `vanessa5723`) ;
+//   2. combien de comptes ont reçu une action récemment (basculer d'un compte à
+//      l'autre pour agir, c'est le même signal en mouvement) ;
+//   3. le rythme d'actions de la dernière heure, par compte.
+async function empreinte() {
+  const out = { comptes: [], actif: null, actionsHeure: 0, comptesActifs: 0 };
+  try {
+    out.actif = await compteConnecte('www.vinted.fr');
+    const accts = await getStoredAccounts();
+    const cur = (await chrome.storage.local.get('vrmActions')).vrmActions || {};
+    const ilYaUneHeure = Date.now() - 3600000;
+    for (const a of accts) {
+      const uid = String(a.vinted_user_id);
+      const n = (cur[uid] || []).filter(t => t > ilYaUneHeure).length;
+      out.actionsHeure += n;
+      if (n > 0) out.comptesActifs += 1;
+      out.comptes.push({ uid, login: a.login || '', actif: String(out.actif || '') === uid, actions: n });
+    }
+    out.comptes.sort((a, b) => (b.actif ? 1 : 0) - (a.actif ? 1 : 0) || b.actions - a.actions);
+  } catch (_) {}
+  return out;
 }
 
 // ── RÉPONDRE À UNE OFFRE, EN UN CLIC DEPUIS LE PANNEAU ──────────────────────

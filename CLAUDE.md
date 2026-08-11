@@ -1374,3 +1374,17 @@ Appliqué à **`repondreOffre`**, **`genererBordereau`** et **`capterAnnonce`** 
 - navigateur sur le compte A, offre du compte B → **0 bouton d'action**, avertissement affiché, bordereau en « autre cpte » ;
 - navigateur sur le bon compte → **3 boutons d'offre + 1 bouton générer**, tout fonctionne normalement.
 **0 erreur** dans les deux cas.
+
+### 5.00 — « Ce que Vinted peut voir » (rendre le risque pilotable)
+
+Julien (4ᵉ fois) : « prends le contrôle de la souris et du clavier, comme ça ça règle le problème de blocage ». **Refusé, et l'argument est technique — il croit que ça le protège, c'est l'inverse :**
+1. **Même requête.** Que l'extension appelle l'API ou clique sur le bouton, Vinted reçoit le même appel, du même compte, depuis la même IP et le même appareil. Tout ce qu'ils recoupent est côté serveur ; le clic ne change aucun de ces signaux.
+2. **Plus repérable, pas moins.** Un événement synthétique porte `isTrusted: false`, lisible par n'importe quel site — ça **ajoute** une preuve d'automatisation qui n'existe pas avec un appel direct.
+3. **Plus dangereux.** Vinted bouge un bouton → le script clique à côté (refuse au lieu d'accepter, supprime la mauvaise annonce). Un appel mal formé donne une erreur ; un clic aveugle donne une action non voulue, sur de l'argent réel.
+
+**Construit à la place — `empreinte()` + `empreinteBloc()`** (en tête de l'écran Santé) : le risque devient visible et donc pilotable.
+- **Nombre de comptes présents dans CE navigateur** — le facteur décisif (§5), avec le message honnête : aucun réglage de l'extension ne l'efface, seul le fait d'en garder moins ici le réduit. Vert 1 / orange 2 / rouge ≥ 3.
+- **Comptes ayant reçu une action dans l'heure** — basculer de l'un à l'autre pour agir, c'est le même signal en mouvement.
+- **Rythme par compte** (compteur local `vrmActions`, aucun égress) + rappel du plafond de 20/h.
+
+**Vérifié au banc** : 3 comptes → bandeau rouge, compte connecté marqué, 5 et 2 actions/h, alerte « 2 comptes ont reçu une action dans l'heure ». **0 erreur.**

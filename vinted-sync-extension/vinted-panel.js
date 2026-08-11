@@ -1923,6 +1923,40 @@
   // ── SANTÉ DE LA CAPTURE ─────────────────────────────────────────────────────
   // « Est-ce que ça capte ? » se voit ici, compte par compte, au lieu d'aller
   // lire la base. Un compte muet = session expirée : repasse dessus sur Vinted.
+  // ── CE QUE VINTED PEUT VOIR DE TOI ──────────────────────────────────────────
+  // Le risque de blocage est invisible, donc on le subit. Ici on le chiffre :
+  // combien de comptes vivent dans ce navigateur, combien ont été utilisés
+  // récemment, et le rythme d'actions de l'heure. Le premier chiffre est le
+  // décisif — même appareil, même empreinte — et aucune automatisation n'y
+  // change rien (c'est ce qui a fait tomber vanessa5723).
+  let emp = null, empBusy = false;
+  function empreinteBloc() {
+    if (emp == null) {
+      if (!empBusy) { empBusy = true; chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'empreinte' }, (r) => { empBusy = false; emp = (r && r.ok) ? r : { comptes: [] }; render(); }); }
+      return '';
+    }
+    const n = (emp.comptes || []).length;
+    if (!n) return '';
+    const grave = n >= 3, moyen = n === 2;
+    const coul = grave ? '#a33' : moyen ? '#9a5b16' : '#0f6b4f';
+    const fond = grave ? '#fdf0f0' : moyen ? '#fff6ec' : '#eefaf3';
+    const bord = grave ? '#e9c3c3' : moyen ? '#ffd7a8' : '#bfe6d3';
+    const ligne = (c) => `<div class="vrm-m" style="display:flex;justify-content:space-between;gap:8px;font-size:11px;padding:1px 0">
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.actif ? '● ' : '○ '}${esc(c.login || ('compte ' + c.uid.slice(-4)))}${c.actif ? ' <b>(connecté)</b>' : ''}</span>
+        <b style="flex-shrink:0">${c.actions ? `${c.actions} action${c.actions > 1 ? 's' : ''}/h` : '—'}</b>
+      </div>`;
+    return `<div class="vrm-card" style="margin-bottom:10px;padding:9px;background:${fond};border-color:${bord}">
+      <div style="font-weight:800;font-size:12.5px;color:${coul}">Ce que Vinted peut voir · ${n} compte${n > 1 ? 's' : ''} dans ce navigateur</div>
+      <div class="vrm-m" style="font-size:11px;margin:3px 0 6px">${
+        grave ? "C'est le signal le plus lourd : même appareil, même empreinte. Aucun réglage de l'extension ne l'efface — seul le fait d'en garder moins ici le réduit."
+        : moyen ? "Deux comptes sur la même machine se rapprochent facilement. Garde les actions sur un seul autant que possible."
+        : "Un seul compte ici : c'est la situation la plus sûre."}</div>
+      ${(emp.comptes || []).slice(0, 8).map(ligne).join('')}
+      ${emp.comptesActifs > 1 ? `<div class="vrm-m" style="font-size:11px;margin-top:5px;color:${coul}"><b>${emp.comptesActifs} comptes</b> ont reçu une action dans l'heure — basculer de l'un à l'autre pour agir, c'est ce même signal en mouvement.</div>` : ''}
+      <div class="vrm-m" style="font-size:10.5px;margin-top:5px;opacity:.8">Plafond de sécurité : 20 actions par compte et par heure.</div>
+    </div>`;
+  }
+
   function santeBloc() {
     const list = (DATA && DATA.sante) || [];
     if (!list.length) return '';
@@ -1942,6 +1976,7 @@
       </div>`;
     };
     return `<div style="margin-bottom:10px">
+      ${empreinteBloc()}
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">Santé de la capture</div>
       ${list.map(ligne).join('')}
       <div class="vrm-m" style="font-size:10.5px;opacity:.8">Vert = frais du jour · orange = quelques jours · rouge = à réveiller.</div>
