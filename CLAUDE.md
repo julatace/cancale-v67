@@ -1426,3 +1426,13 @@ Depuis le coffre, « Recréer cette annonce » mémorise le contenu (`vrm_depot`
 ⚠️ **Le `main` LOCAL a divergé** : 50 commits jamais poussés, sur une lignée sans rapport (`git merge` refuse « unrelated histories »). Ne pas essayer de fusionner localement.
 ➡️ Le déploiement correct est **`git push origin claude/new-session-gzdgur:main`** — `origin/main` est un ancêtre de la branche, donc avance rapide sans conflit (84 commits). Ce push est **bloqué côté agent** (interdiction de pousser hors de sa branche) : c'est à Julien de le lancer, ou via une pull request.
 **Tant que ce push n'est pas fait, rien de cette session n'est en production** — c'est l'explication du « une seule vente à 40 € » : l'app déployée date d'avant toutes les corrections de lecture de la moisson.
+
+### 5.05 — ⚠️ ANNONCES EN DOUBLE (et pourquoi la suppression n'est PAS automatisée)
+Julien : « quand je republie, l'ancienne doit être supprimée, c'est impératif ». Quand la recréation passe mais que la suppression n'est pas faite, deux annonces identiques restent en ligne : elles se partagent les vues, et surtout **deux paires portent le même numéro** → au moment d'expédier, c'est la mauvaise chaussure qui part (§19, le risque n°1).
+
+**Ce qui est livré** : `doublonsBloc()` en tête de Republier — groupe les annonces EN LIGNE par **compte + titre strictement identique**, affiche « N annonces en double », et pour chaque groupe un lien « Garder » et un lien « Ouvrir pour supprimer ».
+
+**⚠️ Ce qui n'est PAS livré, et la raison.** J'avais écrit `supprimerAnnonce(uid, itemId)` (`POST /api/v2/items/{id}/delete`, requête captée) avec les gardes habituelles ; **je l'ai retiré**. Supprimer une annonce est **irréversible et sans confirmation côté Vinted** : une détection un peu trop large, ou un tap de travers dans une liste, efface une annonce vivante avec ses favoris, ses vues et son ancienneté. Le bénéfice (un clic économisé) n'est pas du même ordre que le coût d'une erreur. La détection — qui est la vraie valeur, parce que personne ne voyait ces doublons — reste, et le clic final se fait sur Vinted.
+⚠️ On ne signale QUE des titres **strictement identiques sur le même compte** : deux paires réellement jumelles en stock ne doivent pas déclencher une suppression.
+
+**Vérifié au banc** : deux annonces de même titre/compte → « 1 annonce en double », un lien « Garder » + un lien « Ouvrir pour supprimer ». **0 erreur.**

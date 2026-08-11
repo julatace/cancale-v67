@@ -2384,6 +2384,42 @@
     };
   }
 
+  // ── ANNONCES EN DOUBLE (republication à moitié faite) ───────────────────────
+  // Julien : « quand je republie, l'ancienne doit disparaître, c'est impératif ».
+  // Quand la recréation passe mais que la suppression n'a pas été faite, deux
+  // annonces identiques restent en ligne. Deux conséquences, la seconde grave :
+  //   • elles se font concurrence et se partagent les vues ;
+  //   • surtout, **deux paires portent le même numéro** → au moment d'expédier,
+  //     c'est la mauvaise chaussure qui part (§19, le risque n°1).
+  // ⚠️ On DÉTECTE et on t'emmène dessus ; la suppression se fait sur Vinted,
+  //    par toi. Supprimer par script est irréversible et sans filet : une
+  //    détection un peu trop large effacerait une annonce vivante.
+  //    On ne signale donc QUE des titres STRICTEMENT identiques, même compte.
+  function doublonsBloc() {
+    const on = (DATA && DATA.online) || [];
+    if (on.length < 2) return '';
+    const par = new Map();
+    for (const o of on) {
+      const k = `${o.uid || ''}|${String(o.title || '').toLowerCase().replace(/\s+/g, ' ').trim()}`;
+      if (!k.endsWith('|')) { if (!par.has(k)) par.set(k, []); par.get(k).push(o); }
+    }
+    const groupes = [...par.values()].filter(g => g.length > 1);
+    if (!groupes.length) return '';
+    const n = groupes.reduce((s, g) => s + g.length - 1, 0);
+    const ligne = (g) => `<div style="margin-top:7px;border-top:1px solid #eceff3;padding-top:7px">
+      <div style="font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g[0].title || '')}</div>
+      <div class="vrm-m" style="font-size:11px;margin:2px 0 5px">${g.length} annonces identiques en ligne${g.some(o => o.numero) ? ` · N° ${g.filter(o => o.numero).map(o => o.numero).join(', ')}` : ''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${g.map((o, i) => `<a href="${esc(o.url || '#')}" target="_blank" rel="noreferrer" style="flex:1 1 100px;text-align:center;text-decoration:none;border:1px solid ${i === 0 ? '#dde' : '#9a5b16'};background:${i === 0 ? '#fff' : '#9a5b16'};color:${i === 0 ? '#334' : '#fff'};border-radius:9px;padding:6px;font-weight:700;font-size:11px">${i === 0 ? 'Garder ↗' : 'Ouvrir pour supprimer ↗'}</a>`).join('')}
+      </div>
+    </div>`;
+    return `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fdf0f0;border-color:#e9c3c3">
+      <div style="font-weight:800;font-size:12.5px;color:#a33;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} ${n} annonce${n > 1 ? 's' : ''} en double</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">Une republication où l'ancienne n'a pas été supprimée. Elles se partagent les vues, et si elles portent le même numéro, c'est la mauvaise paire qui part à l'expédition. Ouvre celle à supprimer et retire-la sur Vinted.</div>
+      ${groupes.slice(0, 5).map(ligne).join('')}
+    </div>`;
+  }
+
   // ── LE N° À REMETTRE APRÈS UNE REPUBLICATION ────────────────────────────────
   // Republier crée une nouvelle annonce : la paire perd son numéro, et ce numéro
   // redevient « libre » alors que la chaussure occupe toujours sa boîte. Tant
@@ -2559,6 +2595,7 @@
         <div class="vrm-m" style="font-size:11px;margin-top:2px">Sur ${mv.total} ventes datées : ${mv.nJour} un ${esc(mv.jour)}, ${mv.nCreneau} ${esc(mv.creneau)}. Republie juste avant ce créneau — ton annonce sera en haut quand les acheteurs regardent.</div>
       </div>` : '';
     return `
+      ${doublonsBloc()}
       ${renumBandeau()}
       ${bandeauMoment}
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
