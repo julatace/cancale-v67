@@ -1327,3 +1327,12 @@ Rappel du constat (§22) : **0 prix d'achat sur 177 paires** → bénéfice, mar
 - **Sauvegarde des numéros** (`sauvegardeNumeros`) : lecture seule de `main` → fichier JSON (`vinted_annonce_numeros` + `vinted_buyprice_by_num` + garage). Le N° est ce qui est **écrit sur la boîte** : il ne se recalcule pas, un fichier chez lui est le seul vrai filet. ⚠️ Le bouton est proposé **aussi quand le coffre est vide** (il n'en dépend pas — c'est justement là qu'on veut un filet).
 
 **Vérifié au banc** : pastille rendue et visible (`N°7 · 🏠 B3 · marge 22,00 €`), bandeau créneau (« dimanche, en soirée · 41/180 »), téléchargement réel `numeros-vrm-AAAA-MM-JJ.json` avec 2 entrées et libellé « ✓ 2 N° sauvegardés ». **0 erreur.**
+
+### 4.96 — baisse de prix (raccourci sûr) + garde-fou « ne saborde pas une paire qui travaille »
+**⚠️ POURQUOI L'EXTENSION N'ENVOIE PAS LA BAISSE DE PRIX ELLE-MÊME** (demande #2 de Julien, refusée sur base technique, pas de principe) : la requête captée `PUT /api/v2/item_upload/items/{id}` exige **l'annonce ENTIÈRE** — champs relevés dans la vraie capture : `title, description, brand_id, catalog_id, color_ids, item_attributes, measurement_length/width, package_size_id, shipment_prices, currency, temp_uuid` et **`assigned_photos`** (identifiant + orientation de CHAQUE photo). Changer un seul nombre imposerait de tout reconstruire, et **aucune capture ne permet aujourd'hui de vérifier la correspondance lecture (`GET /items/{id}`) → écriture** (`harvest_*_item_*` est vide). Une PUT mal formée renvoie une annonce **sans ses photos** ou dans la mauvaise catégorie. Coût d'une erreur ≫ deux secondes gagnées.
+➡️ À la place : bouton **« Passer à X € ↗ »** — copie le prix conseillé **et** ouvre l'écran de modification. Il ne reste que le champ prix à coller.
+➡️ **Pour le rendre automatique un jour** : capter un `GET /api/v2/items/{id}` ET la `PUT` correspondante **sur la même annonce**, puis vérifier champ par champ. Sans ça, ne pas coder.
+
+**Garde-fou momentum** (`alerteMomentum`, idée #17) : dans le défilement Republier, une annonce à ≥ 2 favoris ou ≥ 40 vues affiche un avertissement chiffré — republier la remet à zéro et les gens qui l'ont mise en favori la perdent de vue. Oriente vers la bonne action : **remise aux favoris** s'il y en a, **baisse de prix** si c'est très vu et peu mis en favori. ⚠️ On n'interdit rien : on met le chiffre sous les yeux avant un geste irréversible.
+
+**Vérifié au banc** : alerte rendue (« 5 favoris et 120 vues… propose-leur plutôt une remise »), **0 erreur**.

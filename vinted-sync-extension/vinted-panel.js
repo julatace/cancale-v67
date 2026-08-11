@@ -857,7 +857,7 @@
       ${minBloc(o)}
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
         <a class="vrm-link" href="https://www.vinted.fr/items/${esc(id)}/edit" target="_blank" rel="noreferrer" style="border:1px solid #09b1ba;background:#09b1ba;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:12px;text-decoration:none">✏️ Modifier sur Vinted ↗</a>
-        ${suggested != null ? `<button class="vrm-copy-line" data-c="${suggested}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier ${suggested} €</button>` : ''}
+        ${suggested != null ? `<button class="vrm-baisse" data-id="${esc(id)}" data-p="${suggested}" title="Copie ${suggested} € et ouvre la page de modification : il ne te reste que le champ prix à coller" style="border:1px solid #09b1ba;background:#09b1ba;color:#fff;border-radius:8px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer">Passer à ${suggested} € ↗</button>` : ''}
         ${o.numero ? `<button class="vrm-copy-line" data-c="N°${esc(o.numero)} · ${esc(o.title || '')}" style="border:1px solid #09b1ba;background:#09b1ba14;color:#09b1ba;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer">📋 Copier N° + titre</button>` : ''}
       </div>`;
     return card(o, extra);
@@ -1145,6 +1145,26 @@
           if (r && r.ok) { b.innerHTML = '✓ envoyé'; setTimeout(() => load(), 900); }
           else { b.disabled = false; b.innerHTML = '❌ ' + ((r && r.error) || 'échec'); setTimeout(() => { try { b.innerHTML = b.dataset.lbl; } catch (_) {} }, 3500); }
         });
+      };
+    });
+    // ── BAISSER LE PRIX : copie + ouvre l'écran de modification ───────────────
+    // ⚠️ POURQUOI L'EXTENSION NE L'ENVOIE PAS ELLE-MÊME. La requête captée
+    // (`PUT /api/v2/item_upload/items/{id}`) exige l'annonce ENTIÈRE : titre,
+    // description, catégorie, couleurs, attributs, mesures, `package_size_id`,
+    // `shipment_prices`, un `temp_uuid`, et surtout `assigned_photos` avec
+    // l'identifiant de CHAQUE photo. Reconstruire tout ça pour changer un seul
+    // nombre, c'est risquer de renvoyer une annonce SANS ses photos ou avec la
+    // mauvaise catégorie. Aucune capture ne permet aujourd'hui de vérifier la
+    // correspondance entre ce que renvoie la lecture et ce qu'attend l'écriture.
+    // Tant que ce n'est pas vérifié, on ne touche pas : perdre les photos d'une
+    // annonce coûte bien plus cher que les deux secondes gagnées.
+    panel.querySelectorAll('.vrm-baisse').forEach(b => {
+      b.onclick = () => {
+        try { navigator.clipboard.writeText(String(b.dataset.p || '')); } catch (_) {}
+        window.open(`https://www.vinted.fr/items/${b.dataset.id}/edit`, '_blank', 'noopener');
+        const avant = b.textContent;
+        b.textContent = `✓ ${b.dataset.p} € copié — colle dans le champ prix`;
+        setTimeout(() => { try { b.textContent = avant; } catch (_) {} }, 3000);
       };
     });
     // Prix d'achat : chercher, choisir, saisir, effacer.
@@ -2019,6 +2039,24 @@
     </div>`;
   }
 
+  // ── NE SABORDE PAS UNE PAIRE QUI TRAVAILLE ──────────────────────────────────
+  // Republier = supprimer + recréer : l'annonce repart de ZÉRO. Elle perd ses
+  // favoris et ses vues, et les acheteurs qui l'avaient mise de côté ne la
+  // retrouvent plus. Sur une paire qui a de l'engagement, c'est une perte sèche.
+  // ⚠️ On ne l'INTERDIT pas — c'est ta boutique. On te met le chiffre sous les
+  //    yeux avant, parce qu'une fois supprimée, on ne revient pas en arrière.
+  function alerteMomentum(o) {
+    const favs = Number(o.favs) || 0, vues = Number(o.views) || 0;
+    if (favs < 2 && vues < 40) return '';
+    const quoi = [];
+    if (favs) quoi.push(`<b>${favs}</b> favori${favs > 1 ? 's' : ''}`);
+    if (vues) quoi.push(`<b>${vues}</b> vue${vues > 1 ? 's' : ''}`);
+    return `<div class="vrm-card" style="margin-top:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
+      <div style="font-weight:800;font-size:12.5px;color:#9a5b16">Celle-ci travaille déjà — ${quoi.join(' et ')}</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">Republier la remet à zéro : ${favs ? `les ${favs} personnes qui l'ont mise en favori la perdent de vue, et ` : ''}le compteur repart de rien.${favs >= 2 ? ` <b>Propose-leur plutôt une remise</b> (onglet Favoris) : ça déclenche la vente sans rien perdre.` : ` Si elle est très vue mais peu mise en favori, c'est le <b>prix</b> qu'il faut baisser, pas l'annonce qu'il faut refaire.`}</div>
+    </div>`;
+  }
+
   // ── LE KIT DE REPUBLICATION ─────────────────────────────────────────────────
   // Chez Vinted, « republier » n'est PAS un bouton « remonter » : ça n'existe
   // pas. Vérifié dans les requêtes captées — c'est `POST /items/{id}/delete`
@@ -2070,6 +2108,7 @@
         <div style="height:7px;border-radius:999px;background:#e6eaee;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${pct}%;border-radius:999px;background:#09b1ba;transition:width .3s"></div></div>
         <div class="vrm-m" style="margin-bottom:8px">Ouvre-la, <b>republie-la sur Vinted</b>, puis marque <b>✓ Republiée</b>.</div>
         ${card(o, `${o.numero ? `<div class="vrm-m" style="margin-top:3px">N°${esc(o.numero)}${o.cell ? ` · 🏠 case ${esc(o.cell)}` : ''}</div>` : ''}${marketNote(o)}<div style="margin-top:7px">${editLink(o.id)}</div>`)}
+        ${alerteMomentum(o)}
         ${kitRepub(o)}
         <button class="vrm-go" data-act="open" style="width:100%;margin-top:8px;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:10px;font-weight:800;cursor:pointer">Ouvrir sur Vinted ↗</button>
         <div style="display:flex;gap:6px;margin-top:6px">
