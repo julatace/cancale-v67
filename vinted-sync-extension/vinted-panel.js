@@ -1074,7 +1074,7 @@
           <button class="vrm-tab ${tab === 'favoris' ? 'on' : ''}" data-t="favoris">${svgi('heart', 15)} Favoris</button>
         </div>
       </div>
-      <div id="vrm-body">${bandeauAlerte()}${modeleBandeau()}${
+      <div id="vrm-body">${bandeauAlerte()}${depotBandeau()}${modeleBandeau()}${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
@@ -2122,7 +2122,7 @@
           </div>
           <button class="vrm-prep-photos" data-id="${esc(c.id)}" style="width:100%;border:none;background:#0f6b4f;color:#fff;border-radius:9px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer;margin-bottom:6px">📦 Préparer les ${(c.photos || []).length} photos (recadrées, prêtes à déposer)</button>
           <button class="vrm-coffre-photos" data-id="${esc(c.id)}" style="width:100%;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${svgi('eye', 14)} Voir les ${(c.photos || []).length} photos en grand</button>` : ''}
-        <a href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style="display:block;text-align:center;margin-top:6px;text-decoration:none;border:1px solid #0f6b4f;color:#0f6b4f;border-radius:9px;padding:9px;font-weight:800;font-size:12px">Recréer cette annonce sur Vinted ↗</a>
+        <button class="vrm-depot-go" data-id="${esc(c.id)}" style="width:100%;margin-top:6px;border:1px solid #0f6b4f;background:#fff;color:#0f6b4f;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">Recréer cette annonce sur Vinted ↗</button>
       </div>`;
   }
 
@@ -2201,6 +2201,54 @@
     setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
   }
 
+  // ══ DÉPÔT ASSISTÉ : le formulaire de nouvelle annonce, pré-rempli ═══════════
+  // Tu choisis l'annonce à recréer dans le coffre ; sur la page de dépôt, le
+  // panneau remplit titre, description et prix. Tu relis, tu ajoutes les photos
+  // (préparées juste à côté) et **c'est toi qui cliques sur Publier**.
+  // ⚠️ Aucune publication automatique — même principe que l'assistant Leboncoin
+  //    déjà présent dans cette extension.
+  // Le remplissage passe par le setter natif + les événements `input`/`change` :
+  // sans ça, React ne « voit » pas la valeur et le champ se vide à la validation.
+  const surPageDepot = () => /\/items\/(new|upload)/.test(location.pathname);
+  function remplirChamp(el, val) {
+    if (!el) return false;
+    try {
+      const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, val);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    } catch (_) { return false; }
+  }
+  function champVinted(motifs) {
+    const els = Array.from(document.querySelectorAll('input, textarea'));
+    for (const m of motifs) {
+      for (const el of els) {
+        if (el.type === 'hidden' || el.disabled) continue;
+        const foin = `${el.name || ''} ${el.id || ''} ${el.getAttribute('aria-label') || ''} ${el.placeholder || ''} ${el.getAttribute('data-testid') || ''}`.toLowerCase();
+        if (m.test(foin)) return el;
+      }
+    }
+    return null;
+  }
+  function depotBandeau() {
+    if (!surPageDepot()) return '';
+    let d = null;
+    try { d = JSON.parse(readLS('vrm_depot', 'null')); } catch (_) {}
+    if (!d || !d.title) return '';
+    return `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#eefaf3;border-color:#bfe6d3">
+      <div style="font-weight:800;font-size:12.5px;color:#0f6b4f">Annonce prête à recréer</div>
+      <div class="vrm-m" style="font-size:11px;margin:3px 0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.title)}${d.price != null ? ` · ${fmt(d.price)}` : ''}</div>
+      <button id="vrm-depot-fill" style="width:100%;border:none;background:#0f6b4f;color:#fff;border-radius:9px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer">✍️ Remplir le formulaire</button>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button class="vrm-copy-line" data-c="${esc(d.title)}" style="flex:1 1 90px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:6px;font:inherit;font-weight:700;font-size:11px;cursor:pointer">📋 Titre</button>
+        ${d.desc ? `<button class="vrm-copy-line" data-c="${esc(d.desc)}" style="flex:1 1 90px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:6px;font:inherit;font-weight:700;font-size:11px;cursor:pointer">📋 Description</button>` : ''}
+        ${d.price != null ? `<button class="vrm-copy-line" data-c="${esc(String(d.price))}" style="flex:1 1 90px;border:1px solid #0f172a;background:#fff;color:#0f172a;border-radius:9px;padding:6px;font:inherit;font-weight:700;font-size:11px;cursor:pointer">📋 Prix</button>` : ''}
+      </div>
+      <div class="vrm-m" style="font-size:10.5px;margin-top:6px">Marque, taille et catégorie restent à choisir dans les menus de Vinted${d.brand || d.size ? ` — c'était <b>${esc([d.brand, d.size].filter(Boolean).join(' · '))}</b>` : ''}. <b>C'est toi qui publies.</b></div>
+    </div>`;
+  }
+
   // ── PRÉPARER LES PHOTOS D'UNE ANNONCE ───────────────────────────────────────
   // Le vrai temps perdu quand on republie, ce n'est pas les clics : c'est
   // récupérer chaque image, la recadrer, la renommer, puis la redéposer.
@@ -2260,6 +2308,26 @@
     if (s) s.oninput = () => { coffreQuery = s.value; render(); setTimeout(() => { const n = panel.querySelector('#vrm-coffre-search'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 0); };
     panel.querySelectorAll('.vrm-coffre-row').forEach(r => { r.onclick = () => { coffreOuvert = r.dataset.id; render(); }; });
     const back = panel.querySelector('#vrm-coffre-back'); if (back) back.onclick = () => { coffreOuvert = null; render(); };
+    panel.querySelectorAll('.vrm-depot-go').forEach(b => {
+      b.onclick = () => {
+        const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));
+        if (!c) return;
+        writeLS('vrm_depot', JSON.stringify({ title: c.title, desc: c.desc, price: c.price, brand: c.brand, size: c.size, etat: c.etat }));
+        window.open('https://www.vinted.fr/items/new', '_blank', 'noopener');
+        b.textContent = '✓ ouvert — le panneau remplira le formulaire';
+      };
+    });
+    const df = panel.querySelector('#vrm-depot-fill');
+    if (df) df.onclick = () => {
+      let d = null; try { d = JSON.parse(readLS('vrm_depot', 'null')); } catch (_) {}
+      if (!d) return;
+      let n = 0;
+      if (d.title && remplirChamp(champVinted([/titre|title/]), d.title)) n++;
+      if (d.desc && remplirChamp(champVinted([/description|d[ée]cris/]), d.desc)) n++;
+      if (d.price != null && remplirChamp(champVinted([/prix|price/]), String(d.price))) n++;
+      df.textContent = n ? `✓ ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''} — relis et publie` : '❌ champs introuvables — utilise les boutons copier';
+      setTimeout(() => { try { df.textContent = '✍️ Remplir le formulaire'; } catch (_) {} }, 4000);
+    };
     panel.querySelectorAll('.vrm-prep-photos').forEach(b => {
       b.onclick = () => {
         const c = (coffre || []).find(x => String(x.id) === String(b.dataset.id));

@@ -1413,3 +1413,16 @@ Constat posé avec Julien : quand on republie, le temps ne se perd pas dans les 
 - Une photo qui échoue n'arrête pas les autres ; le libellé rend compte (`✓ 2/3`). Pause de 250 ms entre deux téléchargements pour laisser le navigateur enregistrer.
 
 **Vérifié au banc** : 3 sources de formats différents (portrait, paysage, carré) → **3 fichiers** produits, tous en **1200×1600**, nommés `adidas-spezial-vert-taille-36-01/02/03.jpg`, libellé « ✓ 3 photos prêtes ». **0 erreur.**
+
+### 5.04 — DÉPÔT ASSISTÉ sur Vinted (formulaire pré-rempli)
+Depuis le coffre, « Recréer cette annonce » mémorise le contenu (`vrm_depot`, localStorage — la page de dépôt s'ouvre dans un autre onglet) et ouvre `/items/new`. Là, le panneau affiche un bandeau **« Annonce prête à recréer »** avec **✍️ Remplir le formulaire** : titre, description et prix sont posés dans les champs, plus les boutons copier en secours.
+- ⚠️ Le remplissage utilise le **setter natif + `input`/`change`** : sans ça React ne « voit » pas la valeur et le champ se vide à la validation. Même méthode que l'assistant Leboncoin déjà présent (`lbc.js` `setField`).
+- ⚠️ **Aucune publication automatique** : marque, taille et catégorie restent à choisir dans les menus Vinted (on rappelle ce que c'était), et **c'est Julien qui clique sur Publier**. Même principe que l'assistant Leboncoin.
+- Champs repérés par motif (`titre|title`, `description|décris`, `prix|price`) sur `name`/`id`/`aria-label`/`placeholder`/`data-testid` — si Vinted renomme, on ne casse rien : les boutons copier restent.
+
+**Vérifié au banc** (formulaire simulé) : le coffre arme `vrm_depot` et ouvre `/items/new` ; sur cette page le bandeau apparaît et **les 3 champs sont remplis** (titre, description avec ses sauts de ligne, prix), libellé « ✓ 3 champs remplis — relis et publie ». **0 erreur.**
+
+### État du déploiement (à retenir)
+⚠️ **Le `main` LOCAL a divergé** : 50 commits jamais poussés, sur une lignée sans rapport (`git merge` refuse « unrelated histories »). Ne pas essayer de fusionner localement.
+➡️ Le déploiement correct est **`git push origin claude/new-session-gzdgur:main`** — `origin/main` est un ancêtre de la branche, donc avance rapide sans conflit (84 commits). Ce push est **bloqué côté agent** (interdiction de pousser hors de sa branche) : c'est à Julien de le lancer, ou via une pull request.
+**Tant que ce push n'est pas fait, rien de cette session n'est en production** — c'est l'explication du « une seule vente à 40 € » : l'app déployée date d'avant toutes les corrections de lecture de la moisson.
