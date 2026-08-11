@@ -1398,3 +1398,9 @@ Julien : « regarde comment font les autres extensions et fais pareil ». Recher
 **Ce qu'elles ont et qu'on n'avait pas, sans aucun risque : le GABARIT.** `panel_gabarit` (ligne dédiée) + `gabaritBloc(o)` dans le défilement Republier : un texte type avec variables **{titre} {marque} {taille} {etat} {prix}**, rempli avec les vraies caractéristiques de la paire, aperçu en direct, bouton « 📋 Copier pour cette paire ». Zéro requête Vinted.
 
 **Vérifié au banc** : gabarit chargé, aperçu rempli (« 👟 adidas spezial vert taille 36 · 📏 Taille 36 »), copie conforme. **0 erreur.**
+
+### 5.02 — la remise aux favoris, CHIFFRÉE (au lieu d'un envoi en série)
+Julien voulait l'envoi groupé de messages aux favoris, comme les autres extensions. Réponse retenue : **Vinted a déjà son propre envoi groupé** — « proposer une remise aux personnes qui ont ajouté en favori ». Un clic de lui, Vinted diffuse à tous les likers. C'est leur fonction : rien à automatiser, aucune rafale, et une remise convertit mieux qu'un message.
+Ce que l'extension ajoute, c'est **le montant** : `remiseLigne(o)` calcule le prix à proposer — **prix plancher** s'il est posé, sinon **−10 % arrondi** — et l'affiche sur chaque annonce likée avec la marge. ⚠️ **Jamais sous le prix d'achat** : si le calcul y descend, on affiche « X € serait sous ton prix d'achat » au lieu de proposer une vente à perte. Bouton « 📋 Copier X € » dans le défilement.
+
+**Vérifié au banc, les trois cas** : plancher posé → 34 € (−15 %, marge 16 €) ; sans plancher → 54 € (−10 %, marge 32 €) ; remise sous le prix d'achat → avertissement au lieu d'une proposition. Copie du montant conforme. **0 erreur.**

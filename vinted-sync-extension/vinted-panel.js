@@ -1321,6 +1321,27 @@
   }
   // Bandeau visible sur une page de conversation, quel que soit l'onglet du
   // panneau : le message type est prêt, un clic le colle dans le champ Vinted.
+  // ⚠️ « L'humain choisit, l'outil exécute » — argument de Julien, et il est
+  // juste : c'est LUI qui a écrit le message et qui ouvre la conversation. On
+  // pré-remplit donc le champ TOUT SEUL à l'ouverture d'un fil, une seule fois
+  // par conversation. Ce qui reste à lui : relire et appuyer sur Envoyer.
+  // On ne franchit pas la ligne suivante — envoyer à sa place, et surtout
+  // envoyer en RAFALE à vingt personnes d'affilée : c'est le rythme qui fait
+  // repérer un robot, pas le fait que le texte soit prérédigé.
+  let modeleColleSur = null;
+  function autoCollerModele() {
+    try {
+      const cid = currentConvId();
+      if (!cid || !msgModele.trim() || modeleColleSur === cid) return;
+      const champ = document.querySelector('textarea, [contenteditable="true"]');
+      if (!champ) return;                                  // page pas encore prête
+      const dejaEcrit = (champ.value || champ.textContent || '').trim();
+      if (dejaEcrit) { modeleColleSur = cid; return; }      // ne JAMAIS écraser ce que tu tapes
+      modeleColleSur = cid;
+      insertReply(msgModele);
+    } catch (_) {}
+  }
+
   function modeleBandeau() {
     if (!msgModele.trim() || !currentConvId()) return '';
     return `<button id="vrm-modele-go" style="width:100%;box-sizing:border-box;margin-bottom:8px;display:flex;align-items:center;gap:8px;border:1px solid #0f172a;background:#0f172a;color:#fff;border-radius:11px;padding:9px 11px;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;text-align:left">
@@ -1355,6 +1376,28 @@
   //    sélection. Tu coches des annonces, l'extension t'ouvre chacune ; TU
   //    utilises l'offre native Vinted « proposer une remise aux personnes qui ont
   //    ajouté en favori ». Aucune offre ni message envoyés automatiquement.
+  // ── LA REMISE À PROPOSER, CHIFFRÉE ──────────────────────────────────────────
+  // C'est « l'offre chiffrée à chaque favori » que vendent les autres outils.
+  // Chez eux elle part toute seule ; ici le montant est calculé et prêt, et
+  // c'est le bouton natif de Vinted qui l'envoie — donc rien d'automatisé.
+  // Règle : on descend au prix plancher s'il est posé, sinon −10 % arrondi.
+  // ⚠️ Jamais en dessous du prix d'achat : on le signale au lieu de proposer
+  //    une vente à perte (le prix d'achat, quand il est connu, fait foi).
+  function remiseLigne(o) {
+    const prix = Number(o.price);
+    if (!isFinite(prix) || prix <= 0) return '';
+    const plancher = Number(o.minPrice);
+    const cible = Math.max(1, Math.round(isFinite(plancher) && plancher > 0 ? plancher : prix * 0.9));
+    if (cible >= prix) return '';
+    const achat = Number(o.buyPrice);
+    const perte = isFinite(achat) && cible <= achat;
+    const pct = Math.round((1 - cible / prix) * 100);
+    return `<div class="vrm-m" style="font-size:11px;margin-top:2px;color:${perte ? '#a33' : '#0f6b4f'}">
+      ${perte ? `⚠️ ${cible} € serait sous ton prix d'achat (${fmt(achat)})`
+              : `propose <b>${cible} €</b> (−${pct} %)${isFinite(achat) ? ` · marge ${fmt(cible - achat)}` : ''}`}
+    </div>`;
+  }
+
   function renderFavoris() {
     const list = ((DATA && DATA.online) || []).filter(o => (o.favs || 0) > 0).sort((a, b) => (b.favs || 0) - (a.favs || 0));
     if (!list.length) return `<div class="vrm-m">Aucune annonce avec des favoris captée. Ouvre ta boutique Vinted une fois pour capter les compteurs.</div>`;
@@ -1364,7 +1407,13 @@
       const o = favRun.queue[i];
       return `
         <div class="vrm-m" style="margin-bottom:8px">Annonce <b>${i + 1}</b> / ${total} — ouvre-la, propose une remise à tes <b>${o.favs} favori${o.favs > 1 ? 's' : ''}</b> (bouton Vinted « offre aux favoris »), puis <b>Suivante</b>.</div>
-        ${card(o, `<div class="vrm-m" style="margin-top:3px">❤️ ${o.favs} favori${o.favs > 1 ? 's' : ''}${o.views != null ? ` · 👁 ${o.views}` : ''}</div>`)}
+        ${card(o, `<div class="vrm-m" style="margin-top:3px">❤️ ${o.favs} favori${o.favs > 1 ? 's' : ''}${o.views != null ? ` · 👁 ${o.views}` : ''}</div>${remiseLigne(o)}${(() => {
+          const prix = Number(o.price), plancher = Number(o.minPrice);
+          if (!isFinite(prix) || prix <= 0) return '';
+          const cible = Math.max(1, Math.round(isFinite(plancher) && plancher > 0 ? plancher : prix * 0.9));
+          if (cible >= prix) return '';
+          return `<button class="vrm-copy-line" data-c="${cible}" style="margin-top:6px;border:1px solid #0f6b4f;background:#0f6b4f;color:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">📋 Copier ${cible} €</button>`;
+        })()}`)}
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="vrm-fav-go" data-act="open" style="flex:1;border:none;background:#09b1ba;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir ↗</button>
           <button class="vrm-fav-go" data-act="next" style="flex:1;border:1px solid #09b1ba;background:transparent;color:#09b1ba;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Suivante ▶</button>
@@ -1375,7 +1424,7 @@
       <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
         <input type="checkbox" class="vrm-fav-chk" data-k="${esc(o.id)}" ${favSel.has(o.id) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
         ${o.photo ? `<img src="${esc(o.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
-        <div style="flex:1;min-width:0"><div class="vrm-t">${esc(o.title)}</div><div class="vrm-m">❤️ ${o.favs}${o.views != null ? ` · 👁 ${o.views}` : ''} · ${fmt(o.price)}</div></div>
+        <div style="flex:1;min-width:0"><div class="vrm-t">${esc(o.title)}</div><div class="vrm-m">❤️ ${o.favs}${o.views != null ? ` · 👁 ${o.views}` : ''} · ${fmt(o.price)}</div>${remiseLigne(o)}</div>
       </label>`).join('');
     const favTot = list.reduce((s, o) => s + (o.favs || 0), 0);
     return `
