@@ -15604,6 +15604,8 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <div style={{height:8}}/>
       <ConnexionsSetting/>
       <div style={{height:8}}/>
+      <EmailsSetting/>
+      <div style={{height:8}}/>
       <SecuriteSetting/>
 
       {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
@@ -16180,6 +16182,115 @@ function SecuriteSetting() {
 // ⚠️ Lecture en SCALAIRES uniquement (`select=id,updated_at`) : les lignes
 // d'emails portent des PDF en base64, un `select=data` ici referait le trou
 // d'égress d'août (§34).
+// ── MES ADRESSES DE RÉCEPTION (à qui appartiennent les emails) ────────────────
+// Le vendeur déclare ICI, à l'avance, l'adresse vers laquelle il fait suivre ses
+// emails Vinted. C'est cette adresse — et elle seule — qui décide à qui
+// appartient un email reçu. Ni l'expéditeur, ni le sujet, ni le contenu : ils
+// sont écrits par l'extérieur et se falsifient en trois secondes.
+// Le registre vit dans une ligne dédiée (`vrm_email_owners`) que l'app écrit et
+// que le serveur se contente de lire.
+function EmailsSetting() {
+  const [reg, setReg] = useState(null);          // { adresse: {owner,label} }
+  const [quarantaine, setQuarantaine] = useState(null);
+  const [busy, setBusy] = useState('');
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const charger = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=data`, { headers: sbAuth() });
+      const j = r.ok ? await r.json() : [];
+      const d = (j[0] && j[0].data) || {};
+      setReg((d && d.adresses) || {});
+    } catch (_) { setReg({}); }
+    try {
+      // ⚠️ Scalaires seulement : une ligne de quarantaine contient l'email
+      // ENTIER (pièces jointes comprises) — un `select=data` ici referait le
+      // trou d'égress de §34.
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject,raison:data->>raison,quand:data->>at`, { headers: sbAuth() });
+      setQuarantaine(r.ok ? await r.json() : []);
+    } catch (_) { setQuarantaine([]); }
+  }, []);
+  useEffect(() => { charger(); }, [charger]);
+
+  const ecrire = async (adresses) => {
+    setReg(adresses);
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method: 'POST',
+        headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([withOwner({ id: 'vrm_email_owners', data: { adresses, updatedAt: new Date().toISOString() } })]),
+      });
+    } catch (_) { toast("La liste n'a pas pu être enregistrée — réessaie."); }
+  };
+  const ajouter = async () => {
+    const a = await askText({ desc: "Ton adresse de réception.\n\nC'est l'adresse vers laquelle tu fais suivre tes emails Vinted (bordereaux, ventes, colis). Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
+    const adr = String(a || '').trim().toLowerCase();
+    if (!adr) return;
+    if (!/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
+    if (reg && reg[adr]) { toast('Cette adresse est déjà à toi.'); return; }
+    await ecrire({ ...(reg || {}), [adr]: { owner: uid || '', label: '', at: new Date().toISOString() } });
+  };
+  const retirer = async (adr) => {
+    const ok = await askConfirm({ title: `Retirer ${adr} ?`, desc: "Les emails qui arriveront ensuite sur cette adresse ne te seront plus attribués : ils seront mis de côté en attendant que tu les réclames. Rien de déjà reçu n'est supprimé.", ok: 'Retirer', danger: true });
+    if (!ok) return;
+    const u = { ...(reg || {}) }; delete u[adr]; await ecrire(u);
+  };
+  const rattacher = async (id) => {
+    setBusy(id);
+    try {
+      const r = await fetch('/api/email-rattacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) },
+        body: JSON.stringify({ id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      toast(j && j.ok ? 'Email rattaché — il apparaît maintenant dans tes écrans.' : "Ce mail n'a pas pu être rattaché (format non reconnu). Il reste conservé.");
+    } catch (_) { toast('Réseau indisponible — réessaie.'); }
+    setBusy(''); charger();
+  };
+  const liste = Object.keys(reg || {});
+  const enAttente = quarantaine || [];
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
+        Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et tu le réclames d'un tap.
+      </div>
+      {reg === null ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div> : liste.length === 0 ? (
+        <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'9px 11px',lineHeight:1.45}}>
+          Aucune adresse déclarée. Tant qu'il n'y en a pas, les emails reçus sont attribués au propriétaire de cette installation — ce qui va très bien tant que tu es seul dessus.
+        </div>
+      ) : liste.map(adr => (
+        <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+          <span style={{flex:'1 1 140px',minWidth:0,fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{adr}</span>
+          <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
+            style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:9,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
+        </div>
+      ))}
+      <button type="button" onClick={ajouter}
+        style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        + Ajouter une adresse
+      </button>
+      {enAttente.length > 0 && (
+        <div style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+          <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
+          <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés sur une adresse non déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
+          {enAttente.slice(0,8).map(q => (
+            <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
+              <span style={{flex:'1 1 130px',minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {q.sujet || '(sans sujet)'} <span style={{color:C.muted}}>· {q.raison || ''}</span>
+              </span>
+              <button type="button" disabled={busy===q.id} onClick={()=>rattacher(q.id)}
+                style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:9,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:busy===q.id?'default':'pointer',fontFamily:'inherit',opacity:busy===q.id?0.6:1}}>
+                {busy===q.id ? '…' : "C'est à moi"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ConnexionsSetting() {
   const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
   const [mail, setMail] = useState(null);   // { ts, n } | 'vide' | null = en cours

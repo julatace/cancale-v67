@@ -1769,3 +1769,37 @@ Les deux tools tombaient sur 8 vs 7 pour une seule raison, et elle est saine : l
 ⚠️ **Piège de banc rencontré (encore une fois §21)** : mon harnais ne servait pas la ligne `vrm_blocked_accounts`, donc le panneau croyait le compte supprimé encore actif et affichait ses 96 annonces — **104 contre 7**, un écart spectaculaire qui n'était **que l'artefact du banc**. Servir TOUTES les familles de lignes avant de conclure.
 
 **État final** : app — 12 écrans sur les vraies données, **0 erreur, 0 artefact d'affichage** ; extension — **15 onglets sur 15** sans erreur (les 2 « échecs » du banc restent les artefacts connus) ; audit de cohérence — **6 règles comparées, 0 désaccord**.
+
+---
+
+## 5.16 — LES EMAILS APPARTIENNENT À UN VENDEUR (le dernier chantier du multi-vendeurs)
+
+Un email arrive **sans session** : rien, dans le message, ne dit à qui il est destiné. C'était le point qui restait ouvert depuis §12 (« rattacher une adresse email à un vendeur — chantier à part entière »). Il est fait, et construit pour ne **jamais** se tromper.
+
+### La règle, en une phrase
+**C'est l'adresse de RÉCEPTION qui décide, jamais le contenu.**
+
+L'expéditeur, le sujet et le corps sont écrits par n'importe qui : il suffirait d'envoyer un email mentionnant « shopcancale35 » pour déposer des données dans le compte d'un autre vendeur. L'adresse à laquelle le message a été **livré**, elle, est décidée par le routage — le vendeur l'a déclarée lui-même dans l'app, et il est le seul à l'avoir donnée à son transfert. C'est le seul champ que l'extérieur ne choisit pas.
+
+⚠️ **Ne JAMAIS « améliorer » ça en rattachant par le pseudo Vinted, le nom de l'expéditeur ou un mot du corps** — c'est exactement la porte qu'on referme ici.
+
+### Ce qui est livré
+- **`api/_lib/proprietaire-email.js`** — fonction **pure**, donc testable exhaustivement : `adressesDeLivraison(body, mail)` ne lit que des champs d'enveloppe/destination (Postmark `ToFull`, Mailgun `recipient`, Cloudflare `to`, `envelope.to`, `Delivered-To`, `Cc`…), et `resoudreProprietaire(adresses, registre, defaut)` tranche dans cet ordre : **adresse exacte** → **adresse sans son étiquette `+`** → **propriétaire de l'installation** (`VRM_OWNER_UID`) → **quarantaine**.
+- **Deux vendeurs destinataires du même email → quarantaine**, jamais un choix au hasard.
+- **Quarantaine** : l'email est conservé **entier** (`email_quarantaine_*`) avec la raison et les adresses lues. Perdre un email est réparable — le donner au mauvais vendeur ne l'est pas.
+- **Réglages → Mes adresses de réception** : le vendeur déclare ses adresses à l'avance, voit les emails en attente et les réclame d'un tap (**« C'est à moi »**).
+- **`api/email-rattacher.js`** rejoue l'email **exactement comme s'il venait d'arriver**, avec le propriétaire imposé. ⚠️ Il faut **prouver son identité** (jeton de session vérifié auprès de Supabase) — sinon n'importe qui s'attribuerait les emails d'un autre. La ligne de quarantaine n'est supprimée que si le traitement a **réellement** abouti.
+
+### ⚠️ LE PIÈGE QUI AURAIT TOUT GÂCHÉ : une variable de module en serverless
+Première version : le propriétaire résolu était rangé dans une variable de module. **Une fonction serverless garde son instance entre deux appels et peut en traiter plusieurs EN MÊME TEMPS** — l'email suivant écrasait la variable pendant que le premier finissait d'écrire, et des lignes seraient parties **chez le mauvais vendeur, sans aucune erreur visible**. Remplacé par **`AsyncLocalStorage`** : un contexte isolé par requête.
+**Prouvé au banc** : deux emails traités **en parallèle** pour deux vendeurs, avec un délai injecté dans l'écriture pour forcer l'entrelacement → **3 lignes pour U-JULIEN, 3 pour U-MARIE, aucun mélange**.
+
+### Vérifications
+- **19 cas** sur la résolution : adresse exacte, casse, forme « Nom <adresse> », registre en casse mixte, étiquette `+` inconnue → base, plusieurs destinataires dont un connu, **deux vendeurs → quarantaine**, inconnue sans/avec défaut, aucune adresse lisible, doublon, **et l'usurpation** (From + sujet + corps portant l'adresse d'un vendeur → **quarantaine**), plus les 6 formes d'enveloppe des services de réception. **Tous passent.**
+- **Pipeline complet** (vrai handler, Supabase simulé) : email attribué → 3 lignes sous le bon vendeur ; adresse inconnue → quarantaine et **aucune donnée attribuée** ; rattachement avec jeton valide → 3 lignes sous `U-JULIEN` + quarantaine supprimée ; identifiant hors quarantaine → refusé.
+- **Au passage** : `parseSaleEmail` remplaçait le texte par la version HTML dès qu'il faisait moins de 100 caractères — un email court en texte brut était donc **écrasé par un HTML vide** et la vente perdue. On ne remplace plus que si le HTML apporte vraiment plus.
+
+### Mise en service (une fois la migration passée)
+1. Chaque vendeur déclare **sa** adresse de réception dans Réglages → Mes adresses de réception.
+2. Il fait suivre ses emails Vinted vers **cette adresse** (une par vendeur — deux vendeurs qui partagent la même adresse sont indépartageables **par construction**, et le système le dira au lieu de deviner).
+3. `VRM_OWNER_UID` reste le propriétaire par défaut : tant qu'il n'y a qu'un vendeur, **rien ne change** pour lui.
