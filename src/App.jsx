@@ -16082,6 +16082,8 @@ function SecuriteSetting() {
   const [st, setSt] = useState(null);
   const [ext, setExt] = useState(undefined);   // undefined = pas encore demandé
   const [copie, setCopie] = useState('');
+  const [srv, setSrv] = useState(null);   // état des routes serveur (clé de service, propriétaire)
+  useEffect(() => { fetch('/api/sante').then(r=>r.json()).then(j=>setSrv(j&&j.ok?j:{})).catch(()=>setSrv({})); }, []);
   useEffect(() => { (async () => {
     const out = { colonne: null, lisibleSansCompte: null, mailAuto: null };
     // 1. La colonne `owner` existe-t-elle ? (400 « column does not exist » = non)
@@ -16149,6 +16151,18 @@ function SecuriteSetting() {
         etat={s.mailAuto === null ? '…' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
         d={s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
           : "Le serveur d'envoi de test de Supabase est limité à quelques emails par heure — une création peut rester bloquée. Authentication → Providers → Email → décocher « Confirm email »."}/>
+      {/* ⚠️ LA MOITIÉ SERVEUR DU CLOISONNEMENT. Les emails, les rappels
+          d'expédition et les notifications sont écrits par des routes qui
+          tournent SANS vendeur connecté : sans clé de service elles ne
+          pourront plus rien écrire dès que RLS est actif, et sans propriétaire
+          leurs lignes n'appartiendront à personne (email reçu la nuit =
+          silencieusement perdu). C'est le vrai blocage à lever AVANT la
+          migration, et il ne se voit nulle part ailleurs. */}
+      <Ligne t="Routes serveur (emails, rappels)" ok={srv === null ? null : !!(srv.serviceKey && srv.owner)}
+        etat={srv === null ? '…' : srv.serviceKey && srv.owner ? 'prêtes' : srv.serviceKey ? 'propriétaire manquant' : 'clé de service manquante'}
+        d={srv && srv.serviceKey && srv.owner
+          ? "Elles écriront sous ton compte une fois la base cloisonnée."
+          : "À régler dans Vercel → Settings → Environment Variables AVANT la migration : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID (ton identifiant de compte). Sans ça, les emails et rappels cesseront d'être enregistrés dès que la séparation sera activée."}/>
       <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
         etat={ext === undefined ? '…' : !ext ? 'extension absente ici' : ext.connecte ? (ext.email || 'connectée') : 'pas connectée'}
         d={!ext ? "Sur téléphone c'est normal. Sur l'ordinateur, ouvre l'app dans le Chrome où l'extension est installée."

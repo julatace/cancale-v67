@@ -283,3 +283,59 @@ envisager le jour où l'app gère l'argent d'inconnus.
 l'appelant et le relaie à Vinted. Il ne fuit rien (il faut déjà posséder le
 jeton), mais n'importe qui peut s'en servir comme relais. À restreindre aux
 appels authentifiés quand le multi-vendeurs sera actif.
+
+---
+
+# ⚠️ CE QUI RESTE À FAIRE, DANS CET ORDRE (mis à jour)
+
+L'app et l'extension sont **prêtes** : la connexion existe des deux côtés, chaque
+écriture sait porter un propriétaire, et l'app **sonde l'état réel** (Réglages →
+Sécurité des données). Il reste **trois gestes**, et **l'ordre compte** — la
+migration en dernier, sinon des données arrivent pendant que la porte est fermée.
+
+### 1. Régler les deux variables d'environnement Vercel (AVANT la migration)
+`Vercel → le projet → Settings → Environment Variables` :
+
+| variable | valeur | pourquoi |
+|---|---|---|
+| `SUPABASE_SERVICE_KEY` | Supabase → Settings → API → **service_role** | Les routes `api/*` (emails entrants, rappels d'expédition, notifications) tournent **sans vendeur connecté**. Dès que RLS est actif, la clé publique ne peut plus rien écrire : sans cette clé, **un email reçu la nuit est silencieusement perdu**. |
+| `VRM_OWNER_UID` | `74eea6e7-f060-46b6-b9c7-d500cedf4738` | La clé de service contourne RLS mais **ne devine pas à qui la ligne est destinée**. Sans ça, les lignes écrites par le serveur n'appartiennent à personne — donc invisibles pour toi. |
+
+⚠️ Ne JAMAIS mettre la clé service_role dans le dépôt ni dans l'extension : elle
+contourne toutes les protections. Variable d'environnement uniquement.
+
+**Vérification** : `https://vrm.center/api/sante` doit répondre
+`{"serviceKey":true,"owner":true}`. C'est aussi affiché dans **Réglages →
+Sécurité des données → « Routes serveur »**, qui passe de « clé de service
+manquante » à « prêtes ».
+
+### 2. Passer la migration SQL
+`Supabase → SQL Editor` → coller `supabase/migrations/001-multi-utilisateurs.sql`
+(le bouton **📋 Copier la migration SQL** de Réglages → Sécurité des données le
+met dans le presse-papier, pris directement dans le fichier). L'étape 2 du script
+attribue les lignes existantes à `VRM_OWNER_UID`.
+
+### 3. Vérifier — sans rien croire sur parole
+Réglages → **Sécurité des données** sonde la base en direct à chaque ouverture :
+
+| ligne | avant | après |
+|---|---|---|
+| Propriétaire des lignes | ⚠️ colonne absente | ✅ colonne présente |
+| **Lecture sans compte** | ⚠️ **tout est lisible** | ✅ fermée |
+| Routes serveur | ⚠️ clé manquante | ✅ prêtes |
+
+⚠️ **La ligne qui compte est « Lecture sans compte »** : la colonne `owner` seule
+ne protège rien. Tant qu'une lecture avec la clé publique (celle qui est dans le
+code, donc connue de tous) ramène des lignes, **tout est lisible par n'importe
+qui**. C'est RLS qui ferme la porte, pas la colonne.
+
+Dès que la base est cloisonnée, l'app **bascule toute seule** : l'écran de
+connexion devient obligatoire, la porte « entrer sans compte » disparaît, et
+l'extension écrit sous le compte connecté (sa fenêtre → **Compte VRM**).
+
+### Ce qui restera vrai après (limite assumée)
+`VRM_OWNER_UID` couvre **une installation = un vendeur**. Pour héberger
+plusieurs vendeurs sur la même instance, il faudra rattacher chaque **email
+entrant** à un vendeur (par l'adresse de réception) : les emails arrivent sans
+session, rien dans le message ne dit à qui il appartient. C'est un chantier à
+part, pas une variable d'environnement.
