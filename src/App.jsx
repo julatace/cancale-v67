@@ -8943,7 +8943,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Comptes entiers exclus de la compta (par vinted_user_id).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
   // Masquer/afficher un compte partout (annonces + compta) depuis l'onglet Annonces.
-  const toggleHideAcc = (uid) => setHiddenAccts(prev => { const n = new Set(prev); const k = String(uid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
+  // ⚠️ MASQUER UN COMPTE SE DEMANDE, LE RÉAFFICHER NON.
+  // Ces puces ressemblent à des filtres, mais un simple tap RETIRE le compte de
+  // partout (annonces + comptabilité) et la liste part dans le cloud, donc sur
+  // tous les appareils. Vérifié en base : `vinted_accounts_hidden` a changé tout
+  // seul entre deux relevés (un compte masqué, un autre réaffiché) — Julien
+  // tapotait les puces en croyant filtrer. Un geste aussi lourd doit être
+  // confirmé ; le retour en arrière, lui, reste immédiat.
+  const toggleHideAcc = async (uid) => {
+    const k = String(uid);
+    if (!hiddenAccts.has(k)) {
+      const a = (accounts || []).find(x => String(x.vinted_user_id) === k);
+      const nom = a ? accNameOf(a) : `#${k}`;
+      const ok = await askConfirm({
+        title: `Masquer « ${nom} » ?`,
+        desc: "Ses annonces disparaissent de l'écran Annonces et ses ventes ne comptent plus dans la comptabilité, sur tous tes appareils. À réserver à un compte fermé ou abandonné — retape la puce pour le réafficher.",
+        ok: 'Masquer', cancel: 'Annuler', danger: true,
+      });
+      if (!ok) return;
+    }
+    setHiddenAccts(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
+  };
   // Comptes détectés BLOQUÉS par Vinted (un appel réel « Synchroniser » a renvoyé
   // 401/403 même après refresh du token → le compte est fermé/suspendu). On garde
   // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement

@@ -1513,3 +1513,10 @@ L'infobulle du compte est passée de « Bloqué » à **« Refusé par Vinted »
 **Vérifié au banc app** (`dist` servi, `vinted_accounts_blocked` amorcé avec les 6 comptes de la capture, lignes de fraîcheur servies par le mock) : **6 → 0 compte bloqué** après démarrage, **0 PAGEERROR**. ⚠️ Piège de banc rappelé : le Chromium du banc **n'atteint pas Supabase** (`ERR_CONNECTION_RESET`) — sans mock de la requête de fraîcheur, la réparation ne s'exécute pas et on mesure un artefact.
 
 ⚠️ **Ce correctif est dans `App.jsx`** : il n'arrive chez Julien qu'au **déploiement de la branche** (`git push origin claude/new-session-gzdgur:main`), toujours bloqué côté agent.
+
+### 5.10 — la puce de compte ressemblait à un filtre, c'était un interrupteur
+Mesuré en base à 20 minutes d'intervalle : `vinted_accounts_hidden` est passé de `[liliand653, tomj606]` à `[tomj606, llloollllaa]` **tout seul**. Personne n'a « masqué un compte fermé » : Julien tapotait les puces de l'écran Annonces en croyant filtrer l'affichage. Or un tap sur une puce appelle `toggleHideAcc` → le compte sort des annonces **et de la comptabilité**, et la liste part dans le cloud (elle est dans `SYNC_KEYS`), donc sur tous ses appareils.
+
+➡️ **Masquer demande maintenant confirmation** (`askConfirm`, avec le nom du compte et ce que ça implique) ; **réafficher reste instantané** — on ne met un frein que sur le geste qui cache des données.
+
+⚠️ À ne pas confondre avec §5.09 : `vinted_accounts_hidden` (masquage manuel, **synchronisé**) et `vinted_accounts_blocked` (détection auto, **local à l'appareil**, jamais dans `SYNC_KEYS`) sont deux listes différentes. La réparation automatique de §5.09 ne touche QUE la seconde — un compte masqué à la main doit rester masqué.
