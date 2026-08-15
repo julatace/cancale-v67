@@ -1537,3 +1537,6 @@ Julien : « je veux pouvoir enlever les comptes bannis à la main, et que ça me
 
 ### Où sont passées les annonces (chiffres, pas impressions)
 Relevé du 15 août : **17 annonces en ligne sur 6 comptes actifs**, capture fraîche (5 comptes captés dans les 2 h). Le gros du stock — **96 annonces** — est derrière `shop_cancale` (199082413), que Julien a **supprimé lui-même** (il est dans `vrm_blocked_accounts`). Rien n'a été « enlevé » par le code : sur les autres comptes, le dressing Vinted lui-même ne renvoie que 2 à 4 articles encore ouverts (le reste est `is_closed`, donc vendu ou retiré côté Vinted).
+
+### ⚠️ RÈGLE PERMANENTE — pousser à CHAQUE modification
+Julien : « à chaque fois que tu modifies quelque chose, pousse-le ». Donc : **aucune modification ne reste en local**. Chaque changement se termine par `git add -A && git commit && git push origin claude/new-session-gzdgur` — jamais de lot gardé « pour plus tard ». La branche pousse dans la **pull request #3**, qui se met à jour toute seule ; c'est la fusion de cette PR qui met en production.
