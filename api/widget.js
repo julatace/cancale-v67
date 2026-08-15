@@ -122,16 +122,30 @@ export default async function handler(req, res) {
       if (iso < today) shipOverdue += 1; else if (iso === today) shipToday += 1; else if (iso === tomorrow) shipTomorrow += 1;
     }
 
-    // CA + ventes du mois : SOURCE = les emails de VENTE (« X a acheté ton
-    // article »), un par vente AVEC le prix. Source complète, fiable, 24/7, tous
-    // comptes, sans dépendre de l'extension Vinted. (Les emails « argent viré »
-    // sont trop rares/incomplets pour servir de base.)
+    // ── CA + VENTES DU MOIS : LA MÊME SOURCE QUE L'APP ────────────────────────
+    // ⚠️ Ce bloc lisait les emails de vente, alors que l'app calcule désormais
+    // sur la moisson Vinted (§33 : les emails classaient mal achats et ventes,
+    // et voyaient 12 ventes / 308 € là où la moisson en voit 17 / 437 €).
+    // Deux chiffres pour la même chose sur le même écran d'accueil, c'est le
+    // genre d'écart qui fait douter de tout l'outil.
+    // ➡️ RÉFÉRENCE = la photo publiée par l'app (`widget_stats`), donc le widget
+    //    affiche EXACTEMENT ce que montre l'app. Repli sur les emails uniquement
+    //    si cette photo manque ou date d'un autre mois — sinon le widget
+    //    resterait bloqué sur le mois précédent tant que l'app n'est pas ouverte.
+    //    `moneySource` dit laquelle a servi (le widget peut l'afficher).
     let moneyMonth = 0, salesMonth = 0;
     for (const s of sales) {
       if (String(s.receivedAt || '').slice(0, 7) !== ym) continue;
       salesMonth += 1;
       const p = parseFloat(String(s.prix || '').replace(',', '.'));
       if (!isNaN(p) && p > 0) moneyMonth += p;
+    }
+    let moneySource = 'emails';
+    const snapMois = snap && snap.updatedAt ? String(snap.updatedAt).slice(0, 7) : null;
+    if (snap && snapMois === ym && snap.caMois != null) {
+      moneyMonth = Number(snap.caMois) || 0;
+      salesMonth = snap.ventesMois != null ? Number(snap.ventesMois) || 0 : salesMonth;
+      moneySource = 'app';
     }
     // Argent réellement viré ce mois (emails de finalisation) — info secondaire.
     let receivedMonth = 0;
@@ -142,6 +156,8 @@ export default async function handler(req, res) {
       pickup,
       moneyMonth: Math.round(moneyMonth),
       salesMonth,
+      moneySource, // 'app' = identique à l'écran de l'app · 'emails' = repli
+
       received: Math.round(receivedMonth),
       pending: snap && snap.enAttente != null ? snap.enAttente : null,
       online: snap && snap.online != null ? snap.online : null,

@@ -234,11 +234,37 @@ async function logActivity(text) {
 // --- Capture passive des donnees ------------------------------------------
 
 // Range une donnee moissonnee dans app_data sous une ligne dediee.
+// ⚠️ POURQUOI CE COMPTEUR EXISTE. Vérifié en base : `harvest_*_item_*` = ZÉRO
+// ligne, alors que `/api/v2/items/{id}` apparaît bien dans les chemins vus et que
+// tout le code de capture est en place. Donc l'appel part et rien n'arrive : il y
+// a une fuite quelque part entre inject.js et l'écriture. Trois sorties muettes
+// sur ce chemin (pas de compte actif, corps non-JSON, type inconnu) — impossible
+// de savoir laquelle sans mesurer. Ce compteur note CHAQUE passage et CHAQUE
+// abandon, par type. Aucune donnée personnelle : des nombres.
+// Conséquence concrète : sans fiche article, pas de description → « Republier »
+// obligerait à tout retaper. C'est le vrai blocage de cette fonction.
+const _diag = { n: {}, dernier: 0 };
+async function noterDiag(cle) {
+  try {
+    _diag.n[cle] = (_diag.n[cle] || 0) + 1;
+    // On n'écrit qu'une fois par minute (le compteur vit en mémoire entre-temps).
+    if (Date.now() - _diag.dernier < 60000) return;
+    _diag.dernier = Date.now();
+    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+    const cur = (rows && rows[0] && rows[0].data && rows[0].data.n) || {};
+    const n = { ...cur };
+    for (const k in _diag.n) n[k] = (n[k] || 0) + _diag.n[k];
+    _diag.n = {};
+    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { n, majAt: new Date().toISOString() } }], 'id');
+  } catch (_) {}
+}
+
 async function storeHarvest(domain, type, id, body) {
+  noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
-  if (!uid) return;
+  if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
   let parsed = null;
-  try { parsed = JSON.parse(body); } catch (_) { return; }
+  try { parsed = JSON.parse(body); } catch (_) { noterDiag(`abandon_json_${type || 'inconnu'}`); return; }
 
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
@@ -255,7 +281,29 @@ async function storeHarvest(domain, type, id, body) {
   parsed = alleger(type, parsed);
 
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
-  await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
+  const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
+  // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
+  // sinon « rien en base » resterait indiscernable de « jamais reçu ».
+  noterDiag(`${ecrit === false ? 'ecriture_ratee' : 'ecrit'}_${type || 'inconnu'}`);
+
+  // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
+  if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
+
+  // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
+  // URL des photos). C'est le moment où on en sait le plus sur cette annonce.
+  if (type === 'item' && id) {
+    try {
+      const f = (parsed && (parsed.item || parsed)) || {};
+      await archiverAnnonce(uid, { id, url: f.url || '', photo: null }, f);
+    } catch (_) {}
+  }
+  // Le dressing passe → on archive l'essentiel de chaque annonce en ligne.
+  // ⚠️ EN UN SEUL ALLER-RETOUR : une boucle d'archivage unitaire ferait 200
+  // lectures + 200 écritures à chaque chargement du dressing. C'est la faute
+  // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
+  if (type === 'listings') {
+    try { await archiverLot(uid, ((parsed && parsed.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+  }
 
   // Le profil contient le vrai id de profil (different de l'account_id, utile
   // pour les annonces) et le login. Le vrai id reste disponible dans la ligne
@@ -347,6 +395,65 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
           if (msg.action === 'convLastMessage') { const r = await convLastMessage(msg.convId); sendResponse(r); return; }
+          if (msg.action === 'markBordDone' && msg.key) { const ok = await markBordDone(msg.key, msg.done); sendResponse({ ok }); return; }
+          if (msg.action === 'bordPdf' && msg.row) { const r = await bordPdf(msg.row); sendResponse(r); return; }
+          if (msg.action === 'setMinPrice' && msg.id) { const ok = await setMinPrice(msg.id, msg.amount); sendResponse({ ok }); return; }
+          // Une offre, sur TON clic uniquement (jamais en arrière-plan).
+          if (msg.action === 'offre') { const r = await repondreOffre(msg); sendResponse(r); return; }
+          // Générer un bordereau (formalité obligatoire, aucun argent engagé).
+          // ⚠️ UN CLIC = UN BORDEREAU, volontairement. Une version « générer mes
+          //    25 sélectionnés » a été écrite puis retirée : 25 PUT enchaînés
+          //    depuis un seul clic, c'est la rafale qu'on refuse partout ailleurs
+          //    (§32/§43). Ici chaque requête correspond à un geste réel.
+          if (msg.action === 'genererBord') { const r = await genererBordereau(msg.uid, msg.tx); sendResponse(r); return; }
+          // Lire la fiche d'une de TES annonces (description, catégorie) pour
+          // pouvoir la republier sans tout retaper. Lecture seule.
+          if (msg.action === 'capterAnnonce') { const r = await capterAnnonce(msg.uid, msg.itemId); sendResponse(r); return; }
+          // Tu viens de republier une paire : on retient son N° pour le
+          // retrouver sur la nouvelle annonce (cf. marquerRepublie).
+          if (msg.action === 'repubMarque') { const ok = await marquerRepublie(msg.id, msg.numero, msg.title); sendResponse({ ok }); return; }
+          if (msg.action === 'photoBytes') { const r = await photoBytes(msg.url); sendResponse(r); return; }
+          // Ce que Vinted peut voir de TOI, rendu visible pour que tu le pilotes.
+          if (msg.action === 'empreinte') { const r = await empreinte(); sendResponse({ ok: true, ...r }); return; }
+          // Gabarit de description (ce que les autres extensions appellent
+          // « template ») : ton texte type, avec des variables remplies depuis
+          // les vraies caractéristiques de la paire. Aucune requête Vinted.
+          if (msg.action === 'gabarit') {
+            if (msg.set != null) {
+              await supabaseUpsert('app_data', [{ id: 'panel_gabarit', data: { texte: String(msg.set).slice(0, 4000), majAt: new Date().toISOString() } }], 'id');
+              sendResponse({ ok: true });
+              return;
+            }
+            const rows = await sbGet('app_data?id=eq.panel_gabarit&select=data');
+            sendResponse({ ok: true, texte: (rows && rows[0] && rows[0].data && rows[0].data.texte) || '' });
+            return;
+          }
+          // Sauvegarde de tes numéros (et du garage) : lecture seule de `main`.
+          // Si un jour la ligne cloud est perdue, c'est ce fichier qui te sauve —
+          // le numéro est ce qu'il y a d'écrit sur la boîte, ça ne se recalcule pas.
+          if (msg.action === 'sauvegardeNumeros') {
+            const rows = await sbGet('app_data?id=eq.main&select=data');
+            const d = (rows && rows[0] && rows[0].data) || {};
+            sendResponse({ ok: true, data: {
+              exporteLe: new Date().toISOString(),
+              vinted_annonce_numeros: d.vinted_annonce_numeros || {},
+              vinted_buyprice_by_num: d.vinted_buyprice_by_num || {},
+              vinted_garage_grid: d.vinted_garage_grid || null,
+            } });
+            return;
+          }
+          if (msg.action === 'achatsPour') { const items = await achatsPour(msg.title, msg.price); sendResponse({ ok: true, items }); return; }
+          if (msg.action === 'setBuyPrice') { const ok = await setBuyPrice(msg.itemId, msg.prix, msg.tx, msg.titre); sendResponse({ ok }); return; }
+          // LE COFFRE : tout ce qui est enregistré, texte + liens des photos.
+          if (msg.action === 'coffre') {
+            const rows = await sbGet('app_data?id=like.coffre_*&select=id,data') || [];
+            const items = rows.map(r => r && r.data).filter(d => d && d.id)
+              .sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
+            sendResponse({ ok: true, items });
+            return;
+          }
+          if (msg.action === 'setAccountOff' && msg.uid) { const ok = await setAccountOff(msg.uid, !!msg.off); sendResponse({ ok }); return; }
+          if (msg.action === 'markPickupDone' && msg.key) { const ok = await markPickupDone(msg.key, msg.done); sendResponse({ ok }); return; }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -412,6 +519,36 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+// ── DIAGNOSTIC : apprendre le code « offre EN ATTENTE » ─────────────────────
+// On sait lire une offre (`transaction_id`, `offer_request_id`, prix) mais PAS
+// reconnaître à coup sûr celle qui est encore ouverte : sur les 40 conversations
+// captées, les 21 offres étaient toutes en `status` 20 (acceptée) ou 30
+// (refusée). Tant que le code « en attente » est inconnu, on ne peut rien
+// décider automatiquement sans risquer de vendre une paire à n'importe quel prix.
+// Alors on APPREND, passivement : chaque fois qu'une conversation passe, on note
+// les couples status → libellé rencontrés. Zéro requête, zéro action.
+// Dès qu'une offre réellement en attente sera vue, son code sera dans cette ligne.
+async function noterStatutsOffres(parsed) {
+  try {
+    const c = (parsed && (parsed.conversation || parsed)) || {};
+    const msgs = Array.isArray(c.messages) ? c.messages : [];
+    const vus = {};
+    for (const m of msgs) {
+      if (!m || m.entity_type !== 'offer_request_message') continue;
+      const e = m.entity || {};
+      if (e.status == null) continue;
+      vus[String(e.status)] = String(e.status_title || '').trim() || '(sans libellé)';
+    }
+    if (!Object.keys(vus).length) return;
+    const rows = await sbGet('app_data?id=eq.panel_offer_statuts&select=data');
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const next = { ...(cur.statuts || {}), ...vus };
+    // Rien de nouveau → on n'écrit pas (inutile de repousser la même ligne).
+    if (JSON.stringify(next) === JSON.stringify(cur.statuts || {})) return;
+    await supabaseUpsert('app_data', [{ id: 'panel_offer_statuts', data: { statuts: next, majAt: new Date().toISOString() } }], 'id');
+  } catch (_) { /* purement diagnostique : ne doit jamais gêner la capture */ }
+}
+
 // Diagnostic : liste des CHEMINS d'API que le site appelle réellement (aucun
 // contenu, aucun paramètre). Sert à repérer tout de suite quand Vinted déplace
 // un endpoint — c'est ce qui avait rendu la moisson muette pendant 18 jours.
@@ -445,6 +582,84 @@ async function storeLabel(domain, url, b64) {
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
   logActivity('📄 Bordereau capté (prêt à imprimer)');
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// CAPTURE DU BORDEREAU — PAR LES TÉLÉCHARGEMENTS DU NAVIGATEUR
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️ POURQUOI ÇA N'A JAMAIS MARCHÉ (vérifié en base : `harvest_*_label_latest`
+// = ZÉRO ligne, sur tous les comptes) : `inject.js` n'observe que `fetch` et
+// `XMLHttpRequest`. Or Vinted sert le bordereau par un LIEN DIRECT — le
+// navigateur le télécharge lui-même, sans passer par l'un ni par l'autre. La
+// capture ne pouvait donc rien voir, et l'URL du label n'apparaît nulle part
+// ailleurs (ni dans les transactions captées, ni dans `seen_urls`).
+//
+// La bonne porte, c'est `chrome.downloads` (permission déjà accordée, jamais
+// utilisée jusqu'ici) : elle voit TOUS les téléchargements, y compris ceux qui
+// ne passent pas par JavaScript. Pure observation : on ne déclenche rien.
+//
+// Double bénéfice : ça range enfin le PDF, ET ça APPREND l'URL du bordereau —
+// la pièce qui manquait pour aller le chercher soi-même plus tard.
+const LABEL_VU = 'panel_label_urls';   // ce qu'on a appris des URL de bordereaux
+
+async function noterUrlLabel(url, ok) {
+  try {
+    let hote = '', chemin = '';
+    try { const u = new URL(url); hote = u.hostname; chemin = u.pathname.replace(/\/\d{4,}/g, '/_id'); } catch (_) { return; }
+    const rows = await sbGet(`app_data?id=eq.${LABEL_VU}&select=data`);
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const vus = cur.vus || {};
+    const cle = `${hote}${chemin}`;
+    if (vus[cle] && vus[cle].ok === ok) return;              // rien de nouveau
+    vus[cle] = { ok, exemple: String(url).slice(0, 300), vuAt: new Date().toISOString() };
+    await supabaseUpsert('app_data', [{ id: LABEL_VU, data: { vus, majAt: new Date().toISOString() } }], 'id');
+  } catch (_) {}
+}
+
+// Un téléchargement vient de démarrer. Est-ce un bordereau Vinted ?
+async function capterTelechargement(item) {
+  try {
+    const url = String((item && (item.finalUrl || item.url)) || '');
+    if (!/^https:/i.test(url)) return;
+    const nom = String((item && item.filename) || '');
+    const mime = String((item && item.mime) || '');
+    const estPdf = /application\/pdf/i.test(mime) || /\.pdf(\?|$)/i.test(url) || /\.pdf$/i.test(nom);
+    if (!estPdf) return;
+    // Un PDF téléchargé depuis Vinted (ou par un lien venant de Vinted). Le
+    // label peut être hébergé par le transporteur : on accepte aussi un
+    // référent Vinted, sinon on raterait Mondial Relay / Chronopost.
+    const ref = String((item && item.referrer) || '');
+    const deVinted = /vinted\.(fr|com|it|de|net)/i.test(url) || /vinted\.(fr|com|it|de)/i.test(ref);
+    if (!deVinted) return;
+    // Un reçu / une facture n'est pas un bordereau (même distinction qu'inject.js).
+    const estRecu = /invoice|receipt|facture|re[çc]u|billing/i.test(url);
+    let b64 = null;
+    try {
+      // On relit le fichier depuis son URL, avec la session du navigateur.
+      // Si le lien est à usage unique ou hors permissions, on n'insiste pas :
+      // l'URL apprise sert quand même (c'est elle qui manquait).
+      const res = await fetch(url, { credentials: 'include' });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        if (buf.byteLength && buf.byteLength < 4000000) {
+          const bytes = new Uint8Array(buf);
+          let bin = '';
+          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+          b64 = btoa(bin);
+        }
+      }
+    } catch (_) { /* lien à usage unique, CORS, hors permissions… */ }
+    await noterUrlLabel(url, !!b64);
+    if (!b64) { logActivity('📄 Bordereau vu (URL apprise, PDF non relu)'); return; }
+    if (estRecu) await storeReceipt('www.vinted.fr', url, b64);
+    else await storeLabel('www.vinted.fr', url, b64);
+  } catch (_) {}
+}
+
+try {
+  if (chrome.downloads && chrome.downloads.onCreated) {
+    chrome.downloads.onCreated.addListener((item) => { capterTelechargement(item); });
+  }
+} catch (_) {}
+
 // Range le dernier REÇU / FACTURE officiel Vinted (PDF) consulte, pour la compta pro.
 async function storeReceipt(domain, url, b64) {
   const uid = await activeAccountId(domain);
@@ -1013,6 +1228,478 @@ async function saveItemDetail(id, detail) {
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
 }
 
+// ── « TRAITER » un bordereau DEPUIS LE PANNEAU ───────────────────────────────
+// Julien clique « ✓ Traiter » sur un bordereau à imprimer : on le mémorise dans
+// une ligne DÉDIÉE `panel_bords_done` (= { key: ts }). ⚠️ On n'écrit JAMAIS dans
+// la ligne `main` de l'app (un upsert y remplacerait TOUT le blob et pourrait
+// écraser une sauvegarde de l'app faite en parallèle). Cette ligne est un
+// « courrier » à sens unique : le panneau la lit pour cacher le bordereau tout
+// de suite (buildPanelData), et l'app la vide dans `vinted_bords_shipped` à son
+// chargement. La clé est la même que côté app (transaction || suivi || numero).
+async function markBordDone(key, done) {
+  const k = String(key || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_bords_done&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (done === false) delete cur[k];
+  else cur[k] = Date.now();
+  return await supabaseUpsert('app_data', [{ id: 'panel_bords_done', data: cur }], 'id');
+}
+
+// « ✓ Récupéré » un colis à retirer depuis le panneau. Même principe que
+// markBordDone : ligne DÉDIÉE `panel_colis_collected` = { colisKey: ts }, jamais
+// `main`. Le panneau la relit pour vider la liste ; l'app la LIT comme source de
+// « déjà récupéré » supplémentaire. Clé = `suivi || subject` (comme `colisKey`).
+// ── LE BORDEREAU, EN VRAI, DEPUIS LE PANNEAU ────────────────────────────────
+// Julien : « je ne sais pas trop comment tu comptes me les donner, les
+// bordereaux ». Réponse : on va chercher le PDF déjà reçu par email (ligne
+// `email_bord_*`) et on le lui rend directement — la version TAMPONNÉE par
+// l'app (avec le N° de la paire imprimé dessus) si elle existe, sinon le PDF
+// brut de Vinted. Zéro requête vers Vinted, c'est un fichier qu'il a déjà.
+async function bordPdf(rowId) {
+  const id = String(rowId || '').trim();
+  if (!id) return { ok: false };
+  try {
+    const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(id)}&select=pdfB64:data->>pdfB64,pdfTamponneB64:data->>pdfTamponneB64,filename:data->>filename`);
+    const r = rows && rows[0];
+    if (!r) return { ok: false };
+    const net = (v) => (v && v !== 'None') ? v : null;
+    const b64 = net(r.pdfTamponneB64) || net(r.pdfB64);
+    if (!b64) return { ok: false, reason: 'no-pdf' };
+    return { ok: true, b64, tamponne: !!net(r.pdfTamponneB64), filename: net(r.filename) || 'bordereau.pdf' };
+  } catch (_) { return { ok: false }; }
+}
+
+// Prix MINIMUM accepté par paire (ligne dédiée `panel_min_prices`, jamais
+// `main`). Sert à trancher une offre reçue en un coup d'œil : au-dessus →
+// accepte, en dessous → contre-offre proposée. ⚠️ L'extension n'accepte ni ne
+// refuse rien à ta place sur Vinted (cf. refus §32) : elle te dit quoi faire.
+async function setMinPrice(id, amount) {
+  const k = String(id || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const n = Number(amount);
+  if (!isFinite(n) || n <= 0) delete cur[k]; else cur[k] = n;
+  return await supabaseUpsert('app_data', [{ id: 'panel_min_prices', data: cur }], 'id');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GARDE-FOU ANTI-BLOCAGE — à passer AVANT toute action envoyée à Vinted
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien : « améliore tout ça pour ne pas que je me fasse ban ».
+// Les boutons du panneau envoient de vraies requêtes. Sans garde-fou, deux
+// comportements très détectables passaient :
+//
+// 1. ⚠️ AGIR AU NOM D'UN COMPTE QUI N'EST PAS CELUI CONNECTÉ. `vintedSend`
+//    utilise le jeton du compte visé — donc accepter une offre du compte B
+//    pendant que le navigateur est sur le compte A envoie une requête de B
+//    depuis la session/l'empreinte de A. C'est LE signal multi-comptes que
+//    Vinted sanctionne (§5, et c'est ce qui a fait tomber `vanessa5723`).
+//    ➡️ On refuse, et on dit de basculer sur le bon compte d'abord.
+//
+// 2. ⚠️ LA RAFALE. Un plafond par heure et par compte empêche qu'un clic
+//    répété (ou un bug) parte en série. Ce n'est PAS un déguisement de rythme
+//    « faussement humain » (toujours refusé, §32) : c'est une limite dure.
+//
+// Si on n'arrive pas à savoir quel compte est connecté (cookie absent), on
+// LAISSE PASSER : bloquer sur une détection ratée casserait l'outil.
+const ACTIONS_MAX_HEURE = 20;
+
+async function compteConnecte(domain) {
+  try { return await activeAccountId(domain || 'www.vinted.fr'); } catch (_) { return null; }
+}
+
+async function compterAction(uid) {
+  try {
+    const cle = 'vrmActions';
+    const cur = (await chrome.storage.local.get(cle))[cle] || {};
+    const t = Date.now(), ilYaUneHeure = t - 3600000;
+    const list = (cur[uid] || []).filter(x => x > ilYaUneHeure);
+    if (list.length >= ACTIONS_MAX_HEURE) return { ok: false, n: list.length };
+    list.push(t); cur[uid] = list;
+    await chrome.storage.local.set({ [cle]: cur });
+    return { ok: true, n: list.length };
+  } catch (_) { return { ok: true, n: 0 }; }
+}
+
+// Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
+async function garde(uid, acc) {
+  const actif = await compteConnecte(acc && acc.domain);
+  if (actif && String(actif) !== String(uid)) {
+    return { ok: false, code: 'autre-compte',
+             error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted avant d'agir (sinon Vinted voit deux comptes depuis la même session)" };
+  }
+  const c = await compterAction(String(uid));
+  if (!c.ok) {
+    return { ok: false, code: 'trop-d-actions',
+             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
+  }
+  return null;
+}
+
+// ── CE QUE VINTED PEUT VOIR DE TOI ──────────────────────────────────────────
+// Le risque de blocage est invisible, donc impossible à piloter. On le montre.
+// Trois signaux, du plus lourd au plus léger — c'est l'ordre dans lequel Vinted
+// rapproche des comptes (§5) :
+//   1. combien de comptes vivent dans CE navigateur (le facteur décisif : même
+//      appareil, même empreinte — aucune automatisation n'y change quoi que ce
+//      soit, c'est ce qui a fait tomber `vanessa5723`) ;
+//   2. combien de comptes ont reçu une action récemment (basculer d'un compte à
+//      l'autre pour agir, c'est le même signal en mouvement) ;
+//   3. le rythme d'actions de la dernière heure, par compte.
+async function empreinte() {
+  const out = { comptes: [], actif: null, actionsHeure: 0, comptesActifs: 0 };
+  try {
+    out.actif = await compteConnecte('www.vinted.fr');
+    const accts = await getStoredAccounts();
+    const cur = (await chrome.storage.local.get('vrmActions')).vrmActions || {};
+    const ilYaUneHeure = Date.now() - 3600000;
+    for (const a of accts) {
+      const uid = String(a.vinted_user_id);
+      const n = (cur[uid] || []).filter(t => t > ilYaUneHeure).length;
+      out.actionsHeure += n;
+      if (n > 0) out.comptesActifs += 1;
+      out.comptes.push({ uid, login: a.login || '', actif: String(out.actif || '') === uid, actions: n });
+    }
+    out.comptes.sort((a, b) => (b.actif ? 1 : 0) - (a.actif ? 1 : 0) || b.actions - a.actions);
+  } catch (_) {}
+  return out;
+}
+
+// ── RÉPONDRE À UNE OFFRE, EN UN CLIC DEPUIS LE PANNEAU ──────────────────────
+// Julien voulait que ça parte tout seul dès qu'une offre arrive. Refusé, et la
+// raison n'est pas le risque de blocage : accepter une offre engage une VENTE
+// FERME qu'on n'annule pas, et le champ qui dit « cette offre est encore en
+// attente » n'a jamais été observé (aucune offre ouverte dans les conversations
+// captées — que des 20 « acceptée » et 30 « refusée »). Un moteur qui décide
+// seul sur un champ inconnu peut vendre une paire à n'importe quel prix.
+// Ici : un clic = une requête, et il vient de lui.
+//
+// Les deux routes viennent de SES propres actions, captées par `storeWriteReq`
+// sur 5 comptes (jamais devinées) :
+//   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/accept   (corps vide)
+//   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/reject   (corps vide)
+//   POST /api/v2/transactions/{tx}/offers  {"offer":{"price":"32","currency":"EUR"}}
+async function repondreOffre({ uid, tx, oid, quoi, prix }) {
+  if (!uid || !tx) return { ok: false, error: 'offre incomplète' };
+  if (quoi !== 'contre' && !oid) return { ok: false, error: 'offre incomplète' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) return { ok: false, error: 'compte introuvable' };
+  const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
+  let r;
+  if (quoi === 'accept') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, null);
+  else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
+  else if (quoi === 'contre') {
+    const p = Number(prix);
+    if (!isFinite(p) || p <= 0) return { ok: false, error: 'prix invalide' };
+    r = await vintedSend(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { price: String(p), currency: 'EUR' } });
+  } else return { ok: false, error: 'action inconnue' };
+  const mot = quoi === 'accept' ? 'acceptée' : quoi === 'reject' ? 'refusée' : `contrée à ${prix} €`;
+  logActivity(r.ok ? `💶 Offre ${mot}` : `⚠️ Offre ${mot} : Vinted a refusé (${r.status})`);
+  return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+
+// ── ⚠️ REPUBLIER CASSE LE NUMÉRO DE LA PAIRE ────────────────────────────────
+// Effet de bord jamais traité, et il est sérieux. Republier chez Vinted =
+// supprimer + recréer → la nouvelle annonce a un **nouvel id**. Or les numéros
+// vivent dans `vinted_annonce_numeros`, **indexés par id d'annonce** (§7). Donc
+// après une republication :
+//   1. le N° reste accroché à une annonce qui n'existe plus ;
+//   2. la nouvelle annonce n'a PLUS de numéro ;
+//   3. pire — le N° étant « libre » (plus aucune annonce en ligne ne le porte),
+//      la numérotation auto peut le **redonner à une autre paire**, alors que la
+//      tienne dort toujours dans cette boîte au garage. C'est exactement le
+//      « deux paires dans la même boîte » que §19 traite comme dangereux.
+// On mémorise donc ce qu'on republie, et on repère la nouvelle annonce ensuite.
+// ⚠️ L'extension N'ÉCRIT PAS le numéro elle-même : `vinted_annonce_numeros` vit
+// dans la ligne `main`, que le panneau ne doit jamais réécrire (§35). Elle
+// signale, tu appliques dans l'app.
+async function marquerRepublie(id, numero, title) {
+  if (!id) return false;
+  const rows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
+  const cur = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+  const items = { ...cur };
+  items[String(id)] = { numero: numero != null ? String(numero) : '', title: String(title || ''), t: Date.now() };
+  // On oublie au bout de 30 jours : passé ce délai, la nouvelle annonce a été
+  // captée depuis longtemps, ou la paire n'existe plus.
+  const limite = Date.now() - 30 * 86400000;
+  for (const k in items) if (!items[k] || (items[k].t || 0) < limite) delete items[k];
+  return await supabaseUpsert('app_data', [{ id: 'panel_repub_pending', data: { items, majAt: new Date().toISOString() } }], 'id');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE COFFRE — chaque annonce enregistrée EN ENTIER, chez toi
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien : « faire un cloud avec la possibilité d'enregistrer
+// intégralement une annonce ». Ça protège son stock pour de vrai : si une
+// annonce disparaît (suppression par erreur, compte fermé, republication ratée),
+// il garde le texte ET les photos.
+//
+// ⚠️ CHOIX DE STOCKAGE — les photos ne vont PAS en base. 119 annonces × plusieurs
+// images = des centaines de Mo, et c'est très exactement ce qui a fait exploser
+// le quota d'égress en août (§34, le widget qui retéléchargeait les PDF). Le
+// coffre garde le TEXTE COMPLET + les URL des photos (quelques Ko par annonce) ;
+// les fichiers se téléchargent à la demande dans un dossier, chez lui.
+//
+// ⚠️ IL NE DÉPEND PAS de la capture de fiche (`harvest_*_item_*`), qui ne range
+// rien aujourd'hui pour une raison encore inconnue (cf. `noterDiag`). Il se
+// construit avec CE QU'ON A : la fiche si elle existe, sinon les données du
+// dressing (titre, prix, marque, taille, photo). Il s'enrichit tout seul ensuite.
+function coffreRecord(uid, it, fiche) {
+  const f = fiche || {};
+  const photos = [];
+  const push = (u) => { const s = String(u || ''); if (s && !photos.includes(s)) photos.push(s); };
+  if (Array.isArray(f.photos)) for (const p of f.photos) push(p && (p.full_size_url || p.url));
+  push(it && it.photo && (it.photo.url || it.photo));
+  return {
+    id: String((it && it.id) || f.id || ''),
+    uid: String(uid || ''),
+    title: String((f.title || (it && it.title) || '')),
+    desc: String(f.description || ''),
+    brand: String(f.brand || (f.brand_dto && f.brand_dto.title) || (it && it.brand_title) || ''),
+    size: String(f.size_title || (it && it.size_title) || ''),
+    etat: String(f.status || ''),
+    catalogId: f.catalog_id != null ? f.catalog_id : null,
+    price: (f.price && f.price.amount != null) ? f.price.amount
+         : ((it && it.price && it.price.amount != null) ? it.price.amount : (it && it.price) ?? null),
+    photos,
+    url: String((it && it.url) || f.url || ''),
+    savedAt: new Date().toISOString(),
+  };
+}
+
+async function archiverAnnonce(uid, it, fiche) {
+  try {
+    const rec = coffreRecord(uid, it, fiche);
+    if (!rec.id) return false;
+    // On ne REMPLACE pas un enregistrement riche par un pauvre : si le coffre a
+    // déjà la description et qu'on n'apporte que le dressing, on complète.
+    const rows = await sbGet(`app_data?id=eq.coffre_${rec.uid}_${rec.id}&select=data`);
+    const anc = (rows && rows[0] && rows[0].data) || null;
+    if (anc) {
+      if (!rec.desc && anc.desc) rec.desc = anc.desc;
+      if (!rec.brand && anc.brand) rec.brand = anc.brand;
+      if (!rec.size && anc.size) rec.size = anc.size;
+      if (!rec.etat && anc.etat) rec.etat = anc.etat;
+      if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
+      for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
+    } else rec.firstSavedAt = rec.savedAt;
+    return await supabaseUpsert('app_data', [{ id: `coffre_${rec.uid}_${rec.id}`, data: rec }], 'id');
+  } catch (_) { return false; }
+}
+
+// Archivage EN LOT (tout le dressing d'un compte) : une lecture, une écriture.
+// Ne dégrade jamais un enregistrement déjà riche (la description vient de la
+// fiche, le dressing ne l'a pas — on complète, on n'écrase pas).
+async function archiverLot(uid, items) {
+  if (!items || !items.length) return false;
+  const rows = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id,data`) || [];
+  const anciens = {};
+  for (const r of rows) { const d = r && r.data; if (d && d.id) anciens[String(d.id)] = d; }
+  const out = [];
+  for (const it of items.slice(0, 300)) {
+    const rec = coffreRecord(uid, it, null);
+    if (!rec.id) continue;
+    const anc = anciens[rec.id];
+    if (anc) {
+      if (!rec.desc && anc.desc) rec.desc = anc.desc;
+      if (!rec.brand && anc.brand) rec.brand = anc.brand;
+      if (!rec.size && anc.size) rec.size = anc.size;
+      if (!rec.etat && anc.etat) rec.etat = anc.etat;
+      if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
+      for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
+      // Rien de nouveau ? on ne réécrit pas cette ligne (égress inutile).
+      if (anc.title === rec.title && String(anc.price) === String(rec.price)
+          && (anc.photos || []).length === rec.photos.length && anc.desc === rec.desc) continue;
+    } else rec.firstSavedAt = rec.savedAt;
+    out.push({ id: `coffre_${uid}_${rec.id}`, data: rec });
+  }
+  if (!out.length) return true;
+  return await supabaseUpsert('app_data', out, 'id');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE PRIX D'ACHAT — le trou le plus coûteux des données
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré en base : **0 prix d'achat renseigné sur 177 paires**. Conséquence :
+// tout le calcul de bénéfice tourne avec un coût de ZÉRO — marge ~100 %,
+// « meilleure marque » sans valeur, rapport comptable qui sous-estime les
+// charges. L'app le signale, donc rien n'est faussement affirmé, mais les
+// chiffres restent inexploitables.
+// Pourquoi il n'est jamais saisi : il fallait retrouver la bonne paire parmi
+// ~700 achats listés par date. Ici on renverse le problème — on propose les
+// candidats les plus probables pendant qu'il REGARDE l'annonce sur Vinted.
+//
+// Score (repris de `openPicker` dans l'app, mêmes poids → mêmes suggestions) :
+//   titre identique +6 · même marque +4 · même taille +4 · payé moins cher +1
+//   à score égal, le plus récent d'abord.
+// ⚠️ On ne devine JAMAIS tout seul : on propose, il tape. Un mauvais prix
+//    d'achat fausse la compta plus sûrement qu'une case vide.
+const motsClés = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9À-ÿ ]/gi, ' ').split(/\s+/).filter(w => w.length > 2);
+function extraireTaille(t) {
+  const m = /\b(\d{2}(?:[.,]5)?)\b/.exec(String(t || ''));
+  return m ? m[1].replace(',', '.') : '';
+}
+async function achatsPour(titre, prixVente) {
+  const out = [];
+  try {
+    const rows = (await sbGet('app_data?id=like.harvest_*_orders_purchased*&select=id,data') || []);
+    const vus = new Set();
+    const tNorm = String(titre || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const marqueRef = motsClés(titre)[0] || '';
+    const tailleRef = extraireTaille(titre);
+    const pv = Number(prixVente);
+    for (const r of rows) {
+      for (const o of (((r.data || {}).payload || {}).my_orders || [])) {
+        const tx = String(o.transaction_id || '');
+        if (tx && vus.has(tx)) continue; if (tx) vus.add(tx);
+        const t = String(o.title || '');
+        if (!t) continue;
+        if (/annul|cancel|refus|rembours/i.test(String(o.status || ''))) continue;
+        const prix = Number((o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? NaN);
+        let s = 0;
+        if (t.toLowerCase().replace(/\s+/g, ' ').trim() === tNorm) s += 6;
+        const mots = motsClés(t);
+        if (marqueRef && mots.includes(marqueRef)) s += 4;
+        const taille = extraireTaille(t);
+        if (tailleRef && taille && taille === tailleRef) s += 4;
+        if (isFinite(prix) && isFinite(pv) && prix < pv) s += 1;
+        if (s < 4) continue;                       // en dessous, ce n'est plus une suggestion
+        const ts = o.date ? Date.parse(o.date) : 0;
+        out.push({ tx, title: t, prix: isFinite(prix) ? prix : null, ts: isNaN(ts) ? 0 : ts, score: s,
+                   photo: (o.photo && (o.photo.url || o.photo)) || null });
+      }
+    }
+  } catch (_) { return []; }
+  return out.sort((a, b) => (b.score - a.score) || (b.ts - a.ts)).slice(0, 6);
+}
+
+// Le prix d'achat choisi va dans une ligne DÉDIÉE : l'extension n'écrit jamais
+// `main` (§35), c'est l'app qui le reportera sur la paire.
+async function setBuyPrice(itemId, prix, tx, titre) {
+  const k = String(itemId || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_buyprices&select=data');
+  const cur = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+  const items = { ...cur };
+  const n = Number(String(prix).replace(',', '.'));
+  if (!isFinite(n) || n < 0) delete items[k];
+  else items[k] = { price: n, tx: tx ? String(tx) : '', title: String(titre || ''), t: Date.now() };
+  return await supabaseUpsert('app_data', [{ id: 'panel_buyprices', data: { items, majAt: new Date().toISOString() } }], 'id');
+}
+
+// Rapatrie une photo (CDN Vinted) en data: URL.
+// ⚠️ POURQUOI PAR LE BACKGROUND : dans une page, une image du CDN chargée dans
+// un <canvas> le rend « tainted » (cross-origin) et l'export devient interdit —
+// on ne pourrait ni recadrer ni enregistrer. Le service worker, lui, a les
+// permissions d'hôte : il récupère les octets, et une data: URL se recadre sans
+// aucune restriction.
+async function photoBytes(url) {
+  try {
+    if (!/^https:/i.test(String(url || ''))) return { ok: false };
+    const res = await fetch(url);
+    if (!res.ok) return { ok: false, error: `image ${res.status}` };
+    const buf = await res.arrayBuffer();
+    if (!buf.byteLength || buf.byteLength > 12000000) return { ok: false, error: 'image trop lourde' };
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const mime = res.headers.get('content-type') || 'image/jpeg';
+    return { ok: true, dataUrl: `data:${mime};base64,${btoa(bin)}` };
+  } catch (e) { return { ok: false, error: String(e).slice(0, 60) }; }
+}
+
+// ── CAPTER LA FICHE D'UNE ANNONCE (pour pouvoir la republier) ───────────────
+// Sans la fiche, on n'a QUE le titre, le prix et la photo : pas la description,
+// pas la catégorie, pas les attributs. Or republier chez Vinted, c'est supprimer
+// puis RECRÉER — donc tout refournir. Sans description, « Republier » revient à
+// tout retaper à la main : la fonction ne peut pas être bonne.
+// La capture passive devrait s'en charger, mais elle ne range rien (0 ligne en
+// base, cf. `noterDiag`). En attendant de trouver la fuite, ce bouton va la
+// chercher franchement, pour UNE annonce, quand tu la regardes.
+// C'est une LECTURE de ta propre annonce, sur ton clic. Rien n'est modifié.
+async function capterAnnonce(uid, itemId) {
+  if (!itemId) return { ok: false, error: 'annonce inconnue' };
+  const accts = await getStoredAccounts();
+  let acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) acc = accts[0];
+  if (!acc) return { ok: false, error: 'aucun compte lié' };
+  const stop = await garde(acc.vinted_user_id, acc); if (stop) return stop;   // anti-blocage
+  // vintedGet renvoie { status, ok, json }.
+  const r = await vintedGet(acc, `/api/v2/items/${itemId}`);
+  if (!r || !r.ok || !r.json) return { ok: false, error: `Vinted a répondu ${r ? r.status : '—'}` };
+  try {
+    await storeHarvest(acc.domain || 'www.vinted.fr', 'item', String(itemId), JSON.stringify(r.json));
+  } catch (e) { return { ok: false, error: String(e).slice(0, 80) }; }
+  logActivity('📝 Fiche annonce captée (description)');
+  return { ok: true };
+}
+
+// ── GÉNÉRER LE BORDEREAU, À TA PLACE ────────────────────────────────────────
+// Julien : « je ne veux pas avoir à le faire ». Ici je le fais, et sans réserve :
+// générer un bordereau n'engage AUCUN argent et ne décide de rien. La vente est
+// déjà conclue, le colis DOIT partir, l'étiquette est une formalité obligatoire
+// sans prix ni choix — rien à voir avec accepter une offre.
+//
+// La requête vient de SES actions, captée sur 5 comptes (`storeWriteReq`) :
+//   PUT /api/v2/transactions/{tx}/shipment/order
+//   {"seller_address_id":310525135,"drop_off_type":null,"label_type":null}
+// `seller_address_id` change par compte : on le relit dans la capture de CE
+// compte. Sans capture pour ce compte, on ne devine pas — on le dit.
+async function adresseVendeur(uid) {
+  try {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_wreq_api_v2_transactions_id_shipment_order&select=data`);
+    const body = rows && rows[0] && rows[0].data && rows[0].data.body;
+    if (!body) return null;
+    const j = typeof body === 'string' ? JSON.parse(body) : body;
+    const id = j && j.seller_address_id;
+    return id != null ? id : null;
+  } catch (_) { return null; }
+}
+
+async function genererBordereau(uid, tx) {
+  if (!uid || !tx) return { ok: false, error: 'vente incomplète' };
+  const adr = await adresseVendeur(uid);
+  if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
+  const accts = await getStoredAccounts();
+  const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) return { ok: false, error: 'compte introuvable' };
+  const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
+  const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
+    { seller_address_id: adr, drop_off_type: null, label_type: null });
+  logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
+  return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+
+// Couper / réafficher un compte Vinted DEPUIS LE PANNEAU. Ligne DÉDIÉE
+// `panel_accounts_off` = { uid: true } — jamais `main` (un upsert y écraserait
+// tout le blob de l'app). `buildPanelData` la relit : le compte disparaît de
+// TOUTES les vues (annonces, ventes, achats, messages, litiges) tout de suite.
+async function setAccountOff(uid, off) {
+  const k = String(uid || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  // `false` est ENREGISTRÉ (et non effacé) : c'est ce qui permet de rallumer
+  // un compte masqué par l'app, que le panneau n'a pas le droit de modifier.
+  cur[k] = !!off ? true : false;
+  return await supabaseUpsert('app_data', [{ id: 'panel_accounts_off', data: cur }], 'id');
+}
+
+async function markPickupDone(key, done) {
+  const k = String(key || '').trim();
+  if (!k) return false;
+  const rows = await sbGet('app_data?id=eq.panel_colis_collected&select=data');
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (done === false) delete cur[k];
+  else cur[k] = Date.now();
+  return await supabaseUpsert('app_data', [{ id: 'panel_colis_collected', data: cur }], 'id');
+}
+
 // ── ASSISTANT DE RÉPONSE (spec « Messaging Intelligence ») ───────────────────
 // Le panneau relaie le message de l'acheteur ; on le passe à /api/ai (mode
 // reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
@@ -1072,7 +1759,80 @@ async function buildPanelData() {
   // Descriptions/photos lues sur les pages d'annonce (pour Leboncoin + archive).
   const detRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
   const pageDetails = (detRows && detRows[0] && detRows[0].data) || {};
-  const lst = await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || [];
+  // Titre normalisé : sert au rapprochement par titre EXACT (jamais approximatif).
+  const normT = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // ── COMPTES : une seule règle d'exclusion, et tu peux couper un compte ICI ───
+  // Trois sources réunies dans `acctOff` :
+  //   • l'app (ligne main) : `vinted_accounts_hidden` + `vinted_accounts_blocked` ;
+  //   • les comptes supprimés définitivement (`vrm_blocked_accounts`) ;
+  //   • le panneau lui-même (`panel_accounts_off`, ligne DÉDIÉE) — pour couper un
+  //     compte depuis l'extension sans rouvrir l'app (demande de Julien : un
+  //     compte retiré continuait d'afficher ses paires).
+  const hiddenAcc = new Set([
+    ...(Array.isArray(d.vinted_accounts_hidden) ? d.vinted_accounts_hidden : []),
+    ...(Array.isArray(d.vinted_accounts_blocked) ? d.vinted_accounts_blocked : []),
+  ].map(String));
+  let blockedAcc = new Set(); try { blockedAcc = await blockedAccounts(); } catch (_) {}
+  const offRows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
+  const offMap = (offRows && offRows[0] && offRows[0].data) || {};
+  const offPanel = new Set(Object.keys(offMap).filter(k => offMap[k] === true));
+  // ⚠️ « ↺ Réafficher » NE MARCHAIT PAS pour un compte masqué depuis l'APP.
+  // `setAccountOff(uid,false)` se contentait d'effacer la clé de CETTE ligne,
+  // or `acctOff` réunit quatre sources : le compte restait masqué par
+  // `vinted_accounts_hidden` (ligne `main`, écrite par l'app) et le bouton
+  // paraissait mort. C'est exactement ce que Julien a vu : « tous les autres
+  // comptes sont marqués masqués » sans moyen de les rallumer depuis Chrome.
+  // La ligne dédiée porte donc trois états : `true` = masqué par le panneau,
+  // `false` = RALLUMÉ EXPLICITEMENT (ça prime sur l'app), absent = on suit
+  // l'app. Le panneau ne réécrit toujours JAMAIS la ligne `main` (§35).
+  const forceOn = new Set(Object.keys(offMap).filter(k => offMap[k] === false));
+  const acctOff = (uid) => {
+    const k = String(uid == null ? '' : uid);
+    if (!k || forceOn.has(k)) return false;
+    return hiddenAcc.has(k) || blockedAcc.has(k) || offPanel.has(k);
+  };
+  // Pourquoi ce compte est-il masqué ? Sans ça, un compte disparaît sans que
+  // rien ne dise d'où vient la décision — et on croit à un bug de capture.
+  const acctRaison = (uid) => {
+    const k = String(uid == null ? '' : uid);
+    if (!k || forceOn.has(k)) return '';
+    if (offPanel.has(k)) return 'panneau';
+    if (blockedAcc.has(k)) return 'supprime';
+    if (hiddenAcc.has(k)) return 'app';
+    return '';
+  };
+  const keepAcc = (r) => !acctOff(r && r.data && r.data.uid);
+  // Nom lisible d'un compte : l'étiquette posée dans l'app, sinon le pseudo Vinted.
+  const accRows = await sbGet('vinted_accounts?select=vinted_user_id,login') || [];
+  const labels = (d.vinted_account_labels && typeof d.vinted_account_labels === 'object') ? d.vinted_account_labels : {};
+  const nameByUid = {};
+  for (const a of (accRows || [])) { const k = String(a.vinted_user_id || ''); if (k) nameByUid[k] = String(labels[k] || a.login || ('compte ' + k.slice(-4))); }
+  const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || (k ? 'compte ' + k.slice(-4) : ''); };
+  const lstAll = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []);
+  const soldAll = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []);
+  // ⚠️ LA PLUS FRAÎCHE CAPTURE GAGNE. Une même vente peut exister dans plusieurs
+  // lignes moissonnées (comptes, captures successives). Avant, on gardait la
+  // PREMIÈRE rencontrée — donc parfois un statut périmé : une paire déjà expédiée
+  // ressortait « à générer ». On trie par date de capture décroissante : le
+  // premier vu est le plus récent. On se base sur ce qu'on a capté, pas sur une
+  // déduction.
+  const parFraicheur = (a, b) => (Date.parse((b.data && b.data.capturedAt) || '') || 0) - (Date.parse((a.data && a.data.capturedAt) || '') || 0);
+  const lst = lstAll.filter(keepAcc).sort(parFraicheur);
+  const soldRows = soldAll.filter(keepAcc).sort(parFraicheur);
+  // Liste des comptes pour le panneau (avec le nb d'annonces en ligne) : tu vois
+  // exactement d'où viennent tes paires, et tu peux en couper un d'un clic.
+  const accountsSeen = {};
+  const noteAcct = (uid, n) => {
+    const k = String(uid || ''); if (!k) return;
+    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k), raison: acctRaison(k) };
+    accountsSeen[k].online += n || 0;
+  };
+  for (const r of lstAll) {
+    const items = (r.data && r.data.payload && r.data.payload.items) || [];
+    noteAcct(r.data && r.data.uid, items.filter(it => !it.is_closed && !it.is_hidden && !it.is_draft).length);
+  }
+  for (const r of soldAll) noteAcct(r.data && r.data.uid, 0);
+  const accounts = Object.values(accountsSeen).sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || b.online - a.online);
   const online = [];
   const seen = new Set();
   for (const r of lst) {
@@ -1094,6 +1854,7 @@ async function buildPanelData() {
       const ageDays = ts ? Math.floor((Date.now() - ts) / 86400000) : null;
       const numero = e && e.numero ? String(e.numero) : null;
       online.push({
+        uid: String((r.data && r.data.uid) || ''), acct: acctName(r.data && r.data.uid),
         id, title: it.title || '', url: it.url || `https://www.vinted.fr/items/${id}`,
         price: (it.price && (it.price.amount != null ? it.price.amount : it.price)) ?? null,
         photo: (it.photo && it.photo.url) || (it.photos && it.photos[0] && it.photos[0].url) || null,
@@ -1102,10 +1863,57 @@ async function buildPanelData() {
         numero, buyPrice: e && e.buyPrice != null ? e.buyPrice : null,
         cell: numero ? (cellByNum[numero] || null) : null,
         ageDays,
+        brand: String(it.brand_title || '').trim(),
+        size: String(it.size_title || '').trim(),
         hasDesc: !!(pageDetails[id] && pageDetails[id].description),
         nPhotos: (pageDetails[id] && (pageDetails[id].photos || []).length) || 0,
       });
     }
+  }
+  // ── PAIRES VENDUES QUI TRAÎNENT ENCORE EN « EN LIGNE » ──────────────────────
+  // Demande de Julien : « une paire vendue, je veux qu'elle soit supprimée
+  // totalement de la liste en ligne ». Une moisson un peu datée garde l'annonce
+  // avec `is_closed:false` alors que la paire est partie. Deux sources SÛRES :
+  //   • la mémoire de l'app (`vinted_annonces_email_sold`, par ID d'annonce) ;
+  //   • une vente RÉCENTE (< 60 j) dont le titre est UNIQUE parmi les annonces en
+  //     ligne. Un titre en double ne retire jamais rien (§24 : pas de devinette —
+  //     sinon on effacerait une paire identique encore réellement en vente).
+  const emailSoldIds = new Set((Array.isArray(d.vinted_annonces_email_sold) ? d.vinted_annonces_email_sold : []).map(String));
+  const soldRecentTitles = new Set();
+  for (const r of soldRows) {
+    for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
+      if (/annul|cancel|refus|rembours/i.test(o.status || '')) continue;
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
+      const k = normT(o.title); if (k) soldRecentTitles.add(k);
+    }
+  }
+  const onlineTitleN = {};
+  for (const o of online) { const k = normT(o.title); if (k) onlineTitleN[k] = (onlineTitleN[k] || 0) + 1; }
+  let removedSold = 0;
+  for (let i = online.length - 1; i >= 0; i--) {
+    const o = online[i]; const k = normT(o.title);
+    const vendue = emailSoldIds.has(String(o.id)) || (k && onlineTitleN[k] === 1 && soldRecentTitles.has(k));
+    if (vendue) { online.splice(i, 1); removedSold++; }
+  }
+  // ── PRIX DES PAIRES COMPARABLES (peer price) ────────────────────────────────
+  // Même logique que l'app (scoreAnnonce.peerPrice) : la MÉDIANE du prix des
+  // annonces EN LIGNE de MÊME marque + MÊME taille (≥2 paires, sinon on ne dit
+  // rien). Sert à repérer une paire au-dessus/en-dessous de ton propre marché,
+  // pendant que tu la regardes. 0 requête Vinted (calculé sur la moisson).
+  const peerGroups = {};
+  for (const o of online) {
+    const pr = o.price == null ? NaN : Number(o.price);
+    if (!o.brand || !o.size || isNaN(pr)) continue;
+    const k = (o.brand + '|' + o.size).toLowerCase();
+    (peerGroups[k] = peerGroups[k] || []).push(pr);
+  }
+  const median = (arr) => { const s = arr.slice().sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  for (const o of online) {
+    if (!o.brand || !o.size) { o.peer = null; o.peerN = 0; continue; }
+    const g = peerGroups[(o.brand + '|' + o.size).toLowerCase()] || [];
+    o.peer = g.length >= 2 ? median(g) : null; // ≥2 paires comparables sinon rien
+    o.peerN = g.length;
   }
   // « À relancer » : le signal FIABLE est le ratio favoris/vues, pas l'âge.
   // (Vinted ne donne pas la date de mise en ligne dans le dressing, et la date
@@ -1130,20 +1938,57 @@ async function buildPanelData() {
   // NE clique PAS à ta place sur Vinted (ce motif fait bloquer les comptes) : tu
   // ouvres, tu génères d'un clic, et l'extension capte le PDF automatiquement.
   const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
-  const soldRows = await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || [];
+  const acctOfRow = (r) => ({ uid: String((r.data && r.data.uid) || ''), acct: acctName(r.data && r.data.uid) });
+  // ⚠️ LA PHOTO EST DÉJÀ DANS LA COMMANDE. `commandeMaigre` garde `photo` ({url}),
+  // mais on ne la lisait pas → la ligne de vente montrait un pictogramme alors que
+  // la vraie photo Vinted était là (plainte de Julien : « je n'ai pas la photo de
+  // ma paire »). C'est la source la PLUS sûre : elle vient de la commande
+  // elle-même — aucun rapprochement, donc aucun risque d'afficher une autre paire.
+  const photoDeCommande = (o) => (o && ((o.photo && (o.photo.url || (typeof o.photo === 'string' ? o.photo : null))) || o.photo_url)) || null;
   const bordRows = await sbGet("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
   const bordTxns = new Set(bordRows.map(b => String(b.transaction || '')).filter(Boolean));
+  // ── ÉTAT DU COLIS : la capture la plus précise qu'on ait ────────────────────
+  // Le détail de transaction (`harvest_*_txn_*`) porte `shipment.status_title` —
+  // c'est Vinted qui le dit, pas une déduction de notre part. Quand ce détail est
+  // PLUS RÉCENT que la ligne de commande, il fait foi : une paire dont le colis
+  // est parti ne doit plus jamais apparaître « à générer » (plainte de Julien).
+  const txnEtat = {};
+  try {
+    const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data') || []).filter(keepAcc);
+    for (const r of txnRows) {
+      const p = (r.data && r.data.payload) || {};
+      const t = p.transaction || p;
+      const tx = String((t && t.id) || '');
+      if (!tx) continue;
+      const sh = (t && t.shipment) || {};
+      const st = String(sh.status_title || sh.status || t.status_title || t.status || '');
+      const cap = Date.parse((r.data && r.data.capturedAt) || '') || 0;
+      if (!st) continue;
+      if (!txnEtat[tx] || cap > txnEtat[tx].cap) txnEtat[tx] = { st, cap };
+    }
+  } catch (_) { /* la forme du détail de transaction peut varier : on ignore */ }
+  // « Encore à expédier » = ce que dit la capture LA PLUS RÉCENTE dont on dispose.
+  const encoreAExpedier = (tx, statutCommande, capCommande) => {
+    const d = tx ? txnEtat[String(tx)] : null;
+    if (d && d.cap >= (capCommande || 0)) return awaitingShip(d.st);
+    return awaitingShip(statutCommande);
+  };
   const toShip = [];
   const seenTx = new Set();
   for (const r of soldRows) {
     const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    const capR = Date.parse((r.data && r.data.capturedAt) || '') || 0;
     for (const o of orders) {
-      if (!awaitingShip(o.status)) continue;
-      const tx = String(o.transaction_id || '');
-      if (tx && seenTx.has(tx)) continue; if (tx) seenTx.add(tx);
+      const tx0 = String(o.transaction_id || '');
+      // ⚠️ On saute AUSSI les transactions déjà vues dans une capture plus
+      // fraîche : sans ça, une vieille ligne rouvrait une vente déjà traitée.
+      if (tx0 && seenTx.has(tx0)) continue;
+      if (!encoreAExpedier(tx0, o.status, capR)) { if (tx0) seenTx.add(tx0); continue; }
+      const tx = tx0;
+      if (tx) seenTx.add(tx);
       toShip.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
         transaction: tx, title: o.title || '', status: o.status || '',
-        photo: o.photo || o.photo_url || null,
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
         conv: o.conversation_id != null ? String(o.conversation_id) : null,
         url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : (o.conversation_id ? `https://www.vinted.fr/inbox/${o.conversation_id}` : 'https://www.vinted.fr/member/transactions?type=sold'),
@@ -1151,10 +1996,186 @@ async function buildPanelData() {
       });
     }
   }
+  // ── DERNIÈRES VENTES (lecture seule) : mêmes commandes moissonnées que l'app,
+  // mêmes règles de statut (classifyOrderStatus). On NE recalcule AUCUN total ici
+  // (le CA du mois reste celui publié par l'app, appStats) : c'est juste la liste
+  // « qu'est-ce que j'ai vendu récemment » pour éviter de rouvrir l'app. On exclut
+  // les annulées/remboursées (ce n'est pas de l'argent qui rentre).
+  const classifySale = (st) => /annul|cancel|refus|rembours/i.test(st || '') ? 'cancelled'
+    : /finalis/i.test(st || '') ? 'completed' : 'pending';
+  const salesFlat = [];
+  const seenSaleTx = new Set();
+  for (const r of soldRows) {
+    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    const capR = Date.parse((r.data && r.data.capturedAt) || '') || 0;
+    for (const o of orders) {
+      const tx = String(o.transaction_id || '');
+      if (tx && seenSaleTx.has(tx)) continue; if (tx) seenSaleTx.add(tx);
+      if (classifySale(o.status) === 'cancelled') continue;
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      salesFlat.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
+        transaction: tx, title: o.title || '', status: o.status || '',
+        etat: classifySale(o.status),
+        // « à expédier » = Vinted attend encore le colis (même règle que l'app).
+        // (capture la plus récente, détail de transaction prioritaire — sinon une
+        // paire déjà expédiée ressortait « à générer »)
+        aExpedier: encoreAExpedier(tx, o.status, capR),
+        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
+        ts: isNaN(ts) ? 0 : ts,
+        url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : 'https://www.vinted.fr/member/transactions?type=sold',
+      });
+    }
+  }
+  const salesSorted = salesFlat.sort((a, b) => b.ts - a.ts);
+  const sales = salesSorted.slice(0, 80);         // liste complète (onglet Ventes)
+  const recentSales = salesSorted.slice(0, 6);    // top 6 (Ma journée)
+  // ── DERNIERS ACHATS (lecture seule) : mêmes commandes moissonnées `orders_purchased`.
+  // On NE relabelle PAS le statut (l'app classe les achats par statut, on ne veut
+  // rien inventer) : juste titre + prix + date, exclus les annulés/remboursés.
+  const buyRows = (await sbGet('app_data?id=like.harvest_*_orders_purchased&select=data') || []).filter(keepAcc);
+  const buysFlat = [];
+  const seenBuyTx = new Set();
+  for (const r of buyRows) {
+    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    for (const o of orders) {
+      const tx = String(o.transaction_id || '');
+      if (tx && seenBuyTx.has(tx)) continue; if (tx) seenBuyTx.add(tx);
+      if (classifySale(o.status) === 'cancelled') continue;
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      buysFlat.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
+        transaction: tx, title: o.title || '', status: o.status || '',
+        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
+        ts: isNaN(ts) ? 0 : ts,
+        url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : 'https://www.vinted.fr/member/transactions?type=bought',
+      });
+    }
+  }
+  const recentBuys = buysFlat.sort((a, b) => b.ts - a.ts).slice(0, 80);
+  // ── LITIGES / PAIRES QUI REVIENNENT (lecture seule) ─────────────────────────
+  // Source FIABLE et déjà présente : le STATUT des ventes moissonnées (comme
+  // `saleOutcome` de l'app — remboursement / retour / litige / suspension). C'est
+  // ce qui indique qu'une paire te revient, sans rien deviner.
+  // Enrichissement OPTIONNEL : les vraies réclamations captées passivement
+  // (`harvest_*_complaints`) portent parfois un MOTIF ; on l'attache par n° de
+  // transaction quand on le retrouve, sinon on n'invente rien.
+  const DISPUTE = [
+    { re: /rembours/i, kind: 'remboursement', label: '💸 Remboursé' },
+    { re: /retour/i, kind: 'retour', label: '📦 Retour initié' },
+    { re: /litige|r[ée]clam|dispute|complaint|probl[èe]me|signal/i, kind: 'litige', label: '⚠️ Litige' },
+    { re: /suspend/i, kind: 'suspendu', label: '⏸️ Suspendu' },
+  ];
+  // Motifs de réclamation captés, indexés par n° de transaction (défensif : la
+  // forme exacte de l'API complaints n'est pas garantie → on lit large, sans throw).
+  const complaintReasons = {};
+  try {
+    const compRows = await sbGet('app_data?id=like.harvest_*_complaints&select=data') || [];
+    const pick = (o, keys) => { for (const k of keys) { if (o && o[k] != null && o[k] !== '') return o[k]; } return null; };
+    for (const r of compRows) {
+      const pay = (r.data && r.data.payload) || {};
+      const arr = pay.complaints || pay.items || pay.entries || (Array.isArray(pay) ? pay : []);
+      if (!Array.isArray(arr)) continue;
+      for (const c of arr) {
+        if (!c || typeof c !== 'object') continue;
+        const tx = String(pick(c, ['transaction_id', 'transactionId']) || (c.transaction && c.transaction.id) || (c.order && c.order.id) || '');
+        const reason = pick(c, ['reason', 'reason_title', 'title', 'complaint_reason', 'label', 'status_title', 'kind_title']);
+        if (tx && reason) complaintReasons[tx] = String(reason).slice(0, 80);
+      }
+    }
+  } catch (_) { /* la forme de l'API complaints peut varier : on ignore proprement */ }
+  const disputes = [];
+  const seenDispTx = new Set();
+  for (const r of soldRows) {
+    const orders = (r.data && r.data.payload && r.data.payload.my_orders) || [];
+    for (const o of orders) {
+      const st = o.status || '';
+      const m = DISPUTE.find(d => d.re.test(st));
+      if (!m) continue;
+      const tx = String(o.transaction_id || '');
+      if (tx && seenDispTx.has(tx)) continue; if (tx) seenDispTx.add(tx);
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      disputes.push({
+        ...acctOfRow(r), photo: photoDeCommande(o),
+        transaction: tx, title: o.title || '', status: st, kind: m.kind, label: m.label,
+        reason: (tx && complaintReasons[tx]) || null,
+        price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
+        ts: isNaN(ts) ? 0 : ts,
+        url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : 'https://www.vinted.fr/member/transactions?type=sold',
+      });
+    }
+  }
+  disputes.sort((a, b) => b.ts - a.ts);
+  // ── PHOTO + N° DE LA PAIRE sur les lignes ventes/achats/litiges ──────────────
+  // Les commandes moissonnées sont allégées (pas de photo). On retrouve la photo
+  // et le numéro dans `vinted_annonce_numeros` (gardé même pour les paires
+  // vendues) PAR TITRE EXACT, et UNIQUEMENT si le titre est unique — jamais de
+  // devinette sur un titre en double (même garde que l'app §7/§24 `titleAmbiguous`).
+  // La photo d'une annonce ENCORE en ligne prime (plus fraîche).
+  const titleCount = {};
+  const numByTitle = {};
+  for (const id in numeros) {
+    const e = numeros[id]; if (!e) continue;
+    const key = normT(e.title); if (!key) continue;
+    titleCount[key] = (titleCount[key] || 0) + 1;
+    if (!numByTitle[key]) numByTitle[key] = { numero: e.numero != null ? String(e.numero) : null, photo: e.photo || null };
+  }
+  for (const o of online) {
+    const key = normT(o.title); if (!key || (titleCount[key] || 0) !== 1 || !numByTitle[key]) continue;
+    if (o.photo) numByTitle[key].photo = o.photo;               // photo fraîche
+    if (o.numero != null && numByTitle[key].numero == null) numByTitle[key].numero = String(o.numero);
+  }
+  const lookupPair = (title) => { const key = normT(title); if (!key || (titleCount[key] || 0) > 1) return null; return numByTitle[key] || null; };
+  // Photo par NUMÉRO (identité certaine) — pour les bordereaux, où le rapprochement
+  // par titre est INTERDIT (§24 : risque d'envoyer la mauvaise paire). Le N° d'un
+  // bordereau vient de l'email/la transaction (certain) ; on l'utilise pour la photo.
+  const photoByNum = {};
+  for (const id in numeros) { const e = numeros[id]; if (!e || e.numero == null || !e.photo) continue; const k = String(e.numero); if (!photoByNum[k]) photoByNum[k] = e.photo; }
+  for (const o of online) { if (o.numero != null && o.photo) photoByNum[String(o.numero)] = o.photo; } // annonce en ligne = photo fraîche
+  const enrichPairs = (list) => { for (const o of (list || [])) { if (o.photo && o.numero != null) continue; const m = lookupPair(o.title); if (m) { if (!o.photo && m.photo) o.photo = m.photo; if (o.numero == null && m.numero != null) o.numero = m.numero; } } };
+  enrichPairs(sales); enrichPairs(recentSales); enrichPairs(recentBuys); enrichPairs(disputes); enrichPairs(toShip);
+  // Compte PRO = il existe une facture (reçue par email) pour cette paire (§41).
+  // On marque `pro` sur les ventes dont le N° a une facture → bouton facture au panneau.
+  const proNums = new Set((Array.isArray(d.vinted_invoices) ? d.vinted_invoices : []).map(i => String((i && i.productId != null ? i.productId : '')).trim()).filter(Boolean));
+  const markPro = (list) => { for (const o of (list || [])) { o.pro = o.numero != null && proNums.has(String(o.numero)); } };
+  markPro(sales); markPro(recentSales);
+  // ── ACHATS À RETIRER (colis en point relais) — AVEC LE CODE DE RETRAIT ───────
+  // Source = les emails de suivi `email_track_*` (transporteur → « colis
+  // disponible »), car c'est la SEULE source qui porte le CODE, le point relais et
+  // le QR. Les achats moissonnés (statut Vinted) n'ont pas de code, et les relier
+  // par titre serait une devinette (cf. §24 « plus aucune devinette »).
+  // Même règle que l'app (`isColisRetirable`) : status='available', dans les 14
+  // jours, ET (un lieu OU un code 3-8 chiffres). Clé = `suivi || subject`
+  // (`colisKey` de l'app). Exclut ceux déjà « retirés » — par l'app
+  // (`vrm_colis_collected`) OU depuis le panneau (`panel_colis_collected`).
+  const PICKUP_MAX_DAYS = 14;
+  const collectedApp = new Set((Array.isArray(d.vrm_colis_collected) ? d.vrm_colis_collected : []).map(String));
+  const pcRows = await sbGet('app_data?id=eq.panel_colis_collected&select=data');
+  const collectedPanel = new Set(Object.keys((pcRows && pcRows[0] && pcRows[0].data) || {}));
+  const trackRows = await sbGet("app_data?id=like.email_track_*&select=suivi:data->>suivi,subject:data->>subject,status:data->>status,code:data->>code,code2:data->>code2,lieu:data->>lieu,artTitle:data->>artTitle,carrier:data->>carrier,qrUrl:data->>qrUrl,receivedAt:data->>receivedAt") || [];
+  const pickups = [];
+  const seenPk = new Set();
+  for (const t of trackRows) {
+    if (String(t.status || '') !== 'available') continue;
+    const code = String(t.code || '').trim();
+    const hasCode = /^\d{3,8}$/.test(code);
+    const hasLieu = !!String(t.lieu || '').trim();
+    if (!hasCode && !hasLieu) continue; // pas identifiable → écarté
+    const d2 = Date.parse(t.receivedAt || '');
+    if (!isNaN(d2) && (Date.now() - d2) / 86400000 > PICKUP_MAX_DAYS) continue; // trop vieux
+    const key = String(t.suivi || t.subject || '').trim();
+    if (!key || seenPk.has(key)) continue; seenPk.add(key);
+    if (collectedApp.has(key) || collectedPanel.has(key)) continue;
+    pickups.push({
+      key, title: t.artTitle || '', carrier: t.carrier || '',
+      code: hasCode ? code : '', code2: String(t.code2 || '').trim() || '',
+      lieu: String(t.lieu || '').trim(), qrUrl: t.qrUrl || '', suivi: String(t.suivi || '').trim(),
+    });
+  }
   // ── CONVERSATIONS (inbox) : pour l'onglet Messages (relance guidée) ──────────
   // Tu sélectionnes des conversations, l'extension t'ouvre chacune une par une,
   // TU réponds toi-même (aucun message envoyé automatiquement).
-  const inboxRows = await sbGet('app_data?id=like.harvest_*_inbox&select=data') || [];
+  const inboxRows = (await sbGet('app_data?id=like.harvest_*_inbox&select=data') || []).filter(keepAcc);
   const convs = [];
   const seenC = new Set();
   for (const r of inboxRows) {
@@ -1172,17 +2193,253 @@ async function buildPanelData() {
     }
   }
   convs.sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
+  // ── OFFRES REÇUES : trancher en un coup d'œil ───────────────────────────────
+  // Tu poses un PRIX MINIMUM sur une paire ; dès qu'une offre est captée, on te
+  // dit « accepte » ou « propose X € ». Source = les conversations DÉJÀ CAPTÉES
+  // (`harvest_*_conv_*`, donc celles que tu as ouvertes) : on y lit la dernière
+  // demande d'offre et son montant. Si on ne trouve pas de montant, on n'affiche
+  // RIEN (jamais de chiffre inventé).
+  // ⚠️ RIEN N'EST ENVOYÉ TOUT SEUL. Les boutons Accepter / Contre / Refuser du
+  //    panneau partent UNIQUEMENT sur ton clic, un clic = une requête. Pas de
+  //    moteur qui décide en arrière-plan : accepter une offre, c'est une vente
+  //    ferme qu'on n'annule pas.
+  // ── FICHES D'ANNONCE CAPTÉES → la DESCRIPTION, pour republier sans retaper ──
+  // Republier chez Vinted = supprimer + recréer (vérifié dans les requêtes
+  // captées : `POST /items/{id}/delete` puis `POST /item_upload/items`). Il faut
+  // donc refournir tout le texte. On le sert ici quand la fiche a été captée.
+  const fiches = {};
+  try {
+    const fRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data') || [])
+      .filter(r => /_item_\d+$/.test(String(r.id || '')));
+    for (const r of fRows) {
+      const p = (r.data && r.data.payload) || {};
+      const it = p.item || p;
+      const id = String(it.id || (String(r.id).match(/_item_(\d+)$/) || [])[1] || '');
+      if (!id) continue;
+      fiches[id] = {
+        desc: String(it.description || ''),
+        marque: String(it.brand || (it.brand_dto && it.brand_dto.title) || ''),
+        taille: String(it.size_title || it.size || ''),
+        etat: String(it.status || ''),
+        capAt: (r.data && r.data.capturedAt) || null,
+      };
+    }
+  } catch (_) { /* pas de fiche : Republier le dira honnêtement */ }
+  for (const o of online) { const f = fiches[String(o.id)]; if (f && f.desc) o.desc = f.desc; }
+  // ⚠️ DEUXIÈME SOURCE, celle qui marche vraiment aujourd'hui : la description
+  // LUE SUR LA PAGE de l'annonce (`vinted_item_details`, écrite par le panneau
+  // quand tu ouvres une de tes annonces). Elle était déjà en base — 20 fiches,
+  // dont 15 avec le vrai texte de Julien — mais PERSONNE ne la lisait : seules
+  // les fiches d'API (`harvest_*_item_*`, qui ne se rangent quasiment jamais)
+  // alimentaient `o.desc`. Résultat : l'étape « Récupérer le texte » de
+  // Republier annonçait « pas encore capté » et proposait un appel Vinted alors
+  // que le texte était déjà là. On complète, on n'écrase jamais une fiche d'API.
+  // Le filtre `PUB_VINTED` écarte les anciennes lignes où `og:description`
+  // avait enregistré le texte marketing de Vinted à la place de l'annonce.
+  const PUB_VINTED = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+  for (const o of online) {
+    if (o.desc) continue;
+    const p = pageDetails[String(o.id)];
+    const t = p && String(p.description || '').trim();
+    if (t && t.length > 15 && !PUB_VINTED.test(t)) o.desc = t;
+  }
+
+  // ── LE N° PERDU APRÈS UNE REPUBLICATION ─────────────────────────────────────
+  // Pour chaque paire republiée récemment, on cherche la NOUVELLE annonce et on
+  // te propose d'y remettre le numéro. Règles strictes, aucune devinette :
+  //   • le numéro ne doit plus être porté par AUCUNE annonce en ligne
+  //     (s'il l'est déjà, il a été réattribué : on ne touche à rien) ;
+  //   • la nouvelle annonce doit avoir EXACTEMENT le même titre, ce titre doit
+  //     être UNIQUE parmi les annonces en ligne, et elle ne doit pas déjà avoir
+  //     de numéro (même garde que §24 : un titre en double n'associe jamais rien).
+  // ── QUAND TES PAIRES PARTENT-ELLES VRAIMENT ? ───────────────────────────────
+  // Le « meilleur moment pour republier » n'est pas un conseil générique trouvé
+  // sur un blog : c'est TON histoire. On répartit tes ventes par jour de semaine
+  // et par tranche horaire, et on te donne le créneau le plus chargé.
+  // ⚠️ On ne l'affiche qu'à partir de 20 ventes datées — en dessous, un « pic »
+  //    n'est que du hasard, et un conseil inventé vaut moins que rien.
+  let momentVente = null;
+  try {
+    const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const parJour = [0, 0, 0, 0, 0, 0, 0];
+    const parCreneau = { matin: 0, aprem: 0, soir: 0, nuit: 0 };
+    let n = 0;
+    for (const v of salesFlat) {
+      if (!v.ts) continue;
+      const d = new Date(v.ts);
+      if (isNaN(d.getTime())) continue;
+      parJour[d.getDay()] += 1;
+      const h = d.getHours();
+      parCreneau[h < 6 ? 'nuit' : h < 12 ? 'matin' : h < 18 ? 'aprem' : 'soir'] += 1;
+      n += 1;
+    }
+    if (n >= 20) {
+      const iJour = parJour.indexOf(Math.max(...parJour));
+      const cle = Object.keys(parCreneau).reduce((a, b) => (parCreneau[b] > parCreneau[a] ? b : a), 'soir');
+      const libelle = { matin: 'le matin', aprem: "l'après-midi", soir: 'en soirée', nuit: 'la nuit' }[cle];
+      momentVente = { jour: JOURS[iJour], creneau: libelle, nJour: parJour[iJour], nCreneau: parCreneau[cle], total: n };
+    }
+  } catch (_) { momentVente = null; }
+
+  // ── SANTÉ DE LA CAPTURE, compte par compte ──────────────────────────────────
+  // Jusqu'ici, savoir « est-ce que ça capte ? » demandait d'aller lire la base à
+  // la main. Ça se voit maintenant dans le panneau : par compte, la date de la
+  // dernière moisson de chaque type. Un compte muet (session expirée) saute aux
+  // yeux au lieu de se traduire par des écrans vides inexpliqués.
+  const sante = [];
+  try {
+    const age = (iso) => { const t = Date.parse(iso || ''); return isNaN(t) ? null : t; };
+    const parUid = {};
+    const noter = (rows, cle) => {
+      for (const r of (rows || [])) {
+        const uid = String((r.data && r.data.uid) || '');
+        if (!uid) continue;
+        (parUid[uid] = parUid[uid] || {})[cle] = age(r.data && r.data.capturedAt);
+      }
+    };
+    noter(lst, 'annonces'); noter(soldRows, 'ventes'); noter(buyRows, 'achats'); noter(inboxRows, 'messages');
+    for (const a of accounts) {
+      const p = parUid[String(a.uid)] || {};
+      sante.push({ uid: a.uid, name: a.name, off: a.off, online: a.online,
+                   annonces: p.annonces || null, ventes: p.ventes || null,
+                   achats: p.achats || null, messages: p.messages || null });
+    }
+  } catch (_) { /* diagnostic : ne doit jamais gêner le reste */ }
+
+  // Quel compte est RÉELLEMENT connecté dans ce navigateur ? Le panneau s'en
+  // sert pour ne PAS proposer d'agir au nom d'un autre compte (voir `garde`).
+  let compteActif = null;
+  try { compteActif = await compteConnecte('www.vinted.fr'); } catch (_) {}
+
+  const renumSuggest = [];
+  try {
+    const pRows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
+    const pend = (pRows && pRows[0] && pRows[0].data && pRows[0].data.items) || {};
+    const numsEnLigne = new Set(online.map(o => String(o.numero || '')).filter(Boolean));
+    for (const ancienId in pend) {
+      const p = pend[ancienId] || {};
+      if (!p.numero) continue;
+      if (numsEnLigne.has(String(p.numero))) continue;      // déjà repris ailleurs
+      const k = normT(p.title);
+      if (!k || onlineTitleN[k] !== 1) continue;            // titre absent ou ambigu
+      const cible = online.find(o => normT(o.title) === k && !o.numero && String(o.id) !== String(ancienId));
+      if (!cible) continue;
+      renumSuggest.push({ ancienId: String(ancienId), numero: String(p.numero), title: p.title,
+                          nouvelId: String(cible.id), photo: cible.photo || null, prix: cible.price });
+    }
+  } catch (_) { /* aucune suggestion plutôt qu'une fausse */ }
+
+  const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
+  const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
+  for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }
+  // Prix d'achat posés depuis le panneau (ligne dédiée) → visibles tout de suite,
+  // sans attendre que l'app les reporte sur la paire.
+  try {
+    const bRows = await sbGet('app_data?id=eq.panel_buyprices&select=data');
+    const bItems = (bRows && bRows[0] && bRows[0].data && bRows[0].data.items) || {};
+    for (const o of online) {
+      const b = bItems[String(o.id)];
+      if (b && o.buyPrice == null && isFinite(Number(b.price))) o.buyPrice = Number(b.price);
+    }
+  } catch (_) {}
+  const offers = [];
+  try {
+    const nombre = (v) => {
+      if (v == null) return null;
+      if (typeof v === 'number') return isFinite(v) ? v : null;
+      if (typeof v === 'object') return nombre(v.amount != null ? v.amount : v.value);
+      const n = Number(String(v).replace(',', '.').replace(/[^\d.]/g, ''));
+      return isFinite(n) ? n : null;
+    };
+    const convRows = (await sbGet('app_data?id=like.harvest_*_conv_*&select=id,data') || []).filter(keepAcc).sort(parFraicheur);
+    const vus = new Set();
+    for (const r of convRows) {
+      const p = (r.data && r.data.payload) || {};
+      const c = p.conversation || p;
+      const cid = String(c.id || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
+      // Forme RÉELLE, relevée sur les conversations en base (pas devinée) :
+      //   entity_type 'offer_request_message' = une offre DE L'ACHETEUR
+      //     → { price:{amount}, status, status_title, current, user_id,
+      //         transaction_id, offer_request_id }
+      //   entity_type 'offer_message'         = MES propres offres (sans id)
+      // Statuts observés : 20 = « Offre acceptée », 30 = « Refusée ».
+      // ⚠️ Aucune offre EN ATTENTE dans l'échantillon → le code « en attente »
+      //    est inconnu. On prend donc le problème à l'envers : on écarte ce
+      //    qu'on sait tranché, et c'est TON clic (plus Vinted, qui refuse une
+      //    offre déjà traitée) qui décide vraiment.
+      const opp = (c.opposite_user && c.opposite_user.id) != null ? c.opposite_user.id : null;
+      let last = null;
+      for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+        if (!m || m.entity_type !== 'offer_request_message') continue;
+        const e = m.entity || {};
+        if (e.current === false) continue;                       // remplacée par une plus récente
+        if (opp != null && e.user_id !== opp) continue;          // c'est MOI qui l'ai faite
+        if (e.status === 20 || e.status === 30) continue;        // acceptée / refusée
+        if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
+        const px = nombre(e.price != null ? e.price : (e.offer_price != null ? e.offer_price : e.amount));
+        if (px == null) continue;
+        last = { px, tx: e.transaction_id != null ? String(e.transaction_id) : '', oid: e.offer_request_id != null ? String(e.offer_request_id) : '' };
+      }
+      if (!last) continue;
+      const titre = String(c.description || c.title || '');
+      // L'article vient de la transaction (identité certaine) ; le titre n'est
+      // qu'un repli d'affichage, et seulement s'il est unique (§24).
+      const itemId = String((c.transaction && c.transaction.item_id) || '');
+      const key = normT(titre);
+      const cible = (itemId && online.find(o => String(o.id) === itemId))
+        || ((key && onlineTitleN[key] === 1) ? online.find(o => normT(o.title) === key) : null);
+      const min = cible && cible.minPrice != null ? Number(cible.minPrice) : null;
+      offers.push({
+        conv: cid, title: titre, price: last.px,
+        tx: last.tx, oid: last.oid, uid: String((r.data && r.data.uid) || ''),
+        url: `https://www.vinted.fr/inbox/${cid}`,
+        id: cible ? cible.id : null, numero: cible ? cible.numero : null,
+        photo: cible ? cible.photo : null, prixVente: cible ? cible.price : null,
+        min, verdict: min == null ? 'sansmin' : (last.px >= min ? 'accepter' : 'contre'),
+      });
+    }
+  } catch (_) { /* la forme d'une conversation peut varier : on n'affiche rien plutôt que du faux */ }
   // ── BORDEREAUX À IMPRIMER : reçus par email (avec PDF), pas encore imprimés/
   //    expédiés/masqués, avec le N° de la paire + le titre (comme dans l'app). ──
-  const bp = await sbGet("app_data?id=like.email_bord_*&select=numero:data->>numero,modele:data->>modele,article:data->>article,transaction:data->>transaction,suivi:data->>suivi,filename:data->>filename,dateLimite:data->>dateLimite") || [];
+  const bp = await sbGet("app_data?id=like.email_bord_*&select=id,numero:data->>numero,modele:data->>modele,article:data->>article,transaction:data->>transaction,suivi:data->>suivi,filename:data->>filename,dateLimite:data->>dateLimite") || [];
   const bPrinted = d.vinted_bords_printed || {};
   const bShipped = d.vinted_bords_shipped || {};
   const bHidden = d.vinted_bords_hidden || {};
+  // Bordereaux « traités » depuis le panneau (ligne dédiée, pas encore drainée
+  // par l'app) → on les cache tout de suite, sans attendre la synchro de l'app.
+  const pdoneRows = await sbGet('app_data?id=eq.panel_bords_done&select=data');
+  const bDonePanel = (pdoneRows && pdoneRows[0] && pdoneRows[0].data) || {};
   const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+  // ⚠️ VINTED FAIT FOI : si la vente liée (par n° de transaction) n'attend plus le
+  // colis, c'est que le colis est PARTI → le bordereau disparaît TOUT SEUL de la
+  // liste, sans que tu aies à cocher quoi que ce soit (demande de Julien : « tu
+  // vois bien que la paire a été expédiée, c'est débile de me faire cocher »).
+  // Même signal que `bordShipped` dans l'app (statut de la vente moissonnée).
+  // `soldRows` est trié du plus frais au plus ancien → la première occurrence
+  // d'une transaction est sa capture la plus récente.
+  const saleByTxn = {};
+  for (const r of soldRows) {
+    const cap = Date.parse((r.data && r.data.capturedAt) || '') || 0;
+    for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
+      const tx = String(o.transaction_id || ''); if (tx && !saleByTxn[tx]) saleByTxn[tx] = { o, cap };
+    }
+  }
+  const bordExpedie = (tx) => { const s = saleByTxn[String(tx || '')]; return !!s && !encoreAExpedier(tx, s.o.status, s.cap); };
   const bordsToPrint = bp
     .filter(b => b.filename) // a bien un PDF
-    .map(b => ({ numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
-    .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key]);
+    .map(b => ({ row: b.id, numero: b.numero || '', title: b.modele || b.article || '', transaction: b.transaction || '', dateLimite: b.dateLimite || '', key: bKey(b) }))
+    .filter(b => b.key && !bPrinted[b.key] && !bShipped[b.key] && !bHidden[b.key] && !bDonePanel[b.key] && !bordExpedie(b.transaction));
+  // Le bordereau REMONTE SUR LA LIGNE DE VENTE (au lieu d'une liste à part) :
+  // chaque vente sait si son bordereau est prêt à imprimer, ou reste à générer.
+  const bordByTxn = {};
+  for (const b of bordsToPrint) { if (b.transaction) bordByTxn[String(b.transaction)] = b; }
+  for (const v of salesFlat) {
+    const b = v.transaction ? bordByTxn[String(v.transaction)] : null;
+    if (b) v.bord = { etat: 'print', row: b.row, numero: b.numero || '', key: b.key, dateLimite: b.dateLimite || '' };
+    else if (v.aExpedier && !(v.transaction && bordTxns.has(String(v.transaction)))) v.bord = { etat: 'generer' };
+  }
+  // Photo du bordereau = par N° UNIQUEMENT (identité certaine, jamais par titre §24).
+  for (const b of bordsToPrint) { if (b.numero && photoByNum[String(b.numero)]) b.photo = photoByNum[String(b.numero)]; b.pro = !!(b.numero && proNums.has(String(b.numero))); }
   // « Qui dorment » : ancienneté RÉELLE (date lue sur la page de l'annonce).
   // Ne compte que les annonces dont on connaît la date — pas de faux chiffre.
   const sleeping = online.filter(o => o.ageDays != null && o.ageDays >= 30)
@@ -1196,10 +2453,17 @@ async function buildPanelData() {
     noNum: noNum.length,
     withDesc: online.filter(o => o.hasDesc).length,
     value: online.reduce((s, o) => s + (Number(o.price) || 0), 0),
+    viewsTotal: online.reduce((s, o) => s + (o.views != null ? Number(o.views) || 0 : 0), 0),
+    favsTotal: online.reduce((s, o) => s + (o.favs != null ? Number(o.favs) || 0 : 0), 0),
     toShip: toShip.filter(t => !t.hasBord).length,
+    offres: offers.length,
     toPrint: bordsToPrint.length,
+    toPickup: pickups.length,
     unread: convs.filter(c => c.unread).length,
     favoris: online.filter(o => (o.favs || 0) > 0).length,
+    // Paires sensiblement AU-DESSUS de leurs comparables (>15 %) → à baisser.
+    overMarket: online.filter(o => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15).length,
+    litiges: disputes.length,
   };
   // Fraîcheur : la capture la plus récente parmi les données lues → l'utilisateur
   // sait si ses infos datent (et s'il doit repasser sur Vinted pour les capter).
@@ -1210,7 +2474,13 @@ async function buildPanelData() {
   // Réponses rapides déjà enregistrées dans l'app (synchronisées) → insérables en
   // 1 tap depuis le panneau, sur une conversation.
   const quickReplies = Array.isArray(d.vinted_quick_replies) ? d.vinted_quick_replies.slice(0, 20) : [];
-  return { online, relance, sleeping, noNum, toShip, bordsToPrint, convs, activity, quickReplies, freshestAt, stats, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  // Chiffres PUBLIÉS PAR L'APP (ligne widget_stats) → on les affiche tels quels
+  // dans « Ma journée » pour ne jamais recalculer un CA qui divergerait de l'app.
+  // Mis à jour quand Julien ouvre l'app : on montre la fraîcheur, pas de bluff.
+  const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
+  const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
+  const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
+  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

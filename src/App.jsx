@@ -541,6 +541,11 @@ const SYNC_KEYS = [
   // (titre/description/prix préparés, avec l'historique des versions). Synchronisé
   // pour retrouver son travail sur un autre appareil.
   'vinted_annonce_drafts',
+  // Factures PRO — plusieurs micro-entreprises. `vinted_entreprises` = liste des
+  // entités [{id, companyName, companyType, companyAddress, siret, footer}] ;
+  // `vinted_entreprise_active` = id de l'entité utilisée pour les nouvelles
+  // factures. Chaque facture porte son `entrepriseId` (numérotation par entité).
+  'vinted_entreprises','vinted_entreprise_active',
   // Dérivé (annonces vendues d'après les emails) : partagé pour que le tableau
   // de bord compte exactement comme l'onglet Annonces, même sur un autre appareil.
   'vinted_annonces_email_sold',
@@ -693,6 +698,10 @@ const isCloudReady = () => _cloudReady;
 
 // Lecture locale (instantanee)
 const load = (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } };
+// Drapeau « imprimer tous les bordereaux » posé par un deep-link (?print=bord),
+// consommé une fois par l'écran Bordereaux quand les données sont chargées.
+// Sert au bouton « Tout imprimer (dans l'app) » du panneau d'extension.
+let _pendingBordPrint = false;
 
 // Recupere TOUT le contenu du cloud (au demarrage)
 const cloudLoad = async () => {
@@ -788,12 +797,52 @@ const fetchVintedAccounts = async () => {
 // voir. NB : si la session Chrome du compte est encore valide, l'extension peut
 // le re-capturer au prochain passage sur vinted.fr — mais pour un compte bloqué
 // (cookie mort), il ne réapparaît pas. Renvoie true si la suppression a réussi.
-const deleteVintedAccount = async (vintedUserId) => {
+// ⚠️ « DÉCONNECTER » DOIT VRAIMENT DÉCONNECTER (plainte de Julien : « je veux
+// pouvoir enlever les comptes bannis à la main, et que ça les enlève »).
+// Avant, on effaçait seulement la ligne `vinted_accounts` — et l'extension,
+// qui a toujours les cookies dans Chrome, la **recréait dans les 10 minutes**
+// (alarme de capture) ou dès le premier changement de cookie. Le compte
+// revenait donc tout seul, avec ses annonces et ses ventes : de son point de
+// vue, le bouton ne servait à rien.
+//
+// Trois gestes, dans cet ORDRE (le mémo d'abord : si l'extension capture
+// pendant l'opération, elle voit déjà l'interdiction et n'écrit rien) :
+//  1. inscrire le compte dans `vrm_blocked_accounts` — la liste que
+//     `background.js` consulte avant chaque capture (`blockedAccounts()`) ;
+//     il refuse alors de le recapter ET efface toute ligne restante ;
+//  2. supprimer la ligne `vinted_accounts` (les jetons) ;
+//  3. supprimer ses lignes moissonnées `harvest_{uid}_*` — sinon ses annonces
+//     et ses ventes continuent d'alimenter l'app après la « déconnexion ».
+const deleteVintedAccount = async (vintedUserId, login) => {
+  const uid = String(vintedUserId || '').trim();
+  if (!uid) return false;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${vintedUserId}`, {
+    // 1. mémo « supprimé définitivement » (lu par l'extension)
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() });
+      const rows = r.ok ? await r.json() : [];
+      const cur = (rows[0] && rows[0].data) || {};
+      const uids = Array.isArray(cur.uids) ? cur.uids.map(String) : [];
+      const logins = Array.isArray(cur.logins) ? cur.logins.map(String) : [];
+      if (!uids.includes(uid)) uids.push(uid);
+      if (login && !logins.includes(String(login))) logins.push(String(login));
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST',
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: `resolution=merge-duplicates,return=minimal` }),
+        body: JSON.stringify([withOwner({ id: 'vrm_blocked_accounts', data: { ...cur, uids, logins, note: 'supprimé définitivement depuis l\'app' } })]),
+      });
+    } catch (_) { /* le mémo est un plus : on continue quand même */ }
+    // 2. les jetons
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, {
       method: 'DELETE',
       headers: sbAuth({ Prefer: 'return=minimal' }),
     });
+    // 3. ses données moissonnées (annonces, ventes, achats, messages…)
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_*`, {
+        method: 'DELETE', headers: sbAuth({ Prefer: 'return=minimal' }),
+      });
+    } catch (_) { /* best-effort : la ligne `vrm_blocked_accounts` suffit à le masquer */ }
     return res.ok;
   } catch (_) { return false; }
 };
@@ -2138,10 +2187,10 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
 // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
 // [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
-const mergeAndDownloadBordereaux = async (items, resolvePos) => {
+const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const out = await PDFDocument.create();
-  let count = 0;
+  let count = 0, nInv = 0;
   for (const it of items) {
     try {
       const src = await PDFDocument.load(it.pdfBuf);
@@ -2156,20 +2205,26 @@ const mergeAndDownloadBordereaux = async (items, resolvePos) => {
       const pages = await out.copyPages(src, src.getPageIndices());
       pages.forEach(p => out.addPage(p));
       count++;
+      // Facture pro juste APRÈS son bordereau (comptes pro uniquement, §41).
+      if (it.invBytes) {
+        try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
+      }
     } catch (_) {}
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
   const bytes = await out.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const filename = `bordereaux-${count}-a-la-suite.pdf`;
+  const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}-a-la-suite.pdf`;
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-  if (!isIOS) {
+  // « génère + lance l'impression » (ordinateur) ; sinon téléchargement.
+  const printed = opts.autoprint ? autoPrintUrl(url) : false;
+  if (!isIOS && !printed) {
     const a = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
   }
-  return { url, filename, count };
+  return { url, filename, count, nInv, printed };
 };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
@@ -4239,7 +4294,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
 }
 
 /* ── Ventes ──────────────────────────────────────────── */
-function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
+function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entreprises,activeEnt}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [newRow,setNewRow]=useState({productId:'',saleDate:'',receiveDate:'',sellPrice:'',buyPrice:''});
@@ -4474,7 +4529,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings}) {
                       {(() => {
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
                         if(!inv) return <span style={{color:C.muted,fontSize:11}}>—</span>;
-                        return <button type="button" onClick={()=>generatePDF(inv,invoiceSettings||{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'})}
+                        return <button type="button" onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings||{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'}))}
                           title={`Voir la facture ${inv.number}`}
                           style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'monospace'}}>
                           📄 {inv.number}
@@ -4638,7 +4693,7 @@ function Door({h}) {
 }
 
 /* ── Factures ───────────────────────────────────────── */
-function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings}) {
+function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt}) {
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -4741,16 +4796,20 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   
-  // Numéro auto pour la prochaine facture
+  // Numéro auto pour la prochaine facture — SÉQUENCE PROPRE À L'ENTITÉ ACTIVE.
+  // Une facture sans `entrepriseId` appartient à la 1ʳᵉ entité (rétro-compat).
+  // Chaque micro-entreprise garde ainsi sa propre numérotation continue (légal).
+  const firstEntId=(Array.isArray(entreprises)&&entreprises[0]&&entreprises[0].id)||'ent_1';
+  const invBelongsToActive=(i)=>{ const eid=i.entrepriseId||firstEntId; return eid===(activeEnt||firstEntId); };
   const nextInvoiceNumber=useMemo(()=>{
     const year=new Date().getFullYear();
-    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`));
+    const yearInvoices=invoices.filter(i=>i.number&&i.number.startsWith(`${year}-`)&&invBelongsToActive(i));
     const maxNum=yearInvoices.reduce((mx,i)=>{
       const n=parseInt(i.number.split('-')[1],10);
       return isNaN(n)?mx:Math.max(mx,n);
     },0);
     return `${year}-${String(maxNum+1).padStart(6,'0')}`;
-  },[invoices]);
+  },[invoices,activeEnt,firstEntId]);
   
   // Set des productIds qui sont déjà dans Ventes (= comptabilisés)
   const accountedSet=useMemo(()=>{
@@ -4810,6 +4869,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const newInvoice={
       id:'inv_'+Date.now(),
       number:nextInvoiceNumber,
+      entrepriseId:activeEnt||firstEntId, // à quelle micro-entreprise cette facture appartient
       ...data,
       createdAt:new Date().toISOString(),
     };
@@ -4821,13 +4881,16 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // Export CSV/Excel
   const exportExcel=()=>{
     if(fullList.length===0){toast('Aucune facture à exporter');return;}
-    const headers=['N° Facture','Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
-    const rows=fullList.map(i=>[
-      i.number||'',i.saleDate||'',i.productId||'',i.itemName||'',
+    const multiEnt=Array.isArray(entreprises)&&entreprises.length>1;
+    const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
+    const rows=fullList.map(i=>{
+      const e=entForInvoice(i,entreprises,activeEnt,invoiceSettings);
+      return [
+      i.number||'',...(multiEnt?[e&&e.companyName||'',e&&e.siret||'']:[]),i.saleDate||'',i.productId||'',i.itemName||'',
       (i.sellPrice||'').toString().replace('.',','),
       i.buyerName||'',i.buyerEmail||'',i.buyerAddress||'',i.vintedNumber||'',
       accountedSet.has(String(i.productId).trim())?'Comptabilisée':'En attente',
-    ]);
+    ];});
     const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
     const url=URL.createObjectURL(blob);
@@ -4944,13 +5007,14 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
                   <td style={{padding:'8px',color:C.warn,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
-                  <td style={{padding:'8px',color:C.accent,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}</td>
+                  <td style={{padding:'8px',color:C.accent,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:9.5,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,invoiceSettings)} color={C.blue} style={{marginRight:4}}>📄</Btn>
+                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}}>📄</Btn>
+                    <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title="Facture électronique Factur-X (PDF + XML EN16931 embarqué)">🧾</Btn>
                     <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
                   </td>
                 </tr>
@@ -4978,7 +5042,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       {showForm&&<InvoiceForm onClose={()=>setShowForm(false)} onSave={addInvoice} nextNumber={nextInvoiceNumber} catalog={catalog}/>}
       
       {/* Modale réglages */}
-      {showSettings&&<InvoiceSettings settings={invoiceSettings} setSettings={(s)=>{setInvoiceSettings(s);save('vinted_invoice_settings',s);}} onClose={()=>setShowSettings(false)}/>}
+      {showSettings&&<InvoiceSettings settings={invoiceSettings} setSettings={(s)=>{setInvoiceSettings(s);save('vinted_invoice_settings',s);}} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} onClose={()=>setShowSettings(false)}/>}
     </div>
   );
 }
@@ -5056,9 +5120,22 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
 }
 
 // Réglages personnalisables
-function InvoiceSettings({settings,setSettings,onClose}) {
-  const [data,setData]=useState(settings);
-  const save=()=>{setSettings(data);onClose();};
+// Réglages factures — gère PLUSIEURS micro-entreprises. Rétro-compatible : si une
+// seule entité, c'est exactement comme avant. `setSettings` continue de refléter
+// l'entité ACTIVE dans `vinted_invoice_settings` (pour tout code hérité qui le lit).
+function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,onClose}) {
+  const list = (Array.isArray(entreprises)&&entreprises.length) ? entreprises : [{id:'ent_1',...settings}];
+  const [sel,setSel]=useState(()=>{ const a=list.find(e=>e.id===activeEnt); return (a&&a.id)||list[0].id; });
+  const cur = list.find(e=>e.id===sel)||list[0];
+  const [data,setData]=useState(cur);
+  // Quand on change d'entité sélectionnée, charge ses champs dans le formulaire.
+  const pick=(id)=>{ setSel(id); const e=list.find(x=>x.id===id); if(e) setData(e); };
+  const mirror=(entList,activeId)=>{ const act=entList.find(e=>e.id===activeId)||entList[0]; if(act) setSettings({companyName:act.companyName||'',companyType:act.companyType||'',companyAddress:act.companyAddress||'',siret:act.siret||'',footer:act.footer||''}); };
+  const persist=(entList,activeId)=>{ setEntreprises(entList); if(activeId!==undefined){ setActiveEnt(activeId); } mirror(entList, activeId!==undefined?activeId:activeEnt); };
+  const saveCur=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next); onClose(); };
+  const addEnt=()=>{ const id='ent_'+Date.now(); const blank={id,companyName:'',companyType:'Entrepreneur individuel',companyAddress:'',siret:'',tvaMention:'TVA non applicable, art. 293 B du CGI',footer:'Merci pour votre achat !'}; const next=[...list,blank]; setEntreprises(next); setSel(id); setData(blank); };
+  const delEnt=()=>{ if(list.length<=1) return; const next=list.filter(e=>e.id!==sel); const newActive=(activeEnt===sel)?next[0].id:activeEnt; persist(next,newActive); const nsel=next[0].id; setSel(nsel); setData(next[0]); };
+  const makeActive=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next,sel); };
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
@@ -5066,14 +5143,31 @@ function InvoiceSettings({settings,setSettings,onClose}) {
           <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
+        {/* Sélecteur de micro-entreprise */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:5}}>Mes micro-entreprises</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {list.map(e=>(
+              <button key={e.id} type="button" onClick={()=>pick(e.id)}
+                style={{border:`1px solid ${e.id===sel?C.accent:C.border}`,background:e.id===sel?`${C.accent}18`:'transparent',color:e.id===sel?C.accent:C.text,borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                {e.id===activeEnt?'⭐ ':''}{e.companyName||'(sans nom)'}
+              </button>
+            ))}
+            <button type="button" onClick={addEnt} style={{border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
+          </div>
+          <div style={{fontSize:10.5,color:C.muted,marginTop:5}}>⭐ = entité utilisée pour les nouvelles factures. Chaque entité a sa propre numérotation.</div>
+        </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="Nom de l'entreprise"><Input value={data.companyName} onChange={e=>setData(d=>({...d,companyName:e.target.value}))}/></Field>
-          <Field label="Forme juridique"><Input value={data.companyType} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
-          <Field label="Adresse"><Input value={data.companyAddress} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
-          <Field label="SIRET"><Input value={data.siret} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
-          <Field label="Message de bas de page"><Input value={data.footer} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
+          <Field label="Nom de l'entreprise"><Input value={data.companyName||''} onChange={e=>setData(d=>({...d,companyName:e.target.value}))}/></Field>
+          <Field label="Forme juridique"><Input value={data.companyType||''} onChange={e=>setData(d=>({...d,companyType:e.target.value}))}/></Field>
+          <Field label="Adresse"><Input value={data.companyAddress||''} onChange={e=>setData(d=>({...d,companyAddress:e.target.value}))}/></Field>
+          <Field label="SIRET"><Input value={data.siret||''} onChange={e=>setData(d=>({...d,siret:e.target.value}))}/></Field>
+          <Field label="Mention TVA (bas de facture)"><Input value={data.tvaMention!=null?data.tvaMention:'TVA non applicable, art. 293 B du CGI'} onChange={e=>setData(d=>({...d,tvaMention:e.target.value}))}/></Field>
+          <Field label="Message de bas de page"><Input value={data.footer||''} onChange={e=>setData(d=>({...d,footer:e.target.value}))}/></Field>
+          {sel!==activeEnt&&<Btn onClick={makeActive} color={C.blue} style={{fontSize:12}}>⭐ Utiliser cette entité pour les nouvelles factures</Btn>}
           <div style={{display:'flex',gap:8,marginTop:6}}>
-            <Btn onClick={save} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
+            <Btn onClick={saveCur} color={C.accent} style={{flex:1}}>✓ Enregistrer</Btn>
+            {list.length>1&&<Btn onClick={delEnt} color={C.red||'#c0392b'}>🗑 Supprimer</Btn>}
             <Btn onClick={onClose} color={C.border}>Annuler</Btn>
           </div>
         </div>
@@ -5098,6 +5192,16 @@ function fmtDate(d) {
     if(isNaN(dt.getTime())) return d;
     return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
   } catch { return d; }
+}
+
+// Résout l'entité (micro-entreprise) à utiliser pour une facture : celle stockée
+// sur la facture (entrepriseId), sinon l'entité active, sinon la première. Retombe
+// toujours sur `fallback` (les réglages simples) — donc rétro-compatible.
+function entForInvoice(inv, entreprises, activeEnt, fallback) {
+  const list = Array.isArray(entreprises) && entreprises.length ? entreprises : [fallback];
+  if (inv && inv.entrepriseId) { const e = list.find(x => x && x.id === inv.entrepriseId); if (e) return e; }
+  const a = list.find(x => x && x.id === activeEnt); if (a) return a;
+  return list[0] || fallback;
 }
 
 // Génération du PDF (HTML imprimable qui s'ouvre dans une nouvelle fenêtre)
@@ -5154,7 +5258,7 @@ td.right{text-align:right;}
   </div>
   <div class="party" style="text-align:right">
     <div class="party-label">À :</div>
-    <div class="party-info"><b>${inv.buyerEmail||''}</b><br>${inv.buyerName||''}${inv.buyerAddress?', '+inv.buyerAddress:''}</div>
+    <div class="party-info"><b>${inv.buyerName||inv.buyerEmail||'Client'}</b>${inv.buyerAddress?'<br>'+inv.buyerAddress:''}${inv.buyerEmail&&inv.buyerName?'<br>'+inv.buyerEmail:''}</div>
   </div>
 </div>
 <table>
@@ -5162,10 +5266,11 @@ td.right{text-align:right;}
   <tbody><tr><td>${inv.itemName||''}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td></tr></tbody>
 </table>
 <div class="totals">
-  <div class="row"><b>Sous-total (TTC) :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
+  <div class="row"><b>Sous-total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
   <div class="row total"><b>Total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
   <div class="row"><b>Montant payé :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
 </div>
+<div style="text-align:right;font-size:11px;color:#555;margin-top:6px;font-style:italic">${xmlEsc(settings.tvaMention||'TVA non applicable, art. 293 B du CGI')}</div>
 <div class="acquittee">Facture acquittée</div>
 <div class="remarques">
   <div class="label">Remarques :</div>
@@ -5178,6 +5283,194 @@ td.right{text-align:right;}
   const w=window.open('','_blank');
   w.document.write(html);
   w.document.close();
+}
+
+// ── FACTURATION ÉLECTRONIQUE (Factur-X / CII, profil EN16931 BASIC) ─────────
+// Génère le XML normalisé « Cross Industry Invoice » de la facture, importable
+// dans un outil de e-facturation (Indy, plateforme agréée…). Micro-entreprise en
+// franchise de TVA → taxe catégorie « E » (exonéré) + mention art. 293 B du CGI.
+// ⚠️ On produit le XML normalisé (la partie machine) ; l'assemblage en PDF/A-3
+// Factur-X (PDF + XML embarqué) reste une étape ultérieure. Rien n'est inventé :
+// tous les montants viennent de la facture, TVA à 0 (régime réel de Julien).
+function xmlEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])); }
+function factureCII(inv, ent){
+  const total=(+inv.sellPrice||0).toFixed(2);
+  const d=new Date(inv.saleDate); const ymd=isNaN(d)?String(inv.saleDate||'').replace(/-/g,''):`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  const siret=String(ent.siret||'').replace(/\s/g,'');
+  const buyer=inv.buyerName||inv.buyerEmail||'Client';
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+  <rsm:ExchangedDocumentContext>
+    <ram:GuidelineSpecifiedDocumentContextParameter><ram:ID>urn:cen.eu:en16931:2017</ram:ID></ram:GuidelineSpecifiedDocumentContextParameter>
+  </rsm:ExchangedDocumentContext>
+  <rsm:ExchangedDocument>
+    <ram:ID>${xmlEsc(inv.number)}</ram:ID>
+    <ram:TypeCode>380</ram:TypeCode>
+    <ram:IssueDateTime><udt:DateTimeString format="102">${xmlEsc(ymd)}</udt:DateTimeString></ram:IssueDateTime>
+  </rsm:ExchangedDocument>
+  <rsm:SupplyChainTradeTransaction>
+    <ram:IncludedSupplyChainTradeLineItem>
+      <ram:AssociatedDocumentLineDocument><ram:LineID>1</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>${xmlEsc(inv.itemName||'Article')}</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement><ram:NetPriceProductTradePrice><ram:ChargeAmount>${total}</ram:ChargeAmount></ram:NetPriceProductTradePrice></ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">1</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>E</ram:CategoryCode><ram:RateApplicablePercent>0</ram:RateApplicablePercent></ram:ApplicableTradeTax>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${total}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>
+    </ram:IncludedSupplyChainTradeLineItem>
+    <ram:ApplicableHeaderTradeAgreement>
+      <ram:SellerTradeParty>
+        <ram:Name>${xmlEsc(ent.companyName||'')}</ram:Name>
+        ${siret?`<ram:SpecifiedLegalOrganization><ram:ID schemeID="0002">${xmlEsc(siret)}</ram:ID></ram:SpecifiedLegalOrganization>`:''}
+        <ram:PostalTradeAddress><ram:CountryID>FR</ram:CountryID><ram:LineOne>${xmlEsc(ent.companyAddress||'')}</ram:LineOne></ram:PostalTradeAddress>
+      </ram:SellerTradeParty>
+      <ram:BuyerTradeParty><ram:Name>${xmlEsc(buyer)}</ram:Name>${inv.buyerAddress?`<ram:PostalTradeAddress><ram:CountryID>FR</ram:CountryID><ram:LineOne>${xmlEsc(inv.buyerAddress)}</ram:LineOne></ram:PostalTradeAddress>`:''}</ram:BuyerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+    <ram:ApplicableHeaderTradeDelivery/>
+    <ram:ApplicableHeaderTradeSettlement>
+      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+      <ram:ApplicableTradeTax>
+        <ram:CalculatedAmount>0.00</ram:CalculatedAmount>
+        <ram:TypeCode>VAT</ram:TypeCode>
+        <ram:ExemptionReason>${xmlEsc(ent.tvaMention||'TVA non applicable, art. 293 B du CGI')}</ram:ExemptionReason>
+        <ram:BasisAmount>${total}</ram:BasisAmount>
+        <ram:CategoryCode>E</ram:CategoryCode>
+        <ram:RateApplicablePercent>0</ram:RateApplicablePercent>
+      </ram:ApplicableTradeTax>
+      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <ram:LineTotalAmount>${total}</ram:LineTotalAmount>
+        <ram:TaxBasisTotalAmount>${total}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="EUR">0.00</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>${total}</ram:GrandTotalAmount>
+        <ram:DuePayableAmount>${total}</ram:DuePayableAmount>
+      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </ram:ApplicableHeaderTradeSettlement>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>`;
+}
+function downloadFacturX(inv, ent){
+  try{
+    const xml=factureCII(inv, ent);
+    const blob=new Blob([xml],{type:'application/xml'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'e-facture'}.xml`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){ try{toast('Export e-facture impossible : '+e.message);}catch(_){} }
+}
+// XMP Factur-X (identification PDF/A-3 + schéma d'extension fx) — permet aux
+// outils (Indy…) de reconnaître la facture électronique embarquée.
+function facturxXMP(inv){
+  const t=xmlEsc('Facture '+(inv.number||''));
+  return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"><pdfaid:part>3</pdfaid:part><pdfaid:conformance>B</pdfaid:conformance></rdf:Description>
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title><rdf:Alt><rdf:li xml:lang="x-default">${t}</rdf:li></rdf:Alt></dc:title></rdf:Description>
+  <rdf:Description rdf:about="" xmlns:pdfaExtension="http://www.aiim.org/pdfa/ns/extension/" xmlns:pdfaSchema="http://www.aiim.org/pdfa/ns/schema#" xmlns:pdfaProperty="http://www.aiim.org/pdfa/ns/property#">
+   <pdfaExtension:schemas><rdf:Bag><rdf:li rdf:parseType="Resource">
+    <pdfaSchema:schema>Factur-X PDFA Extension Schema</pdfaSchema:schema>
+    <pdfaSchema:namespaceURI>urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#</pdfaSchema:namespaceURI>
+    <pdfaSchema:prefix>fx</pdfaSchema:prefix>
+    <pdfaSchema:property><rdf:Seq>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>DocumentFileName</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>Name of the embedded XML invoice file</pdfaProperty:description></rdf:li>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>DocumentType</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>INVOICE</pdfaProperty:description></rdf:li>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>Version</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>The version of the Factur-X standard</pdfaProperty:description></rdf:li>
+     <rdf:li rdf:parseType="Resource"><pdfaProperty:name>ConformanceLevel</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>The conformance level of the embedded XML</pdfaProperty:description></rdf:li>
+    </rdf:Seq></pdfaSchema:property>
+   </rdf:li></rdf:Bag></pdfaExtension:schemas>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#"><fx:DocumentType>INVOICE</fx:DocumentType><fx:DocumentFileName>factur-x.xml</fx:DocumentFileName><fx:Version>1.0</fx:Version><fx:ConformanceLevel>EN 16931</fx:ConformanceLevel></rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+}
+// Génère le VRAI fichier Factur-X : un PDF de la facture AVEC le XML EN16931
+// embarqué (nom normalisé `factur-x.xml`, relation « Alternative ») + le XMP
+// d'identification. Un seul fichier, lisible à l'œil ET par la machine.
+// ⚠️ Format Factur-X respecté (embarquement + XMP) ; la conformité PDF/A-3 stricte
+// (polices embarquées, profil ICC) n'est pas certifiée par un validateur ici.
+// Construit les OCTETS du PDF Factur-X (facture + XML EN16931 embarqué) SANS le
+// télécharger — factorisé pour pouvoir aussi le fusionner avec un bordereau à
+// l'impression (voir printBordAndInvoice). generateFacturXPdf en dessous ne fait
+// que l'envelopper + déclencher le téléchargement.
+async function buildFacturXBytes(inv, ent){
+  const { PDFDocument, StandardFonts, rgb, PDFName, AFRelationship } = await import('pdf-lib');
+  const pdf = await PDFDocument.create();
+  {
+    const page = pdf.addPage([595.28, 841.89]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const W=595.28, M=50, dark=rgb(0.13,0.13,0.13), gray=rgb(0.42,0.42,0.42), green=rgb(0.15,0.66,0.36);
+    const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=String(t==null?'':t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
+    const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+' €';
+    try{
+      let logoSrc=LOGO_CANCALE;
+      try{ const c=localStorage.getItem('vinted_custom_logo'); if(c) logoSrc=JSON.parse(c); }catch(_){}
+      const m=/^data:image\/(png|jpe?g);base64,(.+)$/i.exec(String(logoSrc||''));
+      if(m){ const img=/png/i.test(m[1])?await pdf.embedPng(b64ToBytes(m[2])):await pdf.embedJpg(b64ToBytes(m[2])); const dim=img.scale(1); const h=62,w=h*(dim.width/dim.height||1); page.drawImage(img,{x:W-M-Math.min(w,90),y:762,width:Math.min(w,90),height:h}); }
+    }catch(_){}
+    let y=792;
+    T('FACTURE',M,y,{s:26,b:true}); y-=20;
+    T('# '+(inv.number||''),M,y,{s:11,c:gray}); y-=15;
+    T('Date : '+fmtDate(inv.saleDate),M,y,{s:10,c:gray});
+    y-=34;
+    const colB=W-M-210;
+    T('DE :',M,y,{s:8.5,b:true,c:gray}); T('CLIENT :',colB,y,{s:8.5,b:true,c:gray}); y-=15;
+    T(ent.companyName||'',M,y,{s:11,b:true}); T(inv.buyerName||inv.buyerEmail||'Client',colB,y,{s:11,b:true}); y-=13;
+    T(ent.companyType||'',M,y,{s:9,c:gray}); if(inv.buyerAddress) T(String(inv.buyerAddress).slice(0,46),colB,y,{s:9,c:gray}); y-=12;
+    T(String(ent.companyAddress||'').slice(0,52),M,y,{s:9,c:gray}); y-=12;
+    if(ent.siret) T('SIRET : '+ent.siret,M,y,{s:9,c:gray});
+    y-=36;
+    page.drawRectangle({x:M,y:y-5,width:W-2*M,height:20,color:rgb(0.95,0.96,0.97)});
+    T('Objet',M+6,y+1,{s:9,b:true}); T('Qté',350,y+1,{s:9,b:true}); T('P.U. HT',455,y+1,{s:9,b:true,right:true}); T('Montant',W-M-6,y+1,{s:9,b:true,right:true});
+    y-=22;
+    T(String(inv.itemName||'Article').slice(0,52),M+6,y,{s:10}); T('1',350,y,{s:10}); T(eur,455,y,{s:10,right:true}); T(eur,W-M-6,y,{s:10,right:true});
+    y-=8; page.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.5,color:rgb(0.85,0.85,0.85)});
+    y-=22;
+    T('Total :',W-M-140,y,{s:12,b:true}); T(eur,W-M-6,y,{s:12,b:true,right:true}); y-=16;
+    T('Montant payé :',W-M-140,y,{s:9,c:gray}); T(eur,W-M-6,y,{s:9,c:gray,right:true}); y-=18;
+    T(ent.tvaMention||'TVA non applicable, art. 293 B du CGI',W-M-6,y,{s:9,c:gray,right:true}); y-=24;
+    T('Facture acquittée',W-M-6,y,{s:12,b:true,c:green,right:true}); y-=44;
+    if(inv.vintedNumber){ T('Transaction Vinted n°'+inv.vintedNumber,M,y,{s:9,c:gray}); y-=13; }
+    T(ent.footer||'Merci pour votre achat !',M,y,{s:9,c:gray});
+    T('Facture electronique - Factur-X (XML EN16931 embarque)',M,40,{s:7.5,c:gray});
+    const xml=factureCII(inv, ent);
+    const bytes=new TextEncoder().encode(xml);
+    await pdf.attach(bytes,'factur-x.xml',{ mimeType:'text/xml', description:'Facture electronique Factur-X', creationDate:new Date(), modificationDate:new Date(), afRelationship:AFRelationship.Alternative });
+    pdf.setTitle('Facture '+(inv.number||'')); pdf.setAuthor(ent.companyName||''); pdf.setSubject('Facture'); pdf.setProducer('VRM Cancale'); pdf.setCreator('VRM Cancale');
+    try{ const stream=pdf.context.stream(facturxXMP(inv),{Type:'Metadata',Subtype:'XML'}); const ref=pdf.context.register(stream); pdf.catalog.set(PDFName.of('Metadata'),ref); }catch(_){}
+  }
+  return await pdf.save({ useObjectStreams:false });
+}
+// Lance l'impression d'un PDF (URL blob) sans clic : iframe caché + print().
+// Marche sur ordinateur (Chrome/Firefox/Edge). Sur iOS l'impression PDF via
+// iframe est bloquée → l'appelant garde le repli « Ouvrir → Partager → Imprimer ».
+const autoPrintUrl = (url) => {
+  try {
+    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+    if (isIOS) return false;
+    const ifr = document.createElement('iframe');
+    ifr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    ifr.src = url;
+    ifr.onload = () => { setTimeout(()=>{ try { ifr.contentWindow.focus(); ifr.contentWindow.print(); } catch(_){} }, 300); };
+    document.body.appendChild(ifr);
+    setTimeout(()=>{ try{ ifr.remove(); }catch(_){} }, 120000);
+    return true;
+  } catch(_) { return false; }
+};
+async function generateFacturXPdf(inv, ent){
+  try{
+    const out = await buildFacturXBytes(inv, ent);
+    const blob=new Blob([out],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
 }
 
 /* ── Garage ──────────────────────────────────────────── */
@@ -5914,7 +6207,37 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         } catch (_) {}
       };
       applyAmbiance(load('vrm_garage_ambiance', 'clair'));
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance };
+      // « Vol vers la boîte » : quand tu cherches un N°, la caméra vole en douceur
+      // jusqu'au meuble qui le contient (au lieu de le surligner sans bouger la
+      // vue). Pure animation de caméra → si ça échoue, le garage reste utilisable.
+      let flyRAF = 0;
+      const flyTo = (itemId) => {
+        try {
+          const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
+          if (!g) return;
+          const box = new THREE.Box3().setFromObject(g);
+          if (box.isEmpty()) return;
+          const c = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const dist = Math.max(size.x, size.y, size.z, 0.6) * 2.1 + 1.4;
+          const destTgt = c.clone();
+          const destPos = new THREE.Vector3(c.x + dist * 0.35, c.y + dist * 0.55, c.z + dist);
+          const startPos = camera.position.clone(), startTgt = controls.target.clone();
+          const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now()), dur = 720;
+          const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          if (flyRAF) cancelAnimationFrame(flyRAF);
+          const step = () => {
+            const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            const k = Math.min(1, (now - t0) / dur), e = ease(k);
+            camera.position.lerpVectors(startPos, destPos, e);
+            controls.target.lerpVectors(startTgt, destTgt, e);
+            controls.update();
+            if (k < 1) flyRAF = requestAnimationFrame(step); else flyRAF = 0;
+          };
+          step();
+        } catch (_) {}
+      };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
@@ -5932,6 +6255,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   // ajout/suppression, N° rangés…) — SANS bouger la caméra (rebuild du groupe seul).
   useEffect(() => { dataRef.current.items = items; if (st.current.buildFurniture) { try { st.current.buildFurniture(); } catch (_) {} } }, [items]);
   // Surlignage : rouge = N° cherché, bleu = meuble sélectionné (édition).
+  const flownRef = useRef(null);
   useEffect(() => {
     const g = st.current.furnGroup; if (!g) return;
     g.children.forEach(grp => {
@@ -5940,6 +6264,11 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const col = isHi ? '#e5484d' : isSel ? '#2f7ae5' : '#000000', inten = isHi ? 0.55 : isSel ? 0.4 : 0;
       grp.traverse(m => { if (m.isMesh && m.material && m.material.emissive) { m.material.emissive.set(col); m.material.emissiveIntensity = inten; } });
     });
+    // Vole vers la boîte cherchée — seulement quand la CIBLE change (pas à chaque
+    // reconstruction de meubles), pour ne pas secouer la caméra sans raison.
+    const target = hi && hi.itemId ? hi.itemId : null;
+    if (target && target !== flownRef.current && st.current.flyTo) { st.current.flyTo(target); }
+    flownRef.current = target;
   }, [hi, sel, loading, items]);
 
   if (err) return fallback || <div style={{ fontSize: 12, color: C.muted, padding: 16 }}>3D indisponible sur cet appareil.</div>;
@@ -7477,7 +7806,7 @@ function VintedAccounts({ accounts, setAccounts }) {
   })(); }, []);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
-    if (blockedAccts.has(uid)) return { icon: '🚫', label: 'Bloqué', color: C.danger, hint: 'Vinted a refusé ce compte (401/403). Ses annonces/ventes sont masquées.' };
+    if (blockedAccts.has(uid)) return { icon: '🚫', label: 'Refusé par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403). Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
     // Sans refresh_token, le compte ne peut pas se renouveler tout seul → il
     // faudra le reconnecter à la main. (Le simple access_token expiré, lui, est
     // normal et se renouvelle automatiquement — on ne le signale pas.)
@@ -7535,7 +7864,7 @@ function VintedAccounts({ accounts, setAccounts }) {
     const uid = String(acc.vinted_user_id);
     setHiddenAccts(prev => { const n = new Set(prev); n.add(uid); save('vinted_accounts_hidden', [...n]); return n; });
     setRemoving(acc.vinted_user_id);
-    const ok = await deleteVintedAccount(acc.vinted_user_id);
+    const ok = await deleteVintedAccount(acc.vinted_user_id, acc.login);
     setRemoving(null);
     if (!ok) { toast('Retiré des annonces et des stats. (La ligne du compte reviendra peut-être, mais il restera masqué partout.)'); }
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
@@ -8654,25 +8983,85 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Comptes entiers exclus de la compta (par vinted_user_id).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
   // Masquer/afficher un compte partout (annonces + compta) depuis l'onglet Annonces.
-  const toggleHideAcc = (uid) => setHiddenAccts(prev => { const n = new Set(prev); const k = String(uid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
+  // ⚠️ MASQUER UN COMPTE SE DEMANDE, LE RÉAFFICHER NON.
+  // Ces puces ressemblent à des filtres, mais un simple tap RETIRE le compte de
+  // partout (annonces + comptabilité) et la liste part dans le cloud, donc sur
+  // tous les appareils. Vérifié en base : `vinted_accounts_hidden` a changé tout
+  // seul entre deux relevés (un compte masqué, un autre réaffiché) — Julien
+  // tapotait les puces en croyant filtrer. Un geste aussi lourd doit être
+  // confirmé ; le retour en arrière, lui, reste immédiat.
+  const toggleHideAcc = async (uid) => {
+    const k = String(uid);
+    if (!hiddenAccts.has(k)) {
+      const a = (accounts || []).find(x => String(x.vinted_user_id) === k);
+      const nom = a ? accNameOf(a) : `#${k}`;
+      const ok = await askConfirm({
+        title: `Masquer « ${nom} » ?`,
+        desc: "Ses annonces disparaissent de l'écran Annonces et ses ventes ne comptent plus dans la comptabilité, sur tous tes appareils. À réserver à un compte fermé ou abandonné — retape la puce pour le réafficher.",
+        ok: 'Masquer', cancel: 'Annuler', danger: true,
+      });
+      if (!ok) return;
+    }
+    setHiddenAccts(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
+  };
   // Comptes détectés BLOQUÉS par Vinted (un appel réel « Synchroniser » a renvoyé
   // 401/403 même après refresh du token → le compte est fermé/suspendu). On garde
   // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement
   // tant qu'un futur « Synchroniser » ne le voit pas revenir en ligne.
   const [blockedAccts, setBlockedAccts] = useState(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)));
-  const isAuthBlock = (e) => e===401 || e===403 || /\b(401|403)\b|suspend|block|bloqu|forbidden|unauthor/i.test(String(e||''));
-  // Sur un appel RÉEL (force) : on marque bloqué si auth échoue, on débloque si OK.
+  // ⚠️ UN 401 N'EST PAS UN COMPTE BLOQUÉ — c'est une session expirée.
+  // Les jetons Vinted durent ~2 h et, depuis le passage en profil discret (§5),
+  // l'app ne les renouvelle plus en masse : tout compte sur lequel Julien n'est
+  // pas repassé récemment répond 401 au premier « Synchroniser ». L'ancien
+  // `isAuthBlock` mettait 401 et 403 dans le même sac → le compte partait dans
+  // `vinted_accounts_blocked`, donc `acctOff`, donc **ses annonces ET sa compta
+  // disparaissaient**, définitivement (rien ne pouvait le déblo­quer tant que le
+  // jeton restait périmé). Résultat constaté par Julien : ses comptes sains
+  // barrés d'un 🚫 et le seul compte réellement bloqué encore affiché.
+  // On ne bloque donc plus que sur un refus EXPLICITE (403 + mot de bannissement).
+  const isSessionExpiree = (e) => e === 401 || /\b401\b|unauthor|expir|token/i.test(String(e || ''));
+  const isBanni = (e) => !isSessionExpiree(e) && (e === 403 || /\b403\b|suspend|forbidden|banned|bloqu|block/i.test(String(e || '')));
+  // Sur un appel RÉEL (force) : on marque bloqué si Vinted REFUSE le compte, on
+  // débloque dès qu'un appel repasse. Une session expirée ne masque rien : les
+  // annonces viennent de la moisson de l'extension, pas du jeton.
   const noteAcctLive = (uid, res, force) => {
     if (!force || !uid) return;
     const k = String(uid);
     setBlockedAccts(prev => {
       const n = new Set(prev); const was = n.has(k);
-      if (!res.ok && isAuthBlock(res.error)) n.add(k);
+      if (!res.ok && isBanni(res.error)) n.add(k);
       else if (res.ok) n.delete(k);
       if (n.size !== prev.size || was !== n.has(k)) save('vinted_accounts_blocked', [...n]);
       return n;
     });
   };
+  // ── RÉPARATION AUTOMATIQUE des comptes marqués bloqués à tort ──────────────
+  // Un compte que l'extension a capté récemment est VIVANT, quoi qu'ait dit un
+  // 401 passé : la capture se fait dans le navigateur de Julien, avec sa vraie
+  // session. On le sort donc de la liste des bloqués au démarrage, sans rien
+  // lui demander — sinon il devrait retaper chaque puce une par une pour
+  // retrouver des annonces qu'il n'a jamais masquées.
+  // Requête LÉGÈRE (une seule, colonnes scalaires) — cf. le piège d'égress §34.
+  useEffect(() => { (async () => {
+    if (!blockedAccts.size) return;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
+      if (!res.ok) return;
+      const rows = await res.json(); const parUid = {};
+      rows.forEach(r => {
+        const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return;
+        const t = harvestTs(r) || 0; if (t && (!parUid[m[1]] || t > parUid[m[1]])) parUid[m[1]] = t;
+      });
+      const vivants = [...blockedAccts].filter(uid => parUid[uid] && (Date.now() - parUid[uid]) < 7 * 86400000);
+      if (!vivants.length) return;
+      setBlockedAccts(prev => {
+        const n = new Set(prev); vivants.forEach(u => n.delete(u));
+        save('vinted_accounts_blocked', [...n]); return n;
+      });
+    } catch (_) { /* diagnostic : ne doit jamais gêner le démarrage */ }
+  })(); // au démarrage seulement (la liste initiale suffit)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showHidden, setShowHidden] = useState(false);
   // ── COHÉRENCE DES COMPTES (source unique) ────────────────────────────────
   // Un compte masqué à la main OU détecté bloqué par Vinted ne doit exister
@@ -8803,6 +9192,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Colis marqués « récupéré » À LA MAIN (par transaction) : disparaissent de « à
   // retirer » sans attendre que Vinted mette à jour. Synchronisé.
   const [pickupDone, setPickupDone] = useState(() => load('vinted_pickup_done', {}));
+  // Colis marqués « ✓ Récupéré » depuis le PANNEAU de l'extension (ligne dédiée
+  // `panel_colis_collected`, jamais `main`). On les fond dans le set `collected`
+  // (même clé = colisKey) pour qu'ils disparaissent aussi de la liste « à retirer »
+  // de l'app. Lecture seule à l'ouverture : on n'enregistre rien tant que Julien
+  // ne touche à rien (pas de réécriture surprise du store).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_collected&select=data`, { headers: sbAuth() });
+        if (!res.ok) return;
+        const rows = await res.json();
+        const data = (rows && rows[0] && rows[0].data) || {};
+        const keys = Object.keys(data || {});
+        if (alive && keys.length) setCollected(prev => { const n = new Set(prev); keys.forEach(k => n.add(String(k))); return n; });
+      } catch (_) { /* réseau : on garde le set tel quel */ }
+    })();
+    return () => { alive = false; };
+  }, []);
   const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev,[k]:new Date().toISOString()}; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
@@ -8879,6 +9287,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const markBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev,[k]:1}; save('vinted_bords_shipped',u); return u; }); };
   const unmarkBordShipped = (b) => { const k=bordKey(b); if(!k) return; setBordsShipped(prev=>{ const u={...prev}; delete u[k]; save('vinted_bords_shipped',u); return u; }); };
   const isBordShippedManual = (b) => !!bordsShipped[bordKey(b)];
+  // Bordereaux « traités » depuis le PANNEAU de l'extension (bouton « ✓ Traiter »
+  // sur Vinted). L'extension les écrit dans une ligne DÉDIÉE `panel_bords_done`
+  // (jamais dans `main` → aucun risque d'écraser une sauvegarde de l'app). Ici on
+  // la LIT seulement, en source de « déjà traité » supplémentaire — même clé que
+  // `bordKey` (transaction || suivi || numero). Lecture seule : pas de drain, pas
+  // de boucle, l'app ne réécrit rien.
+  const [panelBordsDone, setPanelBordsDone] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_bords_done&select=data`, { headers: sbAuth() });
+        if (!res.ok) return;
+        const rows = await res.json();
+        const data = (rows && rows[0] && rows[0].data) || {};
+        if (alive && data && typeof data === 'object') setPanelBordsDone(data);
+      } catch (_) { /* réseau : on garde {} */ }
+    })();
+    return () => { alive = false; };
+  }, []);
   // Mode expédition : colis coché « posté » à la main (par n° de transaction).
   // Synchronisé → suit d'un appareil à l'autre. Se résorbe tout seul quand le
   // statut Vinted rattrape (la vente n'est alors plus « à expédier »).
@@ -8897,7 +9325,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // liste alors que le colis n'était même pas préparé — on le croyait traité.
   // L'impression reste affichée (pastille « ✓ Imprimé »), mais elle ne retire
   // plus rien. Rien n'est jamais supprimé : « Voir » réaffiche les terminés.
-  const isBordDone = (b) => isBordShippedManual(b) || bordShipped(b);
+  const isBordDone = (b) => isBordShippedManual(b) || bordShipped(b) || !!panelBordsDone[bordKey(b)];
   const [listings, setListings] = useState({ loading:false, items:null });
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
@@ -9577,6 +10005,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { moves, nTotal: movable.length, nLocked: locked.size, nReserved: reserved.size, maxBefore, maxAfter };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, garageNums, sales.items, saleOv]);
+  // ── PRIX D'ACHAT POSÉS DEPUIS LE PANNEAU VINTED ───────────────────────────
+  // Mesuré : 0 prix d'achat sur 177 paires → bénéfice, marge et rapport
+  // comptable calculés avec un coût de ZÉRO. Le panneau de l'extension permet
+  // désormais de relier l'achat d'un tap pendant qu'on regarde l'annonce, et il
+  // l'écrit dans une ligne DÉDIÉE (`panel_buyprices`) : l'extension n'a pas le
+  // droit d'écrire la ligne `main` (§35). C'est donc ici qu'on le reporte sur la
+  // paire — via `updatePair`, qui met aussi à jour le miroir prix-par-numéro.
+  // On ne touche JAMAIS un prix déjà saisi : le panneau complète, il n'écrase pas.
+  const [panelBuy, setPanelBuy] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_buyprices&select=data`, { headers: sbAuth() });
+        if (!res.ok) return;
+        const rows = await res.json();
+        const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+        if (alive && items && typeof items === 'object') setPanelBuy(items);
+      } catch (_) { /* réseau : on garde {} */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    if (!cloudReady) return;                       // même garde que toute écriture auto
+    const ids = Object.keys(panelBuy || {});
+    if (!ids.length || !annBase.length) return;
+    for (const id of ids) {
+      const p = Number(panelBuy[id] && panelBuy[id].price);
+      if (!isFinite(p) || p < 0) continue;
+      const it = annBase.find(x => String(x.id) === String(id));
+      if (!it) continue;
+      const cur = numeros[it.id] || {};
+      if (cur.buyPrice != null && String(cur.buyPrice).trim() !== '') continue; // déjà saisi
+      updatePair(it, { buyPrice: String(p) });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelBuy, cloudReady, annBase, numeros]);
+
   // Applique le plan : réécrit les numéros, met à jour le miroir prix-par-numéro
   // (sinon le prix d'achat suivrait l'ancien numéro) et repart d'un historique
   // « used » propre = ce qui est réellement attribué après l'opération.
@@ -10913,6 +11379,76 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
     } catch(err){ toast('Impossible de lire ce PDF : '+String(err)); }
   };
+  // ── FACTURE liée à un bordereau (comptes PRO uniquement) ────────────────────
+  // La facture vient des emails que l'app reçoit (pipeline Gmail/Apps Script §3) :
+  // s'il existe une facture pour ce bordereau, c'est une vente d'un COMPTE PRO →
+  // on la joint. Sinon (compte perso), pas de facture, rien à faire.
+  // Rapprochement PAR N° DE PAIRE (`productId` = N° tamponné sur le bordereau),
+  // désambiguïsé par le prix de la vente si un même N° a resservi. On ne devine
+  // jamais par titre (même règle §24).
+  const invForBord = (b) => {
+    const num = numForBord(b); if (!num) return null;
+    let invs = [];
+    try { invs = load('vinted_invoices', []) || []; } catch(_) { invs = []; }
+    const cands = invs.filter(i => String(i.productId || '').trim() === String(num));
+    if (!cands.length) return null;
+    if (cands.length === 1) return cands[0];
+    // Plusieurs factures pour ce N° (numéro réattribué au fil du temps) : on
+    // départage par le prix de la vente reliée, puis on prend la plus récente.
+    const so = b.transaction != null ? soldByTxn[String(b.transaction)] : null;
+    const price = so && so.price ? Number(so.price.amount != null ? so.price.amount : so.price) : null;
+    const scored = cands.slice().sort((a, z) => {
+      const pa = price != null ? -Math.abs((Number(a.sellPrice) || 0) - price) : 0;
+      const pz = price != null ? -Math.abs((Number(z.sellPrice) || 0) - price) : 0;
+      return (pz === pa ? 0 : (pa > pz ? -1 : 1)) || (new Date(z.createdAt || 0) - new Date(a.createdAt || 0));
+    });
+    return scored[0];
+  };
+  const entForBordInvoice = (inv) => {
+    if (!inv) return null;
+    let ents = [], active = null, settings = null;
+    try { ents = load('vinted_entreprises', []) || []; } catch(_) {}
+    try { active = load('vinted_entreprise_active', null); } catch(_) {}
+    try { settings = load('vinted_invoice_settings', null); } catch(_) {}
+    return entForInvoice(inv, ents, active, settings || { companyName:'Shop Cancale35', companyType:'Entrepreneur individuel', companyAddress:'80 rue de la vieille rivière 35260', siret:'94135104100012', footer:'Merci pour votre achat !' });
+  };
+  // Imprime le bordereau (tamponné) ET, pour un compte pro, la facture — dans UN
+  // seul PDF (bordereau puis facture), et lance directement l'impression.
+  const printBordAndInvoice = async (b) => {
+    try {
+      const pdf = await fetchBordPdf(b._row);
+      const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
+      if (!buf) { toast('PDF du bordereau illisible.'); return; }
+      const numero = numForBord(b), title = b.modele || b.article || '';
+      const { width, height } = await readPdfFirstPageSize(buf);
+      const pos = posForFormat(width, height);
+      const inv = invForBord(b);
+      const ent = inv ? entForBordInvoice(inv) : null;
+      const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+      const out = await PDFDocument.create();
+      // 1) le bordereau tamponné du N°
+      const src = await PDFDocument.load(buf);
+      const sBold = await src.embedFont(StandardFonts.HelveticaBold);
+      const sReg = await src.embedFont(StandardFonts.Helvetica);
+      drawBordereauStamp(src, rgb, sBold, sReg, numero, title, pos);
+      (await out.copyPages(src, src.getPageIndices())).forEach(p => out.addPage(p));
+      // 2) la facture pro (si elle existe)
+      let joined = false;
+      if (inv && ent) {
+        try { const fb = await buildFacturXBytes(inv, ent); const fsrc = await PDFDocument.load(fb); (await out.copyPages(fsrc, fsrc.getPageIndices())).forEach(p => out.addPage(p)); joined = true; } catch(_) {}
+      }
+      const bytes = await out.save();
+      const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+      const safeTitle = (title || '').replace(/[^\w\-]+/g, '_').slice(0, 40);
+      const filename = `bordereau${numero?'-N'+numero:''}${joined?'-facture':''}${safeTitle?'-'+safeTitle:''}.pdf`;
+      // Sur ordinateur : lance l'impression tout de suite (iframe caché). Sur
+      // iPhone (bloqué) : la modale « Ouvrir → Partager → Imprimer » prend le relais.
+      const printed = autoPrintUrl(url);
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+      if (!isIOS && !printed) { const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); }
+      setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed });
+    } catch(err){ toast('Erreur impression : '+String(err)); }
+  };
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
   // titre dans les annonces numérotées (si le titre n'est pas ambigu).
   // ── QUEL NUMÉRO PORTE CE BORDEREAU ? ──────────────────────────────────────
@@ -10962,13 +11498,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const b of pending) {
         const pdf = await fetchBordPdf(b._row);
         const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
-        if (buf) items.push({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: buf });
+        if (!buf) continue;
+        // Compte pro (une facture existe pour cette vente) → on joint la facture
+        // juste après son bordereau dans le PDF groupé (§41).
+        let invBytes = null;
+        const inv = invForBord(b);
+        if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
+        items.push({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: buf, invBytes });
       }
-      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false));
+      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true });
       setBordResult({ ...r, batch: true });
     } catch(err){ toast('Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
+  // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
+  // bordereaux sont chargés, on lance l'impression groupée une seule fois.
+  React.useEffect(()=>{
+    if(only!=='bordereaux' || !_pendingBordPrint || !Array.isArray(emailBords)) return;
+    _pendingBordPrint=false;
+    const t=setTimeout(()=>{ try{ batchBordereaux(); }catch(_){} }, 400);
+    return ()=>clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[emailBords, only]);
   // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
   const adjustBordPlacement = () => {
     const r = bordResult; if(!r || !r.pdfBuf) return;
@@ -12368,7 +12919,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,fontWeight:700,color:C.danger}}>Compte « {accNameOf(a)} » bloqué par Vinted</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1}}>Ses annonces ont été retirées automatiquement (le compte ne répond plus). Tu peux le déconnecter définitivement.</div>
                 </div>
-                <button type="button" onClick={async ()=>{ if(await askConfirm(`Déconnecter « ${accNameOf(a)} » ? Ses tokens seront supprimés de l'app.`)){ deleteVintedAccount(a.vinted_user_id); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
+                <button type="button" onClick={async ()=>{ if(await askConfirm({title:`Déconnecter « ${accNameOf(a)} » ?`, desc:"Ses jetons, ses annonces et ses ventes captées sont supprimés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). À faire pour un compte banni ou fermé. Réversible depuis « Comptes retirés ».", ok:'Déconnecter', cancel:'Annuler', danger:true})){ const ok=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(ok?`« ${accNameOf(a)} » déconnecté — recharge l'app pour le voir disparaître`:'Échec de la déconnexion — réessaie'); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
               </div>
             ))}
           </div>
@@ -12888,6 +13439,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const withPdf = emailBords.filter(b=>b.hasPdf);
           const pending = withPdf.filter(b=>!isBordDone(b));
           const done = withPdf.length - pending.length;
+          const proNb = pending.filter(b=>invForBord(b)).length; // comptes pro : facture jointe
           return (
             <div style={{border:`1px solid ${pending.length?C.accent:C.border}`,background:pending.length?`${C.accent}0e`:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -12896,7 +13448,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {pending.length>0 ? `📄 ${pending.length} bordereau${pending.length>1?'x':''} à imprimer` : '✅ Aucun bordereau à imprimer'}
                   </div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} colis fait{done>1?'s':''} ou confirmé{done>1?'s':''} par Vinted
+                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} colis fait{done>1?'s':''} ou confirmé{done>1?'s':''} par Vinted{proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}
                   </div>
                 </div>
                 {pending.length>0 && (
@@ -13021,6 +13573,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             {o && o._acc ? <AcctTag acc={o._acc} name={nom}/> : (nom ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{nom}</span> : null)}
                             {bits.length ? <span>{bits.join(' · ')}</span> : null}
+                            {(()=>{ const inv=invForBord(b); return inv ? <span title="Compte pro : une facture (reçue par email) est jointe à l'impression" style={{display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span> : null; })()}
                           </div>
                         );
                       })()}
@@ -13037,11 +13590,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const sec = { flexShrink:0, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
                     return (<>
                       <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12}}>
+                        {(()=>{ const hasInv=!!invForBord(b); return (
                         <button type="button" onClick={async ()=>{
+                          if (hasInv) { await printBordAndInvoice(b); return; }
                           const pdf=await fetchBordPdf(b._row);
                           const bytes=pdf&&pdf.pdfB64?b64ToBytes(pdf.pdfB64):null; if(!bytes){toast('PDF illisible.');return;}
                           processBordereau(numForBord(b), b.modele||b.article||'', bytes);
-                        }} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer</button>
+                        }} title={hasInv?'Génère le bordereau tamponné + la facture pro et lance l\'impression':'Génère le bordereau tamponné et lance l\'impression'} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{hasInv?' + facture':''}</button>
+                        ); })()}
                         {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}
                       </div>
                       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
@@ -13227,10 +13783,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
             <div style={{fontSize:32,marginBottom:6}}>✅</div>
-            <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:'Bordereau prêt'}</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>:<>Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>L'impression est <b>lancée</b> ; si la fenêtre ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>L'impression est <b>lancée</b>{bordResult.withInvoice?<> (bordereau <b>+ facture</b>)</>:null}. Si la fenêtre d'impression ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
-              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':'Ouvrir le bordereau'}</a>
+              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             {bordResult.batch && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
             <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
@@ -15319,7 +15875,7 @@ export default function App() {
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
     const TABS_OK=['dashboard','cat_annonces','cat_repub','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
-    const goto=(search)=>{ try{ const t=new URLSearchParams(search).get('tab'); if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
+    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
@@ -15419,6 +15975,19 @@ export default function App() {
     siret:'94135104100012',
     footer:'Merci pour votre achat !',
   }));
+  // ── Factures PRO : plusieurs micro-entreprises ─────────────────────────────
+  // On démarre TOUJOURS avec au moins une entité, amorcée depuis les réglages
+  // existants → l'app se comporte exactement comme avant tant que Julien n'ajoute
+  // pas de 2ᵉ entité. `activeEnt` = celle utilisée pour les nouvelles factures.
+  const [entreprises,setEntreprisesRaw]=useState(()=>{
+    const stored=load('vinted_entreprises',null);
+    if(Array.isArray(stored)&&stored.length) return stored;
+    const s=load('vinted_invoice_settings',{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'});
+    return [{id:'ent_1',...s}];
+  });
+  const setEntreprises=(v)=>{ setEntreprisesRaw(v); save('vinted_entreprises',v); };
+  const [activeEnt,setActiveEntRaw]=useState(()=>load('vinted_entreprise_active','ent_1'));
+  const setActiveEnt=(id)=>{ setActiveEntRaw(id); save('vinted_entreprise_active',id); };
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);
   const [syncStatus,setSyncStatus]=useState('idle'); // idle | saving | synced | error | loading
@@ -16030,11 +16599,12 @@ export default function App() {
       if(overlay){ swipeStart.current=null; return; }
       swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
       }}
-      // Dès que le geste part franchement de côté, on coupe la sélection de
-      // texte. Sans ça, glisser surlignait la page, et la sélection restée en
-      // place faisait échouer tous les gestes suivants : le balayage ne
-      // marchait qu'une fois. Un geste vertical ou oblique, lui, sélectionne
-      // normalement — c'est ce qui distingue « je navigue » de « je copie ».
+      // À la souris : UNIQUEMENT le balayage HORIZONTAL entre onglets. Le
+      // défilement vertical reste celui du navigateur (molette + barre) —
+      // pas de « glisser-défiler » (Julien n'en veut pas). Dès que le geste part
+      // franchement de côté, on coupe la sélection de texte (sinon glisser
+      // surligne la page et la sélection restée en place casse les gestes
+      // suivants). Un geste vertical ou oblique sélectionne/défile normalement.
       onPointerMove={e=>{
       const s=swipeStart.current; if(!s||!s.souris) return;
       if(s.horiz) return;
@@ -16049,7 +16619,7 @@ export default function App() {
       if(!s||!s.souris||e.pointerType!=='mouse') return;
       swipeStart.current=null;
       try{ document.body.style.userSelect=''; }catch(_){}
-      // Un geste qui n'est jamais devenu horizontal, c'est une sélection.
+      // Un geste qui n'est jamais devenu horizontal, c'est une sélection/un clic.
       if(!s.horiz) return;
       // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
       slideTab(e.clientX-s.x, e.clientY-s.y, 110);
@@ -16357,8 +16927,8 @@ export default function App() {
           setStockVinted(u); save('vinted_stock_vinted',u);
           try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
         }}/>}
-        {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings}/>}
-        {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings}/>}
+        {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/>}
+        {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}

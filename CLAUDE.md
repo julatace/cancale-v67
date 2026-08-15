@@ -915,3 +915,628 @@ Le quota du cycle est déjà dépassé → Supabase reste restreint **jusqu'au r
 ### Reste à surveiller (secondaire, pas corrigé)
 - `api/widget.js` fait encore `harvestOrders('sold')` + `('purchased')` en `select=data` (tableau `my_orders`) : ~0,5 Mo/appel après allègement (§23) — 12× plus léger que les PDF, donc pas le tueur, mais à garder à l'œil. Pour l'annuler complètement, il faudrait précalculer les compteurs « à expédier / à retirer » dans `widget_stats` (publié par l'app) au lieu de lire la moisson en direct — mais ça casse la propriété « se met à jour même app fermée » (§10). À ne faire que si l'égress reste trop haut après ce correctif.
 - **Leçon** : quand un correctif d'égress/perf est trouvé côté app, **vérifier tout de suite les endpoints `api/*.js`** qui lisent les mêmes lignes — ils ont leur propre code de lecture et ne bénéficient pas des corrections de `App.jsx`.
+
+---
+
+## 35. Session août 2026 (suite) — Panneau « boutique en un coup d'œil » + factures pro/multi-entités + Factur-X + 3D fly-to
+
+Longue session. Beaucoup de petites briques sûres, deux gros chantiers finis. **Aucune modif ne casse le chemin existant** (tout est additif). ⚠️ Les changements **app** vivent sur la branche `claude/new-session-gzdgur` → **prod au déploiement de la branche** ; les changements **extension** demandent un **rechargement** (`chrome://extensions` → ⟳).
+
+### Extension (panneau VRM sur Vinted) — 4.40 → 4.50
+Principe tenu : **le panneau LIT et AFFICHE, il n'agit jamais sur Vinted** (aucune requête, aucun clic auto).
+- **4.40** bandeau « À faire » cliquable (chips → onglet concerné).
+- **4.41** le panneau garde sa **position** (ouvert/fermé + onglet) entre les pages (`vrm_panel_open`/`vrm_panel_tab`, localStorage).
+- **4.42** filtre de recherche dans Republier (DOM, garde le focus ; `repubQuery`).
+- **4.43** « Cette paire » : conseils **à relancer / dort** repris tels quels des onglets (mêmes signaux → jamais un chiffre qui contredit l'app).
+- **4.44** « Cette paire » sans prix d'achat → **lien 1-tap** vers l'app (`?tab=cat_annonces`).
+- **4.45** bouton **« ✓ Traiter »** sur les bordereaux à imprimer.
+- **4.46** « Traiter » **réversible** (section « Traités » + ↺ Remettre) + nouvel onglet **« Achats 📦 »** (colis à retirer).
+- **4.47** l'onglet Achats affiche **le CODE de retrait** en gros (source = emails `email_track_*`, la SEULE qui porte le code ; jamais deviné par titre).
+- **4.48** écran d'accueil **« Ma journée »** (CA du mois, argent bloqué, encaissé — lus depuis `widget_stats` publié par l'app, JAMAIS recalculés → zéro divergence) + à-faire cliquables. Bouton **📋 Copier le code**. Défaut d'accueil = `journee`.
+- **4.49** barre **objectif de CA** (lit `vinted_goal`).
+- **4.50** bloc **« Pour vendre plus »** (à relancer / dorment / sans N°).
+
+⚠️ **COHÉRENCE SANS CLOBBER — le motif à réutiliser :** pour qu'une action du panneau (Traiter un bordereau, « Récupéré » un colis) se répercute dans l'app **sans jamais écraser la ligne `main`** (un upsert y remplacerait tout le blob et pourrait effacer une sauvegarde de l'app faite en parallèle) :
+- l'extension écrit dans une **ligne DÉDIÉE** qu'elle est seule à écrire : **`panel_bords_done`** (bordereaux, clé = `transaction||suivi||numero` = `bordKey`) et **`panel_colis_collected`** (colis, clé = `suivi||subject` = `colisKey`) — read-merge-write sur SA propre ligne.
+- `buildPanelData` (background.js) relit ces lignes et filtre → le panneau se met à jour tout de suite.
+- **App.jsx LIT ces lignes en source « déjà fait » SUPPLÉMENTAIRE**, en lecture seule : `isBordDone` inclut `panelBordsDone[bordKey(b)]` ; un effet fond `panel_colis_collected` dans le set `collected` (colis). **Jamais de drain qui réécrit, jamais de boucle.** Sens app→panneau déjà en place (buildPanelData lit `vinted_bords_shipped`/`vrm_colis_collected`).
+- `buildPanelData` renvoie aussi `pickups` (email_track à retirer), `appStats` (ligne `widget_stats`), `goal` (`vinted_goal`).
+
+### Factures PRO — plusieurs micro-entreprises (App.jsx, additif, rétro-compatible)
+- **`vinted_entreprises`** (liste `[{id,companyName,companyType,companyAddress,siret,tvaMention,footer}]`) + **`vinted_entreprise_active`** (id), tous deux dans `SYNC_KEYS`. Amorcés depuis `vinted_invoice_settings` → **une seule entité = comportement identique à avant**.
+- `invoiceSettings` reste le **miroir de l'entité active** (tout code hérité qui le lit marche encore). `InvoiceSettings` (la modale) est devenue un **gestionnaire d'entités** (chips + Ajouter/Supprimer/⭐ active + champ « Mention TVA »).
+- Chaque facture porte `entrepriseId` (stampé à la création, à `activeEnt`). **Numérotation SÉQUENTIELLE PAR ENTITÉ** (`nextInvoiceNumber` filtre par entité ; facture sans `entrepriseId` = 1ʳᵉ entité). Exigence légale.
+- **`entForInvoice(inv, entreprises, activeEnt, fallback)`** (module-level) = LA résolution de l'entité d'une facture (celle stockée dessus, sinon active, sinon 1ʳᵉ). Utilisée par le PDF, le Factur-X, le CSV. Une vieille facture se régénère avec **sa** raison sociale, pas celle du moment.
+- PDF : **mention légale « TVA non applicable, art. 293 B du CGI »** ajoutée (obligatoire en micro, elle manquait) ; bloc client = **nom** en principal (avant : l'email en gras). Étiquette 🏢 entreprise sur les lignes + colonnes Entreprise/SIRET au CSV (si >1 entité).
+
+### Facturation électronique — Factur-X (le vrai fichier)
+- **`factureCII(inv, ent)`** = XML **Cross Industry Invoice EN16931** (profil BASIC), TVA catégorie `E` (exonéré) + `ExemptionReason` = la mention de l'entité. Bien-formé au `xmllint` (échappement `xmlEsc`).
+- **`generateFacturXPdf(inv, ent)`** (bouton 🧾) = **UN SEUL fichier Factur-X** : PDF de la facture (pdf-lib, avec logo) **+ le XML embarqué** sous le nom normalisé **`factur-x.xml`** (`AFRelationship=Alternative`, `/AF`) **+ XMP** d'identification (`pdfaid part=3` + schéma d'extension `fx` : DocumentType/FileName/Version/ConformanceLevel). Sauvé `useObjectStreams:false` → `/AF` + nom en clair, lisibles par les outils (Indy, validateurs). Vérifié au smoke-test pdf-lib.
+- **`downloadFacturX(inv, ent)`** (XML seul) existe encore mais n'est plus câblé à un bouton (le XML est dans le PDF).
+- ⚠️ **HONNÊTETÉ (dit à Julien, à redire) :** le **format** Factur-X est respecté, mais la **conformité PDF/A-3 stricte n'est PAS certifiée** (polices non embarquées, pas de profil ICC — il faudrait un validateur officiel + une police TTF embarquée). Surtout : l'**envoi légal passe par une Plateforme de Dématérialisation Partenaire (PDP) / Indy**, pas par l'app ; **Indy n'a pas d'API publique de push**. Et l'activité de Julien est **B2C (Vinted → particuliers)** → ce n'est **pas** l'e-invoicing Factur-X (B2B) qui s'applique mais l'**e-reporting**. **À confirmer avec son comptable / Indy** — ne pas présenter l'app comme une solution légale complète.
+
+### Garage 3D — « vol vers la boîte »
+- `Room3D` expose `flyTo(itemId)` : à la recherche d'un N°, la caméra **vole en douceur** (720 ms, ease, lerp position+target) jusqu'au meuble. Déclenché depuis l'effet de surlignage **seulement quand la cible change** (`flownRef`), try/catch (si ça rate, le garage reste utilisable). Les **ambiances** (`GARAGE_AMBIANCES`/`applyAmbiance`) étaient déjà là.
+- ❌ **Mode balade 1ʳᵉ personne : REFUSÉ par Julien (« c'est nul »)** — ne pas le construire.
+
+### ✅ VÉRIFIÉ AU BANC (Playwright, rendu réel — §20)
+Fait après coup, sur l'écran **Factures** en multi-entités (2 entités, 3 factures synthétiques réalistes) :
+- **détail du banc** : `dist` servi en statique, Supabase intercepté (`select=owner`→400 pour rester non cloisonné ; `id=eq.main`→données synthétiques ; reste→`[]`), `vrm_acces_direct='1'` (⚠️ **`'1'`, pas `'true'`** — le check `MULTI_USER=true`+`!CLOISONNE` lit exactement `'1'`) injecté par `addInitScript`, deep-link `?tab=invoices`. Chromium `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, `--use-angle=swiftshader`.
+- **Résultat : 0 erreur page/console.** L'écran rend les 3 factures avec l'**étiquette 🏢 entité**, deux factures **`2026-000001`** distinctes (une par entité → numérotation par entité confirmée). La modale **gestionnaire d'entités** s'ouvre (chips ⭐, champ Mention TVA, Ajouter/Supprimer). 📄 (print) et 🧾 (Factur-X) cliqués sans erreur.
+- **Factur-X vérifié à l'octet** : le 🧾 télécharge un vrai PDF ~32 Ko ; il contient `EmbeddedFile` + `factur-x.xml` + `/AF` + `AFRelationship=Alternative` + XMP `pdfaid part 3`. Le stream XML **décompressé (Flate)** est **bien-formé au xmllint** et porte la BONNE entité **par facture** (la facture de la 2ᵉ entité → « Seconde Micro » / 62,50 €, pas Shop Cancale35) + la mention 293 B + le n°. ⇒ `entForInvoice` résout juste.
+- Harnais jetable (chemins absolus scratch) → **non commité**. Pour rejouer : servir `dist`, intercepter Supabase comme ci-dessus, seed `vrm_acces_direct='1'`.
+- **Smoke TOUS les onglets** (Ma journée / Stats / Annonces / Republier / Ventes / Achats / Bordereaux / Messages / Garage / Factures), en cliquant chacun avec le seed synthétique : **0 erreur page/console partout**, Garage 3D inclus (rendu WebGL logiciel, vues Grille/Photo/Plan OK). Aucune régression des changements de session (`isBordDone`+`panelBordsDone`, effet `collected`+`panel_colis_collected`, `flyTo` 3D).
+- **Reste au smoke seulement** (pas d'exercice fonctionnel profond) : le **fly-to 3D** n'a pas été déclenché sur une vraie recherche (garage synthétique sans meuble) — code guardé try/catch.
+
+### ✅ NOUVEAU — le PANNEAU D'EXTENSION SE VÉRIFIE AUSSI (méthode débloquée)
+On croyait le panneau (`vinted-panel.js`) non testable hors Chrome. FAUX : Playwright + un **faux `chrome`** suffit.
+- `page.route('**/*', …)` sert une page HTML factice au chemin **`/items/1-adidas`** (pour que `currentItemId()` renvoie `'1'`), **zéro réseau réel**.
+- `addInitScript` définit `window.chrome.runtime.sendMessage(msg,cb)` qui répond selon `msg.action` : `panelData` → un objet DATA réaliste (mêmes champs que `buildPanelData` : `online, byId, sleeping, relance, noNum, toShip, pickups, bordsToPrint, convs, quickReplies, appStats, goal, stats`) ; `aiReply`/`convLastMessage` → réponses stub ; le reste → `{ok:true}`. Plus `chrome.storage.local.get/set`.
+- On injecte le script (`addScriptTag({content: panelJs})`), on clique le **FAB `#vrm-fab`** pour ouvrir, puis on clique chaque `.vrm-tab[data-t=…]` et on capture `pageerror`/`console.error`.
+- **Résultat de cette session** : 11 onglets (journee/paire/republier/reponse/expedier/achats/messages/favoris/relance/dorment/sansnum) + interactions (cocher priorités, `📋 Copier N°+titre`, `✓ Traiter`, `📋 code` + `✓ Récupéré`, filtre bordereaux) → **0 erreur app**. Capture Ma journée conforme (CA 320 €, objectif 64 %, badge FAB 6).
+- ⚠️ un `click` Playwright qui timeoute sur un élément **filtré (`display:none`)** est une erreur de TEST, pas de l'app — ne compter que `PAGEERROR`/`CONSOLE`.
+- Harnais jetable (scratch). **À refaire à chaque gros changement du panneau** — c'est le pendant §20 pour l'extension.
+
+---
+
+## 36. Session août 2026 (suite) — panneau extension « autosuffisant » : moins besoin de rouvrir l'app
+
+Objectif de Julien : « juste à regarder l'extension pour naviguer sur Vinted et gagner du temps ». Trois briques ajoutées au panneau VRM (`vinted-panel.js` + `background.js`), **toutes en lecture seule, cohérentes avec l'app (mêmes sources moissonnées, aucun total recalculé)**. Extension **4.68 → 4.71** (à recharger dans Chrome).
+
+- **4.69** — bandeau « boutique en un coup d'œil » en haut de **Mes paires** : `👟 N en ligne · valeur · 👁 vues · ❤️ favoris`, calculé sur **toutes** les annonces en ligne (`DATA.online`), comme le bandeau Annonces de l'app. Un champ absent ne fausse rien.
+- **4.70** — **engagement cumulé** (👁 vues / ❤️ favoris) sous les stats de stock de **Ma journée**. Nouveaux champs `stats.viewsTotal` / `stats.favsTotal` dans `buildPanelData` (mêmes `online` → aucun chiffre qui diverge).
+- **4.71** — liste **« 🧾 Dernières ventes »** sur **Ma journée** : nouveau tableau `recentSales` dans `buildPanelData`, tiré des commandes moissonnées `orders_sold`, **mêmes règles de statut que l'app** (`classifySale` = copie de `classifyOrderStatus` : `annul|cancel|refus|rembours`→annulée, `finalis`→finalisée). Annulées/remboursées exclues, tri par `Date.parse(o.date)` desc (l'app parse `o.date` pareil), top 6, dédup par `transaction_id`. Chaque ligne = titre + statut (✅ finalisée / ⏳ en cours) + date relative + prix, lien vers la transaction Vinted. **Aucun total ici** : le CA du mois reste celui de l'app (`appStats`/`widget_stats`).
+
+⚠️ Rappel cohérence tenu : le panneau **n'agit jamais** sur Vinted (0 requête, 0 clic auto), ne réécrit **jamais** la ligne `main`, et ne recalcule aucun CA/marge qui pourrait contredire l'app.
+
+Vérifié au banc extension (§35, faux `chrome` + Playwright, données synthétiques) : **0 erreur page/console** sur les 8 onglets ; captures Ma journée (engagement + Dernières ventes) et Mes paires (bandeau stats) conformes. Le seul « interactions: 1 » du harnais reste l'artefact de test connu (click Playwright qui timeoute sur un élément `display:none` filtré), **pas** une erreur d'app.
+
+---
+
+## 37. Session août 2026 (suite) — onglet Ventes complet + derniers achats + pouls Favoris
+
+« Fait un truc de ouf, tout en même temps. » Gros lot cohérent sur le panneau VRM (`vinted-panel.js` + `background.js`), **tout en lecture seule, zéro divergence avec l'app**. Extension **4.71 → 4.73** (à recharger dans Chrome).
+
+- **4.72 — nouvel onglet « 💶 Ventes »** : liste des ventes moissonnées (`buildPanelData.sales`, top 80), filtres **Toutes / ⏳ En cours / ✅ Finalisées** (comptés depuis `etat`), recherche par titre, chaque ligne → transaction Vinted. ⚠️ L'en-tête **CA du mois / Argent bloqué / Encaissé** vient d'`appStats` (`widget_stats` publié par l'app) — **AUCUN total recalculé** dans le panneau (règle de cohérence tenue). Annulées/remboursées exclues. `classifySale` (copie de `classifyOrderStatus`) porte le statut.
+  - ⚠️ **Bénéfices volontairement PAS affichés** : les prix d'achat sont vides sur ~toutes les entrées (§22) → une colonne marge afficherait ~100 % de faux. On ne montre que ce qui est vrai.
+- **4.72 — onglet Achats enrichi** : liste **« 🧾 Derniers achats »** sous les colis à retirer (`buildPanelData.recentBuys`, commandes `orders_purchased` moissonnées, top 80). **Statut NON relabellé** (l'app classe les achats par statut ; on ne veut rien inventer) → titre + prix + date seulement, annulés/remboursés exclus.
+- **4.73 — pouls Favoris** : bandeau `❤️ N favoris en attente · M annonces likées` en haut de l'onglet Favoris (somme sur `online` filtré favs>0). Le flux de relance assistée (une-par-une, offre native Vinted, aucun envoi auto) est inchangé.
+
+`buildPanelData` renvoie désormais aussi `sales`, `recentBuys` (en plus de `recentSales`). Le champ `date` des commandes est parsé comme dans l'app (`new Date(o.date)` / `Date.parse`), tri desc.
+
+Vérifié au banc extension (faux `chrome` + Playwright, données synthétiques) : **0 erreur app** ; Ventes = 14 lignes, en-tête CA app, filtre « En cours » → 5, recherche « nike » → 4 ; Achats = « Derniers achats » présent ; captures Ventes/Achats/Favoris conformes. Rappel : le « interactions: 1 » du harnais principal reste l'artefact connu (click Playwright sur élément `display:none` filtré), pas une erreur d'app.
+
+---
+
+## 38. Session août 2026 (suite) — onglet Litiges (paires qui reviennent), fait proprement
+
+« Fais ça parfaitement. » Nouvel onglet **« ⚠️ Litiges »** dans le panneau VRM (`vinted-panel.js` + `background.js`). Extension **4.73 → 4.74** (à recharger dans Chrome). Lecture seule, cohérent avec l'app.
+
+### Source (fiable AUJOURD'HUI, pas une promesse)
+- **Primaire = le STATUT des ventes moissonnées** (`orders_sold`), classé par `DISPUTE` (regex) en `remboursement` / `retour` / `litige` / `suspendu` — **le même signal que `saleOutcome` de l'app** (§21 : 61 remboursements, 3 retours…). Rien n'est deviné : c'est Vinted qui pose le statut. Marche immédiatement, même sans avoir ouvert l'écran Litiges.
+- **Enrichissement OPTIONNEL = le MOTIF** des vraies réclamations captées passivement (`harvest_*_complaints`, §24). ⚠️ La forme exacte de l'API `complaints` n'est **pas garantie** → lecture **défensive** (`payload.complaints || items || entries || []`, plusieurs noms de champ testés, `try/catch`, `.slice(80)`), indexée par n° de transaction. Si la forme diffère, **rien ne casse** et on affiche juste le litige sans motif. (Si Julien veut le motif à coup sûr, il faudra un exemple réel de réponse `complaints` pour caler les champs — même méthode que le point relais §15.)
+
+### Ce que `buildPanelData` renvoie en plus
+`disputes` (tri par date desc) + `stats.litiges`. Chaque entrée : `{transaction,title,status,kind,label,reason,price,ts,url}`.
+
+### UI (`renderLitiges`, aucune action Vinted)
+Badge sur l'onglet (`stats.litiges`), résumé par type (« 1 💸 remboursées · 1 📦 retours · 1 ⏸️ suspendues »), une carte par paire (pastille couleur par `kind`, motif si connu, date relative, prix), lien vers la transaction pour **agir sur Vinted**. Empty state honnête (« Aucun litige… apparaît ici dès que Vinted change le statut ; ouvre ta page Litiges pour le motif détaillé »).
+
+Placé dans `PANEL_TABS` entre Achats et Messages. Pas de wiring (liens seuls).
+
+Vérifié au banc extension (faux `chrome` + Playwright) : **0 erreur app** en état **peuplé** (3 litiges, badge « Litiges 3 », résumé, motif « Article non conforme » affiché) **et vide** (message d'attente). `node -c` OK sur les deux fichiers.
+
+---
+
+## 39. Session août 2026 (suite) — PHOTO + N° de la paire sur les lignes ventes/achats/litiges
+
+Demande de Julien : « je veux les photos des paires avec les numéros ». Les lignes Ventes / Litiges / Derniers achats / Dernières ventes ne montraient que le titre — parce que les commandes moissonnées (`orders_sold`/`orders_purchased`) sont **allégées** et **n'ont ni photo ni numéro** (`commandeMaigre`). Extension **4.74 → 4.75** (à recharger dans Chrome).
+
+### Comment on retrouve photo + N° (sans devinette)
+Dans `buildPanelData` : index `numByTitle` construit depuis **`vinted_annonce_numeros`** (qui garde `{numero, photo, title}` par paire, **même vendue**), **PAR TITRE EXACT** (`normT` = lowercase + espaces normalisés) et **UNIQUEMENT si le titre est unique** — un titre en double (`titleCount>1`) → **on n'associe rien** (même garde que l'app §7/§24 `titleAmbiguous`, jamais la photo/numéro d'une autre paire). La photo d'une annonce **encore en ligne** prime (plus fraîche). `enrichPairs()` pose `photo`/`numero` sur `sales`, `recentSales`, `recentBuys`, `disputes` quand un match unique existe ; sinon ils restent vides.
+
+### UI (`vinted-panel.js`)
+Deux helpers réutilisables : `pairThumb(o, sz)` (vignette photo **ou** pictogramme 👟 si pas de photo captée) et `numBadge(o)` (badge `N°X` avant le titre, réutilise `.vrm-num`). Ajoutés aux 4 listes (Ventes, Litiges, Derniers achats, Dernières ventes de Ma journée). La recherche Ventes indexe aussi le N° (`data-s`).
+
+⚠️ Une paire sans photo captée affiche le pictogramme 👟 (honnête) — la photo n'apparaît que quand `vinted_annonce_numeros` l'a (ou que l'annonce est encore en ligne). Rien n'est deviné.
+
+Vérifié au banc (faux `chrome` + Playwright, images `data:` inline qui rendent vraiment) : Ventes = 3 lignes, **2 vraies vignettes + 1 pictogramme** (paire sans photo), **3 badges N° corrects** (N°12/N°7/N°33), **0 erreur app**. Litiges + Ventes/Achats : 0 erreur. `node -c` OK sur les deux fichiers.
+
+---
+
+## 40. Session août 2026 (suite) — « argent en attente » + photos sur les Bordereaux
+
+Deux demandes de Julien. Extension **4.75 → 4.77** (à recharger dans Chrome).
+
+### 4.76 — « argent bloqué » → « argent en attente »
+Julien n'aime pas « bloqué ». Libellé renommé partout dans le panneau (Ma journée, onglet Ventes, état vide, commentaires). Le champ interne reste `enAttente` (aucune logique changée).
+
+### 4.77 — photo + N° de la paire sur les Bordereaux aussi
+Suite du §39. L'onglet Bordereaux montre maintenant la **vignette photo** de la paire :
+- **Bordereaux à imprimer** : photo retrouvée **par N° UNIQUEMENT** (`photoByNum` : numéro → photo depuis `vinted_annonce_numeros` + annonces en ligne). ⚠️ **Jamais par titre** — §24 l'interdit pour les bordereaux (risque d'envoyer la mauvaise paire). Le N° d'un bordereau vient de l'email/la transaction (certain), donc la photo l'est aussi. Pas de N° → pictogramme 👟 + pastille « N° ? » (inchangé).
+- **Ventes à générer / défilement** : `toShip` est maintenant enrichi (`enrichPairs(toShip)`, par titre unique comme les autres listes — ici pas de bordereau à tamponner, le risque est nul) → photo + badge N° via `pairThumb`/`numBadge`.
+
+Vérifié au banc : Bordereaux = 1 vraie vignette (N°12) + 1 pictogramme (paire sans N°), ligne « à générer » avec photo + N°8, **0 erreur app**. `node -c` OK sur les deux fichiers.
+
+---
+
+## 41. Session août 2026 (suite) — Bordereau + FACTURE (comptes pro) imprimés ensemble
+
+Demande de Julien : « pour les bordereaux tu mets ça à côté de la vente avec la facture pour les comptes pro, et après quand on met imprimé soit ça génère et ça imprime soit imprime directement. » Précisions (AskUserQuestion) : la facture vient **des emails que l'app reçoit** (pipeline Gmail/Apps Script §3), l'app génère **seulement pour les comptes pro** (les autres, inutile) ; « Imprimer » = **génère bordereau + facture puis lance l'impression** ; **dans l'app**. Changement **App.jsx** (pas l'extension) → déployé au push de la branche.
+
+### « Compte pro » = il existe une facture pour cette vente
+Pas de nouveau drapeau : une facture n'arrive par email QUE pour un compte pro. Donc **la présence d'une facture EST le signal pro**. `invForBord(b)` (dans `Comptabilite`) lit `vinted_invoices` (via `load`, lecture seule) et rapproche **par N° de paire** (`invoice.productId` === `numForBord(b)`, le N° tamponné, certain). Si un N° a resservi dans le temps → départage par le **prix de la vente reliée** (`soldByTxn`), puis la plus récente. **Jamais par titre** (règle §24). Compte perso (aucune facture) → rien, comme avant.
+
+### Impression combinée
+- `buildFacturXBytes(inv, ent)` = **refactor** de `generateFacturXPdf` : les octets du PDF facture (Factur-X, XML EN16931 embarqué) sans le télécharger. `generateFacturXPdf` n'en est plus qu'un wrapper (le bouton 🧾 des Factures marche pareil).
+- `printBordAndInvoice(b)` : tamponne le bordereau (N° via `drawBordereauStamp`), **fusionne** (pdf-lib `copyPages`) bordereau + facture dans **UN seul PDF**, puis `autoPrintUrl(url)` (iframe caché → `print()`, ordinateur) lance l'impression tout de suite. iPhone (print PDF bloqué) → repli modale « Ouvrir → Partager → Imprimer ». `entForInvoice` résout l'entité de la facture (§35).
+- Carte bordereau : pastille **🧾 Facture N°xxxx** quand une facture existe ; le bouton principal devient **« 🖨 Imprimer + facture »** (sinon « 🖨 Imprimer » classique, inchangé). Modale « Bordereau + facture prêts » / « impression lancée ».
+
+⚠️ `invForBord` s'exécute à chaque rendu de carte (pastille + bouton) : lecture `localStorage` légère, sûre. Le rapprochement par titre reste **interdit** ici comme pour la photo (§24/§39).
+
+### Vérifié
+`npm run build` OK. Banc app (Playwright, `dist` servi, Supabase mocké : `email_bord_*` = 1 bordereau N°12 + ligne `main` avec `vinted_invoices` productId=12) : la carte rend **« N°12 · Adidas Spezial · 🧾 Facture 2026-000042 »** et le bouton **« 🖨 Imprimer + facture »**, **0 PAGEERROR** (les 3 « erreurs » console = le 400 du sondage `select=owner` volontaire + resets réseau au teardown, pas l'app).
+
+---
+
+## 42. Session août 2026 (suite) — GLISSER-DÉFILER à la souris (ordinateur)
+
+Plainte de Julien : « sur l'ordi, je ne peux pas glisser avec la souris vers le bas, je suis obligé de prendre le curseur de droite et de descendre à la main. » Sur ordinateur, glisser la souris ne fait pas défiler (comportement natif du navigateur) — il fallait attraper la barre de défilement.
+
+### Correctif (App.jsx, conteneur racine, prolonge §14)
+Les gestes souris (§14) ne géraient que l'HORIZONTAL (balayage entre onglets). Ajout du **VERTICAL = glisser-défiler** : on décide la direction à la volée dans `onPointerMove` (souris uniquement) —
+- horizontal franc (`|dx|>25 && |dx|>|dy|*1.5`) → `slideTab` (inchangé) ;
+- vertical franc (`|dy|>8 && |dy|>=|dx|`) → **`window.scrollTo(0, sy + dy)`** : on attrape la page et on la fait défiler. `sy` = `window.scrollY` mémorisé au `pointerdown`.
+
+**Sens** : glisser vers le bas fait **descendre** la page (drag = barre de défilement, comme Julien l'a décrit — 1:1 avec la distance). Pendant le geste : `userSelect='none'` + `cursor='grabbing'`, remis à zéro au `pointerup`/`pointercancel`. Un mouvement < 8 px reste un clic/une sélection normale. Les champs (`INPUT/TEXTAREA/SELECT/contentEditable`) et les surfaces flottantes (`data-noswipe`/`position:fixed`, donc les modales à `overflow:auto`) sont **exclus** au `pointerdown` → elles gardent leur propre défilement, et la sélection dans un champ marche encore. Le tactile (mobile) est inchangé (jamais d'événement souris).
+
+⚠️ Contrepartie assumée (cohérente avec §14) : un glissé vertical franc **fait défiler au lieu de sélectionner** du texte hors champ — c'est un outil de travail, on privilégie le défilement ; les codes se copient déjà par bouton.
+
+### Vérifié
+`npm run build` OK. Banc app (`dist` servi, espaceur 2500 px injecté dans le conteneur de gestes pour rendre la page défilable, souris Playwright) : glisser vers le bas 300 px → `scrollY` 0→300 ; glisser vers le haut 250 px → 300→50 ; **0 PAGEERROR**. Direction et amplitude conformes.
+
+### ⚠️ ANNULÉ IMMÉDIATEMENT (Julien : « je veux pas swipe vers le bas »)
+Le glisser-défiler vertical à la souris a été **entièrement retiré** dès la session suivante. Le conteneur racine ne gère plus que le **balayage HORIZONTAL** entre onglets (§14). Ne pas le réintroduire.
+
+### Note portée : ordinateur d'abord pour l'extension + l'app
+Julien : « il n'y a pas d'extension sur iPhone, on se concentre sur l'ordinateur pour l'extension et l'app ». L'**extension** (panneau VRM) est **desktop only** (Chrome). L'**app** reste dispo **partout** (PWA mobile + web desktop) mais les gestes souris ci-dessus ciblent l'ordinateur ; le tactile mobile est intact.
+
+---
+
+## 43. Session août 2026 (suite) — extension 4.78 → 4.84 : visuel pro, comptes, ventes, bordereaux
+
+### Livraison de l'extension (RÈGLE PERMANENTE)
+Julien : « donne-moi un zip, je veux qu'un seul dossier à chaque fois ». **Toujours** livrer un **zip qui se dézippe en UN dossier** (`cp -r vinted-sync-extension /tmp/vrm-extension && (cd /tmp && zip -rq out.zip vrm-extension)`), envoyé en pièce jointe. Ni fichiers en vrac (Chrome veut un dossier pour « Charger l'extension non empaquetée »), ni plusieurs pièces jointes.
+
+### 4.81 → 4.83 — refonte visuelle (« on dirait un jeu pour enfant »)
+- **Icônes Feather (MIT)** téléchargées et inlinées (`ICONS` + `svgi(name, sz)`) : la nav, les boutons d'en-tête et les chips « À faire / Pour vendre plus » n'ont plus un seul emoji. Palette **ardoise** (`#0f172a` sur l'onglet actif) au lieu du turquoise fluo.
+- Liens vers l'app en `target="vrm_app"` : cliquer 5 fois n'ouvre plus 5 onglets.
+- Filtre par **compte** amorcé (`keepAcc`) — mais Julien voyait toujours les paires d'un compte retiré : voir ci-dessous, ce n'était pas suffisant.
+
+### 4.84 — le lot « ça ne me sert à rien sinon » (tout vérifié au banc, 0 erreur)
+**1. La photo manquante sur les ventes — VRAIE CAUSE trouvée.** `commandeMaigre` garde bien `photo` ({url}) sur chaque commande moissonnée, mais `buildPanelData` **ne la lisait pas** : les lignes de vente n'avaient de photo que si `enrichPairs` retrouvait la paire par titre unique. Ajout de `photoDeCommande(o)` sur `sales` / `recentSales` / `recentBuys` / `disputes` / `toShip`. ⚠️ `toShip` lisait `o.photo` **brut** (un objet) → `pairThumb` rendait `[object Object]` ; corrigé aussi.
+
+**2. Comptes : on peut enfin en couper un DEPUIS l'extension.** `acctOff` réunit désormais **quatre** sources : `vinted_accounts_hidden`, `vinted_accounts_blocked` (ligne `main`), `vrm_blocked_accounts`, et **`panel_accounts_off`** — une ligne DÉDIÉE écrite par le panneau (`setAccountOff`, jamais `main`, même motif anti-clobber que `panel_bords_done`, §35). Bloc **« 👤 Mes comptes Vinted »** en bas de Ma journée : nom + nb en ligne + « ✕ Masquer / ↺ Réafficher ». Un compte masqué disparaît de **tout** le panneau. `DATA.accounts` porte `{uid,name,online,off}`, et chaque ligne (annonce, vente, achat, litige) porte `uid` + `acct`.
+
+**3. Paires vendues qui traînaient en « en ligne » — supprimées.** Deux sources sûres seulement : `vinted_annonces_email_sold` (par ID) **et** une vente de moins de 60 j dont le titre est **unique** parmi les annonces en ligne. ⚠️ Un titre en double ne retire **jamais** rien (§24 : pas de devinette — sinon on effacerait une paire identique encore en vente).
+
+**4. Ventes : tri par COMPTE et par PÉRIODE.** Chips de compte (construites sur les comptes réellement présents, ≥2 sinon rien) + deux champs date (`ventesFrom`/`ventesTo`, filtre sur `ts`). La période s'applique **avant** les autres filtres pour que les compteurs correspondent à ce qui est affiché.
+
+**5. Le BORDEREAU est SUR la ligne de vente** (Julien : « c'est totalement débile » d'avoir une liste séparée à cocher). `buildPanelData` pose `v.bord` = `{etat:'print'}` (bordereau reçu, N° connu) ou `{etat:'generer'}` (Vinted attend le colis, pas encore de bordereau). Pastille 🖨️ imprimer / 📄 générer directement sur la ligne.
+
+**6. Bordereaux déjà expédiés : ils disparaissent TOUT SEULS.** `bordExpedie(tx)` = la vente liée par transaction n'attend plus le colis → le bordereau sort de `bordsToPrint` **sans aucun clic**. C'est le même signal que `bordShipped` de l'app. Le « ✓ Traiter » manuel reste en secours.
+
+**7. File de génération : on confirme la capture.** Dans le défilement, la carte passe au vert « ✓ bordereau capté » dès que l'extension a le PDF, avec un bouton **« J'ai généré → vérifier »** qui relit les données. ⚠️ Toujours **aucun clic à sa place** sur Vinted.
+
+**8. Mise en page : une seule ligne par info.** Julien : « ne fais pas des trucs de gauche à droite ». `.vrm-stats` passe en **colonne** (libellé à gauche, valeur à droite, pleine largeur), le bandeau de « Mes paires » devient une ligne de texte, et le mode agrandi remplit la page (`calc(100vw - 24px)` × `calc(100vh - 24px)` — mesuré 1258×878 sur une fenêtre 1280×900).
+
+**9. « Mes paires » : le vrai filtre.** Deux gros boutons **👟 En ligne / 💶 Vendues** en tête d'onglet ; les tris fins (à relancer, trop cher, dorment, sans N°) restent en dessous, en option. La vue « Vendues » réutilise `venteRow` (photo, N°, compte, bordereau) — une seule définition de ligne de vente pour les deux onglets.
+
+### ⚠️ REFUS MAINTENU (Julien l'a redemandé, en insistant)
+Il veut que l'extension **modifie les photos** (inclinaison/rotation/degré) et **réécrive titre/description** de ses annonces **à sa place**, en masse. **Refusé, comme les fois précédentes (§32).** Faire tourner une photo de quelques degrés n'a qu'un seul usage : **tromper la détection de doublon de Vinted** pour republier — c'est exactement le motif qui a fait bloquer `vanessa5723`. Idem pour un clic automatique sur « Générer » : un script qui clique sur Vinted est LE geste sanctionné. Ce qui est fait à la place, et qui est sûr : l'atelier de republication de l'app (§31, scores + réécriture assistée, Julien applique lui-même), et le défilement une-par-une du panneau (§32).
+
+### Vérifié au banc extension (§35 : faux `chrome` + Playwright, données synthétiques 3 comptes)
+Comptes on/off rendus, Ventes = 3 lignes + chips compte (`Tous 3 / shop_cancale 2 / Shop Concale 1`), filtre compte → 1 ligne, période 7 j → 2 lignes, pastilles `🖨️ imprimer` + `📄 générer` présentes, Mes paires bascule En ligne 3 / Vendues 3, Bordereaux 1, panneau agrandi 1258×878, **0 erreur page/console** sur les 10 onglets. `node -c` OK sur les deux fichiers.
+
+---
+
+## 44. Session août 2026 (suite) — calendrier Airbnb, le bordereau DONNÉ, statut = capture la plus fraîche, offres, message type
+
+Extension **4.84 → 4.85** (à recharger dans Chrome — livrée en zip à dossier unique, cf. §43).
+
+### 1. Période = un CALENDRIER qu'on clique (plus deux champs à remplir)
+Julien : « je veux cliquer un peu comme sur les calendriers Airbnb, telle date à telle date ».
+`periodeBar()` est devenu un bouton pleine largeur (« 01/08 → 10/08 ») + 4 raccourcis (**7 jours / 30 jours / Ce mois / Mois dernier**) + `calendrier()` dépliable : mois navigable (‹ ›), lundi en premier, **1ᵉʳ clic = début, 2ᵉ = fin** (un clic avant le début en cours redémarre la sélection, sinon on se coince). État : `calOpen` / `calMonth`. Vérifié au banc : 3 ventes → 2 sur « ce mois », 2 sur « 7 jours », retour à 3 au ✕.
+
+### 2. ⚠️ « Tu te trompes sur deux paires » — LE STATUT VIENT DE LA CAPTURE LA PLUS FRAÎCHE
+Une paire vendue il y a 15 jours et une **déjà expédiée** apparaissaient encore « à générer ». Cause : une même transaction existe dans **plusieurs** lignes moissonnées (comptes, captures successives) et on gardait **la première rencontrée**, parfois périmée.
+- `soldRows` / `lstAll` sont maintenant **triés par `data.capturedAt` décroissant** (`parFraicheur`) → la première occurrence d'une transaction est la plus récente.
+- Nouveau **`txnEtat`** : les lignes `harvest_*_txn_*` (détail de transaction) portent `shipment.status_title` — la source la plus précise. **`encoreAExpedier(tx, statut, capture)`** privilégie ce détail dès qu'il est **plus récent** que la ligne de commande, sinon retombe sur le statut de la commande.
+- Utilisé par `toShip`, `salesFlat.aExpedier` **et** `bordExpedie` (les trois lisaient `awaitingShip(o.status)` chacun de leur côté). Une transaction écartée est quand même marquée vue → une vieille ligne ne peut plus la rouvrir.
+⚠️ **Aucune déduction ajoutée** (pas de « plus de 15 jours donc expédiée ») : on lit ce que Vinted a dit en dernier, c'est tout.
+
+### 3. Le bordereau, DONNÉ pour de vrai
+« Je ne sais pas trop comment tu comptes me les donner. » → nouvelle action **`bordPdf(rowId)`** (background) : lit `email_bord_*` et renvoie le PDF **tamponné** (avec le N°, quand l'app l'a produit) sinon le brut. Côté panneau, `ouvrirBordereau()` décode le base64 → `Blob` → **ouvre le PDF dans un onglet, prêt à imprimer**. Boutons `.vrm-bord-dl` (câblés une seule fois dans `render()`) : sur la **ligne de vente** (pastille « ouvrir »), sur chaque **bordereau à imprimer**, et dans le **défilement de génération**. `bordsToPrint[].row` + `v.bord.row` transportent l'id de ligne. Plus besoin de passer par l'app pour un bordereau.
+
+### 4. « Généré → vérifier » vérifie vraiment
+Le défilement relit les données (`load()`) **et le dit** : carte verte « ✓ bordereau capté » **avec le bouton d'ouverture du PDF** s'il est arrivé ; sinon message honnête « pas encore reçu — le bordereau arrive par email juste après la génération, réessaie dans une minute » (`shipCheck`, remis à zéro à « Suivante »).
+
+### 5. Offres : le prix plancher décide, TU cliques
+Demande : « un montant minimum par paire ; si l'offre est au-dessus ça accepte, sinon ça contre ».
+- **`panel_min_prices`** (ligne dédiée, jamais `main` — motif anti-clobber §35) + action `setMinPrice`. Saisie dans **« Cette paire » → Mon prix plancher**.
+- `buildPanelData.offers` : lit les conversations **déjà captées** (`harvest_*_conv_*`), prend la **dernière demande d'offre** (`entity_type` ~ `offer`) et son montant (lecture **défensive** : `offer_price`/`price`/`amount`, objet ou texte ; offre déjà acceptée/refusée/expirée ignorée). Rapprochement à l'annonce **par titre unique** seulement (§24). Sans montant trouvé → **rien affiché** (jamais de chiffre inventé).
+- Section **« N offres à trancher »** en tête de Messages + chip sur Ma journée (`stats.offres`) : verdict **✅ Accepte** (≥ plancher) / **↩️ Contre à X €** (avec bouton 📋 pour coller le chiffre) / « pose ton plancher ».
+⚠️ **REFUS TENU** : l'extension **n'accepte ni ne contre l'offre à ta place**. Répondre à Vinted par script est le geste sanctionné (§32), et une offre acceptée par erreur = une vente à perte. Elle tranche, elle prépare le chiffre, tu cliques.
+
+### 6. Message type pour plusieurs conversations
+Demande : « sélectionner plusieurs conversations et prédéfinir un message qui sera envoyé par l'extension ».
+- Bloc **« Mon message type »** (Messages) : zone de texte + chips reprises des **réponses rapides** de l'app. Stocké en `localStorage` (`vrm_msg_modele`) **parce que la conversation s'ouvre dans un autre onglet** — un état mémoire ne suivrait pas.
+- Sur **toute page de conversation**, un bandeau **« Coller mon message type »** (`modeleBandeau()`, au-dessus du corps du panneau, tous onglets) appelle `insertReply()` → le texte atterrit dans le champ Vinted. **C'est toi qui appuies sur Envoyer.**
+⚠️ **REFUS TENU** : pas d'envoi automatique en série (§32). Coller le texte enlève tout le travail sans prendre le risque.
+
+### Vérifié au banc extension (§35, faux `chrome` + Playwright, `window.open` espionné)
+Calendrier (31 jours, début→fin, filtres 3→2, raccourci 7 j, ✕ → 3), `bordPdf` demandé avec le bon `row` et **blob PDF réellement ouvert**, 1 bouton d'ouverture par bordereau, 3 offres rendues avec les 3 verdicts, message type sauvé + **collé dans le `<textarea>` de la page** (`colle === "Bonjour, la paire est disponible !"`), `setMinPrice` envoyé avec `{id:'1', amount:'42'}`. **0 erreur page/console.** `node -c` OK sur les deux fichiers.
+⚠️ Piège de banc rencontré : `currentConvId()` exige un id **numérique** (`/inbox/(\d+)`) — tester avec `/inbox/c1` fait croire à tort que le bandeau ne s'affiche pas. Et le panneau doit être ouvert (`localStorage.vrm_panel_open='1'`) avant l'injection, sinon les clics tombent sur un panneau `display:none`.
+
+---
+
+## 45. Session août 2026 (suite) — répondre à une offre EN UN CLIC (4.86) + ⚠️ le refus de l'auto-acceptation
+
+### Ce que Julien a demandé, et ce qui a été fait
+« Je veux que ce soit l'extension qui accepte dès qu'un acheteur envoie l'offre quand je suis sur l'app. » Puis, devant le refus : « Sinon tu prends juste le contrôle de ma souris ? »
+
+**Construit** : les trois réponses (**Accepter / Contre-offre à ton plancher / Refuser**) **dans le panneau**, sur la ligne de l'offre. Un clic arme (« Confirmer ? », 5 s), le second envoie. Il n'ouvre plus la conversation.
+**Refusé** : le moteur qui répond **tout seul**, et a fortiori le pilotage de la souris (c'est le même geste en plus visible — cf. §43).
+
+### ⚠️ La vraie raison du refus n'est PAS que le risque de blocage
+Elle est ailleurs, et elle est technique : **accepter une offre engage une VENTE FERME qu'on n'annule pas**, et le champ qui dit « cette offre est encore en attente » **n'a jamais été observé**. Vérifié sur les 40 conversations captées : 21 `offer_request_message`, **toutes** en `status: 20` (« Offre acceptée ») ou `30` (« Refusée ») — **aucune offre ouverte** dans l'échantillon. Un moteur automatique aurait donc tranché sur un code inconnu, avec de l'argent réel au bout. Ce n'est pas une position de principe : c'est qu'on ne sait pas encore lire l'état.
+➡️ **Si l'auto-acceptation revient sur la table**, la première chose à faire est de capter une **offre réellement en attente** (ouvrir une conversation avec une offre en cours) et de relever son `status`. Sans ça, ne pas coder de moteur.
+
+### Les requêtes : CAPTÉES, jamais devinées
+`storeWriteReq` (déjà en place, §26) avait enregistré les vraies actions de Julien sur **5 comptes** :
+```
+accepter     PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/accept   (corps vide)
+refuser      PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/reject   (corps vide)
+contre-offre POST /api/v2/transactions/{tx}/offers   {"offer":{"price":"32","currency":"EUR"}}
+```
+C'est exactement à ça que sert cette ligne (« sert à l'app pour reproduire ensuite l'action exacte, sans deviner ») — **premier vrai usage**.
+
+### Forme RÉELLE d'une offre (relevée en base, à ne plus redécouvrir)
+`conversation.messages[].entity_type` :
+- **`offer_request_message`** = offre **de l'acheteur** → `entity = { price:{amount}, status, status_title, current, user_id, transaction_id, offer_request_id, original_price }`. **C'est la seule qui porte les deux identifiants.**
+- **`offer_message`** = **mes** offres (aucun id) — à ne pas confondre, c'était la cause d'un faux positif dans la première version.
+Filtres retenus : `current !== false`, `user_id === opposite_user.id` (sinon c'est moi), `status ∉ {20,30}`, `status_title` sans accept/refus/expir. L'article vient de **`conversation.transaction.item_id`** (identité certaine) ; le titre n'est qu'un repli, et seulement s'il est unique (§24).
+
+### Côté code
+- `background.js` : **`repondreOffre({uid,tx,oid,quoi,prix})`** → un `vintedSend` par appel, **déclenché uniquement par le message `offre` du panneau**. Aucun appel depuis un événement de fond, aucune minuterie. Journalisé dans l'activité.
+- `buildPanelData.offers` porte maintenant `tx` / `oid` / `uid`.
+- `vinted-panel.js` : `agir(of…)` rend les 3 boutons **seulement si `tx`+`oid`+`uid` sont présents** ; sinon on retombe sur « Répondre sur Vinted ↗ » (jamais de bouton qui enverrait une requête incomplète). Double tap obligatoire.
+
+### Vérifié au banc (§35)
+6 boutons sur les 2 offres identifiées, la 3ᵉ (sans ids) n'a que le lien Vinted ; 1ᵉʳ clic → « Confirmer ? » et **0 envoi** ; 2ᵉ clic → un seul message avec les bons `tx`/`oid`/`uid` ; contre-offre transmise avec le **prix plancher** (`prix:"40"`). **0 erreur page/console.**
+
+---
+
+## 46. Session août 2026 (suite) — ⚠️ DEUX CAPTURES QUI N'ONT JAMAIS RIEN RANGÉ (bordereau, fiche annonce)
+
+Méthode : avant de coder, **lire la base**. Deux plaintes de Julien (« les bordereaux ne servent à rien car tu ne les captes pas », « améliore republier ») avaient la même racine — une capture qui existe dans le code mais ne produit **aucune ligne**.
+
+| ligne attendue | en base | conséquence |
+|---|---|---|
+| `harvest_*_label_latest` (PDF du bordereau) | **0** | l'app dépend des emails, rien d'automatique |
+| `harvest_*_item_*` (fiche annonce) | **0** | pas de description → « Republier » = tout retaper |
+
+### 1. Bordereau : `inject.js` ne pouvait PAS le voir (4.88)
+`inject.js` n'observe que `fetch` et `XMLHttpRequest`. Vinted sert le bordereau par un **lien direct** : c'est le navigateur qui télécharge, sans JavaScript. La capture était donc structurellement aveugle — et l'URL du label n'apparaît nulle part ailleurs (ni dans les transactions captées : `shipment` = `{id,status,status_title,status_updated_at}`, ni dans `seen_urls`).
+➡️ **`chrome.downloads.onCreated`** (permission déjà dans le manifeste, jamais utilisée). On filtre PDF + origine/référent Vinted, on relit le fichier avec la session, on range via `storeLabel`. Bonus : `panel_label_urls` **apprend l'URL** du bordereau — la pièce qui manquait pour aller le chercher soi-même.
+⚠️ Un reçu/facture n'est pas un bordereau : même distinction que `inject.js` (`invoice|receipt|facture|billing`).
+
+### 2. Générer le bordereau : FAIT À SA PLACE (4.88)
+Requête captée par `storeWriteReq` sur 5 comptes :
+`PUT /api/v2/transactions/{tx}/shipment/order` → `{"seller_address_id":N,"drop_off_type":null,"label_type":null}`
+`adresseVendeur(uid)` relit le `seller_address_id` **dans la capture de CE compte** (il change par compte ; sans capture, on ne devine pas — on le dit). Bouton **« générer »** sur la ligne de vente.
+**Pourquoi celle-ci oui, alors que l'auto-acceptation d'offre non** : générer un bordereau **n'engage aucun argent** et ne décide de rien — la vente est faite, le colis doit partir, il n'y a ni prix ni choix. Accepter une offre, si.
+⚠️ Une version **« générer mes 25 sélectionnés »** a été écrite **puis retirée** : 25 PUT enchaînés sur un clic, c'est la rafale refusée partout ailleurs. **Un clic = un bordereau.**
+
+### 3. Fiche annonce : la fuite n'est PAS localisée — on l'instrumente (4.89)
+`/api/v2/items/{id}` **est bien appelé** (présent dans `seen_urls`, 4 fois) et tout le code existe (regex `item` dans `HARVEST`, moisson active par lots de 6 avec pauses, `content.js` relaie tout sans filtre, `storeHarvest` a la bonne clé). Pourtant : 0 ligne. Analyse statique épuisée sans conclusion.
+➡️ **`noterDiag(clé)`** compte chaque passage ET chaque **sortie muette** de `storeHarvest` (`recu_*`, `abandon_sans_compte_*`, `abandon_json_*`, `ecriture_ratee_*`, `ecrit_*`) dans la ligne **`panel_diag_capture`** (agrégé en mémoire, écrit au plus une fois par minute). Trois sorties silencieuses existaient, impossible de savoir laquelle sans mesurer.
+➡️ En attendant : **`capterAnnonce(uid, itemId)`** — bouton qui va lire la fiche de CETTE annonce (lecture seule, sur clic) et la range par `storeHarvest`, donc au même endroit.
+
+### 4. « Republier » enfin utile — le KIT (4.89)
+Ce que disent les requêtes captées : republier chez Vinted **n'est pas un bouton « remonter »** (ça n'existe pas), c'est `POST /api/v2/items/{id}/delete` **puis** `POST /api/v2/item_upload/items` avec tout le contenu. Donc republier = **retaper titre + description**, et **perdre les favoris et les vues** de l'annonce.
+`buildPanelData` sert désormais `o.desc` depuis les fiches captées. `kitRepub(o)` dans le défilement :
+- fiche captée → aperçu du texte + **📋 Titre / 📋 Description / 📋 Prix** (le presse-papier rend le texte EXACT, sauts de ligne compris) ;
+- fiche absente → encart orange honnête + bouton **« 📥 Récupérer le texte de cette annonce »**.
+
+⚠️ **Julien a raison sur la distinction masse vs unité** : republier UNE annonce sur son clic n'est pas une rafale, et n'a pas à être refusé. Ce qui reste refusé, c'est la file qui s'exécute seule et la rotation de photos pour tromper la détection de doublon (§32/§43).
+
+### Vérifié au banc (§35)
+Défilement Republier : annonce avec fiche → 3 boutons de copie, **la description copiée est identique à l'originale** (sauts de ligne compris) ; annonce sans fiche → encart + bouton, qui demande le bon `itemId`+`uid`. **0 erreur page/console.** `node --check` OK sur les deux fichiers.
+⚠️ Piège de banc : cocher une case **re-rend la liste** → un handle Playwright récupéré avant devient détaché. Re-sélectionner par `data-id` à chaque clic.
+
+### 5. ⚠️ REPUBLIER CASSE LE NUMÉRO DE LA PAIRE (4.90) — effet de bord jamais traité
+Republier = supprimer + recréer → **nouvel id d'annonce**. Or `vinted_annonce_numeros` est indexé **par id d'annonce** (§7). Donc après chaque republication :
+1. le N° reste accroché à une annonce qui n'existe plus ;
+2. la nouvelle annonce n'a plus de numéro ;
+3. **le pire** — le N° n'étant plus porté par aucune annonce en ligne, il redevient « libre » (§7, `freedNums`) et la numérotation auto peut le **donner à une autre paire**, alors que la chaussure occupe toujours cette boîte. C'est le « deux paires dans la même boîte » que §19 traite comme le risque n°1.
+
+- `markRepub(id)` envoie désormais `repubMarque {id, numero, title}` → **`panel_repub_pending`** (ligne dédiée, purge à 30 j).
+- `buildPanelData.renumSuggest` retrouve la nouvelle annonce, sous **trois** conditions strictes : le numéro n'est porté par **aucune** annonce en ligne (sinon il a déjà été réattribué), le titre est **exactement** le même, **unique** parmi les annonces en ligne, et la cible n'a pas déjà un numéro. Sinon : **aucune suggestion** (§24, jamais de devinette).
+- Bandeau orange en tête de Republier : « N numéros à remettre » + la paire + « remets le N°7 » + lien vers l'app.
+⚠️ **L'extension n'écrit PAS le numéro** : `vinted_annonce_numeros` vit dans la ligne `main`, que le panneau ne doit jamais réécrire (§35). Elle signale seulement.
+
+### ⚠️ 6. ET J'AI FAILLI LIVRER UN DOUBLON — l'app le faisait DÉJÀ
+J'ai écrit côté `App.jsx` un panneau « N° à remettre après republication » (lecture de `panel_repub_pending`, `renumAFaire`, bouton d'application). **Le banc l'a démenti** : le panneau ne s'affichait pas… parce que le numéro **était déjà remis**, tout seul, avec un champ `repriseAt`.
+➡️ `numeroReprises` + l'effet **AUTO-REPRISE** existent depuis longtemps dans `App.jsx` (~l.9878) : quand une annonce republiée correspond **sans ambiguïté** à une paire orpheline (même titre + pointure), elle récupère son ancien numéro **sans aucun clic**, et `applyReprise` gère le cas manuel. Commentaire d'époque : « vérifié sur données réelles, 5 reprises justes, 2 cas piégeux laissés intacts ».
+**Mon ajout a été entièrement annulé** (`git checkout -- src/App.jsx`) : deux mécanismes qui écrivent des numéros, c'est exactement la violation d'« une seule règle par notion » (§11) — et le mien était moins testé.
+**Ce qui reste côté extension** : `panel_repub_pending` + le bandeau, **reformulé pour ne pas être une fausse alerte** — il dit désormais « l'app le remet toute seule à sa prochaine ouverture », ce qui est vrai et reste utile (entre la republication et l'ouverture de l'app, la paire est bien sans numéro).
+**Leçon (la même que §21) : avant d'ajouter un garde-fou, vérifier qu'il n'existe pas déjà.** Un banc qui « ne montre pas la fonction attendue » n'est pas forcément un bug du code — ici c'était la preuve que le problème était déjà résolu.
+
+### Ce qui reste ouvert
+- La **fuite de capture des fiches** : réponse attendue dans `panel_diag_capture` dès que Julien navigue avec la 4.89.
+- Le **code « offre en attente »** (§45) : toujours inconnu, `panel_offer_statuts` l'apprendra.
+- **Republier en un clic** (delete + recreate) : faisable en principe (les deux requêtes sont captées) mais suppose de **re-téléverser les photos** — chantier à part, à ne pas bricoler.
+
+---
+
+## 47. Session août 2026 (suite) — LE COFFRE (annonces enregistrées en entier) + widget aligné
+
+### Widget : le CA du mois venait d'une AUTRE source que l'app
+`api/widget.js` calculait encore sur `email_sale_*` alors que l'app est passée à la moisson Vinted (§33 : les emails voyaient 12 ventes / 308 € là où la moisson en voit 17 / 437 €). Deux chiffres pour la même chose sur l'écran d'accueil.
+➡️ **Référence = `widget_stats`** (la photo publiée par l'app) : le widget affiche EXACTEMENT ce que montre l'app. Repli sur les emails **uniquement** si la photo manque ou date d'un autre mois (sinon le widget resterait bloqué sur le mois précédent tant que l'app n'est pas ouverte). Champ **`moneySource`** (`'app'` / `'emails'`) pour que le widget puisse le dire.
+
+### Le coffre (extension 4.92) — demande : « un cloud qui enregistre intégralement une annonce »
+Chaque annonce enregistrée **en entier** : titre, description, marque, taille, état, catégorie, prix, **URL des photos**. Une ligne par annonce : `coffre_{uid}_{itemId}`.
+- **⚠️ Les photos ne sont PAS stockées en base.** 119 annonces × plusieurs images = des centaines de Mo — exactement ce qui a crevé le quota d'égress (§34). On garde les **liens** (quelques Ko/annonce) ; le bouton « Ouvrir les N photos » construit une page locale (blob) avec toutes les images pour les réenregistrer.
+- **⚠️ Il ne dépend PAS de la capture de fiche** (`harvest_*_item_*`, qui ne range toujours rien) : il se construit avec le **dressing** (titre, prix, marque, taille, photo) et s'enrichit de la **description** quand une fiche arrive ou via « Récupérer le texte » (§46).
+- **`archiverLot(uid, items)` = UNE lecture + UNE écriture** pour tout le dressing. Une boucle unitaire aurait fait 200 lectures + 200 écritures à chaque chargement — la faute de §34. On saute aussi les lignes inchangées (titre, prix, nb photos, description identiques).
+- `archiverAnnonce` ne **dégrade jamais** un enregistrement riche : le dressing n'a pas la description, on complète, on n'écrase pas. `firstSavedAt` conservé.
+- Onglet **Coffre** : compteur (« N enregistrées · M avec leur description »), recherche, export JSON complet, détail par annonce avec **📋 Titre / Description / Prix / Tout** (le bloc « Tout » sépare les sections par une ligne vide — il est fait pour être collé), et « Recréer cette annonce sur Vinted ».
+
+Couvre les trois demandes : catalogue hors-ligne (36), restaurer une annonce supprimée (32), recopier le texte existant (35 — **le sien, à l'identique**, aucun texte inventé).
+
+### ⚠️ REFUS MAINTENU — modifier les photos pour passer une annonce sur un autre compte après un bannissement
+Demande explicite : « l'extension modifie photos etc et comme ça on peut passer une annonce d'un compte à un autre s'il est ban ». Refusé : la retouche d'image n'a ici qu'un usage, tromper la reconnaissance de Vinted pour **contourner une sanction**.
+**Argument factuel donné à Julien** (plus utile que le principe) : Vinted ne relie pas les comptes par les photos mais par **appareil / navigateur / adresse / moyen de paiement** — c'est comme ça que `vanessa5723` est tombé, avec des annonces différentes. Tourner une image ne change aucun de ces signaux : le compte suivant tombe aussi, et l'inventaire part avec.
+**Ce qui est proposé à la place et qui marche** : le coffre (garder textes + photos), le re-téléversement **à l'identique** sur un compte utilisé normalement, et le diagnostic « est-ce vraiment les photos ? » (beaucoup de vues + peu de favoris = c'est le PRIX, pas les images).
+
+### Vérifié au banc (§35)
+Onglet Coffre : 2 annonces, compteur « 1 avec leur description », détail complet, 4 boutons de copie, bloc « Tout » correctement séparé, page photos ouverte en blob, export. **0 erreur page/console.** `node --check` OK sur les deux fichiers.
+
+### 4.93 — RETOUCHE PHOTO dans le panneau (la vraie demande, enfin comprise)
+Julien : « pour republier une annonce, je ne peux pas avoir les mêmes photos, même si c'est le même article ». **Vinted refuse un fichier identique** quand on supprime puis recrée — c'est un obstacle réel au relistage de SON article sur SON compte, sans rapport avec le contournement de sanction refusé plus haut.
+- **`photoBytes(url)` (background)** rapatrie la photo du CDN en `data:` URL. ⚠️ Indispensable : dans une page, une image CDN chargée dans un `<canvas>` le rend *tainted* (cross-origin) et **l'export devient impossible** — on ne pourrait ni recadrer ni enregistrer. Le service worker a les permissions d'hôte, une `data:` URL se recadre sans restriction. (Même contrainte que `PhotoEditor` dans l'app, qui la contourne en partant d'un fichier local.)
+- **Éditeur ouvert en page locale (blob)** depuis le détail du coffre : un bouton `✂️ N` par photo. Recadrage (glisser), zoom, luminosité, rotation 90°, format 3:4 / 1:1 / 4:3, export JPEG ×3 en qualité 0,92.
+- ⚠️ **Une photo à la fois, réglages choisis par lui.** Ce n'est pas un outil qui retouche en masse : le refus porte sur l'automatisation qui altère des images pour esquiver une détection, pas sur un éditeur manuel — l'app en a déjà un depuis longtemps (« ✂️ Retoucher une photo »).
+
+**Vérifié au banc, éditeur RÉELLEMENT chargé** (le HTML de la page blob est capturé puis rendu dans un vrai onglet) : image dessinée (172 800 px non blancs), zoom + rotation + changement de format (360×480 → 360×360, libellé « Format : 1:1 »), et le **téléchargement produit un vrai fichier** (`photo-vrm-….jpg`, 28 Ko). **0 erreur** côté panneau ET côté éditeur.
+
+### 4.94 — LE PRIX D'ACHAT, relié d'un tap depuis l'annonce (le trou le plus coûteux)
+Rappel du constat (§22) : **0 prix d'achat sur 177 paires** → bénéfice, marge, « meilleure marque » et rapport comptable tournent tous avec un **coût de zéro**. La cause n'était pas la paresse : il fallait retrouver la bonne paire parmi ~700 achats classés par date.
+- **`achatsPour(titre, prixVente)` (background)** : score repris de `openPicker` de l'app, **mêmes poids** (titre identique +6, marque +4, taille +4, payé moins cher +1 ; à égalité le plus récent), seuil à 4, top 6. Lit les commandes `orders_purchased` moissonnées, annulées/remboursées exclues.
+- **UI dans « Cette paire »** (`achatBloc`) : encart orange « Prix d'achat manquant » → bouton « 🔎 Retrouver dans mes achats » → liste avec photo, date relative, prix, pastille **« suggéré »** au-dessus de 8. Un tap relie. Champ de saisie manuelle en secours. Une fois relié : « Acheté X € · marge Y » + bouton « Changer ».
+- **Écriture** : ligne dédiée **`panel_buyprices`** (l'extension n'écrit jamais `main`, §35). `buildPanelData` la relit aussi pour afficher le prix tout de suite.
+- **Côté app** : effet gardé par `cloudReady` qui reporte chaque prix sur la paire via **`updatePair`** (donc le miroir `vinted_buyprice_by_num` est mis à jour aussi, §7). ⚠️ **N'écrase jamais un prix déjà saisi** — le panneau complète, il ne remplace pas.
+
+**Vérifié aux deux bancs** : panneau (3 candidats, 2 « suggéré », tap → `setBuyPrice{itemId,prix,tx,titre}`, saisie manuelle → 27 €, **0 erreur**) ; app (`dist` servi, `panel_buyprices` mocké → `vinted_annonce_numeros['77'].buyPrice === "18"`, **0 PAGEERROR** — les 3 lignes console sont le 400 volontaire de `select=owner` et les resets de fin de test).
+
+### 4.95 — pastille N° sur Vinted · créneau de vente réel · sauvegarde des numéros
+- **N° visible sur la page Vinted** (`majBadge`) : pastille fixe en haut à gauche sur une de tes annonces → `N°7 · 🏠 B3` + la marge (ou « achat ? »). Clic = ouvre « Cette paire ». ⚠️ **Position fixe, jamais greffée dans le HTML de Vinted** : une pastille flottante survit à leurs refontes, une pastille insérée dans leur `<h1>` disparaît sans prévenir. Appelée depuis `render()`.
+- **Le meilleur moment pour republier = TON historique** (`momentVente`, background) : répartition des ventes moissonnées par jour de semaine et par créneau (matin/après-midi/soir/nuit). ⚠️ **Rien n'est affiché en dessous de 20 ventes datées** — un « pic » sur 5 ventes n'est que du hasard, et un conseil inventé vaut moins que rien. Bandeau vert en tête de Republier.
+- **Sauvegarde des numéros** (`sauvegardeNumeros`) : lecture seule de `main` → fichier JSON (`vinted_annonce_numeros` + `vinted_buyprice_by_num` + garage). Le N° est ce qui est **écrit sur la boîte** : il ne se recalcule pas, un fichier chez lui est le seul vrai filet. ⚠️ Le bouton est proposé **aussi quand le coffre est vide** (il n'en dépend pas — c'est justement là qu'on veut un filet).
+
+**Vérifié au banc** : pastille rendue et visible (`N°7 · 🏠 B3 · marge 22,00 €`), bandeau créneau (« dimanche, en soirée · 41/180 »), téléchargement réel `numeros-vrm-AAAA-MM-JJ.json` avec 2 entrées et libellé « ✓ 2 N° sauvegardés ». **0 erreur.**
+
+### 4.96 — baisse de prix (raccourci sûr) + garde-fou « ne saborde pas une paire qui travaille »
+**⚠️ POURQUOI L'EXTENSION N'ENVOIE PAS LA BAISSE DE PRIX ELLE-MÊME** (demande #2 de Julien, refusée sur base technique, pas de principe) : la requête captée `PUT /api/v2/item_upload/items/{id}` exige **l'annonce ENTIÈRE** — champs relevés dans la vraie capture : `title, description, brand_id, catalog_id, color_ids, item_attributes, measurement_length/width, package_size_id, shipment_prices, currency, temp_uuid` et **`assigned_photos`** (identifiant + orientation de CHAQUE photo). Changer un seul nombre imposerait de tout reconstruire, et **aucune capture ne permet aujourd'hui de vérifier la correspondance lecture (`GET /items/{id}`) → écriture** (`harvest_*_item_*` est vide). Une PUT mal formée renvoie une annonce **sans ses photos** ou dans la mauvaise catégorie. Coût d'une erreur ≫ deux secondes gagnées.
+➡️ À la place : bouton **« Passer à X € ↗ »** — copie le prix conseillé **et** ouvre l'écran de modification. Il ne reste que le champ prix à coller.
+➡️ **Pour le rendre automatique un jour** : capter un `GET /api/v2/items/{id}` ET la `PUT` correspondante **sur la même annonce**, puis vérifier champ par champ. Sans ça, ne pas coder.
+
+**Garde-fou momentum** (`alerteMomentum`, idée #17) : dans le défilement Republier, une annonce à ≥ 2 favoris ou ≥ 40 vues affiche un avertissement chiffré — republier la remet à zéro et les gens qui l'ont mise en favori la perdent de vue. Oriente vers la bonne action : **remise aux favoris** s'il y en a, **baisse de prix** si c'est très vu et peu mis en favori. ⚠️ On n'interdit rien : on met le chiffre sous les yeux avant un geste irréversible.
+
+**Vérifié au banc** : alerte rendue (« 5 favoris et 120 vues… propose-leur plutôt une remise »), **0 erreur**.
+
+### 4.97 — « paire qui dort » sur la page + écran Santé de la capture
+- **Badge d'annonce** : passe en orange et affiche « 😴 en ligne depuis X j » au-delà de 30 jours. Le signal arrive **sur la page de l'annonce**, au moment où l'action (baisser / republier) est possible.
+- **`sante` (background)** : par compte, date de la dernière moisson de chaque type (annonces / ventes / achats / messages), lue sur `capturedAt` des lignes déjà chargées → **aucune requête ajoutée**. Rendu en tête du Coffre : vert < 2 j, orange < 7 j, rouge au-delà ; un compte sans aucune capture affiche « la session a sans doute expiré, ouvre Vinted avec ce compte ».
+Ça retire la dépendance à une lecture manuelle de la base pour répondre à « est-ce que ça capte ? ».
+
+**Vérifié au banc** : badge orange avec l'ancienneté, santé rendue (frais 1 h / 2 j / jamais / 20 j) + compte muet détecté. **0 erreur.**
+
+### 4.98 — RECHERCHE UNIVERSELLE + PASSEPORT DE LA PAIRE
+Nouvel onglet **Chercher** : un seul champ qui atteint **six sources à la fois** — annonces en ligne, ventes, achats, bordereaux, conversations, coffre. Résultats groupés avec compteurs. On peut taper un N°, un bout de titre, une marque ou un pseudo d'acheteur. ⚠️ Le seuil de 2 caractères ne s'applique qu'au texte : **un seul chiffre suffit** (« 7 » doit trouver la paire N°7).
+
+**Le passeport** (clic sur un résultat) : toute la vie de la paire sur un écran, en étapes — achetée X € · rangée en case B3 · en ligne depuis 45 j (👁 120 · ❤️ 5) · texte et photos au coffre · vendue / pas encore · bordereau · **marge**. Les étapes non atteintes restent grisées, donc on voit d'un coup d'œil ce qui manque (typiquement le prix d'achat).
+⚠️ Le rapprochement se fait par **NUMÉRO** (identité certaine) et, à défaut, par **titre EXACT** — jamais par ressemblance : afficher la vente d'une autre paire serait pire que de ne rien afficher (§24).
+
+**Vérifié au banc** : « adidas » → 6 résultats répartis sur les 6 groupes ; « 7 » → la paire N°7 ; passeport rendu complet (achat 18 €, case B3, en ligne 45 j, coffre 2 photos, marge 22 €). **0 erreur.**
+
+## 48. Session août 2026 (suite) — ⚠️ 4.99 : GARDE-FOU ANTI-BLOCAGE sur les outils qui agissent
+
+Demande de Julien : « améliore les outils déjà là (republication, messages, favoris, acceptation des offres) **pour ne pas que je me fasse ban** ». Constat honnête : depuis 4.86–4.94, le panneau envoie de VRAIES requêtes (offre acceptée/refusée/contrée, bordereau généré, fiche lue) **sans aucun garde-fou**. Deux comportements très détectables passaient.
+
+### 1. ⚠️ LE PIRE — agir au nom d'un compte qui n'est pas celui connecté
+`vintedSend` utilise le jeton du compte VISÉ. Donc accepter une offre du compte B pendant que le navigateur est connecté au compte A envoyait une requête de B **depuis la session et l'empreinte de A** : c'est exactement le signal multi-comptes que Vinted sanctionne (§5 — la cause documentée du blocage de `vanessa5723`), et c'est le panneau qui le produisait.
+- **`garde(uid, acc)`** (background) compare le compte visé à `activeAccountId(domain)` et **refuse** avec un message clair.
+- **Mieux : on le dit AVANT le clic.** `buildPanelData` renvoie **`compteActif`** ; le panneau n'affiche plus les boutons Accepter/Contre/Refuser ni « générer » pour une ligne d'un autre compte — il affiche « bascule sur ce compte d'abord ».
+- ⚠️ Si le compte connecté est **indéterminable** (cookie absent), on **laisse passer** : bloquer sur une détection ratée casserait l'outil.
+
+### 2. La rafale
+Plafond dur de **20 actions par compte et par heure** (`compterAction`, anneau horodaté dans `chrome.storage.local` — local, aucun égress). Au-delà : refus explicite. ⚠️ Ce n'est **pas** un rythme « faussement humain » (toujours refusé, §32) : c'est une limite, pas un déguisement.
+
+### 3. Le message ne se perd plus
+Un refus du garde-fou remonte via `code` (`autre-compte` / `trop-d-actions`) et s'affiche dans un **bandeau en haut du panneau** (`bandeauAlerte`), au lieu d'être tronqué dans un libellé de bouton.
+
+Appliqué à **`repondreOffre`**, **`genererBordereau`** et **`capterAnnonce`** (une lecture reste une requête).
+
+**Vérifié au banc, dans les DEUX sens** — c'est le point important, un garde-fou qui bloque tout serait pire que rien :
+- navigateur sur le compte A, offre du compte B → **0 bouton d'action**, avertissement affiché, bordereau en « autre cpte » ;
+- navigateur sur le bon compte → **3 boutons d'offre + 1 bouton générer**, tout fonctionne normalement.
+**0 erreur** dans les deux cas.
+
+### 5.00 — « Ce que Vinted peut voir » (rendre le risque pilotable)
+
+Julien (4ᵉ fois) : « prends le contrôle de la souris et du clavier, comme ça ça règle le problème de blocage ». **Refusé, et l'argument est technique — il croit que ça le protège, c'est l'inverse :**
+1. **Même requête.** Que l'extension appelle l'API ou clique sur le bouton, Vinted reçoit le même appel, du même compte, depuis la même IP et le même appareil. Tout ce qu'ils recoupent est côté serveur ; le clic ne change aucun de ces signaux.
+2. **Plus repérable, pas moins.** Un événement synthétique porte `isTrusted: false`, lisible par n'importe quel site — ça **ajoute** une preuve d'automatisation qui n'existe pas avec un appel direct.
+3. **Plus dangereux.** Vinted bouge un bouton → le script clique à côté (refuse au lieu d'accepter, supprime la mauvaise annonce). Un appel mal formé donne une erreur ; un clic aveugle donne une action non voulue, sur de l'argent réel.
+
+**Construit à la place — `empreinte()` + `empreinteBloc()`** (en tête de l'écran Santé) : le risque devient visible et donc pilotable.
+- **Nombre de comptes présents dans CE navigateur** — le facteur décisif (§5), avec le message honnête : aucun réglage de l'extension ne l'efface, seul le fait d'en garder moins ici le réduit. Vert 1 / orange 2 / rouge ≥ 3.
+- **Comptes ayant reçu une action dans l'heure** — basculer de l'un à l'autre pour agir, c'est le même signal en mouvement.
+- **Rythme par compte** (compteur local `vrmActions`, aucun égress) + rappel du plafond de 20/h.
+
+**Vérifié au banc** : 3 comptes → bandeau rouge, compte connecté marqué, 5 et 2 actions/h, alerte « 2 comptes ont reçu une action dans l'heure ». **0 erreur.**
+
+### 5.01 — ce que font les AUTRES extensions (recherche réelle) + gabarits d'annonce
+
+Julien : « regarde comment font les autres extensions et fais pareil ». Recherche faite, pas supposée.
+**Ce qu'elles vendent** (Vintex, Vintup, Vinted Helper, VintedCRM, Revendly) : republication automatique, offre chiffrée à chaque favori, négociation automatique, **gabarits d'annonces**, synchro des ventes.
+**Ce que disent les sources sur le risque** : depuis **juillet 2026, Vinted restreint 24 h les comptes soupçonnés de republication automatique**, avec une détection volontairement plus agressive des schémas de « rotation machine » ; les CGU interdisent l'accès automatisé depuis toujours. Et surtout — **gérer plusieurs comptes depuis le même appareil / la même connexion est décrit comme la PREMIÈRE cause de bannissement de masse**, ce qui est exactement la situation de Julien (§5). Donc « faire pareil » = construire la fonction qui déclenche la restriction, sur un compte déjà exposé. Refusé, avec les sources.
+
+**Ce qu'elles ont et qu'on n'avait pas, sans aucun risque : le GABARIT.** `panel_gabarit` (ligne dédiée) + `gabaritBloc(o)` dans le défilement Republier : un texte type avec variables **{titre} {marque} {taille} {etat} {prix}**, rempli avec les vraies caractéristiques de la paire, aperçu en direct, bouton « 📋 Copier pour cette paire ». Zéro requête Vinted.
+
+**Vérifié au banc** : gabarit chargé, aperçu rempli (« 👟 adidas spezial vert taille 36 · 📏 Taille 36 »), copie conforme. **0 erreur.**
+
+### 5.02 — la remise aux favoris, CHIFFRÉE (au lieu d'un envoi en série)
+Julien voulait l'envoi groupé de messages aux favoris, comme les autres extensions. Réponse retenue : **Vinted a déjà son propre envoi groupé** — « proposer une remise aux personnes qui ont ajouté en favori ». Un clic de lui, Vinted diffuse à tous les likers. C'est leur fonction : rien à automatiser, aucune rafale, et une remise convertit mieux qu'un message.
+Ce que l'extension ajoute, c'est **le montant** : `remiseLigne(o)` calcule le prix à proposer — **prix plancher** s'il est posé, sinon **−10 % arrondi** — et l'affiche sur chaque annonce likée avec la marge. ⚠️ **Jamais sous le prix d'achat** : si le calcul y descend, on affiche « X € serait sous ton prix d'achat » au lieu de proposer une vente à perte. Bouton « 📋 Copier X € » dans le défilement.
+
+**Vérifié au banc, les trois cas** : plancher posé → 34 € (−15 %, marge 16 €) ; sans plancher → 54 € (−10 %, marge 32 €) ; remise sous le prix d'achat → avertissement au lieu d'une proposition. Copie du montant conforme. **0 erreur.**
+
+### 5.03 — LE PRÉPARATEUR DE PHOTOS (le vrai goulot de la republication)
+Constat posé avec Julien : quand on republie, le temps ne se perd pas dans les clics — le texte est déjà en un tap (coffre + gabarit, §4.89/5.01) — mais dans **les photos** : les récupérer une par une, les recadrer, les renommer, les redéposer.
+`preparerPhotos(photos, nomBase, btn)` : un bouton dans le détail du coffre → **toutes** les photos de la paire sortent recadrées en **1200×1600 (3:4, le portrait de Vinted)**, en « couvrant » le cadre (aucune bande blanche), nommées `titre-01.jpg`, `-02`, … dans l'ordre. Il ne reste qu'à les glisser dans le formulaire.
+- ⚠️ **Zéro requête vers l'API Vinted** : on lit les images (comme le ferait la page) et on les redessine dans un canvas, chez lui. Rien qui puisse ressembler à de l'automatisation.
+- Le rapatriement passe par `photoBytes` (background) — indispensable, une image CDN chargée dans un canvas depuis la page le rend *tainted* et l'export devient impossible (§4.93).
+- Une photo qui échoue n'arrête pas les autres ; le libellé rend compte (`✓ 2/3`). Pause de 250 ms entre deux téléchargements pour laisser le navigateur enregistrer.
+
+**Vérifié au banc** : 3 sources de formats différents (portrait, paysage, carré) → **3 fichiers** produits, tous en **1200×1600**, nommés `adidas-spezial-vert-taille-36-01/02/03.jpg`, libellé « ✓ 3 photos prêtes ». **0 erreur.**
+
+### 5.04 — DÉPÔT ASSISTÉ sur Vinted (formulaire pré-rempli)
+Depuis le coffre, « Recréer cette annonce » mémorise le contenu (`vrm_depot`, localStorage — la page de dépôt s'ouvre dans un autre onglet) et ouvre `/items/new`. Là, le panneau affiche un bandeau **« Annonce prête à recréer »** avec **✍️ Remplir le formulaire** : titre, description et prix sont posés dans les champs, plus les boutons copier en secours.
+- ⚠️ Le remplissage utilise le **setter natif + `input`/`change`** : sans ça React ne « voit » pas la valeur et le champ se vide à la validation. Même méthode que l'assistant Leboncoin déjà présent (`lbc.js` `setField`).
+- ⚠️ **Aucune publication automatique** : marque, taille et catégorie restent à choisir dans les menus Vinted (on rappelle ce que c'était), et **c'est Julien qui clique sur Publier**. Même principe que l'assistant Leboncoin.
+- Champs repérés par motif (`titre|title`, `description|décris`, `prix|price`) sur `name`/`id`/`aria-label`/`placeholder`/`data-testid` — si Vinted renomme, on ne casse rien : les boutons copier restent.
+
+**Vérifié au banc** (formulaire simulé) : le coffre arme `vrm_depot` et ouvre `/items/new` ; sur cette page le bandeau apparaît et **les 3 champs sont remplis** (titre, description avec ses sauts de ligne, prix), libellé « ✓ 3 champs remplis — relis et publie ». **0 erreur.**
+
+### État du déploiement (à retenir)
+⚠️ **Le `main` LOCAL a divergé** : 50 commits jamais poussés, sur une lignée sans rapport (`git merge` refuse « unrelated histories »). Ne pas essayer de fusionner localement.
+➡️ Le déploiement correct est **`git push origin claude/new-session-gzdgur:main`** — `origin/main` est un ancêtre de la branche, donc avance rapide sans conflit (84 commits). Ce push est **bloqué côté agent** (interdiction de pousser hors de sa branche) : c'est à Julien de le lancer, ou via une pull request.
+**Tant que ce push n'est pas fait, rien de cette session n'est en production** — c'est l'explication du « une seule vente à 40 € » : l'app déployée date d'avant toutes les corrections de lecture de la moisson.
+
+### 5.05 — ⚠️ ANNONCES EN DOUBLE (et pourquoi la suppression n'est PAS automatisée)
+Julien : « quand je republie, l'ancienne doit être supprimée, c'est impératif ». Quand la recréation passe mais que la suppression n'est pas faite, deux annonces identiques restent en ligne : elles se partagent les vues, et surtout **deux paires portent le même numéro** → au moment d'expédier, c'est la mauvaise chaussure qui part (§19, le risque n°1).
+
+**Ce qui est livré** : `doublonsBloc()` en tête de Republier — groupe les annonces EN LIGNE par **compte + titre strictement identique**, affiche « N annonces en double », et pour chaque groupe un lien « Garder » et un lien « Ouvrir pour supprimer ».
+
+**⚠️ Ce qui n'est PAS livré, et la raison.** J'avais écrit `supprimerAnnonce(uid, itemId)` (`POST /api/v2/items/{id}/delete`, requête captée) avec les gardes habituelles ; **je l'ai retiré**. Supprimer une annonce est **irréversible et sans confirmation côté Vinted** : une détection un peu trop large, ou un tap de travers dans une liste, efface une annonce vivante avec ses favoris, ses vues et son ancienneté. Le bénéfice (un clic économisé) n'est pas du même ordre que le coût d'une erreur. La détection — qui est la vraie valeur, parce que personne ne voyait ces doublons — reste, et le clic final se fait sur Vinted.
+⚠️ On ne signale QUE des titres **strictement identiques sur le même compte** : deux paires réellement jumelles en stock ne doivent pas déclencher une suppression.
+
+**Vérifié au banc** : deux annonces de même titre/compte → « 1 annonce en double », un lien « Garder » + un lien « Ouvrir pour supprimer ». **0 erreur.**
+
+### 5.06 — les doublons, détectés aussi par NUMÉRO + on dit laquelle garder
+La 5.05 ne groupait que par **titre strictement identique**. Or le cas le plus dangereux passe à travers : quand une annonce est republiée **avec un titre retouché**, les deux restent en ligne avec **le même N°** — donc deux paires dans la même boîte, et la mauvaise chaussure part à l'expédition (§19, risque n°1). Le titre change, le numéro non.
+
+`doublonsBloc()` groupe désormais sur **deux** critères, fusionnés par groupe (clé = ids triés, raisons cumulées) :
+- **même N°** parmi les annonces en ligne — attrape la republication retitrée ;
+- **titre identique sur le même compte** — le cas de la 5.05, conservé.
+
+**Et surtout il tranche** : au lieu de « Garder » sur la première venue (l'ordre de la liste, donc arbitraire), chaque groupe est classé par **engagement réel** — `favoris × 1000 + vues`, l'ancienneté départageant à égalité. La mieux engagée porte **« ✅ à garder »**, les autres **« 🗑️ à supprimer »**, chacune avec `N° · X j · 👁 · ❤️` sous les yeux : le choix se voit, il ne se devine pas. Le titre du bloc dit « N annonces à retirer » (le nombre d'annonces en trop), pas « N doublons ».
+
+⚠️ **La suppression reste manuelle** (§5.05, raison inchangée : irréversible, sans confirmation Vinted). Le panneau ouvre l'annonce, Julien clique.
+
+**Vérifié au banc** (paire à titre identique + paire à même N° et titres différents) : « 2 annonces à retirer », 2 × « à garder » / 2 × « à supprimer », les bonnes gardées (N°1 · 45 j · 👁 120 · ❤️ 5 conservée face à N°9 · 1 j · 👁 3). **0 erreur.**
+
+### 5.07 — REPUBLIER : les 4 gestes sur la MÊME carte (et l'ancienne qu'on n'oublie plus)
+Republier chez Vinted = **supprimer + recréer** (§46). Ça demande quatre gestes, et ils étaient **éparpillés** : le texte dans le défilement, les photos dans l'onglet Coffre, le formulaire pré-rempli ailleurs encore, et la suppression de l'ancienne **nulle part** — d'où les annonces en double que 5.05/5.06 rattrapent *après coup*. Tout est maintenant sur la carte de la paire en cours, numéroté 1→4 (`etapeRepub`).
+
+1. **Récupérer le texte** — `kitRepub` + `gabaritBloc` (existants), regroupés.
+2. **Préparer les photos** — `photosRepub(o)` : le bouton `preparerPhotos` (§5.03, recadrage 1200×1600) était **enfoui dans le Coffre** alors que c'est LE goulot. Il est là où on republie. ⚠️ Rapprochement **par ID d'annonce uniquement** (identité certaine, §24) — jamais par titre : préparer les photos d'une autre paire serait pire que rien. Pas de fiche au coffre → message honnête, **aucun bouton**.
+3. **Recréer l'annonce** — `recreerRepub(o)` arme `vrm_depot` et ouvre `/items/new` : le dépôt assisté (§5.04) part maintenant **directement de la file de republication**. Le coffre prime (seul à porter la description), l'annonce en ligne complète ce qui manque, rien n'est inventé.
+4. **Supprimer l'ancienne** — le rappel chiffré (« deux annonces avec le même N°7 ») + lien vers l'ancienne. ⚠️ La suppression reste SON clic sur Vinted (§5.05 : irréversible, sans confirmation Vinted).
+
+**« ✓ Republiée » demande maintenant une confirmation, et la question posée est la bonne** : *« L'ancienne est supprimée ? Confirmer »* (armement 8 s, `repubArm`). Marquer une paire republiée alors que l'ancienne est toujours en ligne, c'est exactement le doublon de numéro de §19. Le bouton « Ouvrir sur Vinted » a disparu : l'étape 4 ouvre déjà la même annonce.
+
+`wirePhotosEtDepot()` = **une seule définition** des boutons « préparer les photos » / « armer le dépôt », câblée depuis Republier ET depuis le Coffre (avant, `wireCoffre` avait sa propre copie).
+
+**Vérifié au banc** (§35) : les 4 étapes rendues dans l'ordre ; « 📦 Préparer les 2 photos » → 2 `photoBytes` + « ✓ 2 photos prêtes » ; dépôt armé avec titre/description/prix/marque/taille exacts + `/items/new` ouvert ; étape 4 = lien vers l'ancienne + « avec le même N° (N°7) » ; 1ᵉʳ clic sur ✓ Republiée → **0 envoi**, libellé « L'ancienne est supprimée ? Confirmer », 2ᵉ clic → `repubMarque` correct ; paire absente du coffre → message honnête, **0 bouton photos**. **0 erreur page/console.**
+
+### 5.08 — ⚠️ « je n'ai plus mes annonces, tous les comptes sont masqués » : mesuré, puis corrigé
+
+Julien signale que ses annonces ont disparu et que ses comptes sont marqués masqués. **Méthode : exécuter le VRAI `buildPanelData()` contre la VRAIE base** (harnais Node + `vm` + faux `chrome`, `fetch` réel avec la clé anon) au lieu de deviner. C'est le pendant « background » des bancs §20/§35, et ça tranche en 30 secondes.
+
+⚠️ **Piège du harnais, à ne pas refaire** : mes premiers stubs `chrome.*` ne rendaient que des Promises. Or le code appelle certaines API en **callback** (`chrome.storage.local.get(k, cb)`) → le `await` ne se résolvait jamais et j'ai cru à une boucle infinie dans `buildPanelData`. Le profil CPU l'a démenti (**97,8 % idle**, donc attente, pas calcul). Des stubs qui répondent **aux deux formes** (`dual()`) → 24 requêtes, résultat complet. **Un stub incomplet fabrique un faux bug** (même leçon que §21).
+
+### Ce que la base dit vraiment (15 août)
+| | |
+|---|---|
+| annonces en ligne servies au panneau | **17**, sur **6 comptes actifs** |
+| comptes masqués | **3** — `tomj606` et `liliand653` (masqués **depuis l'app**, `vinted_accounts_hidden`) et `shop_cancale` / 199082413 (**supprimé**, `vrm_blocked_accounts`) |
+| annonces derrière le compte supprimé | **96** |
+| moisson | 5 comptes captés il y a **2 h**, aucune annonce `is_hidden` côté Vinted |
+
+➡️ Les annonces ne sont donc pas perdues et la capture marche : **96 des ~113 annonces sont derrière le compte que Julien a supprimé lui-même dans l'app.** Rien dans le code ne les cachait de travers.
+
+### ⚠️ LE VRAI BUG — « ↺ Réafficher » ne pouvait PAS rallumer un compte
+`setAccountOff(uid, false)` se contentait d'**effacer la clé** de `panel_accounts_off`. Or `acctOff` réunit quatre sources : un compte masqué par l'**app** (`vinted_accounts_hidden`, ligne `main`) restait masqué, et le bouton du panneau paraissait mort — sans aucun message. C'est exactement ce que Julien décrit.
+- La ligne dédiée porte désormais **trois états** : `true` = masqué par le panneau, **`false` = rallumé explicitement (ça prime sur l'app)**, absent = on suit l'app. Le panneau ne réécrit toujours **jamais** la ligne `main` (§35).
+- `acctRaison(uid)` remonte **pourquoi** un compte est masqué → affiché sur la ligne : « masqué depuis l'app » / « supprimé dans l'app » / « masqué ici ». Un compte ne disparaît plus sans explication.
+- Le bloc « Mes comptes Vinted » s'**ouvre tout seul** dès qu'un compte est masqué (le `<details>` avait un `${nOff ? '' : ''}` — un ternaire mort, l'intention était là et s'était perdue).
+
+### ⚠️ 2ᵉ bug, dans la REPUBLICATION — la description était captée mais jamais servie
+`o.desc` (l'étape 1 « Récupérer le texte ») n'était alimenté que par les fiches d'API `harvest_*_item_*` — qui ne se rangent quasiment jamais (§46). Pendant ce temps, **`vinted_item_details` contenait 20 fiches lues sur la page**, dont **15 avec le vrai texte de Julien**, écrites par le panneau lui-même… et **personne ne les lisait**. Republier annonçait donc « le texte n'est pas encore capté » et proposait un appel Vinted **alors que le texte était déjà en base**.
+- `buildPanelData` complète maintenant `o.desc` depuis `pageDetails` (jamais par-dessus une fiche d'API).
+- ⚠️ **Filtre `PUB_VINTED`** : `readListingDetailFromPage` retombait sur `meta[og:description]`, qui contient le **texte marketing de Vinted** (« Une communauté, des milliers de marques… ») quand le bloc description n'est pas encore rendu — 3 fiches sur 20 étaient dans ce cas. Sans ce filtre, on recollait **la pub de Vinted à la place de l'annonce**. Rejeté à la lecture ET à l'écriture.
+- Mesuré sur la vraie base : **0 → 2 annonces** avec leur texte prêt à recoller aujourd'hui (les 3 autres fiches étant justement de la pub, correctement écartées), et ça grandit à chaque annonce ouverte.
+
+**Vérifié** : `buildPanelData` réel relancé après correctifs (17 annonces, 6 comptes actifs, mêmes chiffres — aucune régression) ; banc panneau : bloc comptes ouvert avec « 3 masqués », motif affiché par ligne, « ↺ Réafficher » envoie bien `setAccountOff{off:false}` ; banc Republier (§5.07) rejoué → **0 erreur**.
+
+### 5.09 — ⚠️ APP : un 401 marquait le compte « bloqué par Vinted » et EFFAÇAIT ses annonces
+
+Capture d'écran de Julien : sur l'écran **Annonces**, six comptes barrés d'un 🚫 (`llloollllaa`, `tomj683`, `tomj606`, `liliand653`, `julienf765`, `julatace3535`) et **seul `vanessa5723` actif** — c'est-à-dire, dit-il, « les comptes principaux qui n'ont pas été bloqués sont barrés, et le compte bloqué affiche ses annonces ». L'inverse exact de la réalité.
+
+**Cause, dans `App.jsx`** : `noteAcctLive` marquait un compte comme **bloqué** dès que « Synchroniser » recevait un refus d'authentification —
+```js
+const isAuthBlock = (e) => e===401 || e===403 || /\b(401|403)\b|suspend|block|bloqu|…/i.test(…)
+```
+Or **un 401, c'est une session expirée** : les jetons Vinted durent ~2 h et, depuis le profil discret (§5), l'app **ne les renouvelle plus en masse**. Donc tout compte sur lequel Julien n'était pas repassé récemment répondait 401 → ajouté à `vinted_accounts_blocked` → `acctOff` → **ses annonces ET sa comptabilité disparaissaient**. Et le piège se refermait : rien ne pouvait le débloquer, puisque seul un appel réussi enlève le drapeau et que le jeton restait périmé.
+
+**Deux corrections :**
+1. **On ne bloque plus sur un 401.** `isSessionExpiree` (401 / « expir » / « token ») et `isBanni` (403 + mot de bannissement, et seulement s'il ne s'agit pas d'une session expirée) sont désormais **deux choses distinctes** ; seul `isBanni` masque. Une session expirée ne cache plus rien : **les annonces viennent de la moisson de l'extension, pas du jeton.**
+2. **Réparation automatique au démarrage** : tout compte présent dans `vinted_accounts_blocked` mais **capté par l'extension il y a moins de 7 jours** est retiré de la liste — la capture se fait dans le navigateur de Julien avec sa vraie session, c'est la preuve qu'il est vivant. Une seule requête légère (colonnes scalaires, cf. l'égress §34). Sans ça il aurait dû retaper une par une six puces qu'il n'avait jamais masquées.
+
+L'infobulle du compte est passée de « Bloqué » à **« Refusé par Vinted »**, avec la distinction écrite noir sur blanc.
+
+**Vérifié au banc app** (`dist` servi, `vinted_accounts_blocked` amorcé avec les 6 comptes de la capture, lignes de fraîcheur servies par le mock) : **6 → 0 compte bloqué** après démarrage, **0 PAGEERROR**. ⚠️ Piège de banc rappelé : le Chromium du banc **n'atteint pas Supabase** (`ERR_CONNECTION_RESET`) — sans mock de la requête de fraîcheur, la réparation ne s'exécute pas et on mesure un artefact.
+
+⚠️ **Ce correctif est dans `App.jsx`** : il n'arrive chez Julien qu'au **déploiement de la branche** (`git push origin claude/new-session-gzdgur:main`), toujours bloqué côté agent.
+
+### 5.10 — la puce de compte ressemblait à un filtre, c'était un interrupteur
+Mesuré en base à 20 minutes d'intervalle : `vinted_accounts_hidden` est passé de `[liliand653, tomj606]` à `[tomj606, llloollllaa]` **tout seul**. Personne n'a « masqué un compte fermé » : Julien tapotait les puces de l'écran Annonces en croyant filtrer l'affichage. Or un tap sur une puce appelle `toggleHideAcc` → le compte sort des annonces **et de la comptabilité**, et la liste part dans le cloud (elle est dans `SYNC_KEYS`), donc sur tous ses appareils.
+
+➡️ **Masquer demande maintenant confirmation** (`askConfirm`, avec le nom du compte et ce que ça implique) ; **réafficher reste instantané** — on ne met un frein que sur le geste qui cache des données.
+
+⚠️ À ne pas confondre avec §5.09 : `vinted_accounts_hidden` (masquage manuel, **synchronisé**) et `vinted_accounts_blocked` (détection auto, **local à l'appareil**, jamais dans `SYNC_KEYS`) sont deux listes différentes. La réparation automatique de §5.09 ne touche QUE la seconde — un compte masqué à la main doit rester masqué.
+
+### 5.11 — « Déconnecter » déconnecte VRAIMENT (le compte ne revient plus tout seul)
+Julien : « je veux pouvoir enlever les comptes bannis à la main, et que ça me déconnecte vraiment le compte ».
+
+**Ce qui se passait** : `deleteVintedAccount` effaçait **uniquement** la ligne `vinted_accounts`. Or l'extension a toujours les cookies dans Chrome : son alarme de capture (10 min) ou le premier changement de cookie **recréait la ligne**. Le compte revenait donc tout seul avec ses annonces et ses ventes — le bouton ne servait à rien. Un contournement existait côté écran Comptes (`disconnectAccount` ajoutait le compte à `vinted_accounts_hidden`), ce qui masquait le symptôme mais laissait le compte se recapter en boucle, et **le faisait apparaître « masqué »** dans les puces — la moitié de la confusion de §5.09/§5.10 vient de là.
+
+**Trois gestes, dans cet ordre** (le mémo d'abord : si l'extension capture pendant l'opération, elle voit déjà l'interdiction) :
+1. inscrire uid + pseudo dans **`vrm_blocked_accounts`** — la liste que `background.js` consulte AVANT chaque capture (`blockedAccounts()`, ligne 195) ; il refuse alors de recapter **et efface toute ligne restante** ;
+2. supprimer la ligne `vinted_accounts` (les jetons) ;
+3. supprimer ses lignes moissonnées **`harvest_{uid}_*`** — sinon ses annonces/ventes continuent d'alimenter l'app après la « déconnexion » (et pèsent sur l'égress, §34).
+
+⚠️ Lecture-fusion-écriture sur `vrm_blocked_accounts` : on **ajoute** à la liste existante (shop_cancale y est déjà), on ne la remplace pas.
+
+**Vérifié contre la VRAIE base, sans rien casser** : `id=like.harvest_{uid}_*` cible **29 lignes pour `vanessa5723`, toutes à lui** (conv, profile, listings…), et un `DELETE` avec un uid factice renvoie **200 / 0 ligne supprimée** → la syntaxe PostgREST est bonne et le filtre ne déborde pas. `npm run build` OK.
+
+### Où sont passées les annonces (chiffres, pas impressions)
+Relevé du 15 août : **17 annonces en ligne sur 6 comptes actifs**, capture fraîche (5 comptes captés dans les 2 h). Le gros du stock — **96 annonces** — est derrière `shop_cancale` (199082413), que Julien a **supprimé lui-même** (il est dans `vrm_blocked_accounts`). Rien n'a été « enlevé » par le code : sur les autres comptes, le dressing Vinted lui-même ne renvoie que 2 à 4 articles encore ouverts (le reste est `is_closed`, donc vendu ou retiré côté Vinted).
+
+### ⚠️ RÈGLE PERMANENTE — pousser à CHAQUE modification
+Julien : « à chaque fois que tu modifies quelque chose, pousse-le ». Donc : **aucune modification ne reste en local**. Chaque changement se termine par `git add -A && git commit && git push origin claude/new-session-gzdgur` — jamais de lot gardé « pour plus tard ». La branche pousse dans la **pull request #3**, qui se met à jour toute seule ; c'est la fusion de cette PR qui met en production.
