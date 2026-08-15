@@ -797,12 +797,52 @@ const fetchVintedAccounts = async () => {
 // voir. NB : si la session Chrome du compte est encore valide, l'extension peut
 // le re-capturer au prochain passage sur vinted.fr — mais pour un compte bloqué
 // (cookie mort), il ne réapparaît pas. Renvoie true si la suppression a réussi.
-const deleteVintedAccount = async (vintedUserId) => {
+// ⚠️ « DÉCONNECTER » DOIT VRAIMENT DÉCONNECTER (plainte de Julien : « je veux
+// pouvoir enlever les comptes bannis à la main, et que ça les enlève »).
+// Avant, on effaçait seulement la ligne `vinted_accounts` — et l'extension,
+// qui a toujours les cookies dans Chrome, la **recréait dans les 10 minutes**
+// (alarme de capture) ou dès le premier changement de cookie. Le compte
+// revenait donc tout seul, avec ses annonces et ses ventes : de son point de
+// vue, le bouton ne servait à rien.
+//
+// Trois gestes, dans cet ORDRE (le mémo d'abord : si l'extension capture
+// pendant l'opération, elle voit déjà l'interdiction et n'écrit rien) :
+//  1. inscrire le compte dans `vrm_blocked_accounts` — la liste que
+//     `background.js` consulte avant chaque capture (`blockedAccounts()`) ;
+//     il refuse alors de le recapter ET efface toute ligne restante ;
+//  2. supprimer la ligne `vinted_accounts` (les jetons) ;
+//  3. supprimer ses lignes moissonnées `harvest_{uid}_*` — sinon ses annonces
+//     et ses ventes continuent d'alimenter l'app après la « déconnexion ».
+const deleteVintedAccount = async (vintedUserId, login) => {
+  const uid = String(vintedUserId || '').trim();
+  if (!uid) return false;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${vintedUserId}`, {
+    // 1. mémo « supprimé définitivement » (lu par l'extension)
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() });
+      const rows = r.ok ? await r.json() : [];
+      const cur = (rows[0] && rows[0].data) || {};
+      const uids = Array.isArray(cur.uids) ? cur.uids.map(String) : [];
+      const logins = Array.isArray(cur.logins) ? cur.logins.map(String) : [];
+      if (!uids.includes(uid)) uids.push(uid);
+      if (login && !logins.includes(String(login))) logins.push(String(login));
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST',
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: `resolution=merge-duplicates,return=minimal` }),
+        body: JSON.stringify([withOwner({ id: 'vrm_blocked_accounts', data: { ...cur, uids, logins, note: 'supprimé définitivement depuis l\'app' } })]),
+      });
+    } catch (_) { /* le mémo est un plus : on continue quand même */ }
+    // 2. les jetons
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, {
       method: 'DELETE',
       headers: sbAuth({ Prefer: 'return=minimal' }),
     });
+    // 3. ses données moissonnées (annonces, ventes, achats, messages…)
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_*`, {
+        method: 'DELETE', headers: sbAuth({ Prefer: 'return=minimal' }),
+      });
+    } catch (_) { /* best-effort : la ligne `vrm_blocked_accounts` suffit à le masquer */ }
     return res.ok;
   } catch (_) { return false; }
 };
@@ -7824,7 +7864,7 @@ function VintedAccounts({ accounts, setAccounts }) {
     const uid = String(acc.vinted_user_id);
     setHiddenAccts(prev => { const n = new Set(prev); n.add(uid); save('vinted_accounts_hidden', [...n]); return n; });
     setRemoving(acc.vinted_user_id);
-    const ok = await deleteVintedAccount(acc.vinted_user_id);
+    const ok = await deleteVintedAccount(acc.vinted_user_id, acc.login);
     setRemoving(null);
     if (!ok) { toast('Retiré des annonces et des stats. (La ligne du compte reviendra peut-être, mais il restera masqué partout.)'); }
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
@@ -12879,7 +12919,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,fontWeight:700,color:C.danger}}>Compte « {accNameOf(a)} » bloqué par Vinted</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1}}>Ses annonces ont été retirées automatiquement (le compte ne répond plus). Tu peux le déconnecter définitivement.</div>
                 </div>
-                <button type="button" onClick={async ()=>{ if(await askConfirm(`Déconnecter « ${accNameOf(a)} » ? Ses tokens seront supprimés de l'app.`)){ deleteVintedAccount(a.vinted_user_id); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
+                <button type="button" onClick={async ()=>{ if(await askConfirm({title:`Déconnecter « ${accNameOf(a)} » ?`, desc:"Ses jetons, ses annonces et ses ventes captées sont supprimés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). À faire pour un compte banni ou fermé. Réversible depuis « Comptes retirés ».", ok:'Déconnecter', cancel:'Annuler', danger:true})){ const ok=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(ok?`« ${accNameOf(a)} » déconnecté — recharge l'app pour le voir disparaître`:'Échec de la déconnexion — réessaie'); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
               </div>
             ))}
           </div>

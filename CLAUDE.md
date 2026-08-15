@@ -1520,3 +1520,20 @@ Mesuré en base à 20 minutes d'intervalle : `vinted_accounts_hidden` est passé
 ➡️ **Masquer demande maintenant confirmation** (`askConfirm`, avec le nom du compte et ce que ça implique) ; **réafficher reste instantané** — on ne met un frein que sur le geste qui cache des données.
 
 ⚠️ À ne pas confondre avec §5.09 : `vinted_accounts_hidden` (masquage manuel, **synchronisé**) et `vinted_accounts_blocked` (détection auto, **local à l'appareil**, jamais dans `SYNC_KEYS`) sont deux listes différentes. La réparation automatique de §5.09 ne touche QUE la seconde — un compte masqué à la main doit rester masqué.
+
+### 5.11 — « Déconnecter » déconnecte VRAIMENT (le compte ne revient plus tout seul)
+Julien : « je veux pouvoir enlever les comptes bannis à la main, et que ça me déconnecte vraiment le compte ».
+
+**Ce qui se passait** : `deleteVintedAccount` effaçait **uniquement** la ligne `vinted_accounts`. Or l'extension a toujours les cookies dans Chrome : son alarme de capture (10 min) ou le premier changement de cookie **recréait la ligne**. Le compte revenait donc tout seul avec ses annonces et ses ventes — le bouton ne servait à rien. Un contournement existait côté écran Comptes (`disconnectAccount` ajoutait le compte à `vinted_accounts_hidden`), ce qui masquait le symptôme mais laissait le compte se recapter en boucle, et **le faisait apparaître « masqué »** dans les puces — la moitié de la confusion de §5.09/§5.10 vient de là.
+
+**Trois gestes, dans cet ordre** (le mémo d'abord : si l'extension capture pendant l'opération, elle voit déjà l'interdiction) :
+1. inscrire uid + pseudo dans **`vrm_blocked_accounts`** — la liste que `background.js` consulte AVANT chaque capture (`blockedAccounts()`, ligne 195) ; il refuse alors de recapter **et efface toute ligne restante** ;
+2. supprimer la ligne `vinted_accounts` (les jetons) ;
+3. supprimer ses lignes moissonnées **`harvest_{uid}_*`** — sinon ses annonces/ventes continuent d'alimenter l'app après la « déconnexion » (et pèsent sur l'égress, §34).
+
+⚠️ Lecture-fusion-écriture sur `vrm_blocked_accounts` : on **ajoute** à la liste existante (shop_cancale y est déjà), on ne la remplace pas.
+
+**Vérifié contre la VRAIE base, sans rien casser** : `id=like.harvest_{uid}_*` cible **29 lignes pour `vanessa5723`, toutes à lui** (conv, profile, listings…), et un `DELETE` avec un uid factice renvoie **200 / 0 ligne supprimée** → la syntaxe PostgREST est bonne et le filtre ne déborde pas. `npm run build` OK.
+
+### Où sont passées les annonces (chiffres, pas impressions)
+Relevé du 15 août : **17 annonces en ligne sur 6 comptes actifs**, capture fraîche (5 comptes captés dans les 2 h). Le gros du stock — **96 annonces** — est derrière `shop_cancale` (199082413), que Julien a **supprimé lui-même** (il est dans `vrm_blocked_accounts`). Rien n'a été « enlevé » par le code : sur les autres comptes, le dressing Vinted lui-même ne renvoie que 2 à 4 articles encore ouverts (le reste est `is_closed`, donc vendu ou retiré côté Vinted).
