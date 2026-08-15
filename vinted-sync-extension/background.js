@@ -1684,7 +1684,9 @@ async function setAccountOff(uid, off) {
   if (!k) return false;
   const rows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
   const cur = (rows && rows[0] && rows[0].data) || {};
-  if (off) cur[k] = true; else delete cur[k];
+  // `false` est ENREGISTRÉ (et non effacé) : c'est ce qui permet de rallumer
+  // un compte masqué par l'app, que le panneau n'a pas le droit de modifier.
+  cur[k] = !!off ? true : false;
   return await supabaseUpsert('app_data', [{ id: 'panel_accounts_off', data: cur }], 'id');
 }
 
@@ -1773,8 +1775,32 @@ async function buildPanelData() {
   let blockedAcc = new Set(); try { blockedAcc = await blockedAccounts(); } catch (_) {}
   const offRows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
   const offMap = (offRows && offRows[0] && offRows[0].data) || {};
-  const offPanel = new Set(Object.keys(offMap).filter(k => offMap[k]));
-  const acctOff = (uid) => { const k = String(uid == null ? '' : uid); return !!k && (hiddenAcc.has(k) || blockedAcc.has(k) || offPanel.has(k)); };
+  const offPanel = new Set(Object.keys(offMap).filter(k => offMap[k] === true));
+  // ⚠️ « ↺ Réafficher » NE MARCHAIT PAS pour un compte masqué depuis l'APP.
+  // `setAccountOff(uid,false)` se contentait d'effacer la clé de CETTE ligne,
+  // or `acctOff` réunit quatre sources : le compte restait masqué par
+  // `vinted_accounts_hidden` (ligne `main`, écrite par l'app) et le bouton
+  // paraissait mort. C'est exactement ce que Julien a vu : « tous les autres
+  // comptes sont marqués masqués » sans moyen de les rallumer depuis Chrome.
+  // La ligne dédiée porte donc trois états : `true` = masqué par le panneau,
+  // `false` = RALLUMÉ EXPLICITEMENT (ça prime sur l'app), absent = on suit
+  // l'app. Le panneau ne réécrit toujours JAMAIS la ligne `main` (§35).
+  const forceOn = new Set(Object.keys(offMap).filter(k => offMap[k] === false));
+  const acctOff = (uid) => {
+    const k = String(uid == null ? '' : uid);
+    if (!k || forceOn.has(k)) return false;
+    return hiddenAcc.has(k) || blockedAcc.has(k) || offPanel.has(k);
+  };
+  // Pourquoi ce compte est-il masqué ? Sans ça, un compte disparaît sans que
+  // rien ne dise d'où vient la décision — et on croit à un bug de capture.
+  const acctRaison = (uid) => {
+    const k = String(uid == null ? '' : uid);
+    if (!k || forceOn.has(k)) return '';
+    if (offPanel.has(k)) return 'panneau';
+    if (blockedAcc.has(k)) return 'supprime';
+    if (hiddenAcc.has(k)) return 'app';
+    return '';
+  };
   const keepAcc = (r) => !acctOff(r && r.data && r.data.uid);
   // Nom lisible d'un compte : l'étiquette posée dans l'app, sinon le pseudo Vinted.
   const accRows = await sbGet('vinted_accounts?select=vinted_user_id,login') || [];
@@ -1798,7 +1824,7 @@ async function buildPanelData() {
   const accountsSeen = {};
   const noteAcct = (uid, n) => {
     const k = String(uid || ''); if (!k) return;
-    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k) };
+    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k), raison: acctRaison(k) };
     accountsSeen[k].online += n || 0;
   };
   for (const r of lstAll) {
@@ -2200,6 +2226,23 @@ async function buildPanelData() {
     }
   } catch (_) { /* pas de fiche : Republier le dira honnêtement */ }
   for (const o of online) { const f = fiches[String(o.id)]; if (f && f.desc) o.desc = f.desc; }
+  // ⚠️ DEUXIÈME SOURCE, celle qui marche vraiment aujourd'hui : la description
+  // LUE SUR LA PAGE de l'annonce (`vinted_item_details`, écrite par le panneau
+  // quand tu ouvres une de tes annonces). Elle était déjà en base — 20 fiches,
+  // dont 15 avec le vrai texte de Julien — mais PERSONNE ne la lisait : seules
+  // les fiches d'API (`harvest_*_item_*`, qui ne se rangent quasiment jamais)
+  // alimentaient `o.desc`. Résultat : l'étape « Récupérer le texte » de
+  // Republier annonçait « pas encore capté » et proposait un appel Vinted alors
+  // que le texte était déjà là. On complète, on n'écrase jamais une fiche d'API.
+  // Le filtre `PUB_VINTED` écarte les anciennes lignes où `og:description`
+  // avait enregistré le texte marketing de Vinted à la place de l'annonce.
+  const PUB_VINTED = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+  for (const o of online) {
+    if (o.desc) continue;
+    const p = pageDetails[String(o.id)];
+    const t = p && String(p.description || '').trim();
+    if (t && t.length > 15 && !PUB_VINTED.test(t)) o.desc = t;
+  }
 
   // ── LE N° PERDU APRÈS UNE REPUBLICATION ─────────────────────────────────────
   // Pour chaque paire republiée récemment, on cherche la NOUVELLE annonce et on

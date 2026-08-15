@@ -1463,3 +1463,33 @@ Republier chez Vinted = **supprimer + recréer** (§46). Ça demande quatre gest
 `wirePhotosEtDepot()` = **une seule définition** des boutons « préparer les photos » / « armer le dépôt », câblée depuis Republier ET depuis le Coffre (avant, `wireCoffre` avait sa propre copie).
 
 **Vérifié au banc** (§35) : les 4 étapes rendues dans l'ordre ; « 📦 Préparer les 2 photos » → 2 `photoBytes` + « ✓ 2 photos prêtes » ; dépôt armé avec titre/description/prix/marque/taille exacts + `/items/new` ouvert ; étape 4 = lien vers l'ancienne + « avec le même N° (N°7) » ; 1ᵉʳ clic sur ✓ Republiée → **0 envoi**, libellé « L'ancienne est supprimée ? Confirmer », 2ᵉ clic → `repubMarque` correct ; paire absente du coffre → message honnête, **0 bouton photos**. **0 erreur page/console.**
+
+### 5.08 — ⚠️ « je n'ai plus mes annonces, tous les comptes sont masqués » : mesuré, puis corrigé
+
+Julien signale que ses annonces ont disparu et que ses comptes sont marqués masqués. **Méthode : exécuter le VRAI `buildPanelData()` contre la VRAIE base** (harnais Node + `vm` + faux `chrome`, `fetch` réel avec la clé anon) au lieu de deviner. C'est le pendant « background » des bancs §20/§35, et ça tranche en 30 secondes.
+
+⚠️ **Piège du harnais, à ne pas refaire** : mes premiers stubs `chrome.*` ne rendaient que des Promises. Or le code appelle certaines API en **callback** (`chrome.storage.local.get(k, cb)`) → le `await` ne se résolvait jamais et j'ai cru à une boucle infinie dans `buildPanelData`. Le profil CPU l'a démenti (**97,8 % idle**, donc attente, pas calcul). Des stubs qui répondent **aux deux formes** (`dual()`) → 24 requêtes, résultat complet. **Un stub incomplet fabrique un faux bug** (même leçon que §21).
+
+### Ce que la base dit vraiment (15 août)
+| | |
+|---|---|
+| annonces en ligne servies au panneau | **17**, sur **6 comptes actifs** |
+| comptes masqués | **3** — `tomj606` et `liliand653` (masqués **depuis l'app**, `vinted_accounts_hidden`) et `shop_cancale` / 199082413 (**supprimé**, `vrm_blocked_accounts`) |
+| annonces derrière le compte supprimé | **96** |
+| moisson | 5 comptes captés il y a **2 h**, aucune annonce `is_hidden` côté Vinted |
+
+➡️ Les annonces ne sont donc pas perdues et la capture marche : **96 des ~113 annonces sont derrière le compte que Julien a supprimé lui-même dans l'app.** Rien dans le code ne les cachait de travers.
+
+### ⚠️ LE VRAI BUG — « ↺ Réafficher » ne pouvait PAS rallumer un compte
+`setAccountOff(uid, false)` se contentait d'**effacer la clé** de `panel_accounts_off`. Or `acctOff` réunit quatre sources : un compte masqué par l'**app** (`vinted_accounts_hidden`, ligne `main`) restait masqué, et le bouton du panneau paraissait mort — sans aucun message. C'est exactement ce que Julien décrit.
+- La ligne dédiée porte désormais **trois états** : `true` = masqué par le panneau, **`false` = rallumé explicitement (ça prime sur l'app)**, absent = on suit l'app. Le panneau ne réécrit toujours **jamais** la ligne `main` (§35).
+- `acctRaison(uid)` remonte **pourquoi** un compte est masqué → affiché sur la ligne : « masqué depuis l'app » / « supprimé dans l'app » / « masqué ici ». Un compte ne disparaît plus sans explication.
+- Le bloc « Mes comptes Vinted » s'**ouvre tout seul** dès qu'un compte est masqué (le `<details>` avait un `${nOff ? '' : ''}` — un ternaire mort, l'intention était là et s'était perdue).
+
+### ⚠️ 2ᵉ bug, dans la REPUBLICATION — la description était captée mais jamais servie
+`o.desc` (l'étape 1 « Récupérer le texte ») n'était alimenté que par les fiches d'API `harvest_*_item_*` — qui ne se rangent quasiment jamais (§46). Pendant ce temps, **`vinted_item_details` contenait 20 fiches lues sur la page**, dont **15 avec le vrai texte de Julien**, écrites par le panneau lui-même… et **personne ne les lisait**. Republier annonçait donc « le texte n'est pas encore capté » et proposait un appel Vinted **alors que le texte était déjà en base**.
+- `buildPanelData` complète maintenant `o.desc` depuis `pageDetails` (jamais par-dessus une fiche d'API).
+- ⚠️ **Filtre `PUB_VINTED`** : `readListingDetailFromPage` retombait sur `meta[og:description]`, qui contient le **texte marketing de Vinted** (« Une communauté, des milliers de marques… ») quand le bloc description n'est pas encore rendu — 3 fiches sur 20 étaient dans ce cas. Sans ce filtre, on recollait **la pub de Vinted à la place de l'annonce**. Rejeté à la lecture ET à l'écriture.
+- Mesuré sur la vraie base : **0 → 2 annonces** avec leur texte prêt à recoller aujourd'hui (les 3 autres fiches étant justement de la pub, correctement écartées), et ça grandit à chaque annonce ouverte.
+
+**Vérifié** : `buildPanelData` réel relancé après correctifs (17 annonces, 6 comptes actifs, mêmes chiffres — aucune régression) ; banc panneau : bloc comptes ouvert avec « 3 masqués », motif affiché par ligne, « ↺ Réafficher » envoie bien `setAccountOff{off:false}` ; banc Republier (§5.07) rejoué → **0 erreur**.

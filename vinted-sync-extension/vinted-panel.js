@@ -248,6 +248,9 @@
   // À quoi ça sert : (1) tes annonces Leboncoin reprennent ta vraie description
   // au lieu d'un texte générique ; (2) tu gardes une copie de tes photos et de
   // tes textes, donc tu ne les perds jamais et tu n'as pas à tout refaire.
+  // Textes que Vinted met dans `og:description` quand la vraie description
+  // n'est pas (encore) dans la page. Ce n'est jamais l'annonce du vendeur.
+  const PUB_VINTED = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
   function readListingDetailFromPage() {
     const out = { description: '', photos: [] };
     try {
@@ -263,7 +266,13 @@
         if (!el) continue;
         const v = (el.tagName === 'META' ? el.getAttribute('content') : el.textContent) || '';
         const t = v.trim();
-        if (t.length > 15) { out.description = t.slice(0, 3000); break; }
+        // ⚠️ `og:description` retombe sur le TEXTE MARKETING DE VINTED quand le
+        // bloc description n'est pas encore rendu (« Une communauté, des
+        // milliers de marques… », « Pour chaque achat effectué… »). Enregistré
+        // tel quel, ce texte remplaçait la vraie annonce dans Republier : on
+        // aurait recollé la pub de Vinted à la place de la description de
+        // Julien. Mesuré : 5 fiches sur 20 étaient dans ce cas.
+        if (t.length > 15 && !PUB_VINTED.test(t)) { out.description = t.slice(0, 3000); break; }
       }
       // Photos : les images Vinted en grand format présentes sur la page.
       const seen = new Set();
@@ -514,15 +523,20 @@
     const accs = (DATA && DATA.accounts) || [];
     if (accs.length < 2) return '';
     const nOff = accs.filter(a => a.off).length;
+    // D'où vient le masquage ? Un compte peut être coupé depuis l'app
+    // (`vinted_accounts_hidden`), supprimé définitivement, ou masqué ici. Sans
+    // cette mention, un compte disparaît sans raison visible et on croit à un
+    // bug de capture. « ↺ Réafficher » marche désormais dans les trois cas.
+    const pourquoi = { app: "masqué depuis l'app", supprime: "supprimé dans l'app", panneau: 'masqué ici' };
     const rows = accs.map(a => `
       <div style="display:flex;gap:8px;align-items:center;padding:7px 2px;border-top:1px solid #f0f2f5">
         <div style="flex:1 1 120px;min-width:0">
           <div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${a.off ? 'opacity:.5;text-decoration:line-through' : ''}">${esc(a.name)}</div>
-          <div class="vrm-m" style="font-size:10.5px">${a.online} en ligne</div>
+          <div class="vrm-m" style="font-size:10.5px">${a.online} en ligne${a.off && pourquoi[a.raison] ? ` · ${pourquoi[a.raison]}` : ''}</div>
         </div>
         <button class="vrm-acct-off" data-uid="${esc(a.uid)}" data-off="${a.off ? '0' : '1'}" style="flex-shrink:0;border:1px solid ${a.off ? '#0f6b4f' : '#dde'};background:${a.off ? 'rgba(15,107,79,.08)' : '#fff'};color:${a.off ? '#0f6b4f' : '#556'};border-radius:8px;padding:5px 10px;font-weight:700;font-size:11px;cursor:pointer">${a.off ? '↺ Réafficher' : '✕ Masquer'}</button>
       </div>`).join('');
-    return `<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? '' : ''}>
+    return `<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? ' open' : ''}>
       <summary style="cursor:pointer;font-weight:700;font-size:12.5px;list-style:none">👤 Mes comptes Vinted (${accs.length}${nOff ? ` · ${nOff} masqué${nOff > 1 ? 's' : ''}` : ''})</summary>
       <div class="vrm-m" style="margin:5px 0 2px">Masque un compte que tu n'utilises plus : ses paires, ventes et messages disparaissent partout dans VRM.</div>
       ${rows}
