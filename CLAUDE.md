@@ -1733,3 +1733,39 @@ Deux fois cette année, une erreur de rendu a vidé la page entière — barre d
 **9. Le service worker mettait `/api/` en cache.** Règle « cache d'abord » pour tout GET de même origine hors navigation : `/api/ai` (« la clé IA est-elle configurée ? ») et toute future route GET restaient **figées pour toujours** sur leur première réponse. `/api/` passe désormais toujours par le réseau.
 
 **Aussi** : la fenêtre de l'extension insérait les pseudos Vinted dans du HTML **sans les échapper** — un pseudo bien choisi cassait (ou détournait) l'affichage. Échappés.
+
+---
+
+## 5.15 — COHÉRENCE APP ↔ EXTENSION : les règles ne sont plus écrites deux fois
+
+Demande de Julien (il veut la vendre) : **aucune incohérence, ni dans l'app, ni dans l'extension, ni entre les deux.**
+
+### La méthode, désormais outillée : `scripts/audit-coherence.cjs`
+À lancer après toute modification d'une règle métier. Il **extrait les prédicats des deux fichiers**, les exécute sur **tous les statuts réellement présents en base** (12 distincts aujourd'hui) et affiche chaque désaccord. Lecture seule, aucun appel à Vinted. C'est ce script qui a trouvé les deux premiers défauts ci-dessous — pas la relecture.
+
+### 1. ⚠️ DANS L'APP : « Bordereau envoyé au vendeur » était à la fois « à expédier » et « rien à expédier »
+`isAwaitingShipStatus` répondait **oui** (c'est le moment où Vinted te donne l'étiquette), et `needsBordereau` **non** — parce que son test « déjà parti » attrape le mot **« envoyé »**. Deux conséquences réelles : le **numéro de cette paire retombait dans le pool** alors que le carton est encore sur l'étagère (deux paires dans la même boîte, §19), et le même statut valait « à expédier » ailleurs dans l'app.
+Les deux tests deviennent **la référence unique, au niveau module** (ils vivaient dans un composant, donc invisibles pour `needsBordereau` juste en dessous), et la vente qui attend TON envoi passe avant le test « déjà parti ».
+
+### 2. Trois statuts classés différemment par l'app et par l'extension
+`classifySale` (extension) n'avait pas `retour` ni `suspend` : **« Retour initié »**, **« Transaction suspendue »** et **« Commande non réclamée – Retournée »** étaient **annulées côté app** et **affichées comme ventes en cours** dans le panneau. Copie exacte de la règle de l'app. **Vérifié : 0 désaccord sur les 12 statuts.**
+
+### 3. « À booster » (app) ≠ « à relancer » (extension)
+Même question — *cette annonce a de l'audience mais ne convertit pas* — deux règles : l'app faisait `vues ≥ 20 && favoris ≤ 1` (seuils absolus), le panneau comparait le ratio favoris/vues à **ta médiane**. Deux listes différentes selon l'outil ouvert. L'app adopte la règle relative (un seuil absolu ne veut rien dire : 300 vues et 3 favoris convertit deux fois moins bien que 40 vues et 1 favori), avec repli sur l'ancien repère quand il y a moins de 5 annonces notées.
+
+### 4. Une paire vendue restait « en ligne » dans l'app, pas dans le panneau
+Vinted laisse parfois l'annonce ouverte après la vente. Le panneau la retirait (vente de moins de 60 j au **titre unique**) ; l'app non. Même règle des deux côtés, même garde (`§24` : un titre en double ne retire **jamais** rien). Et la **portée** est alignée : on regarde les ventes de **tous** les comptes, y compris masqués — une paire vendue sur un compte masqué a quand même quitté l'étagère.
+
+### 5. Masquer un compte depuis le panneau ne masquait rien dans l'app
+Le panneau écrit `panel_accounts_off` (sa ligne dédiée) ; l'app **ne la lisait pas**. Le sens inverse marchait déjà — le masquage ne tenait donc que dans un sens. L'app lit maintenant la même liste, avec le **même trois-états** (`false` = rallumé exprès depuis le panneau, ça prime). Elle n'y écrit toujours jamais (§35).
+
+### ✅ Convergence PROUVÉE sur les mêmes données
+Le vrai `buildPanelData()` de l'extension et l'app rendue par Playwright, alimentés par **les mêmes copies de la vraie base** :
+| | app | panneau |
+|---|---|---|
+| annonces en ligne | 7 | **8** → **7** |
+Les deux tools tombaient sur 8 vs 7 pour une seule raison, et elle est saine : l'app **dérive** des ventes depuis les emails (bordereau reçu ⟹ paire vendue) et **persiste** le résultat dans `vinted_annonces_email_sold` ; le panneau **consomme** cette clé plutôt que de relire tous les emails (égress, §34). Simulé « l'app a tourné une fois » → le panneau passe de 8 à **7**. ⚠️ **Un seul propriétaire par règle, les autres consomment** — c'est le motif à garder.
+
+⚠️ **Piège de banc rencontré (encore une fois §21)** : mon harnais ne servait pas la ligne `vrm_blocked_accounts`, donc le panneau croyait le compte supprimé encore actif et affichait ses 96 annonces — **104 contre 7**, un écart spectaculaire qui n'était **que l'artefact du banc**. Servir TOUTES les familles de lignes avant de conclure.
+
+**État final** : app — 12 écrans sur les vraies données, **0 erreur, 0 artefact d'affichage** ; extension — **15 onglets sur 15** sans erreur (les 2 « échecs » du banc restent les artefacts connus) ; audit de cohérence — **6 règles comparées, 0 désaccord**.

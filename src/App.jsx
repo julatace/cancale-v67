@@ -1785,11 +1785,28 @@ const classifyOrderStatus = (status) => {
 // « expédié / en transit / livré / finalisé ». Le reste (payé, en attente
 // d'expédition, en préparation…) = à expédier. Statut inconnu -> on montre quand
 // même (mieux vaut proposer que cacher à tort).
+// ⚠️ CES DEUX TESTS SONT LA RÉFÉRENCE, ET ILS VIVENT ICI (niveau module) :
+// l'app, le widget et l'extension doivent répondre la même chose à « faut-il
+// expédier ? » et « le colis attend-il au relais ? ». Ils étaient définis à
+// l'intérieur d'un composant, donc invisibles pour `needsBordereau` juste
+// en dessous — d'où le désaccord corrigé ci-après.
+const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+
 const needsBordereau = (status) => {
   const s = (status || '').toLowerCase();
   if (!s) return true;
   if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
   if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
+  // ⚠️ « BORDEREAU ENVOYÉ AU VENDEUR » N'EST PAS UN COLIS PARTI. Le test
+  // « déjà expédié » ci-dessous attrape le mot « envoyé » — donc au moment
+  // EXACT où Vinted te donne l'étiquette, l'app répondait « plus besoin de
+  // bordereau ». Deux conséquences mesurées : le numéro de cette paire
+  // retombait dans le pool alors que le carton est encore sur l'étagère
+  // (deux paires dans la même boîte, §19), et le même statut valait
+  // « à expédier » ailleurs dans l'app. La vente qui attend TON envoi passe
+  // donc en premier.
+  if (isAwaitingShipStatus(s)) return true;
   if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
   return true;                                                              // à expédier
 };
@@ -9136,6 +9153,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
   // Comptes entiers exclus de la compta (par vinted_user_id).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
+  // Comptes masqués/rallumés DEPUIS LE PANNEAU de l'extension (ligne dédiée
+  // `panel_accounts_off`, qu'elle est seule à écrire — on la lit, on n'y touche
+  // jamais : §35, pas de clobber croisé).
+  const [panelAcctOff, setPanelAcctOff] = useState({});
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const j = await r.json();
+      const d = (j[0] && j[0].data) || {};
+      if (d && typeof d === 'object') setPanelAcctOff(d);
+    } catch (_) {}
+  })(); }, []);
   // Masquer/afficher un compte partout (annonces + compta) depuis l'onglet Annonces.
   // ⚠️ MASQUER UN COMPTE SE DEMANDE, LE RÉAFFICHER NON.
   // Ces puces ressemblent à des filtres, mais un simple tap RETIRE le compte de
@@ -9225,7 +9255,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // d'afficher un compte déconnecté, et le bandeau de stats des Annonces
   // comptait des annonces que la grille en dessous n'affichait pas.
   // Tout passe désormais par ces deux fonctions.
-  const acctOff = (uid) => { const k = String(uid ?? ''); return hiddenAccts.has(k) || blockedAccts.has(k); };
+  // ⚠️ LE PANNEAU DE L'EXTENSION A SA PROPRE LISTE, ET L'APP L'IGNORAIT.
+  // « ✕ Masquer » depuis le panneau écrit `panel_accounts_off` (ligne dédiée,
+  // §35) : le compte disparaissait du panneau et restait dans l'app. Le sens
+  // inverse marchait déjà (l'extension lit `vinted_accounts_hidden`), donc le
+  // masquage ne tenait que dans un sens. On lit la même liste, avec le même
+  // trois-états : `false` = réactivé exprès depuis le panneau, ça prime.
+  const acctOff = (uid) => {
+    const k = String(uid ?? '');
+    if (panelAcctOff[k] === false) return false;      // rallumé depuis le panneau
+    return hiddenAccts.has(k) || blockedAccts.has(k) || panelAcctOff[k] === true;
+  };
   const acctOffOf = (o) => acctOff(o?._acc?.vinted_user_id);
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = (tid) => {
@@ -9339,8 +9379,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Statut Vinted PRÉCIS = source de vérité automatique (Vinted le met à jour tout
   // seul quand tu expédies / récupères). Utilisé pour « à retirer » et « à expédier ».
-  const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');       // achat prêt à retirer
-  const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || ''); // vente à expédier
+  // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
   // Colis marqués « récupéré » À LA MAIN (par transaction) : disparaissent de « à
@@ -9874,10 +9913,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, numeros, accounts, hiddenAccts, blockedAccts]);
 
-  const annBase = useMemo(
-    () => (listings.items || []).filter(it => !acctOffOf(it) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id)))),
+  // ⚠️ UNE PAIRE VENDUE QUI TRAÎNE ENCORE « EN LIGNE ».
+  // Vinted laisse parfois l'annonce avec `is_closed:false` après la vente. Le
+  // panneau de l'extension la retirait déjà (vente de moins de 60 jours dont le
+  // titre est UNIQUE parmi les annonces en ligne) — pas l'app : les deux outils
+  // n'affichaient donc pas le même nombre d'annonces en ligne. Même règle des
+  // deux côtés, avec la même garde : un titre en double ne retire JAMAIS rien
+  // (§24 — sinon on effacerait une paire identique réellement encore en vente).
+  const venduesRecentes = useMemo(() => {
+    const titres = new Set();
+    for (const o of (sales.items || [])) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;   // retour/remboursement : la paire revient
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
+      const k = normTitle(o.title); if (k) titres.add(k);
+    }
+    return titres;
+  }, [sales.items]);
+  const annBase = useMemo(() => {
+    const items = (listings.items || []);
+    const nParTitre = {};
+    for (const it of items) { const k = normTitle(it.title); if (k) nParTitre[k] = (nParTitre[k] || 0) + 1; }
+    return items.filter(it => {
+      if (acctOffOf(it) || soldManual.has(String(it.id))) return false;
+      if (!showEmailSold && emailSoldIds.has(String(it.id))) return false;
+      const k = normTitle(it.title);
+      if (!showEmailSold && k && nParTitre[k] === 1 && venduesRecentes.has(k)) return false;  // vendue, titre sans ambiguïté
+      return true;
+    });
+  },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts]);
+  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, venduesRecentes]);
 
   // ── NUMÉROS EN DOUBLE ─────────────────────────────────────────────────
   // Deux annonces EN LIGNE portant le même numéro = deux paires dans la même
@@ -9924,9 +9990,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     else if (annSort==='views') arr.sort((a,b)=>(b.views??-1)-(a.views??-1));
     else if (annSort==='nonum') arr = arr.filter(it=>!(numeros[it.id]?.numero));
     else if (annSort==='boost') {
-      // « À booster » : les paires qui ont de l'audience mais ne se vendent pas
-      // (beaucoup de vues, peu/pas de favoris) -> candidates à une baisse de prix.
-      arr = arr.filter(it=> it.views!=null && it.views>=20 && (it.favourites??0) <= 1);
+      // « À booster » : de l'audience mais pas de conversion → le prix est trop
+      // haut. ⚠️ RÈGLE IDENTIQUE À CELLE DU PANNEAU DE L'EXTENSION (« à
+      // relancer ») : elle disait `vues≥20 && favoris≤1`, le panneau comparait
+      // le ratio favoris/vues à TA médiane. Deux listes différentes pour la
+      // même question, selon l'outil ouvert. On garde la règle relative — un
+      // seuil absolu ne veut rien dire quand une annonce à 300 vues et 3
+      // favoris convertit deux fois moins bien qu'une à 40 vues et 1 favori.
+      const notes = arr.filter(it => it.views != null && it.views >= 40);
+      if (notes.length >= 5) {
+        const ratios = notes.map(it => (it.favourites || 0) / it.views).sort((a,b)=>a-b);
+        const median = ratios[Math.floor(ratios.length / 2)];
+        const seuil = median * 0.5;
+        arr = notes.filter(it => (it.favourites || 0) / it.views < seuil);
+      } else {
+        // Pas assez d'annonces notées pour une médiane fiable : on retombe sur
+        // le repère simple plutôt que de ne rien proposer.
+        arr = arr.filter(it => it.views != null && it.views >= 20 && (it.favourites ?? 0) <= 1);
+      }
       arr.sort((a,b)=>(b.views??0)-(a.views??0));
     }
     else if (annSort==='sleeping') {

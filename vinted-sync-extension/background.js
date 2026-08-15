@@ -2139,17 +2139,29 @@ async function buildPanelData() {
   //     ligne. Un titre en double ne retire jamais rien (§24 : pas de devinette —
   //     sinon on effacerait une paire identique encore réellement en vente).
   const emailSoldIds = new Set((Array.isArray(d.vinted_annonces_email_sold) ? d.vinted_annonces_email_sold : []).map(String));
+  // ⚠️ PORTÉE : on regarde les ventes de TOUS les comptes, pas seulement des
+  // comptes affichés. Une paire vendue sur un compte masqué a quand même quitté
+  // l'étagère. L'app le faisait déjà (elle lit toutes ses ventes) — la
+  // différence donnait 8 annonces en ligne ici contre 7 dans l'app, sur les
+  // mêmes données. Même remarque pour le comptage des titres en double juste
+  // après : plus la vue est large, moins on risque de retirer à tort.
   const soldRecentTitles = new Set();
-  for (const r of soldRows) {
+  for (const r of soldAll) {
     for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
-      if (/annul|cancel|refus|rembours/i.test(o.status || '')) continue;
+      // Même classement que l'app (`classifyOrderStatus`) : un retour ou une
+      // transaction suspendue n'est PAS une vente aboutie — la paire revient,
+      // son annonce doit rester en ligne.
+      if (/annul|cancel|refus|rembours|retour|suspend/i.test(o.status || '')) continue;
       const ts = o.date ? Date.parse(o.date) : NaN;
       if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
       const k = normT(o.title); if (k) soldRecentTitles.add(k);
     }
   }
   const onlineTitleN = {};
-  for (const o of online) { const k = normT(o.title); if (k) onlineTitleN[k] = (onlineTitleN[k] || 0) + 1; }
+  for (const r of lstAll) for (const it of (((r.data && r.data.payload) || {}).items || [])) {
+    if (it.is_closed || it.is_hidden || it.is_draft) continue;
+    const k = normT(it.title); if (k) onlineTitleN[k] = (onlineTitleN[k] || 0) + 1;
+  }
   let removedSold = 0;
   for (let i = online.length - 1; i >= 0; i--) {
     const o = online[i]; const k = normT(o.title);
@@ -2261,7 +2273,11 @@ async function buildPanelData() {
   // (le CA du mois reste celui publié par l'app, appStats) : c'est juste la liste
   // « qu'est-ce que j'ai vendu récemment » pour éviter de rouvrir l'app. On exclut
   // les annulées/remboursées (ce n'est pas de l'argent qui rentre).
-  const classifySale = (st) => /annul|cancel|refus|rembours/i.test(st || '') ? 'cancelled'
+  // ⚠️ COPIE EXACTE de `classifyOrderStatus` de l'app. Il manquait `retour` et
+  // `suspend` : « Retour initié », « Transaction suspendue » et « Commande non
+  // réclamée » étaient annulées côté app et affichées comme ventes en cours
+  // dans le panneau. Le même écran de vente, deux vérités selon l'outil.
+  const classifySale = (st) => /annul|cancel|refus|rembours|retour|suspend/i.test(st || '') ? 'cancelled'
     : /finalis/i.test(st || '') ? 'completed' : 'pending';
   const salesFlat = [];
   const seenSaleTx = new Set();
