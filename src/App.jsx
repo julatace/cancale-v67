@@ -7766,7 +7766,7 @@ function VintedAccounts({ accounts, setAccounts }) {
   })(); }, []);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
-    if (blockedAccts.has(uid)) return { icon: '🚫', label: 'Bloqué', color: C.danger, hint: 'Vinted a refusé ce compte (401/403). Ses annonces/ventes sont masquées.' };
+    if (blockedAccts.has(uid)) return { icon: '🚫', label: 'Refusé par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403). Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
     // Sans refresh_token, le compte ne peut pas se renouveler tout seul → il
     // faudra le reconnecter à la main. (Le simple access_token expiré, lui, est
     // normal et se renouvelle automatiquement — on ne le signale pas.)
@@ -8949,19 +8949,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement
   // tant qu'un futur « Synchroniser » ne le voit pas revenir en ligne.
   const [blockedAccts, setBlockedAccts] = useState(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)));
-  const isAuthBlock = (e) => e===401 || e===403 || /\b(401|403)\b|suspend|block|bloqu|forbidden|unauthor/i.test(String(e||''));
-  // Sur un appel RÉEL (force) : on marque bloqué si auth échoue, on débloque si OK.
+  // ⚠️ UN 401 N'EST PAS UN COMPTE BLOQUÉ — c'est une session expirée.
+  // Les jetons Vinted durent ~2 h et, depuis le passage en profil discret (§5),
+  // l'app ne les renouvelle plus en masse : tout compte sur lequel Julien n'est
+  // pas repassé récemment répond 401 au premier « Synchroniser ». L'ancien
+  // `isAuthBlock` mettait 401 et 403 dans le même sac → le compte partait dans
+  // `vinted_accounts_blocked`, donc `acctOff`, donc **ses annonces ET sa compta
+  // disparaissaient**, définitivement (rien ne pouvait le déblo­quer tant que le
+  // jeton restait périmé). Résultat constaté par Julien : ses comptes sains
+  // barrés d'un 🚫 et le seul compte réellement bloqué encore affiché.
+  // On ne bloque donc plus que sur un refus EXPLICITE (403 + mot de bannissement).
+  const isSessionExpiree = (e) => e === 401 || /\b401\b|unauthor|expir|token/i.test(String(e || ''));
+  const isBanni = (e) => !isSessionExpiree(e) && (e === 403 || /\b403\b|suspend|forbidden|banned|bloqu|block/i.test(String(e || '')));
+  // Sur un appel RÉEL (force) : on marque bloqué si Vinted REFUSE le compte, on
+  // débloque dès qu'un appel repasse. Une session expirée ne masque rien : les
+  // annonces viennent de la moisson de l'extension, pas du jeton.
   const noteAcctLive = (uid, res, force) => {
     if (!force || !uid) return;
     const k = String(uid);
     setBlockedAccts(prev => {
       const n = new Set(prev); const was = n.has(k);
-      if (!res.ok && isAuthBlock(res.error)) n.add(k);
+      if (!res.ok && isBanni(res.error)) n.add(k);
       else if (res.ok) n.delete(k);
       if (n.size !== prev.size || was !== n.has(k)) save('vinted_accounts_blocked', [...n]);
       return n;
     });
   };
+  // ── RÉPARATION AUTOMATIQUE des comptes marqués bloqués à tort ──────────────
+  // Un compte que l'extension a capté récemment est VIVANT, quoi qu'ait dit un
+  // 401 passé : la capture se fait dans le navigateur de Julien, avec sa vraie
+  // session. On le sort donc de la liste des bloqués au démarrage, sans rien
+  // lui demander — sinon il devrait retaper chaque puce une par une pour
+  // retrouver des annonces qu'il n'a jamais masquées.
+  // Requête LÉGÈRE (une seule, colonnes scalaires) — cf. le piège d'égress §34.
+  useEffect(() => { (async () => {
+    if (!blockedAccts.size) return;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
+      if (!res.ok) return;
+      const rows = await res.json(); const parUid = {};
+      rows.forEach(r => {
+        const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return;
+        const t = harvestTs(r) || 0; if (t && (!parUid[m[1]] || t > parUid[m[1]])) parUid[m[1]] = t;
+      });
+      const vivants = [...blockedAccts].filter(uid => parUid[uid] && (Date.now() - parUid[uid]) < 7 * 86400000);
+      if (!vivants.length) return;
+      setBlockedAccts(prev => {
+        const n = new Set(prev); vivants.forEach(u => n.delete(u));
+        save('vinted_accounts_blocked', [...n]); return n;
+      });
+    } catch (_) { /* diagnostic : ne doit jamais gêner le démarrage */ }
+  })(); // au démarrage seulement (la liste initiale suffit)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showHidden, setShowHidden] = useState(false);
   // ── COHÉRENCE DES COMPTES (source unique) ────────────────────────────────
   // Un compte masqué à la main OU détecté bloqué par Vinted ne doit exister

@@ -1493,3 +1493,23 @@ Julien signale que ses annonces ont disparu et que ses comptes sont marqués mas
 - Mesuré sur la vraie base : **0 → 2 annonces** avec leur texte prêt à recoller aujourd'hui (les 3 autres fiches étant justement de la pub, correctement écartées), et ça grandit à chaque annonce ouverte.
 
 **Vérifié** : `buildPanelData` réel relancé après correctifs (17 annonces, 6 comptes actifs, mêmes chiffres — aucune régression) ; banc panneau : bloc comptes ouvert avec « 3 masqués », motif affiché par ligne, « ↺ Réafficher » envoie bien `setAccountOff{off:false}` ; banc Republier (§5.07) rejoué → **0 erreur**.
+
+### 5.09 — ⚠️ APP : un 401 marquait le compte « bloqué par Vinted » et EFFAÇAIT ses annonces
+
+Capture d'écran de Julien : sur l'écran **Annonces**, six comptes barrés d'un 🚫 (`llloollllaa`, `tomj683`, `tomj606`, `liliand653`, `julienf765`, `julatace3535`) et **seul `vanessa5723` actif** — c'est-à-dire, dit-il, « les comptes principaux qui n'ont pas été bloqués sont barrés, et le compte bloqué affiche ses annonces ». L'inverse exact de la réalité.
+
+**Cause, dans `App.jsx`** : `noteAcctLive` marquait un compte comme **bloqué** dès que « Synchroniser » recevait un refus d'authentification —
+```js
+const isAuthBlock = (e) => e===401 || e===403 || /\b(401|403)\b|suspend|block|bloqu|…/i.test(…)
+```
+Or **un 401, c'est une session expirée** : les jetons Vinted durent ~2 h et, depuis le profil discret (§5), l'app **ne les renouvelle plus en masse**. Donc tout compte sur lequel Julien n'était pas repassé récemment répondait 401 → ajouté à `vinted_accounts_blocked` → `acctOff` → **ses annonces ET sa comptabilité disparaissaient**. Et le piège se refermait : rien ne pouvait le débloquer, puisque seul un appel réussi enlève le drapeau et que le jeton restait périmé.
+
+**Deux corrections :**
+1. **On ne bloque plus sur un 401.** `isSessionExpiree` (401 / « expir » / « token ») et `isBanni` (403 + mot de bannissement, et seulement s'il ne s'agit pas d'une session expirée) sont désormais **deux choses distinctes** ; seul `isBanni` masque. Une session expirée ne cache plus rien : **les annonces viennent de la moisson de l'extension, pas du jeton.**
+2. **Réparation automatique au démarrage** : tout compte présent dans `vinted_accounts_blocked` mais **capté par l'extension il y a moins de 7 jours** est retiré de la liste — la capture se fait dans le navigateur de Julien avec sa vraie session, c'est la preuve qu'il est vivant. Une seule requête légère (colonnes scalaires, cf. l'égress §34). Sans ça il aurait dû retaper une par une six puces qu'il n'avait jamais masquées.
+
+L'infobulle du compte est passée de « Bloqué » à **« Refusé par Vinted »**, avec la distinction écrite noir sur blanc.
+
+**Vérifié au banc app** (`dist` servi, `vinted_accounts_blocked` amorcé avec les 6 comptes de la capture, lignes de fraîcheur servies par le mock) : **6 → 0 compte bloqué** après démarrage, **0 PAGEERROR**. ⚠️ Piège de banc rappelé : le Chromium du banc **n'atteint pas Supabase** (`ERR_CONNECTION_RESET`) — sans mock de la requête de fraîcheur, la réparation ne s'exécute pas et on mesure un artefact.
+
+⚠️ **Ce correctif est dans `App.jsx`** : il n'arrive chez Julien qu'au **déploiement de la branche** (`git push origin claude/new-session-gzdgur:main`), toujours bloqué côté agent.
