@@ -1626,3 +1626,39 @@ Deux causes cumulées :
 `photosCompletes(o)` compare les photos **gardées** aux photos **réelles** (`coffre.nPhotos`, sinon `nPhotosVinted` du dressing). Une paire dont le coffre n'a que 2 photos sur 6 n'est plus « prête » : elle porte **`📸 2/6 photos`**. « Prête » veut dire prête.
 
 **Vérifié au banc** (§35, 3 paires : complète / rien / texte OK mais 2 photos sur 6) : bandeau « 1 paire prête à republier · 2 incomplètes », badges `prête · ✍️ 📸2` / `texte + photos à capter` / `📸 2/6 photos`, les 4 étapes du défilement inchangées, **0 erreur page/console**. `npm run build` OK, `node --check` OK sur les deux fichiers.
+
+---
+
+## 5.12 — ⚠️ LE PONT APP↔EXTENSION NE TOURNAIT PAS SUR LE VRAI DOMAINE
+
+Vérifié, pas supposé : `https://vrm.center` **sert bien l'app** (titre « VRM », le bundle construit). Or le manifeste n'injectait `bridge.js` que sur `cancale-v67-ten.vercel.app` et `cancale-v67.vercel.app` :
+
+```
+"js": ["bridge.js"], "matches": ["…vercel.app/*"]      ← vrm.center absent
+```
+
+Donc **sur le domaine que Julien utilise, l'extension était invisible pour l'app** : `vmrExtPresent()` restait faux pour toujours. Conséquences directes — répondre à un message depuis l'app répondait « Extension VRM non détectée sur cet appareil » **même extension installée et à jour**, et le jeton du vendeur (multi-vendeurs, §12) n'était jamais transmis au service worker.
+
+⚠️ Le reste était pourtant prêt : `host_permissions` contenait `vrm.center`, et le contrôle d'origine côté `background.js` l'acceptait déjà. **Seule la ligne `matches` manquait** — le genre de trou qu'aucun test de code ne voit, parce que le code est juste et que c'est la configuration qui l'empêche de s'exécuter.
+
+- `matches` += `https://vrm.center/*` et `https://www.vrm.center/*` ; `host_permissions` complété ; le contrôle d'origine accepte `www.`.
+- `VRM_APP_API` (appel `/api/ai` de l'extension) pointait encore sur l'alias Vercel → passé sur `vrm.center`.
+
+### La détection était fragile en plus d'être coupée
+`bridge.js` s'injecte à `document_idle` : l'app envoyait **un** ping au chargement de son module, souvent **avant** que le pont existe, et concluait « pas d'extension » définitivement.
+- Le pont **s'annonce plusieurs fois** (immédiatement, au `DOMContentLoaded`, à 0,8 s et 2,5 s) et **joint sa version**.
+- L'app **re-ping** à 0,6 / 1,5 / 3 / 6 s tant qu'elle n'a rien reçu, et **prévient ses écrans** (`onVmrExt`) quand la réponse arrive — un composant déjà affiché doit se redessiner, sinon la détection tardive ne change rien à l'écran.
+
+### « Est-ce que ça capte ? » a maintenant une réponse DANS l'app
+Bloc **État des connexions** (Réglages → Comptes Vinted), trois voies qui tombent séparément :
+- **Extension Chrome** — détectée + **numéro de version** (après un rechargement dans Chrome, c'est la seule façon de vérifier que la nouvelle tourne — plainte répétée « je ne vois pas ce que tu as changé ») ;
+- **Capture Vinted** — date de la dernière moisson ;
+- **Emails** — date du dernier email reçu (bordereaux, colis, codes de retrait).
+
+Vert < 2 j / orange < 7 j / rouge au-delà, **la même échelle que l'écran Santé de l'extension** (§4.97) : un même état ne doit pas porter deux couleurs selon l'écran. ⚠️ Lecture en **scalaires** (`select=id,updated_at,cap:data->>capturedAt`) : les lignes d'emails portent des PDF en base64, un `select=data` ici referait le trou d'égress de §34.
+
+### Accueil et création de compte : plus de promesse invérifiable
+- **Onboarding** : l'étape 1 se **coche toute seule** (✓ vert + version) quand l'extension répond. Elle dit aussi que sur téléphone il n'y a pas d'extension, au lieu de laisser croire à un échec.
+- **Création de compte** : le sous-titre promettait « tes données ne seront visibles que par toi ». **Faux tant que `CLOISONNE` est faux** (vérifié en base : `select=owner` → 400, la colonne n'existe pas) — un compte créé aujourd'hui ouvre la MÊME boutique. Le formulaire le dit maintenant avant, pas après.
+
+**Vérifié au banc app** (`dist` servi, Supabase mocké, faux pont qui rejoue `{__vmr:'ready',version}` **après** le chargement du module — le cas réel) : « Extension Chrome · version 5.12.0 », « Capture Vinted · dernière il y a 3 h », « Emails · dernier il y a 20 h ». **Et sans pont** : « pas détectée ici » + la marche à suivre. **0 PAGEERROR** dans les deux sens. `npm run build` OK, `node --check` OK sur les trois fichiers d'extension.

@@ -1957,15 +1957,30 @@ const normalizeConversationMessages = (conversation) => {
 // sur cette page. Aucune écriture ne passe par un serveur → zéro risque de ban.
 // Si l'extension n'est pas là (mobile, pas Chrome…), vmrExtPresent() est faux et
 // l'app propose le repli « répondre sur Vinted ».
-let __vmrExtReady = false;
+let __vmrExtReady = false, __vmrExtVersion = '';
+// Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
+// la détection est asynchrone, un composant déjà affiché doit se redessiner.
+const __vmrExtSubs = new Set();
+const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delete(fn); };
 if (typeof window !== 'undefined') {
   try {
-    window.addEventListener('message', (e) => { if (e.source === window && e.data && e.data.__vmr === 'ready') __vmrExtReady = true; });
+    window.addEventListener('message', (e) => {
+      if (e.source !== window || !e.data || e.data.__vmr !== 'ready') return;
+      __vmrExtReady = true;
+      if (e.data.version) __vmrExtVersion = String(e.data.version);
+      __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+    });
     window.postMessage({ __vmr: 'ping' }, '*');
-    setTimeout(() => { try { window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {} }, 1500);
+    // ⚠️ L'extension injecte bridge.js à `document_idle` : un seul ping au
+    // chargement du module tombe souvent AVANT qu'il existe, et l'app conclut
+    // « pas d'extension » définitivement. On redemande quelques fois.
+    [600, 1500, 3000, 6000].forEach(ms => setTimeout(() => {
+      try { if (!__vmrExtReady) window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
+    }, ms));
   } catch (_) {}
 }
 const vmrExtPresent = () => __vmrExtReady;
+const vmrExtVersion = () => __vmrExtVersion;
 function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
@@ -3235,7 +3250,12 @@ function AuthScreen() {
             {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
           </div>
           <div style={{fontSize:12.5,color:C.muted,marginBottom:16,lineHeight:1.45}}>
-            {mode==='up' ? 'Tes données (annonces, garage, compta) ne seront visibles que par toi.'
+            {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
+                sans la colonne `owner` (§12), un compte créé ici tombe dans les
+                MÊMES données que le vendeur existant. Le dire avant, pas après. */}
+            {mode==='up' ? (CLOISONNE
+              ? 'Tes données (annonces, garage, compta) ne seront visibles que par toi.'
+              : 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.')
              : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
              : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
              : 'Retrouve ta boutique, tes numéros et ta compta.'}
@@ -3383,8 +3403,14 @@ function AuthScreen() {
 // le nouvel utilisateur en 3 étapes (installer l'extension, se connecter sur
 // Vinted, revenir). Disparaît d'elle-même dès qu'un compte est capté.
 function Onboarding({ setTab }) {
+  // L'étape 1 se VÉRIFIE : l'extension se signale à l'app (bridge.js). Cocher
+  // « fait » soi-même n'apprend rien ; savoir qu'elle répond, si.
+  const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
   const steps = [
-    { n:1, t:'Installe l\'extension Chrome', d:'« Shop Cancale35 – Vinted Sync » (mode développeur). Elle synchronise tes données Vinted en toute discrétion, sans jamais toucher à ton mot de passe.' },
+    { n:1, t:'Installe l\'extension Chrome', ok: ext.on,
+      d: ext.on ? `Elle répond sur cette page${ext.v ? ` (version ${ext.v})` : ''} — étape faite.`
+                : '« Shop Cancale35 – Vinted Sync » (mode développeur). Elle synchronise tes données Vinted en toute discrétion, sans jamais toucher à ton mot de passe. Sur téléphone, il n\'y a pas d\'extension : installe-la sur l\'ordinateur.' },
     { n:2, t:'Connecte-toi sur vinted.fr', d:'Ouvre ta boutique une fois, connecté. L\'extension capte automatiquement ton compte et tes annonces — aucune manip supplémentaire.' },
     { n:3, t:'Reviens ici', d:'Tes annonces, ventes, achats et messages apparaissent tout seuls. Mets un numéro sur chaque paire pour la retrouver au garage et sur le bordereau.' },
   ];
@@ -3401,7 +3427,7 @@ function Onboarding({ setTab }) {
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           {steps.map(s=>(
             <div key={s.n} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
-              <div style={{flexShrink:0,width:32,height:32,borderRadius:999,background:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>{s.n}</div>
+              <div style={{flexShrink:0,width:32,height:32,borderRadius:999,background:s.ok?INV_STATUS.online.color:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>{s.ok?'✓':s.n}</div>
               <div style={{minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text}}>{s.t}</div>
                 <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>{s.d}</div>
@@ -15400,6 +15426,8 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
       <Row icon="link" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
+      <div style={{height:8}}/>
+      <ConnexionsSetting/>
 
       {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
@@ -15827,6 +15855,70 @@ function PushSetting() {
 // il ne doit jamais partir dans la ligne Supabase partagée. Il reste sur CET
 // appareil. Le mieux reste la variable d'environnement Vercel (AI_API_KEY) —
 // ce champ est le raccourci « je veux tester tout de suite » pour Julien.
+// ── ÉTAT DES CONNEXIONS ───────────────────────────────────────────────────────
+// « Est-ce que ça capte ? » n'avait aucune réponse dans l'app : il fallait lire
+// la base à la main. Trois voies alimentent VRM, chacune peut tomber seule —
+// l'extension (annonces, ventes, achats), les comptes Vinted (jetons captés),
+// les emails (bordereaux, colis, factures). On les montre côte à côte.
+// ⚠️ Lecture en SCALAIRES uniquement (`select=id,updated_at`) : les lignes
+// d'emails portent des PDF en base64, un `select=data` ici referait le trou
+// d'égress d'août (§34).
+function ConnexionsSetting() {
+  const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  const [mail, setMail] = useState(null);   // { ts, n } | 'vide' | null = en cours
+  const [capt, setCapt] = useState(null);   // { ts, n }
+  useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  useEffect(() => { (async () => {
+    const lire = async (motif) => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${motif}&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
+        if (!r.ok) return null;
+        const rows = await r.json();
+        let ts = 0; rows.forEach(x => { const t = harvestTs(x) || 0; if (t > ts) ts = t; });
+        return { n: rows.length, ts };
+      } catch (_) { return null; }
+    };
+    setMail(await lire('email_*') || 'vide');
+    setCapt(await lire('harvest_*') || 'vide');
+  })(); }, []);
+  const depuis = (ts) => {
+    if (!ts) return 'jamais';
+    const h = (Date.now() - ts) / 3600000;
+    return h < 1 ? "il y a moins d'une heure" : h < 48 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`;
+  };
+  // Vert < 2 j, orange < 7 j, rouge au-delà — même échelle que l'écran Santé de
+  // l'extension, pour qu'un même état ne porte pas deux couleurs différentes.
+  const teinte = (ts) => !ts ? C.muted : (Date.now() - ts) < 2 * 864e5 ? INV_STATUS.online.color
+                       : (Date.now() - ts) < 7 * 864e5 ? C.warn : C.danger;
+  const Ligne = ({ t, etat, coul, d }) => (
+    <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
+      <span style={{flexShrink:0,width:9,height:9,borderRadius:999,background:coul,marginTop:5}}/>
+      <div style={{minWidth:0,flex:'1 1 140px'}}>
+        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color:coul}}>· {etat}</span></div>
+        <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>État des connexions</div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>Ce qui alimente l'app, et depuis quand.</div>
+      <Ligne t="Extension Chrome" coul={ext.on ? INV_STATUS.online.color : C.warn}
+        etat={ext.on ? (ext.v ? `version ${ext.v}` : 'détectée') : 'pas détectée ici'}
+        d={ext.on ? "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."
+                  : "Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions."}/>
+      <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
+        etat={capt === 'vide' || !capt ? 'inconnue' : `dernière ${depuis(capt.ts)}`}
+        d={capt && capt.ts && (Date.now() - capt.ts) > 2 * 864e5
+            ? "Repasse sur vinted.fr avec l'extension — c'est la navigation qui capte."
+            : "Annonces, ventes, achats et messages viennent de là."}/>
+      <Ligne t="Emails" coul={teinte(mail && mail.ts)}
+        etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
+        d="Bordereaux, suivi des colis et codes de retrait arrivent par email — Vinted ne les donne pas autrement."/>
+    </div>
+  );
+}
+
 function AiKeySetting() {
   const [key, setKey] = useState(() => load('vrm_ai_key', ''));
   const [ready, setReady] = useState(null); // null = inconnu, true/false = clé serveur présente ?

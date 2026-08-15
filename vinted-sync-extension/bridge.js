@@ -11,8 +11,17 @@
 
   // Signale a l'app que l'extension est presente (pour afficher/activer les
   // boutons d'action). On le renvoie au chargement et sur demande ('ping').
-  const announce = () => { try { window.postMessage({ __vmr: 'ready' }, '*'); } catch (_) {} };
+  // On joint la VERSION : l'app peut alors dire « extension 5.12 détectée »
+  // plutôt que « détectée » — après un rechargement dans Chrome, c'est la seule
+  // façon de vérifier de visu que c'est bien la nouvelle qui tourne.
+  const version = (() => { try { return chrome.runtime.getManifest().version; } catch (_) { return ''; } })();
+  const announce = () => { try { window.postMessage({ __vmr: 'ready', version }, '*'); } catch (_) {} };
   announce();
+  // L'app peut se charger APRÈS nous : sans ces rappels, son écouteur n'existe
+  // pas encore quand on annonce, et elle croit l'extension absente pour toujours.
+  document.addEventListener('DOMContentLoaded', announce);
+  setTimeout(announce, 800);
+  setTimeout(announce, 2500);
 
   window.addEventListener('message', (ev) => {
     if (ev.source !== window) return;

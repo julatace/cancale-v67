@@ -403,7 +403,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // refiler un jeton et ecrire sous le compte de quelqu'un d'autre.
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
       const from = (sender && sender.origin) || (sender && sender.url) || '';
-      const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|vrm\.center)/.test(from);
+      const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(from);
       if (!trusted) { sendResponse({ ok: false, error: 'origine non autorisee' }); return true; }
       saveSession(msg.session || null).then(() => sendResponse({ ok: true }));
       return true;
@@ -1816,7 +1816,7 @@ async function markPickupDone(key, done) {
 // reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
 // RIEN sur Vinted : Julien relit, choisit, adapte et envoie LUI-MÊME (assistance
 // stricte, conforme). La clé de l'IA reste côté serveur (Vercel), jamais ici.
-const VRM_APP_API = 'https://cancale-v67-ten.vercel.app';
+const VRM_APP_API = 'https://vrm.center';
 async function aiReply(message, article, price) {
   try {
     const r = await fetch(`${VRM_APP_API}/api/ai`, {

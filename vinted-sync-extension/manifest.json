@@ -1,9 +1,16 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "5.11.0",
+  "version": "5.12.0",
   "description": "Synchronise tes comptes et donnees Vinted (annonces detaillees, ventes, achats, messages) vers VRM, depuis TON navigateur. + Panneau VRM sur Vinted (numero de la paire, prix achat, case garage, paires a relancer - affichage seul). + Assistant Leboncoin : prepare tes annonces (titre, description, prix, categorie, photos) et remplit le formulaire de depot des qu'il s'affiche, pour que tu n'aies plus qu'a relire et publier. Aucune publication automatique : c'est toi qui cliques sur Publier.",
-  "permissions": ["cookies", "storage", "alarms", "scripting", "tabs", "downloads"],
+  "permissions": [
+    "cookies",
+    "storage",
+    "alarms",
+    "scripting",
+    "tabs",
+    "downloads"
+  ],
   "host_permissions": [
     "https://*.vinted.fr/*",
     "https://*.vinted.com/*",
@@ -13,9 +20,13 @@
     "https://*.leboncoin.fr/*",
     "https://lgonxzrzjcqthjtbdpzo.supabase.co/*",
     "https://cancale-v67-ten.vercel.app/*",
-    "https://vrm.center/*"
+    "https://vrm.center/*",
+    "https://cancale-v67.vercel.app/*",
+    "https://www.vrm.center/*"
   ],
-  "background": { "service_worker": "background.js" },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -24,7 +35,9 @@
         "https://*.vinted.it/*",
         "https://*.vinted.de/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -35,36 +48,52 @@
         "https://*.vinted.it/*",
         "https://*.vinted.de/*"
       ],
-      "js": ["vinted-panel.js"],
+      "js": [
+        "vinted-panel.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": [
         "https://cancale-v67-ten.vercel.app/*",
-        "https://cancale-v67.vercel.app/*"
+        "https://cancale-v67.vercel.app/*",
+        "https://vrm.center/*",
+        "https://www.vrm.center/*"
       ],
-      "js": ["bridge.js"],
+      "js": [
+        "bridge.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
-      "matches": ["https://*.leboncoin.fr/*"],
-      "js": ["lbc-inject.js"],
+      "matches": [
+        "https://*.leboncoin.fr/*"
+      ],
+      "js": [
+        "lbc-inject.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN",
       "all_frames": false
     },
     {
-      "matches": ["https://*.leboncoin.fr/*"],
-      "js": ["lbc.js"],
+      "matches": [
+        "https://*.leboncoin.fr/*"
+      ],
+      "js": [
+        "lbc.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["inject.js"],
+      "resources": [
+        "inject.js"
+      ],
       "matches": [
         "https://*.vinted.fr/*",
         "https://*.vinted.com/*",
@@ -73,9 +102,16 @@
       ]
     },
     {
-      "resources": ["lbc-inject.js"],
-      "matches": ["https://*.leboncoin.fr/*"]
+      "resources": [
+        "lbc-inject.js"
+      ],
+      "matches": [
+        "https://*.leboncoin.fr/*"
+      ]
     }
   ],
-  "action": { "default_popup": "popup.html", "default_title": "Shop Cancale35 - Vinted Sync" }
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Shop Cancale35 - Vinted Sync"
+  }
 }
