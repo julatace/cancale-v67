@@ -3,6 +3,11 @@
 // Avant, il listait seulement les comptes captés — donc on croyait que tout
 // allait bien alors que les annonces d'un compte pouvaient dater de 25 jours.
 const JOUR = 86400000;
+// Un pseudo Vinted est du texte fourni par un tiers : il n'entre jamais dans du
+// HTML sans être échappé, sinon un pseudo bien choisi casse (ou détourne) la
+// fenêtre de l'extension.
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 
 function age(ms) {
   if (!ms) return { txt: 'jamais', etat: 'off' };
@@ -27,7 +32,7 @@ function render(list, lastSync, fresh) {
     acc.innerHTML = '<div class="row"><span class="dot off"></span>Aucun compte détecté — connecte-toi sur vinted.fr</div>';
   } else {
     acc.innerHTML = list.map(a =>
-      `<div class="row"><span class="dot"></span><span class="nom">${nomDe[String(a.uid)] || 'compte ' + a.uid}</span><span class="age">${(a.domain || '').replace(/^www\./, '')}</span></div>`
+      `<div class="row"><span class="dot"></span><span class="nom">${esc(nomDe[String(a.uid)] || 'compte ' + a.uid)}</span><span class="age">${esc((a.domain || '').replace(/^www\./, ''))}</span></div>`
     ).join('');
   }
 
@@ -41,7 +46,7 @@ function render(list, lastSync, fresh) {
       const vide = !(r.n || 0);
       const etat = vide ? '' : a.etat;           // pas d'alerte rouge sur un compte sans annonce
       const info = vide ? 'aucune annonce' : `${r.n} annonces · ${a.txt}`;
-      return `<div class="row"><span class="dot ${etat === 'ok' ? '' : etat}"></span><span class="nom">${r.login || '#' + r.uid}</span><span class="age">${info}</span></div>`;
+      return `<div class="row"><span class="dot ${etat === 'ok' ? '' : etat}"></span><span class="nom">${esc(r.login || '#' + r.uid)}</span><span class="age">${esc(info)}</span></div>`;
     }).join('');
     // Un compte SANS AUCUNE ANNONCE (0) n'a rien a rafraichir : le compter
     // comme « annonces qui datent » faisait crier « 25 jours » alors que tous
@@ -64,7 +69,6 @@ function render(list, lastSync, fresh) {
 // sépare pas les vendeurs (colonne `owner` + RLS), se connecter ne cloisonne
 // RIEN — ça prépare, ça ne protège pas encore. Promettre l'inverse serait
 // exactement le genre de mensonge qui fait fuiter des données.
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function rendreAuth(e) {
   const box = document.getElementById('auth');

@@ -1721,3 +1721,15 @@ Deux fois cette année, une erreur de rendu a vidé la page entière — barre d
 `load()` rendait tel quel ce qu'il trouvait : une clé corrompue (écriture interrompue, import bancal) rendait une **chaîne** là où l'app attend une liste, et le premier `.filter` faisait écran blanc — **avant** que le garde-fou d'écran existe, puisque la lecture a lieu dans l'état initial du composant racine. `load` vérifie maintenant que la forme correspond à la valeur par défaut, sinon défaut + avertissement en console. Vérifié : `vinted_invoices` corrompue → l'écran Factures s'affiche normalement au lieu de tout faire tomber.
 
 **État final vérifié** : 12 écrans rendus sur les vraies données, **0 erreur de page, 0 artefact d'affichage** ; panneau d'extension, **tous les onglets déclarés** (recherche, coffre, litiges, ventes… ) sans erreur — les 2 « échecs » du banc sont les artefacts connus (clic sur un élément filtré `display:none`, onglet « réponse » qui n'existe que sur une page de conversation).
+
+### 5.14 (suite) — trois défauts trouvés en TESTANT le correctif précédent
+
+**7. Le résumé des commandes classait 7 ventes en « colis à retirer ».** En comparant le résumé au calcul de l'app sur les vraies commandes, l'écart a sauté aux yeux : 0 côté app, 7 côté résumé. Cause — `resumeCommandes` acceptait tout type commençant par `orders`, donc aussi les vieilles lignes génériques (`orders_bought`, `orders_all`) dont le contenu **mélange ventes et achats** (§25). Restreint aux deux clés canoniques exactes. **Re-mesuré : 4 à expédier / 0 à retirer, identiques à l'app, transaction par transaction.** ⚠️ C'est le test qui a trouvé le bug, pas la relecture — un résumé faux aurait fait clignoter le widget pour des colis inexistants.
+
+**8. 114 € invisibles dans le porte-monnaie, et un solde écrasé par une réponse sans rapport.** Les 8 lignes `harvest_*_billing` réelles ont **trois formes** : `{main, escrow}` (le porte-monnaie), `{balance, history, reference}` (la lecture `payouts` ajoutée en 4.26) — **que l'app ne lisait pas**, donc 114,36 € jamais comptés — et une réponse de tarification (`minimum_price`) rangée là par erreur, qui avait **remplacé** le vrai solde d'un compte (il n'y a qu'une ligne par compte : la dernière réponse gagne, même piège que le dressing partiel de §5.13).
+- L'app lit maintenant `escrow` **ou** `balance`, et ignore ce qui ne porte aucun montant. **Mesuré : 675,43 € sur 5 comptes → 789,79 € sur 7.**
+- L'extension refuse d'écrire une ligne `billing` qui n'est pas un porte-monnaie (`estPorteMonnaie`), des deux côtés (capture passive et moisson active — cette dernière jetait au passage la lecture `payouts`, qui ne portait pas `main`/`escrow`).
+
+**9. Le service worker mettait `/api/` en cache.** Règle « cache d'abord » pour tout GET de même origine hors navigation : `/api/ai` (« la clé IA est-elle configurée ? ») et toute future route GET restaient **figées pour toujours** sur leur première réponse. `/api/` passe désormais toujours par le réseau.
+
+**Aussi** : la fenêtre de l'extension insérait les pseudos Vinted dans du HTML **sans les échapper** — un pseudo bien choisi cassait (ou détournait) l'affichage. Échappés.

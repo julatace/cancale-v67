@@ -113,6 +113,12 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // ⚠️ JAMAIS DE CACHE SUR /api/. Ces routes répondent à des questions dont la
+  // réponse change (la clé IA est-elle configurée ? les chiffres du widget) :
+  // mises en cache par la règle 3 ci-dessous — même origine, GET, non-navigation
+  // — elles seraient figées pour toujours sur leur première réponse.
+  if (url.pathname.startsWith('/api/')) return;
+
   // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 

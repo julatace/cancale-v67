@@ -1069,7 +1069,20 @@ const fetchWalletEscrow = async () => {
     if (!res.ok) return { total: 0, accounts: 0 };
     const rows = await res.json();
     let total = 0, accounts = 0;
-    for (const r of rows) { const p = (r.data || {}).payload || {}; const e = p.escrow && p.escrow.amount; if (e != null) { const n = parseFloat(e); if (!isNaN(n)) { total += n; accounts++; } } }
+    // ⚠️ TROIS FORMES DIFFÉRENTES en base, vérifiées sur les 8 lignes réelles :
+    // le porte-monnaie classique `{main, escrow}` (5 lignes), la réponse de
+    // `payouts` `{balance, history, reference}` ajoutée en 4.26 (2 lignes, dont
+    // une à 114,36 €) — qu'on ne lisait PAS, donc de l'argent invisible — et une
+    // réponse qui n'a rien à voir (`minimum_price`, rangée là par erreur) qu'il
+    // faut ignorer plutôt que compter pour zéro.
+    for (const r of rows) {
+      const p = (r.data || {}).payload || {};
+      const brut = (p.escrow && p.escrow.amount) != null ? p.escrow.amount
+                 : (p.balance && p.balance.amount) != null ? p.balance.amount : null;
+      if (brut == null) continue;                       // pas un porte-monnaie
+      const n = parseFloat(brut);
+      if (!isNaN(n)) { total += n; accounts++; }
+    }
     return { total, accounts };
   } catch (_) { return { total: 0, accounts: 0 }; }
 };

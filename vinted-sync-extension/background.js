@@ -376,6 +376,12 @@ async function storeHarvest(domain, type, id, body) {
     noterDiag('ignore_dressing_partiel');
     return;
   }
+  // ⚠️ MÊME PIÈGE QUE LE DRESSING, SUR LE PORTE-MONNAIE. Le motif « billing » de
+  // `inject.js` attrape aussi des réponses de tarification : l'une d'elles
+  // (`minimum_price`) avait REMPLACÉ le vrai solde d'un compte — il n'y a qu'une
+  // ligne `harvest_{uid}_billing`, donc la dernière réponse gagne. On n'écrit
+  // que ce qui porte vraiment un montant de porte-monnaie.
+  if (type === 'billing' && !estPorteMonnaie(parsed)) { noterDiag('ignore_billing_hors_sujet'); return; }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   if (type === 'listings') data.nItems = ((parsed && parsed.items) || []).length;
   data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
@@ -995,13 +1001,22 @@ function alleger(type, payload) {
 // capture. ⚠️ Les deux tests de statut sont la COPIE EXACTE de ceux de l'app
 // (`isAwaitingShipStatus` / `isAtRelayStatus`) : deux règles différentes pour la
 // même notion, c'est la garantie de deux chiffres qui se contredisent.
+// Un porte-monnaie porte un montant : `{main,escrow}` (solde) ou `{balance}`
+// (versements). Tout le reste qui passe par le motif « billing » n'en est pas un.
+const estPorteMonnaie = (p) => !!(p && ((p.main && p.main.amount != null) || (p.escrow && p.escrow.amount != null) || (p.balance && p.balance.amount != null) || p.main || p.escrow));
+
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
 function resumeCommandes(type, payload) {
-  if (!/^orders/.test(type || '')) return null;
+  // ⚠️ EXACTEMENT `orders_sold` ou `orders_purchased`, jamais une ligne
+  // générique. Une réponse `/my_orders` sans `?type=` MÉLANGE ventes et achats
+  // (§25) : mesuré sur la vraie base, un `/^orders/` laxiste faisait passer 7
+  // ventes anciennes pour des colis « à retirer ». Ces lignes ne sont plus
+  // écrites, mais elles existent encore en base.
+  const vente = type === 'orders_sold';
+  if (!vente && type !== 'orders_purchased') return null;
   const cmds = (payload && payload.my_orders) || [];
   if (!Array.isArray(cmds)) return null;
-  const vente = /sold/.test(type);
   const txns = [];
   for (const o of cmds) {
     if (!o) continue;
@@ -1300,7 +1315,9 @@ async function pageActiveFetch() {
   if (plein(out.bought, 'my_orders')) { await storeHarvestRow(uid, 'orders_purchased', out.bought, domain); stored = true; }
   if (plein(out.inbox, 'conversations')) { await storeHarvestRow(uid, 'inbox', out.inbox, domain); stored = true; }
   // Le solde n'est pas une liste : on le range des qu'il porte un montant.
-  if (out.wallet && (out.wallet.main || out.wallet.escrow)) { await storeHarvestRow(uid, 'billing', out.wallet, domain); stored = true; }
+  // `payouts` renvoie `{balance}` là où le porte-monnaie renvoie `{main,escrow}` :
+  // sans ce troisième cas, la lecture ajoutée en 4.26 était jetée à l'arrivée.
+  if (estPorteMonnaie(out.wallet)) { await storeHarvestRow(uid, 'billing', out.wallet, domain); stored = true; }
   if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
   return stored;
 }
