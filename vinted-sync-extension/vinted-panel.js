@@ -2686,15 +2686,22 @@
       chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'coffre' }, (r) => { coffreBusy = false; coffre = (r && r.ok && r.items) || []; render(); });
     }
     const photosDe = (o) => { const c = coffrePour(o); return c ? (c.photos || []).length : 0; };
-    const pretes = list.filter(o => o.desc && photosDe(o) > 0).length;
+    // Combien l'annonce en a vraiment (coffre, sinon le compteur du dressing) :
+    // dire « prête · 📸1 » pour une annonce qui a six photos, c'est faire
+    // découvrir le problème une fois lancé — exactement ce qu'on veut éviter.
+    const photosReelles = (o) => { const c = coffrePour(o); return Number((c && c.nPhotos) || o.nPhotosVinted) || 0; };
+    const photosCompletes = (o) => { const n = photosDe(o), r = photosReelles(o); return n > 0 && (!r || n >= r); };
+    const pretes = list.filter(o => o.desc && photosCompletes(o)).length;
     const reasonsOf = (o) => {
       const r = [];
       if (isRepubRecent(o.id)) r.push({ t: '✓ republiée', c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' });
-      const np = photosDe(o);
-      if (o.desc && np) r.push({ t: `prête · ✍️ 📸${np}`, c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' });
-      else if (!o.desc && !np) r.push({ t: 'texte + photos à capter', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
-      else if (!o.desc) r.push({ t: 'texte à capter', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
-      else r.push({ t: 'photos à capter', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
+      const np = photosDe(o), nr = photosReelles(o), okPh = photosCompletes(o);
+      const VERT = { c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' }, ORANGE = { c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' };
+      if (o.desc && okPh) r.push(Object.assign({ t: `prête · ✍️ 📸${np}` }, VERT));
+      else if (!o.desc && !np) r.push(Object.assign({ t: 'texte + photos à capter' }, ORANGE));
+      else if (!o.desc && !okPh) r.push(Object.assign({ t: `texte + ${nr ? `${np}/${nr} photos` : 'photos'}` }, ORANGE));
+      else if (!o.desc) r.push(Object.assign({ t: 'texte à capter' }, ORANGE));
+      else r.push(Object.assign({ t: nr ? `📸 ${np}/${nr} photos` : 'photos à capter' }, ORANGE));
       if (sleepIds.has(String(o.id))) r.push({ t: `😴 ${o.ageDays} j`, c: '#2b5b9a', bg: '#eef4ff', bd: '#c9dbf7' });
       if (relIds.has(String(o.id))) r.push({ t: '💡 à relancer', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
       if (overOf(o)) r.push({ t: '📊 trop cher', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });

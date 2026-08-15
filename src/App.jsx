@@ -2018,7 +2018,13 @@ const mapWardrobeItem = (it) => ({
   // Qualité d'annonce (défensif : selon ce que la penderie renvoie). Nb de photos
   // et longueur de description — null si Vinted ne le fournit pas (on ne signale
   // alors rien, pour éviter les faux positifs).
-  photoCount: Array.isArray(it.photos) ? it.photos.length : (it.photo ? 1 : null),
+  // ⚠️ `it.nPhotos` D'ABORD. L'allègement de la moisson (§23) ne garde qu'une
+  // photo par annonce : sans ce compteur, TOUTES les annonces moissonnées
+  // ressortaient à « 1 seule photo » — 15 points retirés à chacune dans la note
+  // d'annonce, et le conseil « ajoute des photos » servi à des annonces qui en
+  // ont six. L'extension pose maintenant le vrai nombre.
+  photoCount: Number.isFinite(it.nPhotos) ? it.nPhotos
+            : (Array.isArray(it.photos) ? it.photos.length : (it.photo ? 1 : null)),
   descLen: typeof it.description === 'string' ? it.description.trim().length : null,
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),

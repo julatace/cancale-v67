@@ -295,6 +295,12 @@ async function storeHarvest(domain, type, id, body) {
   // storeHarvestRow : l'allegement doit donc etre applique ICI AUSSI, sinon la
   // moisson faite en naviguant reste enorme (7 Mo d'annonces) alors que celle
   // faite activement est allegee. Meme fonction, un seul comportement.
+  // ⚠️ On garde le brut SOUS LA MAIN pour le coffre : le dressing complet porte
+  // TOUTES les URL de photos de chaque annonce, et l'allègement n'en laisse
+  // qu'une. Or republier demande toutes les photos. La ligne moissonnée reste
+  // légère (c'est elle qui repart à chaque lecture, §34), et les URL vont dans
+  // le coffre — une ligne par annonce, lue seulement quand on republie.
+  const brut = parsed;
   parsed = alleger(type, parsed);
 
   // ⚠️⚠️ ON NE REMPLACE JAMAIS UN DRESSING PAR UN PLUS PAUVRE.
@@ -337,7 +343,7 @@ async function storeHarvest(domain, type, id, body) {
   // lectures + 200 écritures à chaque chargement du dressing. C'est la faute
   // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
   if (type === 'listings') {
-    try { await archiverLot(uid, ((parsed && parsed.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
   }
 
   // Le profil contient le vrai id de profil (different de l'account_id, utile
@@ -848,6 +854,14 @@ function articleMaigre(it) {
   const o = {};
   for (const c of CHAMPS_ARTICLE) if (it[c] !== undefined) o[c] = it[c];
   const ph = photoUtile(it); if (ph) o.photo = ph;
+  // ⚠️ COMBIEN de photos, pas lesquelles. L'allègement (§23) ne garde qu'une
+  // photo par annonce — l'app en déduisait « 1 seule photo » pour TOUTES les
+  // annonces (mapWardrobeItem comptait it.photos, absent), retirait 15 points
+  // à chacune dans la note d'annonce et conseillait « ajoute des photos » à
+  // des annonces qui en ont six. Un entier par article coûte trois octets et
+  // rend le diagnostic honnête. Les URL, elles, vont au coffre (archiverLot).
+  if (Array.isArray(it.photos)) o.nPhotos = it.photos.length;
+  else if (o.photo) o.nPhotos = 1;
   return o;
 }
 
@@ -883,6 +897,13 @@ function alleger(type, payload) {
 }
 
 async function storeHarvestRow(uid, type, payload, domain) {
+  // ⚠️ LA MOISSON ACTIVE N'ALIMENTAIT PAS LE COFFRE. « 🔄 Tout recapter » va
+  // chercher le dressing COMPLET (toutes les pages) — et jetait tout au coffre
+  // près : seule la voie passive archivait. C'est pour ça que le coffre plafonne
+  // à 25 annonces quand 112 sont en ligne, donc que « Republier » n'a ni texte
+  // ni photos pour la plupart des paires. On archive depuis le payload BRUT
+  // (l'allègement ci-dessous ne laisse qu'une photo par annonce).
+  const brut = payload;
   payload = alleger(type, payload);
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
@@ -899,6 +920,9 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
+  if (type === 'listings') {
+    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+  }
 }
 
 // Recupere TOUTES les pages du dressing. Vinted plafonne per_page a ~96 : sans
@@ -1504,7 +1528,16 @@ function coffreRecord(uid, it, fiche) {
   const photos = [];
   const push = (u) => { const s = String(u || ''); if (s && !photos.includes(s)) photos.push(s); };
   if (Array.isArray(f.photos)) for (const p of f.photos) push(p && (p.full_size_url || p.url));
+  // ⚠️ Le DRESSING porte lui aussi toutes les photos de l'annonce. On ne les
+  // lisait pas (seulement `it.photo`, la vignette) : le coffre gardait UNE
+  // photo pour une annonce qui en a six, et republier repartait quasi nu.
+  if (Array.isArray(it && it.photos)) for (const p of it.photos) push(p && (p.full_size_url || p.url));
   push(it && it.photo && (it.photo.url || it.photo));
+  // Combien l'annonce en a VRAIMENT (même quand on n'a pas pu toutes les lire) :
+  // sert à dire « 2 photos sur 6 » plutôt que de faire croire au compte complet.
+  const nReel = (Array.isArray(f.photos) && f.photos.length)
+             || (Array.isArray(it && it.photos) && it.photos.length)
+             || (it && it.nPhotos) || photos.length || 0;
   return {
     id: String((it && it.id) || f.id || ''),
     uid: String(uid || ''),
@@ -1517,6 +1550,7 @@ function coffreRecord(uid, it, fiche) {
     price: (f.price && f.price.amount != null) ? f.price.amount
          : ((it && it.price && it.price.amount != null) ? it.price.amount : (it && it.price) ?? null),
     photos,
+    nPhotos: Number(nReel) || photos.length || 0,
     url: String((it && it.url) || f.url || ''),
     savedAt: new Date().toISOString(),
   };
@@ -1537,6 +1571,7 @@ async function archiverAnnonce(uid, it, fiche) {
       if (!rec.etat && anc.etat) rec.etat = anc.etat;
       if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
       for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.nPhotos = Math.max(Number(rec.nPhotos) || 0, Number(anc.nPhotos) || 0, rec.photos.length);
       rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
     } else rec.firstSavedAt = rec.savedAt;
     return await supabaseUpsert('app_data', [{ id: `coffre_${rec.uid}_${rec.id}`, data: rec }], 'id');
@@ -1585,10 +1620,12 @@ async function archiverLot(uid, items) {
       if (!rec.etat && anc.etat) rec.etat = anc.etat;
       if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
       for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.nPhotos = Math.max(Number(rec.nPhotos) || 0, Number(anc.nPhotos) || 0, rec.photos.length);
       rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
       // Rien de nouveau ? on ne réécrit pas cette ligne (égress inutile).
       if (anc.title === rec.title && String(anc.price) === String(rec.price)
-          && (anc.photos || []).length === rec.photos.length && anc.desc === rec.desc) continue;
+          && (anc.photos || []).length === rec.photos.length && anc.desc === rec.desc
+          && Number(anc.nPhotos) === Number(rec.nPhotos)) continue;
     } else rec.firstSavedAt = rec.savedAt;
     out.push({ id: `coffre_${uid}_${rec.id}`, data: rec });
   }
@@ -1941,6 +1978,10 @@ async function buildPanelData() {
         size: String(it.size_title || '').trim(),
         hasDesc: !!(pageDetails[id] && pageDetails[id].description),
         nPhotos: (pageDetails[id] && (pageDetails[id].photos || []).length) || 0,
+        // Combien de photos l'annonce a VRAIMENT sur Vinted (≠ combien on en a
+        // gardées) : c'est ce qui permet de dire « 2 sur 6 » au lieu de laisser
+        // croire que le coffre est complet.
+        nPhotosVinted: Number(it.nPhotos) || (Array.isArray(it.photos) ? it.photos.length : 0) || 0,
       });
     }
   }

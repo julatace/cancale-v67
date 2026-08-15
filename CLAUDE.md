@@ -1604,3 +1604,25 @@ Les deux ne se parlaient pas. `coffreRecord` n'attendait la description que d'un
 - **Le panneau dit ce qui est prêt AVANT de lancer le défilement** : bandeau « N paires prêtes à republier · M incomplètes » en tête de Republier + une pastille par ligne (`prête · ✍️ 📸N` / `texte à capter` / `photos à capter` / `texte + photos à capter`). Le frein n'a jamais été de cocher des cases, c'est de découvrir en cours de route qu'il faut tout retaper. Pour les incomplètes, la marche à suivre est écrite : **ouvrir l'annonce une fois sur Vinted**, le panneau capte au passage.
 
 **Vérifié au banc** (§35) : bandeau rendu (« 1 paire prête à republier · 1 incomplète »), badges corrects sur les deux lignes (`prête · ✍️ 📸2` / `texte + photos à capter`), les 4 étapes du défilement inchangées, **0 erreur page/console**. `node --check` OK sur les deux fichiers.
+
+---
+
+## 5.11 — LE COFFRE NE POUVAIT PAS SE REMPLIR (3 défauts qui s'additionnent)
+
+Mesuré en base avant de coder : **112 annonces en ligne, 25 au coffre**. Ce n'est pas un problème de capture — c'est que trois chemins jetaient la donnée.
+
+### 1. La moisson ACTIVE n'archivait rien
+`archiverLot` n'était appelé que par `storeHarvest` (voie **passive**). Or « 🔄 Tout recapter » (§5.09) passe par **`storeHarvestRow`** et récupère le dressing **complet, toutes les pages** — le meilleur moment pour remplir le coffre. Il n'y déposait rien. `storeHarvestRow` archive maintenant lui aussi.
+
+### 2. Le coffre gardait UNE photo par annonce
+Deux causes cumulées :
+- `coffreRecord` ne lisait le tableau `photos` que de la **fiche** ; du dressing il ne prenait que `it.photo` (la vignette). Or **98 des 112 annonces en ligne portent leur tableau `photos` complet** dans la moisson — il était ignoré. Il est lu.
+- Pire : `storeHarvest` **allégeait `parsed` AVANT** d'archiver (§23 ne garde qu'une photo), donc le coffre ne voyait déjà plus rien. On garde le **brut** sous la main pour le coffre ; la ligne moissonnée reste légère (c'est elle qui repart à chaque lecture, §34), les URL vont au coffre — une ligne par annonce, lue seulement quand on republie.
+
+### 3. ⚠️ L'app accusait CHAQUE annonce de n'avoir « 1 seule photo »
+`mapWardrobeItem` calculait `photoCount` sur `it.photos` — supprimé par l'allègement — et retombait sur `it.photo ? 1 : null`. Donc **toutes** les annonces moissonnées ressortaient à une photo : **−15 points** dans `scoreAnnonce` pour chacune, et le conseil « ajoute des photos » servi à des annonces qui en ont six. `articleMaigre` pose désormais **`nPhotos`** (un entier, trois octets) et l'app le lit en premier.
+
+### Le panneau ne fait plus croire au compte complet
+`photosCompletes(o)` compare les photos **gardées** aux photos **réelles** (`coffre.nPhotos`, sinon `nPhotosVinted` du dressing). Une paire dont le coffre n'a que 2 photos sur 6 n'est plus « prête » : elle porte **`📸 2/6 photos`**. « Prête » veut dire prête.
+
+**Vérifié au banc** (§35, 3 paires : complète / rien / texte OK mais 2 photos sur 6) : bandeau « 1 paire prête à republier · 2 incomplètes », badges `prête · ✍️ 📸2` / `texte + photos à capter` / `📸 2/6 photos`, les 4 étapes du défilement inchangées, **0 erreur page/console**. `npm run build` OK, `node --check` OK sur les deux fichiers.
