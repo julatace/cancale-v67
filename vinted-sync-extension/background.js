@@ -1551,10 +1551,32 @@ async function archiverLot(uid, items) {
   const rows = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id,data`) || [];
   const anciens = {};
   for (const r of rows) { const d = r && r.data; if (d && d.id) anciens[String(d.id)] = d; }
+  // ⚠️ LE COFFRE IGNORAIT LE SEUL ENDROIT OÙ LE TEXTE EXISTE VRAIMENT.
+  // Mesuré le 15 août : coffre = 25 annonces, **0 avec description** ; en face,
+  // `vinted_item_details` (les fiches lues sur la PAGE de l'annonce, écrites
+  // par le panneau) = 23 fiches, **23 avec description ET photos HD**. Les deux
+  // magasins ne se parlaient pas : `coffreRecord` n'attendait la description
+  // que d'une fiche d'API (`harvest_*_item_*`) qui ne se range quasiment
+  // jamais (§46). Résultat : « Republier » n'avait ni texte ni photos alors
+  // que les deux étaient en base.
+  let pages = {};
+  try {
+    const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+    pages = (dr && dr[0] && dr[0].data) || {};
+  } catch (_) { pages = {}; }
+  const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
   const out = [];
   for (const it of items.slice(0, 300)) {
     const rec = coffreRecord(uid, it, null);
     if (!rec.id) continue;
+    // Ce que la page de l'annonce a livré : le vrai texte du vendeur + les
+    // photos en grand. On complète, on n'écrase jamais une source plus riche.
+    const p = pages[String(rec.id)];
+    if (p) {
+      const t = String(p.description || '').trim();
+      if (!rec.desc && t.length > 15 && !PUB.test(t)) rec.desc = t;
+      for (const u of (p.photos || [])) if (u && !rec.photos.includes(u)) rec.photos.push(u);
+    }
     const anc = anciens[rec.id];
     if (anc) {
       if (!rec.desc && anc.desc) rec.desc = anc.desc;

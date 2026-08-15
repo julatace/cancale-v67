@@ -2677,9 +2677,24 @@
     const sleepIds = new Set(((DATA && DATA.sleeping) || []).map(o => String(o.id)));
     const relIds = new Set(((DATA && DATA.relance) || []).map(o => String(o.id)));
     const overOf = (o) => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15;
+    // ── PRÊTE À REPUBLIER ? ────────────────────────────────────────────────
+    // Republier = supprimer + recréer : sans le TEXTE et sans les PHOTOS, il
+    // faut tout retaper. On dit donc, paire par paire, ce qui est déjà en
+    // magasin — au lieu de le découvrir une fois lancé dans le défilement.
+    if (coffre == null && !coffreBusy) {
+      coffreBusy = true;
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'coffre' }, (r) => { coffreBusy = false; coffre = (r && r.ok && r.items) || []; render(); });
+    }
+    const photosDe = (o) => { const c = coffrePour(o); return c ? (c.photos || []).length : 0; };
+    const pretes = list.filter(o => o.desc && photosDe(o) > 0).length;
     const reasonsOf = (o) => {
       const r = [];
       if (isRepubRecent(o.id)) r.push({ t: '✓ republiée', c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' });
+      const np = photosDe(o);
+      if (o.desc && np) r.push({ t: `prête · ✍️ 📸${np}`, c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' });
+      else if (!o.desc && !np) r.push({ t: 'texte + photos à capter', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
+      else if (!o.desc) r.push({ t: 'texte à capter', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
+      else r.push({ t: 'photos à capter', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
       if (sleepIds.has(String(o.id))) r.push({ t: `😴 ${o.ageDays} j`, c: '#2b5b9a', bg: '#eef4ff', bd: '#c9dbf7' });
       if (relIds.has(String(o.id))) r.push({ t: '💡 à relancer', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
       if (overOf(o)) r.push({ t: '📊 trop cher', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
@@ -2715,6 +2730,16 @@
       ${renumBandeau()}
       ${bandeauMoment}
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
+      ${(() => {
+        // Le vrai frein n'est pas de cocher : c'est d'avoir le texte et les
+        // photos sous la main. On l'annonce avant de commencer.
+        if (!list.length) return '';
+        const manque = list.length - pretes;
+        return `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:${pretes ? '#eefaf3' : '#fff6ec'};border-color:${pretes ? '#bfe6d3' : '#ffd7a8'}">
+          <div style="font-weight:800;font-size:12.5px;color:${pretes ? '#0f6b4f' : '#9a5b16'}">${pretes} paire${pretes > 1 ? 's' : ''} prête${pretes > 1 ? 's' : ''} à republier${manque > 0 ? ` · ${manque} incomplète${manque > 1 ? 's' : ''}` : ''}</div>
+          <div class="vrm-m" style="font-size:11px;margin-top:3px">« Prête » = son texte et ses photos sont au coffre, donc tout se recolle en un tap.${manque > 0 ? " Pour les autres : <b>ouvre l'annonce sur Vinted une fois</b>, le panneau capte le texte et les photos au passage." : ''}</div>
+        </div>`;
+      })()}
       ${nDone ? `<div class="vrm-m" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding:6px 9px;border-radius:8px;background:#eefaf3;color:#0f6b4f;border:1px solid #bfe6d3"><span>✓ <b>${nDone}</b> republiée${nDone > 1 ? 's' : ''} récemment (rangées en bas)</span><button class="vrm-go" data-act="resetdone" style="border:none;background:transparent;color:#0f6b4f;font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline;flex-shrink:0">Réinitialiser</button></div>` : ''}
       ${list.length > 8 ? `<input id="vrm-repub-search" type="search" value="${esc(repubQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       <div style="display:flex;gap:6px;margin-bottom:8px">

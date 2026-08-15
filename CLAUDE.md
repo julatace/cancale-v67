@@ -1586,3 +1586,21 @@ Le compteur est lu **en scalaire** (`select=n:data->>nItems`, un entier) — jam
 La capture passive ne voit que ce que la page charge : un compte peut rester incomplet indéfiniment. Ce bouton appelle `activeFetchActiveAccount()` → dressing **complet (toutes les pages)** + ventes + achats + boîte, **pour le seul compte connecté dans ce navigateur**, depuis sa session et son IP. ⚠️ Jamais tous les comptes d'un coup : c'est la signature multi-comptes de §5. À faire une fois par compte.
 
 **Vérifié** : `node --check` sur les deux fichiers ; banc panneau → bouton rendu, message `recapter` émis, bloc comptes intact, 0 erreur ; `buildPanelData` réel relancé contre la vraie base après correctif (aucune régression).
+
+---
+
+## 5.10 — REPUBLIER : le texte et les photos étaient DÉJÀ en base, personne ne les servait
+
+Mesuré avant de coder (méthode §46 : lire la base, pas deviner) :
+
+| magasin | contenu |
+|---|---|
+| **coffre** (`coffre_{uid}_{itemId}`) | 25 annonces, **0 avec description**, 25 avec photos |
+| **`vinted_item_details`** (fiches lues sur la PAGE, écrites par le panneau) | **23 fiches, 23 avec description ET photos HD** |
+
+Les deux ne se parlaient pas. `coffreRecord` n'attendait la description que d'une **fiche d'API** (`harvest_*_item_*`) qui ne se range quasiment jamais (§46), alors que le vrai texte de Julien dormait dans `vinted_item_details` depuis des semaines. Conséquence directe : l'étape 1 de Republier (§5.07) annonçait « le texte n'est pas encore capté » et l'étape 2 n'avait aucune photo — **pour des annonces dont tout était en base**.
+
+- **`archiverLot` lit `vinted_item_details` UNE FOIS** (pas une lecture par annonce — la faute de §34) et complète chaque enregistrement : description si le coffre n'en a pas, photos HD ajoutées sans doublon. ⚠️ **On ne dégrade jamais** une source plus riche, et le filtre `PUB` (§5.08) rejette le texte marketing de Vinted que `og:description` renvoie parfois à la place de l'annonce.
+- **Le panneau dit ce qui est prêt AVANT de lancer le défilement** : bandeau « N paires prêtes à republier · M incomplètes » en tête de Republier + une pastille par ligne (`prête · ✍️ 📸N` / `texte à capter` / `photos à capter` / `texte + photos à capter`). Le frein n'a jamais été de cocher des cases, c'est de découvrir en cours de route qu'il faut tout retaper. Pour les incomplètes, la marche à suivre est écrite : **ouvrir l'annonce une fois sur Vinted**, le panneau capte au passage.
+
+**Vérifié au banc** (§35) : bandeau rendu (« 1 paire prête à republier · 1 incomplète »), badges corrects sur les deux lignes (`prête · ✍️ 📸2` / `texte + photos à capter`), les 4 étapes du défilement inchangées, **0 erreur page/console**. `node --check` OK sur les deux fichiers.
