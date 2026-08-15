@@ -1540,3 +1540,23 @@ Relevé du 15 août : **17 annonces en ligne sur 6 comptes actifs**, capture fra
 
 ### ⚠️ RÈGLE PERMANENTE — pousser à CHAQUE modification
 Julien : « à chaque fois que tu modifies quelque chose, pousse-le ». Donc : **aucune modification ne reste en local**. Chaque changement se termine par `git add -A && git commit && git push origin claude/new-session-gzdgur` — jamais de lot gardé « pour plus tard ». La branche pousse dans la **pull request #3**, qui se met à jour toute seule ; c'est la fusion de cette PR qui met en production.
+
+### 5.12 — « mets TOUTES les annonces et TOUTES les ventes » : l'écart mesuré, et un bouton
+Relevé du 15 août, compte par compte (moisson réelle) :
+
+| compte | état | annonces en ligne | ventes |
+|---|---|---|---|
+| llloollllaa | masqué | 4 | 69 |
+| tomj606 | masqué | 2 | 7 |
+| vanessa5723 | masqué | 1 | 1 |
+| **199082413 (shop_cancale)** | **retiré** | **96** | **284** |
+| julatace3535 / julatace35260 / julienf765 / tomj683 / liliand653 | actifs | 9 | 153 |
+
+➡️ **Visible dans l'app : 9 annonces / 153 ventes. Réellement capté : 112 annonces / 514 ventes.** L'écart n'est **pas** une perte de données ni un défaut de capture : ce sont trois comptes masqués (les puces tapées par erreur, §5.10) et **un compte retiré qui porte à lui seul 96 annonces et 284 ventes**.
+
+**Bouton « Tout réafficher »** (Paramètres → Comptes liés, bandeau en haut, visible **seulement** s'il y a des exclus) : vide `vinted_accounts_hidden`, vide `vinted_accounts_blocked`, et **remet à zéro `vrm_blocked_accounts`** — donc les comptes retirés reviennent, avec leurs annonces et leurs ventes. Le bandeau nomme les comptes retirés pour qu'on sache ce qu'on récupère.
+
+⚠️ Dans `VintedAccounts`, `blockedAccts` est un **`useMemo`**, pas un état : appeler un `setBlockedAccts` (qui n'existe que dans `App`) aurait planté l'écran sans que le build ne dise rien — même famille de bug qu'en §26. On écrit la clé, l'app la relit au démarrage.
+
+**Vérifié au banc** : bandeau rendu (« 1 compte est exclu… Retiré : shop_cancale »), la feuille de confirmation s'ouvre, et après confirmation `vinted_accounts_hidden` → `[]`, `vinted_accounts_blocked` → `[]`, **PATCH sur `vrm_blocked_accounts`** émis. 0 erreur de page.
+⚠️ Piège de banc : `<ConfirmHost/>` est monté **en haut** de l'arbre → le bouton de la feuille apparaît AVANT celui de la page dans le DOM. Cliquer « le dernier bouton portant ce libellé » tape sur celui de la page, derrière le voile, et le test conclut à tort que rien ne se passe.

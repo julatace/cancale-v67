@@ -7896,8 +7896,68 @@ function VintedAccounts({ accounts, setAccounts }) {
     }));
   };
 
+  // ── TOUT REMETTRE : le seul écran qui décide de ce qui manque ──────────────
+  // Demande de Julien : « mets TOUTES les annonces et TOUTES les ventes dans
+  // l'application ». Relevé du 15 août : 9 annonces et 153 ventes visibles,
+  // pour **112 annonces et 514 ventes réellement captées** — l'écart n'est pas
+  // une perte de données, c'est trois comptes masqués (des puces tapées par
+  // erreur, §5.10) et un compte retiré qui porte à lui seul 96 annonces et
+  // 284 ventes. Un bouton remet tout, au lieu de chercher où ça coince.
+  const [retires, setRetires] = useState(null);   // { uids:[], logins:[] }
+  const [remise, setRemise] = useState(false);
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const j = await r.json();
+      setRetires((j[0] && j[0].data) || { uids: [], logins: [] });
+    } catch (_) { /* pas bloquant */ }
+  })(); }, []);
+  const nbExclus = hiddenAccts.size + ((retires && retires.uids) || []).length;
+  const toutAfficher = async () => {
+    if (!await askConfirm({
+      title: 'Tout réafficher ?',
+      desc: "Les comptes masqués et les comptes retirés reviennent, avec leurs annonces, leurs ventes et leurs achats. Tu pourras en remasquer un ensuite si besoin.",
+      ok: 'Tout réafficher', cancel: 'Annuler',
+    })) return;
+    setRemise(true);
+    setHiddenAccts(new Set()); save('vinted_accounts_hidden', []);
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts`, {
+        method: 'PATCH',
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+        body: JSON.stringify({ data: { uids: [], logins: [], note: 'tout réaffiché depuis l\'app' } }),
+      });
+      setRetires({ uids: [], logins: [] });
+    } catch (_) { /* le démasquage local est déjà fait */ }
+    // ⚠️ Ici `blockedAccts` est un useMemo (pas d'état) : on écrit la clé, et
+    // l'app la relit au prochain démarrage. Appeler un `setBlockedAccts`
+    // inexistant dans CE composant planterait l'écran (même famille de bug
+    // qu'en §26 : un identifiant absent que le build ne voit pas).
+    save('vinted_accounts_blocked', []);
+    await refreshAccounts();
+    setRemise(false);
+    toast('Tous les comptes sont réaffichés — rouvre l\'onglet Annonces');
+  };
+
   return (
     <div style={{padding:'16px 14px 40px'}}>
+      {nbExclus > 0 && (
+        <div style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:14,padding:'12px 13px',marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
+            {nbExclus} compte{nbExclus>1?'s':''} {nbExclus>1?'sont exclus':'est exclu'} de l'application
+          </div>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:9}}>
+            Leurs annonces, leurs ventes et leurs achats n'apparaissent nulle part — ni dans les onglets, ni dans les totaux.
+            {(retires && retires.logins && retires.logins.length)
+              ? ` Retiré${retires.logins.length>1?'s':''} : ${retires.logins.join(', ')}.` : ''}
+          </div>
+          <button type="button" onClick={toutAfficher} disabled={remise}
+            style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'11px',fontSize:13,fontWeight:600,cursor:remise?'default':'pointer',fontFamily:'inherit'}}>
+            {remise ? '…' : 'Tout réafficher'}
+          </button>
+        </div>
+      )}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:20,fontWeight:600,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
         <button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
