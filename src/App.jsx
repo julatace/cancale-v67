@@ -701,7 +701,26 @@ const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} ret
 const isCloudReady = () => _cloudReady;
 
 // Lecture locale (instantanee)
-const load = (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } };
+// ⚠️ UNE DONNÉE ABÎMÉE NE DOIT PAS TUER L'APP. `load` rendait tel quel ce qu'il
+// trouvait : une clé corrompue (écriture interrompue, ancienne version, import
+// bancal) rendait une CHAÎNE là où l'app attend une liste, et le premier
+// `.filter` faisait écran blanc — avant même que le garde-fou d'écran puisse
+// s'interposer, puisque la lecture a lieu dans l'état initial du composant
+// racine. On vérifie donc que la forme correspond à la valeur par défaut :
+// liste attendue → liste reçue, objet attendu → objet reçu. Sinon, la valeur
+// par défaut (et on le dit dans la console, pour pouvoir enquêter).
+const load = (k,d) => {
+  try {
+    const v = localStorage.getItem(k); if (!v) return d;
+    const p = JSON.parse(v);
+    if (Array.isArray(d) && !Array.isArray(p)) throw new Error('liste attendue');
+    if (d && typeof d === 'object' && !Array.isArray(d) && (p === null || typeof p !== 'object' || Array.isArray(p))) throw new Error('objet attendu');
+    return p;
+  } catch (e) {
+    try { if (localStorage.getItem(k)) console.warn('[VRM] clé ignorée (forme inattendue) :', k, String(e && e.message || e)); } catch (_) {}
+    return d;
+  }
+};
 // Drapeau « imprimer tous les bordereaux » posé par un deep-link (?print=bord),
 // consommé une fois par l'écran Bordereaux quand les données sont chargées.
 // Sert au bouton « Tout imprimer (dans l'app) » du panneau d'extension.
@@ -7153,11 +7172,22 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // Cohérence garage ↔ paires numérotées (annonces). Chargé depuis la même
   // source que l'onglet Comptes (clé vinted_annonce_numeros).
   const pairNumeros=useMemo(()=>load('vinted_annonce_numeros',{}),[]);
+  // ⚠️ Seules les paires qui EXISTENT ENCORE ont une place à occuper. La photo
+  // `vinted_nums_physiques` est publiée par l'écran Annonces (annonce en ligne
+  // ou vente pas encore expédiée). Sans elle (écran jamais ouvert sur cet
+  // appareil), on garde l'ancien comportement plutôt que de masquer à tort.
+  const numsPhysiques=useMemo(()=>{
+    const p=load('vinted_nums_physiques', null);
+    if(!p || !Array.isArray(p.nums) || !p.nums.length) return null;
+    return new Set(p.nums.map(x=>String(x).trim().toLowerCase()));
+  },[]);
   const numberedSet=useMemo(()=>{
     const s=new Set();
-    Object.values(pairNumeros).forEach(e=>{ const t=String((e&&e.numero)||'').trim().toLowerCase(); if(t) s.add(t); });
+    Object.values(pairNumeros).forEach(e=>{ const t=String((e&&e.numero)||'').trim().toLowerCase(); if(!t) return;
+      if(numsPhysiques && !numsPhysiques.has(t)) return;   // paire partie : sa boîte est libre
+      s.add(t); });
     return s;
-  },[pairNumeros]);
+  },[pairNumeros,numsPhysiques]);
   // Numérotées (paires connues) mais absentes du garage → à ranger.
   const numberedNotStored=useMemo(()=>Array.from(numberedSet).filter(n=>!allValsSet.has(n)).sort((a,b)=>(+a||0)-(+b||0)),[numberedSet,allValsSet]);
   // Au garage mais numéro inconnu (aucune paire numérotée) → doute/typo/ancien.
@@ -9609,6 +9639,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [usedNumeros, numeros, saleOv, freedNums, listings.items, garageNums]);
   const nextNumero = useMemo(() => { let n=1; while(takenNums.has(n)) n++; return n; }, [takenNums]);
 
+  // ── LES PAIRES QUI EXISTENT VRAIMENT (pour le Garage) ───────────────────────
+  // ⚠️ Le Garage listait « à ranger » TOUTES les entrées de vinted_annonce_numeros
+  // — 176 boîtes pour 15 paires réellement en stock, dont l'écrasante majorité
+  // sont vendues et parties depuis longtemps. Un panneau qu'on ne peut pas
+  // vider n'est plus une alerte, c'est du décor.
+  // Une paire occupe une place tant que : son annonce est EN LIGNE, ou sa vente
+  // n'est pas encore expédiée (le carton est encore à la maison). Exactement la
+  // règle de `freedNums` ci-dessus — on la PUBLIE au lieu de la refaire ailleurs
+  // (§11 : une seule règle par notion). Clé LOCALE (pas dans SYNC_KEYS) : c'est
+  // une photo recalculable, elle n'a rien à faire dans le nuage.
+  useEffect(() => {
+    if (!listings.items || !listings.items.length) return;   // rien de sûr à publier
+    if (!sales.items) return;
+    const vivants = new Set();
+    for (const it of listings.items) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    for (const o of (sales.items || [])) {
+      if (!needsBordereau(o.status)) continue;
+      const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
+    }
+    const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
+    try {
+      const avant = load('vinted_nums_physiques', null);
+      const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i]);
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, at: Date.now() });
+    } catch (_) {}
+  }, [listings.items, sales.items, numeros, saleOv]);
+
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
   // dans les Ventes les prix saisis dans Annonces, même après vente/republication.
@@ -11773,7 +11830,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2}}>☀️ {hello} Julien</div>
               {!loading && (
                 <div style={{fontSize:13,color:C.muted,marginTop:3}}>
-                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> qui te font avancer aujourd'hui.</> : <>Rien d'urgent — ta boutique tourne. 👌</>}
+                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</> : <>Rien d'urgent — ta boutique tourne. 👌</>}
                 </div>
               )}
             </div>
@@ -13547,7 +13604,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(()=>{
           if (emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des bordereaux…</div>;
           if (!Array.isArray(emailBords)) return null;
-          const withPdf = emailBords.filter(b=>b.hasPdf);
+          // ⚠️ UN BORDEREAU MASQUÉ NE COMPTE NULLE PART. Ce récap comptait tout,
+          // alors que la ligne « ✅ N colis faits » plus bas exclut les masqués :
+          // le même écran affichait 64 puis 63 pour la même chose (mesuré sur les
+          // 71 bordereaux réels, l'un d'eux étant masqué). Une seule règle.
+          const withPdf = emailBords.filter(b=>b.hasPdf && !isBordHidden(b));
           const pending = withPdf.filter(b=>!isBordDone(b));
           const done = withPdf.length - pending.length;
           const proNb = pending.filter(b=>invForBord(b)).length; // comptes pro : facture jointe
@@ -13621,7 +13682,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <div style={{fontSize:12,fontWeight:600,color:C.text,flex:1}}>
                     📧 {visibles} bordereau{visibles>1?'x':''} affiché{visibles>1?'s':''}
-                    {visibles!==emailBords.length && <span style={{fontWeight:500,color:C.muted}}> · {emailBords.length} reçus en tout</span>}
+                    {(()=>{ const total=emailBords.filter(b=>!isBordHidden(b)).length;
+                  return visibles!==total ? <span style={{fontWeight:500,color:C.muted}}> · {total} reçus en tout</span> : null; })()}
                   </div>
                 );
               })()}
@@ -15876,6 +15938,47 @@ function PushSetting() {
 // il ne doit jamais partir dans la ligne Supabase partagée. Il reste sur CET
 // appareil. Le mieux reste la variable d'environnement Vercel (AI_API_KEY) —
 // ce champ est le raccourci « je veux tester tout de suite » pour Julien.
+// ── ÉCRAN QUI TOMBE ≠ APPLICATION QUI TOMBE ───────────────────────────────────
+// ⚠️ Sans garde-fou, UNE erreur de rendu dans un seul écran vide la page
+// entière : écran blanc, barre du bas comprise, plus rien à faire que recharger
+// en espérant. C'est arrivé deux fois (§19 : un useMemo lu trop tôt ; §26 : une
+// variable jamais déclarée) et les deux fois l'app était inutilisable alors que
+// neuf écrans sur dix allaient bien.
+// Ici l'erreur est attrapée : l'écran fautif affiche un message, la navigation
+// reste vivante, et changer d'onglet remet le garde-fou à zéro (`resetKey`) —
+// sinon on resterait coincé sur l'erreur après avoir quitté l'écran.
+class EcranGardeFou extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) { try { console.error('[VRM] écran en erreur', err, info && info.componentStack); } catch (_) {} }
+  componentDidUpdate(prev) { if (prev.resetKey !== this.props.resetKey && this.state.err) this.setState({ err: null }); }
+  render() {
+    if (!this.state.err) return this.props.children;
+    const msg = String((this.state.err && this.state.err.message) || this.state.err);
+    return (
+      <div style={{padding:'22px 18px'}}>
+        <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:16,padding:'18px 16px'}}>
+          <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Cet écran n'a pas pu s'afficher</div>
+          <div style={{fontSize:13,color:C.muted,lineHeight:1.5,marginBottom:12}}>
+            Le reste de l'application fonctionne : change d'onglet en bas, tes données ne sont pas touchées.
+            Si ça se reproduit, envoie-moi cette ligne :
+          </div>
+          <div style={{fontSize:11.5,fontFamily:'ui-monospace,monospace',color:C.text,background:C.card,border:`1px solid ${C.border}`,
+            borderRadius:10,padding:'9px 11px',overflowX:'auto',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{msg}</div>
+          <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
+            <button type="button" onClick={()=>this.setState({err:null})}
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>
+            <button type="button" onClick={()=>{ try{ navigator.clipboard.writeText(msg); }catch(_){} }}
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier l'erreur</button>
+            <button type="button" onClick={()=>location.reload()}
+              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Recharger l'app</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 // ── SÉCURITÉ DES DONNÉES : L'ÉTAT RÉEL, MESURÉ ────────────────────────────────
 // Trois verrous doivent être en place pour que « chacun ses données » soit vrai.
 // Ils étaient décrits dans la documentation, donc invérifiables depuis l'app —
@@ -17117,6 +17220,7 @@ export default function App() {
         </div>
       )}
       <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:'calc(84px + env(safe-area-inset-bottom))'}}>
+        <EcranGardeFou resetKey={tab}>
         {tab==='settings'&&<SettingsScreen setTab={setTab}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}
@@ -17199,6 +17303,7 @@ export default function App() {
         {(()=>{ const map={cat_annonces:'annonces',cat_repub:'republication',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
+        </EcranGardeFou>
       </main>
       <BottomBar tab={tab} setTab={setTab}/>
       {showBackup&&<BackupModal

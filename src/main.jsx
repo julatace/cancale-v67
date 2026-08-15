@@ -1,8 +1,49 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+
+// ⚠️ DERNIER FILET : même si l'application entière tombe (erreur AVANT que le
+// garde-fou d'écran soit monté), on ne laisse jamais une page blanche. Une page
+// blanche ne dit rien, ne propose rien, et donne l'impression que tout est
+// perdu — alors que les données sont intactes dans le nuage.
+class DernierFilet extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} }
+  render() {
+    if (!this.state.err) return this.props.children;
+    const msg = String((this.state.err && this.state.err.message) || this.state.err);
+    const btn = { border: '1px solid #d7dde3', background: 'transparent', borderRadius: 10, padding: '10px 15px',
+      fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22,
+        fontFamily: 'Inter, system-ui, sans-serif', background: '#f6f7f9', color: '#14181d' }}>
+        <div style={{ maxWidth: 420, width: '100%', background: '#fff', border: '1px solid #e6e9ee', borderRadius: 18, padding: '20px 18px' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>L'application n'a pas pu démarrer</div>
+          <div style={{ fontSize: 13, color: '#5b6675', lineHeight: 1.5, marginBottom: 12 }}>
+            Tes données sont intactes (elles sont dans le nuage, pas dans cette page). Recharge — si l'erreur revient,
+            « Repartir propre » efface seulement les réglages de CE navigateur, puis retélécharge tout depuis ton compte.
+          </div>
+          <div style={{ fontSize: 11.5, fontFamily: 'ui-monospace, monospace', background: '#f6f7f9', border: '1px solid #e6e9ee',
+            borderRadius: 10, padding: '9px 11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+            <button style={{ ...btn, border: 'none', background: '#14181d', color: '#fff' }} onClick={() => location.reload()}>Recharger</button>
+            <button style={btn} onClick={() => { try { navigator.clipboard.writeText(msg); } catch (_) {} }}>📋 Copier l'erreur</button>
+            <button style={btn} onClick={() => {
+              // On ne touche QU'AUX clés de l'app, et on garde la session : le
+              // nuage est la source de vérité, tout revient au rechargement.
+              try { Object.keys(localStorage).forEach(k => { if (/^(vinted_|vrm_)/.test(k) && k !== 'vrm_session') localStorage.removeItem(k); }); } catch (_) {}
+              location.reload();
+            }}>Repartir propre</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><App /></React.StrictMode>
+  <React.StrictMode><DernierFilet><App /></DernierFilet></React.StrictMode>
 );
 
 // PWA : enregistre le service worker (app installable + consultable hors-ligne).

@@ -378,6 +378,7 @@ async function storeHarvest(domain, type, id, body) {
   }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   if (type === 'listings') data.nItems = ((parsed && parsed.items) || []).length;
+  data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
   const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
@@ -912,7 +913,14 @@ async function vintedSend(acc, method, endpoint, body) {
 // blocs de promotion... Alleger ici fait tomber le meme contenu a 0,15 Mo (-98 %).
 // Les anciennes lignes deja en base restent lisibles : on ne fait qu'enlever des
 // champs, jamais en renommer.
-const CHAMPS_ARTICLE = ['id','title','price','url','brand_title','size_title','status',
+// ⚠️ VINTED ENVOIE `brand`, `size`, `status` — PAS `brand_title`/`size_title`.
+// Vérifié sur les 112 annonces en ligne de la vraie base : `brand_title` et
+// `size_title` sont absents des 112, `brand`/`size` présents partout. On ne
+// gardait donc que des champs qui n'existent pas : chaque annonce allégée
+// perdait sa marque ET sa taille, et l'app affichait « marque manquante ·
+// taille manquante » sur tout le stock (note d'annonce faussée, conseils faux).
+// Les deux orthographes sont conservées : Vinted a déjà renommé des champs.
+const CHAMPS_ARTICLE = ['id','title','price','url','brand','size','brand_title','size_title','status',
   'view_count','favourite_count','favourites_count','created_at_ts',
   'is_closed','is_hidden','is_draft'];
 
@@ -973,6 +981,38 @@ function alleger(type, payload) {
   } catch (_) { return payload; }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// RÉSUMÉ DES COMMANDES — écrit à la capture, lu par le widget iPhone
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️ ÉGRESS (la faute d'août, §34, dans sa dernière poche). `api/widget.js`
+// lisait les commandes en `select=data` : mesuré aujourd'hui, **791 Ko à CHAQUE
+// rafraîchissement** du widget (609 Ko de ventes + 181 Ko d'achats). Un widget
+// d'écran d'accueil se rafraîchit tout seul, jour et nuit — c'est des gigas par
+// mois pour afficher deux nombres.
+// On écrit donc les deux nombres AU MOMENT DE LA CAPTURE, dans la ligne
+// elle-même : le widget les lit en scalaires (~1 Ko) et garde sa propriété
+// essentielle — il se met à jour même app fermée, puisque c'est l'extension qui
+// capture. ⚠️ Les deux tests de statut sont la COPIE EXACTE de ceux de l'app
+// (`isAwaitingShipStatus` / `isAtRelayStatus`) : deux règles différentes pour la
+// même notion, c'est la garantie de deux chiffres qui se contredisent.
+const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+function resumeCommandes(type, payload) {
+  if (!/^orders/.test(type || '')) return null;
+  const cmds = (payload && payload.my_orders) || [];
+  if (!Array.isArray(cmds)) return null;
+  const vente = /sold/.test(type);
+  const txns = [];
+  for (const o of cmds) {
+    if (!o) continue;
+    const ok = vente ? AWAITING_SHIP(o.status) : AT_RELAY(o.status);
+    if (ok && o.transaction_id != null) txns.push(String(o.transaction_id));
+  }
+  // Les transactions (pas seulement le compte) : le widget dédoublonne entre
+  // comptes, sinon une même vente vue sur deux lignes compterait double.
+  return { n: cmds.length, txns, at: Date.now() };
+}
+
 async function storeHarvestRow(uid, type, payload, domain) {
   // ⚠️ LA MOISSON ACTIVE N'ALIMENTAIT PAS LE COFFRE. « 🔄 Tout recapter » va
   // chercher le dressing COMPLET (toutes les pages) — et jetait tout au coffre
@@ -992,6 +1032,7 @@ async function storeHarvestRow(uid, type, payload, domain) {
     data.nItems = ((payload && payload.items) || []).length;
     if (!(await dressingPlusRiche(`harvest_${uid}_listings`, payload))) return;
   }
+  data.resume = resumeCommandes(type, payload) || undefined;
   // On ecrit AUSSI updated_at : la table n'a pas de trigger, la colonne gardait
   // donc la date de creation de la ligne et faisait passer une moisson de deux
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
@@ -1628,9 +1669,11 @@ function coffreRecord(uid, it, fiche) {
     uid: String(uid || ''),
     title: String((f.title || (it && it.title) || '')),
     desc: String(f.description || ''),
-    brand: String(f.brand || (f.brand_dto && f.brand_dto.title) || (it && it.brand_title) || ''),
-    size: String(f.size_title || (it && it.size_title) || ''),
-    etat: String(f.status || ''),
+    brand: String(f.brand || (f.brand_dto && f.brand_dto.title) || (it && (it.brand || it.brand_title)) || ''),
+    size: String(f.size_title || f.size || (it && (it.size || it.size_title)) || ''),
+    // L'état ("Très bon état") est aussi sur l'article du dressing — on ne le
+    // lisait que sur la fiche, qui n'arrive presque jamais (§46).
+    etat: String(f.status || (it && it.status) || ''),
     catalogId: f.catalog_id != null ? f.catalog_id : null,
     price: (f.price && f.price.amount != null) ? f.price.amount
          : ((it && it.price && it.price.amount != null) ? it.price.amount : (it && it.price) ?? null),
@@ -2059,8 +2102,8 @@ async function buildPanelData() {
         numero, buyPrice: e && e.buyPrice != null ? e.buyPrice : null,
         cell: numero ? (cellByNum[numero] || null) : null,
         ageDays,
-        brand: String(it.brand_title || '').trim(),
-        size: String(it.size_title || '').trim(),
+        brand: String(it.brand || it.brand_title || (it.brand_dto && it.brand_dto.title) || '').trim(),
+        size: String(it.size || it.size_title || '').trim(),
         hasDesc: !!(pageDetails[id] && pageDetails[id].description),
         nPhotos: (pageDetails[id] && (pageDetails[id].photos || []).length) || 0,
         // Combien de photos l'annonce a VRAIMENT sur Vinted (≠ combien on en a

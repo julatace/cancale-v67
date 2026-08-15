@@ -1687,3 +1687,37 @@ Un verrou qu'on croit posé est pire qu'un verrou absent. Quatre lignes, mesuré
 4. **Extension identifiée** — via le pont : connectée, sous quelle adresse.
 
 **Vérifié aux deux bancs.** App (`dist` servi, Supabase mocké) : les 4 lignes rendues avec le bon verdict, badge « partagées », SQL réellement copié (**6 856 caractères**), **0 PAGEERROR**. Puis **état d'après-migration simulé** (`select=owner` → 200, lecture anonyme vide) : l'app **bascule toute seule** sur l'écran de connexion, la porte « entrer sans compte » disparaît, et le pied de page passe à « Chaque vendeur ne voit que ses propres données ». Popup de l'extension (faux `chrome`) : mauvais mot de passe → message honnête et **aucune session**, bon mot de passe validé à la touche Entrée → email affiché, déconnexion → retour à l'état initial. **0 erreur** partout.
+
+---
+
+## 5.14 — BALAYAGE DE FIABILITÉ : 6 défauts réels, tous mesurés avant d'être corrigés
+
+Méthode : smoke complet de l'app sur les **vraies données** (§20) — 12 écrans, chacun rendu et scanné (`NaN`, `undefined`, `[object Object]`, accords, chiffres qui se contredisent) — puis banc du panneau sur **tous** les onglets déclarés, puis tests unitaires des fonctions modifiées contre la vraie moisson.
+
+⚠️ **Le banc doit honorer `select=` .** Sans projection, un écran qui projette ses colonnes (bordereaux, fraîcheur…) reçoit des objets sans leurs champs et **paraît vide** : on mesurerait un artefact du banc, pas l'app (§21). Corrigé — c'est ce qui a fait passer les bordereaux de « vides » à leurs vrais chiffres.
+
+### 1. ⚠️⚠️ VINTED ENVOIE `brand` ET `size` — on ne gardait que `brand_title`/`size_title`
+Mesuré sur les 112 annonces en ligne : **0 ont `brand_title` ou `size_title`**, 112 ont `brand`, `size`, `status`. `CHAMPS_ARTICLE` (l'allègement, §23) ne gardait donc **que des champs qui n'existent pas** : chaque annonce allégée perdait sa marque et sa taille pour toujours. Conséquence visible dans l'app : « marque manquante · taille manquante » sur tout le stock, note d'annonce faussée, conseils faux — et l'atelier Republier classait en tête les annonces les plus abîmées par ce bug, pas les plus à retravailler.
+Corrigé aux trois endroits (`CHAMPS_ARTICLE`, `buildPanelData`, `coffreRecord`), les deux orthographes acceptées. **Mesuré après correction** : sur 112 annonces, le coffre récupère marque 98, taille 98, état **112**, et **plusieurs photos 98** (au lieu d'une seule). Les 14 restantes sont les lignes déjà allégées : elles reviennent à la prochaine capture.
+
+### 2. Bordereaux : deux chiffres pour la même chose sur le même écran
+« 64 colis faits » en haut, « ✅ 63 colis faits » en bas. Le récap comptait **tous** les bordereaux, la ligne du bas **excluait les masqués**. Un bordereau masqué ne compte plus nulle part. Vérifié : 70 reçus · 63 faits · 7 à imprimer, partout le même compte.
+
+### 3. Garage : « À ranger (176) » pour 15 paires réellement en stock
+Le panneau listait **toutes** les entrées de `vinted_annonce_numeros`, y compris les paires vendues et parties depuis des mois. Un panneau qu'on ne peut pas vider n'est plus une alerte, c'est du décor.
+L'écran Annonces **publie** désormais `vinted_nums_physiques` (annonce en ligne, ou vente pas encore expédiée — exactement la règle de `freedNums`, §11 : on la publie au lieu de la refaire), et le Garage s'y limite. **176 → 11.** Clé locale, pas dans `SYNC_KEYS` : c'est une photo recalculable. Sans elle (écran jamais ouvert sur cet appareil), l'ancien comportement est conservé — on ne masque jamais à tort.
+
+### 4. ⚠️ ÉGRESS : le widget retéléchargeait 791 Ko à chaque rafraîchissement
+Dernière poche de la faute d'août (§34) : `api/widget.js` lisait les commandes en `select=data` — **mesuré 609 Ko de ventes + 181 Ko d'achats**, et un widget d'écran d'accueil se rafraîchit tout seul jour et nuit (des gigas par mois pour afficher deux nombres).
+L'extension écrit maintenant le compte utile **au moment de la capture** (`data.resume` = transactions à expédier / à retirer), le widget le lit **en scalaire**. La propriété essentielle est conservée : ça se met à jour **même app fermée**, puisque c'est l'extension qui capture. Les deux tests de statut sont la **copie exacte** de ceux de l'app — deux règles pour la même notion, c'est la garantie de deux chiffres qui se contredisent.
+**Vérifié en exécutant le vrai handler** dans les deux états : sans résumé → mêmes chiffres (2 à expédier, 1 à retirer) et 791 Ko lus ; avec résumé → **mêmes chiffres, 0 octet** de commandes.
+
+### 5. Écran blanc : impossible, désormais
+Deux fois cette année, une erreur de rendu a vidé la page entière — barre du bas comprise (§19 TDZ, §26 variable jamais déclarée). Deux filets, **tous deux prouvés en provoquant une vraie erreur** :
+- **`EcranGardeFou`** autour du contenu : l'écran fautif affiche un message + « Réessayer / Copier l'erreur / Recharger », **la navigation reste vivante**, et changer d'onglet remet le garde-fou à zéro. Vérifié : bandeau d'erreur affiché, puis onglet Ventes normal.
+- **`DernierFilet`** (dans `main.jsx`) pour ce qui casse **avant** : « L'application n'a pas pu démarrer », avec « Repartir propre » qui efface les clés de CE navigateur (jamais la session) — le nuage reste la source de vérité.
+
+### 6. Une clé abîmée ne tue plus l'app
+`load()` rendait tel quel ce qu'il trouvait : une clé corrompue (écriture interrompue, import bancal) rendait une **chaîne** là où l'app attend une liste, et le premier `.filter` faisait écran blanc — **avant** que le garde-fou d'écran existe, puisque la lecture a lieu dans l'état initial du composant racine. `load` vérifie maintenant que la forme correspond à la valeur par défaut, sinon défaut + avertissement en console. Vérifié : `vinted_invoices` corrompue → l'écran Factures s'affiche normalement au lieu de tout faire tomber.
+
+**État final vérifié** : 12 écrans rendus sur les vraies données, **0 erreur de page, 0 artefact d'affichage** ; panneau d'extension, **tous les onglets déclarés** (recherche, coffre, litiges, ventes… ) sans erreur — les 2 « échecs » du banc sont les artefacts connus (clic sur un élément filtré `display:none`, onglet « réponse » qui n'existe que sur une page de conversation).
