@@ -536,7 +536,14 @@
         </div>
         <button class="vrm-acct-off" data-uid="${esc(a.uid)}" data-off="${a.off ? '0' : '1'}" style="flex-shrink:0;border:1px solid ${a.off ? '#0f6b4f' : '#dde'};background:${a.off ? 'rgba(15,107,79,.08)' : '#fff'};color:${a.off ? '#0f6b4f' : '#556'};border-radius:8px;padding:5px 10px;font-weight:700;font-size:11px;cursor:pointer">${a.off ? '↺ Réafficher' : '✕ Masquer'}</button>
       </div>`).join('');
-    return `<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? ' open' : ''}>
+    // ⚠️ « TOUT RECAPTER » — la capture passive ne voit que ce que la page
+    // charge, donc un compte peut rester avec un dressing partiel (mesuré :
+    // 4 annonces captées sur 100 annoncées par Vinted). Ce bouton relit le
+    // dressing COMPLET (toutes les pages), les ventes, les achats et la boîte,
+    // pour le compte actuellement connecté — depuis ta session, sur ton IP.
+    const recap = `<button id="vrm-recapter" style="width:100%;margin-top:8px;border:none;background:#0f6b4f;color:#fff;border-radius:10px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer">🔄 Tout recapter (compte connecté)</button>
+      <div class="vrm-m" style="font-size:10.5px;margin-top:4px">Relit toutes tes annonces, ventes et achats pour le compte ouvert dans ce navigateur. À faire une fois par compte.</div>`;
+    return `${recap}<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? ' open' : ''}>
       <summary style="cursor:pointer;font-weight:700;font-size:12.5px;list-style:none">👤 Mes comptes Vinted (${accs.length}${nOff ? ` · ${nOff} masqué${nOff > 1 ? 's' : ''}` : ''})</summary>
       <div class="vrm-m" style="margin:5px 0 2px">Masque un compte que tu n'utilises plus : ses paires, ventes et messages disparaissent partout dans VRM.</div>
       ${rows}
@@ -1134,6 +1141,17 @@
         chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setAccountOff', uid, off }, () => { load(); });
       };
     });
+    // « Tout recapter » : une seule requête par type, sur le compte connecté.
+    const rec = panel.querySelector('#vrm-recapter');
+    if (rec) rec.onclick = () => {
+      rec.disabled = true; rec.textContent = '⏳ lecture de tes annonces, ventes et achats…';
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'recapter' }, (r) => {
+        rec.disabled = false;
+        if (r && r.ok) { rec.textContent = '✓ recapté'; load(); }
+        else { rec.textContent = '❌ ' + ((r && r.error) || 'échec'); }
+        setTimeout(() => { try { rec.textContent = '🔄 Tout recapter (compte connecté)'; } catch (_) {} }, 6000);
+      });
+    };
     // Ouvrir le PDF d'un bordereau — présent sur plusieurs onglets (Ventes,
     // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
     panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });

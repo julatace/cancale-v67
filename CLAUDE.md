@@ -1560,3 +1560,29 @@ Relevé du 15 août, compte par compte (moisson réelle) :
 
 **Vérifié au banc** : bandeau rendu (« 1 compte est exclu… Retiré : shop_cancale »), la feuille de confirmation s'ouvre, et après confirmation `vinted_accounts_hidden` → `[]`, `vinted_accounts_blocked` → `[]`, **PATCH sur `vrm_blocked_accounts`** émis. 0 erreur de page.
 ⚠️ Piège de banc : `<ConfirmHost/>` est monté **en haut** de l'arbre → le bouton de la feuille apparaît AVANT celui de la page dans le DOM. Cliquer « le dernier bouton portant ce libellé » tape sur celui de la page, derrière le voile, et le test conclut à tort que rien ne se passe.
+
+### 5.13 — ⚠️⚠️ LA VRAIE CAUSE DES ANNONCES QUI DISPARAISSENT : une capture PARTIELLE écrasait la complète
+
+Julien : « je veux simplement que tu captes ». Mesure faite avant de coder, en comparant ce qui est capté à **ce que Vinted lui-même annonce** (`payload.pagination.total_entries`, présent dans chaque moisson) :
+
+| compte | captés | Vinted annonce | pages |
+|---|---|---|---|
+| **julatace35260** | **4** | **100** | 2 |
+| **julatace3535** | **20** | **55** | 3 |
+| **shop_cancale** | **96** | **603** | 7 |
+| julienf765 / llloollllaa / tomj683 / tomj606 / vanessa5723 / liliand653 | complets | = | 1 |
+
+➡️ **La capture passive écrivait TOUT ce que la page chargeait** — y compris une réponse partielle (une page 2, une liste filtrée, un aperçu de profil) — et cette réponse partielle **écrasait la moisson complète**. Le compte tombait alors à « 0 annonce en ligne » dans l'app alors que l'extension avait bien fait son travail dix minutes plus tôt. Mesuré en direct : entre deux relevés à 40 min d'intervalle, le total des annonces visibles est passé de **17 à 7** sans que personne ne touche à rien.
+
+⚠️ Le garde-fou `plein(o, cle)` (§15) ne rejetait que le **vide**. Le partiel passait.
+
+**La règle, appliquée aux DEUX voies d'écriture** (`storeHarvest` passive + `storeHarvestRow` active) via `dressingPlusRiche(rowId, payload)` :
+- une réponse **complète** (`items ≥ total_entries`) fait **toujours** foi ;
+- sinon on n'écrase que si on apporte **au moins autant** d'articles qu'avant.
+
+Le compteur est lu **en scalaire** (`select=n:data->>nItems`, un entier) — jamais le payload : la leçon d'égress de §34 vaut ici aussi. Le champ `nItems` est écrit sur chaque ligne `listings`.
+
+### « 🔄 Tout recapter (compte connecté) » — panneau, bloc « Mes comptes »
+La capture passive ne voit que ce que la page charge : un compte peut rester incomplet indéfiniment. Ce bouton appelle `activeFetchActiveAccount()` → dressing **complet (toutes les pages)** + ventes + achats + boîte, **pour le seul compte connecté dans ce navigateur**, depuis sa session et son IP. ⚠️ Jamais tous les comptes d'un coup : c'est la signature multi-comptes de §5. À faire une fois par compte.
+
+**Vérifié** : `node --check` sur les deux fichiers ; banc panneau → bouton rendu, message `recapter` émis, bloc comptes intact, 0 erreur ; `buildPanelData` réel relancé contre la vraie base après correctif (aucune régression).

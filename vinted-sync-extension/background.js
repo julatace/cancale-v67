@@ -259,6 +259,23 @@ async function noterDiag(cle) {
   } catch (_) {}
 }
 
+// Le dressing qui arrive est-il au moins aussi riche que celui déjà en base ?
+// Lecture ULTRA légère : on ne relit que le compteur `nItems` (un scalaire),
+// jamais le payload — la leçon d'égress de §34 vaut aussi ici.
+async function dressingPlusRiche(rowId, parsed) {
+  const n = ((parsed && parsed.items) || []).length;
+  const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
+  if (isFinite(total) && total > 0 && n >= total) return true;   // capture complète : fait foi
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${rowId}&select=n:data->>nItems`, { headers: await sbHeaders() });
+    if (!r.ok) return true;                       // on ne sait pas → on écrit
+    const j = await r.json();
+    const avant = Number(j[0] && j[0].n);
+    if (!isFinite(avant)) return true;            // ancienne ligne sans compteur → on écrit
+    return n >= avant;                            // jamais plus pauvre qu'avant
+  } catch (_) { return true; }
+}
+
 async function storeHarvest(domain, type, id, body) {
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
@@ -280,7 +297,25 @@ async function storeHarvest(domain, type, id, body) {
   // faite activement est allegee. Meme fonction, un seul comportement.
   parsed = alleger(type, parsed);
 
+  // ⚠️⚠️ ON NE REMPLACE JAMAIS UN DRESSING PAR UN PLUS PAUVRE.
+  // C'est LE défaut qui vidait les annonces. Mesuré en base le 15 août :
+  //   julatace35260 → 4 articles captés alors que Vinted en annonce 100
+  //   julatace3535  → 20 captés sur 55 · shop_cancale → 96 sur 603
+  // La capture passive écrivait **tout ce que la page chargeait**, y compris
+  // une réponse partielle (une page 2, une liste filtrée, un aperçu de
+  // profil) — et cette réponse partielle ÉCRASAIT la moisson complète. Le
+  // compte tombait alors à « 0 annonce en ligne » dans l'app, alors que
+  // l'extension avait bien fait son travail quelques minutes plus tôt.
+  // Le garde-fou `plein()` ne rejetait que le VIDE, pas le partiel.
+  // Règle : une réponse COMPLÈTE (items ≥ total annoncé par Vinted) fait
+  // toujours foi ; sinon on n'écrase que si on apporte AU MOINS autant
+  // d'articles qu'avant.
+  if (type === 'listings' && !(await dressingPlusRiche(rowId, parsed))) {
+    noterDiag('ignore_dressing_partiel');
+    return;
+  }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
+  if (type === 'listings') data.nItems = ((parsed && parsed.items) || []).length;
   const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
@@ -391,6 +426,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (async () => {
         try {
           if (msg.action === 'panelData') { const r = await buildPanelData(); sendResponse({ ok: true, ...r }); return; }
+          // « Tout recapter » : relit le dressing COMPLET (toutes les pages),
+          // les ventes, les achats et la boîte, pour le SEUL compte connecté
+          // dans ce navigateur. Depuis sa session, sur son IP — jamais tous
+          // les comptes d'un coup (c'est la signature multi-comptes, §5).
+          if (msg.action === 'recapter') {
+            const ok = await activeFetchActiveAccount();
+            sendResponse(ok ? { ok: true } : { ok: false, error: "aucun compte Vinted connecté dans ce navigateur — ouvre vinted.fr et connecte-toi" });
+            return;
+          }
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
@@ -842,6 +886,14 @@ async function storeHarvestRow(uid, type, payload, domain) {
   payload = alleger(type, payload);
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
+  // Même règle que la voie passive : un dressing partiel n'écrase pas un
+  // dressing complet. La moisson ACTIVE pagine (fetchAllWardrobe) donc elle
+  // passe toujours — mais si un jour une page échoue en cours de route, on ne
+  // veut pas que le résultat tronqué remplace la bonne capture.
+  if (type === 'listings') {
+    data.nItems = ((payload && payload.items) || []).length;
+    if (!(await dressingPlusRiche(`harvest_${uid}_listings`, payload))) return;
+  }
   // On ecrit AUSSI updated_at : la table n'a pas de trigger, la colonne gardait
   // donc la date de creation de la ligne et faisait passer une moisson de deux
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
