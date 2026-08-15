@@ -58,6 +58,57 @@ function render(list, lastSync, fresh) {
   }
 }
 
+// ── COMPTE VRM ────────────────────────────────────────────────────────────────
+// L'extension peut s'identifier ELLE-MÊME (email + mot de passe), sans passer
+// par l'app. ⚠️ On dit la vérité sur ce que ça protège : tant que la base ne
+// sépare pas les vendeurs (colonne `owner` + RLS), se connecter ne cloisonne
+// RIEN — ça prépare, ça ne protège pas encore. Promettre l'inverse serait
+// exactement le genre de mensonge qui fait fuiter des données.
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function rendreAuth(e) {
+  const box = document.getElementById('auth');
+  if (!box) return;
+  const note = e && e.cloisonne
+    ? "Tes captures sont enregistrées sous ton compte."
+    : "La séparation des comptes n'est pas encore activée en base : se connecter prépare le terrain, mais ne cloisonne pas encore les données.";
+  if (e && e.connecte) {
+    box.innerHTML = `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
+      <div class="muted" style="margin-top:0">${note}</div>
+      <button class="sec" id="outBtn">Se déconnecter</button>`;
+    document.getElementById('outBtn').addEventListener('click', () => {
+      chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogout' }, () => chargerAuth());
+    });
+    return;
+  }
+  const expiree = e && e.expiree;
+  box.innerHTML = `<div class="who"><span class="dot ${expiree ? 'warn' : 'off'}"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
+    <div class="muted" style="margin-top:0">${expiree ? 'Ta session a expiré — retape ton mot de passe.' : note}</div>
+    <input id="mail" type="email" placeholder="Email" autocomplete="username">
+    <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <button id="inBtn">Se connecter</button>
+    <div class="err" id="authErr" hidden></div>`;
+  const err = document.getElementById('authErr');
+  const go = () => {
+    const email = document.getElementById('mail').value, password = document.getElementById('pw').value;
+    const btn = document.getElementById('inBtn');
+    btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password }, (r) => {
+      btn.textContent = 'Se connecter'; btn.disabled = false;
+      if (r && r.ok) chargerAuth();
+      else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
+    });
+  };
+  document.getElementById('inBtn').addEventListener('click', go);
+  // Entrée depuis le champ mot de passe : sinon il faut viser le bouton.
+  document.getElementById('pw').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
+}
+
+function chargerAuth() {
+  chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authEtat' }, (r) => rendreAuth(r || {}));
+}
+chargerAuth();
+
 function charger() {
   chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'freshness' }, (resp) => {
     chrome.storage.local.get(['lastAccounts', 'lastSync'], (r) => {

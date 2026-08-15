@@ -30,6 +30,18 @@
 
     if (d.__vmr === 'ping') { announce(); return; }
 
+    // L'app demande QUI est connecté côté extension. Elle ne peut pas lire le
+    // stockage de l'extension (c'est justement le but) : elle le demande.
+    if (d.__vmr === 'authEtat' && d.reqId) {
+      try {
+        chrome.runtime.sendMessage({ from: 'vmr-bridge', action: 'authEtat' }, (resp) => {
+          const err = chrome.runtime.lastError;
+          try { window.postMessage({ __vmr: 'authEtat:result', reqId: d.reqId, etat: err ? null : resp }, '*'); } catch (_) {}
+        });
+      } catch (_) { try { window.postMessage({ __vmr: 'authEtat:result', reqId: d.reqId, etat: null }, '*'); } catch (_) {} }
+      return;
+    }
+
     // SESSION DU VENDEUR (multi-vendeurs). L'app, une fois connectee, nous
     // transmet son jeton : c'est ce qui permet a l'extension d'ecrire dans la
     // base SOUS SON COMPTE une fois l'isolation activee. On ne la stocke pas

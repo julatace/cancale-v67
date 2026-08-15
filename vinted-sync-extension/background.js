@@ -73,6 +73,62 @@ async function authToken() {
   if (!s.expires_at || s.expires_at < Date.now() + 60000) s = await refreshSession();
   return s && s.access_token ? s : null;
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SE CONNECTER DEPUIS L'EXTENSION (email + mot de passe)
+// ══════════════════════════════════════════════════════════════════════════════
+// Jusqu'ici la session ne pouvait venir QUE de l'app (bridge.js) : sur un
+// navigateur où l'app n'est jamais ouverte, l'extension écrivait forcément avec
+// la clé publique. Une fois la base cloisonnée, ça veut dire : elle n'écrit plus
+// rien. On peut donc s'identifier ici, directement.
+//
+// ⚠️ Le mot de passe n'est JAMAIS gardé : il part une fois chez Supabase, qui
+// renvoie deux jetons. Seuls les jetons sont stockés (`chrome.storage.local`,
+// zone locale de l'extension — un site web ne peut pas la lire).
+async function authLogin(email, password) {
+  const mail = String(email || '').trim().toLowerCase();
+  if (!mail || !password) return { ok: false, error: 'Email et mot de passe requis.' };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: mail, password }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.access_token) {
+      // On traduit : « invalid_grant » n'aide personne à se connecter.
+      const brut = String(j.error_description || j.msg || j.error || '');
+      let msg = brut || 'Connexion refusée.';
+      if (/invalid login|invalid_grant|credentials/i.test(brut)) msg = 'Email ou mot de passe incorrect.';
+      else if (/not confirmed/i.test(brut)) msg = "Cette adresse n'est pas encore confirmée. Ouvre l'email de confirmation, ou confirme le compte depuis l'app.";
+      else if (/rate limit|too many/i.test(brut)) msg = 'Trop de tentatives. Réessaie dans quelques minutes.';
+      return { ok: false, error: msg };
+    }
+    await saveSession({
+      access_token: j.access_token,
+      refresh_token: j.refresh_token,
+      expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
+      user_id: (j.user && j.user.id) || null,
+      email: (j.user && j.user.email) || mail,
+    });
+    return { ok: true, email: (j.user && j.user.email) || mail };
+  } catch (e) { return { ok: false, error: 'Réseau indisponible — réessaie.' }; }
+}
+
+// État de la session, pour l'afficher SANS mentir : connecté ou non, sous quelle
+// adresse, et surtout si la base sait aujourd'hui séparer les vendeurs. Tant que
+// `cloisonne` est faux, se connecter ne protège rien — on le dit.
+async function authEtat() {
+  const s = await loadSession();
+  const cl = await isCloisonne();
+  if (!s) return { ok: true, connecte: false, cloisonne: cl };
+  // Un refresh_token périmé (longue absence) rend la session inutilisable : on
+  // le vérifie vraiment au lieu d'afficher « connecté » sur un jeton mort.
+  const vivant = await authToken();
+  return { ok: true, connecte: !!vivant, expiree: !vivant, email: s.email || '', cloisonne: cl };
+}
+
+async function authLogout() { await saveSession(null); return { ok: true }; }
 // EST-CE QUE LA BASE SAIT SEPARER LES VENDEURS ?
 // Tant que la colonne `owner` n'existe pas, ecrire un `owner` ferait echouer
 // TOUTES les captures (400 : colonne inconnue). On teste donc l'etat reel de la
@@ -393,6 +449,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // COMPTE VRM (identification du vendeur, depuis la fenêtre de l'extension).
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'authEtat') {
+      authEtat().then(sendResponse); return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogin') {
+      authLogin(msg.email, msg.password).then(sendResponse); return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogout') {
+      authLogout().then(sendResponse); return true;
+    }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'syncNow') {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
       return true; // reponse asynchrone
@@ -401,6 +467,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // On ne l'accepte QUE d'un onglet de l'app elle-meme (verification de
     // l'origine de l'expediteur) — sinon n'importe quel site pourrait nous
     // refiler un jeton et ecrire sous le compte de quelqu'un d'autre.
+    // L'app demande l'état de la session côté extension (pour l'afficher).
+    // Même contrôle d'origine : un site quelconque n'a pas à savoir sous quelle
+    // adresse tu es connecté.
+    if (msg && msg.from === 'vmr-bridge' && msg.action === 'authEtat') {
+      const src = (sender && sender.origin) || (sender && sender.url) || '';
+      if (!/^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(src)) {
+        sendResponse({ ok: false, error: 'origine non autorisee' }); return true;
+      }
+      authEtat().then(sendResponse);
+      return true;
+    }
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
       const from = (sender && sender.origin) || (sender && sender.url) || '';
       const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(from);
@@ -1234,9 +1311,17 @@ try {
   // (assez pour etre a jour, assez espace pour rester discret).
   chrome.alarms.create('cancale-sync', { periodInMinutes: 10 });
   chrome.alarms.create('cancale-active', { periodInMinutes: 20 });
+  // ⚠️ ENTRETIEN DE LA SESSION VENDEUR. Le jeton d'accès dure ~1 h ; il n'était
+  // renouvelé qu'au moment d'écrire, et SEULEMENT si la base est cloisonnée.
+  // Une fois la migration passée, une extension restée ouverte sans écrire
+  // aurait laissé mourir son jeton, puis serait retombée sur la clé publique —
+  // c'est-à-dire, sous RLS, plus aucune capture enregistrée, en silence.
+  // 40 min : bien avant l'heure, et rien ne part si aucune session n'existe.
+  chrome.alarms.create('vrm-session', { periodInMinutes: 40 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
+    else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
   });
 } catch (_) {}
 

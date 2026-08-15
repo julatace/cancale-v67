@@ -1,5 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
+// La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
+// deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
+// dans une base de production sans le relire.
+import MIGRATION_SQL from "../supabase/migrations/001-multi-utilisateurs.sql?raw";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
@@ -1981,6 +1985,21 @@ if (typeof window !== 'undefined') {
 }
 const vmrExtPresent = () => __vmrExtReady;
 const vmrExtVersion = () => __vmrExtVersion;
+// Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
+// (c'est le but) : elle le lui demande par le pont. Renvoie null si l'extension
+// n'est pas là ou ne répond pas — jamais une supposition.
+function vmrAuthEtat(timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
+    const reqId = 'a' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let done = false;
+    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'authEtat:result' && e.data.reqId === reqId) fin(e.data.etat || null); };
+    window.addEventListener('message', onMsg);
+    setTimeout(() => fin(null), timeoutMs);
+    try { window.postMessage({ __vmr: 'authEtat', reqId }, '*'); } catch (_) { fin(null); }
+  });
+}
 function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
@@ -15428,6 +15447,8 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <Row icon="link" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
       <div style={{height:8}}/>
       <ConnexionsSetting/>
+      <div style={{height:8}}/>
+      <SecuriteSetting/>
 
       {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
@@ -15855,6 +15876,91 @@ function PushSetting() {
 // il ne doit jamais partir dans la ligne Supabase partagée. Il reste sur CET
 // appareil. Le mieux reste la variable d'environnement Vercel (AI_API_KEY) —
 // ce champ est le raccourci « je veux tester tout de suite » pour Julien.
+// ── SÉCURITÉ DES DONNÉES : L'ÉTAT RÉEL, MESURÉ ────────────────────────────────
+// Trois verrous doivent être en place pour que « chacun ses données » soit vrai.
+// Ils étaient décrits dans la documentation, donc invérifiables depuis l'app —
+// et un verrou qu'on croit posé est pire qu'un verrou absent. Chacun est
+// SONDÉ pour de bon, et chaque ligne dit quoi faire s'il manque.
+function SecuriteSetting() {
+  const [st, setSt] = useState(null);
+  const [ext, setExt] = useState(undefined);   // undefined = pas encore demandé
+  const [copie, setCopie] = useState('');
+  useEffect(() => { (async () => {
+    const out = { colonne: null, lisibleSansCompte: null, mailAuto: null };
+    // 1. La colonne `owner` existe-t-elle ? (400 « column does not exist » = non)
+    try { out.colonne = (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: sbAuth() })).ok; }
+    catch (_) { out.colonne = null; }
+    // 2. ⚠️ LE PIÈGE : la colonne peut exister sans que RLS soit actif. On teste
+    //    donc ce qui compte vraiment — une lecture avec la clé PUBLIQUE seule
+    //    ramène-t-elle encore des lignes ? Si oui, tout le monde lit tout.
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=id&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      out.lisibleSansCompte = r.ok ? (await r.json()).length > 0 : false;
+    } catch (_) { out.lisibleSansCompte = null; }
+    // 3. Création de compte : faut-il un email de confirmation ? (le serveur de
+    //    test Supabase n'en envoie que quelques-uns par heure)
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+      if (r.ok) { const j = await r.json(); out.mailAuto = !!j.mailer_autoconfirm; }
+    } catch (_) { out.mailAuto = null; }
+    setSt(out);
+    setExt(await vmrAuthEtat());
+  })(); }, []);
+  const copier = async (txt, quoi) => {
+    try { await navigator.clipboard.writeText(txt); setCopie(quoi); setTimeout(()=>setCopie(''), 2200); } catch (_) {}
+  };
+  const Ligne = ({ t, ok, etat, d, action }) => (
+    <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
+      <span style={{flexShrink:0,fontSize:13,marginTop:1}}>{ok === null || ok === undefined ? '⏳' : ok ? '✅' : '⚠️'}</span>
+      <div style={{minWidth:0,flex:'1 1 140px'}}>
+        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok ? INV_STATUS.online.color : C.warn}}>· {etat}</span></div>
+        <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
+        {action}
+      </div>
+    </div>
+  );
+  const s = st || {};
+  const proteges = s.colonne === true && s.lisibleSansCompte === false;
+  return (
+    <div style={{border:`1px solid ${proteges ? C.border : C.warn + '66'}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
+        <span style={{fontSize:11,fontWeight:600,color:proteges?INV_STATUS.online.color:C.warn,background:(proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:999,padding:'1px 8px'}}>
+          {st === null ? 'vérification…' : proteges ? 'cloisonnées' : 'partagées'}
+        </span>
+      </div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>
+        Sondé en direct sur ta base, à chaque ouverture de cet écran.
+      </div>
+      <Ligne t="Propriétaire des lignes" ok={s.colonne}
+        etat={s.colonne === null ? '…' : s.colonne ? 'colonne présente' : 'colonne absente'}
+        d={s.colonne ? "Chaque ligne peut être attribuée à un vendeur."
+          : "Sans elle, toutes les données vivent dans la même ligne : un deuxième compte ouvrirait TA boutique. C'est la migration SQL à passer dans Supabase → SQL Editor."}
+        action={!s.colonne && (
+          <button type="button" onClick={()=>copier(MIGRATION_SQL, 'sql')}
+            style={{marginTop:7,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:9,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : '📋 Copier la migration SQL'}
+          </button>)}/>
+      <Ligne t="Lecture sans compte" ok={s.lisibleSansCompte === false}
+        etat={s.lisibleSansCompte === null ? '…' : s.lisibleSansCompte ? 'tout est lisible' : 'fermée'}
+        d={s.lisibleSansCompte
+          ? "⚠️ La clé publique, visible dans le code, suffit encore à tout lire. C'est le verrou qui compte vraiment (RLS) — la colonne seule ne protège rien."
+          : "La clé publique ne ramène plus rien : seule une session identifiée lit tes données."}/>
+      <Ligne t="Création de compte" ok={s.mailAuto === true}
+        etat={s.mailAuto === null ? '…' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
+        d={s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
+          : "Le serveur d'envoi de test de Supabase est limité à quelques emails par heure — une création peut rester bloquée. Authentication → Providers → Email → décocher « Confirm email »."}/>
+      <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
+        etat={ext === undefined ? '…' : !ext ? 'extension absente ici' : ext.connecte ? (ext.email || 'connectée') : 'pas connectée'}
+        d={!ext ? "Sur téléphone c'est normal. Sur l'ordinateur, ouvre l'app dans le Chrome où l'extension est installée."
+          : ext.connecte ? "Elle écrira sous ce compte dès que la base saura séparer les vendeurs."
+          : "Ouvre la fenêtre de l'extension (son icône dans Chrome) → Compte VRM → entre ton email et ton mot de passe."}/>
+    </div>
+  );
+}
+
 // ── ÉTAT DES CONNEXIONS ───────────────────────────────────────────────────────
 // « Est-ce que ça capte ? » n'avait aucune réponse dans l'app : il fallait lire
 // la base à la main. Trois voies alimentent VRM, chacune peut tomber seule —

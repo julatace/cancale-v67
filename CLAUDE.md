@@ -1662,3 +1662,28 @@ Vert < 2 j / orange < 7 j / rouge au-delà, **la même échelle que l'écran San
 - **Création de compte** : le sous-titre promettait « tes données ne seront visibles que par toi ». **Faux tant que `CLOISONNE` est faux** (vérifié en base : `select=owner` → 400, la colonne n'existe pas) — un compte créé aujourd'hui ouvre la MÊME boutique. Le formulaire le dit maintenant avant, pas après.
 
 **Vérifié au banc app** (`dist` servi, Supabase mocké, faux pont qui rejoue `{__vmr:'ready',version}` **après** le chargement du module — le cas réel) : « Extension Chrome · version 5.12.0 », « Capture Vinted · dernière il y a 3 h », « Emails · dernier il y a 20 h ». **Et sans pont** : « pas détectée ici » + la marche à suivre. **0 PAGEERROR** dans les deux sens. `npm run build` OK, `node --check` OK sur les trois fichiers d'extension.
+
+---
+
+## 5.13 — CONNEXION DEPUIS L'EXTENSION + le tableau de bord de sécurité (⚠️ lire le 1er paragraphe)
+
+Demande de Julien : « un système de connexion où les extensions se connectent à l'application avec mot de passe pour sécuriser les données de chaque utilisateur ».
+
+### ⚠️ Ce qui protège vraiment, dit franchement
+**Un mot de passe côté extension ne cloisonne rien tant que la base ne sépare pas les vendeurs.** Vérifié en direct sur la vraie base ce jour : `select=owner` → **400, la colonne n'existe pas**, et une lecture avec la **clé publique seule** (celle qui est dans le code, donc connue de tous) **ramène encore les lignes**. Tant que c'est le cas, n'importe qui peut tout lire sans jamais voir un écran de connexion — l'isolation vit dans Postgres (colonne `owner` + RLS), pas dans le JavaScript (§12). Tout ce qui suit **prépare** ce jour-là et fonctionne à la seconde où la migration passe ; ça ne le remplace pas.
+
+### L'extension s'identifie toute seule (5.13)
+Jusqu'ici la session ne pouvait venir **que** de l'app, par le pont — donc sur un navigateur où l'app n'est jamais ouverte, l'extension écrivait forcément avec la clé publique : après migration, ça veut dire **plus aucune capture enregistrée**.
+- Fenêtre de l'extension → **Compte VRM** : email + mot de passe → `POST /auth/v1/token?grant_type=password`. ⚠️ **Le mot de passe n'est jamais gardé** : il part une fois, seuls les deux jetons sont stockés dans `chrome.storage.local` (zone locale de l'extension, illisible par un site web).
+- Erreurs traduites (`invalid_grant` → « Email ou mot de passe incorrect », email non confirmé, trop de tentatives), état **session expirée** distingué de **non connecté**, bouton se déconnecter.
+- ⚠️ **Entretien de la session** : le jeton dure ~1 h et n'était renouvelé **qu'au moment d'écrire, et seulement si la base est cloisonnée**. Une extension restée ouverte sans écrire aurait laissé mourir son jeton puis serait retombée sur la clé publique — c'est-à-dire, sous RLS, **plus rien d'enregistré, en silence**. Alarme `vrm-session` toutes les 40 min (elle ne part pas s'il n'y a pas de session).
+- Le pont répond à `{__vmr:'authEtat'}` (même contrôle d'origine que le passage de session : un site quelconque n'a pas à savoir sous quelle adresse tu es connecté) → l'app peut afficher qui est connecté **dans** l'extension.
+
+### Réglages → Sécurité des données : les verrous sont SONDÉS, plus décrits
+Un verrou qu'on croit posé est pire qu'un verrou absent. Quatre lignes, mesurées à chaque ouverture de l'écran :
+1. **Propriétaire des lignes** — la colonne `owner` existe-t-elle ? Sinon, bouton **📋 Copier la migration SQL** (importée depuis `supabase/migrations/001-multi-utilisateurs.sql` avec `?raw` — **pas recopiée** : deux copies finiraient par diverger, et c'est un texte qu'on colle dans une base de production sans le relire).
+2. **Lecture sans compte** — ⚠️ **le piège** : la colonne peut exister sans que RLS soit actif. On teste donc ce qui compte : une lecture avec la clé publique seule ramène-t-elle encore des lignes ?
+3. **Création de compte** — `mailer_autoconfirm` lu sur `/auth/v1/settings` : dit si un email de confirmation est exigé (serveur de test Supabase limité à quelques envois par heure, §12).
+4. **Extension identifiée** — via le pont : connectée, sous quelle adresse.
+
+**Vérifié aux deux bancs.** App (`dist` servi, Supabase mocké) : les 4 lignes rendues avec le bon verdict, badge « partagées », SQL réellement copié (**6 856 caractères**), **0 PAGEERROR**. Puis **état d'après-migration simulé** (`select=owner` → 200, lecture anonyme vide) : l'app **bascule toute seule** sur l'écran de connexion, la porte « entrer sans compte » disparaît, et le pied de page passe à « Chaque vendeur ne voit que ses propres données ». Popup de l'extension (faux `chrome`) : mauvais mot de passe → message honnête et **aucune session**, bon mot de passe validé à la touche Entrée → email affiché, déconnexion → retour à l'état initial. **0 erreur** partout.
