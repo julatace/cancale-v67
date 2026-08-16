@@ -1111,6 +1111,67 @@ const fetchWalletEscrow = async (uidsVivants) => {
     return { total, accounts, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
   } catch (_) { return { total: 0, accounts: 0, plusVieuxJours: null }; }
 };
+// OÙ DÉPOSER SES COLIS — la liste des points relais autour de chez toi, avec
+// leur adresse, leur distance et leurs horaires, captée par l'extension quand
+// Vinted la charge (`/api/v2/shipments/{id}/nearby_drop_off_points`).
+// ⚠️ NE PAS CONFONDRE avec le point relais où RETIRER un achat (§16, toujours
+// ouvert, la donnée n'est que dans les emails) : ici c'est le DÉPÔT, l'endroit
+// où tu portes le carton. Ce sont deux choses différentes.
+// ⚠️ ÉGRESS (§34) : chaque ligne pèse ~30 Ko. On lit donc d'abord les dates en
+// SCALAIRE (quelques octets) et on ne télécharge le contenu que de 4 lignes,
+// UNE PAR COMPTE. Le transporteur est attaché au compte (mesuré : 3 comptes en
+// Mondial Relay, 3 en Shop2Shop) — se limiter aux 3 plus récentes faisait donc
+// disparaître un transporteur sur deux, et avec lui les points où Julien dépose
+// réellement la moitié de ses colis.
+const fetchDropOffPoints = async (uidsVivants) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,cap:data->>capturedAt`, { headers: sbAuth() });
+    if (!res.ok) return { carriers: [], capturedAt: null };
+    let metas = await res.json();
+    const vus = new Set();
+    metas = metas.filter(m => {
+      const uid = String((/harvest_(\d+)_pickup_points$/.exec(String(m.id || '')) || [])[1] || '');
+      // Même règle que partout : un compte existe s'il a des jetons (§5.20).
+      return !(uidsVivants && uidsVivants.size && uid && !uidsVivants.has(uid));
+    }).sort((a, b) => Date.parse(b.cap || 0) - Date.parse(a.cap || 0))
+      .filter(m => { const uid = String((/harvest_(\d+)_/.exec(String(m.id || '')) || [])[1] || ''); if (vus.has(uid)) return false; vus.add(uid); return true; })
+      .slice(0, 4);
+    if (!metas.length) return { carriers: [], capturedAt: null };
+    const ids = metas.map(m => `"${m.id}"`).join(',');
+    const r2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids})&select=id,data`, { headers: sbAuth() });
+    if (!r2.ok) return { carriers: [], capturedAt: null };
+    const rows = await r2.json();
+    const parCarrier = new Map();
+    let recent = 0;
+    for (const row of rows) {
+      const d = row.data || {};
+      const bloc = ((d.payload || {}).nearby_drop_off_points) || {};
+      const nom = (bloc.carrier && bloc.carrier.name) || '';
+      const pts = Array.isArray(bloc.drop_off_points) ? bloc.drop_off_points : [];
+      if (!nom || !pts.length) continue;                 // rien à montrer : on n'invente pas
+      const t = Date.parse(d.capturedAt || 0); if (t > recent) recent = t;
+      const dedup = parCarrier.get(nom) || { carrier: nom, icon: (bloc.carrier || {}).icon_url || '', points: new Map() };
+      for (const p of pts) {
+        if (!p || !p.code || dedup.points.has(p.code)) continue;
+        dedup.points.set(p.code, {
+          code: p.code,
+          nom: p.name || '',
+          adresse: p.drop_off_point_address || '',
+          km: typeof p.distance === 'number' ? p.distance : null,
+          unite: p.distance_unit || 'km',
+          ouverture: (p.opening_status && p.opening_status.text) || '',
+          lat: p.latitude || '', lon: p.longitude || '',
+        });
+      }
+      parCarrier.set(nom, dedup);
+    }
+    const carriers = [...parCarrier.values()].map(c => ({
+      carrier: c.carrier, icon: c.icon,
+      points: [...c.points.values()].sort((a, b) => (a.km == null ? 1e9 : a.km) - (b.km == null ? 1e9 : b.km)),
+    })).filter(c => c.points.length);
+    return { carriers, capturedAt: recent || null };
+  } catch (_) { return { carriers: [], capturedAt: null }; }
+};
 // Factures Pro préparées par le serveur (lignes email_invoice_*) :
 // { number, status: draft|queued|sent, designation, prix, buyerName,
 //   buyerEmail, buyerAddress, html, createdAt, sentAt }
@@ -11152,6 +11213,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow(accountUids).then(setWalletEscrow); };
 
+  // Points de DÉPÔT des colis (§5.26). Chargés seulement sur l'écran Bordereaux
+  // et une seule fois : les lignes pèsent ~30 Ko, on ne les relit pas à chaque
+  // changement d'onglet (§34).
+  const [dropOffs, setDropOffs] = useState(null);
+  const [dropOpen, setDropOpen] = useState(false);
+  useEffect(() => {
+    if (dropOffs !== null || curSub !== 'bordereaux') return;
+    fetchDropOffPoints(accountUids).then(d => { if (d) setDropOffs(d); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub]);
+
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
   // CA finalisé du mois en cours.
@@ -13845,6 +13917,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </button>
                 )}
               </div>
+            </div>
+          );
+        })()}
+        {/* ── OÙ DÉPOSER TES COLIS ────────────────────────────────────────────
+            Les points relais autour de chez toi, avec adresse, distance et
+            horaires. Donnée captée par l'extension quand Vinted la charge :
+            ZÉRO appel Vinted depuis l'app.
+            ⚠️ C'est le DÉPÔT (où tu portes le carton), pas le retrait d'un
+            achat — deux choses différentes, cf. fetchDropOffPoints. */}
+        {(()=>{
+          if (!dropOffs || !dropOffs.carriers.length) return null;
+          const jours = dropOffs.capturedAt ? Math.round((Date.now()-dropOffs.capturedAt)/86400000) : null;
+          const total = dropOffs.carriers.reduce((n,c)=>n+c.points.length,0);
+          return (
+            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
+              <button type="button" onClick={()=>setDropOpen(o=>!o)} aria-expanded={dropOpen}
+                style={{width:'100%',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:18,flexShrink:0}}>📍</span>
+                <span style={{flex:'1 1 150px',minWidth:0}}>
+                  <span style={{display:'block',fontSize:15,fontWeight:700,color:C.text}}>Où déposer tes colis</span>
+                  <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {total} point{total>1?'s':''} près de chez toi · {dropOffs.carriers.map(c=>c.carrier).join(' · ')}
+                  </span>
+                </span>
+                <span style={{flexShrink:0,fontSize:12,color:C.muted}}>{dropOpen?'▲':'▼'}</span>
+              </button>
+              {dropOpen && (
+                <div style={{marginTop:10}}>
+                  {dropOffs.carriers.map(c=>(
+                    <div key={c.carrier} style={{marginBottom:10}}>
+                      <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:6}}>{c.carrier}</div>
+                      {c.points.slice(0,6).map(p=>(
+                        <div key={p.code} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+                          <div style={{flex:'1 1 150px',minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</div>
+                            {p.adresse && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.adresse}</div>}
+                            {p.ouverture && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕒 {p.ouverture}</div>}
+                          </div>
+                          {p.km!=null && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text}}>{p.km} {p.unite}</span>}
+                          {p.lat && p.lon && (
+                            <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`} target="_blank" rel="noreferrer"
+                               style={{flexShrink:0,fontSize:12,color:C.accent,textDecoration:'none'}}>Itinéraire ↗</a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  {/* On DIT l'âge : un point relais ferme, la liste n'est pas éternelle. */}
+                  <div style={{fontSize:11,color:C.muted}}>
+                    Liste captée par l'extension{jours!=null?(jours<1?" aujourd'hui":` il y a ${jours} j`):''} — elle se rafraîchit quand tu prépares un envoi sur Vinted.
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}

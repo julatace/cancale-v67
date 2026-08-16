@@ -2107,3 +2107,37 @@ Fait directement en base, dans cet ordre :
 ⚠️ **Ce qui n'a PAS été touché, volontairement** : les **198 numéros de boîte** de `vinted_annonce_numeros`. Un numéro est écrit sur un carton réel ; effacer ceux d'un compte supprimé ferait perdre le rangement de paires physiquement présentes. Un numéro devenu inutile retourne de toute façon dans le pool tout seul (§7, `freedNums`).
 
 ⚠️ **Nouveau compte repéré au passage** : `angeled92` (3175765377) est apparu dans `vinted_accounts`. Il n'a pas été touché.
+
+---
+
+## 5.26 — LE DIAGNOSTIC A PARLÉ + « où déposer mes colis » (une donnée en base que personne ne lisait)
+
+### 1. La fiche article : le corps rejeté est une PAGE D'ERREUR HTML servie en 200
+L'échantillon posé en §5.24 est arrivé :
+```
+id 9677654811 · type "string" · taille 3771
+tête: <div class="u-text-center u-stretch-height u-margin-top-x-large">
+      <span class="svg"><svg width="300" height="300" …
+```
+➡️ Ce n'est ni un flux vidé (taille 3771), ni la page de l'annonce (trop court) : c'est **l'illustration d'erreur de Vinted, renvoyée avec un statut 200**. Comme `apiGet` ne rejette que `!r.ok`, elle passe le filtre et casse au `JSON.parse`.
+⚠️ La regex n'est PAS en cause — elle est bien bornée à l'API (`/\/api\/v\d+\/items\/(\d+)(?:\?|$)/`), une URL de page ne peut pas la déclencher. **`GET /api/v2/items/{id}` ne rend donc plus la fiche** ; l'endroit où lire la description reste `vinted_item_details` (les fiches lues sur la page, §5.10), qui marche. Reste à identifier le remplaçant côté API — piste : `/api/v2/item_upload/items/{id}` (la requête d'édition captée, §4.96).
+
+### 2. ⚠️ DES ENDPOINTS JAMAIS EXPLOITÉS dorment dans `seen_urls`
+En listant les 39 URL réellement observées :
+| endpoint | ce que ça débloque |
+|---|---|
+| `/api/v2/shipments/{id}/label_url` | **l'URL du bordereau PDF** — « pas encore capturé » depuis §5 |
+| `/api/v2/shipments/{id}/nearby_drop_off_points` | **les points de dépôt** (fait, ci-dessous) |
+| `/api/v2/shipments/{id}/label_options` | les formats d'étiquette proposés |
+
+### 3. « Où déposer tes colis » — 6 lignes en base, 0 lecteur
+`harvest_*_pickup_points` existait déjà (6 comptes, 15 points chacun) et **rien ne la lisait**. Elle porte exactement ce que §16 cherchait dans les emails, mais en structuré : `drop_off_point_address` (« 40 RUE DU PORT, CANCALE, 35260 »), `distance`, `opening_status.text` (« Vendredi 09:30–18:30 »), `latitude/longitude`, `business_hours`, et le transporteur.
+
+⚠️ **NE PAS CONFONDRE avec le point relais de RETRAIT** (§16, toujours ouvert) : ici c'est le **DÉPÔT**, l'endroit où Julien porte le carton. Deux notions différentes — c'est écrit dans le code, à côté de la fonction.
+
+- **`fetchDropOffPoints(uidsVivants)`** + carte dépliable en tête de l'écran **Bordereaux** : nom, adresse, distance, horaires du jour, lien Itinéraire. **Zéro appel Vinted** (la donnée vient de la capture). Comptes supprimés filtrés (§5.20).
+- ⚠️ **Égress (§34)** : chaque ligne pèse ~30 Ko. On lit les dates en **scalaire** d'abord, puis le contenu de **4 lignes seulement, une par compte**, une fois par session, uniquement sur cet écran.
+- ⚠️ **Défaut trouvé au banc, pas à la relecture** : ma 1ʳᵉ version prenait « les 3 plus récentes » → **un transporteur sur deux disparaissait** (le transporteur est attaché au compte : 3 comptes Mondial Relay, 3 Shop2Shop), donc les points où partent la moitié des colis. Une ligne par compte corrige.
+- **On dit l'âge** de la liste : un point relais ferme.
+
+**Vérifié au banc** (§20, `dist` servi, Supabase mocké honorant `select=`, vraies lignes) : carte rendue, dépliée, **les deux transporteurs présents** (SUPER U ACCUEIL / Shop2Shop 1,7 km · Maison de la Presse / Mondial Relay 1,9 km), adresses et horaires réels, aucun débordement à 420 px. **0 erreur** (le seul 400 est le sondage `select=owner` volontaire). `npm run build` OK · `scripts/audit-coherence.cjs` : **4 règles, 0 désaccord**.
