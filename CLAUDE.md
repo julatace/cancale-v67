@@ -2065,3 +2065,26 @@ Tentation évidente : 337 achats captés, un score existant, il suffirait de rel
 
 ### Vérifié
 `npm run build` OK · smoke app sur les vraies données : **12 écrans, 0 PAGEERROR** (les 3 « suspects » = l'accord de « colis », invariable) · `scripts/audit-coherence.cjs` : **5 règles, 0 désaccord**.
+
+---
+
+## 5.24 — LE COMPTEUR DE DIAGNOSTIC A PARLÉ : la fiche article échoue au `JSON.parse`
+
+Le compteur posé en §46 (`panel_diag_capture`) a enfin des données. Relevé :
+
+| clé | valeur |
+|---|---|
+| `recu_item` | **13** |
+| `abandon_json_item` | **13** |
+| `ecrit_item` | **0** |
+| tout le reste (profil 70, conversations 57, annonces 47, ventes 26, achats 21, porte-monnaie 43…) | reçu ≈ écrit |
+
+➡️ **Les 13 réponses de fiche article arrivent bien et sont TOUTES rejetées par `JSON.parse`.** La fuite ouverte depuis §46 est localisée : ce n'est ni l'URL (le motif matche), ni le compte (il est trouvé), ni l'écriture — c'est le **corps** qui n'est pas du JSON.
+
+⚠️ **Localisé ≠ expliqué.** Corps vide ? HTML de la page servi sur la même URL ? flux déjà consommé ? On ne peut pas trancher sans voir. Donc **on instrumente encore une fois** plutôt que de supposer : `echantillonRate(type, id, body)` garde **un exemplaire par type** dans `panel_diag_capture.rates` — `{id, taille, type, tete: 160 premiers caractères, at}`. Assez pour reconnaître la forme, trop court pour embarquer quoi que ce soit d'utile ou de lourd, un seul exemplaire écrasé à chaque fois.
+
+➡️ **Prochaine session : lire `panel_diag_capture.rates.item`.** Si `tete` commence par `<!DOCTYPE`, c'est la page HTML qui matche le motif → resserrer la regex. Si `taille` vaut 0, c'est le flux déjà consommé → cloner plus tôt dans `inject.js`.
+
+**Autre trouvaille du même relevé** : `recu_pickup_points: 1` / `ecrit_pickup_points: 1`. **Vinted expose donc bien les points relais** — ce que §16 avait conclu introuvable côté API (« la donnée n'existe QUE dans l'email »). Une ligne existe maintenant. À rouvrir quand il y en aura assez pour en tirer quelque chose.
+
+**Vérifié au banc `vm`** (vrai `storeHarvest`, corps HTML injecté) : ligne de diagnostic écrite, échantillon présent, `tete` = `<!DOCTYPE html><html lang="fr">…`, taille 131. `node --check` OK. Extension **5.19.0**.

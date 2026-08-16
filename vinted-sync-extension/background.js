@@ -352,6 +352,27 @@ async function logActivity(text) {
 // Conséquence concrète : sans fiche article, pas de description → « Republier »
 // obligerait à tout retaper. C'est le vrai blocage de cette fonction.
 const _diag = { n: {}, dernier: 0 };
+// Un exemplaire par type, écrasé à chaque fois (pas d'accumulation).
+const _rates = {};
+let _ratesEcritAt = 0;
+async function echantillonRate(type, id, body) {
+  try {
+    const t = String(type || 'inconnu');
+    _rates[t] = {
+      id: String(id == null ? '' : id).slice(0, 40),
+      taille: body == null ? null : String(body).length,
+      type: typeof body,
+      tete: String(body == null ? '' : body).slice(0, 160),
+      at: new Date().toISOString(),
+    };
+    if (Date.now() - _ratesEcritAt < 60000) return;
+    _ratesEcritAt = Date.now();
+    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { ...cur, rates: { ...(cur.rates || {}), ..._rates } } }], 'id');
+  } catch (_) {}
+}
+
 async function noterDiag(cle) {
   try {
     _diag.n[cle] = (_diag.n[cle] || 0) + 1;
@@ -410,7 +431,17 @@ async function storeHarvest(domain, type, id, body) {
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
   let parsed = null;
-  try { parsed = JSON.parse(body); } catch (_) { noterDiag(`abandon_json_${type || 'inconnu'}`); return; }
+  try { parsed = JSON.parse(body); } catch (_) {
+    noterDiag(`abandon_json_${type || 'inconnu'}`);
+    // ⚠️ MESURER AVANT DE SUPPOSER. Le compteur a localisé la fuite des fiches
+    // article (13 reçues, 13 rejetées, 0 rangée) mais pas sa CAUSE : corps vide,
+    // HTML au lieu de JSON, flux déjà consommé… on ne peut pas trancher sans
+    // voir. On garde donc un ÉCHANTILLON COURT (160 caractères de tête, la
+    // longueur, l'URL) — assez pour reconnaître la forme, trop court pour
+    // embarquer quoi que ce soit d'utile ou de lourd.
+    echantillonRate(type, id, body);
+    return;
+  }
 
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
