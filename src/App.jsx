@@ -1078,9 +1078,10 @@ const fetchWalletEscrow = async (uidsVivants) => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return { total: 0, dispo: 0, accounts: 0, plusVieuxJours: null };
+    if (!res.ok) return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), plusVieuxJours: null };
     const rows = await res.json();
     let total = 0, accounts = 0, plusVieux = 0, dispo = 0;
+    const avecSolde = new Set();   // uid des porte-monnaie RÉELLEMENT lus
     // ⚠️ TROIS FORMES DIFFÉRENTES en base, vérifiées sur les 8 lignes réelles :
     // le porte-monnaie classique `{main, escrow}` (5 lignes), la réponse de
     // `payouts` `{balance, history, reference}` ajoutée en 4.26 (2 lignes, dont
@@ -1111,6 +1112,7 @@ const fetchWalletEscrow = async (uidsVivants) => {
       if (isNaN(attente) && isNaN(dispoN)) continue;    // pas un porte-monnaie
       const n = isNaN(attente) ? NaN : attente;
       if (!isNaN(dispoN)) dispo += dispoN;
+      if (uid) avecSolde.add(uid);
       if (!isNaN(n)) {
         total += n; accounts++;
         // L'argent bouge. Un solde lu il y a cinq jours n'est pas « le montant
@@ -1119,8 +1121,8 @@ const fetchWalletEscrow = async (uidsVivants) => {
         if (t) { const j = (Date.now() - t) / 86400000; if (j > plusVieux) plusVieux = j; }
       }
     }
-    return { total, dispo, accounts, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
-  } catch (_) { return { total: 0, dispo: 0, accounts: 0, plusVieuxJours: null }; }
+    return { total, dispo, accounts, avecSolde, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
+  } catch (_) { return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), plusVieuxJours: null }; }
 };
 // OÙ DÉPOSER SES COLIS — la liste des points relais autour de chez toi, avec
 // leur adresse, leur distance et leurs horaires, captée par l'extension quand
@@ -12339,8 +12341,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </div>
               <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
-                ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie{reel.accounts>1?'x':''}.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null} Ouvre ton porte-monnaie sur les autres comptes pour les inclure.</>
+                ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null}</>
                 : <>Estimation d'après tes ventes en cours. Ouvre une fois ton porte-monnaie sur Vinted : l'app affichera ensuite le montant exact.</>}</div>
+              {/* ⚠️ CE TOTAL EST PARTIEL TANT QUE TOUS LES PORTE-MONNAIE N'ONT PAS
+                  ÉTÉ LUS. Julien : « j'ai 323 € en attente sur un seul compte, ce
+                  n'est pas possible que le total soit 504 € avec sept comptes » —
+                  il a raison, et le total n'était pas faux, il était INCOMPLET.
+                  On NOMME donc les comptes manquants au lieu de laisser croire à
+                  un chiffre complet. Un total partiel qui se présente comme
+                  complet est pire qu'un total absent. */}
+              {(()=>{
+                const lus = (reel && reel.avecSolde) || new Set();
+                const manquants = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
+                if (!manquants.length) return null;
+                return (
+                  <div style={{marginTop:8,padding:'8px 10px',border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:10,fontSize:11,color:C.text,lineHeight:1.45}}>
+                    ⚠️ <b>Total incomplet</b> — {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} n'{manquants.length>1?'ont':'a'} pas encore de porte-monnaie lu, donc leur argent en attente n'est <b>pas</b> dans ce chiffre :{' '}
+                    <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
+                    <div style={{marginTop:4,opacity:0.85}}>Ouvre « Mon porte-monnaie » sur Vinted avec chacun de ces comptes : l'extension le capte au passage.</div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}

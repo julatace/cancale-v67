@@ -2184,3 +2184,20 @@ Donc pour les colis du jour, l'app **ne peut rien afficher** : la donnée n'exis
 
 ### Vérifié
 `npm run build` OK · `node --check` OK sur `background.js` et `inject.js` · banc app (§20, `dist` servi, Supabase mocké honorant `select=`, vraies lignes) : carte « Où déposer » avec **les deux transporteurs**, **0 erreur** (le seul 400 est le sondage `select=owner` volontaire) · `scripts/audit-coherence.cjs` : **5 règles, 0 désaccord** · règle du porte-monnaie exécutée sur les vraies lignes : ancien 504,00 € → nouveau **504,00 € en attente + 114,36 € disponibles** distingués. Extension **5.20.0**.
+
+### 5.27 (suite) — ⚠️ LE TOTAL N'ÉTAIT PAS FAUX, IL ÉTAIT **INCOMPLET** (et il se présentait comme complet)
+
+Capture d'écran de Julien : sur **un seul** compte, « Montant en attente **323,10 €** / Montant disponible 0,00 € ». Or l'app annonçait 504 € pour ~7 comptes. Sa conclusion est juste — et ce 323,10 € **ne correspond à aucune** des deux valeurs en base (359 € et 145 €), donc **ce compte n'a jamais été capté**.
+
+Relevé des 8 lignes `billing` : **2 seulement portent un montant**, les **6 autres sont vides** (`payload: {}`) — écrites par une version de l'extension antérieure au garde-fou (d'où le correctif ci-dessus, désormais dans `storeHarvestRow`).
+
+➡️ **Un total partiel qui se présente comme complet est pire qu'un total absent.** La carte « Argent en attente » porte maintenant un bandeau qui **NOMME les comptes manquants** :
+> ⚠️ Total incomplet — 6 comptes sur 8 n'ont pas encore de porte-monnaie lu, donc leur argent en attente n'est pas dans ce chiffre : julienf765, tomj683, angeled92, llloollllaa, liliand653, julatace35260.
+
+`fetchWalletEscrow` renvoie `avecSolde` (les uid réellement lus) ; la carte croise avec les comptes actifs (`acctOff` exclu, §11).
+
+⚠️ **PIÈGE §26 ÉVITÉ DE JUSTESSE** : ma 1ʳᵉ version appelait `acctLabel(a)` — **fonction inexistante dans cette portée**. `npm run build` passe (JSX ne le voit pas) et un smoke sans données ne rend pas la carte : c'est **exactement** le plantage « `reel is not defined` » de §26. Le bon helper est `accName(acc)` (l. 11142). **Toute carte conditionnelle doit être RENDUE avec les vraies données**, pas seulement compilée.
+
+⚠️ **Piège de banc, nouveau** : l'app filtre avec le joker SQL **`%`** (`id=like.harvest_123_orders_%`), mon mock ne traduisait que `*` → aucune commande servie, l'écran Ventes tombait en « Impossible de charger » et la carte n'était jamais rendue. Corrigé (`/[*%]/g`).
+
+**Vérifié au banc, carte réellement rendue sur les vraies données** : « lu sur 3 porte-monnaie · 114,36 € disponibles » + le bandeau nommant les **6 comptes manquants**, **0 erreur** (le seul 400 est le sondage `select=owner` volontaire).
