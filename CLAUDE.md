@@ -2088,3 +2088,22 @@ Le compteur posé en §46 (`panel_diag_capture`) a enfin des données. Relevé :
 **Autre trouvaille du même relevé** : `recu_pickup_points: 1` / `ecrit_pickup_points: 1`. **Vinted expose donc bien les points relais** — ce que §16 avait conclu introuvable côté API (« la donnée n'existe QUE dans l'email »). Une ligne existe maintenant. À rouvrir quand il y en aura assez pour en tirer quelque chose.
 
 **Vérifié au banc `vm`** (vrai `storeHarvest`, corps HTML injecté) : ligne de diagnostic écrite, échantillon présent, `tete` = `<!DOCTYPE html><html lang="fr">…`, taille 131. `node --check` OK. Extension **5.19.0**.
+
+---
+
+## 5.25 — shop_cancale SUPPRIMÉ POUR DE BON (16 août)
+
+Demande : « je veux que shop cancale soit totalement supprimé ».
+
+⚠️ **Il n'était pas supprimable depuis l'app** : sa ligne `vinted_accounts` avait déjà disparu, donc il n'apparaissait dans aucune liste et le bouton « 🗑 Supprimer ce compte » (§5.22) était hors d'atteinte. Ses **12 lignes moissonnées** continuaient pourtant d'exister (annonces, ventes, achats, boîte, porte-monnaie à 57,23 €…). Et `vrm_blocked_accounts` était **vide** depuis le « Tout réafficher » du 16 août 09:18 (§5.20) — l'extension aurait donc pu le recapter à la première reconnexion.
+
+Fait directement en base, dans cet ordre :
+1. **liste noire** — `199082413` + `shop_cancale` réinscrits dans `vrm_blocked_accounts` (lecture-fusion-écriture) → `captureDomain` refuse de le recapter (§5.18) ;
+2. **jetons** — `DELETE vinted_accounts` (0 ligne, déjà absente) ;
+3. **12 lignes vidées** par upsert `{supprime:true, uid, purgedAt}` — ⚠️ le `DELETE` sur `app_data` reste sans effet avec la clé publique (§5.22), vider est la seule suppression réelle possible.
+
+**Vérifié après coup** : 0 ligne non vidée, 8 comptes restants (`julienf765, tomj683, angeled92, llloollllaa, tomj606, liliand653, julatace35260, julatace3535`).
+
+⚠️ **Ce qui n'a PAS été touché, volontairement** : les **198 numéros de boîte** de `vinted_annonce_numeros`. Un numéro est écrit sur un carton réel ; effacer ceux d'un compte supprimé ferait perdre le rangement de paires physiquement présentes. Un numéro devenu inutile retourne de toute façon dans le pool tout seul (§7, `freedNums`).
+
+⚠️ **Nouveau compte repéré au passage** : `angeled92` (3175765377) est apparu dans `vinted_accounts`. Il n'a pas été touché.
