@@ -1887,3 +1887,37 @@ Le pseudo d'un compte supprimé est repris de la liste noire (elle garde `logins
 
 ### Vérifié
 `node --check` sur les deux fichiers · banc de la porte (vrai `captureDomain` en `vm`, `fetch` simulé) : liste noire seule → **refusé, ligne effacée, refus noté** ; réautorisé → **capté, aucun effacement** — **0 cas non conforme** · banc panneau : les 5 états rendus avec le bon bouton et le bon message, **0 erreur**, et le clic envoie exactement `relierCompte` / `setAccountOff{off:false}` · vrai `buildPanelData` contre la vraie base : 13 annonces, 10 comptes dont **shop_cancale (96 annonces) désormais visible et réactivable**. Extension **5.16.0**.
+
+---
+
+## 5.19 — ⚠️ « ARRÊTE D'INVENTER DES DONNÉES » : il avait raison sur les deux tableaux
+
+### 1. Une VRAIE fausse ligne dormait dans sa base de production
+Trouvée en cherchant, pas en supposant : **`email_bord_99000000001`** — « Nike Air Max N°99001 Taille 42 », suivi `LD123456789FR`, `uid` vide, `account` vide, **aucun PDF**. Créée le 11 juillet en testant le pipeline email. Elle apparaissait dans ses bordereaux « à imprimer » comme un colis réel : c'est **littéralement de la donnée inventée dans son outil de travail**.
+Scan complet : **1 seule** sur les 1000 lignes `app_data`, et **rien** dans la ligne `main` (ni numéro ≥ 9000, ni facture, ni motif de test).
+⚠️ **La clé publique n'a pas le droit de DELETE** (200 / 0 ligne supprimée) : impossible de l'effacer depuis un script. Le ✕ de la carte la masque en un clic.
+➡️ **Règle : ne JAMAIS écrire de donnée de test dans la base de production.** Les bancs servent des copies (§20/§35) ; une ligne synthétique n'a rien à y faire.
+
+### 2. Le chemin de capture PRÉFÉRÉ tronquait les commandes à 100
+`pageActiveFetch` (injecté dans la page, c'est le chemin choisi en premier par `runActive`) faisait `my_orders?page=1&per_page=100` — **une seule page** — alors que l'autre chemin (`fetchAllOrdersCookie`, par cookie) paginait. Donc selon le chemin emprunté, le même compte rendait 320 ventes ou 100.
+**Pire : la capture tronquée ÉCRASAIT la complète.** Le garde-fou anti-partiel (§5.13) ne protégeait que le *dressing* ; les commandes et la boîte n'avaient rien. Des ventes disparaissaient donc toutes seules, sans que personne ne touche à rien.
+
+**Mesuré au banc, sur les vraies volumétries (320 ventes / 434 achats / 603 annonces) :**
+| | avant | après |
+|---|---|---|
+| ventes captées | **100** | **320** |
+| achats captés | **100** | **434** |
+| annonces | 603 | 603 |
+| porte-monnaie | oui | oui |
+
+- `listePlusRiche(rowId, parsed, cle)` **remplace** `dressingPlusRiche` et s'applique à **toutes** les listes (`CLE_LISTE` : listings/orders_sold/orders_purchased/inbox), **sur les DEUX voies d'écriture** (passive `storeHarvest` + active `storeHarvestRow`). Compteur lu **en scalaire** (`select=n:data->>nItems`), jamais le payload (§34).
+- Les commandes se paginent maintenant **dans la page** aussi (10 pages max, pause 700 ms, arrêt sur `total_pages`).
+
+### 3. Capture à CHAQUE visite sur Vinted (la demande)
+`chrome.tabs.onUpdated` (statut `complete`, domaine Vinted) → `visiteVinted()` → `runActive()`, **3 s après le chargement** (on laisse la capture passive profiter de ce que la page demande d'elle-même).
+- **Uniquement le compte connecté dans cet onglet**, depuis sa session et son IP — jamais tous les comptes d'un coup (§5, la signature multi-comptes).
+- **Délai de garde de 5 min par compte** (`vrmDerniereVisite`, local). ⚠️ Ce **n'est pas** un « rythme faussement humain » (toujours refusé, §32) : c'est ne pas refaire dix fois la même lecture en naviguant de page en page — sans lui, ouvrir 30 annonces = 30 moissons complètes.
+- `runActive()` rend désormais un booléen, pour que le journal dise « rafraîchi » seulement quand quelque chose a été rangé.
+
+### Vérifié
+Banc `vm` avec le VRAI code : **6 cas de garde-fou** (dressing / ventes / achats / boîte, tronqué → ignoré, complet → écrit) + **délai de garde dans les deux sens** → **0 cas non conforme**. Banc de pagination exécutant réellement la fonction injectée : **320/434/603 + porte-monnaie, 0 écart** (et 100/100 avant correction, mesuré au `git stash`). Banc panneau : **16 onglets, 0 erreur d'app** (les 2 artefacts connus). Extension **5.17.0**.

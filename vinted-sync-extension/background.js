@@ -370,6 +370,27 @@ async function noterDiag(cle) {
 // Le dressing qui arrive est-il au moins aussi riche que celui déjà en base ?
 // Lecture ULTRA légère : on ne relit que le compteur `nItems` (un scalaire),
 // jamais le payload — la leçon d'égress de §34 vaut aussi ici.
+// ⚠️ LA MÊME RÈGLE, POUR TOUTE LISTE MOISSONNÉE. Elle ne protégeait que le
+// dressing. Or les commandes et la boîte se font écraser exactement pareil :
+// une réponse tronquée (page 1 seule, liste filtrée, session à moitié expirée)
+// remplaçait une capture complète, et des ventes « disparaissaient » sans que
+// personne ne touche à rien. Le compteur est lu EN SCALAIRE (`data->>nItems`),
+// jamais le payload — la leçon d'égress de §34 vaut ici aussi.
+const CLE_LISTE = { listings: 'items', orders_sold: 'my_orders', orders_purchased: 'my_orders', inbox: 'conversations' };
+async function listePlusRiche(rowId, parsed, cle) {
+  const n = ((parsed && parsed[cle]) || []).length;
+  const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
+  if (isFinite(total) && total > 0 && n >= total) return true;   // capture complète : fait foi
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${rowId}&select=n:data->>nItems`, { headers: await sbHeaders() });
+    if (!r.ok) return true;                       // on ne sait pas → on écrit
+    const j = await r.json();
+    const avant = Number(j[0] && j[0].n);
+    if (!isFinite(avant)) return true;            // ancienne ligne sans compteur → on écrit
+    return n >= avant;                            // jamais plus pauvre qu'avant
+  } catch (_) { return true; }
+}
+
 async function dressingPlusRiche(rowId, parsed) {
   const n = ((parsed && parsed.items) || []).length;
   const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
@@ -424,8 +445,8 @@ async function storeHarvest(domain, type, id, body) {
   // Règle : une réponse COMPLÈTE (items ≥ total annoncé par Vinted) fait
   // toujours foi ; sinon on n'écrase que si on apporte AU MOINS autant
   // d'articles qu'avant.
-  if (type === 'listings' && !(await dressingPlusRiche(rowId, parsed))) {
-    noterDiag('ignore_dressing_partiel');
+  if (CLE_LISTE[type] && !(await listePlusRiche(rowId, parsed, CLE_LISTE[type]))) {
+    noterDiag(`ignore_partiel_${type}`);
     return;
   }
   // ⚠️ MÊME PIÈGE QUE LE DRESSING, SUR LE PORTE-MONNAIE. Le motif « billing » de
@@ -435,7 +456,7 @@ async function storeHarvest(domain, type, id, body) {
   // que ce qui porte vraiment un montant de porte-monnaie.
   if (type === 'billing' && !estPorteMonnaie(parsed)) { noterDiag('ignore_billing_hors_sujet'); return; }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
-  if (type === 'listings') data.nItems = ((parsed && parsed.items) || []).length;
+  if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
   data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
   const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
@@ -1104,9 +1125,9 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // dressing complet. La moisson ACTIVE pagine (fetchAllWardrobe) donc elle
   // passe toujours — mais si un jour une page échoue en cours de route, on ne
   // veut pas que le résultat tronqué remplace la bonne capture.
-  if (type === 'listings') {
-    data.nItems = ((payload && payload.items) || []).length;
-    if (!(await dressingPlusRiche(`harvest_${uid}_listings`, payload))) return;
+  if (CLE_LISTE[type]) {
+    data.nItems = ((payload && payload[CLE_LISTE[type]]) || []).length;
+    if (!(await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]))) return;
   }
   data.resume = resumeCommandes(type, payload) || undefined;
   // On ecrit AUSSI updated_at : la table n'a pas de trigger, la colonne gardait
@@ -1343,8 +1364,27 @@ async function pageActiveFetch() {
             await new Promise(res => setTimeout(res, 700));
           }
         }
-        const sold = await get('/api/v2/my_orders?type=sold&page=1&per_page=100');
-        const bought = await get('/api/v2/my_orders?type=purchased&page=1&per_page=100');
+        // ⚠️ LES COMMANDES AUSSI SE PAGINENT. On ne prenait QUE la page 1 ici,
+        // alors que l'autre chemin (par cookie) paginait — donc selon le chemin
+        // emprunté, un compte à 320 ventes en rendait 320 ou 100. Et comme une
+        // capture écrase la précédente, la version tronquée EFFAÇAIT la
+        // complète : des ventes disparaissaient toutes seules. Même faute que
+        // le dressing (§5.13), sur les commandes.
+        const toutesCommandes = async (type) => {
+          const MAX = 10; let out = null;
+          for (let pg = 1; pg <= MAX; pg++) {
+            const r = await get('/api/v2/my_orders?type=' + type + '&page=' + pg + '&per_page=100');
+            const lot = r && Array.isArray(r.my_orders) ? r.my_orders : null;
+            if (!lot) break;
+            if (!out) out = r; else out.my_orders = out.my_orders.concat(lot);
+            const tp = r.pagination && r.pagination.total_pages;
+            if (!lot.length || (tp && pg >= tp) || lot.length < 100) break;
+            await new Promise(res => setTimeout(res, 700));
+          }
+          return out;
+        };
+        const sold = await toutesCommandes('sold');
+        const bought = await toutesCommandes('purchased');
         const inbox = await get('/api/v2/inbox?page=1&per_page=30');
         // PORTE-MONNAIE. Julien : « l'extension n'a pas moyen de capter tout
         // Vinted sans que j'aie besoin de tout ouvrir ? » — si, justement.
@@ -1419,7 +1459,14 @@ async function activeFetchActiveAccount() {
 // Au demarrage / installation : on capte les comptes PUIS on rafraichit le
 // compte ACTIF par cookie (fiable). L'ancien fetch Bearer reste en secours pour
 // les autres comptes, mais il echoue tant que Vinted refuse le Bearer-sans-cookie.
-async function runActive() { if (await pageActiveFetch()) return; if (await activeFetchActiveAccount()) return; await activeFetchAll(); }
+// Rend VRAI si quelque chose a été rangé — la visite peut alors le dire dans
+// le journal au lieu d'annoncer un rafraîchissement qui n'a rien capté.
+async function runActive() {
+  if (await pageActiveFetch()) return true;
+  if (await activeFetchActiveAccount()) return true;
+  await activeFetchAll();
+  return false;
+}
 function fullSync() { captureAllAccounts().then(() => runActive()); }
 
 chrome.runtime.onInstalled.addListener(() => { fullSync(); });
@@ -1441,6 +1488,48 @@ try {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
     else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
+  });
+} catch (_) {}
+
+// ── CAPTURE À CHAQUE VISITE SUR VINTED ──────────────────────────────────────
+// Demande de Julien : « à chaque fois que je vais sur Vinted, l'extension capte
+// toutes les données et rafraîchit pour l'application ». Jusqu'ici la moisson
+// active ne partait qu'au démarrage de Chrome, au changement de session, ou
+// toutes les 20 min — donc en ouvrant Vinted on pouvait travailler sur des
+// chiffres vieux de vingt minutes, et un compte peu visité restait figé.
+//
+// ⚠️ CE QUE ÇA N'EST PAS. On ne rafraîchit QUE le compte connecté dans cet
+// onglet, depuis SA session et SON IP, avec les mêmes appels qu'une visite
+// normale (§5). Jamais tous les comptes d'un coup — c'est ça, la signature
+// multi-comptes que Vinted sanctionne.
+//
+// Le délai de garde n'est pas un « rythme faussement humain » (toujours refusé,
+// §32) : c'est simplement ne pas refaire dix fois la même lecture pendant qu'on
+// navigue de page en page. Sans lui, ouvrir 30 annonces = 30 moissons complètes.
+const VISITE_DELAI_MS = 5 * 60 * 1000;   // au plus une moisson complète / 5 min / compte
+let visiteTimer = null;
+async function visiteVinted() {
+  try {
+    const uid = await activeUidForDomain('www.vinted.fr');
+    if (!uid) return;                                   // pas connecté : rien à capter
+    const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
+    const der = Number(st[uid] || 0);
+    if (Date.now() - der < VISITE_DELAI_MS) return;     // déjà à jour, on ne rejoue pas
+    st[uid] = Date.now();
+    await chrome.storage.local.set({ vrmDerniereVisite: st });
+    const ok = await runActive();
+    logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
+  } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
+}
+try {
+  chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+    if (!info || info.status !== 'complete') return;
+    const u = (tab && tab.url) || '';
+    if (!/^https:\/\/(www\.)?vinted\.(fr|com|it|de)\//.test(u)) return;
+    // Petit délai : on laisse la page finir de se charger, la capture passive
+    // en profite aussi (elle observe ce que la page demande d'elle-même).
+    clearTimeout(visiteTimer);
+    visiteTimer = setTimeout(() => { visiteVinted(); }, 3000);
   });
 } catch (_) {}
 
