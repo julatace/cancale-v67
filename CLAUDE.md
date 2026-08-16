@@ -2029,3 +2029,39 @@ Chrome ne garde **qu'une session Vinted à la fois par domaine** : l'extension c
 
 ### Vérifié
 Banc app dédié : le bouton rend, la confirmation s'ouvre, et les **trois** écritures partent — liste noire ✅, jetons ✅, **3 lignes vidées** (`supprime:true`) ✅, **0 PAGEERROR**. Porte-monnaie recalculé sur la vraie base : 561,23 → 504,00 €. Smoke complet : 12 écrans, **0 PAGEERROR** ; les 3 « suspects » restants sont l'accord de « colis » (invariable) — un artefact du banc. `scripts/audit-coherence.cjs` : **0 désaccord sur les 12 statuts**.
+
+---
+
+## 5.23 — LE PRIX D'ACHAT : la marque et la taille ne suffisent pas (le modèle tranche)
+
+Audit large sur les données du jour (26 annonces en ligne, 7 comptes) :
+
+| contrôle | résultat |
+|---|---|
+| annonces sans numéro | **0** |
+| numéros en double sur des annonces en ligne | **0** |
+| **prix d'achat renseignés** | **0 / 26** ⚠️ |
+| plage de numéros | 1 → **182** pour 26 paires, **156 trous** |
+| titres en double parmi les annonces en ligne | 2 |
+| cases posées au garage | **0** |
+
+Le seul vrai défaut de données reste **le prix d'achat** (§22, toujours à zéro) : tout le bénéfice, la marge, la « meilleure marque » et le rapport comptable tournent avec un coût nul.
+
+### ⚠️ Pourquoi je n'ai PAS fait le rapprochement automatique
+Tentation évidente : 337 achats captés, un score existant, il suffirait de relier ce qui n'a qu'un seul bon candidat. **Mesuré : 5 annonces sur 26 ont un candidat unique à « même marque + même taille »… dont 2 FAUX** —
+- « nike p-6000 blanc/jaune **taille 40** » ← « **Nike speakers** maat 40 » (12,29 €)
+- « nike zoom fly 5 bleu **taille 47** » ← « **Nike Air Max 1** SC in maat 47 » (19,49 €)
+
+« nike » + « 40 » désigne des centaines de paires. Un prix d'achat faux ne se voit pas : il produit une marge crédible et fausse **pour toujours**. C'est pire que pas de prix — donc **pas d'attribution automatique**, comme §22 l'avait déjà conclu pour le titre.
+
+### Ce qui a été fait : le MODÈLE devient un signal
+- **`extractModel(text)`** (module-level, à côté de `extractBrand`/`extractSize`) : ~45 modèles (zoom fly, p-6000, air max 95, spezial, samba, gel-resolution, xt-6, medalist…). Rend **le plus long** modèle reconnu (« air max 95 » gagne sur « air max »).
+- **`openPicker`** : même modèle **+5** ; modèles reconnus mais **DIFFÉRENTS → −6** (c'est ce qui écarte « speakers » et « Air Max » des exemples ci-dessus).
+- **Le badge « suggéré » passe de 8 à 12.** À 8, marque + taille suffisaient — exactement les deux faux cas. À 12 il faut le modèle (4+4+5) ou un titre identique. Une paire dont le modèle n'est pas reconnu **n'est jamais « suggérée »** : on ne se prononce pas.
+
+**Mesuré après correction, avec les vraies fonctions de l'app** : 10 annonces sur 26 ont au moins un candidat suggéré, et **toutes les suggestions sont du même modèle ET de la même taille** (« Adidas Spezial noir 35,5 » ← « Baskets Adidas Spezial taille 35,5 », « zoom fly 5 40,5 » ← « Nike zoom fly 5 pink 40,5 »…). Les 16 autres n'affichent aucun badge — c'est honnête, leur achat n'est pas identifiable avec certitude.
+
+⚠️ `extractSize` de l'app était déjà correct (plage 34–52, donc « air max **95** » n'est pas lu comme une pointure) — c'est mon script d'audit qui avait ce défaut, pas le code. Vérifier la règle de l'app avant de l'accuser.
+
+### Vérifié
+`npm run build` OK · smoke app sur les vraies données : **12 écrans, 0 PAGEERROR** (les 3 « suspects » = l'accord de « colis », invariable) · `scripts/audit-coherence.cjs` : **5 règles, 0 désaccord**.

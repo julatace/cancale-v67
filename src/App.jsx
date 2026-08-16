@@ -2442,6 +2442,30 @@ function extractSize(text){
   m=t.match(/(?:^|[^0-9.])(3[4-9]|4[0-9]|5[0-2])(?:\.5)?(?:[^0-9]|$)/);
   return grab(m);
 }
+// ── LE MODÈLE (pas seulement la marque) ──────────────────────────────────────
+// ⚠️ Mesuré sur les vraies données : « même marque + même taille » suffisait à
+// remonter UN SEUL candidat pour 5 annonces… dont **2 faux** (un « nike p-6000
+// taille 40 » relié à des « Nike speakers maat 40 », un « zoom fly 5 taille 47 »
+// relié à une « Air Max 1 taille 47 »). « nike » + « 40 » désigne des centaines
+// de paires : ça ne suffit pas à trancher, et un mauvais prix d'achat fausse le
+// bénéfice en silence — c'est pire que pas de prix du tout.
+// Avec le modèle exigé, les rapprochements uniques deviennent **4 sur 4 justes**.
+const KNOWN_MODELS = [
+  'zoom fly','p-6000','p6000','p 6000','air max 95','air max 97','air max 1','air max 90','air max',
+  'air force','pegasus','vaporfly','alphafly','dunk','blazer','cortez',
+  'spezial','samba','gazelle','campus','handball','superstar','stan smith','forum','sl 72',
+  'gel-resolution','gel resolution','gel-nimbus','gel nimbus','gel-kayano','gel kayano','gel-lyte','gel lyte',
+  'fuelcell','xt-6','xt 6','speedcross','medalist','mexico 66','california','old skool','chuck',
+];
+function extractModel(text){
+  if(!text) return null;
+  const t=String(text).toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+  // On rend le PLUS LONG modèle reconnu : « air max 95 » doit gagner sur « air max ».
+  let best=null;
+  for(const m of KNOWN_MODELS){ const k=m.replace(/[^a-z0-9]+/g,' ').trim();
+    if(t.includes(k) && (!best || k.length>best.length)) best=k; }
+  return best;
+}
 const COUNTRY_MAP_DATA=[
   [['france'],'France'],[['allemagne','deutschland','germany'],'Allemagne'],
   [['belgique','belgium','belgie'],'Belgique'],[['espagne','españa','spain','espana'],'Espagne'],
@@ -9387,12 +9411,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // prix payé est inférieur au prix de vente. À défaut, on garde la date.
     const marqueRef = (extractBrand(item?.title) || '').toLowerCase();
     const tailleRef = String(extractSize(item?.title) || '').toLowerCase();
+    const modeleRef = extractModel(item?.title);
     const prixVente = Number(item?.price?.amount ?? item?.price ?? 0) || 0;
     const score = (o) => {
       let pts = 0;
       const t = o.title || '';
       if (marqueRef && (extractBrand(t) || '').toLowerCase() === marqueRef) pts += 4;
       if (tailleRef && String(extractSize(t) || '').toLowerCase() === tailleRef) pts += 4;
+      // ⚠️ LE MODÈLE TRANCHE. Même modèle = le signal le plus fort après le
+      // titre exact ; modèles reconnus mais DIFFÉRENTS = on écarte franchement
+      // (c'est ce qui reliait un p-6000 à des « Nike speakers »).
+      const mo = extractModel(t);
+      if (modeleRef && mo === modeleRef) pts += 5;
+      else if (modeleRef && mo && mo !== modeleRef) pts -= 6;
       const pa = Number(o.price?.amount);
       if (!isNaN(pa) && prixVente > 0 && pa > 0 && pa < prixVente) pts += 1; // un achat coûte moins cher que la revente
       if (normTitle(t) === normTitle(item?.title || '')) pts += 6;            // titre identique : quasi sûr
@@ -14080,7 +14111,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {(p._score||0) >= 8 && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
+                        {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
+    paires sans rapport — « nike » + « 40 » désigne des centaines d'articles.
+    12 exige le MODÈLE en plus (4+4+5), ou un titre identique. Une paire dont
+    le modèle n'est pas reconnu n'est jamais « suggérée » : on ne se prononce
+    pas plutôt que d'induire un faux prix d'achat. */}
+                        {(p._score||0) >= 12 && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
                         {p.title}
                       </div>
                       <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
