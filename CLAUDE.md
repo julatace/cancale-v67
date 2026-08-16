@@ -1952,3 +1952,35 @@ Chaque compte porte `capte` (la capture la plus récente de ses lignes). La list
 
 ### Vérifié
 Banc `vm` avec le vrai `buildPanelData` : compte supprimé **écarté de la liste ET de ses 96 annonces**, fraîcheur portée par le compte, panne réseau → aucun filtrage — **0 cas non conforme**. Banc panneau : **16 onglets, 0 erreur**. Bancs 5.16/5.17 rejoués : 0 écart. Extension **5.18.0**.
+
+---
+
+## 5.21 — ⚠️⚠️ L'APP DÉPLOYÉE DATE DU 8 AOÛT : 109 commits de corrections n'ont JAMAIS atteint Julien
+
+Plainte : « j'ai que trois paires en ligne, enfin quatre avec une autre, mais elle appartient à un compte bloqué qui n'est même plus dans les comptes répertoriés ».
+
+### Ce que dit la base (mesuré, compte par compte)
+| compte | captées | en ligne | capture | complète ? |
+|---|---|---|---|---|
+| julienf765 | 33 | 3 | aujourd'hui 08:42 | oui (33/33) |
+| tomj606 | 9 | 2 | aujourd'hui 08:42 | oui |
+| llloollllaa | 29 | 3 | aujourd'hui 08:42 | oui |
+| tomj683 | 9 | 3 | aujourd'hui 08:43 | oui |
+| julatace35260 | 100 | 4 | aujourd'hui 08:39 | oui (100/100) |
+| julatace3535 | 20 | 2 | il y a 4,7 j | **non — 20 sur 55** |
+| liliand653 | 1 | 1 | il y a 14 j | oui |
+
+**18 annonces en ligne**, données de Vinted lui-même, captures fraîches du matin. Julien en voit 3 ou 4.
+
+### LA cause : ce n'est pas le code, c'est le DÉPLOIEMENT
+`origin/main` = **8 août**. La branche porte **109 commits** de plus, **et aucune pull request n'est ouverte** (la « PR #3 » citée en §5.11 n'existe plus). Donc l'app qu'il utilise n'a **rien** de ce qui a été corrigé depuis : ni §5.09 (un 401 marquait le compte « bloqué par Vinted » et **effaçait ses annonces** — c'est mot pour mot « un compte bloqué qui n'est plus dans les comptes répertoriés »), ni les bordereaux (§5.17), ni la cohérence (§5.15).
+⚠️ `vinted_accounts_blocked` est **local à l'appareil** (jamais dans `SYNC_KEYS`) : cette liste ne se voit donc PAS en lisant la base. Un diagnostic fait uniquement en base ne peut pas expliquer ce que Julien a sous les yeux — il faut penser au code réellement servi.
+➡️ **Avant de chercher un bug d'affichage, vérifier ce qui tourne chez lui** : `git log -1 origin/main` et le nombre de commits d'écart. Deux fois cette session, un écart de comportement venait de là.
+
+### Correctif quand même apporté (app, §5.20 côté app)
+Une annonce dont le compte n'a plus de ligne `vinted_accounts` passait **tous** les filtres : `acctOffOf(it)` lit `it._acc.vinted_user_id`, et sur un compte supprimé ce champ est vide → `acctOff('')` répond « non masqué » → l'annonce restait affichée alors que son compte n'apparaît plus nulle part.
+`accountUids` (les comptes qui ont vraiment des jetons) + un test en tête d'`annBase` : **une annonce doit venir d'un compte qui existe encore**. Même règle que l'extension.
+⚠️ `accountUids` est déclaré juste après `acctOff`, donc **avant** `annBase` — un `useMemo` lu avant sa déclaration plante au premier rendu (§19).
+
+### Vérifié
+Banc app dédié (3 annonces d'un compte vivant + 1 d'un compte supprimé) : **les 3 restent, la 4ᵉ disparaît, 0 PAGEERROR**. Smoke complet : **12 écrans, 0 erreur, 0 artefact**.

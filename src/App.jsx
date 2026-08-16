@@ -9266,6 +9266,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (panelAcctOff[k] === false) return false;      // rallumé depuis le panneau
     return hiddenAccts.has(k) || blockedAccts.has(k) || panelAcctOff[k] === true;
   };
+  // ── LES COMPTES QUI EXISTENT VRAIMENT ────────────────────────────────────
+  // Un compte existe s'il a des jetons (ligne `vinted_accounts`), pas parce
+  // qu'il reste des données à son nom. Sans cette liste, une annonce rattachée
+  // à un compte supprimé passait tous les filtres : `acctOff('')` répond
+  // « non masqué », donc elle s'affichait alors que son compte n'apparaît même
+  // plus dans la liste des comptes. Même règle que l'extension (§5.20).
+  // ⚠️ Déclaré ICI, avant tout ce qui l'utilise (piège TDZ, §19).
+  const accountUids = useMemo(
+    () => new Set((accounts || []).map(a => String(a.vinted_user_id || '')).filter(Boolean)),
+    [accounts]);
   const acctOffOf = (o) => acctOff(o?._acc?.vinted_user_id);
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = (tid) => {
@@ -9946,6 +9956,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nParTitre = {};
     for (const it of items) { const k = normTitle(it.title); if (k) nParTitre[k] = (nParTitre[k] || 0) + 1; }
     return items.filter(it => {
+      // ⚠️ UNE ANNONCE DOIT VENIR D'UN COMPTE QUI EXISTE ENCORE. `acctOffOf`
+      // teste `_acc.vinted_user_id` : quand ce compte a été supprimé, l'annonce
+      // portait un compte introuvable, `acctOff('')` répondait « non masqué »
+      // et elle restait affichée — une paire d'un compte qui ne figure même
+      // plus dans la liste des comptes. Même règle que l'extension (§5.20) :
+      // un compte existe s'il a des jetons, pas parce qu'il reste des données.
+      const uidIt = String((it && it._acc && it._acc.vinted_user_id) || '');
+      if (!uidIt || !accountUids.has(uidIt)) return false;
       if (acctOffOf(it) || soldManual.has(String(it.id))) return false;
       if (!showEmailSold && emailSoldIds.has(String(it.id))) return false;
       const k = normTitle(it.title);
@@ -9954,7 +9972,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, venduesRecentes]);
+  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, venduesRecentes, accountUids]);
 
   // ── NUMÉROS EN DOUBLE ─────────────────────────────────────────────────
   // Deux annonces EN LIGNE portant le même numéro = deux paires dans la même
