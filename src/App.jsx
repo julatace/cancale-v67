@@ -12379,19 +12379,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:l.attente?C.accent:C.muted}}>{l.attente!=null?`${l.attente.toFixed(2).replace('.',',')} €`:'—'}</span>
                       </div>
                     ))}
-                    {absents.map(a=>(
-                      <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0',opacity:0.75}}>
-                        <div style={{flex:'1 1 130px',minWidth:0}}>
-                          <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{accName(a)}</div>
-                          <div style={{fontSize:10,color:C.warn,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>porte-monnaie jamais lu — ouvre-le sur Vinted</div>
+                    {/* ⚠️ RÈGLE DE JULIEN, VÉRIFIÉE : l'argent en attente est la SOMME DES
+                        VENTES EN COURS. Mesuré compte par compte contre le solde Vinted —
+                        `angeled92` tombe à l'euro près (91,00 € = 91,00 €, 4 ventes). Donc
+                        pour un compte dont le porte-monnaie n'a jamais été lu, on n'affiche
+                        plus « ? » : on calcule. C'est une ESTIMATION et c'est écrit, mais
+                        c'est infiniment plus utile qu'un trou.
+                        ⚠️ Là où le solde Vinted EST connu, il fait foi : quand il dépasse la
+                        somme des ventes (359 € contre 283 €), l'écart mesure exactement les
+                        ventes qui ne sont pas encore captées — on ne le maquille pas. */}
+                    {absents.map(a=>{
+                      const u=String(a.vinted_user_id||'');
+                      const mes=inRoute.filter(o=>String(o._acc?.vinted_user_id||'')===u);
+                      let s=0; for(const o of mes){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) s+=v; }
+                      return (
+                        <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0',opacity:0.85}}>
+                          <div style={{flex:'1 1 130px',minWidth:0}}>
+                            <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{accName(a)}</div>
+                            <div style={{fontSize:10,color:C.warn,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                              {mes.length?`estimé sur ${mes.length} vente${mes.length>1?'s':''} en cours — ouvre son porte-monnaie pour le chiffre exact`:'porte-monnaie jamais lu, aucune vente en cours captée'}
+                            </div>
+                          </div>
+                          <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:s?C.warn:C.muted}}>{s?`≈ ${s.toFixed(2).replace('.',',')} €`:'?'}</span>
                         </div>
-                        <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.muted}}>?</span>
-                      </div>
-                    ))}
-                    <div style={{display:'flex',alignItems:'center',gap:8,borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:7}}>
-                      <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>Total lu</div>
-                      <span style={{fontSize:14,fontWeight:700,color:C.accent}}>{reel.total.toFixed(2).replace('.',',')} €</span>
-                    </div>
+                      );
+                    })}
+                    {(()=>{
+                      let est=0;
+                      for(const a of absents){ const u=String(a.vinted_user_id||'');
+                        for(const o of inRoute) if(String(o._acc?.vinted_user_id||'')===u){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) est+=v; } }
+                      return (
+                        <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:7}}>
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>Total lu chez Vinted</div>
+                            <span style={{fontSize:14,fontWeight:700,color:C.accent}}>{reel.total.toFixed(2).replace('.',',')} €</span>
+                          </div>
+                          {est>0 && (
+                            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
+                              <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>+ estimé sur les autres comptes</div>
+                              <span style={{fontSize:14,fontWeight:700,color:C.warn}}>≈ {est.toFixed(2).replace('.',',')} €</span>
+                            </div>
+                          )}
+                          {est>0 && (
+                            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6,borderTop:`1px dashed ${C.border}`,paddingTop:6}}>
+                              <div style={{flex:1,fontSize:13,fontWeight:700,color:C.text}}>Total probable</div>
+                              <span style={{fontSize:15,fontWeight:700,color:C.accent}}>≈ {(reel.total+est).toFixed(2).replace('.',',')} €</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
