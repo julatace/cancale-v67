@@ -2212,3 +2212,25 @@ Julien : « quand j'appuie sur en attente, je veux le détail du décompte ». U
 - un **« Total lu »** en pied, qui doit égaler le grand chiffre.
 
 **Vérifié au banc sur les vraies données** : 359,00 € (lu il y a 5 j) · 145,00 € (lu aujourd'hui · 114,36 € disponibles) · 0,00 € · **6 lignes « jamais lu »** · **Total lu 504,00 €**. **0 erreur.**
+
+### 5.27 (suite) — ⚠️ JULIEN AVAIT LA RÈGLE : en attente = SOMME DES VENTES EN COURS
+
+« Si tu n'arrives pas à capter la bonne somme en attente, c'est que tu ne captes pas toutes les ventes en cours — il s'agit simplement de la somme des ventes en cours. »
+
+**Testé compte par compte contre le solde annoncé par Vinted** (ventes moissonnées, `classifyOrderStatus==='pending'`) :
+
+| compte | escrow Vinted | somme des ventes en cours |
+|---|---|---|
+| **angeled92** | **91,00 €** | **91,00 € (4)** ✅ **exact** |
+| julatace3535 | 359,00 € | 283,10 € (8) — manque 75,90 € |
+| julatace35260 | 157,00 € | 125,00 € (3) — manque 32,00 € |
+| tomj606 | 145,00 € | 116,00 € (3) — manque 29,00 € |
+
+➡️ **La règle est juste** (un compte tombe à l'euro près) et **l'écart mesure exactement les ventes non captées** — c'est le diagnostic qu'il proposait, confirmé par les chiffres.
+
+**Ce qu'on en fait** : un compte dont le porte-monnaie n'a jamais été lu n'affiche plus « ? » — on **calcule** son en-attente depuis ses ventes en cours, marqué « estimé sur N ventes en cours ». Pied du décompte : **Total lu chez Vinted · + estimé sur les autres comptes · Total probable**.
+⚠️ Là où Vinted a parlé, **son solde fait foi** : on ne remplace jamais un chiffre mesuré par une estimation, et un escrow supérieur à la somme des ventes reste visible tel quel — c'est le signal « il manque des ventes ici ».
+
+⚠️ **PIÈGE DE MESURE (§21, troisième fois)** : mon premier script rendait **0 vente en cours partout**. Cause — `price` est un **objet** `{amount, currency_code}`, pas un nombre : `String(price)` → `"[object Object]"` → NaN → toutes les ventes écartées. J'ai failli conclure « aucune vente en cours » et accuser la capture. **Toujours vérifier la FORME du champ avant de conclure à un zéro.**
+
+**Vérifié au banc** (vraies données) : lignes estimées rendues (≈ 36 / 30 / 91 / 126 / 125 €), pied « Total lu 504,00 € · + estimé ≈ 408,00 € · **Total probable ≈ 912,00 €** », **0 erreur**.
