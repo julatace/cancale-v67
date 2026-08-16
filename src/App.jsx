@@ -1078,9 +1078,9 @@ const fetchWalletEscrow = async (uidsVivants) => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return { total: 0, accounts: 0, plusVieuxJours: null };
+    if (!res.ok) return { total: 0, dispo: 0, accounts: 0, plusVieuxJours: null };
     const rows = await res.json();
-    let total = 0, accounts = 0, plusVieux = 0;
+    let total = 0, accounts = 0, plusVieux = 0, dispo = 0;
     // ⚠️ TROIS FORMES DIFFÉRENTES en base, vérifiées sur les 8 lignes réelles :
     // le porte-monnaie classique `{main, escrow}` (5 lignes), la réponse de
     // `payouts` `{balance, history, reference}` ajoutée en 4.26 (2 lignes, dont
@@ -1096,10 +1096,21 @@ const fetchWalletEscrow = async (uidsVivants) => {
       const uid = String((/harvest_(\d+)_billing$/.exec(String(r.id || '')) || [])[1] || '');
       if (uidsVivants && uidsVivants.size && uid && !uidsVivants.has(uid)) continue;
       const p = (r.data || {}).payload || {};
-      const brut = (p.escrow && p.escrow.amount) != null ? p.escrow.amount
-                 : (p.balance && p.balance.amount) != null ? p.balance.amount : null;
-      if (brut == null) continue;                       // pas un porte-monnaie
-      const n = parseFloat(brut);
+      // ⚠️⚠️ « EN ATTENTE » ET « DISPONIBLE », CE N'EST PAS LA MÊME CHOSE.
+      // Les deux formes de porte-monnaie portent les DEUX montants :
+      //   forme solde    : `main`    = disponible · `escrow`          = EN ATTENTE
+      //   forme versement: `balance` = disponible · `pending_balance` = EN ATTENTE
+      // L'app lisait `escrow` **ou `balance`** (§5.14) — donc, dès qu'un compte
+      // était capté par `payouts`, elle comptait son argent DISPONIBLE dans le
+      // total « en attente ». Plainte de Julien, vérifiée en base : les deux
+      // champs existent côte à côte (`balance` 0 € / `pending_balance` 0 € /
+      // `previous_balance` 54 €). On ne mélange plus jamais les deux.
+      const val = (o) => (o && o.amount != null) ? parseFloat(o.amount) : NaN;
+      const attente = !isNaN(val(p.escrow)) ? val(p.escrow) : val(p.pending_balance);
+      const dispoN  = !isNaN(val(p.main))   ? val(p.main)   : val(p.balance);
+      if (isNaN(attente) && isNaN(dispoN)) continue;    // pas un porte-monnaie
+      const n = isNaN(attente) ? NaN : attente;
+      if (!isNaN(dispoN)) dispo += dispoN;
       if (!isNaN(n)) {
         total += n; accounts++;
         // L'argent bouge. Un solde lu il y a cinq jours n'est pas « le montant
@@ -1108,8 +1119,8 @@ const fetchWalletEscrow = async (uidsVivants) => {
         if (t) { const j = (Date.now() - t) / 86400000; if (j > plusVieux) plusVieux = j; }
       }
     }
-    return { total, accounts, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
-  } catch (_) { return { total: 0, accounts: 0, plusVieuxJours: null }; }
+    return { total, dispo, accounts, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
+  } catch (_) { return { total: 0, dispo: 0, accounts: 0, plusVieuxJours: null }; }
 };
 // OÙ DÉPOSER SES COLIS — la liste des points relais autour de chez toi, avec
 // leur adresse, leur distance et leurs horaires, captée par l'extension quand
@@ -11219,7 +11230,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [dropOffs, setDropOffs] = useState(null);
   const [dropOpen, setDropOpen] = useState(false);
   useEffect(() => {
-    if (dropOffs !== null || curSub !== 'bordereaux') return;
+    // Aussi sur Achats : c'est là qu'on complète l'adresse et les horaires d'un
+    // point de retrait dont l'email ne donne que le nom.
+    if (dropOffs !== null || (curSub !== 'bordereaux' && curSub !== 'achats')) return;
     fetchDropOffPoints(accountUids).then(d => { if (d) setDropOffs(d); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub]);
@@ -12326,7 +12339,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </div>
               <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
-                ? <>Montant <b>réellement bloqué</b> par Vinted, lu sur {reel.accounts} porte-monnaie{reel.accounts>1?'x':''}. Ouvre ton porte-monnaie sur les autres comptes pour les inclure.</>
+                ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie{reel.accounts>1?'x':''}.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null} Ouvre ton porte-monnaie sur les autres comptes pour les inclure.</>
                 : <>Estimation d'après tes ventes en cours. Ouvre une fois ton porte-monnaie sur Vinted : l'app affichera ensuite le montant exact.</>}</div>
             </div>
           );
@@ -12742,8 +12755,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const relayFreq = {}; // carrier -> { "nom|adresse": count }
           (tracking||[]).forEach(t=>{ const cl=cleanLieu(t.lieu); if(cl.nom){ const k=cl.nom+'|'+(cl.adresse||''); (relayFreq[t.carrier]=relayFreq[t.carrier]||{})[k]=((relayFreq[t.carrier]||{})[k]||0)+1; } });
           const usualRelay = (carrier)=>{ const m=relayFreq[carrier]; if(!m) return null; let best=null,bn=0; for(const k in m){ if(m[k]>bn){bn=m[k];best=k;} } if(!best) return null; const [nom,adresse]=best.split('|'); return {nom,adresse}; };
+          // ⚠️ COMPLÉTER L'ADRESSE DEPUIS LA LISTE OFFICIELLE DE VINTED.
+          // L'email donne souvent le NOM du relais sans son adresse ni ses
+          // horaires (mesuré : 13 lieux renseignés sur 94 suivis). Or la liste
+          // des points captée par l'extension porte, elle, `drop_off_point_address`
+          // et l'ouverture du jour. On rapproche **par NOM EXACT normalisé**
+          // seulement — jamais par ressemblance (§24) : envoyer Julien au mauvais
+          // comptoir serait pire que de ne rien afficher. Ce n'est donc PAS une
+          // déduction : c'est la même enseigne, dans la liste de Vinted.
+          const normNom = (s)=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+          const pointsConnus = {};
+          ((dropOffs&&dropOffs.carriers)||[]).forEach(c=>c.points.forEach(p=>{ const k=normNom(p.nom); if(k&&!pointsConnus[k]) pointsConnus[k]=p; }));
           const groups = {};
-          avail.forEach(t=>{ let cl=cleanLieu(t.lieu); if(!cl.nom){ const u=usualRelay(t.carrier); if(u) cl={...u,guessed:true}; } const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse,guessed:cl.guessed}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          avail.forEach(t=>{ let cl=cleanLieu(t.lieu); if(!cl.nom){ const u=usualRelay(t.carrier); if(u) cl={...u,guessed:true}; } const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; const pc=pointsConnus[normNom(nom)]||null; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,guessed:cl.guessed}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
             <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
@@ -12757,8 +12781,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {nom}</div>
                       <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.adresse,`${g.colis.length} colis`].filter(Boolean).join(' · ')}</div>
+                      {/* Ouverture du jour, quand Vinted l'a donnée pour CE point. */}
+                      {g.horaires && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>🕒 {g.horaires}</div>}
                     </div>
-                    <a href={`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
+                    <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
                   </div>
                   {g.colis.map((t,i)=>{
                     const code=okCode(t.code);

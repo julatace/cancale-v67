@@ -449,6 +449,9 @@ async function storeHarvest(domain, type, id, body) {
   else if (type === 'transaction' && id) rowId = `harvest_${uid}_txn_${id}`;
   else if (type === 'item' && id) rowId = `harvest_${uid}_item_${id}`; // détail complet d'une annonce
   else if (type === 'complaint' && id) rowId = `harvest_${uid}_litige_${id}`; // un litige = une ligne
+  // Une expédition = UNE ligne. Sans l'identifiant dans la clé, chaque colis
+  // écraserait le précédent et on ne saurait jamais où aller chercher le bon.
+  else if (type === 'shipment' && id) rowId = `harvest_${uid}_ship_${id}`;
   else rowId = `harvest_${uid}_${type}`;
 
   // ⚠️ Cette voie (capture PASSIVE) ecrit en direct, sans passer par
@@ -1116,7 +1119,14 @@ function alleger(type, payload) {
 // même notion, c'est la garantie de deux chiffres qui se contredisent.
 // Un porte-monnaie porte un montant : `{main,escrow}` (solde) ou `{balance}`
 // (versements). Tout le reste qui passe par le motif « billing » n'en est pas un.
-const estPorteMonnaie = (p) => !!(p && ((p.main && p.main.amount != null) || (p.escrow && p.escrow.amount != null) || (p.balance && p.balance.amount != null) || p.main || p.escrow));
+// ⚠️ Il FAUT un montant réel. L'ancienne version finissait par `|| p.main ||
+// p.escrow` : un objet vide passait, et une capture sans montant remplaçait le
+// vrai solde (il n'y a qu'une ligne par compte, la dernière gagne). Mesuré en
+// base : 4 comptes sur 8 avaient un `payload: {}` écrit par-dessus leur solde,
+// donc de l'argent en attente invisible dans l'app.
+// `pending_balance` compte aussi : c'est l'« en attente » de la forme versement.
+const MONTANTS_PM = ['main', 'escrow', 'balance', 'pending_balance'];
+const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some(k => p[k] && p[k].amount != null));
 
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
@@ -1150,6 +1160,13 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // (l'allègement ci-dessous ne laisse qu'une photo par annonce).
   const brut = payload;
   payload = alleger(type, payload);
+  // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
+  // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
+  // chemin pouvait donc écrire un porte-monnaie vide par-dessus le vrai solde.
+  // Mesuré en base : 4 comptes sur 8 avaient un `payload: {}`, donc leur argent
+  // en attente n'apparaissait nulle part. Un garde-fou doit vivre dans la
+  // fonction qui écrit, pas chez ceux qui l'appellent.
+  if (type === 'billing' && !estPorteMonnaie(payload)) return;
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
   // Même règle que la voie passive : un dressing partiel n'écrase pas un

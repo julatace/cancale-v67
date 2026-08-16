@@ -2141,3 +2141,46 @@ En listant les 39 URL réellement observées :
 - **On dit l'âge** de la liste : un point relais ferme.
 
 **Vérifié au banc** (§20, `dist` servi, Supabase mocké honorant `select=`, vraies lignes) : carte rendue, dépliée, **les deux transporteurs présents** (SUPER U ACCUEIL / Shop2Shop 1,7 km · Maison de la Presse / Mondial Relay 1,9 km), adresses et horaires réels, aucun débordement à 420 px. **0 erreur** (le seul 400 est le sondage `select=owner` volontaire). `npm run build` OK · `scripts/audit-coherence.cjs` : **4 règles, 0 désaccord**.
+
+---
+
+## 5.27 — ⚠️ « EN ATTENTE » ≠ « DISPONIBLE » + le lieu de retrait complété par la liste de Vinted
+
+### 1. ⚠️ Le porte-monnaie mélangeait deux montants qui n'ont rien à voir
+Julien : « l'argent en attente c'est totalement faux, ce n'est pas l'argent disponible, c'est l'argent en attente que je veux ». **Il a raison, et c'était écrit dans le code.** Les deux formes de porte-monnaie portent **chacune les DEUX montants** :
+
+| forme | disponible | EN ATTENTE |
+|---|---|---|
+| solde (`wallet`) | `main` | `escrow` |
+| versements (`payouts`) | `balance` | **`pending_balance`** |
+
+Or `fetchWalletEscrow` lisait `escrow` **ou `balance`** (§5.14 point 8) : dès qu'un compte est capté par `payouts`, son argent **disponible** était compté dans le total « en attente ». `pending_balance` — le vrai champ — **n'était lu nulle part**.
+
+➡️ Règle posée : `attente = escrow ?? pending_balance`, `dispo = main ?? balance`, **jamais l'un pour l'autre**. La fonction renvoie désormais les deux, et la carte les affiche **côte à côte** (« en attente X € · à côté, Y € déjà disponibles à virer — les deux ne se confondent pas »).
+
+⚠️ **HONNÊTETÉ — mesuré : le total d'aujourd'hui NE CHANGE PAS** (504,00 € avant comme après), parce qu'aucun compte vivant n'a actuellement de ligne au format `payouts`. Le correctif empêche le faux à venir et sépare enfin les deux notions ; il n'explique pas à lui seul un 504 € qui paraîtrait trop haut. **Ce qui l'explique** : seuls **2 porte-monnaie sur 8** sont captés, et celui de `julatace3535` (359 €) date de **5 jours**. La carte le dit déjà (nombre de porte-monnaie + âge du plus ancien).
+
+### 2. ⚠️ Le garde-fou porte-monnaie n'était pas dans la fonction qui écrit
+`estPorteMonnaie` n'était testé **que chez l'appelant** (moisson active) — donc `storeHarvestRow` pouvait écrire un `payload: {}` par-dessus un vrai solde. **Mesuré : 4 comptes sur 8 avaient une ligne `billing` vide**, donc leur argent en attente invisible. Et le test lui-même finissait par `|| p.main || p.escrow`, ce qui laissait passer un objet vide.
+- `estPorteMonnaie` exige maintenant **un montant réel** parmi `main`/`escrow`/`balance`/`pending_balance` ;
+- le test est **dans `storeHarvestRow`**, pas seulement chez ses appelants. Un garde-fou vit dans la fonction qui écrit.
+
+### 3. « Je ne sais pas où aller chercher mes colis » — mesuré avant de coder
+| constat | chiffre |
+|---|---|
+| colis réellement à retirer (statut Vinted) | **2** |
+| ces 2 colis ont un email de suivi | **0** ⚠️ |
+| emails de suivi en base | 94 (MR 58 · Chronopost 26 · Vinted 5 · Colissimo 4 · Shop2Shop 1) |
+| emails portant un **lieu** | **13 / 94** |
+| `shipment` dans la transaction | `{id, status, status_title, status_updated_at}` — **aucune adresse** (§16 reconfirmé) |
+
+Donc pour les colis du jour, l'app **ne peut rien afficher** : la donnée n'existe nulle part. Deux réponses :
+
+**a) On complète le lieu depuis la liste officielle de Vinted.** Quand l'email donne le NOM du relais sans adresse ni horaires, on va les chercher dans les points captés (§5.26) — **par NOM EXACT normalisé uniquement**, jamais par ressemblance (§24). Ce n'est pas une déduction : c'est la même enseigne dans la liste de Vinted. La carte « colis à retirer » gagne l'**adresse**, l'**ouverture du jour** et un itinéraire par **coordonnées** (plus précis qu'une recherche texte).
+**Vérifié sur les vraies données** : les 3 noms de relais présents dans les emails → **2 rapprochés** (« MAISON DE LA PRESSE » et « Maison de la Presse, » → *40 Rue du Port, Cancale · Vendredi 09:30–18:30*), le 3ᵉ étant « juste ici », le remplissage parasite que `cleanLieu` rejette déjà.
+
+**b) On capte le détail de l'expédition.** La transaction donne le `shipment.id` et Vinted sert des `/api/v2/shipments/{id}/…` (vus dans `seen_urls`). Nouveau motif `shipment` dans `inject.js` → **une ligne PAR COLIS** (`harvest_{uid}_ship_{id}`) : sans l'identifiant dans la clé, un colis écraserait le précédent. ⚠️ Motif borné à `(?:\?|$)` pour ne pas avaler `label_url` / `label_options` / `nearby_drop_off_points`.
+➡️ **Prochaine session** : lire `harvest_*_ship_*` dès que Julien aura ouvert une page de suivi avec la 5.20 — c'est là qu'on saura si Vinted expose le point de retrait côté API, ou si l'email reste la seule source.
+
+### Vérifié
+`npm run build` OK · `node --check` OK sur `background.js` et `inject.js` · banc app (§20, `dist` servi, Supabase mocké honorant `select=`, vraies lignes) : carte « Où déposer » avec **les deux transporteurs**, **0 erreur** (le seul 400 est le sondage `select=owner` volontaire) · `scripts/audit-coherence.cjs` : **5 règles, 0 désaccord** · règle du porte-monnaie exécutée sur les vraies lignes : ancien 504,00 € → nouveau **504,00 € en attente + 114,36 € disponibles** distingués. Extension **5.20.0**.
