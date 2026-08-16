@@ -13,7 +13,16 @@
 
 import webpush from 'web-push';
 
-import { withOwnerAll, conflictTarget } from './owner.js';
+import { withOwnerAll, conflictTarget, duVendeur } from './owner.js';
+
+// La base sait-elle séparer les vendeurs ? (sondé une fois par instance)
+let _cl = null;
+const cloisonnee = async () => {
+  if (_cl !== null) return _cl;
+  try { _cl = (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS })).ok; }
+  catch (_) { _cl = false; }
+  return _cl;
+};
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -37,7 +46,9 @@ const HEADERS = {
 
 export async function loadSubs() {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`, { headers: HEADERS });
+    // ⚠️ Les abonnements sont PAR VENDEUR : sans ce filtre, une vente de Julien
+    // ferait sonner le téléphone de Marie.
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`, cloisonnee), { headers: HEADERS });
     if (!res.ok) return [];
     const rows = await res.json();
     return (rows[0] && rows[0].data && Array.isArray(rows[0].data.subs)) ? rows[0].data.subs : [];

@@ -1803,3 +1803,13 @@ Première version : le propriétaire résolu était rangé dans une variable de 
 1. Chaque vendeur déclare **sa** adresse de réception dans Réglages → Mes adresses de réception.
 2. Il fait suivre ses emails Vinted vers **cette adresse** (une par vendeur — deux vendeurs qui partagent la même adresse sont indépartageables **par construction**, et le système le dira au lieu de deviner).
 3. `VRM_OWNER_UID` reste le propriétaire par défaut : tant qu'il n'y a qu'un vendeur, **rien ne change** pour lui.
+
+### 5.16 (suite) — ⚠️ LA CLÉ DE SERVICE CONTOURNE RLS : chaque lecture doit être cadrée
+
+Le pipeline email lit `?id=eq.main`, `vinted_accounts`, `push_subs`… avec la **clé de service**, qui **passe outre RLS**. Une fois la base cloisonnée, ces lectures auraient donc ramené **les lignes de TOUS les vendeurs**, et `rows[0]` aurait été celle du premier venu : en traitant l'email de Marie, on aurait lu les comptes Vinted et les numéros de Julien. Aucune erreur, aucun signe — juste des données mélangées.
+
+- **`duVendeur(url)`** ajoute `owner=eq.<vendeur résolu>` à chaque lecture, **et seulement si la colonne existe** (un filtre sur une colonne inconnue ferait échouer la lecture en 400 — donc rien ne change aujourd'hui).
+- ⚠️ **Le pire cas était les NOTIFICATIONS** : `_lib/push.js` lisait `push_subs` sans filtre → une vente de Julien aurait fait sonner le téléphone de Marie. Le contexte de requête a donc déménagé dans `_lib/owner.js`, pour être partagé par les deux modules.
+
+**Vérifié dans les deux états, à l'URL près** : base partagée → **0 lecture filtrée** (comportement d'aujourd'hui, strictement inchangé) ; base cloisonnée → **5 lectures sur 5** portent `owner=eq.U-JULIEN`, `push_subs` compris.
+⚠️ **Piège de banc** : les modules gardent leur sonde « base cloisonnée ? » en cache. Enchaîner les deux états dans le même processus fait croire à une lecture non filtrée — il faut un processus neuf par état.

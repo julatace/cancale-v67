@@ -20,9 +20,8 @@
 import { sendPushToAll } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
-import { withOwnerAll, conflictTarget } from './_lib/owner.js';
+import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { adressesDeLivraison, resoudreProprietaire } from './_lib/proprietaire-email.js';
-import { AsyncLocalStorage } from 'node:async_hooks';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -86,9 +85,6 @@ function normalizeInbound(body) {
 // partiraient chez le mauvais vendeur, sans le moindre message d'erreur.
 // `AsyncLocalStorage` donne un contexte isolé par requête : deux emails traités
 // en parallèle ne peuvent pas se mélanger.
-const contexteVendeur = new AsyncLocalStorage();
-const proprietaireCourant = () => (contexteVendeur.getStore() || {}).owner || '';
-
 async function supabaseUpsert(rows) {
   const owner = proprietaireCourant();
   rows = owner
@@ -113,13 +109,13 @@ async function detectAccount(raw) {
   try {
     const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
     const low = (raw || '').toLowerCase();
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers });
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`), { headers });
     const accts = res.ok ? await res.json() : [];
     // 1) Par EMAIL de compte (renseigné dans l'app : Comptes liés → champ 📧).
     //    Fiable même avec les adresses masquées iCloud : on cherche l'adresse
     //    destinataire dans le texte brut du mail (To inclus).
     try {
-      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`, { headers });
+      const r2 = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`), { headers });
       if (r2.ok) {
         const rows = await r2.json();
         const map = (rows[0] && rows[0].vinted_account_emails) || {};
@@ -250,7 +246,7 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
 
 async function supabaseGetRow(id) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return null;
@@ -348,7 +344,7 @@ async function findNumeroByTitle(title, size) {
     const normSz = s => String(s == null ? '' : s).toLowerCase().replace(',', '.').replace(/[^0-9.]/g, '').replace(/\.0+$/, '').trim();
     const t = norm(title);
     if (!t) return '';
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`, {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return '';
@@ -380,7 +376,7 @@ async function findBuyPriceByTitle(title) {
   try {
     const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
     const t = norm(title); if (!t) return null;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`, {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return null;
@@ -571,6 +567,27 @@ function extractPickupQr(mail, status) {
 
   return none;
 }
+
+// ── LIRE LES DONNÉES DU BON VENDEUR, ET DE LUI SEUL ──────────────────────────
+// ⚠️ La clé de service CONTOURNE RLS. Donc, une fois la base cloisonnée, un
+// `?id=eq.main` renverrait la ligne `main` de TOUS les vendeurs, et
+// `rows[0]` serait celle du premier venu : en traitant l'email de Marie, on
+// lirait les comptes Vinted et les numéros de Julien. Silencieux, et faux.
+// Chaque lecture est donc filtrée sur le vendeur résolu pour CETTE requête.
+// Tant que la colonne `owner` n'existe pas, on n'ajoute rien (un filtre sur une
+// colonne inconnue ferait échouer la lecture avec un 400).
+let _cloisonnee = null;
+async function baseCloisonnee() {
+  if (_cloisonnee !== null) return _cloisonnee;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    _cloisonnee = r.ok;
+  } catch (_) { _cloisonnee = false; }
+  return _cloisonnee;
+}
+const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
 
 // Registre « adresse de réception → vendeur », écrit par l'app (Réglages →
 // Emails). Ligne dédiée : l'app en est propriétaire, le serveur ne fait que lire.
@@ -763,7 +780,7 @@ export async function traiterEmail(req, res) {
       let pdfTamponneB64 = null, posKnown = false;
       if (pdf) {
         try {
-          const rf = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`, {
+          const rf = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`), {
             headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           });
           const rfRows = rf.ok ? await rf.json() : [];

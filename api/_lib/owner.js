@@ -19,6 +19,24 @@
 // c'est un chantier à part, pas une variable d'environnement.
 const OWNER = process.env.VRM_OWNER_UID || '';
 
+// ── LE VENDEUR DE LA REQUÊTE EN COURS ────────────────────────────────────────
+// ⚠️ Vit ICI et pas dans email-inbound : `_lib/push.js` en a besoin AUSSI. Sans
+// ça, les notifications d'une vente partaient sur les appareils de TOUS les
+// vendeurs (la ligne `push_subs` était lue sans filtre) — le genre de fuite
+// qu'on ne voit qu'en recevant la notification de quelqu'un d'autre.
+// AsyncLocalStorage et pas une variable de module : une fonction serverless
+// traite plusieurs requêtes en parallèle dans la même instance.
+import { AsyncLocalStorage } from 'node:async_hooks';
+export const contexteVendeur = new AsyncLocalStorage();
+export const proprietaireCourant = () => (contexteVendeur.getStore() || {}).owner || '';
+// Filtre PostgREST du vendeur courant, à n'ajouter QUE si la base sait séparer
+// (sinon un filtre sur une colonne inconnue fait échouer la lecture en 400).
+export async function duVendeur(url, cloisonnee) {
+  const owner = proprietaireCourant();
+  if (!owner || !(await cloisonnee())) return url;
+  return url + (url.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(owner)}`;
+}
+
 // Ajoute le propriétaire à une ligne à écrire (sans effet s'il n'est pas réglé).
 export const withOwner = (row) => (OWNER ? { owner: OWNER, ...row } : row);
 
