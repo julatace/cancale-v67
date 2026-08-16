@@ -860,12 +860,24 @@ const deleteVintedAccount = async (vintedUserId, login) => {
       method: 'DELETE',
       headers: sbAuth({ Prefer: 'return=minimal' }),
     });
-    // 3. ses données moissonnées (annonces, ventes, achats, messages…)
+    // 3. ses données moissonnées (annonces, ventes, achats, messages, coffre)
+    // ⚠️ UN `DELETE` SUR `app_data` NE SUPPRIME RIEN. Vérifié en direct : la clé
+    // publique reçoit **200 avec 0 ligne supprimée** — le droit d'effacer n'est
+    // pas accordé sur cette table. L'ancien code croyait donc nettoyer et
+    // laissait tout en place (mesuré : 46 lignes de comptes supprimés encore en
+    // base, dont 96 annonces de shop_cancale). On VIDE les lignes à la place :
+    // un upsert, lui, passe. La donnée part vraiment, et l'égress avec (§34).
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_*`, {
-        method: 'DELETE', headers: sbAuth({ Prefer: 'return=minimal' }),
-      });
-    } catch (_) { /* best-effort : la ligne `vrm_blocked_accounts` suffit à le masquer */ }
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+      const rows = r.ok ? await r.json() : [];
+      if (rows.length) {
+        await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+          method: 'POST',
+          headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+          body: JSON.stringify(rows.map(x => withOwner({ id: x.id, data: { supprime: true, uid, purgedAt: new Date().toISOString() } }))),
+        });
+      }
+    } catch (_) { /* le compte est de toute façon écarté par `accountUids` */ }
     return res.ok;
   } catch (_) { return false; }
 };
@@ -1061,14 +1073,14 @@ const fetchEmailTracking = async () => {
 // Solde BLOQUÉ (escrow) de chaque porte-monnaie Vinted, capté par l'extension
 // (lignes harvest_*_billing quand tu ouvres ton porte-monnaie). On somme sur
 // tous les comptes. total=0/accounts=0 si aucun porte-monnaie n'a été capté.
-const fetchWalletEscrow = async () => {
+const fetchWalletEscrow = async (uidsVivants) => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return { total: 0, accounts: 0 };
+    if (!res.ok) return { total: 0, accounts: 0, plusVieuxJours: null };
     const rows = await res.json();
-    let total = 0, accounts = 0;
+    let total = 0, accounts = 0, plusVieux = 0;
     // ⚠️ TROIS FORMES DIFFÉRENTES en base, vérifiées sur les 8 lignes réelles :
     // le porte-monnaie classique `{main, escrow}` (5 lignes), la réponse de
     // `payouts` `{balance, history, reference}` ajoutée en 4.26 (2 lignes, dont
@@ -1076,15 +1088,28 @@ const fetchWalletEscrow = async () => {
     // réponse qui n'a rien à voir (`minimum_price`, rangée là par erreur) qu'il
     // faut ignorer plutôt que compter pour zéro.
     for (const r of rows) {
+      // ⚠️ UN COMPTE SUPPRIMÉ N'A PLUS D'ARGENT CHEZ TOI. Mesuré : le total
+      // affiché (561,23 €) comptait 57,23 € appartenant à shop_cancale, effacé
+      // depuis 16 jours. Même règle que partout ailleurs (§5.20) : un compte
+      // existe s'il a des jetons. Sans liste de comptes (appel au démarrage),
+      // on ne filtre rien plutôt que de tout jeter.
+      const uid = String((/harvest_(\d+)_billing$/.exec(String(r.id || '')) || [])[1] || '');
+      if (uidsVivants && uidsVivants.size && uid && !uidsVivants.has(uid)) continue;
       const p = (r.data || {}).payload || {};
       const brut = (p.escrow && p.escrow.amount) != null ? p.escrow.amount
                  : (p.balance && p.balance.amount) != null ? p.balance.amount : null;
       if (brut == null) continue;                       // pas un porte-monnaie
       const n = parseFloat(brut);
-      if (!isNaN(n)) { total += n; accounts++; }
+      if (!isNaN(n)) {
+        total += n; accounts++;
+        // L'argent bouge. Un solde lu il y a cinq jours n'est pas « le montant
+        // d'aujourd'hui » : on retient l'âge du plus ancien pour le DIRE.
+        const t = Date.parse((r.data || {}).capturedAt || 0);
+        if (t) { const j = (Date.now() - t) / 86400000; if (j > plusVieux) plusVieux = j; }
+      }
     }
-    return { total, accounts };
-  } catch (_) { return { total: 0, accounts: 0 }; }
+    return { total, accounts, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
+  } catch (_) { return { total: 0, accounts: 0, plusVieuxJours: null }; }
 };
 // Factures Pro préparées par le serveur (lignes email_invoice_*) :
 // { number, status: draft|queued|sent, designation, prix, buyerName,
@@ -7949,21 +7974,25 @@ function VintedAccounts({ accounts, setAccounts }) {
   // compte est bloqué/fermé définitivement. On garde son étiquette au cas où.
   const [removing, setRemoving] = useState(null);
   const disconnectAccount = async (acc) => {
-    if (!await askConfirm(`Déconnecter « ${accountName(acc)} » de l'application ?\n\nSes tokens seront supprimés. Un compte encore actif dans Chrome pourra revenir au prochain passage sur Vinted ; un compte bloqué ne reviendra pas.`)) return;
-    // TON CHOIX : ses ventes passées comptent-elles encore dans ton chiffre
-    // d'affaires ? (C'est bien de l'argent que tu as gagné — mais tu peux
-    // vouloir sortir un compte bloqué de tes stats.) Mémorisé par pseudo, car
-    // c'est ce que portent les emails de vente.
+    if (!await askConfirm({
+      title: `Supprimer « ${accountName(acc)} » ?`,
+      // On dit exactement ce qui part, et ce qui reste. « Déconnecter » laissait
+      // croire à un simple débranchement — Julien veut choisir ses comptes et
+      // supprimer les autres pour de bon.
+      desc: "Ses jetons, ses annonces, ses ventes et ses achats captés sont effacés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). Son chiffre d'affaires passé reste dans tes statistiques — c'est de l'argent réellement gagné. Tes numéros de garage et tes factures ne bougent pas. Réversible depuis « Tout réafficher ».",
+      ok: 'Supprimer', cancel: 'Garder', danger: true,
+    })) return;
+    // ⚠️ UNE SEULE QUESTION. Une deuxième feuille s'ouvrait juste après la
+    // première (« garder son chiffre d'affaires passé ? ») : deux boîtes à la
+    // suite pour un seul geste, et surtout — mesuré au banc — tant qu'on n'y
+    // répondait pas, LA SUPPRESSION NE PARTAIT PAS. On garde le comportement
+    // sensé par défaut : ses ventes passées restent dans le chiffre d'affaires,
+    // parce que c'est de l'argent réellement gagné. Ça ne se devine pas, c'est
+    // écrit dans la confirmation ci-dessus.
     const login = String(acc.login || '').trim().toLowerCase();
     if (login) {
-      const keep = await askConfirm(
-        `Garder le chiffre d'affaires passé de « ${accountName(acc)} » dans tes statistiques ?\n\n` +
-        `OK = OUI, ses ventes continuent d'être comptées (c'est de l'argent réellement gagné).\n` +
-        `Annuler = NON, on le sort complètement des stats.`
-      );
       const cur = (load('vinted_ca_keep_removed', []) || []).map(String);
-      const next = keep ? [...new Set([...cur, login])] : cur.filter(x => x !== login);
-      save('vinted_ca_keep_removed', next);
+      save('vinted_ca_keep_removed', [...new Set([...cur, login])]);
     }
     // ⚠️ On MASQUE aussi le compte de façon permanente (vinted_accounts_hidden,
     // clé synchronisée). Supprimer la ligne Supabase ne suffit pas : un compte
@@ -7972,12 +8001,16 @@ function VintedAccounts({ accounts, setAccounts }) {
     // de Julien : « je l'ai supprimé mais il est toujours là »). Le masque, lui,
     // survit à la re-capture (il est posé sur l'uid, pas sur la ligne du compte)
     // → annonces ET stats l'excluent pour de bon (skipAcc / acctOff).
-    const uid = String(acc.vinted_user_id);
-    setHiddenAccts(prev => { const n = new Set(prev); n.add(uid); save('vinted_accounts_hidden', [...n]); return n; });
+    // ⚠️ ON NE MASQUE PLUS EN PLUS DE SUPPRIMER. `deleteVintedAccount` inscrit
+    // désormais le compte dans `vrm_blocked_accounts` (l'extension refuse de le
+    // recapter) ET vide ses lignes moissonnées. Ajouter en prime son uid à
+    // `vinted_accounts_hidden` — une clé SYNCHRONISÉE — le faisait apparaître
+    // « masqué » sur tous les appareils alors qu'il était supprimé : c'est la
+    // moitié de la confusion « mes comptes sont tous masqués » (§5.09/§5.10).
     setRemoving(acc.vinted_user_id);
     const ok = await deleteVintedAccount(acc.vinted_user_id, acc.login);
     setRemoving(null);
-    if (!ok) { toast('Retiré des annonces et des stats. (La ligne du compte reviendra peut-être, mais il restera masqué partout.)'); }
+    toast(ok ? `« ${accountName(acc)} » supprimé.` : 'Échec de la suppression — réessaie.');
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
   };
 
@@ -8167,9 +8200,9 @@ function VintedAccounts({ accounts, setAccounts }) {
                   <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
-                  <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Retirer ce compte de l'application"
+                  <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Supprimer ce compte : jetons + annonces + ventes captées effacés, et l'extension ne le recaptera plus"
                     style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger,opacity:removing===acc.vinted_user_id?0.5:1}}>
-                    {removing===acc.vinted_user_id ? '…' : 'Déconnecter'}
+                    {removing===acc.vinted_user_id ? '…' : '🗑 Supprimer ce compte'}
                   </button>
                 </div>
               </div>
@@ -11082,11 +11115,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     if (walletEscrow !== null) return;
     if (curSub !== 'ventes' && curSub !== 'journee') return;
-    fetchWalletEscrow().then(w => { if (w) setWalletEscrow(w); }).catch(() => {});
+    fetchWalletEscrow(accountUids).then(w => { if (w) setWalletEscrow(w); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub]);
 
-  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow().then(setWalletEscrow); };
+  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow(accountUids).then(setWalletEscrow); };
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
@@ -12215,7 +12248,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
-            {totals.nbAttente>0 && (()=>{ const esc=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null; return <StatBox label="💰 En attente" value={fmtE0(esc?esc.total:totals.enAttente)} color={C.warn} sub={esc?`bloqué · ${esc.accounts} porte-monnaie`:`${totals.nbAttente} en cours · estimation`}/>; })()}
+            {totals.nbAttente>0 && (()=>{ const esc=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null; return <StatBox label="💰 En attente" value={fmtE0(esc?esc.total:totals.enAttente)} color={C.warn} sub={esc?(esc.plusVieuxJours>1?`${esc.accounts} porte-monnaie · le plus ancien ${esc.plusVieuxJours} j`:`réel · ${esc.accounts} porte-monnaie`):`${totals.nbAttente} en cours · estimation`}/>; })()}
             <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
             {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
@@ -14488,7 +14521,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:16,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.warn,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
                 <div style={{fontSize:32,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)} €</div>
-                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>bloqué</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
+                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
               </div>
               ); })()}
               {/* LITIGES EN COURS (paires qui reviennent : retour / remboursement / suspension) */}
@@ -17063,7 +17096,10 @@ export default function App() {
       // de l'app (exactement l'incohérence signalée par Julien). Repli sur
       // l'estimation tant qu'aucun porte-monnaie n'a été capté.
       let enAttenteReel=enAttente;
-      try{ const esc=await fetchWalletEscrow(); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
+      // Mêmes comptes que l'app : un compte supprimé ne doit pas gonfler le
+      // chiffre du widget (mesuré : 57,23 € de shop_cancale comptés en trop).
+      const uidsVivants=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
+      try{ const esc=await fetchWalletEscrow(uidsVivants); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce

@@ -1993,3 +1993,39 @@ Une annonce dont le compte n'a plus de ligne `vinted_accounts` passait **tous** 
 
 ### Vérifié
 Banc app dédié (3 annonces d'un compte vivant + 1 d'un compte supprimé) : **les 3 restent, la 4ᵉ disparaît, 0 PAGEERROR**. Smoke complet : **12 écrans, 0 erreur, 0 artefact**.
+
+---
+
+## 5.22 — SUPPRIMER UN COMPTE SUPPRIME VRAIMENT + les 561 € d'argent en attente
+
+Julien : « je veux simplement pouvoir choisir quel compte Vinted garder et les autres les supprimer… je n'ai pas 561 € ».
+
+### 1. ⚠️ « Déconnecter » ne supprimait presque rien — TROIS défauts empilés
+**a) Le `DELETE` sur `app_data` est SANS EFFET.** Vérifié en direct : la clé publique reçoit **200 avec 0 ligne supprimée** — le droit d'effacer n'est pas accordé sur cette table (il l'est sur `vinted_accounts`). L'étape « supprimer ses lignes moissonnées » de `deleteVintedAccount` ne faisait donc **rien depuis toujours**, en silence. C'est l'origine des 46 lignes fantômes de §5.20.
+⚠️ §5.11 avait « vérifié » cette suppression avec un **uid factice** : 0 ligne supprimée était le résultat attendu, donc le test ne prouvait rien. **Tester une suppression sur une ligne qui existe vraiment.**
+➡️ On **VIDE** les lignes à la place (un upsert, lui, passe) : `{supprime:true, purgedAt}` sur chaque `harvest_{uid}_*` et `coffre_{uid}_*`. La donnée part réellement, et l'égress avec.
+
+**b) Une DEUXIÈME feuille bloquait la suppression.** Après la confirmation, `disconnectAccount` posait une seconde question (« garder son chiffre d'affaires passé ? »). **Mesuré au banc : tant qu'on n'y répondait pas, aucune des trois écritures ne partait.** Une seule question désormais ; le CA passé est **conservé par défaut** (c'est de l'argent réellement gagné) et c'est écrit dans la confirmation.
+
+**c) Supprimer AJOUTAIT le compte aux « masqués ».** `disconnectAccount` mettait l'uid dans `vinted_accounts_hidden` — une clé **synchronisée** — en plus de le supprimer. Le compte apparaissait donc « masqué » sur tous les appareils alors qu'il était supprimé : c'est la moitié de la confusion « tous mes comptes sont masqués » (§5.09/§5.10). Retiré — la liste noire suffit.
+
+Le bouton dit maintenant **« 🗑 Supprimer ce compte »** et la confirmation liste exactement ce qui part et ce qui reste.
+
+### 2. Les 561,23 € : 57 € appartenaient à un compte supprimé
+Relevé des 8 lignes `harvest_*_billing` :
+| compte | en attente | capture |
+|---|---|---|
+| **199082413 (shop_cancale, supprimé)** | **57,23 €** | 16,9 j |
+| julatace3535 | 359,00 € | 4,9 j |
+| tomj606 | 145,00 € | 0,2 j |
+| 3170782324 (supprimé) | 0 € | 4,8 j |
+| llloollllaa / tomj683 / julienf765 / julatace35260 | ligne vide | — |
+
+`fetchWalletEscrow` additionnait **tout**, comptes supprimés compris. Il reçoit désormais la liste des comptes vivants (même règle que partout, §5.20) → **561,23 € → 504,00 € sur 2 porte-monnaie**. ⚠️ Garde-fou : sans liste de comptes (appel trop tôt), **on ne filtre rien** plutôt que de tout jeter.
+**Et on dit l'âge** : un solde lu il y a 5 jours n'est pas le montant d'aujourd'hui. La carte affiche « le plus ancien lu il y a N j — repasse dessus » au-delà d'un jour. 4 comptes sur 7 n'ont aucun solde capté : le total ne couvre que ceux visités, ce n'est pas masqué.
+
+### 3. « Il manque encore de nouveaux comptes » — la contrainte est dans Chrome
+Chrome ne garde **qu'une session Vinted à la fois par domaine** : l'extension capte le compte actuellement connecté. Un nouveau compte arrive donc **au moment où Julien s'y connecte**, pas avant. Rien à relier (§5.18) ; pour en avoir plusieurs en parallèle il faut des **profils Chrome distincts**.
+
+### Vérifié
+Banc app dédié : le bouton rend, la confirmation s'ouvre, et les **trois** écritures partent — liste noire ✅, jetons ✅, **3 lignes vidées** (`supprime:true`) ✅, **0 PAGEERROR**. Porte-monnaie recalculé sur la vraie base : 561,23 → 504,00 €. Smoke complet : 12 écrans, **0 PAGEERROR** ; les 3 « suspects » restants sont l'accord de « colis » (invariable) — un artefact du banc. `scripts/audit-coherence.cjs` : **0 désaccord sur les 12 statuts**.
