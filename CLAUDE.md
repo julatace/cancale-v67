@@ -1848,3 +1848,42 @@ Le bandeau d'urgence disait « 📮 1 colis à expédier » alors qu'il ne compt
 
 ### Vérifié
 `npm run build` OK · smoke app sur les vraies données : **12 écrans, 0 PAGEERROR, 0 artefact d'affichage** (le dernier « suspect » du banc a disparu avec le renommage) · `scripts/audit-coherence.cjs` : **0 désaccord sur les 12 statuts réels** · `node --check api/ship-reminders.js` OK.
+
+---
+
+## 5.18 — ⚠️ « L'EXTENSION NE RENVOIE PAS MES NOUVEAUX COMPTES » : la suppression était un aller sans retour
+
+Question de Julien : « à chaque fois que j'ajoute l'extension à un nouveau compte, il faut bien que je dise à quel compte elle appartient ? où est-ce que je dois le relier ? »
+
+**Réponse : il n'y a RIEN à relier.** L'extension lit l'identifiant du compte dans le cookie de session Vinted (`access_token_web` → `account_id`) et crée la ligne `vinted_accounts` toute seule. Aucun choix à faire, donc aucun risque de relier le mauvais compte. Le problème était ailleurs.
+
+### La cause, mesurée en base
+`vrm_blocked_accounts` contenait **199082413 = shop_cancale**, supprimé par Julien (§5.11) — **son plus gros compte : 96 annonces, 284 ventes**. Or `captureDomain` refusait de capter tout compte de cette liste **et effaçait sa ligne à chaque cycle**, en silence. Se reconnecter à ce compte dans Chrome ne pouvait donc **jamais** le ramener.
+
+⚠️ Le contre-ordre existait pourtant : `panel_accounts_off[uid] === false` = « rallumé explicitement, ça prime » (tri-état, §5.08). **`buildPanelData` l'honorait pour l'AFFICHAGE, la CAPTURE non** — le compte revenait dans les listes du panneau mais sans jetons frais, donc vide. C'est très exactement « le bouton ne marche pas ».
+
+- `unblockedAccounts()` (cache 60 s) lit le contre-ordre ; `captureDomain` ne refuse plus qu'un compte bloqué **ET** non réautorisé.
+- `setAccountOff(uid, false)` **vide les caches et relance `captureAllAccounts()`** : sans ça, réautoriser ne prenait effet qu'au bout de 5 min.
+- Un refus est **noté** (`chrome.storage.local.vrmRefus`) et journalisé, au lieu d'être muet.
+
+### Un compte tout neuf était INVISIBLE dans le panneau
+La liste des comptes se construisait uniquement à partir des **lignes moissonnées**. Un compte fraîchement capté (jetons OK, aucune moisson encore) n'apparaissait donc nulle part — ce qui ressemble exactement à « il n'arrive pas ». Elle part maintenant de la table `vinted_accounts`, plus du compte connecté dans ce navigateur ; la moisson ne fait qu'ajouter les compteurs.
+
+### Le bloc « compte connecté » (panneau, en tête de Ma journée)
+Trois causes se ressemblaient — jamais capté / supprimé définitivement / simplement masqué — et toutes se présentaient comme du silence. Elles sont désormais distinctes, avec le bouton qui va avec :
+| état | message | bouton |
+|---|---|---|
+| supprimé définitivement | ⛔ n'est pas synchronisé | ↺ Réautoriser et relier |
+| capté nulle part | ⏳ pas encore relié | 🔗 Relier maintenant |
+| relié mais masqué | 🙈 relié mais masqué | ↺ Réafficher |
+| tout va bien | ✓ relié | — |
+| aucun compte connecté | 👤 connecte-toi sur vinted.fr | — |
+
+Le pseudo d'un compte supprimé est repris de la liste noire (elle garde `logins`) : il s'affichait « compte 2413 » alors que sa ligne `vinted_accounts` avait justement été effacée.
+
+### ⚠️ DEUX BANCS ÉTAIENT MUETS DEPUIS UN MOMENT — même piège, troisième fois
+`run_panel_data.cjs` ne sortait **rien du tout** (exit 0, aucune ligne) — et **avant mes changements aussi**, vérifié au `git stash`. Cause : `chrome.cookies.get` est appelé **en callback** par le code, et le stub ne rendait qu'une promesse → attente infinie, sortie silencieuse. C'est le piège de §5.08, à l'identique, sur une autre API.
+➡️ **Tout stub `chrome.*` doit répondre AUX DEUX FORMES** (promesse et callback). Un banc muet n'est pas une preuve que rien ne casse : c'est un banc qui ne s'exécute pas.
+
+### Vérifié
+`node --check` sur les deux fichiers · banc de la porte (vrai `captureDomain` en `vm`, `fetch` simulé) : liste noire seule → **refusé, ligne effacée, refus noté** ; réautorisé → **capté, aucun effacement** — **0 cas non conforme** · banc panneau : les 5 états rendus avec le bon bouton et le bon message, **0 erreur**, et le clic envoie exactement `relierCompte` / `setAccountOff{off:false}` · vrai `buildPanelData` contre la vraie base : 13 annonces, 10 comptes dont **shop_cancale (96 annonces) désormais visible et réactivable**. Extension **5.16.0**.

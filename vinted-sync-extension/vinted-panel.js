@@ -519,9 +519,45 @@
   // messages, litiges) — plus besoin de rouvrir l'app pour retirer un compte.
   // Écrit dans une ligne DÉDIÉE (`panel_accounts_off`), jamais dans la ligne
   // `main` de l'app : aucune sauvegarde de l'app ne peut être écrasée.
+  // ── LE COMPTE CONNECTÉ DANS CE NAVIGATEUR ───────────────────────────────────
+  // Il n'y a RIEN à relier à la main : l'extension lit l'identifiant du compte
+  // dans le cookie de session Vinted. Mais quand il n'arrive pas dans l'app,
+  // trois causes se ressemblent — jamais capté, supprimé définitivement, ou
+  // simplement masqué. On les distingue, avec le bouton qui va avec.
+  function connecteBloc() {
+    const c = DATA && DATA.connecte;
+    if (!c) return `<div class="vrm-card" style="padding:9px 11px;margin-bottom:8px">
+      <div style="font-weight:800;font-size:12.5px">👤 Aucun compte Vinted connecté ici</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">Connecte-toi sur vinted.fr : l'extension capte le compte toute seule, tu n'as rien à choisir.</div>
+    </div>`;
+    const carte = (coul, titre, sous, bouton) => `<div class="vrm-card" style="padding:9px 11px;margin-bottom:8px;border-left:3px solid ${coul}">
+      <div style="font-weight:800;font-size:12.5px;color:${coul}">${titre}</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">${sous}</div>${bouton || ''}</div>`;
+    const btn = (cls, txt, coul) => `<button class="${cls}" data-uid="${esc(c.uid)}" style="width:100%;margin-top:7px;border:none;background:${coul};color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${txt}</button>`;
+    const nom = esc(c.name || ('compte ' + c.uid));
+    if (c.refus === 'supprime' || c.raison === 'supprime') {
+      return carte('#b4232a', `⛔ ${nom} n'est pas synchronisé`,
+        "Ce compte a été <b>supprimé définitivement</b> depuis l'app. L'extension refuse donc de l'envoyer, et efface sa ligne à chaque passage — c'est pour ça que rien n'arrive.",
+        btn('vrm-reautoriser', '↺ Réautoriser et relier ce compte', '#b4232a'));
+    }
+    if (!c.capte) {
+      return carte('#b06b00', `⏳ ${nom} n'est pas encore relié`,
+        "Tu es connecté à ce compte dans ce navigateur, mais l'app ne l'a pas encore reçu.",
+        btn('vrm-relier', '🔗 Relier ce compte maintenant', '#0f6b4f'));
+    }
+    if (c.off) {
+      return carte('#b06b00', `🙈 ${nom} est relié mais masqué`,
+        "Ses paires et ses ventes existent, elles sont juste cachées dans VRM. Réaffiche-le pour les revoir.",
+        btn('vrm-reautoriser', '↺ Réafficher ce compte', '#0f6b4f'));
+    }
+    return carte('#0f6b4f', `✓ ${nom} est relié`,
+      c.moissonne ? "Ses annonces sont bien captées." : "Ouvre ton dressing une fois sur Vinted pour capter ses annonces.");
+  }
+
   function comptesBlock() {
     const accs = (DATA && DATA.accounts) || [];
-    if (accs.length < 2) return '';
+    const tete = connecteBloc();
+    if (accs.length < 2) return tete;
     const nOff = accs.filter(a => a.off).length;
     // D'où vient le masquage ? Un compte peut être coupé depuis l'app
     // (`vinted_accounts_hidden`), supprimé définitivement, ou masqué ici. Sans
@@ -543,7 +579,7 @@
     // pour le compte actuellement connecté — depuis ta session, sur ton IP.
     const recap = `<button id="vrm-recapter" style="width:100%;margin-top:8px;border:none;background:#0f6b4f;color:#fff;border-radius:10px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer">🔄 Tout recapter (compte connecté)</button>
       <div class="vrm-m" style="font-size:10.5px;margin-top:4px">Relit toutes tes annonces, ventes et achats pour le compte ouvert dans ce navigateur. À faire une fois par compte.</div>`;
-    return `${recap}<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? ' open' : ''}>
+    return `${tete}${recap}<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? ' open' : ''}>
       <summary style="cursor:pointer;font-weight:700;font-size:12.5px;list-style:none">👤 Mes comptes Vinted (${accs.length}${nOff ? ` · ${nOff} masqué${nOff > 1 ? 's' : ''}` : ''})</summary>
       <div class="vrm-m" style="margin:5px 0 2px">Masque un compte que tu n'utilises plus : ses paires, ventes et messages disparaissent partout dans VRM.</div>
       ${rows}
@@ -1139,6 +1175,28 @@
         const off = b.dataset.off === '1';
         b.disabled = true; b.textContent = '⏳';
         chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setAccountOff', uid, off }, () => { load(); });
+      };
+    });
+    // « Relier ce compte » / « Réautoriser » : le compte connecté ici est lu
+    // dans le cookie de session — il n'y a aucun choix à faire, donc aucun
+    // risque de relier le mauvais compte.
+    panel.querySelectorAll('.vrm-relier').forEach(b => {
+      b.onclick = () => {
+        b.disabled = true; b.textContent = '⏳ liaison…';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'relierCompte' }, (r) => {
+          b.disabled = false;
+          if (r && r.ok) { alerte = null; b.textContent = '✓ relié'; load(); }
+          else { b.textContent = '↺ Réessayer'; alerte = (r && r.error) || 'liaison impossible'; render(); }
+        });
+      };
+    });
+    panel.querySelectorAll('.vrm-reautoriser').forEach(b => {
+      b.onclick = () => {
+        const uid = b.dataset.uid; if (!uid) return;
+        b.disabled = true; b.textContent = '⏳';
+        // `off:false` = réautorisation explicite : elle prime sur la liste des
+        // comptes supprimés ET relance la capture des jetons côté service worker.
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setAccountOff', uid, off: false }, () => { load(); });
       };
     });
     // « Tout recapter » : une seule requête par type, sur le compte connecté.

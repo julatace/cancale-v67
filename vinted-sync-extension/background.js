@@ -226,16 +226,62 @@ async function activeAccountId(domain) {
 // Tant qu'un compte reste connecté dans Chrome, l'extension le re-capte à
 // chaque cycle → il « revenait tout le temps » (cas shop_cancale). On lit donc
 // cette liste et on NE capte JAMAIS un compte bloqué (et on nettoie sa ligne).
-let _blockedAccts = null, _blockedAt = 0;
+let _blockedAccts = null, _blockedAt = 0, _blockedNames = {};
 async function blockedAccounts() {
   if (_blockedAccts && Date.now() - _blockedAt < 300000) return _blockedAccts;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: await sbHeaders() });
     const rows = res.ok ? await res.json() : [];
-    _blockedAccts = new Set((((rows[0] && rows[0].data && rows[0].data.uids) || [])).map(String));
+    const d = (rows[0] && rows[0].data) || {};
+    const uids = (d.uids || []).map(String);
+    _blockedAccts = new Set(uids);
+    // Le pseudo est stocké à côté de l'identifiant. Sans lui, un compte supprimé
+    // s'affiche « compte 2413 » — illisible, alors qu'on sait qu'il s'appelle
+    // shop_cancale (sa ligne `vinted_accounts` a justement été effacée).
+    _blockedNames = {};
+    uids.forEach((u, i) => { const n = (d.logins || [])[i]; if (n) _blockedNames[u] = String(n); });
     _blockedAt = Date.now();
   } catch (_) { if (!_blockedAccts) _blockedAccts = new Set(); }
   return _blockedAccts;
+}
+
+// ⚠️ LE CONTRE-ORDRE : un compte RÉAUTORISÉ explicitement depuis le panneau.
+// `panel_accounts_off[uid] === false` veut dire « rallume-le, ça prime sur
+// l'app » (tri-état, §5.08). `buildPanelData` l'honorait déjà pour l'AFFICHAGE,
+// mais la CAPTURE, elle, ne consultait que la liste noire : le compte
+// réapparaissait dans le panneau et l'extension continuait de refuser ses
+// jetons — et effaçait sa ligne à chaque cycle. C'est exactement « l'extension
+// ne veut pas renvoyer mes nouveaux comptes ».
+let _unblockAccts = null, _unblockAt = 0;
+async function unblockedAccounts() {
+  if (_unblockAccts && Date.now() - _unblockAt < 60000) return _unblockAccts;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: await sbHeaders() });
+    const rows = res.ok ? await res.json() : [];
+    const map = (rows[0] && rows[0].data) || {};
+    _unblockAccts = new Set(Object.keys(map).filter(k => map[k] === false).map(String));
+    _unblockAt = Date.now();
+  } catch (_) { if (!_unblockAccts) _unblockAccts = new Set(); }
+  return _unblockAccts;
+}
+// Vide les deux caches : sans ça, réautoriser un compte ne prenait effet
+// qu'au bout de 5 minutes — le temps qu'on croie que le bouton ne marche pas.
+function oublierCachesComptes() { _blockedAccts = null; _blockedAt = 0; _unblockAccts = null; _unblockAt = 0; }
+
+// Dernier refus de capture, pour que le panneau puisse le DIRE. Un compte
+// refusé en silence est indiscernable d'un compte jamais capté.
+async function noterRefus(uid, domain, raison) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {};
+    cur[String(uid)] = { at: Date.now(), domain, raison };
+    await chrome.storage.local.set({ vrmRefus: cur });
+  } catch (_) {}
+}
+async function oublierRefus(uid) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {};
+    if (cur[String(uid)]) { delete cur[String(uid)]; await chrome.storage.local.set({ vrmRefus: cur }); }
+  } catch (_) {}
 }
 
 async function captureDomain(domain) {
@@ -248,10 +294,16 @@ async function captureDomain(domain) {
   if (!uid) return null;
   // Compte supprimé définitivement : on ne le re-capte pas et on efface une
   // éventuelle ligne restante, puis on s'arrête là.
-  if ((await blockedAccounts()).has(uid)) {
+  // ⚠️ SAUF s'il a été RÉAUTORISÉ explicitement (tri-état ci-dessus) : sinon la
+  // suppression est un aller sans retour, et rebrancher un compte devient
+  // impossible depuis Chrome — silencieusement.
+  if ((await blockedAccounts()).has(uid) && !(await unblockedAccounts()).has(uid)) {
     try { await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, { method: 'DELETE', headers: await sbHeaders() }); } catch (_) {}
+    await noterRefus(uid, domain, 'supprime');
+    logActivity(`⛔ Compte ${uid} ignoré (supprimé définitivement) — réautorise-le dans « Mes comptes »`);
     return null;
   }
+  await oublierRefus(uid);
   const row = {
     vinted_user_id: uid,
     domain,
@@ -520,6 +572,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // les ventes, les achats et la boîte, pour le SEUL compte connecté
           // dans ce navigateur. Depuis sa session, sur son IP — jamais tous
           // les comptes d'un coup (c'est la signature multi-comptes, §5).
+          // « Relier ce compte » : capte les jetons du compte connecté ICI et
+          // l'envoie à l'app. Rien à choisir — l'identifiant est lu dans le
+          // cookie de session, on ne peut pas se tromper de compte.
+          if (msg.action === 'relierCompte') {
+            oublierCachesComptes();
+            const r = await captureAllAccounts();
+            sendResponse(r && r.length ? { ok: true, accounts: r } : { ok: false, error: "aucun compte Vinted connecté dans ce navigateur — ouvre vinted.fr et connecte-toi" });
+            return;
+          }
           if (msg.action === 'recapter') {
             const ok = await activeFetchActiveAccount();
             sendResponse(ok ? { ok: true } : { ok: false, error: "aucun compte Vinted connecté dans ce navigateur — ouvre vinted.fr et connecte-toi" });
@@ -1943,7 +2004,12 @@ async function setAccountOff(uid, off) {
   // `false` est ENREGISTRÉ (et non effacé) : c'est ce qui permet de rallumer
   // un compte masqué par l'app, que le panneau n'a pas le droit de modifier.
   cur[k] = !!off ? true : false;
-  return await supabaseUpsert('app_data', [{ id: 'panel_accounts_off', data: cur }], 'id');
+  const r = await supabaseUpsert('app_data', [{ id: 'panel_accounts_off', data: cur }], 'id');
+  // Réafficher un compte doit AUSSI relancer sa capture : sinon il revient dans
+  // les listes mais sans jetons frais, donc vide — « le bouton ne marche pas ».
+  oublierCachesComptes();
+  if (!off) { try { await oublierRefus(k); await captureAllAccounts(); } catch (_) {} }
+  return r;
 }
 
 async function markPickupDone(key, done) {
@@ -2063,7 +2129,9 @@ async function buildPanelData() {
   const labels = (d.vinted_account_labels && typeof d.vinted_account_labels === 'object') ? d.vinted_account_labels : {};
   const nameByUid = {};
   for (const a of (accRows || [])) { const k = String(a.vinted_user_id || ''); if (k) nameByUid[k] = String(labels[k] || a.login || ('compte ' + k.slice(-4))); }
-  const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || (k ? 'compte ' + k.slice(-4) : ''); };
+  // Le pseudo d'un compte SUPPRIMÉ n'est plus dans `vinted_accounts` (sa ligne a
+  // été effacée) : on le retrouve dans la liste noire, qui le garde exprès.
+  const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || _blockedNames[k] || (k ? 'compte ' + k.slice(-4) : ''); };
   const lstAll = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []);
   const soldAll = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []);
   // ⚠️ LA PLUS FRAÎCHE CAPTURE GAGNE. Une même vente peut exister dans plusieurs
@@ -2073,6 +2141,12 @@ async function buildPanelData() {
   // premier vu est le plus récent. On se base sur ce qu'on a capté, pas sur une
   // déduction.
   const parFraicheur = (a, b) => (Date.parse((b.data && b.data.capturedAt) || '') || 0) - (Date.parse((a.data && a.data.capturedAt) || '') || 0);
+  // ⚠️ DÉCLARÉ ICI, pas 500 lignes plus bas : la liste des comptes en a besoin.
+  // Un `let` lu avant sa déclaration lève « Cannot access before initialization »
+  // et vide tout le panneau — le piège TDZ déjà rencontré deux fois (§19).
+  let compteActif = null;
+  try { compteActif = await compteConnecte('www.vinted.fr'); } catch (_) {}
+
   const lst = lstAll.filter(keepAcc).sort(parFraicheur);
   const soldRows = soldAll.filter(keepAcc).sort(parFraicheur);
   // Liste des comptes pour le panneau (avec le nb d'annonces en ligne) : tu vois
@@ -2088,7 +2162,34 @@ async function buildPanelData() {
     noteAcct(r.data && r.data.uid, items.filter(it => !it.is_closed && !it.is_hidden && !it.is_draft).length);
   }
   for (const r of soldAll) noteAcct(r.data && r.data.uid, 0);
+  // ⚠️ UN COMPTE TOUT NEUF N'A ENCORE AUCUNE MOISSON. La liste ne se construisait
+  // qu'à partir des lignes moissonnées : le compte qu'on vient de connecter était
+  // donc INVISIBLE ici, alors que ses jetons étaient bien captés — d'où « mes
+  // nouveaux comptes n'arrivent pas ». On part maintenant des comptes captés
+  // (table `vinted_accounts`), la moisson ne fait qu'ajouter les compteurs.
+  for (const a of (accRows || [])) noteAcct(a && a.vinted_user_id, 0);
+  // Et le compte connecté dans CE navigateur, même s'il n'est ni capté ni
+  // moissonné : c'est celui que Julien a sous les yeux quand il se demande
+  // pourquoi rien n'arrive.
+  if (compteActif) noteAcct(compteActif, 0);
   const accounts = Object.values(accountsSeen).sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || b.online - a.online);
+  // État du compte connecté ici : capté ? refusé ? pourquoi ? Sans ça, « pas
+  // capté », « supprimé définitivement » et « masqué » se ressemblent tous —
+  // c'est-à-dire du silence.
+  let connecte = null;
+  if (compteActif) {
+    const k = String(compteActif);
+    let refus = {}; try { refus = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {}; } catch (_) {}
+    connecte = {
+      uid: k,
+      name: acctName(k),
+      capte: (accRows || []).some(a => String(a.vinted_user_id) === k),
+      moissonne: !!accountsSeen[k] && accountsSeen[k].online > 0,
+      off: acctOff(k),
+      raison: acctRaison(k),
+      refus: (refus[k] && refus[k].raison) || '',
+    };
+  }
   const online = [];
   const seen = new Set();
   for (const r of lst) {
@@ -2584,8 +2685,6 @@ async function buildPanelData() {
 
   // Quel compte est RÉELLEMENT connecté dans ce navigateur ? Le panneau s'en
   // sert pour ne PAS proposer d'agir au nom d'un autre compte (voir `garde`).
-  let compteActif = null;
-  try { compteActif = await compteConnecte('www.vinted.fr'); } catch (_) {}
 
   const renumSuggest = [];
   try {
@@ -2756,7 +2855,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, connecte, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
