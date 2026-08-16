@@ -1955,7 +1955,13 @@ Banc `vm` avec le vrai `buildPanelData` : compte supprimé **écarté de la list
 
 ---
 
-## 5.21 — ⚠️⚠️ L'APP DÉPLOYÉE DATE DU 8 AOÛT : 109 commits de corrections n'ont JAMAIS atteint Julien
+## 5.21 — ⚠️ CORRECTION D'UNE DE MES ANALYSES : `origin/main` n'était PAS périmé, ma copie locale l'était
+
+⚠️ **La première version de cette section affirmait « l'app déployée date du 8 août, 109 commits jamais déployés ». C'EST FAUX.** Je lisais `origin/main` **sans avoir fait `git fetch`** : ma référence locale pointait sur le 8 août alors que le vrai `main` était au **15 août 22:36**. L'écart réel était de **16 commits**, pas 109 — et le correctif du 401 (§5.09) **était déjà en production**, donc il n'explique pas ce que Julien voit.
+
+➡️ **`git fetch origin main` AVANT toute comparaison avec la production.** Une référence locale jamais rafraîchie ne vieillit pas toute seule : elle ment silencieusement, et fait accuser le déploiement à la place du code.
+
+### Ce que la mesure a vraiment montré (16 août, données du jour)
 
 Plainte : « j'ai que trois paires en ligne, enfin quatre avec une autre, mais elle appartient à un compte bloqué qui n'est même plus dans les comptes répertoriés ».
 
@@ -1972,10 +1978,13 @@ Plainte : « j'ai que trois paires en ligne, enfin quatre avec une autre, mais e
 
 **18 annonces en ligne**, données de Vinted lui-même, captures fraîches du matin. Julien en voit 3 ou 4.
 
-### LA cause : ce n'est pas le code, c'est le DÉPLOIEMENT
-`origin/main` = **8 août**. La branche porte **109 commits** de plus, **et aucune pull request n'est ouverte** (la « PR #3 » citée en §5.11 n'existe plus). Donc l'app qu'il utilise n'a **rien** de ce qui a été corrigé depuis : ni §5.09 (un 401 marquait le compte « bloqué par Vinted » et **effaçait ses annonces** — c'est mot pour mot « un compte bloqué qui n'est plus dans les comptes répertoriés »), ni les bordereaux (§5.17), ni la cohérence (§5.15).
-⚠️ `vinted_accounts_blocked` est **local à l'appareil** (jamais dans `SYNC_KEYS`) : cette liste ne se voit donc PAS en lisant la base. Un diagnostic fait uniquement en base ne peut pas expliquer ce que Julien a sous les yeux — il faut penser au code réellement servi.
-➡️ **Avant de chercher un bug d'affichage, vérifier ce qui tourne chez lui** : `git log -1 origin/main` et le nombre de commits d'écart. Deux fois cette session, un écart de comportement venait de là.
+### Les annonces affichées sont VRAIES — vérifié une par une
+Après rafraîchissement des copies depuis la base, l'écran Annonces rend **25 annonces**, et chacune a été retracée jusqu'à son compte : **25 sur 25 viennent d'un compte vivant, 0 fantôme**. Elles sortent toutes du dressing Vinted capté par l'extension, dont 4 comptes dans l'heure. **Rien n'est inventé sur cet écran.**
+
+Répartition réelle (16 août) : julatace35260 · 6, julienf765 · 5, llloollllaa · 5, tomj683 · 4, julatace3535 · 3, tomj606 · 2, liliand653 · 1 = **26 annonces sur 7 comptes**.
+➡️ Si Julien n'en reconnaît que 3, ce ne sont pas des annonces fausses : ce sont des **comptes qu'il ne considère pas comme sa boutique** (llloollllaa vend par exemple « 3 manuels première ST2S »). La réponse n'est pas de filtrer dans le code mais de **masquer ces comptes** (✕ Masquer, dans l'app comme dans le panneau). ⚠️ Ne pas « corriger » ça en inventant un filtre : la donnée est juste.
+
+⚠️ `vinted_accounts_blocked` est **local à l'appareil** (jamais dans `SYNC_KEYS`) : cette liste ne se voit PAS en lisant la base. Un diagnostic fait uniquement en base ne peut donc pas expliquer à lui seul ce que Julien a sous les yeux.
 
 ### Correctif quand même apporté (app, §5.20 côté app)
 Une annonce dont le compte n'a plus de ligne `vinted_accounts` passait **tous** les filtres : `acctOffOf(it)` lit `it._acc.vinted_user_id`, et sur un compte supprimé ce champ est vide → `acctOff('')` répond « non masqué » → l'annonce restait affichée alors que son compte n'apparaît plus nulle part.
