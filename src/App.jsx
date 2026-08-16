@@ -9454,7 +9454,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { emailList, extra, total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, vintedToPickup]);
-  const vintedToShip = useMemo(() => (sales.items || []).filter(o => !isHidden(o) && isAwaitingShipStatus(o.status)),
+  // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
+  // à poster (seule une vente masquée à la main sort de la liste).
+  const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
   const soldByTxn = useMemo(() => { const m = {}; (sales.items || []).forEach(o => { if (o.transaction_id != null) m[String(o.transaction_id)] = o; }); return m; }, [sales.items]);
@@ -9472,7 +9474,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const bordShipped = (b) => {
     if (b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) return true; // colis déjà dans le réseau transporteur
     const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null;
-    return !!o && /exp[ée]di|achemin|livr[ée]|finalis|d[ée]pos[ée]|termin/i.test(o.status || '');
+    if (!o) return false;                              // vente inconnue : on ne conclut pas
+    // ⚠️ LA BONNE QUESTION EST « CETTE VENTE ATTEND-ELLE ENCORE MON ENVOI ? »,
+    // pas « son statut ressemble-t-il à un colis parti ». L'ancienne liste
+    // positive (`expédié|acheminé|livré|finalisé|déposé|terminé`) laissait
+    // traîner tout le reste : mesuré sur les 72 bordereaux réels, **4 restaient
+    // à imprimer** alors que la paire ne partira jamais — 2 « Remboursement
+    // effectué » et 2 « Transaction suspendue ». On réutilise la référence
+    // unique `isAwaitingShipStatus` (§5.15) : tout ce qui n'attend plus mon
+    // envoi sort de la liste. 64 → 68 bordereaux correctement classés.
+    return !isAwaitingShipStatus(o.status || '');
   };
   // Expédié À LA MAIN (quand le statut Vinted est en retard, ex. tu as posté
   // aujourd'hui mais Vinted dit encore « bordereau envoyé »).
@@ -11306,7 +11317,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const toShip = useMemo(() => {
     const out = [];
     for (const o of (sales.items || [])) {
-      if (isHidden(o)) continue;
+      // ⚠️ UN COLIS À POSTER N'EST PAS UNE PRÉFÉRENCE D'AFFICHAGE. On écarte une
+      // vente masquée À LA MAIN, jamais une vente dont le COMPTE est masqué :
+      // masquer un compte sert à nettoyer la comptabilité, ça ne fait pas
+      // disparaître un carton de l'étagère — et Vinted pénalise le retard.
+      // Mesuré sur les 72 bordereaux réels : 3 attendent l'envoi, mais 2 sont
+      // sur un compte masqué → l'écran Bordereaux en listait 3 et la carte
+      // « à expédier » en annonçait 1. Deux chiffres pour la même obligation.
+      if (hiddenSales.has(String(o.transaction_id))) continue;
       if (!needsBordereau(o.status)) continue;
       // Déjà coché « posté » : ce colis ne fait plus partie du travail du jour.
       // Avant, la carte « Expédier N colis » comptait les colis déjà postés alors
@@ -11724,14 +11742,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // il pouvait donc tamponner LA MAUVAISE PAIRE, sans que rien ne le signale.
   // Sans lien certain on n'invente plus : le bordereau reste « en attente » et
   // le bouton « Relier » permet de trancher. Ne pas le réintroduire.
+  // ⚠️ LA TRANSACTION PASSE AVANT LE NUMÉRO DE L'EMAIL.
+  // Le `numero` d'un `email_bord_*` n'est PAS écrit par Vinted : c'est le
+  // serveur (`findNumeroByTitle`) qui l'a cherché **par titre** dans
+  // `vinted_annonce_numeros` — un magasin qui contient tout l'historique, donc
+  // une paire vendue il y a six mois au même titre peut gagner. Mesuré sur les
+  // 72 bordereaux réels : **1 désaccord** (email N°41 contre transaction N°131,
+  // « nike zoom fly 5 blanc taille 44 ») — c'est-à-dire un bordereau tamponné
+  // avec le numéro d'une AUTRE paire, donc la mauvaise chaussure dans le carton.
+  // Le chemin par la transaction (bordereau → vente moissonnée → annonce
+  // numérotée) est une identité, pas une ressemblance : il passe devant.
+  const numFromTxn = (b) => {
+    if (!b || b.transaction == null) return '';
+    const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
+    if (!so) return '';
+    const e = effEntry(so);
+    return e && e.numero ? String(e.numero) : '';
+  };
   const numForBord = (b) => {
     const man = manualEntry(b); if (man && man.numero) return String(man.numero);
+    const parTxn = numFromTxn(b); if (parTxn) return parTxn;
     if (b.numero) return String(b.numero);
-    if (b.transaction) {
-      const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
-      if (so) { const e = effEntry(so); if (e && e.numero) return String(e.numero); }
-    }
     return '';
+  };
+  // Le numéro de l'email contredit-il celui de la transaction ? On le signale au
+  // lieu de choisir en silence — c'est le seul cas où la paire peut être fausse.
+  const numLitige = (b) => {
+    const parTxn = numFromTxn(b); const parMail = String((b && b.numero) || '').trim();
+    return parTxn && parMail && parTxn !== parMail ? { txn: parTxn, mail: parMail } : null;
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
   // met en avant, en rouge si c'est aujourd'hui/demain ou dépassé, orange à 2 j.
@@ -13759,7 +13797,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const parts=[]; if(overdue) parts.push(`${overdue} en retard`); if(today) parts.push(`${today} aujourd'hui`); if(tomorrow) parts.push(`${tomorrow} demain`);
           return (
             <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} colis à expédier {overdue?'· du retard !':''}</div>
+              {/* ⚠️ CE BANDEAU NE COMPTE QUE L'URGENT (en retard / aujourd'hui /
+                  demain), pas tous les colis. Il disait « N colis à expédier »,
+                  exactement les mêmes mots que le compteur du haut qui, lui,
+                  compte TOUT : on lisait « 4 bordereaux à imprimer » puis
+                  « 1 colis à expédier » sur le même écran. On nomme ce qu'on
+                  compte au lieu de laisser croire à une contradiction. */}
+              <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} à poster en priorité {overdue?'· du retard !':''}</div>
               <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — imprime les bordereaux ci-dessous, les plus urgents sont en haut.</div>
             </div>
           );
@@ -13844,6 +13888,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         );
                       })()}
+                      {/* ⚠️ Le numéro écrit dans l'email vient d'un rapprochement
+                          PAR TITRE côté serveur ; celui de la transaction est une
+                          identité. Quand les deux se contredisent, on affiche
+                          lequel on retient et pourquoi — tamponner en silence, ce
+                          serait la mauvaise chaussure dans le carton. */}
+                      {(()=>{ const lit=numLitige(b); return lit ? (
+                        <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
+                          <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>choisir</button>
+                        </div>
+                      ) : null; })()}
                       {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{display:'inline-block',fontSize:11,fontWeight:600,marginTop:5,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,background:`${dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}14`,borderRadius:10,padding:'2px 8px'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"À poster aujourd'hui":dl.days===1?'À poster demain':'À poster avant'} {dl.text}</div> : null; })()}
                       {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:11,fontWeight:600,marginTop:5,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
                     </div>

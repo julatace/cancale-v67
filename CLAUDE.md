@@ -1813,3 +1813,38 @@ Le pipeline email lit `?id=eq.main`, `vinted_accounts`, `push_subs`… avec la *
 
 **Vérifié dans les deux états, à l'URL près** : base partagée → **0 lecture filtrée** (comportement d'aujourd'hui, strictement inchangé) ; base cloisonnée → **5 lectures sur 5** portent `owner=eq.U-JULIEN`, `push_subs` compris.
 ⚠️ **Piège de banc** : les modules gardent leur sonde « base cloisonnée ? » en cache. Enchaîner les deux états dans le même processus fait croire à une lecture non filtrée — il faut un processus neuf par état.
+
+---
+
+## 5.17 — LES BORDEREAUX : quatre causes distinctes, toutes mesurées
+
+Plainte de Julien : « j'ai des bordereaux de vente déjà expédiés que tu me laisses dans l'application, tu te trompes sur certains bordereaux et tu ne mets pas les bonnes paires, ni les paires qui ont besoin d'un bordereau imprimé — j'ai reçu une notification où je devais imprimer **51 bordereaux**, je n'ai pas 51 colis à envoyer. »
+
+Quatre défauts indépendants, séparés en mesurant sur les **72 bordereaux réels** avant d'écrire une ligne.
+
+### 1. La notification « 51 bordereaux » — `api/ship-reminders.js` ne regardait presque rien
+Le cron ne consultait que `vinted_bords_printed`… qui est quasi vide **depuis que l'impression ne marque plus un bordereau comme fait** (§24 : sortir le papier de l'imprimante ne veut pas dire que le colis est parti). Résultat : presque tous les bordereaux en retard étaient comptés, d'où le 51.
+Il lit maintenant les quatre sources de « déjà fait » (`vinted_bords_printed`, `vinted_bords_shipped`, `vinted_bords_hidden`, `panel_bords_done`) **et** ne garde que les bordereaux dont la transaction est dans l'ensemble « attend encore mon envoi » écrit par l'extension (`select=id,txns:data->resume->txns`, un scalaire — jamais `select=data`, §34).
+⚠️ **Sans résumé en base, il n'envoie RIEN** (`{ok:true, skipped:'resume absent'}`) : une notification fondée sur une source absente est pire que pas de notification.
+**Mesuré : 72 bordereaux → 3 attendent réellement l'envoi, 67 déjà partis, 1 masqué, 1 vente inconnue.**
+
+### 2. « Déjà expédiés mais toujours listés » — la liste positive laissait passer 4 cas
+`bordShipped` cherchait des mots de colis parti (`expédié|acheminé|livré|finalisé|déposé`). Tout ce qui ne ressemblait à aucun de ces mots restait à imprimer pour toujours.
+La bonne question n'est pas « ce statut ressemble-t-il à un colis parti ? » mais **« cette vente attend-elle encore MON envoi ? »** → `!isAwaitingShipStatus(o.status)`.
+**Mesuré : 64 → 68 bordereaux correctement retirés.** Les 4 gagnés : 2 « Remboursement effectué », 2 « Transaction suspendue » — des paires qui ne partiront jamais.
+
+### 3. ⚠️ « Pas les bonnes paires » — le numéro de l'email vient d'un RAPPROCHEMENT PAR TITRE
+`numForBord` faisait confiance d'abord à `b.numero`, le numéro écrit dans l'email. Or ce numéro est résolu **côté serveur** par `findNumeroByTitle`, contre tout l'historique de `vinted_annonce_numeros` : une paire vendue il y a six mois au même titre peut gagner. C'est une ressemblance, pas une identité — exactement ce que §24 interdit pour les bordereaux.
+Le chemin **bordereau → transaction → vente moissonnée → annonce numérotée** passe désormais devant. **Mesuré : 1 désaccord réel** (email N°41 contre transaction N°131, « nike zoom fly 5 blanc taille 44 ») — soit un bordereau tamponné du numéro d'une AUTRE paire, donc la mauvaise chaussure dans le carton.
+Le désaccord n'est plus tranché en silence : `numLitige(b)` l'affiche sur la carte (« L'email disait N°41, la vente dit N°131 — on garde celui de la vente ») avec un lien **choisir** vers le sélecteur manuel.
+
+### 4. ⚠️ Masquer un compte faisait disparaître un colis à poster
+`toShip` / `vintedToShip` écartaient les ventes d'un compte masqué (`isHidden` → `acctOffOf`). Or l'écran Bordereaux, lui, ne filtre pas par compte (`soldByTxn` est construit sur toutes les ventes). **Deux chiffres pour la même obligation, sur le même écran** : 3 bordereaux à imprimer, « 1 colis à expédier ».
+Masquer un compte sert à nettoyer la **comptabilité** ; ça ne fait pas sortir un carton de l'étagère, et Vinted pénalise le retard. Les deux listes n'écartent plus qu'une vente masquée **à la main**.
+**Mesuré : 4 ventes attendent l'envoi, dont 2 sur un compte masqué** — invisibles avant.
+
+### Et un cinquième, de vocabulaire
+Le bandeau d'urgence disait « 📮 1 colis à expédier » alors qu'il ne compte que **l'urgent** (en retard / aujourd'hui / demain) — les mêmes mots que le compteur du haut qui compte tout. On lisait « 4 bordereaux à imprimer » puis « 1 colis à expédier » sur le même écran. Devenu **« 1 à poster en priorité »**.
+
+### Vérifié
+`npm run build` OK · smoke app sur les vraies données : **12 écrans, 0 PAGEERROR, 0 artefact d'affichage** (le dernier « suspect » du banc a disparu avec le renommage) · `scripts/audit-coherence.cjs` : **0 désaccord sur les 12 statuts réels** · `node --check api/ship-reminders.js` OK.

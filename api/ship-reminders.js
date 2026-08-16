@@ -64,14 +64,47 @@ export default async function handler(req, res) {
     const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=${BORD_SELECT}`, { headers: HEADERS });
     const rows = r.ok ? await r.json() : [];
-    const printed = (await getRow('main'))?.vinted_bords_printed || {};
+    // ⚠️⚠️ CE COMPTE ÉTAIT FAUX, ET LA NOTIFICATION MENTAIT EN GRAND.
+    // Il ne regardait QUE `vinted_bords_printed`. Or depuis §24 imprimer ne
+    // marque plus rien comme fait : cette liste est donc quasi vide, et le cron
+    // annonçait « 51 bordereaux à envoyer » (plainte de Julien) alors que
+    // **3 colis** attendaient réellement — mesuré sur les 72 bordereaux réels :
+    // 68 déjà partis selon Vinted, 1 vente inconnue, 3 en attente.
+    // La seule question qui compte : **cette vente attend-elle encore MON
+    // envoi ?** C'est exactement ce que l'extension écrit à la capture
+    // (`data.resume.txns`, §5.14) — même règle que l'app, lu en scalaire.
+    const m = (await getRow('main')) || {};
+    const printed = m.vinted_bords_printed || {};
+    const shippedManual = m.vinted_bords_shipped || {};
+    const hidden = m.vinted_bords_hidden || {};
+    const panelDone = (await getRow('panel_bords_done')) || {};
     const key = (b) => String(b.transaction || b.suivi || b.numero || '');
+
+    // Transactions encore en attente d'expédition, d'après la moisson.
+    let attente = null;
+    try {
+      const rr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`, { headers: HEADERS });
+      if (rr.ok) {
+        const lignes = await rr.json();
+        for (const l of lignes) {
+          if (!Array.isArray(l.txns)) continue;
+          if (!attente) attente = new Set();
+          for (const t of l.txns) attente.add(String(t));
+        }
+      }
+    } catch (_) { attente = null; }
+    // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
+    // se TAIT. Une notification fausse est pire que pas de notification — c'est
+    // très exactement le « 51 bordereaux » qu'on corrige ici.
+    if (!attente) { res.status(200).json({ ok: true, skipped: 'resume absent — aucune notification envoyee' }); return; }
 
     const today = parisDate(0), tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
     for (const b of rows) {
       if (!b) continue;
-      if (printed[key(b)]) continue;          // déjà imprimé / expédié
+      const k = key(b);
+      if (printed[k] || shippedManual[k] || hidden[k] || panelDone[k]) continue;   // déjà traité, ici ou depuis le panneau
+      if (!b.transaction || !attente.has(String(b.transaction))) continue;         // Vinted n'attend plus ce colis
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) overdue += 1;
       else if (iso === today) dueToday += 1;
