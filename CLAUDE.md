@@ -1560,3 +1560,655 @@ Relevé du 15 août, compte par compte (moisson réelle) :
 
 **Vérifié au banc** : bandeau rendu (« 1 compte est exclu… Retiré : shop_cancale »), la feuille de confirmation s'ouvre, et après confirmation `vinted_accounts_hidden` → `[]`, `vinted_accounts_blocked` → `[]`, **PATCH sur `vrm_blocked_accounts`** émis. 0 erreur de page.
 ⚠️ Piège de banc : `<ConfirmHost/>` est monté **en haut** de l'arbre → le bouton de la feuille apparaît AVANT celui de la page dans le DOM. Cliquer « le dernier bouton portant ce libellé » tape sur celui de la page, derrière le voile, et le test conclut à tort que rien ne se passe.
+
+### 5.13 — ⚠️⚠️ LA VRAIE CAUSE DES ANNONCES QUI DISPARAISSENT : une capture PARTIELLE écrasait la complète
+
+Julien : « je veux simplement que tu captes ». Mesure faite avant de coder, en comparant ce qui est capté à **ce que Vinted lui-même annonce** (`payload.pagination.total_entries`, présent dans chaque moisson) :
+
+| compte | captés | Vinted annonce | pages |
+|---|---|---|---|
+| **julatace35260** | **4** | **100** | 2 |
+| **julatace3535** | **20** | **55** | 3 |
+| **shop_cancale** | **96** | **603** | 7 |
+| julienf765 / llloollllaa / tomj683 / tomj606 / vanessa5723 / liliand653 | complets | = | 1 |
+
+➡️ **La capture passive écrivait TOUT ce que la page chargeait** — y compris une réponse partielle (une page 2, une liste filtrée, un aperçu de profil) — et cette réponse partielle **écrasait la moisson complète**. Le compte tombait alors à « 0 annonce en ligne » dans l'app alors que l'extension avait bien fait son travail dix minutes plus tôt. Mesuré en direct : entre deux relevés à 40 min d'intervalle, le total des annonces visibles est passé de **17 à 7** sans que personne ne touche à rien.
+
+⚠️ Le garde-fou `plein(o, cle)` (§15) ne rejetait que le **vide**. Le partiel passait.
+
+**La règle, appliquée aux DEUX voies d'écriture** (`storeHarvest` passive + `storeHarvestRow` active) via `dressingPlusRiche(rowId, payload)` :
+- une réponse **complète** (`items ≥ total_entries`) fait **toujours** foi ;
+- sinon on n'écrase que si on apporte **au moins autant** d'articles qu'avant.
+
+Le compteur est lu **en scalaire** (`select=n:data->>nItems`, un entier) — jamais le payload : la leçon d'égress de §34 vaut ici aussi. Le champ `nItems` est écrit sur chaque ligne `listings`.
+
+### « 🔄 Tout recapter (compte connecté) » — panneau, bloc « Mes comptes »
+La capture passive ne voit que ce que la page charge : un compte peut rester incomplet indéfiniment. Ce bouton appelle `activeFetchActiveAccount()` → dressing **complet (toutes les pages)** + ventes + achats + boîte, **pour le seul compte connecté dans ce navigateur**, depuis sa session et son IP. ⚠️ Jamais tous les comptes d'un coup : c'est la signature multi-comptes de §5. À faire une fois par compte.
+
+**Vérifié** : `node --check` sur les deux fichiers ; banc panneau → bouton rendu, message `recapter` émis, bloc comptes intact, 0 erreur ; `buildPanelData` réel relancé contre la vraie base après correctif (aucune régression).
+
+---
+
+## 5.10 — REPUBLIER : le texte et les photos étaient DÉJÀ en base, personne ne les servait
+
+Mesuré avant de coder (méthode §46 : lire la base, pas deviner) :
+
+| magasin | contenu |
+|---|---|
+| **coffre** (`coffre_{uid}_{itemId}`) | 25 annonces, **0 avec description**, 25 avec photos |
+| **`vinted_item_details`** (fiches lues sur la PAGE, écrites par le panneau) | **23 fiches, 23 avec description ET photos HD** |
+
+Les deux ne se parlaient pas. `coffreRecord` n'attendait la description que d'une **fiche d'API** (`harvest_*_item_*`) qui ne se range quasiment jamais (§46), alors que le vrai texte de Julien dormait dans `vinted_item_details` depuis des semaines. Conséquence directe : l'étape 1 de Republier (§5.07) annonçait « le texte n'est pas encore capté » et l'étape 2 n'avait aucune photo — **pour des annonces dont tout était en base**.
+
+- **`archiverLot` lit `vinted_item_details` UNE FOIS** (pas une lecture par annonce — la faute de §34) et complète chaque enregistrement : description si le coffre n'en a pas, photos HD ajoutées sans doublon. ⚠️ **On ne dégrade jamais** une source plus riche, et le filtre `PUB` (§5.08) rejette le texte marketing de Vinted que `og:description` renvoie parfois à la place de l'annonce.
+- **Le panneau dit ce qui est prêt AVANT de lancer le défilement** : bandeau « N paires prêtes à republier · M incomplètes » en tête de Republier + une pastille par ligne (`prête · ✍️ 📸N` / `texte à capter` / `photos à capter` / `texte + photos à capter`). Le frein n'a jamais été de cocher des cases, c'est de découvrir en cours de route qu'il faut tout retaper. Pour les incomplètes, la marche à suivre est écrite : **ouvrir l'annonce une fois sur Vinted**, le panneau capte au passage.
+
+**Vérifié au banc** (§35) : bandeau rendu (« 1 paire prête à republier · 1 incomplète »), badges corrects sur les deux lignes (`prête · ✍️ 📸2` / `texte + photos à capter`), les 4 étapes du défilement inchangées, **0 erreur page/console**. `node --check` OK sur les deux fichiers.
+
+---
+
+## 5.11 — LE COFFRE NE POUVAIT PAS SE REMPLIR (3 défauts qui s'additionnent)
+
+Mesuré en base avant de coder : **112 annonces en ligne, 25 au coffre**. Ce n'est pas un problème de capture — c'est que trois chemins jetaient la donnée.
+
+### 1. La moisson ACTIVE n'archivait rien
+`archiverLot` n'était appelé que par `storeHarvest` (voie **passive**). Or « 🔄 Tout recapter » (§5.09) passe par **`storeHarvestRow`** et récupère le dressing **complet, toutes les pages** — le meilleur moment pour remplir le coffre. Il n'y déposait rien. `storeHarvestRow` archive maintenant lui aussi.
+
+### 2. Le coffre gardait UNE photo par annonce
+Deux causes cumulées :
+- `coffreRecord` ne lisait le tableau `photos` que de la **fiche** ; du dressing il ne prenait que `it.photo` (la vignette). Or **98 des 112 annonces en ligne portent leur tableau `photos` complet** dans la moisson — il était ignoré. Il est lu.
+- Pire : `storeHarvest` **allégeait `parsed` AVANT** d'archiver (§23 ne garde qu'une photo), donc le coffre ne voyait déjà plus rien. On garde le **brut** sous la main pour le coffre ; la ligne moissonnée reste légère (c'est elle qui repart à chaque lecture, §34), les URL vont au coffre — une ligne par annonce, lue seulement quand on republie.
+
+### 3. ⚠️ L'app accusait CHAQUE annonce de n'avoir « 1 seule photo »
+`mapWardrobeItem` calculait `photoCount` sur `it.photos` — supprimé par l'allègement — et retombait sur `it.photo ? 1 : null`. Donc **toutes** les annonces moissonnées ressortaient à une photo : **−15 points** dans `scoreAnnonce` pour chacune, et le conseil « ajoute des photos » servi à des annonces qui en ont six. `articleMaigre` pose désormais **`nPhotos`** (un entier, trois octets) et l'app le lit en premier.
+
+### Le panneau ne fait plus croire au compte complet
+`photosCompletes(o)` compare les photos **gardées** aux photos **réelles** (`coffre.nPhotos`, sinon `nPhotosVinted` du dressing). Une paire dont le coffre n'a que 2 photos sur 6 n'est plus « prête » : elle porte **`📸 2/6 photos`**. « Prête » veut dire prête.
+
+**Vérifié au banc** (§35, 3 paires : complète / rien / texte OK mais 2 photos sur 6) : bandeau « 1 paire prête à republier · 2 incomplètes », badges `prête · ✍️ 📸2` / `texte + photos à capter` / `📸 2/6 photos`, les 4 étapes du défilement inchangées, **0 erreur page/console**. `npm run build` OK, `node --check` OK sur les deux fichiers.
+
+---
+
+## 5.12 — ⚠️ LE PONT APP↔EXTENSION NE TOURNAIT PAS SUR LE VRAI DOMAINE
+
+Vérifié, pas supposé : `https://vrm.center` **sert bien l'app** (titre « VRM », le bundle construit). Or le manifeste n'injectait `bridge.js` que sur `cancale-v67-ten.vercel.app` et `cancale-v67.vercel.app` :
+
+```
+"js": ["bridge.js"], "matches": ["…vercel.app/*"]      ← vrm.center absent
+```
+
+Donc **sur le domaine que Julien utilise, l'extension était invisible pour l'app** : `vmrExtPresent()` restait faux pour toujours. Conséquences directes — répondre à un message depuis l'app répondait « Extension VRM non détectée sur cet appareil » **même extension installée et à jour**, et le jeton du vendeur (multi-vendeurs, §12) n'était jamais transmis au service worker.
+
+⚠️ Le reste était pourtant prêt : `host_permissions` contenait `vrm.center`, et le contrôle d'origine côté `background.js` l'acceptait déjà. **Seule la ligne `matches` manquait** — le genre de trou qu'aucun test de code ne voit, parce que le code est juste et que c'est la configuration qui l'empêche de s'exécuter.
+
+- `matches` += `https://vrm.center/*` et `https://www.vrm.center/*` ; `host_permissions` complété ; le contrôle d'origine accepte `www.`.
+- `VRM_APP_API` (appel `/api/ai` de l'extension) pointait encore sur l'alias Vercel → passé sur `vrm.center`.
+
+### La détection était fragile en plus d'être coupée
+`bridge.js` s'injecte à `document_idle` : l'app envoyait **un** ping au chargement de son module, souvent **avant** que le pont existe, et concluait « pas d'extension » définitivement.
+- Le pont **s'annonce plusieurs fois** (immédiatement, au `DOMContentLoaded`, à 0,8 s et 2,5 s) et **joint sa version**.
+- L'app **re-ping** à 0,6 / 1,5 / 3 / 6 s tant qu'elle n'a rien reçu, et **prévient ses écrans** (`onVmrExt`) quand la réponse arrive — un composant déjà affiché doit se redessiner, sinon la détection tardive ne change rien à l'écran.
+
+### « Est-ce que ça capte ? » a maintenant une réponse DANS l'app
+Bloc **État des connexions** (Réglages → Comptes Vinted), trois voies qui tombent séparément :
+- **Extension Chrome** — détectée + **numéro de version** (après un rechargement dans Chrome, c'est la seule façon de vérifier que la nouvelle tourne — plainte répétée « je ne vois pas ce que tu as changé ») ;
+- **Capture Vinted** — date de la dernière moisson ;
+- **Emails** — date du dernier email reçu (bordereaux, colis, codes de retrait).
+
+Vert < 2 j / orange < 7 j / rouge au-delà, **la même échelle que l'écran Santé de l'extension** (§4.97) : un même état ne doit pas porter deux couleurs selon l'écran. ⚠️ Lecture en **scalaires** (`select=id,updated_at,cap:data->>capturedAt`) : les lignes d'emails portent des PDF en base64, un `select=data` ici referait le trou d'égress de §34.
+
+### Accueil et création de compte : plus de promesse invérifiable
+- **Onboarding** : l'étape 1 se **coche toute seule** (✓ vert + version) quand l'extension répond. Elle dit aussi que sur téléphone il n'y a pas d'extension, au lieu de laisser croire à un échec.
+- **Création de compte** : le sous-titre promettait « tes données ne seront visibles que par toi ». **Faux tant que `CLOISONNE` est faux** (vérifié en base : `select=owner` → 400, la colonne n'existe pas) — un compte créé aujourd'hui ouvre la MÊME boutique. Le formulaire le dit maintenant avant, pas après.
+
+**Vérifié au banc app** (`dist` servi, Supabase mocké, faux pont qui rejoue `{__vmr:'ready',version}` **après** le chargement du module — le cas réel) : « Extension Chrome · version 5.12.0 », « Capture Vinted · dernière il y a 3 h », « Emails · dernier il y a 20 h ». **Et sans pont** : « pas détectée ici » + la marche à suivre. **0 PAGEERROR** dans les deux sens. `npm run build` OK, `node --check` OK sur les trois fichiers d'extension.
+
+---
+
+## 5.13 — CONNEXION DEPUIS L'EXTENSION + le tableau de bord de sécurité (⚠️ lire le 1er paragraphe)
+
+Demande de Julien : « un système de connexion où les extensions se connectent à l'application avec mot de passe pour sécuriser les données de chaque utilisateur ».
+
+### ⚠️ Ce qui protège vraiment, dit franchement
+**Un mot de passe côté extension ne cloisonne rien tant que la base ne sépare pas les vendeurs.** Vérifié en direct sur la vraie base ce jour : `select=owner` → **400, la colonne n'existe pas**, et une lecture avec la **clé publique seule** (celle qui est dans le code, donc connue de tous) **ramène encore les lignes**. Tant que c'est le cas, n'importe qui peut tout lire sans jamais voir un écran de connexion — l'isolation vit dans Postgres (colonne `owner` + RLS), pas dans le JavaScript (§12). Tout ce qui suit **prépare** ce jour-là et fonctionne à la seconde où la migration passe ; ça ne le remplace pas.
+
+### L'extension s'identifie toute seule (5.13)
+Jusqu'ici la session ne pouvait venir **que** de l'app, par le pont — donc sur un navigateur où l'app n'est jamais ouverte, l'extension écrivait forcément avec la clé publique : après migration, ça veut dire **plus aucune capture enregistrée**.
+- Fenêtre de l'extension → **Compte VRM** : email + mot de passe → `POST /auth/v1/token?grant_type=password`. ⚠️ **Le mot de passe n'est jamais gardé** : il part une fois, seuls les deux jetons sont stockés dans `chrome.storage.local` (zone locale de l'extension, illisible par un site web).
+- Erreurs traduites (`invalid_grant` → « Email ou mot de passe incorrect », email non confirmé, trop de tentatives), état **session expirée** distingué de **non connecté**, bouton se déconnecter.
+- ⚠️ **Entretien de la session** : le jeton dure ~1 h et n'était renouvelé **qu'au moment d'écrire, et seulement si la base est cloisonnée**. Une extension restée ouverte sans écrire aurait laissé mourir son jeton puis serait retombée sur la clé publique — c'est-à-dire, sous RLS, **plus rien d'enregistré, en silence**. Alarme `vrm-session` toutes les 40 min (elle ne part pas s'il n'y a pas de session).
+- Le pont répond à `{__vmr:'authEtat'}` (même contrôle d'origine que le passage de session : un site quelconque n'a pas à savoir sous quelle adresse tu es connecté) → l'app peut afficher qui est connecté **dans** l'extension.
+
+### Réglages → Sécurité des données : les verrous sont SONDÉS, plus décrits
+Un verrou qu'on croit posé est pire qu'un verrou absent. Quatre lignes, mesurées à chaque ouverture de l'écran :
+1. **Propriétaire des lignes** — la colonne `owner` existe-t-elle ? Sinon, bouton **📋 Copier la migration SQL** (importée depuis `supabase/migrations/001-multi-utilisateurs.sql` avec `?raw` — **pas recopiée** : deux copies finiraient par diverger, et c'est un texte qu'on colle dans une base de production sans le relire).
+2. **Lecture sans compte** — ⚠️ **le piège** : la colonne peut exister sans que RLS soit actif. On teste donc ce qui compte : une lecture avec la clé publique seule ramène-t-elle encore des lignes ?
+3. **Création de compte** — `mailer_autoconfirm` lu sur `/auth/v1/settings` : dit si un email de confirmation est exigé (serveur de test Supabase limité à quelques envois par heure, §12).
+4. **Extension identifiée** — via le pont : connectée, sous quelle adresse.
+
+**Vérifié aux deux bancs.** App (`dist` servi, Supabase mocké) : les 4 lignes rendues avec le bon verdict, badge « partagées », SQL réellement copié (**6 856 caractères**), **0 PAGEERROR**. Puis **état d'après-migration simulé** (`select=owner` → 200, lecture anonyme vide) : l'app **bascule toute seule** sur l'écran de connexion, la porte « entrer sans compte » disparaît, et le pied de page passe à « Chaque vendeur ne voit que ses propres données ». Popup de l'extension (faux `chrome`) : mauvais mot de passe → message honnête et **aucune session**, bon mot de passe validé à la touche Entrée → email affiché, déconnexion → retour à l'état initial. **0 erreur** partout.
+
+---
+
+## 5.14 — BALAYAGE DE FIABILITÉ : 6 défauts réels, tous mesurés avant d'être corrigés
+
+Méthode : smoke complet de l'app sur les **vraies données** (§20) — 12 écrans, chacun rendu et scanné (`NaN`, `undefined`, `[object Object]`, accords, chiffres qui se contredisent) — puis banc du panneau sur **tous** les onglets déclarés, puis tests unitaires des fonctions modifiées contre la vraie moisson.
+
+⚠️ **Le banc doit honorer `select=` .** Sans projection, un écran qui projette ses colonnes (bordereaux, fraîcheur…) reçoit des objets sans leurs champs et **paraît vide** : on mesurerait un artefact du banc, pas l'app (§21). Corrigé — c'est ce qui a fait passer les bordereaux de « vides » à leurs vrais chiffres.
+
+### 1. ⚠️⚠️ VINTED ENVOIE `brand` ET `size` — on ne gardait que `brand_title`/`size_title`
+Mesuré sur les 112 annonces en ligne : **0 ont `brand_title` ou `size_title`**, 112 ont `brand`, `size`, `status`. `CHAMPS_ARTICLE` (l'allègement, §23) ne gardait donc **que des champs qui n'existent pas** : chaque annonce allégée perdait sa marque et sa taille pour toujours. Conséquence visible dans l'app : « marque manquante · taille manquante » sur tout le stock, note d'annonce faussée, conseils faux — et l'atelier Republier classait en tête les annonces les plus abîmées par ce bug, pas les plus à retravailler.
+Corrigé aux trois endroits (`CHAMPS_ARTICLE`, `buildPanelData`, `coffreRecord`), les deux orthographes acceptées. **Mesuré après correction** : sur 112 annonces, le coffre récupère marque 98, taille 98, état **112**, et **plusieurs photos 98** (au lieu d'une seule). Les 14 restantes sont les lignes déjà allégées : elles reviennent à la prochaine capture.
+
+### 2. Bordereaux : deux chiffres pour la même chose sur le même écran
+« 64 colis faits » en haut, « ✅ 63 colis faits » en bas. Le récap comptait **tous** les bordereaux, la ligne du bas **excluait les masqués**. Un bordereau masqué ne compte plus nulle part. Vérifié : 70 reçus · 63 faits · 7 à imprimer, partout le même compte.
+
+### 3. Garage : « À ranger (176) » pour 15 paires réellement en stock
+Le panneau listait **toutes** les entrées de `vinted_annonce_numeros`, y compris les paires vendues et parties depuis des mois. Un panneau qu'on ne peut pas vider n'est plus une alerte, c'est du décor.
+L'écran Annonces **publie** désormais `vinted_nums_physiques` (annonce en ligne, ou vente pas encore expédiée — exactement la règle de `freedNums`, §11 : on la publie au lieu de la refaire), et le Garage s'y limite. **176 → 11.** Clé locale, pas dans `SYNC_KEYS` : c'est une photo recalculable. Sans elle (écran jamais ouvert sur cet appareil), l'ancien comportement est conservé — on ne masque jamais à tort.
+
+### 4. ⚠️ ÉGRESS : le widget retéléchargeait 791 Ko à chaque rafraîchissement
+Dernière poche de la faute d'août (§34) : `api/widget.js` lisait les commandes en `select=data` — **mesuré 609 Ko de ventes + 181 Ko d'achats**, et un widget d'écran d'accueil se rafraîchit tout seul jour et nuit (des gigas par mois pour afficher deux nombres).
+L'extension écrit maintenant le compte utile **au moment de la capture** (`data.resume` = transactions à expédier / à retirer), le widget le lit **en scalaire**. La propriété essentielle est conservée : ça se met à jour **même app fermée**, puisque c'est l'extension qui capture. Les deux tests de statut sont la **copie exacte** de ceux de l'app — deux règles pour la même notion, c'est la garantie de deux chiffres qui se contredisent.
+**Vérifié en exécutant le vrai handler** dans les deux états : sans résumé → mêmes chiffres (2 à expédier, 1 à retirer) et 791 Ko lus ; avec résumé → **mêmes chiffres, 0 octet** de commandes.
+
+### 5. Écran blanc : impossible, désormais
+Deux fois cette année, une erreur de rendu a vidé la page entière — barre du bas comprise (§19 TDZ, §26 variable jamais déclarée). Deux filets, **tous deux prouvés en provoquant une vraie erreur** :
+- **`EcranGardeFou`** autour du contenu : l'écran fautif affiche un message + « Réessayer / Copier l'erreur / Recharger », **la navigation reste vivante**, et changer d'onglet remet le garde-fou à zéro. Vérifié : bandeau d'erreur affiché, puis onglet Ventes normal.
+- **`DernierFilet`** (dans `main.jsx`) pour ce qui casse **avant** : « L'application n'a pas pu démarrer », avec « Repartir propre » qui efface les clés de CE navigateur (jamais la session) — le nuage reste la source de vérité.
+
+### 6. Une clé abîmée ne tue plus l'app
+`load()` rendait tel quel ce qu'il trouvait : une clé corrompue (écriture interrompue, import bancal) rendait une **chaîne** là où l'app attend une liste, et le premier `.filter` faisait écran blanc — **avant** que le garde-fou d'écran existe, puisque la lecture a lieu dans l'état initial du composant racine. `load` vérifie maintenant que la forme correspond à la valeur par défaut, sinon défaut + avertissement en console. Vérifié : `vinted_invoices` corrompue → l'écran Factures s'affiche normalement au lieu de tout faire tomber.
+
+**État final vérifié** : 12 écrans rendus sur les vraies données, **0 erreur de page, 0 artefact d'affichage** ; panneau d'extension, **tous les onglets déclarés** (recherche, coffre, litiges, ventes… ) sans erreur — les 2 « échecs » du banc sont les artefacts connus (clic sur un élément filtré `display:none`, onglet « réponse » qui n'existe que sur une page de conversation).
+
+### 5.14 (suite) — trois défauts trouvés en TESTANT le correctif précédent
+
+**7. Le résumé des commandes classait 7 ventes en « colis à retirer ».** En comparant le résumé au calcul de l'app sur les vraies commandes, l'écart a sauté aux yeux : 0 côté app, 7 côté résumé. Cause — `resumeCommandes` acceptait tout type commençant par `orders`, donc aussi les vieilles lignes génériques (`orders_bought`, `orders_all`) dont le contenu **mélange ventes et achats** (§25). Restreint aux deux clés canoniques exactes. **Re-mesuré : 4 à expédier / 0 à retirer, identiques à l'app, transaction par transaction.** ⚠️ C'est le test qui a trouvé le bug, pas la relecture — un résumé faux aurait fait clignoter le widget pour des colis inexistants.
+
+**8. 114 € invisibles dans le porte-monnaie, et un solde écrasé par une réponse sans rapport.** Les 8 lignes `harvest_*_billing` réelles ont **trois formes** : `{main, escrow}` (le porte-monnaie), `{balance, history, reference}` (la lecture `payouts` ajoutée en 4.26) — **que l'app ne lisait pas**, donc 114,36 € jamais comptés — et une réponse de tarification (`minimum_price`) rangée là par erreur, qui avait **remplacé** le vrai solde d'un compte (il n'y a qu'une ligne par compte : la dernière réponse gagne, même piège que le dressing partiel de §5.13).
+- L'app lit maintenant `escrow` **ou** `balance`, et ignore ce qui ne porte aucun montant. **Mesuré : 675,43 € sur 5 comptes → 789,79 € sur 7.**
+- L'extension refuse d'écrire une ligne `billing` qui n'est pas un porte-monnaie (`estPorteMonnaie`), des deux côtés (capture passive et moisson active — cette dernière jetait au passage la lecture `payouts`, qui ne portait pas `main`/`escrow`).
+
+**9. Le service worker mettait `/api/` en cache.** Règle « cache d'abord » pour tout GET de même origine hors navigation : `/api/ai` (« la clé IA est-elle configurée ? ») et toute future route GET restaient **figées pour toujours** sur leur première réponse. `/api/` passe désormais toujours par le réseau.
+
+**Aussi** : la fenêtre de l'extension insérait les pseudos Vinted dans du HTML **sans les échapper** — un pseudo bien choisi cassait (ou détournait) l'affichage. Échappés.
+
+---
+
+## 5.15 — COHÉRENCE APP ↔ EXTENSION : les règles ne sont plus écrites deux fois
+
+Demande de Julien (il veut la vendre) : **aucune incohérence, ni dans l'app, ni dans l'extension, ni entre les deux.**
+
+### La méthode, désormais outillée : `scripts/audit-coherence.cjs`
+À lancer après toute modification d'une règle métier. Il **extrait les prédicats des deux fichiers**, les exécute sur **tous les statuts réellement présents en base** (12 distincts aujourd'hui) et affiche chaque désaccord. Lecture seule, aucun appel à Vinted. C'est ce script qui a trouvé les deux premiers défauts ci-dessous — pas la relecture.
+
+### 1. ⚠️ DANS L'APP : « Bordereau envoyé au vendeur » était à la fois « à expédier » et « rien à expédier »
+`isAwaitingShipStatus` répondait **oui** (c'est le moment où Vinted te donne l'étiquette), et `needsBordereau` **non** — parce que son test « déjà parti » attrape le mot **« envoyé »**. Deux conséquences réelles : le **numéro de cette paire retombait dans le pool** alors que le carton est encore sur l'étagère (deux paires dans la même boîte, §19), et le même statut valait « à expédier » ailleurs dans l'app.
+Les deux tests deviennent **la référence unique, au niveau module** (ils vivaient dans un composant, donc invisibles pour `needsBordereau` juste en dessous), et la vente qui attend TON envoi passe avant le test « déjà parti ».
+
+### 2. Trois statuts classés différemment par l'app et par l'extension
+`classifySale` (extension) n'avait pas `retour` ni `suspend` : **« Retour initié »**, **« Transaction suspendue »** et **« Commande non réclamée – Retournée »** étaient **annulées côté app** et **affichées comme ventes en cours** dans le panneau. Copie exacte de la règle de l'app. **Vérifié : 0 désaccord sur les 12 statuts.**
+
+### 3. « À booster » (app) ≠ « à relancer » (extension)
+Même question — *cette annonce a de l'audience mais ne convertit pas* — deux règles : l'app faisait `vues ≥ 20 && favoris ≤ 1` (seuils absolus), le panneau comparait le ratio favoris/vues à **ta médiane**. Deux listes différentes selon l'outil ouvert. L'app adopte la règle relative (un seuil absolu ne veut rien dire : 300 vues et 3 favoris convertit deux fois moins bien que 40 vues et 1 favori), avec repli sur l'ancien repère quand il y a moins de 5 annonces notées.
+
+### 4. Une paire vendue restait « en ligne » dans l'app, pas dans le panneau
+Vinted laisse parfois l'annonce ouverte après la vente. Le panneau la retirait (vente de moins de 60 j au **titre unique**) ; l'app non. Même règle des deux côtés, même garde (`§24` : un titre en double ne retire **jamais** rien). Et la **portée** est alignée : on regarde les ventes de **tous** les comptes, y compris masqués — une paire vendue sur un compte masqué a quand même quitté l'étagère.
+
+### 5. Masquer un compte depuis le panneau ne masquait rien dans l'app
+Le panneau écrit `panel_accounts_off` (sa ligne dédiée) ; l'app **ne la lisait pas**. Le sens inverse marchait déjà — le masquage ne tenait donc que dans un sens. L'app lit maintenant la même liste, avec le **même trois-états** (`false` = rallumé exprès depuis le panneau, ça prime). Elle n'y écrit toujours jamais (§35).
+
+### ✅ Convergence PROUVÉE sur les mêmes données
+Le vrai `buildPanelData()` de l'extension et l'app rendue par Playwright, alimentés par **les mêmes copies de la vraie base** :
+| | app | panneau |
+|---|---|---|
+| annonces en ligne | 7 | **8** → **7** |
+Les deux tools tombaient sur 8 vs 7 pour une seule raison, et elle est saine : l'app **dérive** des ventes depuis les emails (bordereau reçu ⟹ paire vendue) et **persiste** le résultat dans `vinted_annonces_email_sold` ; le panneau **consomme** cette clé plutôt que de relire tous les emails (égress, §34). Simulé « l'app a tourné une fois » → le panneau passe de 8 à **7**. ⚠️ **Un seul propriétaire par règle, les autres consomment** — c'est le motif à garder.
+
+⚠️ **Piège de banc rencontré (encore une fois §21)** : mon harnais ne servait pas la ligne `vrm_blocked_accounts`, donc le panneau croyait le compte supprimé encore actif et affichait ses 96 annonces — **104 contre 7**, un écart spectaculaire qui n'était **que l'artefact du banc**. Servir TOUTES les familles de lignes avant de conclure.
+
+**État final** : app — 12 écrans sur les vraies données, **0 erreur, 0 artefact d'affichage** ; extension — **15 onglets sur 15** sans erreur (les 2 « échecs » du banc restent les artefacts connus) ; audit de cohérence — **6 règles comparées, 0 désaccord**.
+
+---
+
+## 5.16 — LES EMAILS APPARTIENNENT À UN VENDEUR (le dernier chantier du multi-vendeurs)
+
+Un email arrive **sans session** : rien, dans le message, ne dit à qui il est destiné. C'était le point qui restait ouvert depuis §12 (« rattacher une adresse email à un vendeur — chantier à part entière »). Il est fait, et construit pour ne **jamais** se tromper.
+
+### La règle, en une phrase
+**C'est l'adresse de RÉCEPTION qui décide, jamais le contenu.**
+
+L'expéditeur, le sujet et le corps sont écrits par n'importe qui : il suffirait d'envoyer un email mentionnant « shopcancale35 » pour déposer des données dans le compte d'un autre vendeur. L'adresse à laquelle le message a été **livré**, elle, est décidée par le routage — le vendeur l'a déclarée lui-même dans l'app, et il est le seul à l'avoir donnée à son transfert. C'est le seul champ que l'extérieur ne choisit pas.
+
+⚠️ **Ne JAMAIS « améliorer » ça en rattachant par le pseudo Vinted, le nom de l'expéditeur ou un mot du corps** — c'est exactement la porte qu'on referme ici.
+
+### Ce qui est livré
+- **`api/_lib/proprietaire-email.js`** — fonction **pure**, donc testable exhaustivement : `adressesDeLivraison(body, mail)` ne lit que des champs d'enveloppe/destination (Postmark `ToFull`, Mailgun `recipient`, Cloudflare `to`, `envelope.to`, `Delivered-To`, `Cc`…), et `resoudreProprietaire(adresses, registre, defaut)` tranche dans cet ordre : **adresse exacte** → **adresse sans son étiquette `+`** → **propriétaire de l'installation** (`VRM_OWNER_UID`) → **quarantaine**.
+- **Deux vendeurs destinataires du même email → quarantaine**, jamais un choix au hasard.
+- **Quarantaine** : l'email est conservé **entier** (`email_quarantaine_*`) avec la raison et les adresses lues. Perdre un email est réparable — le donner au mauvais vendeur ne l'est pas.
+- **Réglages → Mes adresses de réception** : le vendeur déclare ses adresses à l'avance, voit les emails en attente et les réclame d'un tap (**« C'est à moi »**).
+- **`api/email-rattacher.js`** rejoue l'email **exactement comme s'il venait d'arriver**, avec le propriétaire imposé. ⚠️ Il faut **prouver son identité** (jeton de session vérifié auprès de Supabase) — sinon n'importe qui s'attribuerait les emails d'un autre. La ligne de quarantaine n'est supprimée que si le traitement a **réellement** abouti.
+
+### ⚠️ LE PIÈGE QUI AURAIT TOUT GÂCHÉ : une variable de module en serverless
+Première version : le propriétaire résolu était rangé dans une variable de module. **Une fonction serverless garde son instance entre deux appels et peut en traiter plusieurs EN MÊME TEMPS** — l'email suivant écrasait la variable pendant que le premier finissait d'écrire, et des lignes seraient parties **chez le mauvais vendeur, sans aucune erreur visible**. Remplacé par **`AsyncLocalStorage`** : un contexte isolé par requête.
+**Prouvé au banc** : deux emails traités **en parallèle** pour deux vendeurs, avec un délai injecté dans l'écriture pour forcer l'entrelacement → **3 lignes pour U-JULIEN, 3 pour U-MARIE, aucun mélange**.
+
+### Vérifications
+- **19 cas** sur la résolution : adresse exacte, casse, forme « Nom <adresse> », registre en casse mixte, étiquette `+` inconnue → base, plusieurs destinataires dont un connu, **deux vendeurs → quarantaine**, inconnue sans/avec défaut, aucune adresse lisible, doublon, **et l'usurpation** (From + sujet + corps portant l'adresse d'un vendeur → **quarantaine**), plus les 6 formes d'enveloppe des services de réception. **Tous passent.**
+- **Pipeline complet** (vrai handler, Supabase simulé) : email attribué → 3 lignes sous le bon vendeur ; adresse inconnue → quarantaine et **aucune donnée attribuée** ; rattachement avec jeton valide → 3 lignes sous `U-JULIEN` + quarantaine supprimée ; identifiant hors quarantaine → refusé.
+- **Au passage** : `parseSaleEmail` remplaçait le texte par la version HTML dès qu'il faisait moins de 100 caractères — un email court en texte brut était donc **écrasé par un HTML vide** et la vente perdue. On ne remplace plus que si le HTML apporte vraiment plus.
+
+### Mise en service (une fois la migration passée)
+1. Chaque vendeur déclare **sa** adresse de réception dans Réglages → Mes adresses de réception.
+2. Il fait suivre ses emails Vinted vers **cette adresse** (une par vendeur — deux vendeurs qui partagent la même adresse sont indépartageables **par construction**, et le système le dira au lieu de deviner).
+3. `VRM_OWNER_UID` reste le propriétaire par défaut : tant qu'il n'y a qu'un vendeur, **rien ne change** pour lui.
+
+### 5.16 (suite) — ⚠️ LA CLÉ DE SERVICE CONTOURNE RLS : chaque lecture doit être cadrée
+
+Le pipeline email lit `?id=eq.main`, `vinted_accounts`, `push_subs`… avec la **clé de service**, qui **passe outre RLS**. Une fois la base cloisonnée, ces lectures auraient donc ramené **les lignes de TOUS les vendeurs**, et `rows[0]` aurait été celle du premier venu : en traitant l'email de Marie, on aurait lu les comptes Vinted et les numéros de Julien. Aucune erreur, aucun signe — juste des données mélangées.
+
+- **`duVendeur(url)`** ajoute `owner=eq.<vendeur résolu>` à chaque lecture, **et seulement si la colonne existe** (un filtre sur une colonne inconnue ferait échouer la lecture en 400 — donc rien ne change aujourd'hui).
+- ⚠️ **Le pire cas était les NOTIFICATIONS** : `_lib/push.js` lisait `push_subs` sans filtre → une vente de Julien aurait fait sonner le téléphone de Marie. Le contexte de requête a donc déménagé dans `_lib/owner.js`, pour être partagé par les deux modules.
+
+**Vérifié dans les deux états, à l'URL près** : base partagée → **0 lecture filtrée** (comportement d'aujourd'hui, strictement inchangé) ; base cloisonnée → **5 lectures sur 5** portent `owner=eq.U-JULIEN`, `push_subs` compris.
+⚠️ **Piège de banc** : les modules gardent leur sonde « base cloisonnée ? » en cache. Enchaîner les deux états dans le même processus fait croire à une lecture non filtrée — il faut un processus neuf par état.
+
+---
+
+## 5.17 — LES BORDEREAUX : quatre causes distinctes, toutes mesurées
+
+Plainte de Julien : « j'ai des bordereaux de vente déjà expédiés que tu me laisses dans l'application, tu te trompes sur certains bordereaux et tu ne mets pas les bonnes paires, ni les paires qui ont besoin d'un bordereau imprimé — j'ai reçu une notification où je devais imprimer **51 bordereaux**, je n'ai pas 51 colis à envoyer. »
+
+Quatre défauts indépendants, séparés en mesurant sur les **72 bordereaux réels** avant d'écrire une ligne.
+
+### 1. La notification « 51 bordereaux » — `api/ship-reminders.js` ne regardait presque rien
+Le cron ne consultait que `vinted_bords_printed`… qui est quasi vide **depuis que l'impression ne marque plus un bordereau comme fait** (§24 : sortir le papier de l'imprimante ne veut pas dire que le colis est parti). Résultat : presque tous les bordereaux en retard étaient comptés, d'où le 51.
+Il lit maintenant les quatre sources de « déjà fait » (`vinted_bords_printed`, `vinted_bords_shipped`, `vinted_bords_hidden`, `panel_bords_done`) **et** ne garde que les bordereaux dont la transaction est dans l'ensemble « attend encore mon envoi » écrit par l'extension (`select=id,txns:data->resume->txns`, un scalaire — jamais `select=data`, §34).
+⚠️ **Sans résumé en base, il n'envoie RIEN** (`{ok:true, skipped:'resume absent'}`) : une notification fondée sur une source absente est pire que pas de notification.
+**Mesuré : 72 bordereaux → 3 attendent réellement l'envoi, 67 déjà partis, 1 masqué, 1 vente inconnue.**
+
+### 2. « Déjà expédiés mais toujours listés » — la liste positive laissait passer 4 cas
+`bordShipped` cherchait des mots de colis parti (`expédié|acheminé|livré|finalisé|déposé`). Tout ce qui ne ressemblait à aucun de ces mots restait à imprimer pour toujours.
+La bonne question n'est pas « ce statut ressemble-t-il à un colis parti ? » mais **« cette vente attend-elle encore MON envoi ? »** → `!isAwaitingShipStatus(o.status)`.
+**Mesuré : 64 → 68 bordereaux correctement retirés.** Les 4 gagnés : 2 « Remboursement effectué », 2 « Transaction suspendue » — des paires qui ne partiront jamais.
+
+### 3. ⚠️ « Pas les bonnes paires » — le numéro de l'email vient d'un RAPPROCHEMENT PAR TITRE
+`numForBord` faisait confiance d'abord à `b.numero`, le numéro écrit dans l'email. Or ce numéro est résolu **côté serveur** par `findNumeroByTitle`, contre tout l'historique de `vinted_annonce_numeros` : une paire vendue il y a six mois au même titre peut gagner. C'est une ressemblance, pas une identité — exactement ce que §24 interdit pour les bordereaux.
+Le chemin **bordereau → transaction → vente moissonnée → annonce numérotée** passe désormais devant. **Mesuré : 1 désaccord réel** (email N°41 contre transaction N°131, « nike zoom fly 5 blanc taille 44 ») — soit un bordereau tamponné du numéro d'une AUTRE paire, donc la mauvaise chaussure dans le carton.
+Le désaccord n'est plus tranché en silence : `numLitige(b)` l'affiche sur la carte (« L'email disait N°41, la vente dit N°131 — on garde celui de la vente ») avec un lien **choisir** vers le sélecteur manuel.
+
+### 4. ⚠️ Masquer un compte faisait disparaître un colis à poster
+`toShip` / `vintedToShip` écartaient les ventes d'un compte masqué (`isHidden` → `acctOffOf`). Or l'écran Bordereaux, lui, ne filtre pas par compte (`soldByTxn` est construit sur toutes les ventes). **Deux chiffres pour la même obligation, sur le même écran** : 3 bordereaux à imprimer, « 1 colis à expédier ».
+Masquer un compte sert à nettoyer la **comptabilité** ; ça ne fait pas sortir un carton de l'étagère, et Vinted pénalise le retard. Les deux listes n'écartent plus qu'une vente masquée **à la main**.
+**Mesuré : 4 ventes attendent l'envoi, dont 2 sur un compte masqué** — invisibles avant.
+
+### Et un cinquième, de vocabulaire
+Le bandeau d'urgence disait « 📮 1 colis à expédier » alors qu'il ne compte que **l'urgent** (en retard / aujourd'hui / demain) — les mêmes mots que le compteur du haut qui compte tout. On lisait « 4 bordereaux à imprimer » puis « 1 colis à expédier » sur le même écran. Devenu **« 1 à poster en priorité »**.
+
+### Vérifié
+`npm run build` OK · smoke app sur les vraies données : **12 écrans, 0 PAGEERROR, 0 artefact d'affichage** (le dernier « suspect » du banc a disparu avec le renommage) · `scripts/audit-coherence.cjs` : **0 désaccord sur les 12 statuts réels** · `node --check api/ship-reminders.js` OK.
+
+---
+
+## 5.18 — ⚠️ « L'EXTENSION NE RENVOIE PAS MES NOUVEAUX COMPTES » : la suppression était un aller sans retour
+
+Question de Julien : « à chaque fois que j'ajoute l'extension à un nouveau compte, il faut bien que je dise à quel compte elle appartient ? où est-ce que je dois le relier ? »
+
+**Réponse : il n'y a RIEN à relier.** L'extension lit l'identifiant du compte dans le cookie de session Vinted (`access_token_web` → `account_id`) et crée la ligne `vinted_accounts` toute seule. Aucun choix à faire, donc aucun risque de relier le mauvais compte. Le problème était ailleurs.
+
+### La cause, mesurée en base
+`vrm_blocked_accounts` contenait **199082413 = shop_cancale**, supprimé par Julien (§5.11) — **son plus gros compte : 96 annonces, 284 ventes**. Or `captureDomain` refusait de capter tout compte de cette liste **et effaçait sa ligne à chaque cycle**, en silence. Se reconnecter à ce compte dans Chrome ne pouvait donc **jamais** le ramener.
+
+⚠️ Le contre-ordre existait pourtant : `panel_accounts_off[uid] === false` = « rallumé explicitement, ça prime » (tri-état, §5.08). **`buildPanelData` l'honorait pour l'AFFICHAGE, la CAPTURE non** — le compte revenait dans les listes du panneau mais sans jetons frais, donc vide. C'est très exactement « le bouton ne marche pas ».
+
+- `unblockedAccounts()` (cache 60 s) lit le contre-ordre ; `captureDomain` ne refuse plus qu'un compte bloqué **ET** non réautorisé.
+- `setAccountOff(uid, false)` **vide les caches et relance `captureAllAccounts()`** : sans ça, réautoriser ne prenait effet qu'au bout de 5 min.
+- Un refus est **noté** (`chrome.storage.local.vrmRefus`) et journalisé, au lieu d'être muet.
+
+### Un compte tout neuf était INVISIBLE dans le panneau
+La liste des comptes se construisait uniquement à partir des **lignes moissonnées**. Un compte fraîchement capté (jetons OK, aucune moisson encore) n'apparaissait donc nulle part — ce qui ressemble exactement à « il n'arrive pas ». Elle part maintenant de la table `vinted_accounts`, plus du compte connecté dans ce navigateur ; la moisson ne fait qu'ajouter les compteurs.
+
+### Le bloc « compte connecté » (panneau, en tête de Ma journée)
+Trois causes se ressemblaient — jamais capté / supprimé définitivement / simplement masqué — et toutes se présentaient comme du silence. Elles sont désormais distinctes, avec le bouton qui va avec :
+| état | message | bouton |
+|---|---|---|
+| supprimé définitivement | ⛔ n'est pas synchronisé | ↺ Réautoriser et relier |
+| capté nulle part | ⏳ pas encore relié | 🔗 Relier maintenant |
+| relié mais masqué | 🙈 relié mais masqué | ↺ Réafficher |
+| tout va bien | ✓ relié | — |
+| aucun compte connecté | 👤 connecte-toi sur vinted.fr | — |
+
+Le pseudo d'un compte supprimé est repris de la liste noire (elle garde `logins`) : il s'affichait « compte 2413 » alors que sa ligne `vinted_accounts` avait justement été effacée.
+
+### ⚠️ DEUX BANCS ÉTAIENT MUETS DEPUIS UN MOMENT — même piège, troisième fois
+`run_panel_data.cjs` ne sortait **rien du tout** (exit 0, aucune ligne) — et **avant mes changements aussi**, vérifié au `git stash`. Cause : `chrome.cookies.get` est appelé **en callback** par le code, et le stub ne rendait qu'une promesse → attente infinie, sortie silencieuse. C'est le piège de §5.08, à l'identique, sur une autre API.
+➡️ **Tout stub `chrome.*` doit répondre AUX DEUX FORMES** (promesse et callback). Un banc muet n'est pas une preuve que rien ne casse : c'est un banc qui ne s'exécute pas.
+
+### Vérifié
+`node --check` sur les deux fichiers · banc de la porte (vrai `captureDomain` en `vm`, `fetch` simulé) : liste noire seule → **refusé, ligne effacée, refus noté** ; réautorisé → **capté, aucun effacement** — **0 cas non conforme** · banc panneau : les 5 états rendus avec le bon bouton et le bon message, **0 erreur**, et le clic envoie exactement `relierCompte` / `setAccountOff{off:false}` · vrai `buildPanelData` contre la vraie base : 13 annonces, 10 comptes dont **shop_cancale (96 annonces) désormais visible et réactivable**. Extension **5.16.0**.
+
+---
+
+## 5.19 — ⚠️ « ARRÊTE D'INVENTER DES DONNÉES » : il avait raison sur les deux tableaux
+
+### 1. Une VRAIE fausse ligne dormait dans sa base de production
+Trouvée en cherchant, pas en supposant : **`email_bord_99000000001`** — « Nike Air Max N°99001 Taille 42 », suivi `LD123456789FR`, `uid` vide, `account` vide, **aucun PDF**. Créée le 11 juillet en testant le pipeline email. Elle apparaissait dans ses bordereaux « à imprimer » comme un colis réel : c'est **littéralement de la donnée inventée dans son outil de travail**.
+Scan complet : **1 seule** sur les 1000 lignes `app_data`, et **rien** dans la ligne `main` (ni numéro ≥ 9000, ni facture, ni motif de test).
+⚠️ **La clé publique n'a pas le droit de DELETE** (200 / 0 ligne supprimée) : impossible de l'effacer depuis un script. Le ✕ de la carte la masque en un clic.
+➡️ **Règle : ne JAMAIS écrire de donnée de test dans la base de production.** Les bancs servent des copies (§20/§35) ; une ligne synthétique n'a rien à y faire.
+
+### 2. Le chemin de capture PRÉFÉRÉ tronquait les commandes à 100
+`pageActiveFetch` (injecté dans la page, c'est le chemin choisi en premier par `runActive`) faisait `my_orders?page=1&per_page=100` — **une seule page** — alors que l'autre chemin (`fetchAllOrdersCookie`, par cookie) paginait. Donc selon le chemin emprunté, le même compte rendait 320 ventes ou 100.
+**Pire : la capture tronquée ÉCRASAIT la complète.** Le garde-fou anti-partiel (§5.13) ne protégeait que le *dressing* ; les commandes et la boîte n'avaient rien. Des ventes disparaissaient donc toutes seules, sans que personne ne touche à rien.
+
+**Mesuré au banc, sur les vraies volumétries (320 ventes / 434 achats / 603 annonces) :**
+| | avant | après |
+|---|---|---|
+| ventes captées | **100** | **320** |
+| achats captés | **100** | **434** |
+| annonces | 603 | 603 |
+| porte-monnaie | oui | oui |
+
+- `listePlusRiche(rowId, parsed, cle)` **remplace** `dressingPlusRiche` et s'applique à **toutes** les listes (`CLE_LISTE` : listings/orders_sold/orders_purchased/inbox), **sur les DEUX voies d'écriture** (passive `storeHarvest` + active `storeHarvestRow`). Compteur lu **en scalaire** (`select=n:data->>nItems`), jamais le payload (§34).
+- Les commandes se paginent maintenant **dans la page** aussi (10 pages max, pause 700 ms, arrêt sur `total_pages`).
+
+### 3. Capture à CHAQUE visite sur Vinted (la demande)
+`chrome.tabs.onUpdated` (statut `complete`, domaine Vinted) → `visiteVinted()` → `runActive()`, **3 s après le chargement** (on laisse la capture passive profiter de ce que la page demande d'elle-même).
+- **Uniquement le compte connecté dans cet onglet**, depuis sa session et son IP — jamais tous les comptes d'un coup (§5, la signature multi-comptes).
+- **Délai de garde de 5 min par compte** (`vrmDerniereVisite`, local). ⚠️ Ce **n'est pas** un « rythme faussement humain » (toujours refusé, §32) : c'est ne pas refaire dix fois la même lecture en naviguant de page en page — sans lui, ouvrir 30 annonces = 30 moissons complètes.
+- `runActive()` rend désormais un booléen, pour que le journal dise « rafraîchi » seulement quand quelque chose a été rangé.
+
+### Vérifié
+Banc `vm` avec le VRAI code : **6 cas de garde-fou** (dressing / ventes / achats / boîte, tronqué → ignoré, complet → écrit) + **délai de garde dans les deux sens** → **0 cas non conforme**. Banc de pagination exécutant réellement la fonction injectée : **320/434/603 + porte-monnaie, 0 écart** (et 100/100 avant correction, mesuré au `git stash`). Banc panneau : **16 onglets, 0 erreur d'app** (les 2 artefacts connus). Extension **5.17.0**.
+
+---
+
+## 5.20 — LES COMPTES FANTÔMES : des données qui survivaient à la suppression
+
+Julien : « garde simplement ceux qui ont été captés récemment par Vinted, shop_cancale a été supprimé de toute façon ».
+
+### Ce que la base disait
+| identifiant | lignes moissonnées | dernière capture | ligne `vinted_accounts` |
+|---|---|---|---|
+| 199082413 (shop_cancale) | 12 | 12,7 j | **aucune** |
+| 3170782324 | 29 | 4,6 j | **aucune** |
+| 3170790456 | 5 | 39,5 j | **aucune** |
+
+**46 lignes appartenant à des comptes qui n'existent plus** — et elles alimentaient encore les listes du panneau et s'affichaient comme des comptes. ⚠️ La clé publique **n'a pas le droit d'effacer `app_data`** (DELETE → 200 / 0 ligne) : ces restes ne partent donc **jamais** tout seuls. Supprimer un compte doit vouloir dire supprimer.
+
+### La règle, unique et sans délai
+**Un compte existe s'il a des JETONS (`vinted_accounts`), pas parce qu'il reste des données.** `compteExiste(uid)` filtre `keepAcc` **et** `noteAcct` : un identifiant orphelin ne s'affiche plus et ne nourrit plus rien. Pas de seuil d'ancienneté à régler — un compte supprimé est supprimé, quelle que soit la fraîcheur de ses restes.
+
+⚠️ **Garde-fou obligatoire** : si la lecture de `vinted_accounts` échoue (réseau), on **n'applique aucun filtre**. Filtrer sur une liste vide viderait tout le panneau pour une simple coupure — c'est-à-dire reproduire exactement le bug qu'on corrige. Testé : lecture vide → **99 annonces conservées, 0 filtrage**.
+
+### La fraîcheur est écrite, pas devinée
+Chaque compte porte `capte` (la capture la plus récente de ses lignes). La liste est **triée du plus frais au plus ancien**, et chaque ligne le dit : « capté aujourd'hui » / « capté il y a 4 j » / « ⚠️ rien depuis 14 j — repasse dessus ». Même échelle que l'écran Santé et que l'app (§5.12) — un même état ne doit pas porter deux couleurs selon l'écran.
+**On ne cache jamais un compte muet** : une session expirée n'est pas un compte mort, ses paires sont réelles. On le montre, trié en bas, avec la raison.
+
+### État relevé (16 août)
+7 comptes vivants : 5 captés dans l'heure, `julatace3535` à 4,7 j, `liliand653` à 14 j (session à rafraîchir). **18 annonces en ligne** au total.
+⚠️ `vinted_accounts_hidden` et `vrm_blocked_accounts` sont **vides depuis 09:18** — Julien a cliqué « Tout réafficher » (§5.12) lui-même. Ce n'est pas un effet du code.
+
+### Vérifié
+Banc `vm` avec le vrai `buildPanelData` : compte supprimé **écarté de la liste ET de ses 96 annonces**, fraîcheur portée par le compte, panne réseau → aucun filtrage — **0 cas non conforme**. Banc panneau : **16 onglets, 0 erreur**. Bancs 5.16/5.17 rejoués : 0 écart. Extension **5.18.0**.
+
+---
+
+## 5.21 — ⚠️ CORRECTION D'UNE DE MES ANALYSES : `origin/main` n'était PAS périmé, ma copie locale l'était
+
+⚠️ **La première version de cette section affirmait « l'app déployée date du 8 août, 109 commits jamais déployés ». C'EST FAUX.** Je lisais `origin/main` **sans avoir fait `git fetch`** : ma référence locale pointait sur le 8 août alors que le vrai `main` était au **15 août 22:36**. L'écart réel était de **16 commits**, pas 109 — et le correctif du 401 (§5.09) **était déjà en production**, donc il n'explique pas ce que Julien voit.
+
+➡️ **`git fetch origin main` AVANT toute comparaison avec la production.** Une référence locale jamais rafraîchie ne vieillit pas toute seule : elle ment silencieusement, et fait accuser le déploiement à la place du code.
+
+### Ce que la mesure a vraiment montré (16 août, données du jour)
+
+Plainte : « j'ai que trois paires en ligne, enfin quatre avec une autre, mais elle appartient à un compte bloqué qui n'est même plus dans les comptes répertoriés ».
+
+### Ce que dit la base (mesuré, compte par compte)
+| compte | captées | en ligne | capture | complète ? |
+|---|---|---|---|---|
+| julienf765 | 33 | 3 | aujourd'hui 08:42 | oui (33/33) |
+| tomj606 | 9 | 2 | aujourd'hui 08:42 | oui |
+| llloollllaa | 29 | 3 | aujourd'hui 08:42 | oui |
+| tomj683 | 9 | 3 | aujourd'hui 08:43 | oui |
+| julatace35260 | 100 | 4 | aujourd'hui 08:39 | oui (100/100) |
+| julatace3535 | 20 | 2 | il y a 4,7 j | **non — 20 sur 55** |
+| liliand653 | 1 | 1 | il y a 14 j | oui |
+
+**18 annonces en ligne**, données de Vinted lui-même, captures fraîches du matin. Julien en voit 3 ou 4.
+
+### Les annonces affichées sont VRAIES — vérifié une par une
+Après rafraîchissement des copies depuis la base, l'écran Annonces rend **25 annonces**, et chacune a été retracée jusqu'à son compte : **25 sur 25 viennent d'un compte vivant, 0 fantôme**. Elles sortent toutes du dressing Vinted capté par l'extension, dont 4 comptes dans l'heure. **Rien n'est inventé sur cet écran.**
+
+Répartition réelle (16 août) : julatace35260 · 6, julienf765 · 5, llloollllaa · 5, tomj683 · 4, julatace3535 · 3, tomj606 · 2, liliand653 · 1 = **26 annonces sur 7 comptes**.
+➡️ Si Julien n'en reconnaît que 3, ce ne sont pas des annonces fausses : ce sont des **comptes qu'il ne considère pas comme sa boutique** (llloollllaa vend par exemple « 3 manuels première ST2S »). La réponse n'est pas de filtrer dans le code mais de **masquer ces comptes** (✕ Masquer, dans l'app comme dans le panneau). ⚠️ Ne pas « corriger » ça en inventant un filtre : la donnée est juste.
+
+⚠️ `vinted_accounts_blocked` est **local à l'appareil** (jamais dans `SYNC_KEYS`) : cette liste ne se voit PAS en lisant la base. Un diagnostic fait uniquement en base ne peut donc pas expliquer à lui seul ce que Julien a sous les yeux.
+
+### Correctif quand même apporté (app, §5.20 côté app)
+Une annonce dont le compte n'a plus de ligne `vinted_accounts` passait **tous** les filtres : `acctOffOf(it)` lit `it._acc.vinted_user_id`, et sur un compte supprimé ce champ est vide → `acctOff('')` répond « non masqué » → l'annonce restait affichée alors que son compte n'apparaît plus nulle part.
+`accountUids` (les comptes qui ont vraiment des jetons) + un test en tête d'`annBase` : **une annonce doit venir d'un compte qui existe encore**. Même règle que l'extension.
+⚠️ `accountUids` est déclaré juste après `acctOff`, donc **avant** `annBase` — un `useMemo` lu avant sa déclaration plante au premier rendu (§19).
+
+### Vérifié
+Banc app dédié (3 annonces d'un compte vivant + 1 d'un compte supprimé) : **les 3 restent, la 4ᵉ disparaît, 0 PAGEERROR**. Smoke complet : **12 écrans, 0 erreur, 0 artefact**.
+
+---
+
+## 5.22 — SUPPRIMER UN COMPTE SUPPRIME VRAIMENT + les 561 € d'argent en attente
+
+Julien : « je veux simplement pouvoir choisir quel compte Vinted garder et les autres les supprimer… je n'ai pas 561 € ».
+
+### 1. ⚠️ « Déconnecter » ne supprimait presque rien — TROIS défauts empilés
+**a) Le `DELETE` sur `app_data` est SANS EFFET.** Vérifié en direct : la clé publique reçoit **200 avec 0 ligne supprimée** — le droit d'effacer n'est pas accordé sur cette table (il l'est sur `vinted_accounts`). L'étape « supprimer ses lignes moissonnées » de `deleteVintedAccount` ne faisait donc **rien depuis toujours**, en silence. C'est l'origine des 46 lignes fantômes de §5.20.
+⚠️ §5.11 avait « vérifié » cette suppression avec un **uid factice** : 0 ligne supprimée était le résultat attendu, donc le test ne prouvait rien. **Tester une suppression sur une ligne qui existe vraiment.**
+➡️ On **VIDE** les lignes à la place (un upsert, lui, passe) : `{supprime:true, purgedAt}` sur chaque `harvest_{uid}_*` et `coffre_{uid}_*`. La donnée part réellement, et l'égress avec.
+
+**b) Une DEUXIÈME feuille bloquait la suppression.** Après la confirmation, `disconnectAccount` posait une seconde question (« garder son chiffre d'affaires passé ? »). **Mesuré au banc : tant qu'on n'y répondait pas, aucune des trois écritures ne partait.** Une seule question désormais ; le CA passé est **conservé par défaut** (c'est de l'argent réellement gagné) et c'est écrit dans la confirmation.
+
+**c) Supprimer AJOUTAIT le compte aux « masqués ».** `disconnectAccount` mettait l'uid dans `vinted_accounts_hidden` — une clé **synchronisée** — en plus de le supprimer. Le compte apparaissait donc « masqué » sur tous les appareils alors qu'il était supprimé : c'est la moitié de la confusion « tous mes comptes sont masqués » (§5.09/§5.10). Retiré — la liste noire suffit.
+
+Le bouton dit maintenant **« 🗑 Supprimer ce compte »** et la confirmation liste exactement ce qui part et ce qui reste.
+
+### 2. Les 561,23 € : 57 € appartenaient à un compte supprimé
+Relevé des 8 lignes `harvest_*_billing` :
+| compte | en attente | capture |
+|---|---|---|
+| **199082413 (shop_cancale, supprimé)** | **57,23 €** | 16,9 j |
+| julatace3535 | 359,00 € | 4,9 j |
+| tomj606 | 145,00 € | 0,2 j |
+| 3170782324 (supprimé) | 0 € | 4,8 j |
+| llloollllaa / tomj683 / julienf765 / julatace35260 | ligne vide | — |
+
+`fetchWalletEscrow` additionnait **tout**, comptes supprimés compris. Il reçoit désormais la liste des comptes vivants (même règle que partout, §5.20) → **561,23 € → 504,00 € sur 2 porte-monnaie**. ⚠️ Garde-fou : sans liste de comptes (appel trop tôt), **on ne filtre rien** plutôt que de tout jeter.
+**Et on dit l'âge** : un solde lu il y a 5 jours n'est pas le montant d'aujourd'hui. La carte affiche « le plus ancien lu il y a N j — repasse dessus » au-delà d'un jour. 4 comptes sur 7 n'ont aucun solde capté : le total ne couvre que ceux visités, ce n'est pas masqué.
+
+### 3. « Il manque encore de nouveaux comptes » — la contrainte est dans Chrome
+Chrome ne garde **qu'une session Vinted à la fois par domaine** : l'extension capte le compte actuellement connecté. Un nouveau compte arrive donc **au moment où Julien s'y connecte**, pas avant. Rien à relier (§5.18) ; pour en avoir plusieurs en parallèle il faut des **profils Chrome distincts**.
+
+### Vérifié
+Banc app dédié : le bouton rend, la confirmation s'ouvre, et les **trois** écritures partent — liste noire ✅, jetons ✅, **3 lignes vidées** (`supprime:true`) ✅, **0 PAGEERROR**. Porte-monnaie recalculé sur la vraie base : 561,23 → 504,00 €. Smoke complet : 12 écrans, **0 PAGEERROR** ; les 3 « suspects » restants sont l'accord de « colis » (invariable) — un artefact du banc. `scripts/audit-coherence.cjs` : **0 désaccord sur les 12 statuts**.
+
+---
+
+## 5.23 — LE PRIX D'ACHAT : la marque et la taille ne suffisent pas (le modèle tranche)
+
+Audit large sur les données du jour (26 annonces en ligne, 7 comptes) :
+
+| contrôle | résultat |
+|---|---|
+| annonces sans numéro | **0** |
+| numéros en double sur des annonces en ligne | **0** |
+| **prix d'achat renseignés** | **0 / 26** ⚠️ |
+| plage de numéros | 1 → **182** pour 26 paires, **156 trous** |
+| titres en double parmi les annonces en ligne | 2 |
+| cases posées au garage | **0** |
+
+Le seul vrai défaut de données reste **le prix d'achat** (§22, toujours à zéro) : tout le bénéfice, la marge, la « meilleure marque » et le rapport comptable tournent avec un coût nul.
+
+### ⚠️ Pourquoi je n'ai PAS fait le rapprochement automatique
+Tentation évidente : 337 achats captés, un score existant, il suffirait de relier ce qui n'a qu'un seul bon candidat. **Mesuré : 5 annonces sur 26 ont un candidat unique à « même marque + même taille »… dont 2 FAUX** —
+- « nike p-6000 blanc/jaune **taille 40** » ← « **Nike speakers** maat 40 » (12,29 €)
+- « nike zoom fly 5 bleu **taille 47** » ← « **Nike Air Max 1** SC in maat 47 » (19,49 €)
+
+« nike » + « 40 » désigne des centaines de paires. Un prix d'achat faux ne se voit pas : il produit une marge crédible et fausse **pour toujours**. C'est pire que pas de prix — donc **pas d'attribution automatique**, comme §22 l'avait déjà conclu pour le titre.
+
+### Ce qui a été fait : le MODÈLE devient un signal
+- **`extractModel(text)`** (module-level, à côté de `extractBrand`/`extractSize`) : ~45 modèles (zoom fly, p-6000, air max 95, spezial, samba, gel-resolution, xt-6, medalist…). Rend **le plus long** modèle reconnu (« air max 95 » gagne sur « air max »).
+- **`openPicker`** : même modèle **+5** ; modèles reconnus mais **DIFFÉRENTS → −6** (c'est ce qui écarte « speakers » et « Air Max » des exemples ci-dessus).
+- **Le badge « suggéré » passe de 8 à 12.** À 8, marque + taille suffisaient — exactement les deux faux cas. À 12 il faut le modèle (4+4+5) ou un titre identique. Une paire dont le modèle n'est pas reconnu **n'est jamais « suggérée »** : on ne se prononce pas.
+
+**Mesuré après correction, avec les vraies fonctions de l'app** : 10 annonces sur 26 ont au moins un candidat suggéré, et **toutes les suggestions sont du même modèle ET de la même taille** (« Adidas Spezial noir 35,5 » ← « Baskets Adidas Spezial taille 35,5 », « zoom fly 5 40,5 » ← « Nike zoom fly 5 pink 40,5 »…). Les 16 autres n'affichent aucun badge — c'est honnête, leur achat n'est pas identifiable avec certitude.
+
+⚠️ `extractSize` de l'app était déjà correct (plage 34–52, donc « air max **95** » n'est pas lu comme une pointure) — c'est mon script d'audit qui avait ce défaut, pas le code. Vérifier la règle de l'app avant de l'accuser.
+
+### Vérifié
+`npm run build` OK · smoke app sur les vraies données : **12 écrans, 0 PAGEERROR** (les 3 « suspects » = l'accord de « colis », invariable) · `scripts/audit-coherence.cjs` : **5 règles, 0 désaccord**.
+
+---
+
+## 5.24 — LE COMPTEUR DE DIAGNOSTIC A PARLÉ : la fiche article échoue au `JSON.parse`
+
+Le compteur posé en §46 (`panel_diag_capture`) a enfin des données. Relevé :
+
+| clé | valeur |
+|---|---|
+| `recu_item` | **13** |
+| `abandon_json_item` | **13** |
+| `ecrit_item` | **0** |
+| tout le reste (profil 70, conversations 57, annonces 47, ventes 26, achats 21, porte-monnaie 43…) | reçu ≈ écrit |
+
+➡️ **Les 13 réponses de fiche article arrivent bien et sont TOUTES rejetées par `JSON.parse`.** La fuite ouverte depuis §46 est localisée : ce n'est ni l'URL (le motif matche), ni le compte (il est trouvé), ni l'écriture — c'est le **corps** qui n'est pas du JSON.
+
+⚠️ **Localisé ≠ expliqué.** Corps vide ? HTML de la page servi sur la même URL ? flux déjà consommé ? On ne peut pas trancher sans voir. Donc **on instrumente encore une fois** plutôt que de supposer : `echantillonRate(type, id, body)` garde **un exemplaire par type** dans `panel_diag_capture.rates` — `{id, taille, type, tete: 160 premiers caractères, at}`. Assez pour reconnaître la forme, trop court pour embarquer quoi que ce soit d'utile ou de lourd, un seul exemplaire écrasé à chaque fois.
+
+➡️ **Prochaine session : lire `panel_diag_capture.rates.item`.** Si `tete` commence par `<!DOCTYPE`, c'est la page HTML qui matche le motif → resserrer la regex. Si `taille` vaut 0, c'est le flux déjà consommé → cloner plus tôt dans `inject.js`.
+
+**Autre trouvaille du même relevé** : `recu_pickup_points: 1` / `ecrit_pickup_points: 1`. **Vinted expose donc bien les points relais** — ce que §16 avait conclu introuvable côté API (« la donnée n'existe QUE dans l'email »). Une ligne existe maintenant. À rouvrir quand il y en aura assez pour en tirer quelque chose.
+
+**Vérifié au banc `vm`** (vrai `storeHarvest`, corps HTML injecté) : ligne de diagnostic écrite, échantillon présent, `tete` = `<!DOCTYPE html><html lang="fr">…`, taille 131. `node --check` OK. Extension **5.19.0**.
+
+---
+
+## 5.25 — shop_cancale SUPPRIMÉ POUR DE BON (16 août)
+
+Demande : « je veux que shop cancale soit totalement supprimé ».
+
+⚠️ **Il n'était pas supprimable depuis l'app** : sa ligne `vinted_accounts` avait déjà disparu, donc il n'apparaissait dans aucune liste et le bouton « 🗑 Supprimer ce compte » (§5.22) était hors d'atteinte. Ses **12 lignes moissonnées** continuaient pourtant d'exister (annonces, ventes, achats, boîte, porte-monnaie à 57,23 €…). Et `vrm_blocked_accounts` était **vide** depuis le « Tout réafficher » du 16 août 09:18 (§5.20) — l'extension aurait donc pu le recapter à la première reconnexion.
+
+Fait directement en base, dans cet ordre :
+1. **liste noire** — `199082413` + `shop_cancale` réinscrits dans `vrm_blocked_accounts` (lecture-fusion-écriture) → `captureDomain` refuse de le recapter (§5.18) ;
+2. **jetons** — `DELETE vinted_accounts` (0 ligne, déjà absente) ;
+3. **12 lignes vidées** par upsert `{supprime:true, uid, purgedAt}` — ⚠️ le `DELETE` sur `app_data` reste sans effet avec la clé publique (§5.22), vider est la seule suppression réelle possible.
+
+**Vérifié après coup** : 0 ligne non vidée, 8 comptes restants (`julienf765, tomj683, angeled92, llloollllaa, tomj606, liliand653, julatace35260, julatace3535`).
+
+⚠️ **Ce qui n'a PAS été touché, volontairement** : les **198 numéros de boîte** de `vinted_annonce_numeros`. Un numéro est écrit sur un carton réel ; effacer ceux d'un compte supprimé ferait perdre le rangement de paires physiquement présentes. Un numéro devenu inutile retourne de toute façon dans le pool tout seul (§7, `freedNums`).
+
+⚠️ **Nouveau compte repéré au passage** : `angeled92` (3175765377) est apparu dans `vinted_accounts`. Il n'a pas été touché.
+
+---
+
+## 5.26 — LE DIAGNOSTIC A PARLÉ + « où déposer mes colis » (une donnée en base que personne ne lisait)
+
+### 1. La fiche article : le corps rejeté est une PAGE D'ERREUR HTML servie en 200
+L'échantillon posé en §5.24 est arrivé :
+```
+id 9677654811 · type "string" · taille 3771
+tête: <div class="u-text-center u-stretch-height u-margin-top-x-large">
+      <span class="svg"><svg width="300" height="300" …
+```
+➡️ Ce n'est ni un flux vidé (taille 3771), ni la page de l'annonce (trop court) : c'est **l'illustration d'erreur de Vinted, renvoyée avec un statut 200**. Comme `apiGet` ne rejette que `!r.ok`, elle passe le filtre et casse au `JSON.parse`.
+⚠️ La regex n'est PAS en cause — elle est bien bornée à l'API (`/\/api\/v\d+\/items\/(\d+)(?:\?|$)/`), une URL de page ne peut pas la déclencher. **`GET /api/v2/items/{id}` ne rend donc plus la fiche** ; l'endroit où lire la description reste `vinted_item_details` (les fiches lues sur la page, §5.10), qui marche. Reste à identifier le remplaçant côté API — piste : `/api/v2/item_upload/items/{id}` (la requête d'édition captée, §4.96).
+
+### 2. ⚠️ DES ENDPOINTS JAMAIS EXPLOITÉS dorment dans `seen_urls`
+En listant les 39 URL réellement observées :
+| endpoint | ce que ça débloque |
+|---|---|
+| `/api/v2/shipments/{id}/label_url` | **l'URL du bordereau PDF** — « pas encore capturé » depuis §5 |
+| `/api/v2/shipments/{id}/nearby_drop_off_points` | **les points de dépôt** (fait, ci-dessous) |
+| `/api/v2/shipments/{id}/label_options` | les formats d'étiquette proposés |
+
+### 3. « Où déposer tes colis » — 6 lignes en base, 0 lecteur
+`harvest_*_pickup_points` existait déjà (6 comptes, 15 points chacun) et **rien ne la lisait**. Elle porte exactement ce que §16 cherchait dans les emails, mais en structuré : `drop_off_point_address` (« 40 RUE DU PORT, CANCALE, 35260 »), `distance`, `opening_status.text` (« Vendredi 09:30–18:30 »), `latitude/longitude`, `business_hours`, et le transporteur.
+
+⚠️ **NE PAS CONFONDRE avec le point relais de RETRAIT** (§16, toujours ouvert) : ici c'est le **DÉPÔT**, l'endroit où Julien porte le carton. Deux notions différentes — c'est écrit dans le code, à côté de la fonction.
+
+- **`fetchDropOffPoints(uidsVivants)`** + carte dépliable en tête de l'écran **Bordereaux** : nom, adresse, distance, horaires du jour, lien Itinéraire. **Zéro appel Vinted** (la donnée vient de la capture). Comptes supprimés filtrés (§5.20).
+- ⚠️ **Égress (§34)** : chaque ligne pèse ~30 Ko. On lit les dates en **scalaire** d'abord, puis le contenu de **4 lignes seulement, une par compte**, une fois par session, uniquement sur cet écran.
+- ⚠️ **Défaut trouvé au banc, pas à la relecture** : ma 1ʳᵉ version prenait « les 3 plus récentes » → **un transporteur sur deux disparaissait** (le transporteur est attaché au compte : 3 comptes Mondial Relay, 3 Shop2Shop), donc les points où partent la moitié des colis. Une ligne par compte corrige.
+- **On dit l'âge** de la liste : un point relais ferme.
+
+**Vérifié au banc** (§20, `dist` servi, Supabase mocké honorant `select=`, vraies lignes) : carte rendue, dépliée, **les deux transporteurs présents** (SUPER U ACCUEIL / Shop2Shop 1,7 km · Maison de la Presse / Mondial Relay 1,9 km), adresses et horaires réels, aucun débordement à 420 px. **0 erreur** (le seul 400 est le sondage `select=owner` volontaire). `npm run build` OK · `scripts/audit-coherence.cjs` : **4 règles, 0 désaccord**.
+
+---
+
+## 5.27 — ⚠️ « EN ATTENTE » ≠ « DISPONIBLE » + le lieu de retrait complété par la liste de Vinted
+
+### 1. ⚠️ Le porte-monnaie mélangeait deux montants qui n'ont rien à voir
+Julien : « l'argent en attente c'est totalement faux, ce n'est pas l'argent disponible, c'est l'argent en attente que je veux ». **Il a raison, et c'était écrit dans le code.** Les deux formes de porte-monnaie portent **chacune les DEUX montants** :
+
+| forme | disponible | EN ATTENTE |
+|---|---|---|
+| solde (`wallet`) | `main` | `escrow` |
+| versements (`payouts`) | `balance` | **`pending_balance`** |
+
+Or `fetchWalletEscrow` lisait `escrow` **ou `balance`** (§5.14 point 8) : dès qu'un compte est capté par `payouts`, son argent **disponible** était compté dans le total « en attente ». `pending_balance` — le vrai champ — **n'était lu nulle part**.
+
+➡️ Règle posée : `attente = escrow ?? pending_balance`, `dispo = main ?? balance`, **jamais l'un pour l'autre**. La fonction renvoie désormais les deux, et la carte les affiche **côte à côte** (« en attente X € · à côté, Y € déjà disponibles à virer — les deux ne se confondent pas »).
+
+⚠️ **HONNÊTETÉ — mesuré : le total d'aujourd'hui NE CHANGE PAS** (504,00 € avant comme après), parce qu'aucun compte vivant n'a actuellement de ligne au format `payouts`. Le correctif empêche le faux à venir et sépare enfin les deux notions ; il n'explique pas à lui seul un 504 € qui paraîtrait trop haut. **Ce qui l'explique** : seuls **2 porte-monnaie sur 8** sont captés, et celui de `julatace3535` (359 €) date de **5 jours**. La carte le dit déjà (nombre de porte-monnaie + âge du plus ancien).
+
+### 2. ⚠️ Le garde-fou porte-monnaie n'était pas dans la fonction qui écrit
+`estPorteMonnaie` n'était testé **que chez l'appelant** (moisson active) — donc `storeHarvestRow` pouvait écrire un `payload: {}` par-dessus un vrai solde. **Mesuré : 4 comptes sur 8 avaient une ligne `billing` vide**, donc leur argent en attente invisible. Et le test lui-même finissait par `|| p.main || p.escrow`, ce qui laissait passer un objet vide.
+- `estPorteMonnaie` exige maintenant **un montant réel** parmi `main`/`escrow`/`balance`/`pending_balance` ;
+- le test est **dans `storeHarvestRow`**, pas seulement chez ses appelants. Un garde-fou vit dans la fonction qui écrit.
+
+### 3. « Je ne sais pas où aller chercher mes colis » — mesuré avant de coder
+| constat | chiffre |
+|---|---|
+| colis réellement à retirer (statut Vinted) | **2** |
+| ces 2 colis ont un email de suivi | **0** ⚠️ |
+| emails de suivi en base | 94 (MR 58 · Chronopost 26 · Vinted 5 · Colissimo 4 · Shop2Shop 1) |
+| emails portant un **lieu** | **13 / 94** |
+| `shipment` dans la transaction | `{id, status, status_title, status_updated_at}` — **aucune adresse** (§16 reconfirmé) |
+
+Donc pour les colis du jour, l'app **ne peut rien afficher** : la donnée n'existe nulle part. Deux réponses :
+
+**a) On complète le lieu depuis la liste officielle de Vinted.** Quand l'email donne le NOM du relais sans adresse ni horaires, on va les chercher dans les points captés (§5.26) — **par NOM EXACT normalisé uniquement**, jamais par ressemblance (§24). Ce n'est pas une déduction : c'est la même enseigne dans la liste de Vinted. La carte « colis à retirer » gagne l'**adresse**, l'**ouverture du jour** et un itinéraire par **coordonnées** (plus précis qu'une recherche texte).
+**Vérifié sur les vraies données** : les 3 noms de relais présents dans les emails → **2 rapprochés** (« MAISON DE LA PRESSE » et « Maison de la Presse, » → *40 Rue du Port, Cancale · Vendredi 09:30–18:30*), le 3ᵉ étant « juste ici », le remplissage parasite que `cleanLieu` rejette déjà.
+
+**b) On capte le détail de l'expédition.** La transaction donne le `shipment.id` et Vinted sert des `/api/v2/shipments/{id}/…` (vus dans `seen_urls`). Nouveau motif `shipment` dans `inject.js` → **une ligne PAR COLIS** (`harvest_{uid}_ship_{id}`) : sans l'identifiant dans la clé, un colis écraserait le précédent. ⚠️ Motif borné à `(?:\?|$)` pour ne pas avaler `label_url` / `label_options` / `nearby_drop_off_points`.
+➡️ **Prochaine session** : lire `harvest_*_ship_*` dès que Julien aura ouvert une page de suivi avec la 5.20 — c'est là qu'on saura si Vinted expose le point de retrait côté API, ou si l'email reste la seule source.
+
+### Vérifié
+`npm run build` OK · `node --check` OK sur `background.js` et `inject.js` · banc app (§20, `dist` servi, Supabase mocké honorant `select=`, vraies lignes) : carte « Où déposer » avec **les deux transporteurs**, **0 erreur** (le seul 400 est le sondage `select=owner` volontaire) · `scripts/audit-coherence.cjs` : **5 règles, 0 désaccord** · règle du porte-monnaie exécutée sur les vraies lignes : ancien 504,00 € → nouveau **504,00 € en attente + 114,36 € disponibles** distingués. Extension **5.20.0**.
+
+### 5.27 (suite) — ⚠️ LE TOTAL N'ÉTAIT PAS FAUX, IL ÉTAIT **INCOMPLET** (et il se présentait comme complet)
+
+Capture d'écran de Julien : sur **un seul** compte, « Montant en attente **323,10 €** / Montant disponible 0,00 € ». Or l'app annonçait 504 € pour ~7 comptes. Sa conclusion est juste — et ce 323,10 € **ne correspond à aucune** des deux valeurs en base (359 € et 145 €), donc **ce compte n'a jamais été capté**.
+
+Relevé des 8 lignes `billing` : **2 seulement portent un montant**, les **6 autres sont vides** (`payload: {}`) — écrites par une version de l'extension antérieure au garde-fou (d'où le correctif ci-dessus, désormais dans `storeHarvestRow`).
+
+➡️ **Un total partiel qui se présente comme complet est pire qu'un total absent.** La carte « Argent en attente » porte maintenant un bandeau qui **NOMME les comptes manquants** :
+> ⚠️ Total incomplet — 6 comptes sur 8 n'ont pas encore de porte-monnaie lu, donc leur argent en attente n'est pas dans ce chiffre : julienf765, tomj683, angeled92, llloollllaa, liliand653, julatace35260.
+
+`fetchWalletEscrow` renvoie `avecSolde` (les uid réellement lus) ; la carte croise avec les comptes actifs (`acctOff` exclu, §11).
+
+⚠️ **PIÈGE §26 ÉVITÉ DE JUSTESSE** : ma 1ʳᵉ version appelait `acctLabel(a)` — **fonction inexistante dans cette portée**. `npm run build` passe (JSX ne le voit pas) et un smoke sans données ne rend pas la carte : c'est **exactement** le plantage « `reel is not defined` » de §26. Le bon helper est `accName(acc)` (l. 11142). **Toute carte conditionnelle doit être RENDUE avec les vraies données**, pas seulement compilée.
+
+⚠️ **Piège de banc, nouveau** : l'app filtre avec le joker SQL **`%`** (`id=like.harvest_123_orders_%`), mon mock ne traduisait que `*` → aucune commande servie, l'écran Ventes tombait en « Impossible de charger » et la carte n'était jamais rendue. Corrigé (`/[*%]/g`).
+
+**Vérifié au banc, carte réellement rendue sur les vraies données** : « lu sur 3 porte-monnaie · 114,36 € disponibles » + le bandeau nommant les **6 comptes manquants**, **0 erreur** (le seul 400 est le sondage `select=owner` volontaire).
+
+### 5.27 (suite) — LE DÉCOMPTE : la carte « en attente » s'ouvre
+
+Julien : « quand j'appuie sur en attente, je veux le détail du décompte ». Un chiffre agrégé qu'on ne peut pas ouvrir est invérifiable — donc invendable.
+
+`fetchWalletEscrow` renvoie **`parCompte`** : `{uid, attente, dispo, jours, format}` par ligne lue, trié par montant décroissant. La carte devient un bouton (`detailAttente`) qui déroule :
+- **une ligne par compte lu** : nom · « lu aujourd'hui / il y a N j » · le disponible en second · le montant en attente à droite ;
+- **une ligne par compte NON lu**, à `?`, avec « porte-monnaie jamais lu — ouvre-le sur Vinted » (c'est là qu'est l'écart) ;
+- un **« Total lu »** en pied, qui doit égaler le grand chiffre.
+
+**Vérifié au banc sur les vraies données** : 359,00 € (lu il y a 5 j) · 145,00 € (lu aujourd'hui · 114,36 € disponibles) · 0,00 € · **6 lignes « jamais lu »** · **Total lu 504,00 €**. **0 erreur.**

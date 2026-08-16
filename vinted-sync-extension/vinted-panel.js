@@ -519,24 +519,79 @@
   // messages, litiges) — plus besoin de rouvrir l'app pour retirer un compte.
   // Écrit dans une ligne DÉDIÉE (`panel_accounts_off`), jamais dans la ligne
   // `main` de l'app : aucune sauvegarde de l'app ne peut être écrasée.
+  // ── LE COMPTE CONNECTÉ DANS CE NAVIGATEUR ───────────────────────────────────
+  // Il n'y a RIEN à relier à la main : l'extension lit l'identifiant du compte
+  // dans le cookie de session Vinted. Mais quand il n'arrive pas dans l'app,
+  // trois causes se ressemblent — jamais capté, supprimé définitivement, ou
+  // simplement masqué. On les distingue, avec le bouton qui va avec.
+  function connecteBloc() {
+    const c = DATA && DATA.connecte;
+    if (!c) return `<div class="vrm-card" style="padding:9px 11px;margin-bottom:8px">
+      <div style="font-weight:800;font-size:12.5px">👤 Aucun compte Vinted connecté ici</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">Connecte-toi sur vinted.fr : l'extension capte le compte toute seule, tu n'as rien à choisir.</div>
+    </div>`;
+    const carte = (coul, titre, sous, bouton) => `<div class="vrm-card" style="padding:9px 11px;margin-bottom:8px;border-left:3px solid ${coul}">
+      <div style="font-weight:800;font-size:12.5px;color:${coul}">${titre}</div>
+      <div class="vrm-m" style="font-size:11px;margin-top:3px">${sous}</div>${bouton || ''}</div>`;
+    const btn = (cls, txt, coul) => `<button class="${cls}" data-uid="${esc(c.uid)}" style="width:100%;margin-top:7px;border:none;background:${coul};color:#fff;border-radius:9px;padding:9px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">${txt}</button>`;
+    const nom = esc(c.name || ('compte ' + c.uid));
+    if (c.refus === 'supprime' || c.raison === 'supprime') {
+      return carte('#b4232a', `⛔ ${nom} n'est pas synchronisé`,
+        "Ce compte a été <b>supprimé définitivement</b> depuis l'app. L'extension refuse donc de l'envoyer, et efface sa ligne à chaque passage — c'est pour ça que rien n'arrive.",
+        btn('vrm-reautoriser', '↺ Réautoriser et relier ce compte', '#b4232a'));
+    }
+    if (!c.capte) {
+      return carte('#b06b00', `⏳ ${nom} n'est pas encore relié`,
+        "Tu es connecté à ce compte dans ce navigateur, mais l'app ne l'a pas encore reçu.",
+        btn('vrm-relier', '🔗 Relier ce compte maintenant', '#0f6b4f'));
+    }
+    if (c.off) {
+      return carte('#b06b00', `🙈 ${nom} est relié mais masqué`,
+        "Ses paires et ses ventes existent, elles sont juste cachées dans VRM. Réaffiche-le pour les revoir.",
+        btn('vrm-reautoriser', '↺ Réafficher ce compte', '#0f6b4f'));
+    }
+    return carte('#0f6b4f', `✓ ${nom} est relié`,
+      c.moissonne ? "Ses annonces sont bien captées." : "Ouvre ton dressing une fois sur Vinted pour capter ses annonces.");
+  }
+
   function comptesBlock() {
     const accs = (DATA && DATA.accounts) || [];
-    if (accs.length < 2) return '';
+    const tete = connecteBloc();
+    if (accs.length < 2) return tete;
     const nOff = accs.filter(a => a.off).length;
     // D'où vient le masquage ? Un compte peut être coupé depuis l'app
     // (`vinted_accounts_hidden`), supprimé définitivement, ou masqué ici. Sans
     // cette mention, un compte disparaît sans raison visible et on croit à un
     // bug de capture. « ↺ Réafficher » marche désormais dans les trois cas.
     const pourquoi = { app: "masqué depuis l'app", supprime: "supprimé dans l'app", panneau: 'masqué ici' };
+    // Depuis quand ce compte n'a-t-il rien envoyé ? Un compte muet depuis
+    // deux semaines, c'est une session expirée — il faut repasser dessus.
+    // Même échelle que l'écran Santé et que l'app : un même état ne doit pas
+    // porter deux couleurs selon l'écran.
+    const fraicheurTxt = (t) => {
+      if (!t) return 'jamais capté';
+      const j = (Date.now() - t) / 86400000;
+      if (j < 1) return 'capté aujourd\'hui';
+      if (j < 2) return 'capté hier';
+      if (j < 7) return `capté il y a ${Math.round(j)} j`;
+      return `⚠️ rien depuis ${Math.round(j)} j — repasse dessus`;
+    };
     const rows = accs.map(a => `
       <div style="display:flex;gap:8px;align-items:center;padding:7px 2px;border-top:1px solid #f0f2f5">
         <div style="flex:1 1 120px;min-width:0">
           <div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${a.off ? 'opacity:.5;text-decoration:line-through' : ''}">${esc(a.name)}</div>
-          <div class="vrm-m" style="font-size:10.5px">${a.online} en ligne${a.off && pourquoi[a.raison] ? ` · ${pourquoi[a.raison]}` : ''}</div>
+          <div class="vrm-m" style="font-size:10.5px">${a.online} en ligne${a.off && pourquoi[a.raison] ? ` · ${pourquoi[a.raison]}` : ''} · ${fraicheurTxt(a.capte)}</div>
         </div>
         <button class="vrm-acct-off" data-uid="${esc(a.uid)}" data-off="${a.off ? '0' : '1'}" style="flex-shrink:0;border:1px solid ${a.off ? '#0f6b4f' : '#dde'};background:${a.off ? 'rgba(15,107,79,.08)' : '#fff'};color:${a.off ? '#0f6b4f' : '#556'};border-radius:8px;padding:5px 10px;font-weight:700;font-size:11px;cursor:pointer">${a.off ? '↺ Réafficher' : '✕ Masquer'}</button>
       </div>`).join('');
-    return `<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? ' open' : ''}>
+    // ⚠️ « TOUT RECAPTER » — la capture passive ne voit que ce que la page
+    // charge, donc un compte peut rester avec un dressing partiel (mesuré :
+    // 4 annonces captées sur 100 annoncées par Vinted). Ce bouton relit le
+    // dressing COMPLET (toutes les pages), les ventes, les achats et la boîte,
+    // pour le compte actuellement connecté — depuis ta session, sur ton IP.
+    const recap = `<button id="vrm-recapter" style="width:100%;margin-top:8px;border:none;background:#0f6b4f;color:#fff;border-radius:10px;padding:10px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer">🔄 Tout recapter (compte connecté)</button>
+      <div class="vrm-m" style="font-size:10.5px;margin-top:4px">Relit toutes tes annonces, ventes et achats pour le compte ouvert dans ce navigateur. À faire une fois par compte.</div>`;
+    return `${tete}${recap}<details class="vrm-card" style="margin-top:10px;padding:9px 11px"${nOff ? ' open' : ''}>
       <summary style="cursor:pointer;font-weight:700;font-size:12.5px;list-style:none">👤 Mes comptes Vinted (${accs.length}${nOff ? ` · ${nOff} masqué${nOff > 1 ? 's' : ''}` : ''})</summary>
       <div class="vrm-m" style="margin:5px 0 2px">Masque un compte que tu n'utilises plus : ses paires, ventes et messages disparaissent partout dans VRM.</div>
       ${rows}
@@ -1134,6 +1189,39 @@
         chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setAccountOff', uid, off }, () => { load(); });
       };
     });
+    // « Relier ce compte » / « Réautoriser » : le compte connecté ici est lu
+    // dans le cookie de session — il n'y a aucun choix à faire, donc aucun
+    // risque de relier le mauvais compte.
+    panel.querySelectorAll('.vrm-relier').forEach(b => {
+      b.onclick = () => {
+        b.disabled = true; b.textContent = '⏳ liaison…';
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'relierCompte' }, (r) => {
+          b.disabled = false;
+          if (r && r.ok) { alerte = null; b.textContent = '✓ relié'; load(); }
+          else { b.textContent = '↺ Réessayer'; alerte = (r && r.error) || 'liaison impossible'; render(); }
+        });
+      };
+    });
+    panel.querySelectorAll('.vrm-reautoriser').forEach(b => {
+      b.onclick = () => {
+        const uid = b.dataset.uid; if (!uid) return;
+        b.disabled = true; b.textContent = '⏳';
+        // `off:false` = réautorisation explicite : elle prime sur la liste des
+        // comptes supprimés ET relance la capture des jetons côté service worker.
+        chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setAccountOff', uid, off: false }, () => { load(); });
+      };
+    });
+    // « Tout recapter » : une seule requête par type, sur le compte connecté.
+    const rec = panel.querySelector('#vrm-recapter');
+    if (rec) rec.onclick = () => {
+      rec.disabled = true; rec.textContent = '⏳ lecture de tes annonces, ventes et achats…';
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'recapter' }, (r) => {
+        rec.disabled = false;
+        if (r && r.ok) { rec.textContent = '✓ recapté'; load(); }
+        else { rec.textContent = '❌ ' + ((r && r.error) || 'échec'); }
+        setTimeout(() => { try { rec.textContent = '🔄 Tout recapter (compte connecté)'; } catch (_) {} }, 6000);
+      });
+    };
     // Ouvrir le PDF d'un bordereau — présent sur plusieurs onglets (Ventes,
     // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
     panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });
@@ -2659,9 +2747,31 @@
     const sleepIds = new Set(((DATA && DATA.sleeping) || []).map(o => String(o.id)));
     const relIds = new Set(((DATA && DATA.relance) || []).map(o => String(o.id)));
     const overOf = (o) => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15;
+    // ── PRÊTE À REPUBLIER ? ────────────────────────────────────────────────
+    // Republier = supprimer + recréer : sans le TEXTE et sans les PHOTOS, il
+    // faut tout retaper. On dit donc, paire par paire, ce qui est déjà en
+    // magasin — au lieu de le découvrir une fois lancé dans le défilement.
+    if (coffre == null && !coffreBusy) {
+      coffreBusy = true;
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'coffre' }, (r) => { coffreBusy = false; coffre = (r && r.ok && r.items) || []; render(); });
+    }
+    const photosDe = (o) => { const c = coffrePour(o); return c ? (c.photos || []).length : 0; };
+    // Combien l'annonce en a vraiment (coffre, sinon le compteur du dressing) :
+    // dire « prête · 📸1 » pour une annonce qui a six photos, c'est faire
+    // découvrir le problème une fois lancé — exactement ce qu'on veut éviter.
+    const photosReelles = (o) => { const c = coffrePour(o); return Number((c && c.nPhotos) || o.nPhotosVinted) || 0; };
+    const photosCompletes = (o) => { const n = photosDe(o), r = photosReelles(o); return n > 0 && (!r || n >= r); };
+    const pretes = list.filter(o => o.desc && photosCompletes(o)).length;
     const reasonsOf = (o) => {
       const r = [];
       if (isRepubRecent(o.id)) r.push({ t: '✓ republiée', c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' });
+      const np = photosDe(o), nr = photosReelles(o), okPh = photosCompletes(o);
+      const VERT = { c: '#0f6b4f', bg: '#eefaf3', bd: '#bfe6d3' }, ORANGE = { c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' };
+      if (o.desc && okPh) r.push(Object.assign({ t: `prête · ✍️ 📸${np}` }, VERT));
+      else if (!o.desc && !np) r.push(Object.assign({ t: 'texte + photos à capter' }, ORANGE));
+      else if (!o.desc && !okPh) r.push(Object.assign({ t: `texte + ${nr ? `${np}/${nr} photos` : 'photos'}` }, ORANGE));
+      else if (!o.desc) r.push(Object.assign({ t: 'texte à capter' }, ORANGE));
+      else r.push(Object.assign({ t: nr ? `📸 ${np}/${nr} photos` : 'photos à capter' }, ORANGE));
       if (sleepIds.has(String(o.id))) r.push({ t: `😴 ${o.ageDays} j`, c: '#2b5b9a', bg: '#eef4ff', bd: '#c9dbf7' });
       if (relIds.has(String(o.id))) r.push({ t: '💡 à relancer', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
       if (overOf(o)) r.push({ t: '📊 trop cher', c: '#9a5b16', bg: '#fff6ec', bd: '#ffd7a8' });
@@ -2697,6 +2807,16 @@
       ${renumBandeau()}
       ${bandeauMoment}
       <div class="vrm-m" style="margin-bottom:8px">Coche les annonces à <b>remettre en avant</b>. Tu les republieras <b>une par une, toi-même</b> — aucune action automatique.</div>
+      ${(() => {
+        // Le vrai frein n'est pas de cocher : c'est d'avoir le texte et les
+        // photos sous la main. On l'annonce avant de commencer.
+        if (!list.length) return '';
+        const manque = list.length - pretes;
+        return `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:${pretes ? '#eefaf3' : '#fff6ec'};border-color:${pretes ? '#bfe6d3' : '#ffd7a8'}">
+          <div style="font-weight:800;font-size:12.5px;color:${pretes ? '#0f6b4f' : '#9a5b16'}">${pretes} paire${pretes > 1 ? 's' : ''} prête${pretes > 1 ? 's' : ''} à republier${manque > 0 ? ` · ${manque} incomplète${manque > 1 ? 's' : ''}` : ''}</div>
+          <div class="vrm-m" style="font-size:11px;margin-top:3px">« Prête » = son texte et ses photos sont au coffre, donc tout se recolle en un tap.${manque > 0 ? " Pour les autres : <b>ouvre l'annonce sur Vinted une fois</b>, le panneau capte le texte et les photos au passage." : ''}</div>
+        </div>`;
+      })()}
       ${nDone ? `<div class="vrm-m" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding:6px 9px;border-radius:8px;background:#eefaf3;color:#0f6b4f;border:1px solid #bfe6d3"><span>✓ <b>${nDone}</b> republiée${nDone > 1 ? 's' : ''} récemment (rangées en bas)</span><button class="vrm-go" data-act="resetdone" style="border:none;background:transparent;color:#0f6b4f;font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline;flex-shrink:0">Réinitialiser</button></div>` : ''}
       ${list.length > 8 ? `<input id="vrm-repub-search" type="search" value="${esc(repubQuery)}" placeholder="🔍 Filtrer (titre ou N°)…" style="width:100%;box-sizing:border-box;margin-bottom:8px;border:1px solid #d7dde3;border-radius:9px;padding:7px 10px;font:inherit;font-size:12.5px">` : ''}
       <div style="display:flex;gap:6px;margin-bottom:8px">

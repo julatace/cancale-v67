@@ -14,8 +14,17 @@
 
 import { sendPushToAll } from './_lib/push.js';
 
+import { withOwnerAll, conflictTarget } from './_lib/owner.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+// ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
+// vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
+// publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
+// LE blocage qui empêchait d'activer le multi-vendeurs. On prend donc
+// `SUPABASE_SERVICE_KEY` (variable d'environnement Vercel, jamais dans le
+// dépôt) si elle est définie, et on retombe sur la clé publique tant qu'elle ne
+// l'est pas : le comportement d'aujourd'hui reste identique.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
 // Date du jour (et de demain) dans le fuseau de Paris, en 'YYYY-MM-DD'.
@@ -55,14 +64,47 @@ export default async function handler(req, res) {
     const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=${BORD_SELECT}`, { headers: HEADERS });
     const rows = r.ok ? await r.json() : [];
-    const printed = (await getRow('main'))?.vinted_bords_printed || {};
+    // ⚠️⚠️ CE COMPTE ÉTAIT FAUX, ET LA NOTIFICATION MENTAIT EN GRAND.
+    // Il ne regardait QUE `vinted_bords_printed`. Or depuis §24 imprimer ne
+    // marque plus rien comme fait : cette liste est donc quasi vide, et le cron
+    // annonçait « 51 bordereaux à envoyer » (plainte de Julien) alors que
+    // **3 colis** attendaient réellement — mesuré sur les 72 bordereaux réels :
+    // 68 déjà partis selon Vinted, 1 vente inconnue, 3 en attente.
+    // La seule question qui compte : **cette vente attend-elle encore MON
+    // envoi ?** C'est exactement ce que l'extension écrit à la capture
+    // (`data.resume.txns`, §5.14) — même règle que l'app, lu en scalaire.
+    const m = (await getRow('main')) || {};
+    const printed = m.vinted_bords_printed || {};
+    const shippedManual = m.vinted_bords_shipped || {};
+    const hidden = m.vinted_bords_hidden || {};
+    const panelDone = (await getRow('panel_bords_done')) || {};
     const key = (b) => String(b.transaction || b.suivi || b.numero || '');
+
+    // Transactions encore en attente d'expédition, d'après la moisson.
+    let attente = null;
+    try {
+      const rr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`, { headers: HEADERS });
+      if (rr.ok) {
+        const lignes = await rr.json();
+        for (const l of lignes) {
+          if (!Array.isArray(l.txns)) continue;
+          if (!attente) attente = new Set();
+          for (const t of l.txns) attente.add(String(t));
+        }
+      }
+    } catch (_) { attente = null; }
+    // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
+    // se TAIT. Une notification fausse est pire que pas de notification — c'est
+    // très exactement le « 51 bordereaux » qu'on corrige ici.
+    if (!attente) { res.status(200).json({ ok: true, skipped: 'resume absent — aucune notification envoyee' }); return; }
 
     const today = parisDate(0), tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
     for (const b of rows) {
       if (!b) continue;
-      if (printed[key(b)]) continue;          // déjà imprimé / expédié
+      const k = key(b);
+      if (printed[k] || shippedManual[k] || hidden[k] || panelDone[k]) continue;   // déjà traité, ici ou depuis le panneau
+      if (!b.transaction || !attente.has(String(b.transaction))) continue;         // Vinted n'attend plus ce colis
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) overdue += 1;
       else if (iso === today) dueToday += 1;
@@ -88,10 +130,10 @@ export default async function handler(req, res) {
         url: '/?tab=cat_bord',
       });
     }
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
       method: 'POST',
       headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ id: 'ship_reminder_dedup', data: { date: today, total } }]),
+      body: JSON.stringify(withOwnerAll([{ id: 'ship_reminder_dedup', data: { date: today, total } }])),
     });
     res.status(200).json({ ok: true, overdue, dueToday, dueTomorrow, total });
   } catch (e) {

@@ -10,7 +10,14 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+// ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
+// vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
+// publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
+// LE blocage qui empêchait d'activer le multi-vendeurs. On prend donc
+// `SUPABASE_SERVICE_KEY` (variable d'environnement Vercel, jamais dans le
+// dépôt) si elle est définie, et on retombe sur la clé publique tant qu'elle ne
+// l'est pas : le comportement d'aujourd'hui reste identique.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
 const parisDate = (off = 0) => new Date(Date.now() + off * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
@@ -38,6 +45,32 @@ async function bordRows() {
 }
 // Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
 // source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.
+// ⚠️ ÉGRESS — CE POINT ÉTAIT LE DERNIER GROS ROBINET OUVERT (§34).
+// Un `select=data` ici ramenait **791 Ko à chaque rafraîchissement** (mesuré :
+// 609 Ko de ventes + 181 Ko d'achats), et un widget d'écran d'accueil se
+// rafraîchit tout seul jour et nuit → plusieurs gigas par mois pour afficher
+// deux nombres. L'extension écrit maintenant le compte utile DANS la ligne
+// (`data.resume`, posé à la capture) : on le lit en scalaire.
+// La propriété qui compte est conservée — ça se met à jour **même app fermée**,
+// puisque c'est l'extension qui capture.
+async function comptesAExpedierOuRetirer(kind) {
+  try {
+    const sel = 'id,txns:data->resume->txns';
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    const vus = new Set(); let resumeTrouve = false;
+    for (const row of rows) {
+      if (!Array.isArray(row.txns)) continue;
+      resumeTrouve = true;
+      for (const t of row.txns) vus.add(String(t));
+    }
+    // Aucune ligne n'a encore de résumé (extension pas rechargée) → on le dit à
+    // l'appelant, qui retombera sur la lecture complète. Une seule fois : dès la
+    // première capture avec la nouvelle extension, on ne lit plus que ~1 Ko.
+    return resumeTrouve ? [...vus] : null;
+  } catch (_) { return null; }
+}
 async function harvestOrders(kind) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_${kind}&select=data`, { headers: HEADERS });
@@ -88,9 +121,15 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
   try {
-    const [bords, sold, purchased, finals, sales, m, snap] = await Promise.all([
-      bordRows(), harvestOrders('sold'), harvestOrders('purchased'), rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
+    // On tente D'ABORD les résumés scalaires (~1 Ko). La lecture complète des
+    // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
+    // c'est-à-dire tant que l'extension n'a pas recapté une fois.
+    const [bords, txSold, txBuy, finals, sales, m, snap] = await Promise.all([
+      bordRows(), comptesAExpedierOuRetirer('sold'), comptesAExpedierOuRetirer('purchased'),
+      rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
     ]);
+    const sold = txSold ? [] : await harvestOrders('sold');
+    const purchased = txBuy ? [] : await harvestOrders('purchased');
 
     const expected = m && m.vrm_widget_token ? String(m.vrm_widget_token) : '';
     if (expected) {
@@ -107,12 +146,13 @@ export default async function handler(req, res) {
     // À expédier + à retirer = STATUT VINTED (automatique, à jour). Fini les
     // emails imprécis : Vinted sait quand c'est expédié / récupéré.
     const pickupDone = m.vinted_pickup_done || {};
-    const toShip = sold.filter(o => awaitingShip(o.status));
-    const shipTotal = toShip.length;
-    const pickup = purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)]).length;
+    const shipTxns = new Set(txSold ? txSold : sold.filter(o => awaitingShip(o.status)).map(o => String(o.transaction_id)));
+    const shipTotal = shipTxns.size;
+    const pickup = txBuy
+      ? txBuy.filter(t => !pickupDone[String(t)]).length
+      : purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)]).length;
     // Urgence d'expédition : on croise avec les bordereaux (date limite) pour les
     // ventes réellement en attente d'envoi.
-    const shipTxns = new Set(toShip.map(o => String(o.transaction_id)));
     const printed = m.vinted_bords_printed || {};
     const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
     let shipOverdue = 0, shipToday = 0, shipTomorrow = 0;

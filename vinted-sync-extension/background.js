@@ -73,6 +73,62 @@ async function authToken() {
   if (!s.expires_at || s.expires_at < Date.now() + 60000) s = await refreshSession();
   return s && s.access_token ? s : null;
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SE CONNECTER DEPUIS L'EXTENSION (email + mot de passe)
+// ══════════════════════════════════════════════════════════════════════════════
+// Jusqu'ici la session ne pouvait venir QUE de l'app (bridge.js) : sur un
+// navigateur où l'app n'est jamais ouverte, l'extension écrivait forcément avec
+// la clé publique. Une fois la base cloisonnée, ça veut dire : elle n'écrit plus
+// rien. On peut donc s'identifier ici, directement.
+//
+// ⚠️ Le mot de passe n'est JAMAIS gardé : il part une fois chez Supabase, qui
+// renvoie deux jetons. Seuls les jetons sont stockés (`chrome.storage.local`,
+// zone locale de l'extension — un site web ne peut pas la lire).
+async function authLogin(email, password) {
+  const mail = String(email || '').trim().toLowerCase();
+  if (!mail || !password) return { ok: false, error: 'Email et mot de passe requis.' };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: mail, password }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.access_token) {
+      // On traduit : « invalid_grant » n'aide personne à se connecter.
+      const brut = String(j.error_description || j.msg || j.error || '');
+      let msg = brut || 'Connexion refusée.';
+      if (/invalid login|invalid_grant|credentials/i.test(brut)) msg = 'Email ou mot de passe incorrect.';
+      else if (/not confirmed/i.test(brut)) msg = "Cette adresse n'est pas encore confirmée. Ouvre l'email de confirmation, ou confirme le compte depuis l'app.";
+      else if (/rate limit|too many/i.test(brut)) msg = 'Trop de tentatives. Réessaie dans quelques minutes.';
+      return { ok: false, error: msg };
+    }
+    await saveSession({
+      access_token: j.access_token,
+      refresh_token: j.refresh_token,
+      expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
+      user_id: (j.user && j.user.id) || null,
+      email: (j.user && j.user.email) || mail,
+    });
+    return { ok: true, email: (j.user && j.user.email) || mail };
+  } catch (e) { return { ok: false, error: 'Réseau indisponible — réessaie.' }; }
+}
+
+// État de la session, pour l'afficher SANS mentir : connecté ou non, sous quelle
+// adresse, et surtout si la base sait aujourd'hui séparer les vendeurs. Tant que
+// `cloisonne` est faux, se connecter ne protège rien — on le dit.
+async function authEtat() {
+  const s = await loadSession();
+  const cl = await isCloisonne();
+  if (!s) return { ok: true, connecte: false, cloisonne: cl };
+  // Un refresh_token périmé (longue absence) rend la session inutilisable : on
+  // le vérifie vraiment au lieu d'afficher « connecté » sur un jeton mort.
+  const vivant = await authToken();
+  return { ok: true, connecte: !!vivant, expiree: !vivant, email: s.email || '', cloisonne: cl };
+}
+
+async function authLogout() { await saveSession(null); return { ok: true }; }
 // EST-CE QUE LA BASE SAIT SEPARER LES VENDEURS ?
 // Tant que la colonne `owner` n'existe pas, ecrire un `owner` ferait echouer
 // TOUTES les captures (400 : colonne inconnue). On teste donc l'etat reel de la
@@ -170,16 +226,62 @@ async function activeAccountId(domain) {
 // Tant qu'un compte reste connecté dans Chrome, l'extension le re-capte à
 // chaque cycle → il « revenait tout le temps » (cas shop_cancale). On lit donc
 // cette liste et on NE capte JAMAIS un compte bloqué (et on nettoie sa ligne).
-let _blockedAccts = null, _blockedAt = 0;
+let _blockedAccts = null, _blockedAt = 0, _blockedNames = {};
 async function blockedAccounts() {
   if (_blockedAccts && Date.now() - _blockedAt < 300000) return _blockedAccts;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: await sbHeaders() });
     const rows = res.ok ? await res.json() : [];
-    _blockedAccts = new Set((((rows[0] && rows[0].data && rows[0].data.uids) || [])).map(String));
+    const d = (rows[0] && rows[0].data) || {};
+    const uids = (d.uids || []).map(String);
+    _blockedAccts = new Set(uids);
+    // Le pseudo est stocké à côté de l'identifiant. Sans lui, un compte supprimé
+    // s'affiche « compte 2413 » — illisible, alors qu'on sait qu'il s'appelle
+    // shop_cancale (sa ligne `vinted_accounts` a justement été effacée).
+    _blockedNames = {};
+    uids.forEach((u, i) => { const n = (d.logins || [])[i]; if (n) _blockedNames[u] = String(n); });
     _blockedAt = Date.now();
   } catch (_) { if (!_blockedAccts) _blockedAccts = new Set(); }
   return _blockedAccts;
+}
+
+// ⚠️ LE CONTRE-ORDRE : un compte RÉAUTORISÉ explicitement depuis le panneau.
+// `panel_accounts_off[uid] === false` veut dire « rallume-le, ça prime sur
+// l'app » (tri-état, §5.08). `buildPanelData` l'honorait déjà pour l'AFFICHAGE,
+// mais la CAPTURE, elle, ne consultait que la liste noire : le compte
+// réapparaissait dans le panneau et l'extension continuait de refuser ses
+// jetons — et effaçait sa ligne à chaque cycle. C'est exactement « l'extension
+// ne veut pas renvoyer mes nouveaux comptes ».
+let _unblockAccts = null, _unblockAt = 0;
+async function unblockedAccounts() {
+  if (_unblockAccts && Date.now() - _unblockAt < 60000) return _unblockAccts;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: await sbHeaders() });
+    const rows = res.ok ? await res.json() : [];
+    const map = (rows[0] && rows[0].data) || {};
+    _unblockAccts = new Set(Object.keys(map).filter(k => map[k] === false).map(String));
+    _unblockAt = Date.now();
+  } catch (_) { if (!_unblockAccts) _unblockAccts = new Set(); }
+  return _unblockAccts;
+}
+// Vide les deux caches : sans ça, réautoriser un compte ne prenait effet
+// qu'au bout de 5 minutes — le temps qu'on croie que le bouton ne marche pas.
+function oublierCachesComptes() { _blockedAccts = null; _blockedAt = 0; _unblockAccts = null; _unblockAt = 0; }
+
+// Dernier refus de capture, pour que le panneau puisse le DIRE. Un compte
+// refusé en silence est indiscernable d'un compte jamais capté.
+async function noterRefus(uid, domain, raison) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {};
+    cur[String(uid)] = { at: Date.now(), domain, raison };
+    await chrome.storage.local.set({ vrmRefus: cur });
+  } catch (_) {}
+}
+async function oublierRefus(uid) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {};
+    if (cur[String(uid)]) { delete cur[String(uid)]; await chrome.storage.local.set({ vrmRefus: cur }); }
+  } catch (_) {}
 }
 
 async function captureDomain(domain) {
@@ -192,10 +294,16 @@ async function captureDomain(domain) {
   if (!uid) return null;
   // Compte supprimé définitivement : on ne le re-capte pas et on efface une
   // éventuelle ligne restante, puis on s'arrête là.
-  if ((await blockedAccounts()).has(uid)) {
+  // ⚠️ SAUF s'il a été RÉAUTORISÉ explicitement (tri-état ci-dessus) : sinon la
+  // suppression est un aller sans retour, et rebrancher un compte devient
+  // impossible depuis Chrome — silencieusement.
+  if ((await blockedAccounts()).has(uid) && !(await unblockedAccounts()).has(uid)) {
     try { await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, { method: 'DELETE', headers: await sbHeaders() }); } catch (_) {}
+    await noterRefus(uid, domain, 'supprime');
+    logActivity(`⛔ Compte ${uid} ignoré (supprimé définitivement) — réautorise-le dans « Mes comptes »`);
     return null;
   }
+  await oublierRefus(uid);
   const row = {
     vinted_user_id: uid,
     domain,
@@ -244,6 +352,27 @@ async function logActivity(text) {
 // Conséquence concrète : sans fiche article, pas de description → « Republier »
 // obligerait à tout retaper. C'est le vrai blocage de cette fonction.
 const _diag = { n: {}, dernier: 0 };
+// Un exemplaire par type, écrasé à chaque fois (pas d'accumulation).
+const _rates = {};
+let _ratesEcritAt = 0;
+async function echantillonRate(type, id, body) {
+  try {
+    const t = String(type || 'inconnu');
+    _rates[t] = {
+      id: String(id == null ? '' : id).slice(0, 40),
+      taille: body == null ? null : String(body).length,
+      type: typeof body,
+      tete: String(body == null ? '' : body).slice(0, 160),
+      at: new Date().toISOString(),
+    };
+    if (Date.now() - _ratesEcritAt < 60000) return;
+    _ratesEcritAt = Date.now();
+    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { ...cur, rates: { ...(cur.rates || {}), ..._rates } } }], 'id');
+  } catch (_) {}
+}
+
 async function noterDiag(cle) {
   try {
     _diag.n[cle] = (_diag.n[cle] || 0) + 1;
@@ -259,12 +388,60 @@ async function noterDiag(cle) {
   } catch (_) {}
 }
 
+// Le dressing qui arrive est-il au moins aussi riche que celui déjà en base ?
+// Lecture ULTRA légère : on ne relit que le compteur `nItems` (un scalaire),
+// jamais le payload — la leçon d'égress de §34 vaut aussi ici.
+// ⚠️ LA MÊME RÈGLE, POUR TOUTE LISTE MOISSONNÉE. Elle ne protégeait que le
+// dressing. Or les commandes et la boîte se font écraser exactement pareil :
+// une réponse tronquée (page 1 seule, liste filtrée, session à moitié expirée)
+// remplaçait une capture complète, et des ventes « disparaissaient » sans que
+// personne ne touche à rien. Le compteur est lu EN SCALAIRE (`data->>nItems`),
+// jamais le payload — la leçon d'égress de §34 vaut ici aussi.
+const CLE_LISTE = { listings: 'items', orders_sold: 'my_orders', orders_purchased: 'my_orders', inbox: 'conversations' };
+async function listePlusRiche(rowId, parsed, cle) {
+  const n = ((parsed && parsed[cle]) || []).length;
+  const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
+  if (isFinite(total) && total > 0 && n >= total) return true;   // capture complète : fait foi
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${rowId}&select=n:data->>nItems`, { headers: await sbHeaders() });
+    if (!r.ok) return true;                       // on ne sait pas → on écrit
+    const j = await r.json();
+    const avant = Number(j[0] && j[0].n);
+    if (!isFinite(avant)) return true;            // ancienne ligne sans compteur → on écrit
+    return n >= avant;                            // jamais plus pauvre qu'avant
+  } catch (_) { return true; }
+}
+
+async function dressingPlusRiche(rowId, parsed) {
+  const n = ((parsed && parsed.items) || []).length;
+  const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
+  if (isFinite(total) && total > 0 && n >= total) return true;   // capture complète : fait foi
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${rowId}&select=n:data->>nItems`, { headers: await sbHeaders() });
+    if (!r.ok) return true;                       // on ne sait pas → on écrit
+    const j = await r.json();
+    const avant = Number(j[0] && j[0].n);
+    if (!isFinite(avant)) return true;            // ancienne ligne sans compteur → on écrit
+    return n >= avant;                            // jamais plus pauvre qu'avant
+  } catch (_) { return true; }
+}
+
 async function storeHarvest(domain, type, id, body) {
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
   let parsed = null;
-  try { parsed = JSON.parse(body); } catch (_) { noterDiag(`abandon_json_${type || 'inconnu'}`); return; }
+  try { parsed = JSON.parse(body); } catch (_) {
+    noterDiag(`abandon_json_${type || 'inconnu'}`);
+    // ⚠️ MESURER AVANT DE SUPPOSER. Le compteur a localisé la fuite des fiches
+    // article (13 reçues, 13 rejetées, 0 rangée) mais pas sa CAUSE : corps vide,
+    // HTML au lieu de JSON, flux déjà consommé… on ne peut pas trancher sans
+    // voir. On garde donc un ÉCHANTILLON COURT (160 caractères de tête, la
+    // longueur, l'URL) — assez pour reconnaître la forme, trop court pour
+    // embarquer quoi que ce soit d'utile ou de lourd.
+    echantillonRate(type, id, body);
+    return;
+  }
 
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
@@ -272,15 +449,49 @@ async function storeHarvest(domain, type, id, body) {
   else if (type === 'transaction' && id) rowId = `harvest_${uid}_txn_${id}`;
   else if (type === 'item' && id) rowId = `harvest_${uid}_item_${id}`; // détail complet d'une annonce
   else if (type === 'complaint' && id) rowId = `harvest_${uid}_litige_${id}`; // un litige = une ligne
+  // Une expédition = UNE ligne. Sans l'identifiant dans la clé, chaque colis
+  // écraserait le précédent et on ne saurait jamais où aller chercher le bon.
+  else if (type === 'shipment' && id) rowId = `harvest_${uid}_ship_${id}`;
   else rowId = `harvest_${uid}_${type}`;
 
   // ⚠️ Cette voie (capture PASSIVE) ecrit en direct, sans passer par
   // storeHarvestRow : l'allegement doit donc etre applique ICI AUSSI, sinon la
   // moisson faite en naviguant reste enorme (7 Mo d'annonces) alors que celle
   // faite activement est allegee. Meme fonction, un seul comportement.
+  // ⚠️ On garde le brut SOUS LA MAIN pour le coffre : le dressing complet porte
+  // TOUTES les URL de photos de chaque annonce, et l'allègement n'en laisse
+  // qu'une. Or republier demande toutes les photos. La ligne moissonnée reste
+  // légère (c'est elle qui repart à chaque lecture, §34), et les URL vont dans
+  // le coffre — une ligne par annonce, lue seulement quand on republie.
+  const brut = parsed;
   parsed = alleger(type, parsed);
 
+  // ⚠️⚠️ ON NE REMPLACE JAMAIS UN DRESSING PAR UN PLUS PAUVRE.
+  // C'est LE défaut qui vidait les annonces. Mesuré en base le 15 août :
+  //   julatace35260 → 4 articles captés alors que Vinted en annonce 100
+  //   julatace3535  → 20 captés sur 55 · shop_cancale → 96 sur 603
+  // La capture passive écrivait **tout ce que la page chargeait**, y compris
+  // une réponse partielle (une page 2, une liste filtrée, un aperçu de
+  // profil) — et cette réponse partielle ÉCRASAIT la moisson complète. Le
+  // compte tombait alors à « 0 annonce en ligne » dans l'app, alors que
+  // l'extension avait bien fait son travail quelques minutes plus tôt.
+  // Le garde-fou `plein()` ne rejetait que le VIDE, pas le partiel.
+  // Règle : une réponse COMPLÈTE (items ≥ total annoncé par Vinted) fait
+  // toujours foi ; sinon on n'écrase que si on apporte AU MOINS autant
+  // d'articles qu'avant.
+  if (CLE_LISTE[type] && !(await listePlusRiche(rowId, parsed, CLE_LISTE[type]))) {
+    noterDiag(`ignore_partiel_${type}`);
+    return;
+  }
+  // ⚠️ MÊME PIÈGE QUE LE DRESSING, SUR LE PORTE-MONNAIE. Le motif « billing » de
+  // `inject.js` attrape aussi des réponses de tarification : l'une d'elles
+  // (`minimum_price`) avait REMPLACÉ le vrai solde d'un compte — il n'y a qu'une
+  // ligne `harvest_{uid}_billing`, donc la dernière réponse gagne. On n'écrit
+  // que ce qui porte vraiment un montant de porte-monnaie.
+  if (type === 'billing' && !estPorteMonnaie(parsed)) { noterDiag('ignore_billing_hors_sujet'); return; }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
+  if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
+  data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
   const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
@@ -302,7 +513,7 @@ async function storeHarvest(domain, type, id, body) {
   // lectures + 200 écritures à chaque chargement du dressing. C'est la faute
   // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
   if (type === 'listings') {
-    try { await archiverLot(uid, ((parsed && parsed.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
   }
 
   // Le profil contient le vrai id de profil (different de l'account_id, utile
@@ -352,6 +563,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // COMPTE VRM (identification du vendeur, depuis la fenêtre de l'extension).
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'authEtat') {
+      authEtat().then(sendResponse); return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogin') {
+      authLogin(msg.email, msg.password).then(sendResponse); return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogout') {
+      authLogout().then(sendResponse); return true;
+    }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'syncNow') {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
       return true; // reponse asynchrone
@@ -360,9 +581,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // On ne l'accepte QUE d'un onglet de l'app elle-meme (verification de
     // l'origine de l'expediteur) — sinon n'importe quel site pourrait nous
     // refiler un jeton et ecrire sous le compte de quelqu'un d'autre.
+    // L'app demande l'état de la session côté extension (pour l'afficher).
+    // Même contrôle d'origine : un site quelconque n'a pas à savoir sous quelle
+    // adresse tu es connecté.
+    if (msg && msg.from === 'vmr-bridge' && msg.action === 'authEtat') {
+      const src = (sender && sender.origin) || (sender && sender.url) || '';
+      if (!/^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(src)) {
+        sendResponse({ ok: false, error: 'origine non autorisee' }); return true;
+      }
+      authEtat().then(sendResponse);
+      return true;
+    }
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
       const from = (sender && sender.origin) || (sender && sender.url) || '';
-      const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|vrm\.center)/.test(from);
+      const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(from);
       if (!trusted) { sendResponse({ ok: false, error: 'origine non autorisee' }); return true; }
       saveSession(msg.session || null).then(() => sendResponse({ ok: true }));
       return true;
@@ -391,6 +623,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (async () => {
         try {
           if (msg.action === 'panelData') { const r = await buildPanelData(); sendResponse({ ok: true, ...r }); return; }
+          // « Tout recapter » : relit le dressing COMPLET (toutes les pages),
+          // les ventes, les achats et la boîte, pour le SEUL compte connecté
+          // dans ce navigateur. Depuis sa session, sur son IP — jamais tous
+          // les comptes d'un coup (c'est la signature multi-comptes, §5).
+          // « Relier ce compte » : capte les jetons du compte connecté ICI et
+          // l'envoie à l'app. Rien à choisir — l'identifiant est lu dans le
+          // cookie de session, on ne peut pas se tromper de compte.
+          if (msg.action === 'relierCompte') {
+            oublierCachesComptes();
+            const r = await captureAllAccounts();
+            sendResponse(r && r.length ? { ok: true, accounts: r } : { ok: false, error: "aucun compte Vinted connecté dans ce navigateur — ouvre vinted.fr et connecte-toi" });
+            return;
+          }
+          if (msg.action === 'recapter') {
+            const ok = await activeFetchActiveAccount();
+            sendResponse(ok ? { ok: true } : { ok: false, error: "aucun compte Vinted connecté dans ce navigateur — ouvre vinted.fr et connecte-toi" });
+            return;
+          }
           if (msg.action === 'saveDate' && msg.id && msg.ts) { await saveListingDate(msg.id, msg.ts, msg.text); sendResponse({ ok: true }); return; }
           if (msg.action === 'saveDetail' && msg.id && msg.detail) { await saveItemDetail(msg.id, msg.detail); sendResponse({ ok: true }); return; }
           if (msg.action === 'aiReply') { const r = await aiReply(msg.message, msg.article, msg.price); sendResponse(r); return; }
@@ -785,7 +1035,14 @@ async function vintedSend(acc, method, endpoint, body) {
 // blocs de promotion... Alleger ici fait tomber le meme contenu a 0,15 Mo (-98 %).
 // Les anciennes lignes deja en base restent lisibles : on ne fait qu'enlever des
 // champs, jamais en renommer.
-const CHAMPS_ARTICLE = ['id','title','price','url','brand_title','size_title','status',
+// ⚠️ VINTED ENVOIE `brand`, `size`, `status` — PAS `brand_title`/`size_title`.
+// Vérifié sur les 112 annonces en ligne de la vraie base : `brand_title` et
+// `size_title` sont absents des 112, `brand`/`size` présents partout. On ne
+// gardait donc que des champs qui n'existent pas : chaque annonce allégée
+// perdait sa marque ET sa taille, et l'app affichait « marque manquante ·
+// taille manquante » sur tout le stock (note d'annonce faussée, conseils faux).
+// Les deux orthographes sont conservées : Vinted a déjà renommé des champs.
+const CHAMPS_ARTICLE = ['id','title','price','url','brand','size','brand_title','size_title','status',
   'view_count','favourite_count','favourites_count','created_at_ts',
   'is_closed','is_hidden','is_draft'];
 
@@ -804,6 +1061,14 @@ function articleMaigre(it) {
   const o = {};
   for (const c of CHAMPS_ARTICLE) if (it[c] !== undefined) o[c] = it[c];
   const ph = photoUtile(it); if (ph) o.photo = ph;
+  // ⚠️ COMBIEN de photos, pas lesquelles. L'allègement (§23) ne garde qu'une
+  // photo par annonce — l'app en déduisait « 1 seule photo » pour TOUTES les
+  // annonces (mapWardrobeItem comptait it.photos, absent), retirait 15 points
+  // à chacune dans la note d'annonce et conseillait « ajoute des photos » à
+  // des annonces qui en ont six. Un entier par article coûte trois octets et
+  // rend le diagnostic honnête. Les URL, elles, vont au coffre (archiverLot).
+  if (Array.isArray(it.photos)) o.nPhotos = it.photos.length;
+  else if (o.photo) o.nPhotos = 1;
   return o;
 }
 
@@ -838,15 +1103,89 @@ function alleger(type, payload) {
   } catch (_) { return payload; }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// RÉSUMÉ DES COMMANDES — écrit à la capture, lu par le widget iPhone
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️ ÉGRESS (la faute d'août, §34, dans sa dernière poche). `api/widget.js`
+// lisait les commandes en `select=data` : mesuré aujourd'hui, **791 Ko à CHAQUE
+// rafraîchissement** du widget (609 Ko de ventes + 181 Ko d'achats). Un widget
+// d'écran d'accueil se rafraîchit tout seul, jour et nuit — c'est des gigas par
+// mois pour afficher deux nombres.
+// On écrit donc les deux nombres AU MOMENT DE LA CAPTURE, dans la ligne
+// elle-même : le widget les lit en scalaires (~1 Ko) et garde sa propriété
+// essentielle — il se met à jour même app fermée, puisque c'est l'extension qui
+// capture. ⚠️ Les deux tests de statut sont la COPIE EXACTE de ceux de l'app
+// (`isAwaitingShipStatus` / `isAtRelayStatus`) : deux règles différentes pour la
+// même notion, c'est la garantie de deux chiffres qui se contredisent.
+// Un porte-monnaie porte un montant : `{main,escrow}` (solde) ou `{balance}`
+// (versements). Tout le reste qui passe par le motif « billing » n'en est pas un.
+// ⚠️ Il FAUT un montant réel. L'ancienne version finissait par `|| p.main ||
+// p.escrow` : un objet vide passait, et une capture sans montant remplaçait le
+// vrai solde (il n'y a qu'une ligne par compte, la dernière gagne). Mesuré en
+// base : 4 comptes sur 8 avaient un `payload: {}` écrit par-dessus leur solde,
+// donc de l'argent en attente invisible dans l'app.
+// `pending_balance` compte aussi : c'est l'« en attente » de la forme versement.
+const MONTANTS_PM = ['main', 'escrow', 'balance', 'pending_balance'];
+const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some(k => p[k] && p[k].amount != null));
+
+const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+function resumeCommandes(type, payload) {
+  // ⚠️ EXACTEMENT `orders_sold` ou `orders_purchased`, jamais une ligne
+  // générique. Une réponse `/my_orders` sans `?type=` MÉLANGE ventes et achats
+  // (§25) : mesuré sur la vraie base, un `/^orders/` laxiste faisait passer 7
+  // ventes anciennes pour des colis « à retirer ». Ces lignes ne sont plus
+  // écrites, mais elles existent encore en base.
+  const vente = type === 'orders_sold';
+  if (!vente && type !== 'orders_purchased') return null;
+  const cmds = (payload && payload.my_orders) || [];
+  if (!Array.isArray(cmds)) return null;
+  const txns = [];
+  for (const o of cmds) {
+    if (!o) continue;
+    const ok = vente ? AWAITING_SHIP(o.status) : AT_RELAY(o.status);
+    if (ok && o.transaction_id != null) txns.push(String(o.transaction_id));
+  }
+  // Les transactions (pas seulement le compte) : le widget dédoublonne entre
+  // comptes, sinon une même vente vue sur deux lignes compterait double.
+  return { n: cmds.length, txns, at: Date.now() };
+}
+
 async function storeHarvestRow(uid, type, payload, domain) {
+  // ⚠️ LA MOISSON ACTIVE N'ALIMENTAIT PAS LE COFFRE. « 🔄 Tout recapter » va
+  // chercher le dressing COMPLET (toutes les pages) — et jetait tout au coffre
+  // près : seule la voie passive archivait. C'est pour ça que le coffre plafonne
+  // à 25 annonces quand 112 sont en ligne, donc que « Republier » n'a ni texte
+  // ni photos pour la plupart des paires. On archive depuis le payload BRUT
+  // (l'allègement ci-dessous ne laisse qu'une photo par annonce).
+  const brut = payload;
   payload = alleger(type, payload);
+  // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
+  // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
+  // chemin pouvait donc écrire un porte-monnaie vide par-dessus le vrai solde.
+  // Mesuré en base : 4 comptes sur 8 avaient un `payload: {}`, donc leur argent
+  // en attente n'apparaissait nulle part. Un garde-fou doit vivre dans la
+  // fonction qui écrit, pas chez ceux qui l'appellent.
+  if (type === 'billing' && !estPorteMonnaie(payload)) return;
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
+  // Même règle que la voie passive : un dressing partiel n'écrase pas un
+  // dressing complet. La moisson ACTIVE pagine (fetchAllWardrobe) donc elle
+  // passe toujours — mais si un jour une page échoue en cours de route, on ne
+  // veut pas que le résultat tronqué remplace la bonne capture.
+  if (CLE_LISTE[type]) {
+    data.nItems = ((payload && payload[CLE_LISTE[type]]) || []).length;
+    if (!(await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]))) return;
+  }
+  data.resume = resumeCommandes(type, payload) || undefined;
   // On ecrit AUSSI updated_at : la table n'a pas de trigger, la colonne gardait
   // donc la date de creation de la ligne et faisait passer une moisson de deux
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
+  if (type === 'listings') {
+    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+  }
 }
 
 // Recupere TOUTES les pages du dressing. Vinted plafonne per_page a ~96 : sans
@@ -1073,8 +1412,27 @@ async function pageActiveFetch() {
             await new Promise(res => setTimeout(res, 700));
           }
         }
-        const sold = await get('/api/v2/my_orders?type=sold&page=1&per_page=100');
-        const bought = await get('/api/v2/my_orders?type=purchased&page=1&per_page=100');
+        // ⚠️ LES COMMANDES AUSSI SE PAGINENT. On ne prenait QUE la page 1 ici,
+        // alors que l'autre chemin (par cookie) paginait — donc selon le chemin
+        // emprunté, un compte à 320 ventes en rendait 320 ou 100. Et comme une
+        // capture écrase la précédente, la version tronquée EFFAÇAIT la
+        // complète : des ventes disparaissaient toutes seules. Même faute que
+        // le dressing (§5.13), sur les commandes.
+        const toutesCommandes = async (type) => {
+          const MAX = 10; let out = null;
+          for (let pg = 1; pg <= MAX; pg++) {
+            const r = await get('/api/v2/my_orders?type=' + type + '&page=' + pg + '&per_page=100');
+            const lot = r && Array.isArray(r.my_orders) ? r.my_orders : null;
+            if (!lot) break;
+            if (!out) out = r; else out.my_orders = out.my_orders.concat(lot);
+            const tp = r.pagination && r.pagination.total_pages;
+            if (!lot.length || (tp && pg >= tp) || lot.length < 100) break;
+            await new Promise(res => setTimeout(res, 700));
+          }
+          return out;
+        };
+        const sold = await toutesCommandes('sold');
+        const bought = await toutesCommandes('purchased');
         const inbox = await get('/api/v2/inbox?page=1&per_page=30');
         // PORTE-MONNAIE. Julien : « l'extension n'a pas moyen de capter tout
         // Vinted sans que j'aie besoin de tout ouvrir ? » — si, justement.
@@ -1106,7 +1464,9 @@ async function pageActiveFetch() {
   if (plein(out.bought, 'my_orders')) { await storeHarvestRow(uid, 'orders_purchased', out.bought, domain); stored = true; }
   if (plein(out.inbox, 'conversations')) { await storeHarvestRow(uid, 'inbox', out.inbox, domain); stored = true; }
   // Le solde n'est pas une liste : on le range des qu'il porte un montant.
-  if (out.wallet && (out.wallet.main || out.wallet.escrow)) { await storeHarvestRow(uid, 'billing', out.wallet, domain); stored = true; }
+  // `payouts` renvoie `{balance}` là où le porte-monnaie renvoie `{main,escrow}` :
+  // sans ce troisième cas, la lecture ajoutée en 4.26 était jetée à l'arrivée.
+  if (estPorteMonnaie(out.wallet)) { await storeHarvestRow(uid, 'billing', out.wallet, domain); stored = true; }
   if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
   return stored;
 }
@@ -1147,7 +1507,14 @@ async function activeFetchActiveAccount() {
 // Au demarrage / installation : on capte les comptes PUIS on rafraichit le
 // compte ACTIF par cookie (fiable). L'ancien fetch Bearer reste en secours pour
 // les autres comptes, mais il echoue tant que Vinted refuse le Bearer-sans-cookie.
-async function runActive() { if (await pageActiveFetch()) return; if (await activeFetchActiveAccount()) return; await activeFetchAll(); }
+// Rend VRAI si quelque chose a été rangé — la visite peut alors le dire dans
+// le journal au lieu d'annoncer un rafraîchissement qui n'a rien capté.
+async function runActive() {
+  if (await pageActiveFetch()) return true;
+  if (await activeFetchActiveAccount()) return true;
+  await activeFetchAll();
+  return false;
+}
 function fullSync() { captureAllAccounts().then(() => runActive()); }
 
 chrome.runtime.onInstalled.addListener(() => { fullSync(); });
@@ -1158,9 +1525,59 @@ try {
   // (assez pour etre a jour, assez espace pour rester discret).
   chrome.alarms.create('cancale-sync', { periodInMinutes: 10 });
   chrome.alarms.create('cancale-active', { periodInMinutes: 20 });
+  // ⚠️ ENTRETIEN DE LA SESSION VENDEUR. Le jeton d'accès dure ~1 h ; il n'était
+  // renouvelé qu'au moment d'écrire, et SEULEMENT si la base est cloisonnée.
+  // Une fois la migration passée, une extension restée ouverte sans écrire
+  // aurait laissé mourir son jeton, puis serait retombée sur la clé publique —
+  // c'est-à-dire, sous RLS, plus aucune capture enregistrée, en silence.
+  // 40 min : bien avant l'heure, et rien ne part si aucune session n'existe.
+  chrome.alarms.create('vrm-session', { periodInMinutes: 40 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
+    else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
+  });
+} catch (_) {}
+
+// ── CAPTURE À CHAQUE VISITE SUR VINTED ──────────────────────────────────────
+// Demande de Julien : « à chaque fois que je vais sur Vinted, l'extension capte
+// toutes les données et rafraîchit pour l'application ». Jusqu'ici la moisson
+// active ne partait qu'au démarrage de Chrome, au changement de session, ou
+// toutes les 20 min — donc en ouvrant Vinted on pouvait travailler sur des
+// chiffres vieux de vingt minutes, et un compte peu visité restait figé.
+//
+// ⚠️ CE QUE ÇA N'EST PAS. On ne rafraîchit QUE le compte connecté dans cet
+// onglet, depuis SA session et SON IP, avec les mêmes appels qu'une visite
+// normale (§5). Jamais tous les comptes d'un coup — c'est ça, la signature
+// multi-comptes que Vinted sanctionne.
+//
+// Le délai de garde n'est pas un « rythme faussement humain » (toujours refusé,
+// §32) : c'est simplement ne pas refaire dix fois la même lecture pendant qu'on
+// navigue de page en page. Sans lui, ouvrir 30 annonces = 30 moissons complètes.
+const VISITE_DELAI_MS = 5 * 60 * 1000;   // au plus une moisson complète / 5 min / compte
+let visiteTimer = null;
+async function visiteVinted() {
+  try {
+    const uid = await activeUidForDomain('www.vinted.fr');
+    if (!uid) return;                                   // pas connecté : rien à capter
+    const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
+    const der = Number(st[uid] || 0);
+    if (Date.now() - der < VISITE_DELAI_MS) return;     // déjà à jour, on ne rejoue pas
+    st[uid] = Date.now();
+    await chrome.storage.local.set({ vrmDerniereVisite: st });
+    const ok = await runActive();
+    logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
+  } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
+}
+try {
+  chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+    if (!info || info.status !== 'complete') return;
+    const u = (tab && tab.url) || '';
+    if (!/^https:\/\/(www\.)?vinted\.(fr|com|it|de)\//.test(u)) return;
+    // Petit délai : on laisse la page finir de se charger, la capture passive
+    // en profite aussi (elle observe ce que la page demande d'elle-même).
+    clearTimeout(visiteTimer);
+    visiteTimer = setTimeout(() => { visiteVinted(); }, 3000);
   });
 } catch (_) {}
 
@@ -1452,19 +1869,31 @@ function coffreRecord(uid, it, fiche) {
   const photos = [];
   const push = (u) => { const s = String(u || ''); if (s && !photos.includes(s)) photos.push(s); };
   if (Array.isArray(f.photos)) for (const p of f.photos) push(p && (p.full_size_url || p.url));
+  // ⚠️ Le DRESSING porte lui aussi toutes les photos de l'annonce. On ne les
+  // lisait pas (seulement `it.photo`, la vignette) : le coffre gardait UNE
+  // photo pour une annonce qui en a six, et republier repartait quasi nu.
+  if (Array.isArray(it && it.photos)) for (const p of it.photos) push(p && (p.full_size_url || p.url));
   push(it && it.photo && (it.photo.url || it.photo));
+  // Combien l'annonce en a VRAIMENT (même quand on n'a pas pu toutes les lire) :
+  // sert à dire « 2 photos sur 6 » plutôt que de faire croire au compte complet.
+  const nReel = (Array.isArray(f.photos) && f.photos.length)
+             || (Array.isArray(it && it.photos) && it.photos.length)
+             || (it && it.nPhotos) || photos.length || 0;
   return {
     id: String((it && it.id) || f.id || ''),
     uid: String(uid || ''),
     title: String((f.title || (it && it.title) || '')),
     desc: String(f.description || ''),
-    brand: String(f.brand || (f.brand_dto && f.brand_dto.title) || (it && it.brand_title) || ''),
-    size: String(f.size_title || (it && it.size_title) || ''),
-    etat: String(f.status || ''),
+    brand: String(f.brand || (f.brand_dto && f.brand_dto.title) || (it && (it.brand || it.brand_title)) || ''),
+    size: String(f.size_title || f.size || (it && (it.size || it.size_title)) || ''),
+    // L'état ("Très bon état") est aussi sur l'article du dressing — on ne le
+    // lisait que sur la fiche, qui n'arrive presque jamais (§46).
+    etat: String(f.status || (it && it.status) || ''),
     catalogId: f.catalog_id != null ? f.catalog_id : null,
     price: (f.price && f.price.amount != null) ? f.price.amount
          : ((it && it.price && it.price.amount != null) ? it.price.amount : (it && it.price) ?? null),
     photos,
+    nPhotos: Number(nReel) || photos.length || 0,
     url: String((it && it.url) || f.url || ''),
     savedAt: new Date().toISOString(),
   };
@@ -1485,6 +1914,7 @@ async function archiverAnnonce(uid, it, fiche) {
       if (!rec.etat && anc.etat) rec.etat = anc.etat;
       if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
       for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.nPhotos = Math.max(Number(rec.nPhotos) || 0, Number(anc.nPhotos) || 0, rec.photos.length);
       rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
     } else rec.firstSavedAt = rec.savedAt;
     return await supabaseUpsert('app_data', [{ id: `coffre_${rec.uid}_${rec.id}`, data: rec }], 'id');
@@ -1499,10 +1929,32 @@ async function archiverLot(uid, items) {
   const rows = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id,data`) || [];
   const anciens = {};
   for (const r of rows) { const d = r && r.data; if (d && d.id) anciens[String(d.id)] = d; }
+  // ⚠️ LE COFFRE IGNORAIT LE SEUL ENDROIT OÙ LE TEXTE EXISTE VRAIMENT.
+  // Mesuré le 15 août : coffre = 25 annonces, **0 avec description** ; en face,
+  // `vinted_item_details` (les fiches lues sur la PAGE de l'annonce, écrites
+  // par le panneau) = 23 fiches, **23 avec description ET photos HD**. Les deux
+  // magasins ne se parlaient pas : `coffreRecord` n'attendait la description
+  // que d'une fiche d'API (`harvest_*_item_*`) qui ne se range quasiment
+  // jamais (§46). Résultat : « Republier » n'avait ni texte ni photos alors
+  // que les deux étaient en base.
+  let pages = {};
+  try {
+    const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+    pages = (dr && dr[0] && dr[0].data) || {};
+  } catch (_) { pages = {}; }
+  const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
   const out = [];
   for (const it of items.slice(0, 300)) {
     const rec = coffreRecord(uid, it, null);
     if (!rec.id) continue;
+    // Ce que la page de l'annonce a livré : le vrai texte du vendeur + les
+    // photos en grand. On complète, on n'écrase jamais une source plus riche.
+    const p = pages[String(rec.id)];
+    if (p) {
+      const t = String(p.description || '').trim();
+      if (!rec.desc && t.length > 15 && !PUB.test(t)) rec.desc = t;
+      for (const u of (p.photos || [])) if (u && !rec.photos.includes(u)) rec.photos.push(u);
+    }
     const anc = anciens[rec.id];
     if (anc) {
       if (!rec.desc && anc.desc) rec.desc = anc.desc;
@@ -1511,10 +1963,12 @@ async function archiverLot(uid, items) {
       if (!rec.etat && anc.etat) rec.etat = anc.etat;
       if (rec.catalogId == null && anc.catalogId != null) rec.catalogId = anc.catalogId;
       for (const p of (anc.photos || [])) if (!rec.photos.includes(p)) rec.photos.push(p);
+      rec.nPhotos = Math.max(Number(rec.nPhotos) || 0, Number(anc.nPhotos) || 0, rec.photos.length);
       rec.firstSavedAt = anc.firstSavedAt || anc.savedAt;
       // Rien de nouveau ? on ne réécrit pas cette ligne (égress inutile).
       if (anc.title === rec.title && String(anc.price) === String(rec.price)
-          && (anc.photos || []).length === rec.photos.length && anc.desc === rec.desc) continue;
+          && (anc.photos || []).length === rec.photos.length && anc.desc === rec.desc
+          && Number(anc.nPhotos) === Number(rec.nPhotos)) continue;
     } else rec.firstSavedAt = rec.savedAt;
     out.push({ id: `coffre_${uid}_${rec.id}`, data: rec });
   }
@@ -1687,7 +2141,12 @@ async function setAccountOff(uid, off) {
   // `false` est ENREGISTRÉ (et non effacé) : c'est ce qui permet de rallumer
   // un compte masqué par l'app, que le panneau n'a pas le droit de modifier.
   cur[k] = !!off ? true : false;
-  return await supabaseUpsert('app_data', [{ id: 'panel_accounts_off', data: cur }], 'id');
+  const r = await supabaseUpsert('app_data', [{ id: 'panel_accounts_off', data: cur }], 'id');
+  // Réafficher un compte doit AUSSI relancer sa capture : sinon il revient dans
+  // les listes mais sans jetons frais, donc vide — « le bouton ne marche pas ».
+  oublierCachesComptes();
+  if (!off) { try { await oublierRefus(k); await captureAllAccounts(); } catch (_) {} }
+  return r;
 }
 
 async function markPickupDone(key, done) {
@@ -1705,7 +2164,7 @@ async function markPickupDone(key, done) {
 // reply), qui renvoie une intention + des réponses suggérées. ⚠️ On n'ENVOIE
 // RIEN sur Vinted : Julien relit, choisit, adapte et envoie LUI-MÊME (assistance
 // stricte, conforme). La clé de l'IA reste côté serveur (Vercel), jamais ici.
-const VRM_APP_API = 'https://cancale-v67-ten.vercel.app';
+const VRM_APP_API = 'https://vrm.center';
 async function aiReply(message, article, price) {
   try {
     const r = await fetch(`${VRM_APP_API}/api/ai`, {
@@ -1801,13 +2260,27 @@ async function buildPanelData() {
     if (hiddenAcc.has(k)) return 'app';
     return '';
   };
-  const keepAcc = (r) => !acctOff(r && r.data && r.data.uid);
+  const keepAcc = (r) => { const u = r && r.data && r.data.uid; return compteExiste(u) && !acctOff(u); };
   // Nom lisible d'un compte : l'étiquette posée dans l'app, sinon le pseudo Vinted.
   const accRows = await sbGet('vinted_accounts?select=vinted_user_id,login') || [];
   const labels = (d.vinted_account_labels && typeof d.vinted_account_labels === 'object') ? d.vinted_account_labels : {};
   const nameByUid = {};
   for (const a of (accRows || [])) { const k = String(a.vinted_user_id || ''); if (k) nameByUid[k] = String(labels[k] || a.login || ('compte ' + k.slice(-4))); }
-  const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || (k ? 'compte ' + k.slice(-4) : ''); };
+  // Le pseudo d'un compte SUPPRIMÉ n'est plus dans `vinted_accounts` (sa ligne a
+  // été effacée) : on le retrouve dans la liste noire, qui le garde exprès.
+  const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || _blockedNames[k] || (k ? 'compte ' + k.slice(-4) : ''); };
+  // ── UN COMPTE EXISTE S'IL A DES JETONS, PAS PARCE QU'IL RESTE DES DONNÉES ──
+  // Mesuré : 3 identifiants avaient encore des lignes moissonnées (46 en tout,
+  // dont shop_cancale supprimé il y a 12 j) SANS aucune ligne `vinted_accounts`.
+  // Comme la clé publique n'a pas le droit d'effacer `app_data`, ces restes ne
+  // partent jamais tout seuls : ils continuaient d'alimenter les listes et de
+  // s'afficher comme des comptes. Supprimer un compte doit vouloir dire
+  // supprimer, donc on ignore les données d'un identifiant qui n'a plus de
+  // compte — c'est la seule règle, elle ne dépend d'aucun délai.
+  // ⚠️ Si la lecture des comptes échoue (réseau), on n'applique RIEN : filtrer
+  // sur une liste vide viderait tout le panneau pour une simple coupure.
+  const comptesConnus = new Set((accRows || []).map(a => String(a.vinted_user_id || '')).filter(Boolean));
+  const compteExiste = (uid) => !comptesConnus.size || comptesConnus.has(String(uid == null ? '' : uid));
   const lstAll = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []);
   const soldAll = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []);
   // ⚠️ LA PLUS FRAÎCHE CAPTURE GAGNE. Une même vente peut exister dans plusieurs
@@ -1817,22 +2290,65 @@ async function buildPanelData() {
   // premier vu est le plus récent. On se base sur ce qu'on a capté, pas sur une
   // déduction.
   const parFraicheur = (a, b) => (Date.parse((b.data && b.data.capturedAt) || '') || 0) - (Date.parse((a.data && a.data.capturedAt) || '') || 0);
+  // ⚠️ DÉCLARÉ ICI, pas 500 lignes plus bas : la liste des comptes en a besoin.
+  // Un `let` lu avant sa déclaration lève « Cannot access before initialization »
+  // et vide tout le panneau — le piège TDZ déjà rencontré deux fois (§19).
+  let compteActif = null;
+  try { compteActif = await compteConnecte('www.vinted.fr'); } catch (_) {}
+
   const lst = lstAll.filter(keepAcc).sort(parFraicheur);
   const soldRows = soldAll.filter(keepAcc).sort(parFraicheur);
   // Liste des comptes pour le panneau (avec le nb d'annonces en ligne) : tu vois
   // exactement d'où viennent tes paires, et tu peux en couper un d'un clic.
   const accountsSeen = {};
-  const noteAcct = (uid, n) => {
+  const noteAcct = (uid, n, cap) => {
     const k = String(uid || ''); if (!k) return;
-    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k), raison: acctRaison(k) };
+    // Un identifiant sans compte n'est pas un compte : c'est un reste de
+    // suppression. Il ne doit ni s'afficher, ni proposer « Réafficher ».
+    if (!compteExiste(k)) return;
+    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k), raison: acctRaison(k), capte: 0 };
     accountsSeen[k].online += n || 0;
+    const t = cap ? Date.parse(cap) : 0;                 // capture la plus récente
+    if (t && t > accountsSeen[k].capte) accountsSeen[k].capte = t;
   };
   for (const r of lstAll) {
     const items = (r.data && r.data.payload && r.data.payload.items) || [];
-    noteAcct(r.data && r.data.uid, items.filter(it => !it.is_closed && !it.is_hidden && !it.is_draft).length);
+    noteAcct(r.data && r.data.uid, items.filter(it => !it.is_closed && !it.is_hidden && !it.is_draft).length, r.data && r.data.capturedAt);
   }
-  for (const r of soldAll) noteAcct(r.data && r.data.uid, 0);
-  const accounts = Object.values(accountsSeen).sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || b.online - a.online);
+  for (const r of soldAll) noteAcct(r.data && r.data.uid, 0, r.data && r.data.capturedAt);
+  // ⚠️ UN COMPTE TOUT NEUF N'A ENCORE AUCUNE MOISSON. La liste ne se construisait
+  // qu'à partir des lignes moissonnées : le compte qu'on vient de connecter était
+  // donc INVISIBLE ici, alors que ses jetons étaient bien captés — d'où « mes
+  // nouveaux comptes n'arrivent pas ». On part maintenant des comptes captés
+  // (table `vinted_accounts`), la moisson ne fait qu'ajouter les compteurs.
+  for (const a of (accRows || [])) noteAcct(a && a.vinted_user_id, 0);
+  // Et le compte connecté dans CE navigateur, même s'il n'est ni capté ni
+  // moissonné : c'est celui que Julien a sous les yeux quand il se demande
+  // pourquoi rien n'arrive.
+  if (compteActif) noteAcct(compteActif, 0);
+  // Julien : « garde simplement ceux qui ont été captés récemment ». On ne cache
+  // personne (une session expirée n'est pas un compte mort, ses paires sont
+  // réelles) — on TRIE par fraîcheur et on écrit la date sur chaque ligne, pour
+  // qu'un compte muet se voie au lieu de se deviner.
+  const accounts = Object.values(accountsSeen)
+    .sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || (b.capte || 0) - (a.capte || 0) || b.online - a.online);
+  // État du compte connecté ici : capté ? refusé ? pourquoi ? Sans ça, « pas
+  // capté », « supprimé définitivement » et « masqué » se ressemblent tous —
+  // c'est-à-dire du silence.
+  let connecte = null;
+  if (compteActif) {
+    const k = String(compteActif);
+    let refus = {}; try { refus = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {}; } catch (_) {}
+    connecte = {
+      uid: k,
+      name: acctName(k),
+      capte: (accRows || []).some(a => String(a.vinted_user_id) === k),
+      moissonne: !!accountsSeen[k] && accountsSeen[k].online > 0,
+      off: acctOff(k),
+      raison: acctRaison(k),
+      refus: (refus[k] && refus[k].raison) || '',
+    };
+  }
   const online = [];
   const seen = new Set();
   for (const r of lst) {
@@ -1863,10 +2379,14 @@ async function buildPanelData() {
         numero, buyPrice: e && e.buyPrice != null ? e.buyPrice : null,
         cell: numero ? (cellByNum[numero] || null) : null,
         ageDays,
-        brand: String(it.brand_title || '').trim(),
-        size: String(it.size_title || '').trim(),
+        brand: String(it.brand || it.brand_title || (it.brand_dto && it.brand_dto.title) || '').trim(),
+        size: String(it.size || it.size_title || '').trim(),
         hasDesc: !!(pageDetails[id] && pageDetails[id].description),
         nPhotos: (pageDetails[id] && (pageDetails[id].photos || []).length) || 0,
+        // Combien de photos l'annonce a VRAIMENT sur Vinted (≠ combien on en a
+        // gardées) : c'est ce qui permet de dire « 2 sur 6 » au lieu de laisser
+        // croire que le coffre est complet.
+        nPhotosVinted: Number(it.nPhotos) || (Array.isArray(it.photos) ? it.photos.length : 0) || 0,
       });
     }
   }
@@ -1879,17 +2399,29 @@ async function buildPanelData() {
   //     ligne. Un titre en double ne retire jamais rien (§24 : pas de devinette —
   //     sinon on effacerait une paire identique encore réellement en vente).
   const emailSoldIds = new Set((Array.isArray(d.vinted_annonces_email_sold) ? d.vinted_annonces_email_sold : []).map(String));
+  // ⚠️ PORTÉE : on regarde les ventes de TOUS les comptes, pas seulement des
+  // comptes affichés. Une paire vendue sur un compte masqué a quand même quitté
+  // l'étagère. L'app le faisait déjà (elle lit toutes ses ventes) — la
+  // différence donnait 8 annonces en ligne ici contre 7 dans l'app, sur les
+  // mêmes données. Même remarque pour le comptage des titres en double juste
+  // après : plus la vue est large, moins on risque de retirer à tort.
   const soldRecentTitles = new Set();
-  for (const r of soldRows) {
+  for (const r of soldAll) {
     for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
-      if (/annul|cancel|refus|rembours/i.test(o.status || '')) continue;
+      // Même classement que l'app (`classifyOrderStatus`) : un retour ou une
+      // transaction suspendue n'est PAS une vente aboutie — la paire revient,
+      // son annonce doit rester en ligne.
+      if (/annul|cancel|refus|rembours|retour|suspend/i.test(o.status || '')) continue;
       const ts = o.date ? Date.parse(o.date) : NaN;
       if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
       const k = normT(o.title); if (k) soldRecentTitles.add(k);
     }
   }
   const onlineTitleN = {};
-  for (const o of online) { const k = normT(o.title); if (k) onlineTitleN[k] = (onlineTitleN[k] || 0) + 1; }
+  for (const r of lstAll) for (const it of (((r.data && r.data.payload) || {}).items || [])) {
+    if (it.is_closed || it.is_hidden || it.is_draft) continue;
+    const k = normT(it.title); if (k) onlineTitleN[k] = (onlineTitleN[k] || 0) + 1;
+  }
   let removedSold = 0;
   for (let i = online.length - 1; i >= 0; i--) {
     const o = online[i]; const k = normT(o.title);
@@ -2001,7 +2533,11 @@ async function buildPanelData() {
   // (le CA du mois reste celui publié par l'app, appStats) : c'est juste la liste
   // « qu'est-ce que j'ai vendu récemment » pour éviter de rouvrir l'app. On exclut
   // les annulées/remboursées (ce n'est pas de l'argent qui rentre).
-  const classifySale = (st) => /annul|cancel|refus|rembours/i.test(st || '') ? 'cancelled'
+  // ⚠️ COPIE EXACTE de `classifyOrderStatus` de l'app. Il manquait `retour` et
+  // `suspend` : « Retour initié », « Transaction suspendue » et « Commande non
+  // réclamée » étaient annulées côté app et affichées comme ventes en cours
+  // dans le panneau. Le même écran de vente, deux vérités selon l'outil.
+  const classifySale = (st) => /annul|cancel|refus|rembours|retour|suspend/i.test(st || '') ? 'cancelled'
     : /finalis/i.test(st || '') ? 'completed' : 'pending';
   const salesFlat = [];
   const seenSaleTx = new Set();
@@ -2308,8 +2844,6 @@ async function buildPanelData() {
 
   // Quel compte est RÉELLEMENT connecté dans ce navigateur ? Le panneau s'en
   // sert pour ne PAS proposer d'agir au nom d'un autre compte (voir `garde`).
-  let compteActif = null;
-  try { compteActif = await compteConnecte('www.vinted.fr'); } catch (_) {}
 
   const renumSuggest = [];
   try {
@@ -2480,7 +3014,7 @@ async function buildPanelData() {
   const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, connecte, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

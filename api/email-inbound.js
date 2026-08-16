@@ -20,8 +20,18 @@
 import { sendPushToAll } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
+import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
+import { adressesDeLivraison, resoudreProprietaire } from './_lib/proprietaire-email.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+// ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
+// vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
+// publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
+// LE blocage qui empêchait d'activer le multi-vendeurs. On prend donc
+// `SUPABASE_SERVICE_KEY` (variable d'environnement Vercel, jamais dans le
+// dépôt) si elle est définie, et on retombe sur la clé publique tant qu'elle ne
+// l'est pas : le comportement d'aujourd'hui reste identique.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
 // ── Utilitaires ─────────────────────────────────────────────────────────────
 
@@ -68,8 +78,21 @@ function normalizeInbound(body) {
   return out;
 }
 
+// ⚠️ LE PROPRIÉTAIRE EST PROPRE À CHAQUE REQUÊTE, PAS AU MODULE.
+// Une fonction serverless garde son instance entre deux appels et peut en
+// traiter plusieurs EN MÊME TEMPS : une simple variable de module serait écrasée
+// par l'email suivant pendant que le premier finit d'écrire — et des lignes
+// partiraient chez le mauvais vendeur, sans le moindre message d'erreur.
+// `AsyncLocalStorage` donne un contexte isolé par requête : deux emails traités
+// en parallèle ne peuvent pas se mélanger.
 async function supabaseUpsert(rows) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+  const owner = proprietaireCourant();
+  rows = owner
+    ? rows.map(r => ({ owner, ...r }))
+    // Sans vendeur résolu : le comportement d'avant (propriétaire de
+    // l'installation s'il est réglé, rien sinon) — voir api/_lib/owner.js.
+    : withOwnerAll(rows);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
     method: 'POST',
     headers: {
       apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -86,13 +109,13 @@ async function detectAccount(raw) {
   try {
     const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
     const low = (raw || '').toLowerCase();
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers });
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`), { headers });
     const accts = res.ok ? await res.json() : [];
     // 1) Par EMAIL de compte (renseigné dans l'app : Comptes liés → champ 📧).
     //    Fiable même avec les adresses masquées iCloud : on cherche l'adresse
     //    destinataire dans le texte brut du mail (To inclus).
     try {
-      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`, { headers });
+      const r2 = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`), { headers });
       if (r2.ok) {
         const rows = await r2.json();
         const map = (rows[0] && rows[0].vinted_account_emails) || {};
@@ -133,7 +156,11 @@ function extraireNumerosLot(body) {
 
 function parseSaleEmail({ subject, text, html }) {
   let body = text || '';
-  if (body.length < 100) body = htmlToText(html);
+  // ⚠️ On ne REMPLACE le texte par la version HTML que si elle apporte
+  // vraiment plus. Avant, un email court en texte brut (moins de 100
+  // caractères) était écrasé par un HTML vide → le message était pourtant
+  // parfaitement lisible, mais l'analyse échouait et la vente était perdue.
+  if (body.length < 100) { const alt = htmlToText(html); if (alt.length > body.length) body = alt; }
   const cleanBody = body.replace(/\t/g, ' ').replace(/ {2,}/g, ' ');
   const data = { pseudo: '', designation: '', prix: '', numero: '', nomComplet: '', adresse: '', email: '' };
   const stripBrackets = s => s.replace(/^\[.*?\]\s*/, '').trim();
@@ -219,7 +246,7 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
 
 async function supabaseGetRow(id) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return null;
@@ -317,7 +344,7 @@ async function findNumeroByTitle(title, size) {
     const normSz = s => String(s == null ? '' : s).toLowerCase().replace(',', '.').replace(/[^0-9.]/g, '').replace(/\.0+$/, '').trim();
     const t = norm(title);
     if (!t) return '';
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`, {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return '';
@@ -349,7 +376,7 @@ async function findBuyPriceByTitle(title) {
   try {
     const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
     const t = norm(title); if (!t) return null;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`, {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
     if (!res.ok) return null;
@@ -541,7 +568,85 @@ function extractPickupQr(mail, status) {
   return none;
 }
 
+// ── LIRE LES DONNÉES DU BON VENDEUR, ET DE LUI SEUL ──────────────────────────
+// ⚠️ La clé de service CONTOURNE RLS. Donc, une fois la base cloisonnée, un
+// `?id=eq.main` renverrait la ligne `main` de TOUS les vendeurs, et
+// `rows[0]` serait celle du premier venu : en traitant l'email de Marie, on
+// lirait les comptes Vinted et les numéros de Julien. Silencieux, et faux.
+// Chaque lecture est donc filtrée sur le vendeur résolu pour CETTE requête.
+// Tant que la colonne `owner` n'existe pas, on n'ajoute rien (un filtre sur une
+// colonne inconnue ferait échouer la lecture avec un 400).
+let _cloisonnee = null;
+async function baseCloisonnee() {
+  if (_cloisonnee !== null) return _cloisonnee;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    _cloisonnee = r.ok;
+  } catch (_) { _cloisonnee = false; }
+  return _cloisonnee;
+}
+const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
+
+// Registre « adresse de réception → vendeur », écrit par l'app (Réglages →
+// Emails). Ligne dédiée : l'app en est propriétaire, le serveur ne fait que lire.
+async function lireRegistreEmails() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!r.ok) return {};
+    const j = await r.json();
+    const d = (j[0] && j[0].data) || {};
+    return (d && typeof d === 'object') ? (d.adresses || d) : {};
+  } catch (_) { return {}; }
+}
+
+// Email non attribuable : on le garde ENTIER, avec la raison et les adresses
+// lues, sous le propriétaire de l'installation (sinon, une fois la base
+// cloisonnée, personne ne pourrait le relire pour le rattacher).
+async function mettreEnQuarantaine(mail, adresses, raison) {
+  try {
+    const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const ligne = {
+      id,
+      data: {
+        raison, adresses, at: new Date().toISOString(),
+        from: mail.from || '', to: mail.to || '', subject: mail.subject || '',
+        text: String(mail.text || '').slice(0, 20000),
+        html: String(mail.html || '').slice(0, 40000),
+        pieces: (mail.attachments || []).map(a => ({ filename: a.filename, contentType: a.contentType })),
+      },
+    };
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify(withOwnerAll([ligne])),
+    });
+  } catch (_) {}
+}
+
+// Le handler exporté n'est qu'une enveloppe : il ouvre un contexte isolé pour
+// CETTE requête, puis délègue. Tout ce qui écrit à l'intérieur (y compris les
+// écritures déclenchées plus tard dans la même chaîne d'await) lit le bon
+// vendeur, même si un autre email est traité en parallèle.
 export default async function handler(req, res) {
+  return contexteVendeur.run({ owner: '' }, () => traiterEmail(req, res));
+}
+
+// `traiterEmail` est aussi appelée par `api/email-rattacher.js` pour REJOUER un
+// email mis en quarantaine, une fois que le vendeur a prouvé son identité.
+// ⚠️ `req.__ownerForce` est posé côté serveur uniquement : Vercel construit
+// l'objet `req` lui-même, une requête HTTP ne peut pas y ajouter de propriété.
+export async function traiterEmail(req, res) {
+  // ⚠️ Appelée directement (rejeu depuis `email-rattacher`), il n'y a pas encore
+  // de contexte : sans ça le propriétaire imposé se perdait en silence et les
+  // lignes rejouées repartaient sans vendeur. On en ouvre un.
+  if (!contexteVendeur.getStore()) return contexteVendeur.run({ owner: '' }, () => traiterEmail(req, res));
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
   // Garde-fou : clé secrète partagée avec le service de réception.
@@ -551,9 +656,31 @@ export default async function handler(req, res) {
     if (key !== secret) { res.status(401).json({ error: 'clé invalide' }); return; }
   }
 
-  let mail;
-  try { mail = normalizeInbound(typeof req.body === 'string' ? JSON.parse(req.body) : req.body); }
+  let mail, corpsBrut;
+  try {
+    corpsBrut = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    mail = normalizeInbound(corpsBrut);
+  }
   catch (_) { res.status(200).json({ ok: false, error: 'corps illisible' }); return; }
+
+  // ── À QUEL VENDEUR CET EMAIL APPARTIENT-IL ? ──────────────────────────────
+  // Décidé par l'ADRESSE DE RÉCEPTION, que le vendeur a enregistrée lui-même
+  // dans l'app. Jamais par l'expéditeur ni par le contenu : ils sont écrits par
+  // l'extérieur (voir api/_lib/proprietaire-email.js).
+  const registre = await lireRegistreEmails();
+  const adresses = adressesDeLivraison(corpsBrut, mail);
+  const proprio = req.__ownerForce
+    ? { owner: String(req.__ownerForce), via: 'rattachement' }
+    : resoudreProprietaire(adresses, registre, process.env.VRM_OWNER_UID || '');
+  { const st = contexteVendeur.getStore(); if (st) st.owner = proprio.owner || ''; }
+  if (!proprio.owner) {
+    // ⚠️ ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec
+    // sa raison ; l'app le signale et permet de le rattacher. Un email égaré se
+    // répare, un email livré au mauvais vendeur non.
+    await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué');
+    res.status(200).json({ ok: true, quarantaine: true, raison: proprio.raison, adresses });
+    return;
+  }
 
   const subject = mail.subject || '';
   const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${mail.text}`;
@@ -653,7 +780,7 @@ export default async function handler(req, res) {
       let pdfTamponneB64 = null, posKnown = false;
       if (pdf) {
         try {
-          const rf = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`, {
+          const rf = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`), {
             headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           });
           const rfRows = rf.ok ? await rf.json() : [];

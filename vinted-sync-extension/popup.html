@@ -19,6 +19,13 @@
     .muted { font-size: 10px; color: #6f7f77; margin-top: 10px; line-height: 1.5; }
     .tip { font-size: 10.5px; color: #dcae5c; margin-top: 8px; line-height: 1.5; background: rgba(220,174,92,.09); border: 1px solid rgba(220,174,92,.28); border-radius: 9px; padding: 8px 10px; }
     #status { font-size: 11px; color: #8b9b92; margin-top: 8px; min-height: 14px; }
+    input { width: 100%; box-sizing: border-box; margin-top: 7px; padding: 9px 10px; border-radius: 9px;
+      border: 1px solid #263129; background: #101815; color: #eef4f0; font: inherit; font-size: 12px; outline: none; }
+    input:focus { border-color: #4aa87d; }
+    button.sec { background: transparent; color: #8b9b92; border: 1px solid #263129; font-weight: 600; margin-top: 8px; }
+    .err { font-size: 11px; color: #e87b7f; margin-top: 8px; line-height: 1.45; }
+    .who { display: flex; align-items: center; gap: 9px; font-size: 12px; padding: 7px 0; }
+    .who .nom { font-weight: 600; }
   </style>
 </head>
 <body>
@@ -39,6 +46,9 @@
     <h1>VRM — Sync Vinted</h1>
   </div>
   <div class="sub">Capture locale, depuis ton navigateur.</div>
+
+  <div class="sect">Compte VRM</div>
+  <div id="auth"></div>
 
   <div class="sect">Comptes captés</div>
   <div id="accounts"></div>

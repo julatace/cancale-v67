@@ -59,6 +59,19 @@
     // la capte passivement pour l'afficher sur la carte. Motif large (Vinted a
     // plusieurs noms d'endpoint selon le transporteur / la version).
     { re: /pickup[_-]?points?|pudo|drop[_-]?off[_-]?points?|shipping[_-]?points?|parcel[_-]?shops?|point[_-]?of[_-]?delivery|delivery[_-]?points?/i, type: 'pickup_points' },
+    // DÉTAIL D'UNE EXPÉDITION — « où vais-je chercher ce colis ? ».
+    // ⚠️ Mesuré : la transaction ne porte QUE `shipment {id,status,status_title,
+    // status_updated_at}` — aucune adresse (§16, reconfirmé aujourd'hui). Et les
+    // 2 colis réellement à retirer n'ont AUCUN email de suivi, donc ni code ni
+    // lieu : c'est exactement « je ne sais pas où aller chercher mes colis ».
+    // La transaction donne pourtant le `shipment.id`, et Vinted sert bien des
+    // `/shipments/{id}/…` (vus dans seen_urls). On capte donc le détail quand la
+    // page de suivi le charge — une ligne PAR COLIS (`ship_{id}`), sinon un colis
+    // écraserait le précédent.
+    // ⚠️ Borné à `(?:\?|$)` : les sous-chemins (label_url, label_options,
+    // nearby_drop_off_points) ont déjà leur propre traitement, il ne faut pas
+    // que ce motif les avale.
+    { re: /\/api\/v\d+\/shipments\/(\d+)(?:\?|$)/, type: 'shipment' },
   ];
   const matchHarvest = (url) => {
     for (const h of HARVEST) {

@@ -1,5 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
+// La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
+// deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
+// dans une base de production sans le relire.
+import MIGRATION_SQL from "../supabase/migrations/001-multi-utilisateurs.sql?raw";
 
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
@@ -697,7 +701,26 @@ const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} ret
 const isCloudReady = () => _cloudReady;
 
 // Lecture locale (instantanee)
-const load = (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } };
+// ⚠️ UNE DONNÉE ABÎMÉE NE DOIT PAS TUER L'APP. `load` rendait tel quel ce qu'il
+// trouvait : une clé corrompue (écriture interrompue, ancienne version, import
+// bancal) rendait une CHAÎNE là où l'app attend une liste, et le premier
+// `.filter` faisait écran blanc — avant même que le garde-fou d'écran puisse
+// s'interposer, puisque la lecture a lieu dans l'état initial du composant
+// racine. On vérifie donc que la forme correspond à la valeur par défaut :
+// liste attendue → liste reçue, objet attendu → objet reçu. Sinon, la valeur
+// par défaut (et on le dit dans la console, pour pouvoir enquêter).
+const load = (k,d) => {
+  try {
+    const v = localStorage.getItem(k); if (!v) return d;
+    const p = JSON.parse(v);
+    if (Array.isArray(d) && !Array.isArray(p)) throw new Error('liste attendue');
+    if (d && typeof d === 'object' && !Array.isArray(d) && (p === null || typeof p !== 'object' || Array.isArray(p))) throw new Error('objet attendu');
+    return p;
+  } catch (e) {
+    try { if (localStorage.getItem(k)) console.warn('[VRM] clé ignorée (forme inattendue) :', k, String(e && e.message || e)); } catch (_) {}
+    return d;
+  }
+};
 // Drapeau « imprimer tous les bordereaux » posé par un deep-link (?print=bord),
 // consommé une fois par l'écran Bordereaux quand les données sont chargées.
 // Sert au bouton « Tout imprimer (dans l'app) » du panneau d'extension.
@@ -837,12 +860,24 @@ const deleteVintedAccount = async (vintedUserId, login) => {
       method: 'DELETE',
       headers: sbAuth({ Prefer: 'return=minimal' }),
     });
-    // 3. ses données moissonnées (annonces, ventes, achats, messages…)
+    // 3. ses données moissonnées (annonces, ventes, achats, messages, coffre)
+    // ⚠️ UN `DELETE` SUR `app_data` NE SUPPRIME RIEN. Vérifié en direct : la clé
+    // publique reçoit **200 avec 0 ligne supprimée** — le droit d'effacer n'est
+    // pas accordé sur cette table. L'ancien code croyait donc nettoyer et
+    // laissait tout en place (mesuré : 46 lignes de comptes supprimés encore en
+    // base, dont 96 annonces de shop_cancale). On VIDE les lignes à la place :
+    // un upsert, lui, passe. La donnée part vraiment, et l'égress avec (§34).
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_*`, {
-        method: 'DELETE', headers: sbAuth({ Prefer: 'return=minimal' }),
-      });
-    } catch (_) { /* best-effort : la ligne `vrm_blocked_accounts` suffit à le masquer */ }
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+      const rows = r.ok ? await r.json() : [];
+      if (rows.length) {
+        await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+          method: 'POST',
+          headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+          body: JSON.stringify(rows.map(x => withOwner({ id: x.id, data: { supprime: true, uid, purgedAt: new Date().toISOString() } }))),
+        });
+      }
+    } catch (_) { /* le compte est de toute façon écarté par `accountUids` */ }
     return res.ok;
   } catch (_) { return false; }
 };
@@ -1038,17 +1073,129 @@ const fetchEmailTracking = async () => {
 // Solde BLOQUÉ (escrow) de chaque porte-monnaie Vinted, capté par l'extension
 // (lignes harvest_*_billing quand tu ouvres ton porte-monnaie). On somme sur
 // tous les comptes. total=0/accounts=0 si aucun porte-monnaie n'a été capté.
-const fetchWalletEscrow = async () => {
+const fetchWalletEscrow = async (uidsVivants) => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return { total: 0, accounts: 0 };
+    if (!res.ok) return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null };
     const rows = await res.json();
-    let total = 0, accounts = 0;
-    for (const r of rows) { const p = (r.data || {}).payload || {}; const e = p.escrow && p.escrow.amount; if (e != null) { const n = parseFloat(e); if (!isNaN(n)) { total += n; accounts++; } } }
-    return { total, accounts };
-  } catch (_) { return { total: 0, accounts: 0 }; }
+    let total = 0, accounts = 0, plusVieux = 0, dispo = 0;
+    const avecSolde = new Set();   // uid des porte-monnaie RÉELLEMENT lus
+    const parCompte = [];          // le DÉTAIL, compte par compte (Julien veut voir le décompte)
+    // ⚠️ TROIS FORMES DIFFÉRENTES en base, vérifiées sur les 8 lignes réelles :
+    // le porte-monnaie classique `{main, escrow}` (5 lignes), la réponse de
+    // `payouts` `{balance, history, reference}` ajoutée en 4.26 (2 lignes, dont
+    // une à 114,36 €) — qu'on ne lisait PAS, donc de l'argent invisible — et une
+    // réponse qui n'a rien à voir (`minimum_price`, rangée là par erreur) qu'il
+    // faut ignorer plutôt que compter pour zéro.
+    for (const r of rows) {
+      // ⚠️ UN COMPTE SUPPRIMÉ N'A PLUS D'ARGENT CHEZ TOI. Mesuré : le total
+      // affiché (561,23 €) comptait 57,23 € appartenant à shop_cancale, effacé
+      // depuis 16 jours. Même règle que partout ailleurs (§5.20) : un compte
+      // existe s'il a des jetons. Sans liste de comptes (appel au démarrage),
+      // on ne filtre rien plutôt que de tout jeter.
+      const uid = String((/harvest_(\d+)_billing$/.exec(String(r.id || '')) || [])[1] || '');
+      if (uidsVivants && uidsVivants.size && uid && !uidsVivants.has(uid)) continue;
+      const p = (r.data || {}).payload || {};
+      // ⚠️⚠️ « EN ATTENTE » ET « DISPONIBLE », CE N'EST PAS LA MÊME CHOSE.
+      // Les deux formes de porte-monnaie portent les DEUX montants :
+      //   forme solde    : `main`    = disponible · `escrow`          = EN ATTENTE
+      //   forme versement: `balance` = disponible · `pending_balance` = EN ATTENTE
+      // L'app lisait `escrow` **ou `balance`** (§5.14) — donc, dès qu'un compte
+      // était capté par `payouts`, elle comptait son argent DISPONIBLE dans le
+      // total « en attente ». Plainte de Julien, vérifiée en base : les deux
+      // champs existent côte à côte (`balance` 0 € / `pending_balance` 0 € /
+      // `previous_balance` 54 €). On ne mélange plus jamais les deux.
+      const val = (o) => (o && o.amount != null) ? parseFloat(o.amount) : NaN;
+      const attente = !isNaN(val(p.escrow)) ? val(p.escrow) : val(p.pending_balance);
+      const dispoN  = !isNaN(val(p.main))   ? val(p.main)   : val(p.balance);
+      if (isNaN(attente) && isNaN(dispoN)) continue;    // pas un porte-monnaie
+      const n = isNaN(attente) ? NaN : attente;
+      if (!isNaN(dispoN)) dispo += dispoN;
+      if (uid) avecSolde.add(uid);
+      // Chaque ligne du décompte, avec SA fraîcheur et SON format : sans ça on
+      // ne peut pas expliquer d'où sort le total, ni pourquoi un compte pèse 0.
+      const tCap = Date.parse((r.data || {}).capturedAt || 0) || 0;
+      parCompte.push({
+        uid,
+        attente: isNaN(attente) ? null : attente,
+        dispo: isNaN(dispoN) ? null : dispoN,
+        jours: tCap ? Math.floor((Date.now() - tCap) / 86400000) : null,
+        format: (p.escrow || p.main) ? 'solde' : 'versements',
+      });
+      if (!isNaN(n)) {
+        total += n; accounts++;
+        // L'argent bouge. Un solde lu il y a cinq jours n'est pas « le montant
+        // d'aujourd'hui » : on retient l'âge du plus ancien pour le DIRE.
+        const t = Date.parse((r.data || {}).capturedAt || 0);
+        if (t) { const j = (Date.now() - t) / 86400000; if (j > plusVieux) plusVieux = j; }
+      }
+    }
+    parCompte.sort((x, y) => (y.attente || 0) - (x.attente || 0));
+    return { total, dispo, accounts, avecSolde, parCompte, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
+  } catch (_) { return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null }; }
+};
+// OÙ DÉPOSER SES COLIS — la liste des points relais autour de chez toi, avec
+// leur adresse, leur distance et leurs horaires, captée par l'extension quand
+// Vinted la charge (`/api/v2/shipments/{id}/nearby_drop_off_points`).
+// ⚠️ NE PAS CONFONDRE avec le point relais où RETIRER un achat (§16, toujours
+// ouvert, la donnée n'est que dans les emails) : ici c'est le DÉPÔT, l'endroit
+// où tu portes le carton. Ce sont deux choses différentes.
+// ⚠️ ÉGRESS (§34) : chaque ligne pèse ~30 Ko. On lit donc d'abord les dates en
+// SCALAIRE (quelques octets) et on ne télécharge le contenu que de 4 lignes,
+// UNE PAR COMPTE. Le transporteur est attaché au compte (mesuré : 3 comptes en
+// Mondial Relay, 3 en Shop2Shop) — se limiter aux 3 plus récentes faisait donc
+// disparaître un transporteur sur deux, et avec lui les points où Julien dépose
+// réellement la moitié de ses colis.
+const fetchDropOffPoints = async (uidsVivants) => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,cap:data->>capturedAt`, { headers: sbAuth() });
+    if (!res.ok) return { carriers: [], capturedAt: null };
+    let metas = await res.json();
+    const vus = new Set();
+    metas = metas.filter(m => {
+      const uid = String((/harvest_(\d+)_pickup_points$/.exec(String(m.id || '')) || [])[1] || '');
+      // Même règle que partout : un compte existe s'il a des jetons (§5.20).
+      return !(uidsVivants && uidsVivants.size && uid && !uidsVivants.has(uid));
+    }).sort((a, b) => Date.parse(b.cap || 0) - Date.parse(a.cap || 0))
+      .filter(m => { const uid = String((/harvest_(\d+)_/.exec(String(m.id || '')) || [])[1] || ''); if (vus.has(uid)) return false; vus.add(uid); return true; })
+      .slice(0, 4);
+    if (!metas.length) return { carriers: [], capturedAt: null };
+    const ids = metas.map(m => `"${m.id}"`).join(',');
+    const r2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids})&select=id,data`, { headers: sbAuth() });
+    if (!r2.ok) return { carriers: [], capturedAt: null };
+    const rows = await r2.json();
+    const parCarrier = new Map();
+    let recent = 0;
+    for (const row of rows) {
+      const d = row.data || {};
+      const bloc = ((d.payload || {}).nearby_drop_off_points) || {};
+      const nom = (bloc.carrier && bloc.carrier.name) || '';
+      const pts = Array.isArray(bloc.drop_off_points) ? bloc.drop_off_points : [];
+      if (!nom || !pts.length) continue;                 // rien à montrer : on n'invente pas
+      const t = Date.parse(d.capturedAt || 0); if (t > recent) recent = t;
+      const dedup = parCarrier.get(nom) || { carrier: nom, icon: (bloc.carrier || {}).icon_url || '', points: new Map() };
+      for (const p of pts) {
+        if (!p || !p.code || dedup.points.has(p.code)) continue;
+        dedup.points.set(p.code, {
+          code: p.code,
+          nom: p.name || '',
+          adresse: p.drop_off_point_address || '',
+          km: typeof p.distance === 'number' ? p.distance : null,
+          unite: p.distance_unit || 'km',
+          ouverture: (p.opening_status && p.opening_status.text) || '',
+          lat: p.latitude || '', lon: p.longitude || '',
+        });
+      }
+      parCarrier.set(nom, dedup);
+    }
+    const carriers = [...parCarrier.values()].map(c => ({
+      carrier: c.carrier, icon: c.icon,
+      points: [...c.points.values()].sort((a, b) => (a.km == null ? 1e9 : a.km) - (b.km == null ? 1e9 : b.km)),
+    })).filter(c => c.points.length);
+    return { carriers, capturedAt: recent || null };
+  } catch (_) { return { carriers: [], capturedAt: null }; }
 };
 // Factures Pro préparées par le serveur (lignes email_invoice_*) :
 // { number, status: draft|queued|sent, designation, prix, buyerName,
@@ -1749,11 +1896,28 @@ const classifyOrderStatus = (status) => {
 // « expédié / en transit / livré / finalisé ». Le reste (payé, en attente
 // d'expédition, en préparation…) = à expédier. Statut inconnu -> on montre quand
 // même (mieux vaut proposer que cacher à tort).
+// ⚠️ CES DEUX TESTS SONT LA RÉFÉRENCE, ET ILS VIVENT ICI (niveau module) :
+// l'app, le widget et l'extension doivent répondre la même chose à « faut-il
+// expédier ? » et « le colis attend-il au relais ? ». Ils étaient définis à
+// l'intérieur d'un composant, donc invisibles pour `needsBordereau` juste
+// en dessous — d'où le désaccord corrigé ci-après.
+const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+
 const needsBordereau = (status) => {
   const s = (status || '').toLowerCase();
   if (!s) return true;
   if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
   if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
+  // ⚠️ « BORDEREAU ENVOYÉ AU VENDEUR » N'EST PAS UN COLIS PARTI. Le test
+  // « déjà expédié » ci-dessous attrape le mot « envoyé » — donc au moment
+  // EXACT où Vinted te donne l'étiquette, l'app répondait « plus besoin de
+  // bordereau ». Deux conséquences mesurées : le numéro de cette paire
+  // retombait dans le pool alors que le carton est encore sur l'étagère
+  // (deux paires dans la même boîte, §19), et le même statut valait
+  // « à expédier » ailleurs dans l'app. La vente qui attend TON envoi passe
+  // donc en premier.
+  if (isAwaitingShipStatus(s)) return true;
   if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
   return true;                                                              // à expédier
 };
@@ -1957,15 +2121,45 @@ const normalizeConversationMessages = (conversation) => {
 // sur cette page. Aucune écriture ne passe par un serveur → zéro risque de ban.
 // Si l'extension n'est pas là (mobile, pas Chrome…), vmrExtPresent() est faux et
 // l'app propose le repli « répondre sur Vinted ».
-let __vmrExtReady = false;
+let __vmrExtReady = false, __vmrExtVersion = '';
+// Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
+// la détection est asynchrone, un composant déjà affiché doit se redessiner.
+const __vmrExtSubs = new Set();
+const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delete(fn); };
 if (typeof window !== 'undefined') {
   try {
-    window.addEventListener('message', (e) => { if (e.source === window && e.data && e.data.__vmr === 'ready') __vmrExtReady = true; });
+    window.addEventListener('message', (e) => {
+      if (e.source !== window || !e.data || e.data.__vmr !== 'ready') return;
+      __vmrExtReady = true;
+      if (e.data.version) __vmrExtVersion = String(e.data.version);
+      __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+    });
     window.postMessage({ __vmr: 'ping' }, '*');
-    setTimeout(() => { try { window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {} }, 1500);
+    // ⚠️ L'extension injecte bridge.js à `document_idle` : un seul ping au
+    // chargement du module tombe souvent AVANT qu'il existe, et l'app conclut
+    // « pas d'extension » définitivement. On redemande quelques fois.
+    [600, 1500, 3000, 6000].forEach(ms => setTimeout(() => {
+      try { if (!__vmrExtReady) window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
+    }, ms));
   } catch (_) {}
 }
 const vmrExtPresent = () => __vmrExtReady;
+const vmrExtVersion = () => __vmrExtVersion;
+// Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
+// (c'est le but) : elle le lui demande par le pont. Renvoie null si l'extension
+// n'est pas là ou ne répond pas — jamais une supposition.
+function vmrAuthEtat(timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
+    const reqId = 'a' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let done = false;
+    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'authEtat:result' && e.data.reqId === reqId) fin(e.data.etat || null); };
+    window.addEventListener('message', onMsg);
+    setTimeout(() => fin(null), timeoutMs);
+    try { window.postMessage({ __vmr: 'authEtat', reqId }, '*'); } catch (_) { fin(null); }
+  });
+}
 function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
@@ -2018,7 +2212,13 @@ const mapWardrobeItem = (it) => ({
   // Qualité d'annonce (défensif : selon ce que la penderie renvoie). Nb de photos
   // et longueur de description — null si Vinted ne le fournit pas (on ne signale
   // alors rien, pour éviter les faux positifs).
-  photoCount: Array.isArray(it.photos) ? it.photos.length : (it.photo ? 1 : null),
+  // ⚠️ `it.nPhotos` D'ABORD. L'allègement de la moisson (§23) ne garde qu'une
+  // photo par annonce : sans ce compteur, TOUTES les annonces moissonnées
+  // ressortaient à « 1 seule photo » — 15 points retirés à chacune dans la note
+  // d'annonce, et le conseil « ajoute des photos » servi à des annonces qui en
+  // ont six. L'extension pose maintenant le vrai nombre.
+  photoCount: Number.isFinite(it.nPhotos) ? it.nPhotos
+            : (Array.isArray(it.photos) ? it.photos.length : (it.photo ? 1 : null)),
   descLen: typeof it.description === 'string' ? it.description.trim().length : null,
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
@@ -2327,6 +2527,30 @@ function extractSize(text){
   if(m) return grab(m);
   m=t.match(/(?:^|[^0-9.])(3[4-9]|4[0-9]|5[0-2])(?:\.5)?(?:[^0-9]|$)/);
   return grab(m);
+}
+// ── LE MODÈLE (pas seulement la marque) ──────────────────────────────────────
+// ⚠️ Mesuré sur les vraies données : « même marque + même taille » suffisait à
+// remonter UN SEUL candidat pour 5 annonces… dont **2 faux** (un « nike p-6000
+// taille 40 » relié à des « Nike speakers maat 40 », un « zoom fly 5 taille 47 »
+// relié à une « Air Max 1 taille 47 »). « nike » + « 40 » désigne des centaines
+// de paires : ça ne suffit pas à trancher, et un mauvais prix d'achat fausse le
+// bénéfice en silence — c'est pire que pas de prix du tout.
+// Avec le modèle exigé, les rapprochements uniques deviennent **4 sur 4 justes**.
+const KNOWN_MODELS = [
+  'zoom fly','p-6000','p6000','p 6000','air max 95','air max 97','air max 1','air max 90','air max',
+  'air force','pegasus','vaporfly','alphafly','dunk','blazer','cortez',
+  'spezial','samba','gazelle','campus','handball','superstar','stan smith','forum','sl 72',
+  'gel-resolution','gel resolution','gel-nimbus','gel nimbus','gel-kayano','gel kayano','gel-lyte','gel lyte',
+  'fuelcell','xt-6','xt 6','speedcross','medalist','mexico 66','california','old skool','chuck',
+];
+function extractModel(text){
+  if(!text) return null;
+  const t=String(text).toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+  // On rend le PLUS LONG modèle reconnu : « air max 95 » doit gagner sur « air max ».
+  let best=null;
+  for(const m of KNOWN_MODELS){ const k=m.replace(/[^a-z0-9]+/g,' ').trim();
+    if(t.includes(k) && (!best || k.length>best.length)) best=k; }
+  return best;
 }
 const COUNTRY_MAP_DATA=[
   [['france'],'France'],[['allemagne','deutschland','germany'],'Allemagne'],
@@ -3229,7 +3453,12 @@ function AuthScreen() {
             {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
           </div>
           <div style={{fontSize:12.5,color:C.muted,marginBottom:16,lineHeight:1.45}}>
-            {mode==='up' ? 'Tes données (annonces, garage, compta) ne seront visibles que par toi.'
+            {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
+                sans la colonne `owner` (§12), un compte créé ici tombe dans les
+                MÊMES données que le vendeur existant. Le dire avant, pas après. */}
+            {mode==='up' ? (CLOISONNE
+              ? 'Tes données (annonces, garage, compta) ne seront visibles que par toi.'
+              : 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.')
              : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
              : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
              : 'Retrouve ta boutique, tes numéros et ta compta.'}
@@ -3377,8 +3606,14 @@ function AuthScreen() {
 // le nouvel utilisateur en 3 étapes (installer l'extension, se connecter sur
 // Vinted, revenir). Disparaît d'elle-même dès qu'un compte est capté.
 function Onboarding({ setTab }) {
+  // L'étape 1 se VÉRIFIE : l'extension se signale à l'app (bridge.js). Cocher
+  // « fait » soi-même n'apprend rien ; savoir qu'elle répond, si.
+  const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
   const steps = [
-    { n:1, t:'Installe l\'extension Chrome', d:'« Shop Cancale35 – Vinted Sync » (mode développeur). Elle synchronise tes données Vinted en toute discrétion, sans jamais toucher à ton mot de passe.' },
+    { n:1, t:'Installe l\'extension Chrome', ok: ext.on,
+      d: ext.on ? `Elle répond sur cette page${ext.v ? ` (version ${ext.v})` : ''} — étape faite.`
+                : '« Shop Cancale35 – Vinted Sync » (mode développeur). Elle synchronise tes données Vinted en toute discrétion, sans jamais toucher à ton mot de passe. Sur téléphone, il n\'y a pas d\'extension : installe-la sur l\'ordinateur.' },
     { n:2, t:'Connecte-toi sur vinted.fr', d:'Ouvre ta boutique une fois, connecté. L\'extension capte automatiquement ton compte et tes annonces — aucune manip supplémentaire.' },
     { n:3, t:'Reviens ici', d:'Tes annonces, ventes, achats et messages apparaissent tout seuls. Mets un numéro sur chaque paire pour la retrouver au garage et sur le bordereau.' },
   ];
@@ -3395,7 +3630,7 @@ function Onboarding({ setTab }) {
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           {steps.map(s=>(
             <div key={s.n} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
-              <div style={{flexShrink:0,width:32,height:32,borderRadius:999,background:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>{s.n}</div>
+              <div style={{flexShrink:0,width:32,height:32,borderRadius:999,background:s.ok?INV_STATUS.online.color:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>{s.ok?'✓':s.n}</div>
               <div style={{minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text}}>{s.t}</div>
                 <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>{s.d}</div>
@@ -7102,11 +7337,22 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // Cohérence garage ↔ paires numérotées (annonces). Chargé depuis la même
   // source que l'onglet Comptes (clé vinted_annonce_numeros).
   const pairNumeros=useMemo(()=>load('vinted_annonce_numeros',{}),[]);
+  // ⚠️ Seules les paires qui EXISTENT ENCORE ont une place à occuper. La photo
+  // `vinted_nums_physiques` est publiée par l'écran Annonces (annonce en ligne
+  // ou vente pas encore expédiée). Sans elle (écran jamais ouvert sur cet
+  // appareil), on garde l'ancien comportement plutôt que de masquer à tort.
+  const numsPhysiques=useMemo(()=>{
+    const p=load('vinted_nums_physiques', null);
+    if(!p || !Array.isArray(p.nums) || !p.nums.length) return null;
+    return new Set(p.nums.map(x=>String(x).trim().toLowerCase()));
+  },[]);
   const numberedSet=useMemo(()=>{
     const s=new Set();
-    Object.values(pairNumeros).forEach(e=>{ const t=String((e&&e.numero)||'').trim().toLowerCase(); if(t) s.add(t); });
+    Object.values(pairNumeros).forEach(e=>{ const t=String((e&&e.numero)||'').trim().toLowerCase(); if(!t) return;
+      if(numsPhysiques && !numsPhysiques.has(t)) return;   // paire partie : sa boîte est libre
+      s.add(t); });
     return s;
-  },[pairNumeros]);
+  },[pairNumeros,numsPhysiques]);
   // Numérotées (paires connues) mais absentes du garage → à ranger.
   const numberedNotStored=useMemo(()=>Array.from(numberedSet).filter(n=>!allValsSet.has(n)).sort((a,b)=>(+a||0)-(+b||0)),[numberedSet,allValsSet]);
   // Au garage mais numéro inconnu (aucune paire numérotée) → doute/typo/ancien.
@@ -7838,21 +8084,25 @@ function VintedAccounts({ accounts, setAccounts }) {
   // compte est bloqué/fermé définitivement. On garde son étiquette au cas où.
   const [removing, setRemoving] = useState(null);
   const disconnectAccount = async (acc) => {
-    if (!await askConfirm(`Déconnecter « ${accountName(acc)} » de l'application ?\n\nSes tokens seront supprimés. Un compte encore actif dans Chrome pourra revenir au prochain passage sur Vinted ; un compte bloqué ne reviendra pas.`)) return;
-    // TON CHOIX : ses ventes passées comptent-elles encore dans ton chiffre
-    // d'affaires ? (C'est bien de l'argent que tu as gagné — mais tu peux
-    // vouloir sortir un compte bloqué de tes stats.) Mémorisé par pseudo, car
-    // c'est ce que portent les emails de vente.
+    if (!await askConfirm({
+      title: `Supprimer « ${accountName(acc)} » ?`,
+      // On dit exactement ce qui part, et ce qui reste. « Déconnecter » laissait
+      // croire à un simple débranchement — Julien veut choisir ses comptes et
+      // supprimer les autres pour de bon.
+      desc: "Ses jetons, ses annonces, ses ventes et ses achats captés sont effacés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). Son chiffre d'affaires passé reste dans tes statistiques — c'est de l'argent réellement gagné. Tes numéros de garage et tes factures ne bougent pas. Réversible depuis « Tout réafficher ».",
+      ok: 'Supprimer', cancel: 'Garder', danger: true,
+    })) return;
+    // ⚠️ UNE SEULE QUESTION. Une deuxième feuille s'ouvrait juste après la
+    // première (« garder son chiffre d'affaires passé ? ») : deux boîtes à la
+    // suite pour un seul geste, et surtout — mesuré au banc — tant qu'on n'y
+    // répondait pas, LA SUPPRESSION NE PARTAIT PAS. On garde le comportement
+    // sensé par défaut : ses ventes passées restent dans le chiffre d'affaires,
+    // parce que c'est de l'argent réellement gagné. Ça ne se devine pas, c'est
+    // écrit dans la confirmation ci-dessus.
     const login = String(acc.login || '').trim().toLowerCase();
     if (login) {
-      const keep = await askConfirm(
-        `Garder le chiffre d'affaires passé de « ${accountName(acc)} » dans tes statistiques ?\n\n` +
-        `OK = OUI, ses ventes continuent d'être comptées (c'est de l'argent réellement gagné).\n` +
-        `Annuler = NON, on le sort complètement des stats.`
-      );
       const cur = (load('vinted_ca_keep_removed', []) || []).map(String);
-      const next = keep ? [...new Set([...cur, login])] : cur.filter(x => x !== login);
-      save('vinted_ca_keep_removed', next);
+      save('vinted_ca_keep_removed', [...new Set([...cur, login])]);
     }
     // ⚠️ On MASQUE aussi le compte de façon permanente (vinted_accounts_hidden,
     // clé synchronisée). Supprimer la ligne Supabase ne suffit pas : un compte
@@ -7861,12 +8111,16 @@ function VintedAccounts({ accounts, setAccounts }) {
     // de Julien : « je l'ai supprimé mais il est toujours là »). Le masque, lui,
     // survit à la re-capture (il est posé sur l'uid, pas sur la ligne du compte)
     // → annonces ET stats l'excluent pour de bon (skipAcc / acctOff).
-    const uid = String(acc.vinted_user_id);
-    setHiddenAccts(prev => { const n = new Set(prev); n.add(uid); save('vinted_accounts_hidden', [...n]); return n; });
+    // ⚠️ ON NE MASQUE PLUS EN PLUS DE SUPPRIMER. `deleteVintedAccount` inscrit
+    // désormais le compte dans `vrm_blocked_accounts` (l'extension refuse de le
+    // recapter) ET vide ses lignes moissonnées. Ajouter en prime son uid à
+    // `vinted_accounts_hidden` — une clé SYNCHRONISÉE — le faisait apparaître
+    // « masqué » sur tous les appareils alors qu'il était supprimé : c'est la
+    // moitié de la confusion « mes comptes sont tous masqués » (§5.09/§5.10).
     setRemoving(acc.vinted_user_id);
     const ok = await deleteVintedAccount(acc.vinted_user_id, acc.login);
     setRemoving(null);
-    if (!ok) { toast('Retiré des annonces et des stats. (La ligne du compte reviendra peut-être, mais il restera masqué partout.)'); }
+    toast(ok ? `« ${accountName(acc)} » supprimé.` : 'Échec de la suppression — réessaie.');
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
   };
 
@@ -8056,9 +8310,9 @@ function VintedAccounts({ accounts, setAccounts }) {
                   <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
-                  <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Retirer ce compte de l'application"
+                  <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Supprimer ce compte : jetons + annonces + ventes captées effacés, et l'extension ne le recaptera plus"
                     style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger,opacity:removing===acc.vinted_user_id?0.5:1}}>
-                    {removing===acc.vinted_user_id ? '…' : 'Déconnecter'}
+                    {removing===acc.vinted_user_id ? '…' : '🗑 Supprimer ce compte'}
                   </button>
                 </div>
               </div>
@@ -9042,6 +9296,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
   // Comptes entiers exclus de la compta (par vinted_user_id).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
+  // Comptes masqués/rallumés DEPUIS LE PANNEAU de l'extension (ligne dédiée
+  // `panel_accounts_off`, qu'elle est seule à écrire — on la lit, on n'y touche
+  // jamais : §35, pas de clobber croisé).
+  const [panelAcctOff, setPanelAcctOff] = useState({});
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const j = await r.json();
+      const d = (j[0] && j[0].data) || {};
+      if (d && typeof d === 'object') setPanelAcctOff(d);
+    } catch (_) {}
+  })(); }, []);
   // Masquer/afficher un compte partout (annonces + compta) depuis l'onglet Annonces.
   // ⚠️ MASQUER UN COMPTE SE DEMANDE, LE RÉAFFICHER NON.
   // Ces puces ressemblent à des filtres, mais un simple tap RETIRE le compte de
@@ -9131,7 +9398,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // d'afficher un compte déconnecté, et le bandeau de stats des Annonces
   // comptait des annonces que la grille en dessous n'affichait pas.
   // Tout passe désormais par ces deux fonctions.
-  const acctOff = (uid) => { const k = String(uid ?? ''); return hiddenAccts.has(k) || blockedAccts.has(k); };
+  // ⚠️ LE PANNEAU DE L'EXTENSION A SA PROPRE LISTE, ET L'APP L'IGNORAIT.
+  // « ✕ Masquer » depuis le panneau écrit `panel_accounts_off` (ligne dédiée,
+  // §35) : le compte disparaissait du panneau et restait dans l'app. Le sens
+  // inverse marchait déjà (l'extension lit `vinted_accounts_hidden`), donc le
+  // masquage ne tenait que dans un sens. On lit la même liste, avec le même
+  // trois-états : `false` = réactivé exprès depuis le panneau, ça prime.
+  const acctOff = (uid) => {
+    const k = String(uid ?? '');
+    if (panelAcctOff[k] === false) return false;      // rallumé depuis le panneau
+    return hiddenAccts.has(k) || blockedAccts.has(k) || panelAcctOff[k] === true;
+  };
+  // ── LES COMPTES QUI EXISTENT VRAIMENT ────────────────────────────────────
+  // Un compte existe s'il a des jetons (ligne `vinted_accounts`), pas parce
+  // qu'il reste des données à son nom. Sans cette liste, une annonce rattachée
+  // à un compte supprimé passait tous les filtres : `acctOff('')` répond
+  // « non masqué », donc elle s'affichait alors que son compte n'apparaît même
+  // plus dans la liste des comptes. Même règle que l'extension (§5.20).
+  // ⚠️ Déclaré ICI, avant tout ce qui l'utilise (piège TDZ, §19).
+  const accountUids = useMemo(
+    () => new Set((accounts || []).map(a => String(a.vinted_user_id || '')).filter(Boolean)),
+    [accounts]);
   const acctOffOf = (o) => acctOff(o?._acc?.vinted_user_id);
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = (tid) => {
@@ -9210,12 +9497,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // prix payé est inférieur au prix de vente. À défaut, on garde la date.
     const marqueRef = (extractBrand(item?.title) || '').toLowerCase();
     const tailleRef = String(extractSize(item?.title) || '').toLowerCase();
+    const modeleRef = extractModel(item?.title);
     const prixVente = Number(item?.price?.amount ?? item?.price ?? 0) || 0;
     const score = (o) => {
       let pts = 0;
       const t = o.title || '';
       if (marqueRef && (extractBrand(t) || '').toLowerCase() === marqueRef) pts += 4;
       if (tailleRef && String(extractSize(t) || '').toLowerCase() === tailleRef) pts += 4;
+      // ⚠️ LE MODÈLE TRANCHE. Même modèle = le signal le plus fort après le
+      // titre exact ; modèles reconnus mais DIFFÉRENTS = on écarte franchement
+      // (c'est ce qui reliait un p-6000 à des « Nike speakers »).
+      const mo = extractModel(t);
+      if (modeleRef && mo === modeleRef) pts += 5;
+      else if (modeleRef && mo && mo !== modeleRef) pts -= 6;
       const pa = Number(o.price?.amount);
       if (!isNaN(pa) && prixVente > 0 && pa > 0 && pa < prixVente) pts += 1; // un achat coûte moins cher que la revente
       if (normTitle(t) === normTitle(item?.title || '')) pts += 6;            // titre identique : quasi sûr
@@ -9245,8 +9539,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Statut Vinted PRÉCIS = source de vérité automatique (Vinted le met à jour tout
   // seul quand tu expédies / récupères). Utilisé pour « à retirer » et « à expédier ».
-  const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');       // achat prêt à retirer
-  const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || ''); // vente à expédier
+  // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
   // Colis marqués « récupéré » À LA MAIN (par transaction) : disparaissent de « à
@@ -9321,7 +9614,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { emailList, extra, total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, vintedToPickup]);
-  const vintedToShip = useMemo(() => (sales.items || []).filter(o => !isHidden(o) && isAwaitingShipStatus(o.status)),
+  // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
+  // à poster (seule une vente masquée à la main sort de la liste).
+  const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
   const soldByTxn = useMemo(() => { const m = {}; (sales.items || []).forEach(o => { if (o.transaction_id != null) m[String(o.transaction_id)] = o; }); return m; }, [sales.items]);
@@ -9339,7 +9634,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const bordShipped = (b) => {
     if (b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) return true; // colis déjà dans le réseau transporteur
     const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null;
-    return !!o && /exp[ée]di|achemin|livr[ée]|finalis|d[ée]pos[ée]|termin/i.test(o.status || '');
+    if (!o) return false;                              // vente inconnue : on ne conclut pas
+    // ⚠️ LA BONNE QUESTION EST « CETTE VENTE ATTEND-ELLE ENCORE MON ENVOI ? »,
+    // pas « son statut ressemble-t-il à un colis parti ». L'ancienne liste
+    // positive (`expédié|acheminé|livré|finalisé|déposé|terminé`) laissait
+    // traîner tout le reste : mesuré sur les 72 bordereaux réels, **4 restaient
+    // à imprimer** alors que la paire ne partira jamais — 2 « Remboursement
+    // effectué » et 2 « Transaction suspendue ». On réutilise la référence
+    // unique `isAwaitingShipStatus` (§5.15) : tout ce qui n'attend plus mon
+    // envoi sort de la liste. 64 → 68 bordereaux correctement classés.
+    return !isAwaitingShipStatus(o.status || '');
   };
   // Expédié À LA MAIN (quand le statut Vinted est en retard, ex. tu as posté
   // aujourd'hui mais Vinted dit encore « bordereau envoyé »).
@@ -9558,6 +9862,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [usedNumeros, numeros, saleOv, freedNums, listings.items, garageNums]);
   const nextNumero = useMemo(() => { let n=1; while(takenNums.has(n)) n++; return n; }, [takenNums]);
 
+  // ── LES PAIRES QUI EXISTENT VRAIMENT (pour le Garage) ───────────────────────
+  // ⚠️ Le Garage listait « à ranger » TOUTES les entrées de vinted_annonce_numeros
+  // — 176 boîtes pour 15 paires réellement en stock, dont l'écrasante majorité
+  // sont vendues et parties depuis longtemps. Un panneau qu'on ne peut pas
+  // vider n'est plus une alerte, c'est du décor.
+  // Une paire occupe une place tant que : son annonce est EN LIGNE, ou sa vente
+  // n'est pas encore expédiée (le carton est encore à la maison). Exactement la
+  // règle de `freedNums` ci-dessus — on la PUBLIE au lieu de la refaire ailleurs
+  // (§11 : une seule règle par notion). Clé LOCALE (pas dans SYNC_KEYS) : c'est
+  // une photo recalculable, elle n'a rien à faire dans le nuage.
+  useEffect(() => {
+    if (!listings.items || !listings.items.length) return;   // rien de sûr à publier
+    if (!sales.items) return;
+    const vivants = new Set();
+    for (const it of listings.items) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    for (const o of (sales.items || [])) {
+      if (!needsBordereau(o.status)) continue;
+      const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
+    }
+    const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
+    try {
+      const avant = load('vinted_nums_physiques', null);
+      const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i]);
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, at: Date.now() });
+    } catch (_) {}
+  }, [listings.items, sales.items, numeros, saleOv]);
+
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
   // dans les Ventes les prix saisis dans Annonces, même après vente/republication.
@@ -9753,10 +10084,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, numeros, accounts, hiddenAccts, blockedAccts]);
 
-  const annBase = useMemo(
-    () => (listings.items || []).filter(it => !acctOffOf(it) && !soldManual.has(String(it.id)) && (showEmailSold || !emailSoldIds.has(String(it.id)))),
+  // ⚠️ UNE PAIRE VENDUE QUI TRAÎNE ENCORE « EN LIGNE ».
+  // Vinted laisse parfois l'annonce avec `is_closed:false` après la vente. Le
+  // panneau de l'extension la retirait déjà (vente de moins de 60 jours dont le
+  // titre est UNIQUE parmi les annonces en ligne) — pas l'app : les deux outils
+  // n'affichaient donc pas le même nombre d'annonces en ligne. Même règle des
+  // deux côtés, avec la même garde : un titre en double ne retire JAMAIS rien
+  // (§24 — sinon on effacerait une paire identique réellement encore en vente).
+  const venduesRecentes = useMemo(() => {
+    const titres = new Set();
+    for (const o of (sales.items || [])) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;   // retour/remboursement : la paire revient
+      const ts = o.date ? Date.parse(o.date) : NaN;
+      if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
+      const k = normTitle(o.title); if (k) titres.add(k);
+    }
+    return titres;
+  }, [sales.items]);
+  const annBase = useMemo(() => {
+    const items = (listings.items || []);
+    const nParTitre = {};
+    for (const it of items) { const k = normTitle(it.title); if (k) nParTitre[k] = (nParTitre[k] || 0) + 1; }
+    return items.filter(it => {
+      // ⚠️ UNE ANNONCE DOIT VENIR D'UN COMPTE QUI EXISTE ENCORE. `acctOffOf`
+      // teste `_acc.vinted_user_id` : quand ce compte a été supprimé, l'annonce
+      // portait un compte introuvable, `acctOff('')` répondait « non masqué »
+      // et elle restait affichée — une paire d'un compte qui ne figure même
+      // plus dans la liste des comptes. Même règle que l'extension (§5.20) :
+      // un compte existe s'il a des jetons, pas parce qu'il reste des données.
+      const uidIt = String((it && it._acc && it._acc.vinted_user_id) || '');
+      if (!uidIt || !accountUids.has(uidIt)) return false;
+      if (acctOffOf(it) || soldManual.has(String(it.id))) return false;
+      if (!showEmailSold && emailSoldIds.has(String(it.id))) return false;
+      const k = normTitle(it.title);
+      if (!showEmailSold && k && nParTitre[k] === 1 && venduesRecentes.has(k)) return false;  // vendue, titre sans ambiguïté
+      return true;
+    });
+  },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts]);
+  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, venduesRecentes, accountUids]);
 
   // ── NUMÉROS EN DOUBLE ─────────────────────────────────────────────────
   // Deux annonces EN LIGNE portant le même numéro = deux paires dans la même
@@ -9803,9 +10169,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     else if (annSort==='views') arr.sort((a,b)=>(b.views??-1)-(a.views??-1));
     else if (annSort==='nonum') arr = arr.filter(it=>!(numeros[it.id]?.numero));
     else if (annSort==='boost') {
-      // « À booster » : les paires qui ont de l'audience mais ne se vendent pas
-      // (beaucoup de vues, peu/pas de favoris) -> candidates à une baisse de prix.
-      arr = arr.filter(it=> it.views!=null && it.views>=20 && (it.favourites??0) <= 1);
+      // « À booster » : de l'audience mais pas de conversion → le prix est trop
+      // haut. ⚠️ RÈGLE IDENTIQUE À CELLE DU PANNEAU DE L'EXTENSION (« à
+      // relancer ») : elle disait `vues≥20 && favoris≤1`, le panneau comparait
+      // le ratio favoris/vues à TA médiane. Deux listes différentes pour la
+      // même question, selon l'outil ouvert. On garde la règle relative — un
+      // seuil absolu ne veut rien dire quand une annonce à 300 vues et 3
+      // favoris convertit deux fois moins bien qu'une à 40 vues et 1 favori.
+      const notes = arr.filter(it => it.views != null && it.views >= 40);
+      if (notes.length >= 5) {
+        const ratios = notes.map(it => (it.favourites || 0) / it.views).sort((a,b)=>a-b);
+        const median = ratios[Math.floor(ratios.length / 2)];
+        const seuil = median * 0.5;
+        arr = notes.filter(it => (it.favourites || 0) / it.views < seuil);
+      } else {
+        // Pas assez d'annonces notées pour une médiane fiable : on retombe sur
+        // le repère simple plutôt que de ne rien proposer.
+        arr = arr.filter(it => it.views != null && it.views >= 20 && (it.favourites ?? 0) <= 1);
+      }
       arr.sort((a,b)=>(b.views??0)-(a.views??0));
     }
     else if (annSort==='sleeping') {
@@ -10843,6 +11224,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
   const [showTreasury, setShowTreasury] = useState(false);
+  const [detailAttente, setDetailAttente] = useState(false); // décompte compte par compte de l'argent en attente
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
   // Le solde réel des porte-monnaie sert AUSSI à la carte « argent en route »
   // de l'écran Ventes, pas seulement à la modale Trésorerie : sans ça la carte
@@ -10851,11 +11233,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     if (walletEscrow !== null) return;
     if (curSub !== 'ventes' && curSub !== 'journee') return;
-    fetchWalletEscrow().then(w => { if (w) setWalletEscrow(w); }).catch(() => {});
+    fetchWalletEscrow(accountUids).then(w => { if (w) setWalletEscrow(w); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub]);
 
-  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow().then(setWalletEscrow); };
+  const openTreasury = () => { setShowTreasury(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); fetchWalletEscrow(accountUids).then(setWalletEscrow); };
+
+  // Points de DÉPÔT des colis (§5.26). Chargés seulement sur l'écran Bordereaux
+  // et une seule fois : les lignes pèsent ~30 Ko, on ne les relit pas à chaque
+  // changement d'onglet (§34).
+  const [dropOffs, setDropOffs] = useState(null);
+  const [dropOpen, setDropOpen] = useState(false);
+  useEffect(() => {
+    // Aussi sur Achats : c'est là qu'on complète l'adresse et les horaires d'un
+    // point de retrait dont l'email ne donne que le nom.
+    if (dropOffs !== null || (curSub !== 'bordereaux' && curSub !== 'achats')) return;
+    fetchDropOffPoints(accountUids).then(d => { if (d) setDropOffs(d); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub]);
 
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
@@ -11104,7 +11499,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const toShip = useMemo(() => {
     const out = [];
     for (const o of (sales.items || [])) {
-      if (isHidden(o)) continue;
+      // ⚠️ UN COLIS À POSTER N'EST PAS UNE PRÉFÉRENCE D'AFFICHAGE. On écarte une
+      // vente masquée À LA MAIN, jamais une vente dont le COMPTE est masqué :
+      // masquer un compte sert à nettoyer la comptabilité, ça ne fait pas
+      // disparaître un carton de l'étagère — et Vinted pénalise le retard.
+      // Mesuré sur les 72 bordereaux réels : 3 attendent l'envoi, mais 2 sont
+      // sur un compte masqué → l'écran Bordereaux en listait 3 et la carte
+      // « à expédier » en annonçait 1. Deux chiffres pour la même obligation.
+      if (hiddenSales.has(String(o.transaction_id))) continue;
       if (!needsBordereau(o.status)) continue;
       // Déjà coché « posté » : ce colis ne fait plus partie du travail du jour.
       // Avant, la carte « Expédier N colis » comptait les colis déjà postés alors
@@ -11522,14 +11924,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // il pouvait donc tamponner LA MAUVAISE PAIRE, sans que rien ne le signale.
   // Sans lien certain on n'invente plus : le bordereau reste « en attente » et
   // le bouton « Relier » permet de trancher. Ne pas le réintroduire.
+  // ⚠️ LA TRANSACTION PASSE AVANT LE NUMÉRO DE L'EMAIL.
+  // Le `numero` d'un `email_bord_*` n'est PAS écrit par Vinted : c'est le
+  // serveur (`findNumeroByTitle`) qui l'a cherché **par titre** dans
+  // `vinted_annonce_numeros` — un magasin qui contient tout l'historique, donc
+  // une paire vendue il y a six mois au même titre peut gagner. Mesuré sur les
+  // 72 bordereaux réels : **1 désaccord** (email N°41 contre transaction N°131,
+  // « nike zoom fly 5 blanc taille 44 ») — c'est-à-dire un bordereau tamponné
+  // avec le numéro d'une AUTRE paire, donc la mauvaise chaussure dans le carton.
+  // Le chemin par la transaction (bordereau → vente moissonnée → annonce
+  // numérotée) est une identité, pas une ressemblance : il passe devant.
+  const numFromTxn = (b) => {
+    if (!b || b.transaction == null) return '';
+    const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
+    if (!so) return '';
+    const e = effEntry(so);
+    return e && e.numero ? String(e.numero) : '';
+  };
   const numForBord = (b) => {
     const man = manualEntry(b); if (man && man.numero) return String(man.numero);
+    const parTxn = numFromTxn(b); if (parTxn) return parTxn;
     if (b.numero) return String(b.numero);
-    if (b.transaction) {
-      const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
-      if (so) { const e = effEntry(so); if (e && e.numero) return String(e.numero); }
-    }
     return '';
+  };
+  // Le numéro de l'email contredit-il celui de la transaction ? On le signale au
+  // lieu de choisir en silence — c'est le seul cas où la paire peut être fausse.
+  const numLitige = (b) => {
+    const parTxn = numFromTxn(b); const parMail = String((b && b.numero) || '').trim();
+    return parTxn && parMail && parTxn !== parMail ? { txn: parTxn, mail: parMail } : null;
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
   // met en avant, en rouge si c'est aujourd'hui/demain ou dépassé, orange à 2 j.
@@ -11722,7 +12144,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2}}>☀️ {hello} Julien</div>
               {!loading && (
                 <div style={{fontSize:13,color:C.muted,marginTop:3}}>
-                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> qui te font avancer aujourd'hui.</> : <>Rien d'urgent — ta boutique tourne. 👌</>}
+                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</> : <>Rien d'urgent — ta boutique tourne. 👌</>}
                 </div>
               )}
             </div>
@@ -11920,20 +12342,81 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const reel = (walletEscrow && walletEscrow.total > 0) ? walletEscrow : null;
           return (
             <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}10`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:11}}>
-                <span style={{fontSize:22}}>💶</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}</div>
-                  <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
+              {/* La carte est CLIQUABLE : Julien veut voir d'où sort le total,
+                  compte par compte — un chiffre agrégé qu'on ne peut pas ouvrir
+                  est invérifiable, donc invendable. */}
+              <button type="button" onClick={()=>setDetailAttente(v=>!v)} aria-expanded={detailAttente} disabled={!reel}
+                style={{width:'100%',border:'none',background:'transparent',padding:0,textAlign:'left',fontFamily:'inherit',cursor:reel?'pointer':'default'}}>
+                <div style={{display:'flex',alignItems:'center',gap:11}}>
+                  <span style={{fontSize:22}}>💶</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}{reel?<span style={{textTransform:'none',letterSpacing:0,fontWeight:600,color:C.accent}}> · {detailAttente?'masquer le détail ▲':'voir le détail ▼'}</span>:null}</div>
+                    <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
+                  </div>
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    <div style={{fontSize:20,fontWeight:700,color:C.text}}>{inRoute.length}</div>
+                    <div style={{fontSize:11,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
+                  </div>
                 </div>
-                <div style={{textAlign:'right',flexShrink:0}}>
-                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{inRoute.length}</div>
-                  <div style={{fontSize:11,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
-                </div>
-              </div>
+              </button>
+              {/* LE DÉCOMPTE : une ligne par compte, avec sa fraîcheur. Les comptes
+                  sans porte-monnaie lu figurent AUSSI, à 0, pour qu'on voie
+                  immédiatement pourquoi le total est plus bas que la réalité. */}
+              {reel && detailAttente && (()=>{
+                const lignes = (reel.parCompte||[]).map(l=>({...l, nom: accName((accounts||[]).find(a=>String(a.vinted_user_id)===l.uid) || {vinted_user_id:l.uid})}));
+                const lus = reel.avecSolde || new Set();
+                const absents = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
+                return (
+                  <div style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:8}}>
+                    {lignes.map(l=>(
+                      <div key={l.uid} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0'}}>
+                        <div style={{flex:'1 1 130px',minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.nom}</div>
+                          <div style={{fontSize:10,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                            {l.jours==null?'':l.jours<1?'lu aujourd’hui':`lu il y a ${l.jours} j`}{l.dispo>0?` · ${l.dispo.toFixed(2).replace('.',',')} € disponibles`:''}
+                          </div>
+                        </div>
+                        <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:l.attente?C.accent:C.muted}}>{l.attente!=null?`${l.attente.toFixed(2).replace('.',',')} €`:'—'}</span>
+                      </div>
+                    ))}
+                    {absents.map(a=>(
+                      <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0',opacity:0.75}}>
+                        <div style={{flex:'1 1 130px',minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{accName(a)}</div>
+                          <div style={{fontSize:10,color:C.warn,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>porte-monnaie jamais lu — ouvre-le sur Vinted</div>
+                        </div>
+                        <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.muted}}>?</span>
+                      </div>
+                    ))}
+                    <div style={{display:'flex',alignItems:'center',gap:8,borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:7}}>
+                      <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>Total lu</div>
+                      <span style={{fontSize:14,fontWeight:700,color:C.accent}}>{reel.total.toFixed(2).replace('.',',')} €</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
-                ? <>Montant <b>réellement bloqué</b> par Vinted, lu sur {reel.accounts} porte-monnaie{reel.accounts>1?'x':''}. Ouvre ton porte-monnaie sur les autres comptes pour les inclure.</>
+                ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null}</>
                 : <>Estimation d'après tes ventes en cours. Ouvre une fois ton porte-monnaie sur Vinted : l'app affichera ensuite le montant exact.</>}</div>
+              {/* ⚠️ CE TOTAL EST PARTIEL TANT QUE TOUS LES PORTE-MONNAIE N'ONT PAS
+                  ÉTÉ LUS. Julien : « j'ai 323 € en attente sur un seul compte, ce
+                  n'est pas possible que le total soit 504 € avec sept comptes » —
+                  il a raison, et le total n'était pas faux, il était INCOMPLET.
+                  On NOMME donc les comptes manquants au lieu de laisser croire à
+                  un chiffre complet. Un total partiel qui se présente comme
+                  complet est pire qu'un total absent. */}
+              {(()=>{
+                const lus = (reel && reel.avecSolde) || new Set();
+                const manquants = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
+                if (!manquants.length) return null;
+                return (
+                  <div style={{marginTop:8,padding:'8px 10px',border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:10,fontSize:11,color:C.text,lineHeight:1.45}}>
+                    ⚠️ <b>Total incomplet</b> — {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} n'{manquants.length>1?'ont':'a'} pas encore de porte-monnaie lu, donc leur argent en attente n'est <b>pas</b> dans ce chiffre :{' '}
+                    <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
+                    <div style={{marginTop:4,opacity:0.85}}>Ouvre « Mon porte-monnaie » sur Vinted avec chacun de ces comptes : l'extension le capte au passage.</div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
@@ -11957,7 +12440,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
-            {totals.nbAttente>0 && (()=>{ const esc=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null; return <StatBox label="💰 En attente" value={fmtE0(esc?esc.total:totals.enAttente)} color={C.warn} sub={esc?`bloqué · ${esc.accounts} porte-monnaie`:`${totals.nbAttente} en cours · estimation`}/>; })()}
+            {totals.nbAttente>0 && (()=>{ const esc=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null; return <StatBox label="💰 En attente" value={fmtE0(esc?esc.total:totals.enAttente)} color={C.warn} sub={esc?(esc.plusVieuxJours>1?`${esc.accounts} porte-monnaie · le plus ancien ${esc.plusVieuxJours} j`:`réel · ${esc.accounts} porte-monnaie`):`${totals.nbAttente} en cours · estimation`}/>; })()}
             <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
             {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
@@ -12348,8 +12831,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const relayFreq = {}; // carrier -> { "nom|adresse": count }
           (tracking||[]).forEach(t=>{ const cl=cleanLieu(t.lieu); if(cl.nom){ const k=cl.nom+'|'+(cl.adresse||''); (relayFreq[t.carrier]=relayFreq[t.carrier]||{})[k]=((relayFreq[t.carrier]||{})[k]||0)+1; } });
           const usualRelay = (carrier)=>{ const m=relayFreq[carrier]; if(!m) return null; let best=null,bn=0; for(const k in m){ if(m[k]>bn){bn=m[k];best=k;} } if(!best) return null; const [nom,adresse]=best.split('|'); return {nom,adresse}; };
+          // ⚠️ COMPLÉTER L'ADRESSE DEPUIS LA LISTE OFFICIELLE DE VINTED.
+          // L'email donne souvent le NOM du relais sans son adresse ni ses
+          // horaires (mesuré : 13 lieux renseignés sur 94 suivis). Or la liste
+          // des points captée par l'extension porte, elle, `drop_off_point_address`
+          // et l'ouverture du jour. On rapproche **par NOM EXACT normalisé**
+          // seulement — jamais par ressemblance (§24) : envoyer Julien au mauvais
+          // comptoir serait pire que de ne rien afficher. Ce n'est donc PAS une
+          // déduction : c'est la même enseigne, dans la liste de Vinted.
+          const normNom = (s)=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+          const pointsConnus = {};
+          ((dropOffs&&dropOffs.carriers)||[]).forEach(c=>c.points.forEach(p=>{ const k=normNom(p.nom); if(k&&!pointsConnus[k]) pointsConnus[k]=p; }));
           const groups = {};
-          avail.forEach(t=>{ let cl=cleanLieu(t.lieu); if(!cl.nom){ const u=usualRelay(t.carrier); if(u) cl={...u,guessed:true}; } const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse,guessed:cl.guessed}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          avail.forEach(t=>{ let cl=cleanLieu(t.lieu); if(!cl.nom){ const u=usualRelay(t.carrier); if(u) cl={...u,guessed:true}; } const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; const pc=pointsConnus[normNom(nom)]||null; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,guessed:cl.guessed}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
             <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
@@ -12363,8 +12857,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>📍 {nom}</div>
                       <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.adresse,`${g.colis.length} colis`].filter(Boolean).join(' · ')}</div>
+                      {/* Ouverture du jour, quand Vinted l'a donnée pour CE point. */}
+                      {g.horaires && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>🕒 {g.horaires}</div>}
                     </div>
-                    <a href={`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
+                    <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
                   </div>
                   {g.colis.map((t,i)=>{
                     const code=okCode(t.code);
@@ -13496,7 +13992,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(()=>{
           if (emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des bordereaux…</div>;
           if (!Array.isArray(emailBords)) return null;
-          const withPdf = emailBords.filter(b=>b.hasPdf);
+          // ⚠️ UN BORDEREAU MASQUÉ NE COMPTE NULLE PART. Ce récap comptait tout,
+          // alors que la ligne « ✅ N colis faits » plus bas exclut les masqués :
+          // le même écran affichait 64 puis 63 pour la même chose (mesuré sur les
+          // 71 bordereaux réels, l'un d'eux étant masqué). Une seule règle.
+          const withPdf = emailBords.filter(b=>b.hasPdf && !isBordHidden(b));
           const pending = withPdf.filter(b=>!isBordDone(b));
           const done = withPdf.length - pending.length;
           const proNb = pending.filter(b=>invForBord(b)).length; // comptes pro : facture jointe
@@ -13519,6 +14019,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </button>
                 )}
               </div>
+            </div>
+          );
+        })()}
+        {/* ── OÙ DÉPOSER TES COLIS ────────────────────────────────────────────
+            Les points relais autour de chez toi, avec adresse, distance et
+            horaires. Donnée captée par l'extension quand Vinted la charge :
+            ZÉRO appel Vinted depuis l'app.
+            ⚠️ C'est le DÉPÔT (où tu portes le carton), pas le retrait d'un
+            achat — deux choses différentes, cf. fetchDropOffPoints. */}
+        {(()=>{
+          if (!dropOffs || !dropOffs.carriers.length) return null;
+          const jours = dropOffs.capturedAt ? Math.round((Date.now()-dropOffs.capturedAt)/86400000) : null;
+          const total = dropOffs.carriers.reduce((n,c)=>n+c.points.length,0);
+          return (
+            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
+              <button type="button" onClick={()=>setDropOpen(o=>!o)} aria-expanded={dropOpen}
+                style={{width:'100%',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:18,flexShrink:0}}>📍</span>
+                <span style={{flex:'1 1 150px',minWidth:0}}>
+                  <span style={{display:'block',fontSize:15,fontWeight:700,color:C.text}}>Où déposer tes colis</span>
+                  <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {total} point{total>1?'s':''} près de chez toi · {dropOffs.carriers.map(c=>c.carrier).join(' · ')}
+                  </span>
+                </span>
+                <span style={{flexShrink:0,fontSize:12,color:C.muted}}>{dropOpen?'▲':'▼'}</span>
+              </button>
+              {dropOpen && (
+                <div style={{marginTop:10}}>
+                  {dropOffs.carriers.map(c=>(
+                    <div key={c.carrier} style={{marginBottom:10}}>
+                      <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:6}}>{c.carrier}</div>
+                      {c.points.slice(0,6).map(p=>(
+                        <div key={p.code} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+                          <div style={{flex:'1 1 150px',minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</div>
+                            {p.adresse && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.adresse}</div>}
+                            {p.ouverture && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕒 {p.ouverture}</div>}
+                          </div>
+                          {p.km!=null && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text}}>{p.km} {p.unite}</span>}
+                          {p.lat && p.lon && (
+                            <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`} target="_blank" rel="noreferrer"
+                               style={{flexShrink:0,fontSize:12,color:C.accent,textDecoration:'none'}}>Itinéraire ↗</a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  {/* On DIT l'âge : un point relais ferme, la liste n'est pas éternelle. */}
+                  <div style={{fontSize:11,color:C.muted}}>
+                    Liste captée par l'extension{jours!=null?(jours<1?" aujourd'hui":` il y a ${jours} j`):''} — elle se rafraîchit quand tu prépares un envoi sur Vinted.
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -13553,7 +14106,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const parts=[]; if(overdue) parts.push(`${overdue} en retard`); if(today) parts.push(`${today} aujourd'hui`); if(tomorrow) parts.push(`${tomorrow} demain`);
           return (
             <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} colis à expédier {overdue?'· du retard !':''}</div>
+              {/* ⚠️ CE BANDEAU NE COMPTE QUE L'URGENT (en retard / aujourd'hui /
+                  demain), pas tous les colis. Il disait « N colis à expédier »,
+                  exactement les mêmes mots que le compteur du haut qui, lui,
+                  compte TOUT : on lisait « 4 bordereaux à imprimer » puis
+                  « 1 colis à expédier » sur le même écran. On nomme ce qu'on
+                  compte au lieu de laisser croire à une contradiction. */}
+              <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} à poster en priorité {overdue?'· du retard !':''}</div>
               <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — imprime les bordereaux ci-dessous, les plus urgents sont en haut.</div>
             </div>
           );
@@ -13570,7 +14129,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <div style={{fontSize:12,fontWeight:600,color:C.text,flex:1}}>
                     📧 {visibles} bordereau{visibles>1?'x':''} affiché{visibles>1?'s':''}
-                    {visibles!==emailBords.length && <span style={{fontWeight:500,color:C.muted}}> · {emailBords.length} reçus en tout</span>}
+                    {(()=>{ const total=emailBords.filter(b=>!isBordHidden(b)).length;
+                  return visibles!==total ? <span style={{fontWeight:500,color:C.muted}}> · {total} reçus en tout</span> : null; })()}
                   </div>
                 );
               })()}
@@ -13637,6 +14197,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         );
                       })()}
+                      {/* ⚠️ Le numéro écrit dans l'email vient d'un rapprochement
+                          PAR TITRE côté serveur ; celui de la transaction est une
+                          identité. Quand les deux se contredisent, on affiche
+                          lequel on retient et pourquoi — tamponner en silence, ce
+                          serait la mauvaise chaussure dans le carton. */}
+                      {(()=>{ const lit=numLitige(b); return lit ? (
+                        <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
+                          <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>choisir</button>
+                        </div>
+                      ) : null; })()}
                       {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{display:'inline-block',fontSize:11,fontWeight:600,marginTop:5,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,background:`${dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}14`,borderRadius:10,padding:'2px 8px'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"À poster aujourd'hui":dl.days===1?'À poster demain':'À poster avant'} {dl.text}</div> : null; })()}
                       {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:11,fontWeight:600,marginTop:5,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
                     </div>
@@ -13767,7 +14338,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {(p._score||0) >= 8 && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
+                        {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
+    paires sans rapport — « nike » + « 40 » désigne des centaines d'articles.
+    12 exige le MODÈLE en plus (4+4+5), ou un titre identique. Une paire dont
+    le modèle n'est pas reconnu n'est jamais « suggérée » : on ne se prononce
+    pas plutôt que d'induire un faux prix d'achat. */}
+                        {(p._score||0) >= 12 && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
                         {p.title}
                       </div>
                       <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
@@ -14208,7 +14784,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:16,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.warn,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
                 <div style={{fontSize:32,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)} €</div>
-                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>bloqué</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
+                <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
               </div>
               ); })()}
               {/* LITIGES EN COURS (paires qui reviennent : retour / remboursement / suspension) */}
@@ -15394,6 +15970,12 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
       <Row icon="link" title="Comptes liés" desc="État de connexion, renommer, tester." onClick={()=>setTab('vintedaccounts')}/>
+      <div style={{height:8}}/>
+      <ConnexionsSetting/>
+      <div style={{height:8}}/>
+      <EmailsSetting/>
+      <div style={{height:8}}/>
+      <SecuriteSetting/>
 
       {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
@@ -15821,6 +16403,319 @@ function PushSetting() {
 // il ne doit jamais partir dans la ligne Supabase partagée. Il reste sur CET
 // appareil. Le mieux reste la variable d'environnement Vercel (AI_API_KEY) —
 // ce champ est le raccourci « je veux tester tout de suite » pour Julien.
+// ── ÉCRAN QUI TOMBE ≠ APPLICATION QUI TOMBE ───────────────────────────────────
+// ⚠️ Sans garde-fou, UNE erreur de rendu dans un seul écran vide la page
+// entière : écran blanc, barre du bas comprise, plus rien à faire que recharger
+// en espérant. C'est arrivé deux fois (§19 : un useMemo lu trop tôt ; §26 : une
+// variable jamais déclarée) et les deux fois l'app était inutilisable alors que
+// neuf écrans sur dix allaient bien.
+// Ici l'erreur est attrapée : l'écran fautif affiche un message, la navigation
+// reste vivante, et changer d'onglet remet le garde-fou à zéro (`resetKey`) —
+// sinon on resterait coincé sur l'erreur après avoir quitté l'écran.
+class EcranGardeFou extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) { try { console.error('[VRM] écran en erreur', err, info && info.componentStack); } catch (_) {} }
+  componentDidUpdate(prev) { if (prev.resetKey !== this.props.resetKey && this.state.err) this.setState({ err: null }); }
+  render() {
+    if (!this.state.err) return this.props.children;
+    const msg = String((this.state.err && this.state.err.message) || this.state.err);
+    return (
+      <div style={{padding:'22px 18px'}}>
+        <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:16,padding:'18px 16px'}}>
+          <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Cet écran n'a pas pu s'afficher</div>
+          <div style={{fontSize:13,color:C.muted,lineHeight:1.5,marginBottom:12}}>
+            Le reste de l'application fonctionne : change d'onglet en bas, tes données ne sont pas touchées.
+            Si ça se reproduit, envoie-moi cette ligne :
+          </div>
+          <div style={{fontSize:11.5,fontFamily:'ui-monospace,monospace',color:C.text,background:C.card,border:`1px solid ${C.border}`,
+            borderRadius:10,padding:'9px 11px',overflowX:'auto',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{msg}</div>
+          <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
+            <button type="button" onClick={()=>this.setState({err:null})}
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>
+            <button type="button" onClick={()=>{ try{ navigator.clipboard.writeText(msg); }catch(_){} }}
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier l'erreur</button>
+            <button type="button" onClick={()=>location.reload()}
+              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Recharger l'app</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+// ── SÉCURITÉ DES DONNÉES : L'ÉTAT RÉEL, MESURÉ ────────────────────────────────
+// Trois verrous doivent être en place pour que « chacun ses données » soit vrai.
+// Ils étaient décrits dans la documentation, donc invérifiables depuis l'app —
+// et un verrou qu'on croit posé est pire qu'un verrou absent. Chacun est
+// SONDÉ pour de bon, et chaque ligne dit quoi faire s'il manque.
+function SecuriteSetting() {
+  const [st, setSt] = useState(null);
+  const [ext, setExt] = useState(undefined);   // undefined = pas encore demandé
+  const [copie, setCopie] = useState('');
+  const [srv, setSrv] = useState(null);   // état des routes serveur (clé de service, propriétaire)
+  useEffect(() => { fetch('/api/sante').then(r=>r.json()).then(j=>setSrv(j&&j.ok?j:{})).catch(()=>setSrv({})); }, []);
+  useEffect(() => { (async () => {
+    const out = { colonne: null, lisibleSansCompte: null, mailAuto: null };
+    // 1. La colonne `owner` existe-t-elle ? (400 « column does not exist » = non)
+    try { out.colonne = (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: sbAuth() })).ok; }
+    catch (_) { out.colonne = null; }
+    // 2. ⚠️ LE PIÈGE : la colonne peut exister sans que RLS soit actif. On teste
+    //    donc ce qui compte vraiment — une lecture avec la clé PUBLIQUE seule
+    //    ramène-t-elle encore des lignes ? Si oui, tout le monde lit tout.
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=id&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      out.lisibleSansCompte = r.ok ? (await r.json()).length > 0 : false;
+    } catch (_) { out.lisibleSansCompte = null; }
+    // 3. Création de compte : faut-il un email de confirmation ? (le serveur de
+    //    test Supabase n'en envoie que quelques-uns par heure)
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+      if (r.ok) { const j = await r.json(); out.mailAuto = !!j.mailer_autoconfirm; }
+    } catch (_) { out.mailAuto = null; }
+    setSt(out);
+    setExt(await vmrAuthEtat());
+  })(); }, []);
+  const copier = async (txt, quoi) => {
+    try { await navigator.clipboard.writeText(txt); setCopie(quoi); setTimeout(()=>setCopie(''), 2200); } catch (_) {}
+  };
+  const Ligne = ({ t, ok, etat, d, action }) => (
+    <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
+      <span style={{flexShrink:0,fontSize:13,marginTop:1}}>{ok === null || ok === undefined ? '⏳' : ok ? '✅' : '⚠️'}</span>
+      <div style={{minWidth:0,flex:'1 1 140px'}}>
+        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok ? INV_STATUS.online.color : C.warn}}>· {etat}</span></div>
+        <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
+        {action}
+      </div>
+    </div>
+  );
+  const s = st || {};
+  const proteges = s.colonne === true && s.lisibleSansCompte === false;
+  return (
+    <div style={{border:`1px solid ${proteges ? C.border : C.warn + '66'}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
+        <span style={{fontSize:11,fontWeight:600,color:proteges?INV_STATUS.online.color:C.warn,background:(proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:999,padding:'1px 8px'}}>
+          {st === null ? 'vérification…' : proteges ? 'cloisonnées' : 'partagées'}
+        </span>
+      </div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>
+        Sondé en direct sur ta base, à chaque ouverture de cet écran.
+      </div>
+      <Ligne t="Propriétaire des lignes" ok={s.colonne}
+        etat={s.colonne === null ? '…' : s.colonne ? 'colonne présente' : 'colonne absente'}
+        d={s.colonne ? "Chaque ligne peut être attribuée à un vendeur."
+          : "Sans elle, toutes les données vivent dans la même ligne : un deuxième compte ouvrirait TA boutique. C'est la migration SQL à passer dans Supabase → SQL Editor."}
+        action={!s.colonne && (
+          <button type="button" onClick={()=>copier(MIGRATION_SQL, 'sql')}
+            style={{marginTop:7,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:9,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : '📋 Copier la migration SQL'}
+          </button>)}/>
+      <Ligne t="Lecture sans compte" ok={s.lisibleSansCompte === false}
+        etat={s.lisibleSansCompte === null ? '…' : s.lisibleSansCompte ? 'tout est lisible' : 'fermée'}
+        d={s.lisibleSansCompte
+          ? "⚠️ La clé publique, visible dans le code, suffit encore à tout lire. C'est le verrou qui compte vraiment (RLS) — la colonne seule ne protège rien."
+          : "La clé publique ne ramène plus rien : seule une session identifiée lit tes données."}/>
+      <Ligne t="Création de compte" ok={s.mailAuto === true}
+        etat={s.mailAuto === null ? '…' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
+        d={s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
+          : "Le serveur d'envoi de test de Supabase est limité à quelques emails par heure — une création peut rester bloquée. Authentication → Providers → Email → décocher « Confirm email »."}/>
+      {/* ⚠️ LA MOITIÉ SERVEUR DU CLOISONNEMENT. Les emails, les rappels
+          d'expédition et les notifications sont écrits par des routes qui
+          tournent SANS vendeur connecté : sans clé de service elles ne
+          pourront plus rien écrire dès que RLS est actif, et sans propriétaire
+          leurs lignes n'appartiendront à personne (email reçu la nuit =
+          silencieusement perdu). C'est le vrai blocage à lever AVANT la
+          migration, et il ne se voit nulle part ailleurs. */}
+      <Ligne t="Routes serveur (emails, rappels)" ok={srv === null ? null : !!(srv.serviceKey && srv.owner)}
+        etat={srv === null ? '…' : srv.serviceKey && srv.owner ? 'prêtes' : srv.serviceKey ? 'propriétaire manquant' : 'clé de service manquante'}
+        d={srv && srv.serviceKey && srv.owner
+          ? "Elles écriront sous ton compte une fois la base cloisonnée."
+          : "À régler dans Vercel → Settings → Environment Variables AVANT la migration : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID (ton identifiant de compte). Sans ça, les emails et rappels cesseront d'être enregistrés dès que la séparation sera activée."}/>
+      <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
+        etat={ext === undefined ? '…' : !ext ? 'extension absente ici' : ext.connecte ? (ext.email || 'connectée') : 'pas connectée'}
+        d={!ext ? "Sur téléphone c'est normal. Sur l'ordinateur, ouvre l'app dans le Chrome où l'extension est installée."
+          : ext.connecte ? "Elle écrira sous ce compte dès que la base saura séparer les vendeurs."
+          : "Ouvre la fenêtre de l'extension (son icône dans Chrome) → Compte VRM → entre ton email et ton mot de passe."}/>
+    </div>
+  );
+}
+
+// ── ÉTAT DES CONNEXIONS ───────────────────────────────────────────────────────
+// « Est-ce que ça capte ? » n'avait aucune réponse dans l'app : il fallait lire
+// la base à la main. Trois voies alimentent VRM, chacune peut tomber seule —
+// l'extension (annonces, ventes, achats), les comptes Vinted (jetons captés),
+// les emails (bordereaux, colis, factures). On les montre côte à côte.
+// ⚠️ Lecture en SCALAIRES uniquement (`select=id,updated_at`) : les lignes
+// d'emails portent des PDF en base64, un `select=data` ici referait le trou
+// d'égress d'août (§34).
+// ── MES ADRESSES DE RÉCEPTION (à qui appartiennent les emails) ────────────────
+// Le vendeur déclare ICI, à l'avance, l'adresse vers laquelle il fait suivre ses
+// emails Vinted. C'est cette adresse — et elle seule — qui décide à qui
+// appartient un email reçu. Ni l'expéditeur, ni le sujet, ni le contenu : ils
+// sont écrits par l'extérieur et se falsifient en trois secondes.
+// Le registre vit dans une ligne dédiée (`vrm_email_owners`) que l'app écrit et
+// que le serveur se contente de lire.
+function EmailsSetting() {
+  const [reg, setReg] = useState(null);          // { adresse: {owner,label} }
+  const [quarantaine, setQuarantaine] = useState(null);
+  const [busy, setBusy] = useState('');
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const charger = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=data`, { headers: sbAuth() });
+      const j = r.ok ? await r.json() : [];
+      const d = (j[0] && j[0].data) || {};
+      setReg((d && d.adresses) || {});
+    } catch (_) { setReg({}); }
+    try {
+      // ⚠️ Scalaires seulement : une ligne de quarantaine contient l'email
+      // ENTIER (pièces jointes comprises) — un `select=data` ici referait le
+      // trou d'égress de §34.
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject,raison:data->>raison,quand:data->>at`, { headers: sbAuth() });
+      setQuarantaine(r.ok ? await r.json() : []);
+    } catch (_) { setQuarantaine([]); }
+  }, []);
+  useEffect(() => { charger(); }, [charger]);
+
+  const ecrire = async (adresses) => {
+    setReg(adresses);
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method: 'POST',
+        headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([withOwner({ id: 'vrm_email_owners', data: { adresses, updatedAt: new Date().toISOString() } })]),
+      });
+    } catch (_) { toast("La liste n'a pas pu être enregistrée — réessaie."); }
+  };
+  const ajouter = async () => {
+    const a = await askText({ desc: "Ton adresse de réception.\n\nC'est l'adresse vers laquelle tu fais suivre tes emails Vinted (bordereaux, ventes, colis). Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
+    const adr = String(a || '').trim().toLowerCase();
+    if (!adr) return;
+    if (!/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
+    if (reg && reg[adr]) { toast('Cette adresse est déjà à toi.'); return; }
+    await ecrire({ ...(reg || {}), [adr]: { owner: uid || '', label: '', at: new Date().toISOString() } });
+  };
+  const retirer = async (adr) => {
+    const ok = await askConfirm({ title: `Retirer ${adr} ?`, desc: "Les emails qui arriveront ensuite sur cette adresse ne te seront plus attribués : ils seront mis de côté en attendant que tu les réclames. Rien de déjà reçu n'est supprimé.", ok: 'Retirer', danger: true });
+    if (!ok) return;
+    const u = { ...(reg || {}) }; delete u[adr]; await ecrire(u);
+  };
+  const rattacher = async (id) => {
+    setBusy(id);
+    try {
+      const r = await fetch('/api/email-rattacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) },
+        body: JSON.stringify({ id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      toast(j && j.ok ? 'Email rattaché — il apparaît maintenant dans tes écrans.' : "Ce mail n'a pas pu être rattaché (format non reconnu). Il reste conservé.");
+    } catch (_) { toast('Réseau indisponible — réessaie.'); }
+    setBusy(''); charger();
+  };
+  const liste = Object.keys(reg || {});
+  const enAttente = quarantaine || [];
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
+        Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et tu le réclames d'un tap.
+      </div>
+      {reg === null ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div> : liste.length === 0 ? (
+        <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'9px 11px',lineHeight:1.45}}>
+          Aucune adresse déclarée. Tant qu'il n'y en a pas, les emails reçus sont attribués au propriétaire de cette installation — ce qui va très bien tant que tu es seul dessus.
+        </div>
+      ) : liste.map(adr => (
+        <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+          <span style={{flex:'1 1 140px',minWidth:0,fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{adr}</span>
+          <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
+            style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:9,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
+        </div>
+      ))}
+      <button type="button" onClick={ajouter}
+        style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        + Ajouter une adresse
+      </button>
+      {enAttente.length > 0 && (
+        <div style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+          <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
+          <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés sur une adresse non déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
+          {enAttente.slice(0,8).map(q => (
+            <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
+              <span style={{flex:'1 1 130px',minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {q.sujet || '(sans sujet)'} <span style={{color:C.muted}}>· {q.raison || ''}</span>
+              </span>
+              <button type="button" disabled={busy===q.id} onClick={()=>rattacher(q.id)}
+                style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:9,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:busy===q.id?'default':'pointer',fontFamily:'inherit',opacity:busy===q.id?0.6:1}}>
+                {busy===q.id ? '…' : "C'est à moi"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConnexionsSetting() {
+  const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  const [mail, setMail] = useState(null);   // { ts, n } | 'vide' | null = en cours
+  const [capt, setCapt] = useState(null);   // { ts, n }
+  useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  useEffect(() => { (async () => {
+    const lire = async (motif) => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${motif}&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
+        if (!r.ok) return null;
+        const rows = await r.json();
+        let ts = 0; rows.forEach(x => { const t = harvestTs(x) || 0; if (t > ts) ts = t; });
+        return { n: rows.length, ts };
+      } catch (_) { return null; }
+    };
+    setMail(await lire('email_*') || 'vide');
+    setCapt(await lire('harvest_*') || 'vide');
+  })(); }, []);
+  const depuis = (ts) => {
+    if (!ts) return 'jamais';
+    const h = (Date.now() - ts) / 3600000;
+    return h < 1 ? "il y a moins d'une heure" : h < 48 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`;
+  };
+  // Vert < 2 j, orange < 7 j, rouge au-delà — même échelle que l'écran Santé de
+  // l'extension, pour qu'un même état ne porte pas deux couleurs différentes.
+  const teinte = (ts) => !ts ? C.muted : (Date.now() - ts) < 2 * 864e5 ? INV_STATUS.online.color
+                       : (Date.now() - ts) < 7 * 864e5 ? C.warn : C.danger;
+  const Ligne = ({ t, etat, coul, d }) => (
+    <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
+      <span style={{flexShrink:0,width:9,height:9,borderRadius:999,background:coul,marginTop:5}}/>
+      <div style={{minWidth:0,flex:'1 1 140px'}}>
+        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color:coul}}>· {etat}</span></div>
+        <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>État des connexions</div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>Ce qui alimente l'app, et depuis quand.</div>
+      <Ligne t="Extension Chrome" coul={ext.on ? INV_STATUS.online.color : C.warn}
+        etat={ext.on ? (ext.v ? `version ${ext.v}` : 'détectée') : 'pas détectée ici'}
+        d={ext.on ? "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."
+                  : "Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions."}/>
+      <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
+        etat={capt === 'vide' || !capt ? 'inconnue' : `dernière ${depuis(capt.ts)}`}
+        d={capt && capt.ts && (Date.now() - capt.ts) > 2 * 864e5
+            ? "Repasse sur vinted.fr avec l'extension — c'est la navigation qui capte."
+            : "Annonces, ventes, achats et messages viennent de là."}/>
+      <Ligne t="Emails" coul={teinte(mail && mail.ts)}
+        etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
+        d="Bordereaux, suivi des colis et codes de retrait arrivent par email — Vinted ne les donne pas autrement."/>
+    </div>
+  );
+}
+
 function AiKeySetting() {
   const [key, setKey] = useState(() => load('vrm_ai_key', ''));
   const [ready, setReady] = useState(null); // null = inconnu, true/false = clé serveur présente ?
@@ -16464,7 +17359,10 @@ export default function App() {
       // de l'app (exactement l'incohérence signalée par Julien). Repli sur
       // l'estimation tant qu'aucun porte-monnaie n'a été capté.
       let enAttenteReel=enAttente;
-      try{ const esc=await fetchWalletEscrow(); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
+      // Mêmes comptes que l'app : un compte supprimé ne doit pas gonfler le
+      // chiffre du widget (mesuré : 57,23 € de shop_cancale comptés en trop).
+      const uidsVivants=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
+      try{ const esc=await fetchWalletEscrow(uidsVivants); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
       if(!stop && ok){
         setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
@@ -16913,6 +17811,7 @@ export default function App() {
         </div>
       )}
       <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:'calc(84px + env(safe-area-inset-bottom))'}}>
+        <EcranGardeFou resetKey={tab}>
         {tab==='settings'&&<SettingsScreen setTab={setTab}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}
@@ -16995,6 +17894,7 @@ export default function App() {
         {(()=>{ const map={cat_annonces:'annonces',cat_repub:'republication',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
+        </EcranGardeFou>
       </main>
       <BottomBar tab={tab} setTab={setTab}/>
       {showBackup&&<BackupModal

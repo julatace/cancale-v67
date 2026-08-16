@@ -3,6 +3,11 @@
 // Avant, il listait seulement les comptes captés — donc on croyait que tout
 // allait bien alors que les annonces d'un compte pouvaient dater de 25 jours.
 const JOUR = 86400000;
+// Un pseudo Vinted est du texte fourni par un tiers : il n'entre jamais dans du
+// HTML sans être échappé, sinon un pseudo bien choisi casse (ou détourne) la
+// fenêtre de l'extension.
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 
 function age(ms) {
   if (!ms) return { txt: 'jamais', etat: 'off' };
@@ -27,7 +32,7 @@ function render(list, lastSync, fresh) {
     acc.innerHTML = '<div class="row"><span class="dot off"></span>Aucun compte détecté — connecte-toi sur vinted.fr</div>';
   } else {
     acc.innerHTML = list.map(a =>
-      `<div class="row"><span class="dot"></span><span class="nom">${nomDe[String(a.uid)] || 'compte ' + a.uid}</span><span class="age">${(a.domain || '').replace(/^www\./, '')}</span></div>`
+      `<div class="row"><span class="dot"></span><span class="nom">${esc(nomDe[String(a.uid)] || 'compte ' + a.uid)}</span><span class="age">${esc((a.domain || '').replace(/^www\./, ''))}</span></div>`
     ).join('');
   }
 
@@ -41,7 +46,7 @@ function render(list, lastSync, fresh) {
       const vide = !(r.n || 0);
       const etat = vide ? '' : a.etat;           // pas d'alerte rouge sur un compte sans annonce
       const info = vide ? 'aucune annonce' : `${r.n} annonces · ${a.txt}`;
-      return `<div class="row"><span class="dot ${etat === 'ok' ? '' : etat}"></span><span class="nom">${r.login || '#' + r.uid}</span><span class="age">${info}</span></div>`;
+      return `<div class="row"><span class="dot ${etat === 'ok' ? '' : etat}"></span><span class="nom">${esc(r.login || '#' + r.uid)}</span><span class="age">${esc(info)}</span></div>`;
     }).join('');
     // Un compte SANS AUCUNE ANNONCE (0) n'a rien a rafraichir : le compter
     // comme « annonces qui datent » faisait crier « 25 jours » alors que tous
@@ -57,6 +62,56 @@ function render(list, lastSync, fresh) {
     document.getElementById('status').textContent = 'Dernière synchro : ' + new Date(lastSync).toLocaleTimeString('fr-FR');
   }
 }
+
+// ── COMPTE VRM ────────────────────────────────────────────────────────────────
+// L'extension peut s'identifier ELLE-MÊME (email + mot de passe), sans passer
+// par l'app. ⚠️ On dit la vérité sur ce que ça protège : tant que la base ne
+// sépare pas les vendeurs (colonne `owner` + RLS), se connecter ne cloisonne
+// RIEN — ça prépare, ça ne protège pas encore. Promettre l'inverse serait
+// exactement le genre de mensonge qui fait fuiter des données.
+
+function rendreAuth(e) {
+  const box = document.getElementById('auth');
+  if (!box) return;
+  const note = e && e.cloisonne
+    ? "Tes captures sont enregistrées sous ton compte."
+    : "La séparation des comptes n'est pas encore activée en base : se connecter prépare le terrain, mais ne cloisonne pas encore les données.";
+  if (e && e.connecte) {
+    box.innerHTML = `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
+      <div class="muted" style="margin-top:0">${note}</div>
+      <button class="sec" id="outBtn">Se déconnecter</button>`;
+    document.getElementById('outBtn').addEventListener('click', () => {
+      chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogout' }, () => chargerAuth());
+    });
+    return;
+  }
+  const expiree = e && e.expiree;
+  box.innerHTML = `<div class="who"><span class="dot ${expiree ? 'warn' : 'off'}"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
+    <div class="muted" style="margin-top:0">${expiree ? 'Ta session a expiré — retape ton mot de passe.' : note}</div>
+    <input id="mail" type="email" placeholder="Email" autocomplete="username">
+    <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <button id="inBtn">Se connecter</button>
+    <div class="err" id="authErr" hidden></div>`;
+  const err = document.getElementById('authErr');
+  const go = () => {
+    const email = document.getElementById('mail').value, password = document.getElementById('pw').value;
+    const btn = document.getElementById('inBtn');
+    btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password }, (r) => {
+      btn.textContent = 'Se connecter'; btn.disabled = false;
+      if (r && r.ok) chargerAuth();
+      else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
+    });
+  };
+  document.getElementById('inBtn').addEventListener('click', go);
+  // Entrée depuis le champ mot de passe : sinon il faut viser le bouton.
+  document.getElementById('pw').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
+}
+
+function chargerAuth() {
+  chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authEtat' }, (r) => rendreAuth(r || {}));
+}
+chargerAuth();
 
 function charger() {
   chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'freshness' }, (resp) => {

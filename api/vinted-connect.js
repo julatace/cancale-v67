@@ -15,8 +15,17 @@
 // d'anonymisation / fingerprint : on ne cherche pas à masquer quoi que ce soit
 // à Vinted, juste à connecter un compte proprement depuis l'app.
 
+import { withOwnerAll, conflictTarget } from './_lib/owner.js';
+
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+// ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
+// vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
+// publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
+// LE blocage qui empêchait d'activer le multi-vendeurs. On prend donc
+// `SUPABASE_SERVICE_KEY` (variable d'environnement Vercel, jamais dans le
+// dépôt) si elle est définie, et on retombe sur la clé publique tant qu'elle ne
+// l'est pas : le comportement d'aujourd'hui reste identique.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
@@ -89,7 +98,9 @@ async function fetchProfile({ host, accessToken, anonId, csrfToken }) {
 }
 
 async function upsertAccount(row) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=vinted_user_id`, {
+  // Multi-vendeurs : la clé d'unicité devient (owner, vinted_user_id) — deux
+  // vendeurs peuvent très bien avoir lié le même compte Vinted.
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=${conflictTarget('vinted_user_id')}`, {
     method: 'POST',
     headers: {
       apikey: SUPABASE_KEY,
@@ -97,7 +108,7 @@ async function upsertAccount(row) {
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal',
     },
-    body: JSON.stringify(row),
+    body: JSON.stringify(withOwnerAll(Array.isArray(row) ? row : [row])),
   });
   return res.ok;
 }
