@@ -564,11 +564,23 @@
     // cette mention, un compte disparaît sans raison visible et on croit à un
     // bug de capture. « ↺ Réafficher » marche désormais dans les trois cas.
     const pourquoi = { app: "masqué depuis l'app", supprime: "supprimé dans l'app", panneau: 'masqué ici' };
+    // Depuis quand ce compte n'a-t-il rien envoyé ? Un compte muet depuis
+    // deux semaines, c'est une session expirée — il faut repasser dessus.
+    // Même échelle que l'écran Santé et que l'app : un même état ne doit pas
+    // porter deux couleurs selon l'écran.
+    const fraicheurTxt = (t) => {
+      if (!t) return 'jamais capté';
+      const j = (Date.now() - t) / 86400000;
+      if (j < 1) return 'capté aujourd\'hui';
+      if (j < 2) return 'capté hier';
+      if (j < 7) return `capté il y a ${Math.round(j)} j`;
+      return `⚠️ rien depuis ${Math.round(j)} j — repasse dessus`;
+    };
     const rows = accs.map(a => `
       <div style="display:flex;gap:8px;align-items:center;padding:7px 2px;border-top:1px solid #f0f2f5">
         <div style="flex:1 1 120px;min-width:0">
           <div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${a.off ? 'opacity:.5;text-decoration:line-through' : ''}">${esc(a.name)}</div>
-          <div class="vrm-m" style="font-size:10.5px">${a.online} en ligne${a.off && pourquoi[a.raison] ? ` · ${pourquoi[a.raison]}` : ''}</div>
+          <div class="vrm-m" style="font-size:10.5px">${a.online} en ligne${a.off && pourquoi[a.raison] ? ` · ${pourquoi[a.raison]}` : ''} · ${fraicheurTxt(a.capte)}</div>
         </div>
         <button class="vrm-acct-off" data-uid="${esc(a.uid)}" data-off="${a.off ? '0' : '1'}" style="flex-shrink:0;border:1px solid ${a.off ? '#0f6b4f' : '#dde'};background:${a.off ? 'rgba(15,107,79,.08)' : '#fff'};color:${a.off ? '#0f6b4f' : '#556'};border-radius:8px;padding:5px 10px;font-weight:700;font-size:11px;cursor:pointer">${a.off ? '↺ Réafficher' : '✕ Masquer'}</button>
       </div>`).join('');

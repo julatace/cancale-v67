@@ -2212,7 +2212,7 @@ async function buildPanelData() {
     if (hiddenAcc.has(k)) return 'app';
     return '';
   };
-  const keepAcc = (r) => !acctOff(r && r.data && r.data.uid);
+  const keepAcc = (r) => { const u = r && r.data && r.data.uid; return compteExiste(u) && !acctOff(u); };
   // Nom lisible d'un compte : l'étiquette posée dans l'app, sinon le pseudo Vinted.
   const accRows = await sbGet('vinted_accounts?select=vinted_user_id,login') || [];
   const labels = (d.vinted_account_labels && typeof d.vinted_account_labels === 'object') ? d.vinted_account_labels : {};
@@ -2221,6 +2221,18 @@ async function buildPanelData() {
   // Le pseudo d'un compte SUPPRIMÉ n'est plus dans `vinted_accounts` (sa ligne a
   // été effacée) : on le retrouve dans la liste noire, qui le garde exprès.
   const acctName = (uid) => { const k = String(uid == null ? '' : uid); return nameByUid[k] || _blockedNames[k] || (k ? 'compte ' + k.slice(-4) : ''); };
+  // ── UN COMPTE EXISTE S'IL A DES JETONS, PAS PARCE QU'IL RESTE DES DONNÉES ──
+  // Mesuré : 3 identifiants avaient encore des lignes moissonnées (46 en tout,
+  // dont shop_cancale supprimé il y a 12 j) SANS aucune ligne `vinted_accounts`.
+  // Comme la clé publique n'a pas le droit d'effacer `app_data`, ces restes ne
+  // partent jamais tout seuls : ils continuaient d'alimenter les listes et de
+  // s'afficher comme des comptes. Supprimer un compte doit vouloir dire
+  // supprimer, donc on ignore les données d'un identifiant qui n'a plus de
+  // compte — c'est la seule règle, elle ne dépend d'aucun délai.
+  // ⚠️ Si la lecture des comptes échoue (réseau), on n'applique RIEN : filtrer
+  // sur une liste vide viderait tout le panneau pour une simple coupure.
+  const comptesConnus = new Set((accRows || []).map(a => String(a.vinted_user_id || '')).filter(Boolean));
+  const compteExiste = (uid) => !comptesConnus.size || comptesConnus.has(String(uid == null ? '' : uid));
   const lstAll = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []);
   const soldAll = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []);
   // ⚠️ LA PLUS FRAÎCHE CAPTURE GAGNE. Une même vente peut exister dans plusieurs
@@ -2241,16 +2253,21 @@ async function buildPanelData() {
   // Liste des comptes pour le panneau (avec le nb d'annonces en ligne) : tu vois
   // exactement d'où viennent tes paires, et tu peux en couper un d'un clic.
   const accountsSeen = {};
-  const noteAcct = (uid, n) => {
+  const noteAcct = (uid, n, cap) => {
     const k = String(uid || ''); if (!k) return;
-    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k), raison: acctRaison(k) };
+    // Un identifiant sans compte n'est pas un compte : c'est un reste de
+    // suppression. Il ne doit ni s'afficher, ni proposer « Réafficher ».
+    if (!compteExiste(k)) return;
+    if (!accountsSeen[k]) accountsSeen[k] = { uid: k, name: acctName(k), online: 0, off: acctOff(k), raison: acctRaison(k), capte: 0 };
     accountsSeen[k].online += n || 0;
+    const t = cap ? Date.parse(cap) : 0;                 // capture la plus récente
+    if (t && t > accountsSeen[k].capte) accountsSeen[k].capte = t;
   };
   for (const r of lstAll) {
     const items = (r.data && r.data.payload && r.data.payload.items) || [];
-    noteAcct(r.data && r.data.uid, items.filter(it => !it.is_closed && !it.is_hidden && !it.is_draft).length);
+    noteAcct(r.data && r.data.uid, items.filter(it => !it.is_closed && !it.is_hidden && !it.is_draft).length, r.data && r.data.capturedAt);
   }
-  for (const r of soldAll) noteAcct(r.data && r.data.uid, 0);
+  for (const r of soldAll) noteAcct(r.data && r.data.uid, 0, r.data && r.data.capturedAt);
   // ⚠️ UN COMPTE TOUT NEUF N'A ENCORE AUCUNE MOISSON. La liste ne se construisait
   // qu'à partir des lignes moissonnées : le compte qu'on vient de connecter était
   // donc INVISIBLE ici, alors que ses jetons étaient bien captés — d'où « mes
@@ -2261,7 +2278,12 @@ async function buildPanelData() {
   // moissonné : c'est celui que Julien a sous les yeux quand il se demande
   // pourquoi rien n'arrive.
   if (compteActif) noteAcct(compteActif, 0);
-  const accounts = Object.values(accountsSeen).sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || b.online - a.online);
+  // Julien : « garde simplement ceux qui ont été captés récemment ». On ne cache
+  // personne (une session expirée n'est pas un compte mort, ses paires sont
+  // réelles) — on TRIE par fraîcheur et on écrit la date sur chaque ligne, pour
+  // qu'un compte muet se voie au lieu de se deviner.
+  const accounts = Object.values(accountsSeen)
+    .sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || (b.capte || 0) - (a.capte || 0) || b.online - a.online);
   // État du compte connecté ici : capté ? refusé ? pourquoi ? Sans ça, « pas
   // capté », « supprimé définitivement » et « masqué » se ressemblent tous —
   // c'est-à-dire du silence.

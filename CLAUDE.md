@@ -1921,3 +1921,34 @@ Scan complet : **1 seule** sur les 1000 lignes `app_data`, et **rien** dans la l
 
 ### Vérifié
 Banc `vm` avec le VRAI code : **6 cas de garde-fou** (dressing / ventes / achats / boîte, tronqué → ignoré, complet → écrit) + **délai de garde dans les deux sens** → **0 cas non conforme**. Banc de pagination exécutant réellement la fonction injectée : **320/434/603 + porte-monnaie, 0 écart** (et 100/100 avant correction, mesuré au `git stash`). Banc panneau : **16 onglets, 0 erreur d'app** (les 2 artefacts connus). Extension **5.17.0**.
+
+---
+
+## 5.20 — LES COMPTES FANTÔMES : des données qui survivaient à la suppression
+
+Julien : « garde simplement ceux qui ont été captés récemment par Vinted, shop_cancale a été supprimé de toute façon ».
+
+### Ce que la base disait
+| identifiant | lignes moissonnées | dernière capture | ligne `vinted_accounts` |
+|---|---|---|---|
+| 199082413 (shop_cancale) | 12 | 12,7 j | **aucune** |
+| 3170782324 | 29 | 4,6 j | **aucune** |
+| 3170790456 | 5 | 39,5 j | **aucune** |
+
+**46 lignes appartenant à des comptes qui n'existent plus** — et elles alimentaient encore les listes du panneau et s'affichaient comme des comptes. ⚠️ La clé publique **n'a pas le droit d'effacer `app_data`** (DELETE → 200 / 0 ligne) : ces restes ne partent donc **jamais** tout seuls. Supprimer un compte doit vouloir dire supprimer.
+
+### La règle, unique et sans délai
+**Un compte existe s'il a des JETONS (`vinted_accounts`), pas parce qu'il reste des données.** `compteExiste(uid)` filtre `keepAcc` **et** `noteAcct` : un identifiant orphelin ne s'affiche plus et ne nourrit plus rien. Pas de seuil d'ancienneté à régler — un compte supprimé est supprimé, quelle que soit la fraîcheur de ses restes.
+
+⚠️ **Garde-fou obligatoire** : si la lecture de `vinted_accounts` échoue (réseau), on **n'applique aucun filtre**. Filtrer sur une liste vide viderait tout le panneau pour une simple coupure — c'est-à-dire reproduire exactement le bug qu'on corrige. Testé : lecture vide → **99 annonces conservées, 0 filtrage**.
+
+### La fraîcheur est écrite, pas devinée
+Chaque compte porte `capte` (la capture la plus récente de ses lignes). La liste est **triée du plus frais au plus ancien**, et chaque ligne le dit : « capté aujourd'hui » / « capté il y a 4 j » / « ⚠️ rien depuis 14 j — repasse dessus ». Même échelle que l'écran Santé et que l'app (§5.12) — un même état ne doit pas porter deux couleurs selon l'écran.
+**On ne cache jamais un compte muet** : une session expirée n'est pas un compte mort, ses paires sont réelles. On le montre, trié en bas, avec la raison.
+
+### État relevé (16 août)
+7 comptes vivants : 5 captés dans l'heure, `julatace3535` à 4,7 j, `liliand653` à 14 j (session à rafraîchir). **18 annonces en ligne** au total.
+⚠️ `vinted_accounts_hidden` et `vrm_blocked_accounts` sont **vides depuis 09:18** — Julien a cliqué « Tout réafficher » (§5.12) lui-même. Ce n'est pas un effet du code.
+
+### Vérifié
+Banc `vm` avec le vrai `buildPanelData` : compte supprimé **écarté de la liste ET de ses 96 annonces**, fraîcheur portée par le compte, panne réseau → aucun filtrage — **0 cas non conforme**. Banc panneau : **16 onglets, 0 erreur**. Bancs 5.16/5.17 rejoués : 0 écart. Extension **5.18.0**.
