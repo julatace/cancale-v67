@@ -1078,10 +1078,11 @@ const fetchWalletEscrow = async (uidsVivants) => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), plusVieuxJours: null };
+    if (!res.ok) return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null };
     const rows = await res.json();
     let total = 0, accounts = 0, plusVieux = 0, dispo = 0;
     const avecSolde = new Set();   // uid des porte-monnaie RÉELLEMENT lus
+    const parCompte = [];          // le DÉTAIL, compte par compte (Julien veut voir le décompte)
     // ⚠️ TROIS FORMES DIFFÉRENTES en base, vérifiées sur les 8 lignes réelles :
     // le porte-monnaie classique `{main, escrow}` (5 lignes), la réponse de
     // `payouts` `{balance, history, reference}` ajoutée en 4.26 (2 lignes, dont
@@ -1113,6 +1114,16 @@ const fetchWalletEscrow = async (uidsVivants) => {
       const n = isNaN(attente) ? NaN : attente;
       if (!isNaN(dispoN)) dispo += dispoN;
       if (uid) avecSolde.add(uid);
+      // Chaque ligne du décompte, avec SA fraîcheur et SON format : sans ça on
+      // ne peut pas expliquer d'où sort le total, ni pourquoi un compte pèse 0.
+      const tCap = Date.parse((r.data || {}).capturedAt || 0) || 0;
+      parCompte.push({
+        uid,
+        attente: isNaN(attente) ? null : attente,
+        dispo: isNaN(dispoN) ? null : dispoN,
+        jours: tCap ? Math.floor((Date.now() - tCap) / 86400000) : null,
+        format: (p.escrow || p.main) ? 'solde' : 'versements',
+      });
       if (!isNaN(n)) {
         total += n; accounts++;
         // L'argent bouge. Un solde lu il y a cinq jours n'est pas « le montant
@@ -1121,8 +1132,9 @@ const fetchWalletEscrow = async (uidsVivants) => {
         if (t) { const j = (Date.now() - t) / 86400000; if (j > plusVieux) plusVieux = j; }
       }
     }
-    return { total, dispo, accounts, avecSolde, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
-  } catch (_) { return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), plusVieuxJours: null }; }
+    parCompte.sort((x, y) => (y.attente || 0) - (x.attente || 0));
+    return { total, dispo, accounts, avecSolde, parCompte, plusVieuxJours: accounts ? Math.round(plusVieux) : null };
+  } catch (_) { return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null }; }
 };
 // OÙ DÉPOSER SES COLIS — la liste des points relais autour de chez toi, avec
 // leur adresse, leur distance et leurs horaires, captée par l'extension quand
@@ -11212,6 +11224,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, offBuys, hiddenSales, hiddenAccts]);
   const [showTreasury, setShowTreasury] = useState(false);
+  const [detailAttente, setDetailAttente] = useState(false); // décompte compte par compte de l'argent en attente
   const [walletEscrow, setWalletEscrow] = useState(null); // { total, accounts } réel des porte-monnaie, ou null
   // Le solde réel des porte-monnaie sert AUSSI à la carte « argent en route »
   // de l'écran Ventes, pas seulement à la modale Trésorerie : sans ça la carte
@@ -12329,17 +12342,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const reel = (walletEscrow && walletEscrow.total > 0) ? walletEscrow : null;
           return (
             <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}10`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:11}}>
-                <span style={{fontSize:22}}>💶</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}</div>
-                  <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
+              {/* La carte est CLIQUABLE : Julien veut voir d'où sort le total,
+                  compte par compte — un chiffre agrégé qu'on ne peut pas ouvrir
+                  est invérifiable, donc invendable. */}
+              <button type="button" onClick={()=>setDetailAttente(v=>!v)} aria-expanded={detailAttente} disabled={!reel}
+                style={{width:'100%',border:'none',background:'transparent',padding:0,textAlign:'left',fontFamily:'inherit',cursor:reel?'pointer':'default'}}>
+                <div style={{display:'flex',alignItems:'center',gap:11}}>
+                  <span style={{fontSize:22}}>💶</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}{reel?<span style={{textTransform:'none',letterSpacing:0,fontWeight:600,color:C.accent}}> · {detailAttente?'masquer le détail ▲':'voir le détail ▼'}</span>:null}</div>
+                    <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
+                  </div>
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    <div style={{fontSize:20,fontWeight:700,color:C.text}}>{inRoute.length}</div>
+                    <div style={{fontSize:11,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
+                  </div>
                 </div>
-                <div style={{textAlign:'right',flexShrink:0}}>
-                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{inRoute.length}</div>
-                  <div style={{fontSize:11,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
-                </div>
-              </div>
+              </button>
+              {/* LE DÉCOMPTE : une ligne par compte, avec sa fraîcheur. Les comptes
+                  sans porte-monnaie lu figurent AUSSI, à 0, pour qu'on voie
+                  immédiatement pourquoi le total est plus bas que la réalité. */}
+              {reel && detailAttente && (()=>{
+                const lignes = (reel.parCompte||[]).map(l=>({...l, nom: accName((accounts||[]).find(a=>String(a.vinted_user_id)===l.uid) || {vinted_user_id:l.uid})}));
+                const lus = reel.avecSolde || new Set();
+                const absents = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
+                return (
+                  <div style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:8}}>
+                    {lignes.map(l=>(
+                      <div key={l.uid} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0'}}>
+                        <div style={{flex:'1 1 130px',minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.nom}</div>
+                          <div style={{fontSize:10,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                            {l.jours==null?'':l.jours<1?'lu aujourd’hui':`lu il y a ${l.jours} j`}{l.dispo>0?` · ${l.dispo.toFixed(2).replace('.',',')} € disponibles`:''}
+                          </div>
+                        </div>
+                        <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:l.attente?C.accent:C.muted}}>{l.attente!=null?`${l.attente.toFixed(2).replace('.',',')} €`:'—'}</span>
+                      </div>
+                    ))}
+                    {absents.map(a=>(
+                      <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0',opacity:0.75}}>
+                        <div style={{flex:'1 1 130px',minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{accName(a)}</div>
+                          <div style={{fontSize:10,color:C.warn,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>porte-monnaie jamais lu — ouvre-le sur Vinted</div>
+                        </div>
+                        <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.muted}}>?</span>
+                      </div>
+                    ))}
+                    <div style={{display:'flex',alignItems:'center',gap:8,borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:7}}>
+                      <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>Total lu</div>
+                      <span style={{fontSize:14,fontWeight:700,color:C.accent}}>{reel.total.toFixed(2).replace('.',',')} €</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
                 ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null}</>
                 : <>Estimation d'après tes ventes en cours. Ouvre une fois ton porte-monnaie sur Vinted : l'app affichera ensuite le montant exact.</>}</div>

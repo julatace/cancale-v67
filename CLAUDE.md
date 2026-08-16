@@ -2201,3 +2201,14 @@ Relevé des 8 lignes `billing` : **2 seulement portent un montant**, les **6 aut
 ⚠️ **Piège de banc, nouveau** : l'app filtre avec le joker SQL **`%`** (`id=like.harvest_123_orders_%`), mon mock ne traduisait que `*` → aucune commande servie, l'écran Ventes tombait en « Impossible de charger » et la carte n'était jamais rendue. Corrigé (`/[*%]/g`).
 
 **Vérifié au banc, carte réellement rendue sur les vraies données** : « lu sur 3 porte-monnaie · 114,36 € disponibles » + le bandeau nommant les **6 comptes manquants**, **0 erreur** (le seul 400 est le sondage `select=owner` volontaire).
+
+### 5.27 (suite) — LE DÉCOMPTE : la carte « en attente » s'ouvre
+
+Julien : « quand j'appuie sur en attente, je veux le détail du décompte ». Un chiffre agrégé qu'on ne peut pas ouvrir est invérifiable — donc invendable.
+
+`fetchWalletEscrow` renvoie **`parCompte`** : `{uid, attente, dispo, jours, format}` par ligne lue, trié par montant décroissant. La carte devient un bouton (`detailAttente`) qui déroule :
+- **une ligne par compte lu** : nom · « lu aujourd'hui / il y a N j » · le disponible en second · le montant en attente à droite ;
+- **une ligne par compte NON lu**, à `?`, avec « porte-monnaie jamais lu — ouvre-le sur Vinted » (c'est là qu'est l'écart) ;
+- un **« Total lu »** en pied, qui doit égaler le grand chiffre.
+
+**Vérifié au banc sur les vraies données** : 359,00 € (lu il y a 5 j) · 145,00 € (lu aujourd'hui · 114,36 € disponibles) · 0,00 € · **6 lignes « jamais lu »** · **Total lu 504,00 €**. **0 erreur.**
