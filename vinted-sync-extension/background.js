@@ -682,8 +682,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (!r.ok) { sendResponse({ ...r, envoye: false }); return; }
             const accs = await getStoredAccounts();
             const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
-            const envoye = acc2 ? await recupererLabel(acc2, msg.uid, msg.tx) : false;
-            sendResponse({ ok: true, envoye });
+            const r2 = acc2 ? await recupererLabel(acc2, msg.uid, msg.tx) : { ok: false, raison: 'compte introuvable' };
+            sendResponse({ ok: true, envoye: r2.ok, error: r2.ok ? '' : r2.raison });
             return;
           }
           // Récupérer le PDF d'un bordereau DÉJÀ émis (aucune génération).
@@ -692,8 +692,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
             if (!acc2) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
             const stop = await garde(msg.uid, acc2); if (stop) { sendResponse(stop); return; }
-            const envoye = await recupererLabel(acc2, msg.uid, msg.tx);
-            sendResponse({ ok: envoye, envoye, error: envoye ? '' : "Vinted n'a pas donné l'URL du PDF — il arrivera par email" });
+            const r2 = await recupererLabel(acc2, msg.uid, msg.tx);
+            sendResponse({ ok: r2.ok, envoye: r2.ok, error: r2.ok ? '' : (r2.raison || 'échec') });
             return;
           }
           // Lire la fiche d'une de TES annonces (description, catégorie) pour
@@ -2250,7 +2250,7 @@ async function recupererLabel(acc, uid, tx) {
   try {
     const t = await vintedGet(acc, `/api/v2/transactions/${tx}`);
     const shipId = t && t.json && (t.json.transaction?.shipment?.id ?? t.json.shipment?.id);
-    if (!shipId) { await echantillonRate('label_txn', tx, JSON.stringify(t && t.json).slice(0, 400)); return false; }
+    if (!shipId) { await echantillonRate('label_txn', tx, JSON.stringify(t && t.json).slice(0, 400)); return { ok: false, raison: "Vinted n'expose pas encore l'expédition de cette vente" }; }
     // ⚠️ On ne connaît la forme d'AUCUNE de ces réponses (§5.29). On essaie donc
     // les chemins observés dans `seen_urls` (§5.26), l'un après l'autre, et on
     // GARDE UN ÉCHANTILLON de ce qui revient : c'est comme ça qu'on a fini par
@@ -2263,13 +2263,21 @@ async function recupererLabel(acc, uid, tx) {
       const u = urlDeLabel(l && l.json);
       if (u) { url = u; via = chemin; break; }
     }
-    if (!url) { await noterDiag('label_url_introuvable'); return false; }
+    if (!url) { await noterDiag('label_url_introuvable'); return { ok: false, raison: "Vinted n'a pas donné l'URL du PDF" }; }
     await noterDiag('label_url_trouve');
-    logActivity(`📎 URL du bordereau trouvée (${via.replace(/\d+/, 'ID')})`);
-    const res = await fetch(url);
-    if (!res.ok) return false;
+    // ⚠️ LE PDF N'EST PAS SERVI PAR VINTED. `label_url` renvoie une URL **S3**
+    // (`svc-shipping-labels.s3.eu-central-1.amazonaws.com`) — vérifié dans
+    // l'échantillon de diagnostic. Sans `https://*.amazonaws.com/*` dans les
+    // permissions, ce `fetch` est bloqué par Chrome et la capture échouait EN
+    // SILENCE, en affichant « Vinted n'a pas donné l'URL » alors que l'URL était
+    // bien là. C'était ça, le vrai blocage.
+    let res;
+    try { res = await fetch(url); }
+    catch (e) { await noterDiag('label_fetch_bloque'); return { ok: false, raison: 'Téléchargement du PDF refusé par le navigateur — recharge l\'extension (permissions)' }; }
+    if (!res.ok) { await noterDiag('label_fetch_' + res.status); return { ok: false, raison: `Le PDF a répondu ${res.status}` }; }
     const buf = await res.arrayBuffer();
-    if (!buf.byteLength || buf.byteLength > 12000000) return false;
+    if (!buf.byteLength) { await noterDiag('label_pdf_vide'); return { ok: false, raison: 'PDF vide' }; }
+    if (buf.byteLength > 12000000) return { ok: false, raison: 'PDF trop lourd' };
     const bytes = new Uint8Array(buf);
     let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     // ⚠️ UNE LIGNE PAR BORDEREAU, PAS UNE SEULE « DERNIÈRE ». `label_latest` est
@@ -2282,9 +2290,10 @@ async function recupererLabel(acc, uid, tx) {
       { id: `harvest_${uid}_label_latest`, data },   // gardée : d'anciens écrans la lisent
     ], 'id');
     await noterUrlLabel(url, true);
+    await noterDiag('label_envoye');
     logActivity('📎 Bordereau envoyé dans l\'application');
-    return true;
-  } catch (_) { return false; }
+    return { ok: true };
+  } catch (e) { await noterDiag('label_erreur'); return { ok: false, raison: String(e).slice(0, 80) }; }
 }
 
 async function genererBordereauxEnAttente(uid, opts = {}) {
@@ -2317,7 +2326,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       memo[tx] = { t: Date.now(), ok: !!r.ok };
       if (r.ok) {
         faits++;
-        const eu = await recupererLabel(acc, uid, tx);
+        const eu = (await recupererLabel(acc, uid, tx)).ok;
         logActivity(eu ? `📄 Bordereau généré et rangé dans l'app — ${String(o.title || '').slice(0, 40)}`
                        : `📄 Bordereau généré — ${String(o.title || '').slice(0, 40)} (le PDF arrivera par email)`);
       } else {
@@ -2350,7 +2359,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       const mk = 'get' + tx;
       if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) continue;
       memo[mk] = { t: Date.now() };
-      const eu = await recupererLabel(acc, uid, tx);
+      const eu = (await recupererLabel(acc, uid, tx)).ok;
       if (eu) { recup++; logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`); }
     }
     await chrome.storage.local.set({ vrmBordFaits: memo });
