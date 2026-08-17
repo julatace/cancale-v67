@@ -2180,6 +2180,22 @@ function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
 // un nombre different). Avec le mauvais id, Vinted renvoie 0 annonce alors que
 // le compte en a. On resout donc d'abord le vrai id via users/current, puis on
 // le garde en cache memoire sur l'objet compte (1 seul appel supplementaire).
+// ⚠️ LA PHOTO D'UNE COMMANDE VINTED S'APPELLE `photo`, PAS `photo_url`.
+// Une commande moissonnée porte `photo: { url, high_resolution }` (vérifié : 219
+// des 275 ventes en base). Or TOUTE l'app affichait `o.photo_url` — un champ que
+// RIEN n'écrit nulle part. Résultat : le pictogramme 👟 sur chaque vente, chaque
+// achat, chaque reçu, alors que l'image était là depuis le début. Une seule
+// fonction, utilisée partout, pour ne plus jamais réécrire cette lecture.
+const orderPhoto = (o) => {
+  if (!o) return null;
+  const p = o.photo;
+  return o.photo_url
+      || (typeof p === 'string' ? p : null)
+      || p?.url || p?.thumbnails?.[0]?.url
+      || o.photos?.[0]?.url || o.photos?.[0]?.thumbnails?.[0]?.url
+      || null;
+};
+
 const mapWardrobeItem = (it) => ({
   id: String(it.id),
   title: it.title || '',
@@ -8566,7 +8582,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           if (!pair) continue;
           const base = {
             transactionId: o.transaction_id || pair.transactionId || null,
-            photo: pair.photo || o.photo_url || null,
+            photo: pair.photo || orderPhoto(o) || null,
             price: pair.price ?? (o.price?.amount != null ? Number(o.price.amount) : null),
             vintedAccountId: pair.vintedAccountId || acc.vinted_user_id,
           };
@@ -9074,7 +9090,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const man = manualEntry(b); if (man && man.photo) return man.photo;
     if (b.transaction) {
       const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
-      if (so && (so.photo_url || so.photo)) return so.photo_url || (so.photo && (so.photo.url || so.photo)) || null;
+      if (so && orderPhoto(so)) return orderPhoto(so);
     }
     if (b.numero) {
       for (const k in numeros) {
@@ -9122,11 +9138,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Photo de la paire (savoir laquelle on va chercher / si on l'a déjà retirée) :
     // les achats moissonnés portent la vraie photo Vinted → on la retrouve par titre.
     const pt = normTitle(t.artTitle || t.article || t.modele || '');
-    const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && (o.photo || o.photo_url)) || {}) : {};
+    const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && orderPhoto(o)) || {}) : {};
     const base = {
       title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', code2: t.code2 || '', suivi: t.suivi || '',
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
-      photo: t.photo || ph.photo || ph.photo_url || null,
+      photo: t.photo || orderPhoto(ph) || null,
       mode: r.mode, _t: t,
     };
     if (r.mode === 'qr' && t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
@@ -9763,7 +9779,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     dup.forEach(pk => delete m[pk]);
     return m;
   }, [numeros]);
-  const entryKeyByPhoto = (o) => { const pk = o ? photoKey(o.photo_url || (o.photo && o.photo.url)) : null; return pk ? (numerosByPhoto[pk] || null) : null; };
+  const entryKeyByPhoto = (o) => { const pk = o ? photoKey(orderPhoto(o)) : null; return pk ? (numerosByPhoto[pk] || null) : null; };
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
@@ -12239,7 +12255,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // Vinted). Sinon rien (placeholder honnête).
               const photoFor=(t)=>{const n=normTitle(t||''); if(!n) return null;
                 const inList=(listings.items||[]).find(it=>normTitle(it.title)===n); if(inList&&inList.photo) return inList.photo;
-                const inSold=(sales.items||[]).find(o=>normTitle(o.title)===n); if(inSold) return inSold.photo_url||(inSold.photo&&inSold.photo.url)||null;
+                const inSold=(sales.items||[]).find(o=>normTitle(o.title)===n); if(inSold) return orderPhoto(inSold);
                 return null;};
               return (
                 <div style={{marginTop:16}}>
@@ -12755,7 +12771,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'11px 12px'}}>
                <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
                 <div style={{width:56,height:56,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
+                  {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:'1 1 140px',minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
@@ -12861,7 +12877,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // photo Vinted → on la montre à côté du code de retrait (savoir quelle
           // paire on va chercher / si on l'a déjà retirée).
           const photoByTitle = {};
-          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=o.photo||o.photo_url; if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
+          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=orderPhoto(o); if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
           const thumb = (src) => src
             ? <img src={src} alt="" loading="lazy" style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
             : <span style={{fontSize:22,flexShrink:0}}>📦</span>;
@@ -12933,7 +12949,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {avail.length>0 && <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:8}}>📍 En point relais — code à venir</div>}
                   {extra.map((o,i)=>(
                     <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
-                      {thumb(o.photo||o.photo_url||photoByTitle[normTitle(o.title||'')])}
+                      {thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Déposé en point relais (Vinted) · le code arrive par email</div>
@@ -13121,7 +13137,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       return (
                         <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 13px',borderTop:i>0?`1px solid ${C.accent}22`:'none'}}>
                           <div style={{width:40,height:40,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {buy&&buy.photo_url?<img src={buy.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>📦</span>}
+                            {buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>📦</span>}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
@@ -13305,7 +13321,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'11px 12px'}}>
               <div style={{display:'flex',gap:12,alignItems:'center'}}>
                 <div style={{width:56,height:56,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
+                  {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
@@ -13614,7 +13630,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'7px 9px'}}>
                       <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:10,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
                       <div style={{width:34,height:34,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {r.o.photo_url?<img src={r.o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                        {orderPhoto(r.o)?<img src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                       </div>
                       <div style={{flex:'1 1 120px',minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
@@ -14329,7 +14345,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const urgTxt = dl==null ? null : dl<0 ? `⚠️ ${-dl}j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl}j pour poster`;
                 return (
                   <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${dl!=null&&dl<0?C.danger+'66':C.border}`,background:C.card,opacity:posted?0.6:1}}>
-                    <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
+                    <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</div>
                       <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -14376,7 +14392,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // commencer, et le prix d'achat finit par ne jamais être saisi.
                 return avail.map((p, iP) => (
                   <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
+                    <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
@@ -15223,7 +15239,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',flexDirection:'column'}}>
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
-                        <div style={{width:32,height:32,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&buy.photo_url?<img src={buy.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
+                        <div style={{width:32,height:32,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{t.code&&<div style={{fontSize:11,color:C.muted}}>code {t.code}</div>}</div>
                         <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
@@ -17786,7 +17802,7 @@ export default function App() {
             {ventes.map((o,i)=>(
               <button key={'v'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_ventes')}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(o.photo_url,'💸')}
+                {thumb(orderPhoto(o),'💸')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{o.status||'vente'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
@@ -17798,7 +17814,7 @@ export default function App() {
             {achats.map((o,i)=>(
               <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_achats')}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(o.photo_url,'📦')}
+                {thumb(orderPhoto(o),'📦')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{o.status||'achat'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
