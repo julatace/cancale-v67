@@ -2358,3 +2358,42 @@ Plus de « 📄 Générer sur Vinted ↗ ». La carte dit où on en est : **« �
 Julien : « oublie liliand653, je l'ai enlevé dans l'application ». Vérifié en base : son uid **3175772080** est dans **`vinted_accounts_hidden`** (clé synchronisée) — donc masqué. Il n'apparaît nulle part, ne compte dans aucun total, et l'extension ne génère rien pour lui (elle ne travaille que sur le compte connecté).
 ⚠️ **Masqué ≠ supprimé** (§5.10 vs §5.22) : sa ligne `vinted_accounts` existe toujours, donc si Julien s'y reconnecte dans Chrome l'extension le recapte (il reste masqué pour autant). Pour l'effacer vraiment il y a « 🗑 Supprimer ce compte ».
 ➡️ **Ne plus le compter comme un compte à rafraîchir** dans les relevés (porte-monnaie non lu, adresse d'envoi manquante, capture ancienne) : ce n'est pas un manque, c'est un choix.
+
+---
+
+## 5.30 — LE NUMÉRO MANQUANT : la numérotation auto ne voyait que les annonces EN LIGNE
+
+Julien : « je me retrouve avec des paires qui n'ont pas de numéro, alors que normalement c'est censé être en automatique ».
+
+### La cause, mesurée
+L'effet de numérotation automatique tourne sur **`annBase`** — c'est-à-dire les annonces **encore en ligne**. Une paire vendue **avant** que l'app soit ouverte n'y passe donc jamais.
+
+| | |
+|---|---|
+| annonces EN LIGNE | 27 · **0 sans numéro** |
+| annonces FERMÉES (vendues/retirées) | 234 · **171 sans numéro** |
+
+Les 3 colis à envoyer du jour en faisaient partie : leurs annonces (`9677383874`, `9677588666`, `9677552994`) sont bien dans le dressing capté, toutes `is_closed: true`, et **aucune n'a jamais eu d'entrée dans `vinted_annonce_numeros`**. Le rapprochement par photo ne pouvait rien y faire — il n'y avait rien à rapprocher.
+
+### Ce qui a changé (et le garde-fou qui va avec)
+L'effet « auto-numéro des ventes » existait déjà mais faisait **réutilisation SEULE** : depuis juillet il n'invente plus de numéro, parce qu'en inventer pour toutes les ventes avait fait grimper le compteur de 50 à 120. Cette règle reste — on l'**élargit au seul cas où le numéro est indispensable** :
+
+➡️ une vente qui **attend encore l'envoi** (`needsBordereau`) et pour laquelle aucun numéro n'est retrouvé reçoit **le plus petit numéro libre**, écrit dans `vinted_sale_overrides` (clé synchronisée) avec le drapeau **`autoShip`**.
+
+Pourquoi c'est cohérent avec §7 (« un numéro = une place au garage ») : le carton est **physiquement à la maison**, il occupe une place, et il faut écrire quelque chose dessus pour l'expédier. Le numéro repart dans le pool dès que le colis est parti (`freedNums`).
+⚠️ **Strictement limité aux ventes qui attendent l'envoi** : 3 ventes aujourd'hui, pas les 275 de l'historique — c'est ce qui évite l'incident de juillet. Le nettoyage des vieux numéros inventés épargne désormais `autoShip` (celui-là est écrit sur un vrai carton).
+
+**Mesuré au banc** : les 3 colis passent de « N° en attente » à **N°117, N°55, N°84** — trois numéros distincts, **aucun porté par une annonce en ligne**, aucun posé au garage.
+
+### Capter le bordereau : on ne devine plus, on mesure
+`recupererLabel` essayait un seul chemin (`/shipments/{id}/label_url`) et abandonnait en silence si la réponse n'avait pas la forme attendue — or **cette forme n'a jamais été observée**.
+- **`urlDeLabel(o)`** balaie la réponse (4 niveaux) et retient la première URL plausible, au lieu de parier sur un nom de champ.
+- Trois chemins essayés à la suite (`label_url`, la transaction d'expédition, `label_options`), et **un échantillon de chaque réponse est conservé** dans `panel_diag_capture.rates` — la méthode qui a fini par expliquer la fiche article (§5.24 → §5.26).
+- La ligne `harvest_{uid}_label_latest` porte maintenant **`tx`** : le PDF est donc rattaché à LA bonne vente.
+
+Côté app, un bordereau capté vaut un bordereau reçu par email : la carte affiche **« 🖨 Imprimer »** + la pastille « 📎 Bordereau capté par l'extension ». ⚠️ Lecture des **scalaires** (`tx`, `capturedAt`) pour l'affichage, octets du PDF **seulement à l'impression** — sinon ouvrir l'écran retéléchargerait un PDF par compte (§34).
+
+### ⚠️ J'ai introduit un plantage, et le filet l'a attrapé
+En rendant `pdf` vrai pour une entrée **sans** bordereau email, le récap appelait `invForBord(e.b)` avec `e.b === null` → `Cannot read properties of null (reading 'transaction')`. **`EcranGardeFou` (§5.14) a fait exactement son travail** : message d'erreur, navigation intacte, rien de perdu — et le banc l'a vu tout de suite. Corrigé (`e.b && invForBord(e.b)`), et `bordKey` rendu insensible à `null` puisque c'est un helper bas niveau.
+
+**Vérifié** : banc `vm` sur le vrai code de l'extension, **11 cas → 0 non conforme** (dont l'URL du PDF trouvée à plat ET imbriquée, et « aucune URL → on ne prétend rien ») · banc app dans les deux états (avec et sans bordereau capté), **0 PAGEERROR** · smoke 12 écrans, **0 PAGEERROR** · `audit-coherence` : 6 règles, 0 désaccord. Extension **5.23.0**.

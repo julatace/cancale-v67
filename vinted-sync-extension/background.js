@@ -2190,15 +2190,43 @@ const aGenererBordereau = (statut) => {
 // URL observées (§5.26) mais sa réponse n'a jamais été capturée — on ne connaît
 // donc pas sa forme exacte. Lecture DÉFENSIVE : si ça ne donne rien, on ne
 // prétend rien, le PDF arrivera par email comme aujourd'hui (§3).
+// Cherche l'URL du PDF n'importe où dans une réponse JSON. On ne connaît pas la
+// forme exacte (voir plus haut) : plutôt que de deviner un nom de champ, on
+// balaie l'objet et on retient la première URL qui ressemble à une étiquette.
+const urlDeLabel = (o, prof = 0) => {
+  if (o == null || prof > 4) return null;
+  if (typeof o === 'string') return /^https?:\/\/\S+/.test(o) && /(label|shipment|pdf|document)/i.test(o) ? o : null;
+  if (Array.isArray(o)) { for (const x of o) { const u = urlDeLabel(x, prof + 1); if (u) return u; } return null; }
+  if (typeof o !== 'object') return null;
+  // les noms plausibles d'abord, le balayage ensuite
+  for (const k of ['url', 'label_url', 'download_url', 'pdf_url', 'href', 'link']) {
+    const v = o[k];
+    if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
+  }
+  for (const k of Object.keys(o)) { const u = urlDeLabel(o[k], prof + 1); if (u) return u; }
+  return null;
+};
+
 async function recupererLabel(acc, uid, tx) {
   try {
     const t = await vintedGet(acc, `/api/v2/transactions/${tx}`);
     const shipId = t && t.json && (t.json.transaction?.shipment?.id ?? t.json.shipment?.id);
-    if (!shipId) return false;
-    const l = await vintedGet(acc, `/api/v2/shipments/${shipId}/label_url`);
-    const j = (l && l.json) || {};
-    const url = j.url || j.label_url || j.download_url || (j.label && (j.label.url || j.label.download_url)) || null;
-    if (!url) return false;
+    if (!shipId) { await echantillonRate('label_txn', tx, JSON.stringify(t && t.json).slice(0, 400)); return false; }
+    // ⚠️ On ne connaît la forme d'AUCUNE de ces réponses (§5.29). On essaie donc
+    // les chemins observés dans `seen_urls` (§5.26), l'un après l'autre, et on
+    // GARDE UN ÉCHANTILLON de ce qui revient : c'est comme ça qu'on a fini par
+    // comprendre la fiche article (§5.24 → §5.26). Sans mesure, on devinerait.
+    let url = null, via = '';
+    for (const chemin of [`/api/v2/shipments/${shipId}/label_url`, `/api/v2/shipments/${shipId}`, `/api/v2/shipments/${shipId}/label_options`]) {
+      const l = await vintedGet(acc, chemin);
+      const brut = l && l.json ? JSON.stringify(l.json) : '';
+      await echantillonRate('label' + chemin.replace(/^.*\/shipments\/\d+/, '').replace(/\W+/g, '_'), shipId, brut.slice(0, 400));
+      const u = urlDeLabel(l && l.json);
+      if (u) { url = u; via = chemin; break; }
+    }
+    if (!url) { await noterDiag('label_url_introuvable'); return false; }
+    await noterDiag('label_url_trouve');
+    logActivity(`📎 URL du bordereau trouvée (${via.replace(/\d+/, 'ID')})`);
     const res = await fetch(url);
     if (!res.ok) return false;
     const buf = await res.arrayBuffer();
