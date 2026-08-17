@@ -12397,7 +12397,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{flex:'1 1 130px',minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{accName(a)}</div>
                             <div style={{fontSize:10,color:C.warn,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                              {mes.length?`estimé sur ${mes.length} vente${mes.length>1?'s':''} en cours — ouvre son porte-monnaie pour le chiffre exact`:'porte-monnaie jamais lu, aucune vente en cours captée'}
+                              {mes.length?`estimé sur ${mes.length} vente${mes.length>1?'s':''} en cours — connecte-toi à ce compte pour le solde exact`:'solde jamais lu — connecte-toi une fois à ce compte sur Vinted'}
                             </div>
                           </div>
                           <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:s?C.warn:C.muted}}>{s?`≈ ${s.toFixed(2).replace('.',',')} €`:'?'}</span>
@@ -12450,7 +12450,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{marginTop:8,padding:'8px 10px',border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:10,fontSize:11,color:C.text,lineHeight:1.45}}>
                     ⚠️ <b>Total incomplet</b> — {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} n'{manquants.length>1?'ont':'a'} pas encore de porte-monnaie lu, donc leur argent en attente n'est <b>pas</b> dans ce chiffre :{' '}
                     <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
-                    <div style={{marginTop:4,opacity:0.85}}>Ouvre « Mon porte-monnaie » sur Vinted avec chacun de ces comptes : l'extension le capte au passage.</div>
+                    {/* ⚠️ NE PAS redire « ouvre ton porte-monnaie » : depuis la 5.20 la
+                        moisson active lit `payouts` toute seule pour le compte CONNECTÉ
+                        (vérifié : 6 soldes captés en 2 minutes sans ouvrir un seul
+                        porte-monnaie). Le seul geste utile est de se connecter au compte. */}
+                    <div style={{marginTop:4,opacity:0.85}}>Connecte-toi une fois à ces comptes sur Vinted : l'extension lit leur solde toute seule, tu n'as pas à ouvrir le porte-monnaie.</div>
                   </div>
                 );
               })()}
