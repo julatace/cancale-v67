@@ -2234,3 +2234,26 @@ Julien : « quand j'appuie sur en attente, je veux le détail du décompte ». U
 ⚠️ **PIÈGE DE MESURE (§21, troisième fois)** : mon premier script rendait **0 vente en cours partout**. Cause — `price` est un **objet** `{amount, currency_code}`, pas un nombre : `String(price)` → `"[object Object]"` → NaN → toutes les ventes écartées. J'ai failli conclure « aucune vente en cours » et accuser la capture. **Toujours vérifier la FORME du champ avant de conclure à un zéro.**
 
 **Vérifié au banc** (vraies données) : lignes estimées rendues (≈ 36 / 30 / 91 / 126 / 125 €), pied « Total lu 504,00 € · + estimé ≈ 408,00 € · **Total probable ≈ 912,00 €** », **0 erreur**.
+
+### 5.27 (suite) — ✅ LA LECTURE DU SOLDE EST AUTOMATIQUE (mesuré, pas supposé)
+
+Julien : « ça ne peut pas lire automatiquement sans que j'aie besoin d'aller dans le porte-monnaie ». **Si — et ça marchait déjà.** `activeFetchAll` (moisson active, §4.26) appelle `/api/v2/users/{profileId}/payouts` pour le **compte connecté**, à chaque visite sur Vinted (§5.19). Ce qui bloquait, c'étaient les lignes `billing` **vides** écrites avant le garde-fou de `storeHarvestRow` (§5.27 point 2) : elles écrasaient les vrais soldes.
+
+**Relevé après qu'il a chargé la 5.20 et rouvert ses comptes** (16 août, aucun porte-monnaie ouvert à la main) :
+
+| compte | en attente | disponible | capté |
+|---|---|---|---|
+| julatace3535 | 359,00 € | 0,00 € | 11 août (5 j) |
+| julatace35260 | **157,00 €** | 0,00 € | 16 août 20:07 |
+| tomj606 | 145,00 € | 114,36 € | 16 août 20:08 |
+| llloollllaa | 126,00 € | 0,00 € | 16 août 20:07 |
+| angeled92 | 91,00 € | 79,00 € | 16 août 20:06 |
+| julienf765 | 69,00 € | 77,20 € | 16 août 20:08 |
+| tomj683 | 30,00 € | 140,00 € | 16 août 20:08 |
+| **total** | **977,00 €** | **410,56 €** | 7 / 8 comptes |
+
+**6 soldes captés entre 20:06 et 20:08**, tout seuls. Et le **157,00 € de `julatace35260` est exactement le chiffre que Julien avait relevé à l'écran** — la lecture est juste, pas seulement présente.
+
+Il ne manque que **`liliand653`** (session à rafraîchir, dernière capture il y a 14 j).
+
+➡️ Les trois textes de l'app qui disaient « ouvre Mon porte-monnaie sur Vinted » sont **faux depuis la 5.20** et ont été corrigés : le seul geste utile est **se connecter une fois au compte**. ⚠️ Ne pas réintroduire la consigne « ouvre ton porte-monnaie ».
