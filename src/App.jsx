@@ -3169,6 +3169,102 @@ const BOTTOM_TABS=[
 // État vide soigné : une icône, une phrase qui explique POURQUOI c'est vide, et
 // quand c'est possible une action. Un simple texte gris laisse l'utilisateur se
 // demander si l'app est cassée ou s'il n'a vraiment rien.
+// ── FILTRER PAR PÉRIODE (ventes / achats) ──────────────────────────────────
+// Demande de Julien : « trier par mois, par jour, par semaine — appuyer comme
+// sur Airbnb, du 12 juillet au 23 août — sinon un filtre par mois pour ma
+// déclaration ». Deux entrées donc : des raccourcis d'un tap pour le quotidien
+// et la déclaration, un calendrier début→fin pour une plage précise.
+const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const jourClef = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const debutJour = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+const finJour = (d) => { const x = new Date(d); x.setHours(23,59,59,999); return x; };
+// Une commande est dans la période si sa date de vente/achat y tombe.
+const dansPeriode = (o, p) => {
+  if (!p || (!p.from && !p.to)) return true;
+  const t = o && o.date ? Date.parse(o.date) : NaN;
+  if (isNaN(t)) return false;                       // sans date, on ne devine pas
+  if (p.from && t < debutJour(p.from).getTime()) return false;
+  if (p.to && t > finJour(p.to).getTime()) return false;
+  return true;
+};
+const libellePeriode = (p) => {
+  if (!p || (!p.from && !p.to)) return 'Toute la période';
+  if (p.label) return p.label;
+  const f = (d) => d ? d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '…';
+  return `${f(p.from)} → ${f(p.to)}`;
+};
+
+function PeriodePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const now = new Date();
+  const [mois, setMois] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const actif = !!(value && (value.from || value.to));
+  const presets = [
+    { k:'mois',   lab:'Ce mois',      f:()=>({ from:new Date(now.getFullYear(),now.getMonth(),1), to:now, label:`${MOIS_FR[now.getMonth()]} ${now.getFullYear()}` }) },
+    { k:'dernier',lab:'Mois dernier', f:()=>{ const d=new Date(now.getFullYear(),now.getMonth()-1,1); return { from:d, to:new Date(now.getFullYear(),now.getMonth(),0), label:`${MOIS_FR[d.getMonth()]} ${d.getFullYear()}` }; } },
+    { k:'j7',     lab:'7 jours',      f:()=>({ from:new Date(now.getTime()-6*86400000), to:now, label:'7 derniers jours' }) },
+    { k:'j30',    lab:'30 jours',     f:()=>({ from:new Date(now.getTime()-29*86400000), to:now, label:'30 derniers jours' }) },
+    { k:'annee',  lab:`${now.getFullYear()}`, f:()=>({ from:new Date(now.getFullYear(),0,1), to:now, label:`Année ${now.getFullYear()}` }) },
+  ];
+  // Grille du mois affiché, lundi en premier.
+  const cases = (() => {
+    const p = new Date(mois.getFullYear(), mois.getMonth(), 1);
+    const decal = (p.getDay() + 6) % 7;                        // lundi = 0
+    const nb = new Date(mois.getFullYear(), mois.getMonth()+1, 0).getDate();
+    const out = Array(decal).fill(null);
+    for (let i=1;i<=nb;i++) out.push(new Date(mois.getFullYear(), mois.getMonth(), i));
+    return out;
+  })();
+  // 1er clic = début, 2e = fin. Un clic AVANT le début en cours repart de zéro,
+  // sinon on se coince sur une plage impossible.
+  const clic = (d) => {
+    if (!value || !value.from || (value.from && value.to)) { onChange({ from:d, to:null }); return; }
+    if (d < value.from) { onChange({ from:d, to:null }); return; }
+    onChange({ from:value.from, to:d });
+    setOpen(false);
+  };
+  const dans = (d) => value && value.from && value.to && d >= debutJour(value.from) && d <= finJour(value.to);
+  const bord = (d) => value && ((value.from && jourClef(d)===jourClef(value.from)) || (value.to && jourClef(d)===jourClef(value.to)));
+  const chip = (on, actifC) => ({ border:`1px solid ${actifC?C.accent:C.border}`, background:actifC?`${C.accent}14`:'transparent', color:actifC?C.accent:C.text, borderRadius:999, padding:'6px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
+  return (
+    <div style={{ marginBottom:12 }}>
+      <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+        <button type="button" onClick={()=>setOpen(o=>!o)} style={{ ...chip(null, actif), display:'inline-flex', alignItems:'center', gap:6 }}>
+          🗓️ {libellePeriode(value)}
+        </button>
+        {presets.map(p=>(
+          <button key={p.k} type="button" onClick={()=>{ onChange(p.f()); setOpen(false); }} style={chip(null, value && value.label===p.f().label)}>{p.lab}</button>
+        ))}
+        {actif && <button type="button" onClick={()=>{ onChange(null); setOpen(false); }} style={{ ...chip(null,false), color:C.muted }}>✕</button>}
+      </div>
+      {open && (
+        <div style={{ marginTop:8, border:`1px solid ${C.border}`, background:C.card, borderRadius:14, padding:'10px 12px' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <button type="button" onClick={()=>setMois(m=>new Date(m.getFullYear(), m.getMonth()-1, 1))} style={{ border:'none', background:'transparent', color:C.text, fontSize:16, cursor:'pointer', padding:'2px 8px' }}>‹</button>
+            <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{MOIS_FR[mois.getMonth()]} {mois.getFullYear()}</div>
+            <button type="button" onClick={()=>setMois(m=>new Date(m.getFullYear(), m.getMonth()+1, 1))} style={{ border:'none', background:'transparent', color:C.text, fontSize:16, cursor:'pointer', padding:'2px 8px' }}>›</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
+            {['L','M','M','J','V','S','D'].map((j,i)=>(<div key={i} style={{ textAlign:'center', fontSize:10, color:C.muted, paddingBottom:4 }}>{j}</div>))}
+            {cases.map((d,i)=> d===null
+              ? <div key={'v'+i}/>
+              : (
+                <button key={jourClef(d)} type="button" onClick={()=>clic(d)}
+                  style={{ border:bord(d)?`1px solid ${C.accent}`:'1px solid transparent', background:bord(d)?C.accent:(dans(d)?`${C.accent}1c`:'transparent'),
+                           color:bord(d)?'#fff':C.text, borderRadius:8, padding:'6px 0', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                  {d.getDate()}
+                </button>
+              ))}
+          </div>
+          <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>
+            {value && value.from && !value.to ? 'Choisis la date de fin.' : 'Clique la date de début, puis celle de fin.'}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmptyState({ icon, title, desc, action }) {
   return (
     <div style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:20,boxShadow:C.shadow||'none'}}>
@@ -9597,6 +9693,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showQuality, setShowQuality] = useState(false); // panneau qualité d'annonce
   const [showLikers, setShowLikers] = useState(false); // panneau relance des likers
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
+  const [periode, setPeriode] = useState(null); // filtre de période (ventes + achats)
   const [pickerFor, setPickerFor] = useState(null);
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
 
@@ -10155,7 +10252,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
+  // La période s'applique EN MÊME TEMPS que la recherche : les compteurs et les
+  // totaux affichés correspondent donc toujours à ce qui est listé.
   const matchOrd = (o) => {
+    if (!dansPeriode(o, periode)) return false;
     const q = ordSearch.trim().toLowerCase(); if (!q) return true;
     const e = effEntry(o); const num = String(e?.numero||'');
     const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
@@ -11400,7 +11500,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
   const totals = useMemo(() => {
-    const items = sales.items || [];
+    // ⚠️ LES TOTAUX SUIVENT LA PÉRIODE AFFICHÉE. Sans ça, filtrer sur « ce mois »
+    // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
+    // quelques lignes : deux chiffres pour la même chose sur le même écran
+    // (§11). C'est exactement ce qu'on veut pour une déclaration mensuelle.
+    const items = (sales.items || []).filter(o => dansPeriode(o, periode));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
     for (const o of items) {
       if (isHidden(o)) continue;
@@ -11418,7 +11522,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -12547,7 +12651,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
 
       {curSub==='ventes' && (<>
-        <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu, tous comptes confondus : bénéfice par paire, suivi de l'expédition à l'encaissement, et tes documents comptables."/>
+        <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par paire, expédition, et tes documents comptables."/>
+        {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
+            recherche étaient sous six bandeaux d'explication : il fallait
+            défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
+            tous les jours vient en premier, les encadrés d'information ensuite. */}
+        {sales.items && sales.items.length>0 && (
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
+            <PeriodePicker value={periode} onChange={setPeriode}/>
+            <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, acheteur)…"
+              style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
+          </div>
+        )}
         <NoAcc/>
         {/* Rappel d'expédition : alerte les ventes à expédier, les plus urgentes
             d'abord (échéance estimée à +5 j). Protège la note vendeur. */}
@@ -12969,10 +13084,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })()}
         </div>
-        {sales.items && sales.items.length>0 && (
-          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, acheteur)…"
-            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
-        )}
         {sales.loading && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
@@ -13526,6 +13637,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button onClick={()=>loadOrders('purchased',setBuys,true)} disabled={buys.loading} title="Va chercher tes achats en direct sur Vinted (tous comptes)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:buys.loading?'default':'pointer',opacity:buys.loading?0.6:1}}>{buys.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
           )}
         </div>
+        {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && (
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
             style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
