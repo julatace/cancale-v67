@@ -2437,3 +2437,34 @@ Trois défauts empêchaient ça, tous corrigés :
 **Vérifié au banc** : 3 bordereaux captés (un par colis) → **les 3 cartes affichent « 🖨 Imprimer »** + « 🖨 Tout imprimer (3) », pastille « récupéré chez Vinted » sur chacune, **0 PAGEERROR**. Banc `vm` extension : 14 cas, 0 non conforme. Smoke 12 écrans : 0 PAGEERROR. Extension **5.25.0**.
 
 ⚠️ **Ce qui reste incertain, dit franchement** : la réponse de `/api/v2/shipments/{id}/label_url` n'a **toujours jamais été observée**. `urlDeLabel` balaie la réponse pour trouver l'URL et un échantillon est conservé dans `panel_diag_capture.rates` — si aucun des trois chemins ne répond, on ne prétend rien et l'email reste le filet. C'est la seule pièce non garantie de la chaîne.
+
+---
+
+## 5.32 — LE TABLEAU DE BORD DES BORDEREAUX (panneau) : par compte, floutés, avec compte rendu
+
+Demande de Julien : « comme font les autres extensions — nos ventes par compte, les autres comptes affichés mais **floutés** car on n'est pas encore dessus ; on sélectionne une vente, on appuie sur **générer** ; et à droite le **compte rendu** pour voir si l'extension a capté ET envoyé à l'application. Pareil pour les numéros. »
+
+### Ce que ça change dans le principe
+La génération **repasse sur son clic** (`visiteVinted` ne génère plus rien). Ce qui reste automatique est **en lecture seule** : aller chercher le PDF des bordereaux déjà émis. Générer = agir sur Vinted, donc c'est lui qui appuie.
+
+### L'onglet Bordereaux du panneau
+Ventes groupées **par compte**, le compte connecté en premier. Les autres sont **floutés** (`filter: blur` + `pointer-events:none`) avec la mention « connecte-toi à ce compte pour agir ».
+⚠️ Le flou n'est pas décoratif : agir au nom d'un compte qui n'est pas celui connecté envoie une requête depuis la session d'un autre — c'est LE signal multi-comptes que Vinted sanctionne (§48). On le montre **avant** le clic au lieu de laisser échouer après.
+
+Chaque ligne porte le **N° de la paire** (couleur : vert s'il est connu, rouge s'il manque) et, à droite, l'état réel :
+| état | ce que ça veut dire | bouton |
+|---|---|---|
+| ✓ dans l'app | le PDF est en base, rattaché à cette vente | — |
+| 📧 reçu par email | l'email est arrivé | 📥 Récupérer |
+| étiquette prête | Vinted l'a émise, on ne l'a pas encore | 📥 Récupérer |
+| pas encore générée | rien n'existe | 📄 Générer |
+
+Le bouton rend compte **lui-même** (« ⏳ », « ✓ envoyé à l'app », « ✓ généré » si le PDF n'est pas récupérable, ou le message d'erreur exact) — plus besoin d'aller lire un journal ailleurs.
+
+**Le N° part avec le bordereau** : `buildPanelData` lit `vinted_sale_overrides` **par n° de transaction** (identité certaine, jamais un rapprochement par titre §24) et `enrichPairs` ne l'écrase pas.
+
+### ⚠️ DEUX PIÈGES, tous deux trouvés au banc
+1. **Collision de classe CSS.** Mes boutons portaient `.vrm-gen-bord` — une classe **déjà utilisée** par les lignes de vente, avec son propre câblage exécuté **après** le mien. Résultat : mon `onclick` était écrasé, le bouton envoyait `genererBord` au lieu de `recupBord`, et un clic « Récupérer » paraissait ne rien faire. Renommés `.vrm-bord-act`. **Deux câblages sur la même classe, le second gagne — et le bouton a l'air mort.**
+2. **`const genSection` en double.** Ma section réutilisait le nom d'une variable réassignée plus bas (`genSection = …`) → `TypeError` sur une constante. L'ancien flux « coche puis je t'ouvre chaque vente » a été **retiré** : deux chemins pour le même geste, c'est la meilleure façon de ne plus savoir lequel marche.
+
+**Vérifié au banc panneau** (faux `chrome`, 3 ventes sur 2 comptes) : 1 bloc flouté, 2 boutons d'action, `pointer-events: none` confirmé sur le compte non connecté, clic « Récupérer » → `recupBord` avec le bon `tx`/`uid`, et le message honnête (« Vinted n'a pas donné l'URL du PDF ») remonté dans le panneau. **0 erreur.** Banc `vm` de génération : 14 cas, 0 non conforme. Extension **5.26.0**.

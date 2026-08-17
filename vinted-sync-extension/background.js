@@ -674,7 +674,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           //    25 sélectionnés » a été écrite puis retirée : 25 PUT enchaînés
           //    depuis un seul clic, c'est la rafale qu'on refuse partout ailleurs
           //    (§32/§43). Ici chaque requête correspond à un geste réel.
-          if (msg.action === 'genererBord') { const r = await genererBordereau(msg.uid, msg.tx); sendResponse(r); return; }
+          if (msg.action === 'genererBord') {
+            // Un clic = un bordereau : on génère, puis on va CHERCHER le PDF et
+            // on l'envoie dans l'app. Le compte rendu remonte au panneau pour
+            // qu'on voie exactement où ça s'est arrêté.
+            const r = await genererBordereau(msg.uid, msg.tx);
+            if (!r.ok) { sendResponse({ ...r, envoye: false }); return; }
+            const accs = await getStoredAccounts();
+            const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
+            const envoye = acc2 ? await recupererLabel(acc2, msg.uid, msg.tx) : false;
+            sendResponse({ ok: true, envoye });
+            return;
+          }
+          // Récupérer le PDF d'un bordereau DÉJÀ émis (aucune génération).
+          if (msg.action === 'recupBord') {
+            const accs = await getStoredAccounts();
+            const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
+            if (!acc2) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
+            const stop = await garde(msg.uid, acc2); if (stop) { sendResponse(stop); return; }
+            const envoye = await recupererLabel(acc2, msg.uid, msg.tx);
+            sendResponse({ ok: envoye, envoye, error: envoye ? '' : "Vinted n'a pas donné l'URL du PDF — il arrivera par email" });
+            return;
+          }
           // Lire la fiche d'une de TES annonces (description, catégorie) pour
           // pouvoir la republier sans tout retaper. Lecture seule.
           if (msg.action === 'capterAnnonce') { const r = await capterAnnonce(msg.uid, msg.itemId); sendResponse(r); return; }
@@ -1601,9 +1622,12 @@ async function visiteVinted() {
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     const ok = await runActive();
     logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
-    // Les bordereaux manquants, APRÈS la moisson (elle vient de rafraîchir les
-    // statuts : sans elle on travaillerait sur une photo périmée).
-    await genererBordereauxEnAttente(uid);
+    // ⚠️ LA VISITE NE GÉNÈRE PLUS RIEN. Demande de Julien : « ce n'est plus
+    // vraiment en automatique, c'est nous qui appuyons ». Générer, c'est agir
+    // sur Vinted — ça reste donc sur SON clic, depuis le panneau. Ce qui tourne
+    // tout seul ici est en LECTURE SEULE : aller chercher le PDF des bordereaux
+    // déjà émis pour le déposer dans l'app.
+    await genererBordereauxEnAttente(uid, { lectureSeule: true });
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 try {
@@ -2263,7 +2287,7 @@ async function recupererLabel(acc, uid, tx) {
   } catch (_) { return false; }
 }
 
-async function genererBordereauxEnAttente(uid) {
+async function genererBordereauxEnAttente(uid, opts = {}) {
   try {
     if (!uid) return 0;
     const accts = await getStoredAccounts();
@@ -2284,7 +2308,7 @@ async function genererBordereauxEnAttente(uid) {
     } catch (_) { /* sans cette lecture on retombe sur le statut Vinted, qui suffit */ }
     const memo = (await chrome.storage.local.get('vrmBordFaits')).vrmBordFaits || {};
     let faits = 0;
-    for (const o of candidates) {
+    for (const o of (opts.lectureSeule ? [] : candidates)) {
       if (faits >= BORD_MAX_PAR_VISITE) break;
       const tx = String(o.transaction_id);
       if (dejaMail.has(tx)) continue;
@@ -2684,6 +2708,21 @@ async function buildPanelData() {
   const photoDeCommande = (o) => (o && ((o.photo && (o.photo.url || (typeof o.photo === 'string' ? o.photo : null))) || o.photo_url)) || null;
   const bordRows = await sbGet("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
   const bordTxns = new Set(bordRows.map(b => String(b.transaction || '')).filter(Boolean));
+  // Bordereaux DÉJÀ ENVOYÉS DANS L'APP par l'extension (une ligne par vente).
+  // C'est ce qui permet d'afficher un vrai compte rendu par colis au lieu de
+  // « on a peut-être capté quelque chose quelque part ».
+  const labelRows = await sbGet("app_data?id=like.harvest_*_label_*&select=tx:data->>tx,capturedAt:data->>capturedAt") || [];
+  const labelParTx = {};
+  for (const r of labelRows) { if (r && r.tx) labelParTx[String(r.tx)] = r.capturedAt || null; }
+  // Numéro de la paire POSÉ SUR LA VENTE par l'app (`vinted_sale_overrides`,
+  // indexé par transaction) : identité certaine, contrairement au rapprochement
+  // par titre (§24). C'est ce numéro qu'on imprime sur le bordereau.
+  const numParTx = {};
+  for (const t in (d.vinted_sale_overrides || {})) {
+    const e = d.vinted_sale_overrides[t];
+    const n = e && e.numero != null ? String(e.numero).trim() : '';
+    if (n) numParTx[String(t)] = n;
+  }
   // ── ÉTAT DU COLIS : la capture la plus précise qu'on ait ────────────────────
   // Le détail de transaction (`harvest_*_txn_*`) porte `shipment.status_title` —
   // c'est Vinted qui le dit, pas une déduction de notre part. Quand ce détail est
@@ -2730,6 +2769,12 @@ async function buildPanelData() {
         conv: o.conversation_id != null ? String(o.conversation_id) : null,
         url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : (o.conversation_id ? `https://www.vinted.fr/inbox/${o.conversation_id}` : 'https://www.vinted.fr/member/transactions?type=sold'),
         hasBord: tx ? bordTxns.has(tx) : false,
+        // Compte rendu, colis par colis : où en est-on vraiment ?
+        aGenerer: aGenererBordereau(o.status),                 // l'étiquette n'existe pas encore
+        emis: !aGenererBordereau(o.status),                    // Vinted l'a émise
+        envoye: tx ? !!labelParTx[tx] : false,                 // l'extension l'a mise dans l'app
+        envoyeAt: tx ? (labelParTx[tx] || null) : null,
+        numero: (tx && numParTx[tx]) || null,                  // le N° posé par l'app
       });
     }
   }
