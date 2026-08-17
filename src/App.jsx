@@ -2725,8 +2725,13 @@ function pushNotif(title, body){
 // Garage : une seule zone neutre. L'utilisateur ajoute lui-même ses colonnes
 // via le bouton +. La porte est optionnelle (bouton afficher/masquer).
 // On démarre avec 1 colonne ; tout le reste s'ajoute à la main.
+// ⚠️ UNE SEULE COLONNE DE 25 = une bande verticale de 25 cartons, illisible sur
+// un écran (plainte de Julien : « le garage ne marche plus »). Une étagère se
+// lit en LARGEUR : 4 colonnes de 8 = 32 places, la forme d'un vrai meuble.
+// `extraCols` ajoute des colonnes de la même hauteur quand le stock grandit.
+const COL_H = 8;
 const LAYOUT = [
-  {id:"zone", name:"", elev:0, cols:[25]},
+  {id:"zone", name:"", elev:0, cols:[COL_H,COL_H,COL_H,COL_H]},
 ];
 const TOTAL_SLOTS = LAYOUT.reduce((s,z)=>s+z.cols.reduce((ss,b)=>ss+b,0),0);
 
@@ -7440,7 +7445,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // LAYOUT effectif avec colonnes ajoutées par l'utilisateur
   const effectiveLayout=useMemo(()=>LAYOUT.map(z=>{
     const extra=extraCols[z.id]||0;
-    return {...z, cols:[...z.cols, ...Array(extra).fill(25)]};
+    return {...z, cols:[...z.cols, ...Array(extra).fill(COL_H)]};
   }),[extraCols]);
   
   const globalMax=useMemo(()=>Math.max(...effectiveLayout.flatMap(z=>z.cols.map(b=>b+z.elev))),[effectiveLayout]);
@@ -7704,6 +7709,9 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
             title="Effacer"><Icon name="close" size={15}/></button>
         </div>}
       </div>
+      {allValsSet.size===0&&!addMode&&<div style={{fontSize:12,color:C.text,background:`${C.accent}0e`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'10px 13px',marginBottom:10,lineHeight:1.45}}>
+        🗄️ <b>Ton garage est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « 🏠 Ranger » pour la placer d'un tap.
+      </div>}
       {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
         {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des paires dans les cases vides.'}
         {blockMode&&'Clique sur une case vide pour la bloquer/débloquer (zone non utilisable). '}
@@ -7756,7 +7764,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                     const cellColor=getColor(z.id,ci,si);
                     
                     // Masquer les cases vides (non bloquées, sans couleur) sauf en mode ajout/blocage/couleur/rangement
-                    const showAllCells=addMode||blockMode||colorMode||!!placing;
+                    // ⚠️ GARAGE VIDE = ÉCRAN VIDE. Les cases vides sont masquées par
+                    // défaut ; quand AUCUNE case n'est remplie, l'écran ne montrait
+                    // donc plus rien du tout — « le garage ne marche plus ». Tant
+                    // qu'il n'y a rien à ranger, on montre l'étagère.
+                    const showAllCells=addMode||blockMode||colorMode||!!placing||allValsSet.size===0;
                     if(!showAllCells&&!blocked&&t===''&&!cellColor){
                       // Case invisible : on rend juste un placeholder vide pour garder l'alignement
                       return <div key={si} style={{width:CW,height:CH}}/>;
