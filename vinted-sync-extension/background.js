@@ -2458,6 +2458,18 @@ async function buildPanelData() {
   const pageDetails = (detRows && detRows[0] && detRows[0].data) || {};
   // Titre normalisé : sert au rapprochement par titre EXACT (jamais approximatif).
   const normT = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Clé stable d'une photo Vinted — COPIE EXACTE de `photoKey` d'App.jsx : l'hôte
+  // (images1/2/3…), la signature « ?s=… » et le répertoire de TAILLE changent
+  // selon l'affichage ; le sous-dossier unique + le nom de fichier, non. Sert
+  // d'identité de repli quand le détail de transaction n'est pas encore capté.
+  const photoKey = (url) => {
+    const raw = String((url && url.url) || url || '').split('?')[0].split('#')[0];
+    if (!raw) return null;
+    const segs = raw.replace(/^https?:\/\/[^/]+/i, '').split('/').filter(Boolean)
+      .filter(s => !/^(f\d{2,4}|\d{2,4}x\d{2,4}|thumbnails?)$/i.test(s));
+    if (!segs.length) return null;
+    return segs.slice(-2).join('/').replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase() || null;
+  };
   // ── COMPTES : une seule règle d'exclusion, et tu peux couper un compte ICI ───
   // Trois sources réunies dans `acctOff` :
   //   • l'app (ligne main) : `vinted_accounts_hidden` + `vinted_accounts_blocked` ;
@@ -2738,6 +2750,10 @@ async function buildPanelData() {
   // PLUS RÉCENT que la ligne de commande, il fait foi : une paire dont le colis
   // est parti ne doit plus jamais apparaître « à générer » (plainte de Julien).
   const txnEtat = {};
+  // Le MÊME détail porte `item_id` : c'est l'identifiant d'annonce donné par
+  // Vinted, donc l'identité d'une vente sans passer par son titre. On le récolte
+  // dans la boucle existante — aucune requête ni octet supplémentaire (§34).
+  const itemParTxn = {};
   try {
     const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data') || []).filter(keepAcc);
     for (const r of txnRows) {
@@ -2745,6 +2761,7 @@ async function buildPanelData() {
       const t = p.transaction || p;
       const tx = String((t && t.id) || '');
       if (!tx) continue;
+      if (t && t.item_id != null) itemParTxn[tx] = String(t.item_id);
       const sh = (t && t.shipment) || {};
       const st = String(sh.status_title || sh.status || t.status_title || t.status || '');
       const cap = Date.parse((r.data && r.data.capturedAt) || '') || 0;
@@ -2907,27 +2924,47 @@ async function buildPanelData() {
   // vendues) PAR TITRE EXACT, et UNIQUEMENT si le titre est unique — jamais de
   // devinette sur un titre en double (même garde que l'app §7/§24 `titleAmbiguous`).
   // La photo d'une annonce ENCORE en ligne prime (plus fraîche).
-  const titleCount = {};
-  const numByTitle = {};
+  // ⚠️ PLUS AUCUN RAPPROCHEMENT PAR TITRE (août 2026, demande de Julien) : « tu
+  // peux avoir des gens qui vendent les mêmes articles avec les mêmes titres,
+  // il faut que ce soit autre chose qui caractérise une annonce ». Mesuré sur la
+  // vraie base : 61 ventes sur 277 (22 %) portent un titre en double, dont deux
+  // « Nike zoom fly 5 noir et violet taille 41 » qui sont DEUX annonces
+  // différentes. Deux identités certaines les remplacent, dans cet ordre :
+  //   1. l'IDENTIFIANT D'ANNONCE de Vinted (transaction → item_id, porté par le
+  //      détail de transaction : 198 lignes sur 198) ;
+  //   2. la PHOTO (0 collision mesurée sur 261 annonces).
+  // Même règle que `identiteAnnonce` dans App.jsx — une seule notion, une règle.
+  const parAnnonce = {};   // id d'annonce → { numero, photo }
   for (const id in numeros) {
     const e = numeros[id]; if (!e) continue;
-    const key = normT(e.title); if (!key) continue;
-    titleCount[key] = (titleCount[key] || 0) + 1;
-    if (!numByTitle[key]) numByTitle[key] = { numero: e.numero != null ? String(e.numero) : null, photo: e.photo || null };
+    parAnnonce[String(id)] = { numero: e.numero != null ? String(e.numero) : null, photo: e.photo || null };
   }
   for (const o of online) {
-    const key = normT(o.title); if (!key || (titleCount[key] || 0) !== 1 || !numByTitle[key]) continue;
-    if (o.photo) numByTitle[key].photo = o.photo;               // photo fraîche
-    if (o.numero != null && numByTitle[key].numero == null) numByTitle[key].numero = String(o.numero);
+    const c = parAnnonce[String(o.id)] || (parAnnonce[String(o.id)] = { numero: null, photo: null });
+    if (o.photo) c.photo = o.photo;                              // photo fraîche
+    if (o.numero != null && c.numero == null) c.numero = String(o.numero);
   }
-  const lookupPair = (title) => { const key = normT(title); if (!key || (titleCount[key] || 0) > 1) return null; return numByTitle[key] || null; };
+  // Index photo → annonce, en ignorant toute photo partagée (jamais de devinette).
+  const parPhoto = {}; const photoDup = new Set();
+  for (const id in parAnnonce) {
+    const k = photoKey(parAnnonce[id].photo); if (!k) continue;
+    if (parPhoto[k] && parPhoto[k] !== id) photoDup.add(k); else parPhoto[k] = id;
+  }
+  photoDup.forEach(k => { delete parPhoto[k]; });
+  const lookupPair = (o) => {
+    const parVinted = o && o.transaction != null ? itemParTxn[String(o.transaction)] : null;
+    if (parVinted && parAnnonce[String(parVinted)]) return parAnnonce[String(parVinted)];
+    const k = photoKey(o && o.photo);
+    const id = k ? parPhoto[k] : null;
+    return id ? parAnnonce[id] : null;
+  };
   // Photo par NUMÉRO (identité certaine) — pour les bordereaux, où le rapprochement
   // par titre est INTERDIT (§24 : risque d'envoyer la mauvaise paire). Le N° d'un
   // bordereau vient de l'email/la transaction (certain) ; on l'utilise pour la photo.
   const photoByNum = {};
   for (const id in numeros) { const e = numeros[id]; if (!e || e.numero == null || !e.photo) continue; const k = String(e.numero); if (!photoByNum[k]) photoByNum[k] = e.photo; }
   for (const o of online) { if (o.numero != null && o.photo) photoByNum[String(o.numero)] = o.photo; } // annonce en ligne = photo fraîche
-  const enrichPairs = (list) => { for (const o of (list || [])) { if (o.photo && o.numero != null) continue; const m = lookupPair(o.title); if (m) { if (!o.photo && m.photo) o.photo = m.photo; if (o.numero == null && m.numero != null) o.numero = m.numero; } } };
+  const enrichPairs = (list) => { for (const o of (list || [])) { if (o.photo && o.numero != null) continue; const m = lookupPair(o); if (m) { if (!o.photo && m.photo) o.photo = m.photo; if (o.numero == null && m.numero != null) o.numero = m.numero; } } };
   enrichPairs(sales); enrichPairs(recentSales); enrichPairs(recentBuys); enrichPairs(disputes); enrichPairs(toShip);
   // Compte PRO = il existe une facture (reçue par email) pour cette paire (§41).
   // On marque `pro` sur les ventes dont le N° a une facture → bouton facture au panneau.
