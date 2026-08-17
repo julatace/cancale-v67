@@ -1629,13 +1629,22 @@ const fetchCapturedLabel = async (uid) => {
 // d'abord les SCALAIRES (quelle vente, quand) pour savoir quoi afficher, et on
 // ne va chercher les octets qu'au moment d'imprimer. Sans ça, ouvrir l'écran
 // Bordereaux retéléchargerait un PDF par compte à chaque fois.
-const fetchCapturedLabelMeta = async (uid) => {
-  if (!uid) return null;
+const fetchCapturedLabelMetas = async (uid) => {
+  if (!uid) return [];
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=tx:data->>tx,capturedAt:data->>capturedAt,url:data->>url`, { headers: sbAuth() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_label_%25&select=id,tx:data->>tx,capturedAt:data->>capturedAt`, { headers: sbAuth() });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (_) { return []; }
+};
+// Les octets d'UN bordereau précis (par id de ligne) — seulement à l'impression.
+const fetchLabelPdf = async (rowId) => {
+  if (!rowId) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=data`, { headers: sbAuth() });
     if (!res.ok) return null;
     const rows = await res.json();
-    return rows[0] || null;
+    return rows[0]?.data || null;
   } catch (_) { return null; }
 };
 // Dernier REÇU / FACTURE officiel Vinted capté par l'extension quand tu l'as
@@ -11300,10 +11309,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     setFreshLabel(best);
     // Index par transaction (lecture scalaire, pas les octets du PDF).
+    // Tous les bordereaux captés, indexés par transaction (une ligne par colis).
     const idx = {};
     for (const a of accounts) {
-      const meta = await fetchCapturedLabelMeta(a.vinted_user_id);
-      if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, capturedAt: meta.capturedAt || null };
+      for (const meta of await fetchCapturedLabelMetas(a.vinted_user_id)) {
+        if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null };
+      }
     }
     setLabelsCaptes(idx);
   })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -14618,9 +14629,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
                           // Le PDF vient de l'email s'il y en a un, sinon de la
                           // capture faite par l'extension au moment de générer.
+                          // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER.
+                          // C'est l'étiquette prise chez Vinted, rattachée à la
+                          // vente par son n° de transaction. L'email n'est qu'une
+                          // VÉRIFICATION (il arrive plus tard, et son numéro vient
+                          // d'un rapprochement par titre, §5.17) — donc un secours,
+                          // pas la source.
                           let bytes = null;
-                          if (b && b.hasPdf) { const p=await fetchBordPdf(b._row); bytes = p&&p.pdfB64?b64ToBytes(p.pdfB64):null; }
-                          if (!bytes && capte) { const l=await fetchCapturedLabel(capte.uid); bytes = l&&l.pdfB64?b64ToBytes(l.pdfB64):null; }
+                          if (capte) { const l=await fetchLabelPdf(capte.row); bytes = l&&l.pdfB64?b64ToBytes(l.pdfB64):null; }
+                          if (!bytes && b && b.hasPdf) { const p=await fetchBordPdf(b._row); bytes = p&&p.pdfB64?b64ToBytes(p.pdfB64):null; }
                           if (!bytes) { toast('PDF illisible.'); return; }
                           processBordereau(num, titre, bytes);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
@@ -14667,7 +14684,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {posted?'↺ Pas encore':'✓ Colis fait'}
                       </button>
                       {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
-                      {pdf && !(b && b.hasPdf) && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau capté par l'extension</span>}
+                      {capte && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · ✓ confirmé par l\'email' : ''}</span>}
                       {!pdf && <span style={{fontSize:11,color:C.muted}}>Bordereau pas encore reçu</span>}
                     </div>
                   </div>

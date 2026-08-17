@@ -847,9 +847,24 @@ async function storeWriteReq(domain, method, url, body) {
 async function storeLabel(domain, url, b64) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
-  const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64 };
-  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
-  logActivity('📄 Bordereau capté (prêt à imprimer)');
+  // À quel colis appartient ce PDF ? Le téléchargement ne le dit pas. On ne
+  // DEVINE pas (§24) : on ne l'attribue que s'il n'y a QU'UN SEUL colis possible
+  // pour ce compte — là ce n'est plus une supposition, c'est le seul candidat.
+  let tx = null;
+  try {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const dejaCapte = new Set();
+    const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
+    for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
+    const cands = ventes.filter(o => o && o.transaction_id != null && AWAITING_SHIP(o.status) && !dejaCapte.has(String(o.transaction_id)));
+    if (cands.length === 1) tx = String(cands[0].transaction_id);
+  } catch (_) { /* sans certitude, le PDF reste simplement « le dernier capté » */ }
+  const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64, ...(tx ? { tx } : {}) };
+  const lignes = [{ id: `harvest_${uid}_label_latest`, data }];
+  if (tx) lignes.unshift({ id: `harvest_${uid}_label_${tx}`, data });
+  await supabaseUpsert('app_data', lignes, 'id');
+  logActivity(tx ? '📎 Bordereau capté et relié à sa vente' : '📄 Bordereau capté (prêt à imprimer)');
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // CAPTURE DU BORDEREAU — PAR LES TÉLÉCHARGEMENTS DU NAVIGATEUR
@@ -2233,9 +2248,17 @@ async function recupererLabel(acc, uid, tx) {
     if (!buf.byteLength || buf.byteLength > 12000000) return false;
     const bytes = new Uint8Array(buf);
     let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    // ⚠️ UNE LIGNE PAR BORDEREAU, PAS UNE SEULE « DERNIÈRE ». `label_latest` est
+    // écrasée à chaque capture : avec 3 colis à envoyer, l'app n'en voyait qu'UN.
+    // La clé porte donc le n° de transaction — c'est l'identité de la vente, donc
+    // du bordereau (il ne peut pas y avoir de bordereau sans vente, §5.28).
     const data = { uid, url, tx: String(tx), capturedAt: new Date().toISOString(), pdfB64: btoa(bin) };
-    await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
+    await supabaseUpsert('app_data', [
+      { id: `harvest_${uid}_label_${tx}`, data },
+      { id: `harvest_${uid}_label_latest`, data },   // gardée : d'anciens écrans la lisent
+    ], 'id');
     await noterUrlLabel(url, true);
+    logActivity('📎 Bordereau envoyé dans l\'application');
     return true;
   } catch (_) { return false; }
 }
@@ -2289,8 +2312,8 @@ async function genererBordereauxEnAttente(uid) {
     // clé « label » — la fonction n'avait jamais été atteinte.
     const dejaCapte = new Set();
     try {
-      const cur = await sbGet(`app_data?id=eq.harvest_${uid}_label_latest&select=tx:data->>tx`);
-      if (cur && cur[0] && cur[0].tx) dejaCapte.add(String(cur[0].tx));
+      const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
+      for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
     } catch (_) { /* pas de ligne : rien de capté, on tente */ }
     let recup = 0;
     for (const o of ventes) {
