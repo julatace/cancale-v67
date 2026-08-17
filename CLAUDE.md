@@ -2554,3 +2554,25 @@ Un article **DANS UN LOT** n'a que son titre (Vinted ne donne ni identifiant ni 
 
 ### Vérifié
 `npm run build` OK · `node --check background.js` OK · smoke app 12 écrans sur les vraies données : **0 PAGEERROR** · vrai `buildPanelData` contre la vraie base : 22 annonces, 80 ventes, 5 colis — aucune régression · `scripts/audit-coherence.cjs` : **6 règles, 0 désaccord**. Extension **5.28.0**.
+
+### 5.34 (suite) — ⚠️ LES VERROUS HÉRITÉS ÉTAIENT LE VRAI RESTE DE RISQUE
+
+Julien : « il n'y a aucun risque de base, on est d'accord ? » — la bonne question, et la réponse honnête demandait une mesure.
+
+Le correctif ci-dessus ne *lit* que des données (deux entiers par transaction) : aucun `DELETE`, aucun numéro touché, aucune écriture nouvelle. **Mais `vinted_txn_link` est un verrou PERMANENT, longtemps posé PAR TITRE, et il est consulté AVANT tout le reste** — donc un mauvais lien déjà en base aurait survécu au correctif.
+
+**Mesuré en base (17 août) :**
+```
+verrous vinted_txn_link : 177  |  vérifiables contre l'id Vinted : 35  |  justes : 33  |  FAUX : 2
+  « adidas spezial noir taille 34 » → verrou N°155, Vinted rattache une AUTRE annonce
+  « adidas spezial noir taille 38 » → verrou N°27,  idem
+numéros auto sur ventes : 3  |  en désaccord avec Vinted : 0
+```
+
+Deux corrections :
+1. **Un verrou ne prime plus sur Vinted** : quand `txnItem[tx]` contredit `txnLink[tx]`, le verrou est ignoré.
+2. **Il est RÉPARÉ en base, pas contourné** — l'auto-lock réécrit la ligne avec l'identifiant Vinted. Sans ça le mauvais lien resurgirait partout où il est lu (bordereau, facture, prix d'achat). L'effet ne saute plus une transaction déjà verrouillée : il la vérifie.
+
+⚠️ **Ce qu'on ne peut PAS affirmer** : 142 des 177 verrous ne sont pas vérifiables aujourd'hui (leur transaction n'est pas encore captée). Ils se vérifieront et se répareront tout seuls au fur et à mesure que l'extension capte les transactions. Aucun n'est réputé juste par défaut.
+
+Vérifié : `npm run build` OK · smoke app 12 écrans sur les vraies données, **0 PAGEERROR**.

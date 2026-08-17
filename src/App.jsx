@@ -10128,8 +10128,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const resolvedEntry = (o) => {
     // Une paire ENCORE EN LIGNE n'est pas vendue : on refuse de l'associer.
     const usable = (key) => (key && numeros[key] && !onlineAnnonceIds.has(String(key))) ? numeros[key] : null;
+    // ⚠️ VERROU HÉRITÉ : `vinted_txn_link` est permanent et a longtemps été posé
+    // PAR TITRE. Vérifié en base le 17 août : sur 177 verrous, 35 sont vérifiables
+    // contre l'identifiant Vinted — 33 justes et **2 FAUX** (« adidas spezial noir
+    // taille 34 » verrouillé sur le N°155, « …taille 38 » sur le N°27, deux paires
+    // que Vinted rattache à une AUTRE annonce). Un verrou ne peut donc plus primer
+    // sur ce que dit Vinted : quand les deux se contredisent, **Vinted gagne**.
+    const certain = o && o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     const linked = o && o.transaction_id != null ? txnLink[String(o.transaction_id)] : null;
-    if (linked && numeros[linked]) {
+    if (linked && numeros[linked] && !(certain && String(certain) !== String(linked))) {
       const e = numeros[linked];
       // Garde-fou taille : un ancien verrouillage par titre a pu relier une autre
       // pointure → on l'ignore et on ré-évalue.
@@ -11212,16 +11219,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const o of sales.items) {
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const tid = o.transaction_id != null ? String(o.transaction_id) : null;
-      if (!tid || next[tid]) continue;
+      if (!tid) continue;
       // ⚠️ Un verrou est PERMANENT : il ne se pose que sur une identité certaine
       // (identifiant Vinted, sinon photo), jamais sur une ressemblance de titre.
       const key = identiteAnnonce(o);
+      // RÉPARATION des verrous hérités : si Vinted dit une AUTRE annonce que le
+      // verrou déjà en base, on corrige la ligne au lieu de la contourner —
+      // sinon le mauvais lien resurgit partout où il est lu (bordereau, facture,
+      // prix d'achat). Mesuré : 2 verrous faux sur les 35 vérifiables.
+      const certain = txnItem[tid] ? String(txnItem[tid]) : null;
+      if (next[tid]) {
+        if (certain && String(next[tid]) !== certain && !onlineAnnonceIds.has(certain)) { next[tid] = certain; changed = true; }
+        continue;
+      }
       // Jamais verrouiller sur une annonce ENCORE EN LIGNE (pas vendue).
       if (key && !onlineAnnonceIds.has(String(key))) { next[tid] = key; changed = true; }
     }
     if (changed) { setTxnLink(next); save('vinted_txn_link', next); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros]);
+  }, [sales.items, numeros, txnItem]);
 
   // AUTO-NUMÉRO des ventes ORPHELINES (num introuvable). Pour une vente ACTIVE
   // (en cours / à expédier, jamais annulée ni déjà finalisée) dont on ne
