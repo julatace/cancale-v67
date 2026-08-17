@@ -1625,6 +1625,19 @@ const fetchCapturedLabel = async (uid) => {
     return rows[0]?.data || null;
   } catch (_) { return null; }
 };
+// ⚠️ ÉGRESS (§34) : la ligne `label_latest` porte le PDF en base64. On lit
+// d'abord les SCALAIRES (quelle vente, quand) pour savoir quoi afficher, et on
+// ne va chercher les octets qu'au moment d'imprimer. Sans ça, ouvrir l'écran
+// Bordereaux retéléchargerait un PDF par compte à chaque fois.
+const fetchCapturedLabelMeta = async (uid) => {
+  if (!uid) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=tx:data->>tx,capturedAt:data->>capturedAt,url:data->>url`, { headers: sbAuth() });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows[0] || null;
+  } catch (_) { return null; }
+};
 // Dernier REÇU / FACTURE officiel Vinted capté par l'extension quand tu l'as
 // consulté sur Vinted (ligne harvest_{uid}_receipt_latest). Pour la compta pro.
 const fetchCapturedReceipt = async (uid) => {
@@ -9072,10 +9085,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Bordereau PDF capté par l'extension quand tu le télécharges sur Vinted → on
   // signale qu'il est dispo pour le tamponner en 1 clic (cf. startBordereau).
   const [freshLabel, setFreshLabel] = useState(null); // { name, mins } ou null
+  // Bordereaux captés par l'extension, indexés par n° de TRANSACTION : c'est ce
+  // qui permet de mettre « 🖨 Imprimer » sur LA bonne ligne (identité certaine),
+  // au lieu du bandeau générique « un bordereau a été téléchargé quelque part ».
+  const [labelsCaptes, setLabelsCaptes] = useState({});
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
-  const bordKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+  const bordKey = (b) => String((b && (b.transaction || b.suivi || b.numero)) || '');
   // Liens MANUELS bordereau → paire numérotée (quand l'app ne retrouve pas seule
   // la paire : titre en double même taille, ou paire jamais numérotée). Clé = clé
   // du bordereau, valeur = { numero }. Synchronisé (vinted_bord_links). Prioritaire
@@ -11006,6 +11023,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // données ne sont pas (encore) là — on ne mint rien plutôt que de tout renuméroter.
     if (!Object.keys(numeros).length) return;
     const ovNext = { ...saleOv };
+    // Numéros déjà pris (annonces en ligne, garage, ventes en cours, historique)
+    // — c'est `takenNums`, la référence unique (§7). On en fait une copie locale
+    // pour que deux ventes numérotées dans la même passe ne reçoivent pas le
+    // même numéro.
+    const dejaPris = new Set(takenNums);
     let changed = false;
     // ⚠️ CHANGEMENT (juillet 2026) : on n'INVENTE plus JAMAIS de numéro pour une
     // vente. Inventer des numéros pour des ventes non reconnues faisait grimper le
@@ -11025,8 +11047,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
       if (reuse) {
         if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
-      } else if (cur && cur.autoAssigned && cur.numero != null && String(cur.numero).trim() !== '') {
+      } else if (needsBordereau(o.status) && !isHidden(o)) {
+        // ⚠️ LE CAS QUI MANQUAIT — « je me retrouve avec des paires qui n'ont pas
+        // de numéro alors que c'est censé être automatique ».
+        // La numérotation auto ne tourne que sur `annBase`, c'est-à-dire les
+        // annonces EN LIGNE. Une paire vendue AVANT que l'app soit ouverte n'y
+        // passe donc jamais : mesuré, 171 annonces fermées sur 234 n'ont aucun
+        // numéro, et les 3 colis à envoyer d'aujourd'hui en font partie.
+        // Or c'est précisément là qu'on en a besoin : le carton est à la maison
+        // et il faut écrire un numéro dessus pour l'expédier.
+        // ⚠️ STRICTEMENT LIMITÉ AUX VENTES QUI ATTENDENT L'ENVOI. Numéroter tout
+        // l'historique ferait exploser le compteur — c'est l'incident de juillet
+        // (50 → 120) qui avait fait supprimer l'invention de numéros. Ici la
+        // paire occupe VRAIMENT une place (§7 : un numéro = une place au
+        // garage), et le numéro repart dans le pool dès que le colis est parti
+        // (`freedNums`). Aujourd'hui : 3 ventes concernées, pas 275.
+        if (!(cur && cur.numero != null && String(cur.numero).trim() !== '')) {
+          let cand = 1; while (dejaPris.has(cand)) cand += 1;
+          dejaPris.add(cand);
+          ovNext[tid] = { ...(cur||{}), numero: String(cand), autoAssigned: true, autoShip: true };
+          changed = true;
+        }
+      } else if (cur && cur.autoAssigned && !cur.autoShip && cur.numero != null && String(cur.numero).trim() !== '') {
         // Ancien numéro inventé sans correspondance → on le retire (garde le reste).
+        // ⚠️ On épargne `autoShip` : celui-là est écrit sur un carton réel.
         const { numero, autoAssigned, ...rest } = cur; ovNext[tid] = rest; changed = true;
       }
     }
@@ -11143,6 +11187,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     }
     setFreshLabel(best);
+    // Index par transaction (lecture scalaire, pas les octets du PDF).
+    const idx = {};
+    for (const a of accounts) {
+      const meta = await fetchCapturedLabelMeta(a.vinted_user_id);
+      if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, capturedAt: meta.capturedAt || null };
+    }
+    setLabelsCaptes(idx);
   })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
@@ -14216,8 +14267,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (sales.loading && emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
           const ex = expeditions();
           const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
-          const avecPdf = ex.filter(e=>e.b && e.b.hasPdf && !(e.o && isShipDone(e.o)));
-          const proNb = avecPdf.filter(e=>invForBord(e.b)).length;   // comptes pro : facture jointe
+          const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
+          const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
           return (
             <div style={{border:`1px solid ${aPoster.length?C.accent:C.border}`,background:aPoster.length?`${C.accent}0e`:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
@@ -14227,7 +14278,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2}}>
                     {aPoster.length>0
-                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} déjà reçu${avecPdf.length>1?'s':''} par email${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}`
+                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}`
                       : 'Vinted ne te demande aucun envoi en ce moment.'}
                   </div>
                 </div>
@@ -14389,7 +14440,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const urgCol = dl==null ? C.muted : dl<0 ? C.danger : dl<=1 ? C.warn : C.muted;
                 const urgTxt = dl==null ? null : dl<0 ? `⚠️ ${-dl}j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl}j pour poster`;
                 const inv = b ? invForBord(b) : null;
-                const pdf = !!(b && b.hasPdf);
+                // Deux sources de PDF, l'une comme l'autre certaines (le lien se
+                // fait par le n° de transaction) : l'email reçu, ou le bordereau
+                // capté par l'extension juste après l'avoir généré.
+                const capte = e.txn ? labelsCaptes[e.txn] : null;
+                const pdf = !!(b && b.hasPdf) || !!capte;
                 const acc = o ? o._acc : null;
                 return (
                   <div key={e.key} data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:16,opacity:posted?0.55:1}}>
@@ -14436,9 +14491,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {pdf ? (
                         <button type="button" onClick={async ()=>{
-                          if (inv) { await printBordAndInvoice(b); return; }
-                          const p=await fetchBordPdf(b._row);
-                          const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){toast('PDF illisible.');return;}
+                          if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
+                          // Le PDF vient de l'email s'il y en a un, sinon de la
+                          // capture faite par l'extension au moment de générer.
+                          let bytes = null;
+                          if (b && b.hasPdf) { const p=await fetchBordPdf(b._row); bytes = p&&p.pdfB64?b64ToBytes(p.pdfB64):null; }
+                          if (!bytes && capte) { const l=await fetchCapturedLabel(capte.uid); bytes = l&&l.pdfB64?b64ToBytes(l.pdfB64):null; }
+                          if (!bytes) { toast('PDF illisible.'); return; }
                           processBordereau(num, titre, bytes);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
                         style={{flex:'1 1 160px',border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
@@ -14484,7 +14543,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {posted?'↺ Pas encore':'✓ Colis fait'}
                       </button>
                       {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
-                      {!pdf && <span style={{fontSize:11,color:C.muted}}>Bordereau pas encore reçu par email</span>}
+                      {pdf && !(b && b.hasPdf) && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau capté par l'extension</span>}
+                      {!pdf && <span style={{fontSize:11,color:C.muted}}>Bordereau pas encore reçu</span>}
                     </div>
                   </div>
                 );

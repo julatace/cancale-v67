@@ -2254,7 +2254,7 @@ Julien : « ça ne peut pas lire automatiquement sans que j'aie besoin d'aller d
 
 **6 soldes captés entre 20:06 et 20:08**, tout seuls. Et le **157,00 € de `julatace35260` est exactement le chiffre que Julien avait relevé à l'écran** — la lecture est juste, pas seulement présente.
 
-Il ne manque que **`liliand653`** (session à rafraîchir, dernière capture il y a 14 j).
+Il ne manquait que **`liliand653`** — ⚠️ **Julien l'a MASQUÉ le 17 août** (`vinted_accounts_hidden` = `3175772080`) : ce compte est hors comptabilité, il n'y a plus rien à en attendre. Ne plus le lister comme un manque.
 
 ➡️ Les trois textes de l'app qui disaient « ouvre Mon porte-monnaie sur Vinted » sont **faux depuis la 5.20** et ont été corrigés : le seul geste utile est **se connecter une fois au compte**. ⚠️ Ne pas réintroduire la consigne « ouvre ton porte-monnaie ».
 
@@ -2344,7 +2344,7 @@ Deux statuts Vinted se ressemblent et veulent dire l'inverse :
 - ⚠️ **Au plus 3 par visite** (`BORD_MAX_PAR_VISITE`). Ce n'est **pas** un « rythme faussement humain » (toujours refusé, §32) : c'est une limite de volume, de même nature que le plafond horaire. Mesuré sur les vraies données : **1 seule vente à générer aujourd'hui** — la rafale est théorique.
 - Une vente refusée n'est **pas réessayée avant 6 h** (`vrmBordFaits`, mémo local, aucun égress).
 - Un bordereau déjà reçu par email ⟹ on ne regénère pas.
-- Adresse d'envoi inconnue ⟹ refus honnête, **0 requête** (`adresseVendeur` lit le `seller_address_id` capté par compte : **6 comptes sur 8** l'ont ; `liliand653` et `julatace3535` ne l'ont pas encore — il faut en générer un à la main une fois).
+- Adresse d'envoi inconnue ⟹ refus honnête, **0 requête** (`adresseVendeur` lit le `seller_address_id` capté par compte : **6 comptes sur 8** l'ont). ⚠️ Le seul compte ACTIF qui n'en a pas est **`julatace3535`** — il faut y générer un bordereau à la main une fois, l'extension retiendra l'adresse. (`liliand653` est masqué, voir ci-dessous.)
 
 ### Récupérer le PDF : tenté, pas promis
 Après génération on essaie `transaction → shipment.id → GET /api/v2/shipments/{id}/label_url` puis on range le PDF en `harvest_{uid}_label_latest` (ce que l'app lit déjà). ⚠️ **L'endpoint a été VU dans les URL observées (§5.26) mais sa réponse n'a jamais été capturée** : lecture défensive sur plusieurs noms de champ, et si ça ne donne rien **on ne prétend rien** — le journal dit « le PDF arrivera par email » (§3). C'est la seule partie non garantie ; la génération, elle, l'est.
@@ -2353,3 +2353,47 @@ Après génération on essaie `transaction → shipment.id → GET /api/v2/shipm
 Plus de « 📄 Générer sur Vinted ↗ ». La carte dit où on en est : **« ⏳ L'extension le génère à ta prochaine visite sur Vinted »** ou **« ✅ Bordereau déjà généré chez Vinted — le PDF arrive par email »**. « 📎 J'ai le PDF » reste (dépôt manuel du fichier téléchargé).
 
 **Vérifié** : banc `vm` exécutant le VRAI `genererBordereauxEnAttente`, **8 cas → 0 non conforme** (génère 1 quand il faut ; 0 sur « bordereau envoyé », sur annulé/remboursé, sans adresse, si l'email l'a déjà, si tenté il y a 1 h ; **3 max** quand 5 sont en attente ; **0 si le navigateur est sur un autre compte**). Banc app : les 3 cartes affichent le bon état (2 « déjà généré », 1 « l'extension le génère »), **0 PAGEERROR**. `audit-coherence` : **6 règles, 0 désaccord**. Extension **5.22.0**.
+
+### ⚠️ `liliand653` : MASQUÉ (17 août), pas supprimé
+Julien : « oublie liliand653, je l'ai enlevé dans l'application ». Vérifié en base : son uid **3175772080** est dans **`vinted_accounts_hidden`** (clé synchronisée) — donc masqué. Il n'apparaît nulle part, ne compte dans aucun total, et l'extension ne génère rien pour lui (elle ne travaille que sur le compte connecté).
+⚠️ **Masqué ≠ supprimé** (§5.10 vs §5.22) : sa ligne `vinted_accounts` existe toujours, donc si Julien s'y reconnecte dans Chrome l'extension le recapte (il reste masqué pour autant). Pour l'effacer vraiment il y a « 🗑 Supprimer ce compte ».
+➡️ **Ne plus le compter comme un compte à rafraîchir** dans les relevés (porte-monnaie non lu, adresse d'envoi manquante, capture ancienne) : ce n'est pas un manque, c'est un choix.
+
+---
+
+## 5.30 — LE NUMÉRO MANQUANT : la numérotation auto ne voyait que les annonces EN LIGNE
+
+Julien : « je me retrouve avec des paires qui n'ont pas de numéro, alors que normalement c'est censé être en automatique ».
+
+### La cause, mesurée
+L'effet de numérotation automatique tourne sur **`annBase`** — c'est-à-dire les annonces **encore en ligne**. Une paire vendue **avant** que l'app soit ouverte n'y passe donc jamais.
+
+| | |
+|---|---|
+| annonces EN LIGNE | 27 · **0 sans numéro** |
+| annonces FERMÉES (vendues/retirées) | 234 · **171 sans numéro** |
+
+Les 3 colis à envoyer du jour en faisaient partie : leurs annonces (`9677383874`, `9677588666`, `9677552994`) sont bien dans le dressing capté, toutes `is_closed: true`, et **aucune n'a jamais eu d'entrée dans `vinted_annonce_numeros`**. Le rapprochement par photo ne pouvait rien y faire — il n'y avait rien à rapprocher.
+
+### Ce qui a changé (et le garde-fou qui va avec)
+L'effet « auto-numéro des ventes » existait déjà mais faisait **réutilisation SEULE** : depuis juillet il n'invente plus de numéro, parce qu'en inventer pour toutes les ventes avait fait grimper le compteur de 50 à 120. Cette règle reste — on l'**élargit au seul cas où le numéro est indispensable** :
+
+➡️ une vente qui **attend encore l'envoi** (`needsBordereau`) et pour laquelle aucun numéro n'est retrouvé reçoit **le plus petit numéro libre**, écrit dans `vinted_sale_overrides` (clé synchronisée) avec le drapeau **`autoShip`**.
+
+Pourquoi c'est cohérent avec §7 (« un numéro = une place au garage ») : le carton est **physiquement à la maison**, il occupe une place, et il faut écrire quelque chose dessus pour l'expédier. Le numéro repart dans le pool dès que le colis est parti (`freedNums`).
+⚠️ **Strictement limité aux ventes qui attendent l'envoi** : 3 ventes aujourd'hui, pas les 275 de l'historique — c'est ce qui évite l'incident de juillet. Le nettoyage des vieux numéros inventés épargne désormais `autoShip` (celui-là est écrit sur un vrai carton).
+
+**Mesuré au banc** : les 3 colis passent de « N° en attente » à **N°117, N°55, N°84** — trois numéros distincts, **aucun porté par une annonce en ligne**, aucun posé au garage.
+
+### Capter le bordereau : on ne devine plus, on mesure
+`recupererLabel` essayait un seul chemin (`/shipments/{id}/label_url`) et abandonnait en silence si la réponse n'avait pas la forme attendue — or **cette forme n'a jamais été observée**.
+- **`urlDeLabel(o)`** balaie la réponse (4 niveaux) et retient la première URL plausible, au lieu de parier sur un nom de champ.
+- Trois chemins essayés à la suite (`label_url`, la transaction d'expédition, `label_options`), et **un échantillon de chaque réponse est conservé** dans `panel_diag_capture.rates` — la méthode qui a fini par expliquer la fiche article (§5.24 → §5.26).
+- La ligne `harvest_{uid}_label_latest` porte maintenant **`tx`** : le PDF est donc rattaché à LA bonne vente.
+
+Côté app, un bordereau capté vaut un bordereau reçu par email : la carte affiche **« 🖨 Imprimer »** + la pastille « 📎 Bordereau capté par l'extension ». ⚠️ Lecture des **scalaires** (`tx`, `capturedAt`) pour l'affichage, octets du PDF **seulement à l'impression** — sinon ouvrir l'écran retéléchargerait un PDF par compte (§34).
+
+### ⚠️ J'ai introduit un plantage, et le filet l'a attrapé
+En rendant `pdf` vrai pour une entrée **sans** bordereau email, le récap appelait `invForBord(e.b)` avec `e.b === null` → `Cannot read properties of null (reading 'transaction')`. **`EcranGardeFou` (§5.14) a fait exactement son travail** : message d'erreur, navigation intacte, rien de perdu — et le banc l'a vu tout de suite. Corrigé (`e.b && invForBord(e.b)`), et `bordKey` rendu insensible à `null` puisque c'est un helper bas niveau.
+
+**Vérifié** : banc `vm` sur le vrai code de l'extension, **11 cas → 0 non conforme** (dont l'URL du PDF trouvée à plat ET imbriquée, et « aucune URL → on ne prétend rien ») · banc app dans les deux états (avec et sans bordereau capté), **0 PAGEERROR** · smoke 12 écrans, **0 PAGEERROR** · `audit-coherence` : 6 règles, 0 désaccord. Extension **5.23.0**.
