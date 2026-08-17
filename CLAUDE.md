@@ -2308,3 +2308,13 @@ L'ancien était une colonne de champs **sans accents** (« Recu d'achat »), san
 `email_bord_99000000001` (« Nike Air Max N°99001 Taille 42 », §5.19) était toujours là. **Vidée** (`{supprime:true}` — le `DELETE` reste sans effet avec la clé publique, §5.22).
 
 **Vérifié** : `npm run build` OK · smoke app 12 écrans sur les vraies données, **0 PAGEERROR** (les seuls « suspects » restent l'accord de « 1 colis », invariable) · `node --check` OK sur `background.js` et `bridge.js`. Extension **5.21.0**.
+
+### 5.28 (suite) — RÈGLE : IL NE PEUT PAS Y AVOIR DE BORDEREAU SANS VENTE
+
+Julien pose la règle. **Vérifiée sur la base avant de coder : 72 des 73 bordereaux retrouvent leur vente, 0 orphelin** (le 73ᵉ était ma ligne de test, vidée le jour même). Elle tient.
+
+Conséquence sur `expeditions()` : la branche « bordereau orphelin gardé 21 jours » **est supprimée**. Un bordereau qu'on ne rattache à aucune vente **n'est pas un colis à préparer** — c'est le signe que la MOISSON manque (compte supprimé, capture en retard). Le mettre dans la liste de travail, c'était exactement le bordereau fantôme d'un compte supprimé qui restait affiché pour toujours.
+
+➡️ Il ressort en **signalement** (`bordSansVente`, bandeau orange, seuil `SANS_VENTE_MAX_J = 21 j`) qui nomme le compte concerné et dit quoi faire (« repasse une fois sur Vinted avec ce compte »), **jamais en carton à préparer**.
+
+**Vérifié au banc dans les deux sens** : sans orphelin → aucun bandeau, 3 colis ; avec un orphelin injecté (fixture de banc, jamais en base) → bandeau « 1 bordereau reçu sans vente correspondante · julatace3535 » et **toujours 3 colis**, pas 4. **0 PAGEERROR** dans les deux cas.

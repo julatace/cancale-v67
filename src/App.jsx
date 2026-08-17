@@ -9803,7 +9803,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ➡️ La source de vérité est maintenant ce que Vinted dit via l'extension :
   // une vente qui attend mon envoi. L'email n'apporte plus que le PDF. Ça
   // marche donc aussi pour quelqu'un qui n'a jamais branché sa boîte mail.
-  const ORPHELIN_MAX_J = 21;
+  // Un bordereau reçu il y a moins de N jours dont la vente reste introuvable
+  // mérite d'être signalé (moisson en retard) ; plus vieux, c'est un reste.
+  const SANS_VENTE_MAX_J = 21;
+  // Bordereaux reçus par email qu'on ne rattache À AUCUNE vente. Ce n'est jamais
+  // un colis (voir la règle dans `expeditions`) : c'est un diagnostic.
+  const bordSansVente = () => {
+    const out = [];
+    for (const b of (emailBords || [])) {
+      if (isBordHidden(b) || isBordDone(b)) continue;
+      if (b.transaction != null && soldByTxn[String(b.transaction)]) continue;
+      const j = b.receivedAt ? (Date.now() - new Date(b.receivedAt).getTime()) / 86400000 : 0;
+      if (j > SANS_VENTE_MAX_J) continue;
+      out.push(b);
+    }
+    return out;
+  };
   const expeditions = () => {
     const parTxn = {};
     for (const b of (emailBords || [])) {
@@ -9820,26 +9835,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
       })
       .filter(e => !(e.b && isBordDone(e.b)));            // colis déjà parti : il sort tout seul
-    const vus = new Set(items.map(e => e.txn));
-    // 2) Bordereaux reçus par email SANS vente correspondante dans la moisson.
-    //    On ne les jette pas (la vente peut ne pas être encore captée) mais on
-    //    ne les garde pas éternellement : au-delà de 3 semaines sans vente, ou
-    //    si le compte n'existe plus, c'est un reste — pas un colis à envoyer.
-    const vivants = new Set((accounts || []).map(a => String(a.login || '').toLowerCase()).filter(Boolean));
-    const orphelins = [];
-    for (const b of Object.values(parTxn)) {
-      if (vus.has(String(b.transaction))) continue;
-      if (isBordDone(b)) continue;
-      const j = b.receivedAt ? (Date.now() - new Date(b.receivedAt).getTime()) / 86400000 : 0;
-      if (j > ORPHELIN_MAX_J) continue;                   // reste ancien
-      const compte = String(b.account || '').toLowerCase();
-      if (compte && vivants.size && !vivants.has(compte)) continue;  // compte supprimé
-      orphelins.push({ key: 'b' + bordKey(b), o: null, b, txn: String(b.transaction || '') });
-    }
+    // 2) ⚠️ IL NE PEUT PAS Y AVOIR DE BORDEREAU SANS VENTE (règle posée par
+    //    Julien, vérifiée sur les données : 72 des 73 bordereaux retrouvent leur
+    //    vente, le 73ᵉ était une ligne de test). Donc un bordereau qu'on ne
+    //    rattache à aucune vente N'EST PAS un colis à envoyer : c'est le signe
+    //    que la vente n'est pas (ou plus) captée — compte supprimé, moisson en
+    //    retard. Le mettre dans la liste de travail, c'était exactement le
+    //    bordereau fantôme d'un compte supprimé qui restait affiché pour
+    //    toujours. On ne l'invente plus ; il ressort en signalement (voir
+    //    `bordSansVente` plus bas), jamais en carton à préparer.
     // Délai d'expédition : celui du bordereau quand on l'a (Vinted l'écrit dans
     // l'email), sinon celui calculé sur la vente (`toShip`). Une seule notion.
     const urg = {}; (toShip || []).forEach(t => { if (t && t.o && t.o.transaction_id != null) urg[String(t.o.transaction_id)] = t; });
-    const tout = [...items, ...orphelins].map(e => {
+    const tout = items.map(e => {
       let dl = null;
       if (e.b) { const d = bordDeadline(e.b); if (d && d.days != null) dl = d.days; }
       if (dl == null && urg[e.txn] && urg[e.txn].daysLeft != null) dl = urg[e.txn].daysLeft;
@@ -14315,6 +14323,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   compte au lieu de laisser croire à une contradiction. */}
               <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} à poster en priorité {overdue?'· du retard !':''}</div>
               <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — les plus urgents sont en haut de la liste.</div>
+            </div>
+          );
+        })()}
+        {/* SIGNALEMENT (pas un colis) : un bordereau reçu qu'on ne rattache à
+            aucune vente. Il ne peut pas y avoir de bordereau sans vente — donc
+            si ça arrive, c'est la MOISSON qui manque, pas un carton à préparer.
+            On le dit ici au lieu de fabriquer une fausse ligne de travail. */}
+        {(()=>{
+          const sv = bordSansVente();
+          if (!sv.length) return null;
+          const comptes = [...new Set(sv.map(b=>b.account).filter(Boolean))];
+          return (
+            <div style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.warn}}>⚠️ {sv.length} bordereau{sv.length>1?'x':''} reçu{sv.length>1?'s':''} sans vente correspondante</div>
+              <div style={{fontSize:11,color:C.text,marginTop:3,lineHeight:1.45}}>
+                Un bordereau existe toujours pour une vente : si celle-ci n'apparaît pas, c'est que la capture est en retard{comptes.length?` sur ${comptes.join(', ')}`:''} — repasse une fois sur Vinted avec ce compte. Ce n'est pas un colis à préparer, donc il n'est pas dans la liste.
+              </div>
             </div>
           );
         })()}
