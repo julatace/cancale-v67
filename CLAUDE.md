@@ -2257,3 +2257,54 @@ Julien : « ça ne peut pas lire automatiquement sans que j'aie besoin d'aller d
 Il ne manque que **`liliand653`** (session à rafraîchir, dernière capture il y a 14 j).
 
 ➡️ Les trois textes de l'app qui disaient « ouvre Mon porte-monnaie sur Vinted » sont **faux depuis la 5.20** et ont été corrigés : le seul geste utile est **se connecter une fois au compte**. ⚠️ Ne pas réintroduire la consigne « ouvre ton porte-monnaie ».
+
+---
+
+## 5.28 — LES PHOTOS, LES BORDEREAUX ET LES REÇUS : trois causes, toutes mesurées à l'écran
+
+Plainte de Julien : « je n'ai plus les photos des ventes… les reçus ne sont pas très bien… la fiabilité des bordereaux n'est vraiment pas bonne, tu me montres une 1000 et c'est marqué Nike air Max obsidienne, je n'ai même pas les dernières que j'ai vendues… prends en compte ce que l'extension capte… tout le monde ne va pas connecter son e-mail ».
+
+Méthode : **rendre l'écran Bordereaux sur les vraies données** (§20) avant d'écrire une ligne. Il avait raison sur les trois points, et chacun avait une cause distincte.
+
+### 1. ⚠️⚠️ `photo_url` N'EXISTE PAS — l'app lisait un champ que rien n'écrit
+Une commande Vinted porte **`photo: { url, high_resolution }`** (vérifié : **219 des 275 ventes** en base). Or **toute** l'app affichait `o.photo_url` — un champ **jamais assigné nulle part** (`grep "photo_url\s*[:=]"` → **0 résultat**). D'où le pictogramme 👟 sur chaque vente, chaque achat, chaque reçu, chaque ligne de bordereau.
+
+⚠️ Le dégât n'était pas que cosmétique : `entryKeyByPhoto(o)` lisait lui aussi `o.photo_url`, donc le **rapprochement vente↔paire PAR PHOTO** (la voie la plus sûre de `resolvedEntry`, celle qui gère les titres en double) **n'a jamais fonctionné**. On retombait toujours sur le titre.
+
+➡️ **`orderPhoto(o)` (module-level) = LA lecture de la photo d'une commande.** 14 sites convertis. **Mesuré : Ventes 0 → 145 photos, Achats 29, Bordereaux 4** ; le rapprochement par photo retrouve maintenant le numéro de **58 ventes sur 275** (21 %) — les autres n'ont réellement pas d'annonce numérotée correspondante.
+
+### 2. LES BORDEREAUX VENAIENT DES EMAILS — ils viennent maintenant de la MOISSON
+Ce que l'écran affichait vraiment, mesuré :
+| | |
+|---|---|
+| ventes qui attendent réellement mon envoi (statut Vinted) | **3** (angeled92 ×2, julatace3535, toutes du 16/08) |
+| ces 3 ventes ont un email de bordereau | **0** |
+| bordereaux affichés « à imprimer » | **1** — « nike air max 1 obsidian lilac bloom », vendu le **16/07** sur **`vanessa5723`, un compte SUPPRIMÉ** |
+
+C'est très exactement sa phrase. Deux défauts :
+- l'écran était construit sur `email_bord_*` : **pas d'email = pas de colis affiché**, donc ses 3 vraies ventes étaient reléguées dans une seconde liste, tout en bas, sans photo ;
+- `bordShipped` refuse de conclure quand la vente est inconnue (« on ne conclut pas ») → un bordereau **orphelin restait à imprimer POUR TOUJOURS**.
+
+➡️ **`expeditions()` = la liste, et elle part de la moisson** : une entrée = une vente que Vinted attend (`needsBordereau`, identité = n° de transaction). L'email n'apporte plus que **le PDF**, accroché par transaction. Conséquences :
+- **ça marche sans email** (« tout le monde ne va pas connecter son e-mail ») : sans PDF la carte propose **« 📄 Générer sur Vinted ↗ »** + **« 📎 J'ai le PDF »** (glisser le fichier téléchargé, il est tamponné du N°) ;
+- **un colis parti disparaît tout seul** : la vente ne demande plus d'envoi ⟹ elle sort de la liste. Rien à cocher ;
+- un bordereau email **sans vente correspondante** n'est gardé que s'il a **moins de 21 jours** ET que **son compte existe encore** (`ORPHELIN_MAX_J`) — c'est ce qui fait disparaître l'obsidian ;
+- **une seule liste** au lieu de deux, avec photo (celle de la vente = identité certaine, jamais un rapprochement par titre, §24), N°, compte, prix, urgence, case au garage, facture pro ;
+- **« ✓ Colis fait » marque les DEUX** marqueurs (`vinted_ship_done` + `vinted_bords_shipped`) : deux marqueurs pour un même carton, c'était deux chiffres qui divergeaient ;
+- **« 🔢 Poser le N° »** sur une vente sans bordereau : il n'existait **aucun** moyen de poser le numéro qu'on tamponne quand l'email manque. Le numéro n'est pas deviné (le titre de revente diffère souvent de celui de l'annonce) — Julien le donne, c'est mémorisé dans `vinted_sale_overrides`.
+
+L'écran s'appelle désormais **« Colis à envoyer »**. Les bordereaux terminés restent consultables (« voir ») avec un bouton **Réimprimer**.
+
+**Vérifié au banc, écran rendu** : 3 colis, les 3 vraies ventes du 16/08, **3 photos**, l'obsidian disparu, **0 PAGEERROR**. Puis avec un bordereau email relié (fixture de banc uniquement, jamais en base) : la carte passe à **N°21 · 🖨 Imprimer · 🔍 Suivre** et le bouton d'impression groupée réapparaît.
+
+### 3. LE REÇU D'ACHAT : refait
+L'ancien était une colonne de champs **sans accents** (« Recu d'achat »), sans photo, sans le numéro de la paire — on ne savait pas de quelle chaussure il s'agissait. Le nouveau : en-tête + **encadré paire (photo, titre, N°, pointure, marque, montant payé en gros)** + détail **en deux colonnes** (date, compte, vendeur, transaction, statut) + mention légale en pied. Les **accents passent** avec les polices standard de pdf-lib (WinAnsi) — la prudence d'origine n'était pas nécessaire.
+
+⚠️ **La photo passe par l'extension, et il n'y a pas d'autre voie.** Vérifié au `curl` : le CDN Vinted ne renvoie **aucun** en-tête CORS, donc une page web peut *afficher* l'image mais pas en *lire les octets* (et un canvas nourri d'une image cross-origin devient inexportable, §4.93). Nouveau relais **`{__vmr:'photo'}`** → `bridge.js` → `photoBytes` du service worker, **borné au CDN `*.vinted.net`** (ce pont ne doit pas devenir un téléchargeur d'URL arbitraire). Sans extension : reçu **sans photo**, rien ne casse.
+
+**Vérifié à l'octet** : le PDF téléchargé porte « Reçu d'achat », « Payé 28,15 € », le compte, la transaction, le statut, la mention légale — et **aucun chevauchement** (positions relevées dans le flux : 469 / 453 / 435). ⚠️ La 1ʳᵉ version écrivait le montant **par-dessus** la marque quand il n'y a pas de photo (bloc de 62 px au lieu de 96) : c'est la lecture des coordonnées dans le PDF qui l'a montré, pas la relecture du code.
+
+### 4. Une ligne de test m'appartenant dormait encore en production
+`email_bord_99000000001` (« Nike Air Max N°99001 Taille 42 », §5.19) était toujours là. **Vidée** (`{supprime:true}` — le `DELETE` reste sans effet avec la clé publique, §5.22).
+
+**Vérifié** : `npm run build` OK · smoke app 12 écrans sur les vraies données, **0 PAGEERROR** (les seuls « suspects » restent l'accord de « 1 colis », invariable) · `node --check` OK sur `background.js` et `bridge.js`. Extension **5.21.0**.
