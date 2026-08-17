@@ -1225,6 +1225,27 @@
     // Ouvrir le PDF d'un bordereau — présent sur plusieurs onglets (Ventes,
     // Bordereaux, Mes paires → Vendues) : on le câble une seule fois, ici.
     panel.querySelectorAll('.vrm-bord-dl').forEach(b => { b.onclick = () => ouvrirBordereau(b.dataset.row, b); });
+    // GÉNÉRER / RÉCUPÉRER un bordereau, sur TON clic, pour LE compte connecté.
+    // Le bouton rend compte lui-même : on ne renvoie pas dans un journal ailleurs.
+    // ⚠️ Classe DISTINCTE de `.vrm-gen-bord` (les lignes de vente) : deux
+    // câblages sur la même classe, le second écrase le premier — et le bouton
+    // paraît mort. C'est exactement ce qui s'est passé au premier essai.
+    panel.querySelectorAll('.vrm-bord-act').forEach(b => {
+      b.onclick = async () => {
+        const { uid, tx, act } = b.dataset;
+        if (!uid || !tx) return;
+        const avant = b.textContent;
+        b.disabled = true; b.textContent = act === 'gen' ? '⏳ Génération…' : '⏳ Récupération…';
+        try {
+          const r = await new Promise(res => chrome.runtime.sendMessage(
+            { from: 'cancale-vpanel', action: act === 'gen' ? 'genererBord' : 'recupBord', uid, tx },
+            (x) => res(chrome.runtime.lastError ? { ok: false, error: chrome.runtime.lastError.message } : x)));
+          if (r && r.ok && r.envoye) { b.textContent = '✓ envoyé à l\'app'; b.style.background = '#0f6b4f'; setTimeout(load, 1200); }
+          else if (r && r.ok) { b.textContent = '✓ généré'; b.style.background = '#0f6b4f'; b.title = "Le PDF n'est pas encore récupérable — il arrivera par email"; setTimeout(load, 1200); }
+          else { b.disabled = false; b.textContent = avant; alerte = (r && (r.error || r.message)) || 'Vinted a refusé'; render(); }
+        } catch (e) { b.disabled = false; b.textContent = avant; alerte = String(e).slice(0, 120); render(); }
+      };
+    });
     // Aller chercher le texte d'une annonce (lecture de ta propre annonce).
     const gt = panel.querySelector('#vrm-gab');
     if (gt) gt.oninput = () => { gabarit = gt.value; };   // pas de re-render : on garde le focus
@@ -1736,6 +1757,59 @@
       return `<div class="vrm-m">✓ Rien à imprimer ni à générer pour l'instant.${done.length ? ` (${done.length} bordereau${done.length > 1 ? 'x' : ''} déjà traité${done.length > 1 ? 's' : ''}.)` : ''}</div><div class="vrm-m" style="margin-top:6px">Ouvre tes ventes / bordereaux sur Vinted pour les capter.</div>`;
     }
 
+    // ── 0) GÉNÉRER LES BORDEREAUX, COMPTE PAR COMPTE, AVEC LE COMPTE RENDU ──
+    // Demande de Julien : voir ses ventes groupées par compte, celles des autres
+    // comptes FLOUTÉES (on ne peut pas agir dessus tant qu'on n'y est pas
+    // connecté), un bouton « Générer » par vente, et à droite l'état réel — a-t-on
+    // capté le bordereau, l'a-t-on envoyé à l'app ?
+    // ⚠️ Le flou n'est pas décoratif : agir au nom d'un compte qui n'est pas
+    // celui connecté envoie une requête depuis la session d'un autre — c'est LE
+    // signal multi-comptes que Vinted sanctionne (§48). On le montre au lieu de
+    // laisser cliquer puis échouer.
+    const actifUid = DATA && DATA.compteActif ? String(DATA.compteActif) : null;
+    const parCompte = {};
+    for (const t of list) {
+      const k = String(t.uid || '—');
+      (parCompte[k] = parCompte[k] || { nom: t.acct || ('compte ' + k.slice(-4)), uid: k, lignes: [] }).lignes.push(t);
+    }
+    const groupes = Object.values(parCompte).sort((a, b) => (a.uid === actifUid ? -1 : b.uid === actifUid ? 1 : 0));
+    const etatVente = (t) => {
+      if (t.envoye) return { txt: '✓ dans l\'app', coul: '#0f6b4f', fond: 'rgba(15,107,79,.1)', act: null };
+      if (t.hasBord) return { txt: '📧 reçu par email', coul: '#0f6b4f', fond: 'rgba(15,107,79,.08)', act: 'recup' };
+      if (t.emis) return { txt: 'étiquette prête', coul: '#9a5b16', fond: 'rgba(154,91,22,.1)', act: 'recup' };
+      return { txt: 'pas encore générée', coul: '#c53030', fond: 'rgba(197,48,48,.08)', act: 'gen' };
+    };
+    const parCompteSection = list.length ? `
+      <div class="vrm-m" style="font-weight:800;margin-bottom:6px">📮 ${list.length} vente${list.length > 1 ? 's' : ''} à expédier</div>
+      <div class="vrm-m" style="margin-bottom:8px;opacity:.85">Tu appuies, l'extension génère le bordereau chez Vinted et l'envoie dans l'app avec le N° de la paire. La colonne de droite dit où ça en est.</div>
+      ${groupes.map(g => {
+        const estActif = actifUid && g.uid === actifUid;
+        return `
+        <div style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            <span style="font-weight:800;font-size:12.5px">${esc(g.nom)}</span>
+            ${estActif
+              ? '<span style="font-size:11px;font-weight:700;color:#0f6b4f;background:rgba(15,107,79,.1);border-radius:999px;padding:2px 8px">compte connecté</span>'
+              : '<span style="font-size:11px;font-weight:700;color:#9a5b16;background:rgba(154,91,22,.1);border-radius:999px;padding:2px 8px">connecte-toi à ce compte pour agir</span>'}
+          </div>
+          <div style="${estActif ? '' : 'filter:blur(1.6px);opacity:.55;pointer-events:none;user-select:none'}">
+          ${g.lignes.map(t => { const e = etatVente(t); return `
+            <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
+              ${pairThumb(t, 40)}
+              <span style="flex-shrink:0;min-width:34px;text-align:center;font-weight:800;font-size:12px;border-radius:8px;padding:5px 6px;color:${t.numero ? '#0f6b4f' : '#c53030'};background:${t.numero ? 'rgba(15,107,79,.1)' : 'rgba(197,48,48,.1)'}">${t.numero ? 'N°' + esc(t.numero) : 'N° ?'}</span>
+              <div style="flex:1 1 90px;min-width:0">
+                <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title || 'Vente')}</div>
+                <div class="vrm-m" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.status || '')}</div>
+              </div>
+              <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                <span style="font-size:11px;font-weight:700;color:${e.coul};background:${e.fond};border-radius:999px;padding:2px 8px;white-space:nowrap">${e.txt}</span>
+                ${e.act ? `<button class="vrm-bord-act" data-uid="${esc(t.uid || '')}" data-tx="${esc(t.transaction || '')}" data-act="${e.act}" style="border:none;background:${e.act === 'gen' ? '#09b1ba' : '#0f172a'};color:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-weight:800;font-size:11.5px;cursor:pointer;white-space:nowrap">${e.act === 'gen' ? '📄 Générer' : '📥 Récupérer'}</button>` : ''}
+              </div>
+            </div>`; }).join('')}
+          </div>
+        </div>`;
+      }).join('')}` : '';
+
     // 1) BORDEREAUX À IMPRIMER — le N° de la paire + le titre, comme dans l'app.
     //    L'impression (avec le N° tamponné sur le PDF) se fait dans l'app en 1 tap.
     const printSection = toPrint.length ? `
@@ -1764,26 +1838,12 @@
         </div>`).join('')}
       <div style="margin-bottom:14px"></div>` : '';
 
-    // 2) À GÉNÉRER D'ABORD — ventes sans bordereau, sélection pilotée par toi.
-    let genSection = '';
-    if (pending.length) {
-      const rows = pending.map(t => { const k = shipKey(t); return `
-        <label class="vrm-card" style="display:flex;gap:9px;align-items:center;cursor:pointer;margin-bottom:6px;padding:8px">
-          <input type="checkbox" class="vrm-ship-chk" data-k="${esc(k)}" ${shipSel.has(k) ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#09b1ba">
-          ${pairThumb(t, 40)}
-          <div style="flex:1;min-width:0"><div class="vrm-t">${numBadge(t)}${esc(t.title || 'Vente')}</div><div class="vrm-m">${esc(t.status || 'à expédier')}${t.price != null ? ` · ${fmt(t.price)}` : ''}</div></div>
-        </label>`; }).join('');
-      genSection = `
-        <div class="vrm-m" style="font-weight:800;margin:2px 0 6px">📄 ${pending.length} bordereau${pending.length > 1 ? 'x' : ''} à générer d'abord</div>
-        <div class="vrm-m" style="margin-bottom:8px">Coche, puis « Générer ma sélection » : l'extension t'ouvre chaque vente, <b>tu</b> cliques « Générer » sur Vinted, elle capte le PDF.</div>
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <button class="vrm-ship-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
-          <button class="vrm-ship-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
-        </div>
-        <div class="vrm-grid" style="margin-bottom:8px">${rows}</div>
-        <button class="vrm-ship-go" data-act="start" ${shipSel.size ? '' : 'disabled'} style="width:100%;border:none;background:${shipSel.size ? '#09b1ba' : '#9bb'};color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:${shipSel.size ? 'pointer' : 'default'}">Générer ma sélection (${shipSel.size})</button>`;
-    }
-    return printSection + doneSection + genSection;
+    // ⚠️ L'ANCIEN FLUX « coche puis je t'ouvre chaque vente » A ÉTÉ RETIRÉ :
+    // il faisait le tour des ventes pour que Julien clique « Générer » sur
+    // Vinted lui-même. Le bouton « 📄 Générer » de la section par compte fait
+    // la même chose en un clic, avec le compte rendu à côté — deux chemins pour
+    // le même geste, c'était la meilleure façon de ne plus savoir lequel marche.
+    return parCompteSection + printSection + doneSection;
   }
 
   function wireExpedier() {
