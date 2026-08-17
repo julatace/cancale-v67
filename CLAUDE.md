@@ -2318,3 +2318,38 @@ Conséquence sur `expeditions()` : la branche « bordereau orphelin gardé 21 jo
 ➡️ Il ressort en **signalement** (`bordSansVente`, bandeau orange, seuil `SANS_VENTE_MAX_J = 21 j`) qui nomme le compte concerné et dit quoi faire (« repasse une fois sur Vinted avec ce compte »), **jamais en carton à préparer**.
 
 **Vérifié au banc dans les deux sens** : sans orphelin → aucun bandeau, 3 colis ; avec un orphelin injecté (fixture de banc, jamais en base) → bandeau « 1 bordereau reçu sans vente correspondante · julatace3535 » et **toujours 3 colis**, pas 4. **0 PAGEERROR** dans les deux cas.
+
+---
+
+## 5.29 — LE BORDEREAU SE GÉNÈRE TOUT SEUL À L'ARRIVÉE SUR VINTED
+
+Demande de Julien : « enlève le bouton *générer* de l'application ; dès que je me connecte sur Vinted, si une vente n'a pas son bordereau, que l'extension appuie et le mette dans l'application ».
+
+### Pourquoi c'est ACCEPTÉ, alors que l'auto-acceptation d'offre reste refusée
+Générer un bordereau **n'engage aucun argent et ne décide de rien** : la vente est faite, le colis doit partir, il n'y a ni prix ni choix — c'est une formalité obligatoire. Accepter une offre, si (§45 : vente ferme, et le champ « offre en attente » n'a jamais été observé). C'est la même distinction que §46, qui autorisait déjà la génération **sur clic** ; ici elle passe automatique.
+
+### La distinction que personne ne faisait : GÉNÉRER ≠ EXPÉDIER
+Deux statuts Vinted se ressemblent et veulent dire l'inverse :
+| statut | ce que ça veut dire |
+|---|---|
+| **« Le paiement a été validé »** | le bordereau **n'existe pas encore** → à générer |
+| **« Bordereau envoyé au vendeur »** | il **existe déjà** → il n'y a qu'à l'imprimer |
+
+**`aGenererBordereau(statut)`** (module-level dans `App.jsx` ET dans `background.js`, copie à l'identique) : `paiement validé` ET pas de mot « bordereau » ET rien d'annulé/finalisé. Ajoutée à `scripts/audit-coherence.cjs` — **0 désaccord sur les 12 statuts réels**. Sans cette distinction, on aurait regénéré des bordereaux existants : des requêtes pour rien, exactement le bruit qu'on évite.
+
+### Ce qui tourne, et ses garde-fous
+`genererBordereauxEnAttente(uid)` est appelée par **`visiteVinted()`**, après la moisson (sinon on travaillerait sur des statuts périmés).
+- **Uniquement le compte connecté dans cet onglet** (`garde`, §48) — agir au nom d'un autre compte est LE signal multi-comptes que Vinted sanctionne (§5).
+- Plafond existant de **20 actions/h par compte**.
+- ⚠️ **Au plus 3 par visite** (`BORD_MAX_PAR_VISITE`). Ce n'est **pas** un « rythme faussement humain » (toujours refusé, §32) : c'est une limite de volume, de même nature que le plafond horaire. Mesuré sur les vraies données : **1 seule vente à générer aujourd'hui** — la rafale est théorique.
+- Une vente refusée n'est **pas réessayée avant 6 h** (`vrmBordFaits`, mémo local, aucun égress).
+- Un bordereau déjà reçu par email ⟹ on ne regénère pas.
+- Adresse d'envoi inconnue ⟹ refus honnête, **0 requête** (`adresseVendeur` lit le `seller_address_id` capté par compte : **6 comptes sur 8** l'ont ; `liliand653` et `julatace3535` ne l'ont pas encore — il faut en générer un à la main une fois).
+
+### Récupérer le PDF : tenté, pas promis
+Après génération on essaie `transaction → shipment.id → GET /api/v2/shipments/{id}/label_url` puis on range le PDF en `harvest_{uid}_label_latest` (ce que l'app lit déjà). ⚠️ **L'endpoint a été VU dans les URL observées (§5.26) mais sa réponse n'a jamais été capturée** : lecture défensive sur plusieurs noms de champ, et si ça ne donne rien **on ne prétend rien** — le journal dit « le PDF arrivera par email » (§3). C'est la seule partie non garantie ; la génération, elle, l'est.
+
+### Côté app : le bouton disparaît
+Plus de « 📄 Générer sur Vinted ↗ ». La carte dit où on en est : **« ⏳ L'extension le génère à ta prochaine visite sur Vinted »** ou **« ✅ Bordereau déjà généré chez Vinted — le PDF arrive par email »**. « 📎 J'ai le PDF » reste (dépôt manuel du fichier téléchargé).
+
+**Vérifié** : banc `vm` exécutant le VRAI `genererBordereauxEnAttente`, **8 cas → 0 non conforme** (génère 1 quand il faut ; 0 sur « bordereau envoyé », sur annulé/remboursé, sans adresse, si l'email l'a déjà, si tenté il y a 1 h ; **3 max** quand 5 sont en attente ; **0 si le navigateur est sur un autre compte**). Banc app : les 3 cartes affichent le bon état (2 « déjà généré », 1 « l'extension le génère »), **0 PAGEERROR**. `audit-coherence` : **6 règles, 0 désaccord**. Extension **5.22.0**.

@@ -58,10 +58,14 @@ const bgRelayConst = extraire(BG, /const AT_RELAY = (\(s\) => [^\n]*?);\n/);
 const bgShipLocal = extraire(BG, /const awaitingShip = (\(s\) => [^\n]*?);\n/);
 globalThis.isAwaitingShipStatus = appShip; globalThis.isAtRelayStatus = appRelay;
 const appNeedsBord = bloc(APP,'needsBordereau');
+// « faut-il GÉNÉRER le bordereau ? » — écrite dans les deux fichiers (l'app pour
+// l'afficher, l'extension pour agir). Deux copies = deux comportements possibles.
+const appGen = bloc(APP,'aGenererBordereau');
+const bgGen  = bloc(BG,'aGenererBordereau');
 const appNorm = extraire(APP, /const normTitle = (\(t\) => [^\n]*?);\n/);
 const bgNorm = extraire(BG, /const normT = (\(t\) => [^\n]*?);\n/);
 
-const dispo={appClassify,extClassify,appShip,appRelay,bgShipConst,bgRelayConst,bgShipLocal,appNeedsBord,appNorm,bgNorm};
+const dispo={appClassify,extClassify,appShip,appRelay,bgShipConst,bgRelayConst,bgShipLocal,appNeedsBord,appNorm,bgNorm,appGen,bgGen};
 const manquants=Object.entries(dispo).filter(([k,v])=>!v).map(([k])=>k);
 if(manquants.length) console.log('⚠️ non extraits :', manquants.join(', '));
 
@@ -78,6 +82,7 @@ cmp('classification vente (annulée/finalisée/en cours)', appClassify, extClass
 cmp('à expédier (app vs extension)', appShip, bgShipConst);
 cmp('à expédier (les DEUX copies internes de l\'extension)', bgShipConst, bgShipLocal);
 cmp('au point relais (app vs extension)', appRelay, bgRelayConst);
+cmp('bordereau À GÉNÉRER (app vs extension)', appGen, bgGen);
 const titres=['Nike  Air   MAX 1','  adidas Spezial ','ÉTÉ  Blanc'];
 console.log((titres.every(t=>appNorm&&bgNorm&&appNorm(t)===bgNorm(t))?'✅':'❌')+' normalisation de titre (app vs extension)');
 // besoin d'un bordereau : l'extension n'a pas la même notion — on regarde l'écart
