@@ -10049,8 +10049,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (target) {
         const exactSz = cands.filter(e => normSize(e.size) === target);
         if (exactSz.length === 1) return exactSz[0];
-        const compat = cands.filter(e => { const es = normSize(e.size); return !es || es === target; });
-        if (compat.length === 1) return compat[0];
+        // ⚠️ L'ANCIEN REPLI « compatible » ACCEPTAIT UNE POINTURE INCONNUE :
+        // entre deux paires du même titre dont l'une n'a pas de taille
+        // enregistrée, il choisissait celle-là. C'est un pari — et mesuré sur
+        // les vraies données, 6 titres portent des numéros DIFFÉRENTS (« adidas
+        // spezial noir taille 35,5 » : N°36, 25, 4, 134, 156, 161). Un mauvais
+        // numéro envoie la mauvaise chaussure et la paire devient introuvable au
+        // garage. On exige donc une pointure IDENTIQUE, sinon on n'attribue rien
+        // et le numéro reste à poser à la main : mieux vaut un blanc qu'un faux.
       }
       return null; // toujours ambigu → on n'attribue rien
     };
@@ -10180,6 +10186,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [usedNumeros, numeros, saleOv, freedNums, listings.items, garageNums]);
   const nextNumero = useMemo(() => { let n=1; while(takenNums.has(n)) n++; return n; }, [takenNums]);
 
+
   // ── LES PAIRES QUI EXISTENT VRAIMENT (pour le Garage) ───────────────────────
   // ⚠️ Le Garage listait « à ranger » TOUTES les entrées de vinted_annonce_numeros
   // — 176 boîtes pour 15 paires réellement en stock, dont l'écrasante majorité
@@ -10227,6 +10234,66 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
     return withBuyByNum(merged);
   };
+
+  // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
+  // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à
+  // retrouver au garage ». Le risque n'est pas théorique — mesuré sur ses
+  // données : 6 titres identiques portent des numéros DIFFÉRENTS (« adidas
+  // spezial noir taille 35,5 » a porté N°36, 25, 4, 134, 156 et 161). Tout
+  // rapprochement par ressemblance peut donc désigner la mauvaise boîte.
+  //
+  // UNE SEULE RÈGLE : un numéro est porté par une paire RÉELLEMENT PRÉSENTE
+  // quand elle est (a) en ligne, (b) vendue mais pas encore expédiée — le carton
+  // est encore à la maison — ou (c) posée dans une case du garage.
+  // Deux porteurs pour un même numéro = deux cartons identiques sur l'étagère.
+  // Ce memo sert À LA FOIS à ne jamais réattribuer un numéro occupé ET à
+  // signaler un conflit existant (§11 : une seule règle, deux usages).
+  const porteursNum = useMemo(() => {
+    const m = {};
+    const add = (num, quoi) => { const n = String(num || '').trim(); if (!n) return; (m[n] = m[n] || []).push(quoi); };
+    // ⚠️ TOUS les comptes, même masqués : masquer un compte cache sa COMPTA,
+    // ça ne sort pas le carton de l'étagère. (`listings.items` ne contient déjà
+    // que des annonces en ligne, le filtre est fait à la lecture.)
+    for (const it of (listings.items || [])) {
+      const e = numeros[it.id]; if (e && e.numero != null) add(e.numero, { type: 'annonce', titre: it.title, id: it.id });
+    }
+    for (const o of (sales.items || [])) {
+      if (!needsBordereau(o.status)) continue;                 // colis déjà parti : la place est libre
+      if (isHidden(o)) continue;
+      const e = effEntry(o); const n = e && e.numero;
+      if (n != null) add(n, { type: 'vente', titre: o.title, id: String(o.transaction_id || '') });
+    }
+    for (const cell in (garageGrid || {})) {
+      const vals = Array.isArray(garageGrid[cell]) ? garageGrid[cell] : [];
+      for (const v of vals) add(v, { type: 'garage', titre: `case ${cell}`, id: cell });
+    }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts]);
+
+  // Numéros OCCUPÉS par une paire réellement présente — jamais réattribuables.
+  const numsOccupes = useMemo(() => {
+    const s = new Set();
+    for (const n in porteursNum) { const v = parseInt(n, 10); if (!isNaN(v)) s.add(v); }
+    return s;
+  }, [porteursNum]);
+
+  // Conflits : un même numéro sur deux paires présentes = la mauvaise chaussure
+  // part à l'expédition. C'est LE risque n°1 (§19) — on le montre en rouge.
+  const conflitsNum = useMemo(() => {
+    const out = [];
+    for (const n in porteursNum) {
+      const p = porteursNum[n];
+      // Une vente et son annonce encore ouverte, c'est la MÊME paire (Vinted
+      // laisse parfois l'annonce en ligne après la vente) : pas un conflit.
+      const ids = new Set(p.map(x => x.type + ':' + x.id));
+      if (p.length > 1 && ids.size > 1) {
+        const titres = new Set(p.map(x => normTitle(x.titre || '')));
+        if (!(p.length === 2 && titres.size === 1)) out.push({ numero: n, porteurs: p });
+      }
+    }
+    return out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  }, [porteursNum]);
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
   const buyOf = (o) => { const e = effEntry(o); const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null; return (b!=null && !isNaN(b)) ? b : null; };
   // Vente finalisée SANS prix d'achat renseigné → fausse le bénéfice (comptée
@@ -11148,7 +11215,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // — c'est `takenNums`, la référence unique (§7). On en fait une copie locale
     // pour que deux ventes numérotées dans la même passe ne reçoivent pas le
     // même numéro.
-    const dejaPris = new Set(takenNums);
+    // ⚠️ POOL STRICT : `takenNums` retire les numéros « libérés ». Pour une paire
+    // qu'on doit expédier, on ne prend JAMAIS un numéro encore porté par une
+    // paire présente (annonce en ligne, autre colis à envoyer, case du garage) —
+    // même si la libération le croyait disponible.
+    const dejaPris = new Set([...takenNums, ...numsOccupes]);
     let changed = false;
     // ⚠️ CHANGEMENT (juillet 2026) : on n'INVENTE plus JAMAIS de numéro pour une
     // vente. Inventer des numéros pour des ventes non reconnues faisait grimper le
@@ -11290,7 +11361,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!error) putCache('convs', out);
     setConvs({ loading:false, items: out, error });
   };
-  useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  // ⚠️ `bordereaux` EN FAIT PARTIE : c'est l'écran où on imprime l'étiquette,
+  // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
+  // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
+  // paire du stock — le détecteur de conflit serait aveugle là où il sert.
+  useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
@@ -14524,6 +14599,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* ⚠️ DEUX PAIRES, UN SEUL NUMÉRO = la mauvaise chaussure part. C'est le
+            risque le plus coûteux de l'app : une fois le mauvais carton envoyé,
+            rien ne le rattrape. On le met en tête, en rouge, avec les porteurs. */}
+        {conflitsNum.length > 0 && (
+          <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.danger}}>🚨 {conflitsNum.length} numéro{conflitsNum.length>1?'x':''} porté{conflitsNum.length>1?'s':''} par deux paires</div>
+            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux cartons portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
+            {conflitsNum.slice(0,6).map(c=>(
+              <div key={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
+                <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
+                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'📦 en ligne':p.type==='vente'?'📮 à expédier':'🏠 garage'} « {String(p.titre||'').slice(0,34)} »</span>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
         {/* SIGNALEMENT (pas un colis) : un bordereau reçu qu'on ne rattache à
             aucune vente. Il ne peut pas y avoir de bordereau sans vente — donc
             si ça arrive, c'est la MOISSON qui manque, pas un carton à préparer.

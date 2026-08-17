@@ -2468,3 +2468,39 @@ Le bouton rend compte **lui-même** (« ⏳ », « ✓ envoyé à l'app », « �
 2. **`const genSection` en double.** Ma section réutilisait le nom d'une variable réassignée plus bas (`genSection = …`) → `TypeError` sur une constante. L'ancien flux « coche puis je t'ouvre chaque vente » a été **retiré** : deux chemins pour le même geste, c'est la meilleure façon de ne plus savoir lequel marche.
 
 **Vérifié au banc panneau** (faux `chrome`, 3 ventes sur 2 comptes) : 1 bloc flouté, 2 boutons d'action, `pointer-events: none` confirmé sur le compte non connecté, clic « Récupérer » → `recupBord` avec le bon `tx`/`uid`, et le message honnête (« Vinted n'a pas donné l'URL du PDF ») remonté dans le panneau. **0 erreur.** Banc `vm` de génération : 14 cas, 0 non conforme. Extension **5.26.0**.
+
+---
+
+## 5.33 — FIABILITÉ DU NUMÉRO : une seule règle, « un numéro = une paire présente »
+
+Julien : « quand on attribue un numéro à une paire, il ne doit y avoir **aucune chance** d'erreur — si le numéro n'est pas le bon, la paire est presque impossible à retrouver au garage ». Même enjeu que les bordereaux.
+
+### Ce que la vraie base disait (mesuré avant de coder)
+| contrôle | résultat |
+|---|---|
+| photos partagées par des numéros différents | **0** (le rapprochement par photo est sûr) |
+| **titres identiques portant des numéros DIFFÉRENTS** | **6** ⚠️ |
+| numéros réutilisés par plusieurs ventes dans l'historique | 31 (normal : §7, un numéro se libère) |
+| numéros à la fois sur une annonce en ligne et sur une vente | 11 (historique — **0 sur une vente qui attend l'envoi**) |
+| cases posées au garage | 0 |
+
+Le pire cas : **« adidas spezial noir taille 35,5 » a porté N°36, 25, 4, 134, 156 ET 161.** Tout rapprochement par ressemblance de titre peut donc désigner la mauvaise boîte.
+
+### 1. `porteursNum` — LA définition de « qui porte ce numéro »
+Un numéro est porté par une paire **réellement présente** quand elle est (a) **en ligne**, (b) **vendue mais pas encore expédiée** (le carton est encore à la maison), ou (c) **posée dans une case du garage**. Un seul memo, **deux usages** (§11) : empêcher une réattribution, et signaler un conflit.
+⚠️ **Tous les comptes, même masqués** : masquer un compte cache sa comptabilité, ça ne sort pas le carton de l'étagère.
+
+### 2. Le pool d'attribution devient STRICT
+L'auto-numérotation d'une vente à expédier puisait dans `takenNums`, qui **retire** les numéros « libérés ». Elle puise maintenant dans `takenNums ∪ numsOccupes` : **jamais** un numéro encore porté par une paire présente, même si la libération le croyait disponible.
+
+### 3. Le conflit est SIGNALÉ, en rouge, là où il coûte cher
+`conflitsNum` → bandeau en tête de **Colis à envoyer** : « 🚨 N numéros portés par deux paires », avec les deux porteurs nommés (📦 en ligne / 📮 à expédier / 🏠 garage). Une annonce restée ouverte après sa vente n'est **pas** un conflit (même paire, même titre) — sinon on crierait au loup en permanence.
+⚠️ L'écran Bordereaux charge désormais les annonces en ligne : sans elles le détecteur serait **aveugle exactement là où il sert**.
+
+### 4. Le rapprochement par titre n'accepte plus une pointure inconnue
+`entryByTitleLoose` refusait déjà l'ambiguïté, mais gardait un repli « compatible » qui acceptait une paire **sans taille enregistrée**. C'était un pari. On exige désormais une pointure **identique** : sinon rien n'est attribué et le numéro reste à poser à la main. **Mieux vaut un blanc qu'un faux.**
+
+### ⚠️ PIÈGE TDZ — troisième fois (§19)
+`porteursNum` lisait `effEntry`, déclaré **80 lignes plus bas** → `Cannot access 'Wn' before initialization`, écran en erreur. Un `useMemo` s'exécute **immédiatement** : il doit être placé APRÈS tout ce qu'il lit. Déplacé juste après `effEntry`.
+
+**Vérifié au banc, dans les deux sens** : sans conflit → aucun bandeau ; avec un conflit forcé (N°1 posé au garage alors qu'une annonce en ligne le porte) → « 🚨 1 numéro porté par deux paires · N°1 — 📦 en ligne « nike p-6000 blanc/jaune taille 40 » · 🏠 garage « case zone-0-3 » ». Smoke 12 écrans : **0 PAGEERROR**.
