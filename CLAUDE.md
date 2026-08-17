@@ -2504,3 +2504,53 @@ L'auto-numérotation d'une vente à expédier puisait dans `takenNums`, qui **re
 `porteursNum` lisait `effEntry`, déclaré **80 lignes plus bas** → `Cannot access 'Wn' before initialization`, écran en erreur. Un `useMemo` s'exécute **immédiatement** : il doit être placé APRÈS tout ce qu'il lit. Déplacé juste après `effEntry`.
 
 **Vérifié au banc, dans les deux sens** : sans conflit → aucun bandeau ; avec un conflit forcé (N°1 posé au garage alors qu'une annonce en ligne le porte) → « 🚨 1 numéro porté par deux paires · N°1 — 📦 en ligne « nike p-6000 blanc/jaune taille 40 » · 🏠 garage « case zone-0-3 » ». Smoke 12 écrans : **0 PAGEERROR**.
+
+---
+
+## 5.34 — ⚠️ UNE ANNONCE N'EST PLUS IDENTIFIÉE PAR SON TITRE
+
+Julien : « il y a des gens qui font des ventes avec les mêmes articles, donc les mêmes titres — il faut que ce soit autre chose qui caractérise une annonce ». Puis : « il n'y a pas un identifiant d'annonce chez Vinted, ce serait plus simple ? »
+
+**Il a raison sur les deux points, et l'identifiant existe.**
+
+### Ce que porte vraiment une vente (mesuré sur les 277 ventes captées)
+```
+date · price · title · status · transaction_id · conversation_id · photo
+```
+**Aucun `item_id`.** C'est pour ça que le rapprochement se faisait par titre.
+
+### ⚠️ LE PONT : le DÉTAIL de transaction porte `item_id`
+`harvest_*_txn_*` → **198 lignes sur 198 portent `transaction.item_id`** (100 %). Or `transaction_id` est présent sur **277 ventes sur 277**. Donc :
+
+> **`transaction_id` → détail de transaction → `item_id` = l'identifiant d'annonce donné par Vinted lui-même.**
+
+Ce n'est pas une ressemblance : c'est Vinted qui dit à quelle annonce correspond la vente.
+
+### La règle unique — `identiteAnnonce(o)` (App.jsx) / `lookupPair(o)` (extension)
+Deux voies, toutes deux certaines, **et rien d'autre** :
+1. **identifiant Vinted** (transaction → `item_id`) ;
+2. **photo** — l'image appartient à une paire et une seule (**0 collision mesurée sur 261 annonces**) ; c'est le repli quand la transaction n'est pas encore captée.
+
+**Le repli par TITRE est supprimé** de `resolvedEntry`, de l'auto-verrouillage `txnLink` (un verrou est permanent : il ne se pose plus jamais sur une ressemblance) et de l'auto-numérotation des ventes. Même règle copiée à l'identique dans l'extension (`enrichPairs`).
+
+### Mesuré sur la vraie base — la preuve
+| | ancienne règle (titre unique) | nouvelle (id Vinted + photo) |
+|---|---|---|
+| ventes résolues | 66 | **88** |
+| **ventes où le titre désignait la MAUVAISE annonce** | **3** | 0 |
+| désaccords entre les deux voies certaines | — | **0** (15 cas comparables) |
+
+Les 3 erreurs réelles : « adidas spezial noir taille 34 » (titre → N°155), « adidas spezial vert taille 36 » (→ N°6), « adidas spezial noir taille 38,5 » (→ N°3) — dans les trois cas **Vinted rattache la vente à une AUTRE annonce**. C'est très exactement la mauvaise boîte au moment d'expédier (§19, risque n°1).
+**61 ventes sur 277 (22 %) portent un titre en double** — dont deux « Nike zoom fly 5 noir et violet taille 41 » qui sont **deux annonces différentes**. Le titre ne caractérise donc pas une annonce.
+
+⚠️ **8 ventes passent de « un numéro deviné » à « rien »** (photo absente ET transaction pas encore captée). C'est voulu : **mieux vaut un blanc qu'un faux** — un numéro faux ne se voit pas, il envoie la mauvaise chaussure.
+
+### Le seul endroit où le titre reste, et pourquoi
+Un article **DANS UN LOT** n'a que son titre (Vinted ne donne ni identifiant ni photo par article du lot). Le N° y est donc encore proposé, mais **en orange avec « titre ? à vérifier »** — jamais présenté comme certain.
+
+### Égress (§34)
+- App : `fetchTxnItemIds()` lit **deux entiers par ligne** (`select=tx:data->payload->transaction->>id,item:…->>item_id`), vérifié en direct sur la base — jamais `select=data`.
+- Extension : `itemParTxn` est récolté **dans la boucle `txnEtat` qui lisait déjà ces lignes** → **0 requête et 0 octet supplémentaires**.
+
+### Vérifié
+`npm run build` OK · `node --check background.js` OK · smoke app 12 écrans sur les vraies données : **0 PAGEERROR** · vrai `buildPanelData` contre la vraie base : 22 annonces, 80 ventes, 5 colis — aucune régression · `scripts/audit-coherence.cjs` : **6 règles, 0 désaccord**. Extension **5.28.0**.

@@ -1637,6 +1637,24 @@ const fetchCapturedLabelMetas = async (uid) => {
     return await res.json();
   } catch (_) { return []; }
 };
+// ── IDENTITÉ CERTAINE D'UNE VENTE : transaction → item_id ───────────────────
+// Une commande moissonnée ne porte PAS l'identifiant de l'annonce (mesuré sur
+// 277 ventes : date, price, title, status, transaction_id, conversation_id,
+// photo — et rien d'autre). Le DÉTAIL de transaction, lui, le porte toujours
+// (`transaction.item_id`, 198 lignes sur 198). C'est donc LE pont sans
+// ressemblance : le n° de transaction est sur chaque vente, et Vinted lui-même
+// dit à quelle annonce il correspond.
+// ⚠️ ÉGRESS (§34) : une ligne de transaction est grosse → on ne lit que les
+// deux entiers utiles, jamais `select=data`.
+const fetchTxnItemIds = async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,item:data->payload->transaction->>item_id`, { headers: sbAuth() });
+    if (!res.ok) return {};
+    const map = {};
+    for (const r of await res.json()) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
+    return map;
+  } catch (_) { return {}; }
+};
 // Les octets d'UN bordereau précis (par id de ligne) — seulement à l'impression.
 const fetchLabelPdf = async (rowId) => {
   if (!rowId) return null;
@@ -9206,6 +9224,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // qui permet de mettre « 🖨 Imprimer » sur LA bonne ligne (identité certaine),
   // au lieu du bandeau générique « un bordereau a été téléchargé quelque part ».
   const [labelsCaptes, setLabelsCaptes] = useState({});
+  // transaction → id d'annonce, tel que Vinted le dit (cf. fetchTxnItemIds).
+  const [txnItem, setTxnItem] = useState({});
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
@@ -10094,6 +10114,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const onlineAnnonceIds = useMemo(() => new Set((listings.items || []).map(it => String(it.id))), [listings.items]);
   // Clé (id d'annonce) d'une entrée numéro, par référence — pour le verrouillage.
   const keyOfEntry = (e) => { if (!e) return null; for (const k in numeros) { if (numeros[k] === e) return k; } return null; };
+  // ⚠️ UNE SEULE RÈGLE D'IDENTITÉ (§11) : « quelle annonce est cette vente ? ».
+  // Deux voies, toutes deux certaines, et RIEN d'autre :
+  //   1. l'identifiant d'annonce donné par Vinted (transaction → item_id) ;
+  //   2. la photo, qui appartient à une paire et une seule (0 collision mesurée).
+  // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
+  const identiteAnnonce = (o) => {
+    if (!o) return null;
+    const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
+    if (parVinted) return String(parVinted);
+    return entryKeyByPhoto(o) || null;
+  };
   const resolvedEntry = (o) => {
     // Une paire ENCORE EN LIGNE n'est pas vendue : on refuse de l'associer.
     const usable = (key) => (key && numeros[key] && !onlineAnnonceIds.has(String(key))) ? numeros[key] : null;
@@ -10105,11 +10136,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const saleSz = normSize(extractSize(o && o.title)), eSz = normSize(e.size);
       if (!(saleSz && eSz && saleSz !== eSz)) { const u = usable(linked); if (u) return u; }
     }
-    // 1) Par la PHOTO (fiable, gère les titres en double, sans N° dans le titre).
-    const u1 = usable(entryKeyByPhoto(o)); if (u1) return u1;
-    // 2) Sinon par le titre départagé par la POINTURE (vraiment identiques → rien).
-    const u2 = o ? usable(keyOfEntry(entryByTitleLoose(o.title, extractSize(o.title)))) : null;
-    if (u2) return u2;
+    // Identité Vinted (transaction → item_id), sinon la photo. Mesuré : 70 ventes
+    // résolues par l'identifiant — les 70 tombent sur une annonce connue — plus
+    // 150 par la photo, et 0 désaccord entre les deux voies.
+    const u1 = usable(identiteAnnonce(o)); if (u1) return u1;
+    // ⚠️ PAS DE REPLI PAR TITRE. Deux paires identiques portent le même
+    //    libellé (mesuré : 61 ventes sur 277, soit 22 %, ont un titre en double —
+    //    dont deux « Nike zoom fly 5 noir et violet taille 41 » qui sont DEUX
+    //    annonces différentes). Un titre ne caractérise donc pas une annonce :
+    //    on préfère ne rien attribuer plutôt que désigner la mauvaise boîte.
     return null;
   };
   // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
@@ -11178,9 +11213,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const tid = o.transaction_id != null ? String(o.transaction_id) : null;
       if (!tid || next[tid]) continue;
-      // On verrouille d'abord par la photo (marche même si le titre est en double),
-      // sinon par le titre départagé par la POINTURE (jamais si vraiment ambigu).
-      const key = entryKeyByPhoto(o) || keyOfEntry(entryByTitleLoose(o.title, extractSize(o.title)));
+      // ⚠️ Un verrou est PERMANENT : il ne se pose que sur une identité certaine
+      // (identifiant Vinted, sinon photo), jamais sur une ressemblance de titre.
+      const key = identiteAnnonce(o);
       // Jamais verrouiller sur une annonce ENCORE EN LIGNE (pas vendue).
       if (key && !onlineAnnonceIds.has(String(key))) { next[tid] = key; changed = true; }
     }
@@ -11235,7 +11270,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const cur = ovNext[tid];
       // Numéro SAISI À LA MAIN (pas autoAssigned) : on n'y touche jamais.
       if (cur && cur.numero != null && String(cur.numero).trim() !== '' && !cur.autoAssigned) continue;
-      const broadKey = entryKeyByPhoto(o) || keyOfEntry(entryByTitleLoose(o.title, extractSize(o.title)));
+      const broadKey = identiteAnnonce(o);
       const reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
       if (reuse) {
         if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
@@ -11393,6 +11428,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     setLabelsCaptes(idx);
   })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  // Identité certaine des ventes (transaction → annonce). Une seule lecture, en
+  // scalaires : elle sert au N°, au bordereau, au prix d'achat et à la photo.
+  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (!mort && m && Object.keys(m).length) setTxnItem(m); }); return () => { mort = true; }; }, []);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
@@ -15118,12 +15156,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:7}}>
                 {lotView.items.map((it,i)=>{
-                  const e=effEntry({title:it.title})||entryByTitleLoose(it.title,extractSize(it.title));
+                  // ⚠️ Un article DANS UN LOT n'a que son titre (Vinted ne donne
+                  // ni identifiant ni photo par article). On peut donc proposer un
+                  // N°, mais jamais le présenter comme certain : deux paires
+                  // identiques portent le même libellé. Il est affiché en orange
+                  // avec « titre ? » → on vérifie la boîte avant d'expédier.
+                  const e=entryByTitleLoose(it.title,extractSize(it.title));
                   const num=e&&e.numero?String(e.numero):null;
                   return (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px'}}>
-                      <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:10,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
-                      <span style={{flex:1,fontSize:13,fontWeight:500,color:C.text}}>{it.title}</span>
+                      <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:10,background:num?'#f59e0b':C.border,color:num?'#fff':C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
+                      <span style={{flex:1,fontSize:13,fontWeight:500,color:C.text}}>{it.title}{num && <span style={{marginLeft:6,fontSize:11,fontWeight:600,color:'#f59e0b'}}>titre ? à vérifier</span>}</span>
                       {it.price!=null && <span style={{fontSize:12,fontWeight:600,color:C.muted}}>{Number(it.price).toFixed(0)} €</span>}
                     </div>
                   );
