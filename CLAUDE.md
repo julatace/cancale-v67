@@ -2397,3 +2397,27 @@ Côté app, un bordereau capté vaut un bordereau reçu par email : la carte aff
 En rendant `pdf` vrai pour une entrée **sans** bordereau email, le récap appelait `invForBord(e.b)` avec `e.b === null` → `Cannot read properties of null (reading 'transaction')`. **`EcranGardeFou` (§5.14) a fait exactement son travail** : message d'erreur, navigation intacte, rien de perdu — et le banc l'a vu tout de suite. Corrigé (`e.b && invForBord(e.b)`), et `bordKey` rendu insensible à `null` puisque c'est un helper bas niveau.
 
 **Vérifié** : banc `vm` sur le vrai code de l'extension, **11 cas → 0 non conforme** (dont l'URL du PDF trouvée à plat ET imbriquée, et « aucune URL → on ne prétend rien ») · banc app dans les deux états (avec et sans bordereau capté), **0 PAGEERROR** · smoke 12 écrans, **0 PAGEERROR** · `audit-coherence` : 6 règles, 0 désaccord. Extension **5.23.0**.
+
+---
+
+## 5.31 — LE GARAGE, LA PÉRIODE, ET LE BORDEREAU QU'ON N'ALLAIT JAMAIS CHERCHER
+
+### 1. « Le garage ne marche plus » — une bande verticale de 25 cartons
+`LAYOUT` déclarait **une seule colonne de 25 places**. Rendu réel (capture) : 25 rectangles empilés en colonne sur **1 244 px de haut**, illisible.
+➡️ `COL_H = 8`, **4 colonnes de 8** = 32 places, la forme d'un vrai meuble (mesuré : 32 cases, page ramenée à **666 px**). `extraCols` ajoute des colonnes de la même hauteur.
+⚠️ Le changement **déplace la correspondance case↔numéro** : c'était sans risque ici (garage vide en base, 0 case posée), ça ne le serait plus une fois qu'il aura rangé des paires.
+Deuxième défaut du même écran : les cases vides sont masquées par défaut → garage vide = **écran totalement vide**. On montre l'étagère tant qu'aucune case n'est remplie.
+
+### 2. Filtre de période sur Ventes et Achats (demande : « comme sur Airbnb »)
+`PeriodePicker` (module-level) : raccourcis **Ce mois / Mois dernier / 7 j / 30 j / année** + un **calendrier** début→fin (lundi en premier, 2ᵉ clic avant le 1er = on repart de zéro, sinon on se coince). `dansPeriode(o, p)` est branché **dans `matchOrd`**, donc la liste, la recherche et les compteurs partagent la même règle.
+⚠️ **Les totaux devaient suivre** : au premier essai, filtrer sur « ce mois » laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de quelques lignes — deux chiffres pour la même chose sur le même écran (§11). Le memo `totals` filtre désormais lui aussi. **Mesuré : 212 ventes / 6 068 € → 40 / 1 397 € (ce mois) → 2 / 37 € (7 jours).**
+
+### 3. La barre d'outils était sous six bandeaux
+Capture de l'écran Ventes : avant d'atteindre la moindre vente il fallait passer « colis à expédier », « argent en attente » (+ son encadré), « vente repérée », 4 cartes de stats, « Wrapped », « Analyse »… La période et la recherche arrivaient après. **Ce qu'on manipule tous les jours passe en premier**, juste sous le titre.
+
+### 4. ⚠️ « Ça ne capte pas le bordereau » — on n'allait le chercher qu'après l'avoir généré
+Le diagnostic en base l'a montré sans ambiguïté : `panel_diag_capture` **ne portait aucune clé `label`** — `recupererLabel` n'avait jamais été atteinte. Raison : elle n'était appelée qu'**après une génération réussie**. Or une vente au statut **« Bordereau envoyé au vendeur » a déjà son étiquette chez Vinted** : rien à générer, donc on ne passait jamais la chercher. **2 des 3 colis de Julien étaient exactement dans ce cas.**
+Second défaut, plus bête : `if (!candidates.length) return 0;` sortait avant toute autre passe dès qu'il n'y avait rien à générer.
+➡️ **2ᵉ passe** dans `genererBordereauxEnAttente` : toute vente qui attend l'envoi, dont l'étiquette existe, sans PDF connu (ni email, ni `label_latest`), déclenche `recupererLabel`. Mêmes garde-fous (compte connecté, 3 par visite, pas de nouvel essai avant 6 h).
+
+**Vérifié** : banc `vm` sur le vrai code, **14 cas → 0 non conforme** (dont « bordereau envoyé → 0 génération mais le PDF est récupéré », « PDF déjà reçu par email → on ne redemande rien », « vente finalisée → on ne va rien chercher ») · banc app : garage 32 cases, filtre de période mesuré sur les 3 états · smoke 12 écrans **0 PAGEERROR** · `audit-coherence` 6 règles, 0 désaccord. Extension **5.24.0**.
