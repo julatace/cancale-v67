@@ -17990,7 +17990,18 @@ export default function App() {
 
   const vintedNotifChecked = React.useRef(false);
   useEffect(()=>{
-    if(!vintedAccounts || vintedAccounts.length===0 || vintedNotifChecked.current) return;
+    if(!vintedAccounts || vintedAccounts.length===0) return;
+    // ⚠️ DEUX CHOSES DIFFÉRENTES VIVAIENT DANS LE MÊME « UNE SEULE FOIS » :
+    //  · le BANDEAU « nouveautés depuis la dernière ouverture » → doit être unique ;
+    //  · le CENTRE de notifications (la cloche) → c'est une liste de choses À FAIRE,
+    //    elle doit se recalculer quand les données changent.
+    // Le drapeau coupait les DEUX. Or il était posé AVANT le travail réseau :
+    // si `vintedAccounts` changeait pendant ce travail (ça arrive à chaque
+    // rafraîchissement de compte), le nettoyage de l'effet posait `cancelled`,
+    // la 1ʳᵉ exécution sortait à `if(cancelled) return`, et la 2ᵉ sortait
+    // immédiatement sur le drapeau → **la cloche restait vide pour toujours**.
+    // Mesuré en base au même moment : 37 messages non lus et 6 ventes à expédier.
+    const dejaVu = vintedNotifChecked.current;
     vintedNotifChecked.current = true;
     let cancelled=false;
     (async()=>{
@@ -18104,7 +18115,9 @@ export default function App() {
       const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);
       const newSales = prevS<0 ? 0 : Math.max(0, salesCount-prevS);
       save('vinted_notif_last_vsales',salesCount);
-      if(newMsgs>0 || newSales>0){
+      // Le bandeau ne s'affiche qu'à la PREMIÈRE passe : un recalcul déclenché
+      // par un rafraîchissement de comptes ne doit pas re-sonner.
+      if(!dejaVu && (newMsgs>0 || newSales>0)){
         setVintedNotif({messages:newMsgs, ventes:newSales});
         if(notifEnabled){
           const parts=[];

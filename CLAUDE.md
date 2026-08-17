@@ -2599,3 +2599,38 @@ paire N°20     : 05_02624_dfaznfhbbwgavj8tfkfe5ttc/1785602038
 **Mesuré : ventes résolues 60 → 65 · articles de lot 4 → 6 · 4 dossiers ambigus refusés.**
 
 Vérifié : `npm run build` OK · smoke app 12 écrans sur les vraies données, **0 PAGEERROR** · `audit-coherence` : 6 règles, 0 désaccord.
+
+---
+
+## 5.35 — Numéro dès la vente récente · ventes à l'heure · ⚠️ la cloche marchait (correction de mon diagnostic)
+
+### 1. Le numéro manquait sur les ventes récentes — cause mesurée
+La numérotation auto ne tourne que sur `annBase` = les annonces **encore en ligne**. Une paire vendue **avant** que l'app soit ouverte n'y passe jamais.
+
+| ventes | sans N° | dont **numérotables** (annonce captée) |
+|---|---|---|
+| 7 derniers jours | 13 | **6** |
+| 30 jours | 29 | **14** |
+| plus de 90 j | 140 | 0 (annonce jamais captée) |
+
+⚠️ Les 6 colis qui **attendent l'envoi** avaient tous leur numéro : le trou est sur les ventes déjà parties, pas sur celles qui comptent pour expédier.
+
+➡️ `VENTE_NUM_MAX_J = 60` + `venteRecente(o)` (module-level) : l'auto-numérotation couvre désormais **les ventes qui attendent l'envoi OU vendues il y a moins de 60 jours**, identité certaine exigée (§5.34), annulées exclues, pool strict (`takenNums ∪ numsOccupes`, §5.33).
+⚠️ **C'est la fenêtre qui protège** : sans elle on renumérote les 140 ventes de plus de 90 jours — exactement l'inflation de juillet (compteur 50 → 120).
+
+### 2. Ventes et achats triés à l'HEURE
+L'écran Ventes n'avait **aucun tri** : il suivait l'ordre de la moisson, donc plusieurs comptes mis bout à bout s'entremêlaient. `tsCommande` / `parDateDesc` / `heureCommande` (module-level) ; `.sort(parDateDesc)` sur Ventes ET Achats. Une date illisible part en bas plutôt que de remonter en tête.
+
+### 3. ⚠️ CORRECTION DE MON PROPRE DIAGNOSTIC — le centre de notifications n'était PAS cassé
+Plainte : « je n'ai plus les notifications dans l'app ». Ma première sonde de banc cherchait le badge par une expression régulière sur le HTML (`border-radius:999px`) → **elle ne matchait pas** (React rend `border-radius: 999px`, avec l'espace). J'ai conclu « la cloche est vide », et **c'était faux**.
+
+**En OUVRANT réellement la cloche au banc** : « **3 ventes à expédier** » + « **37 messages non lus · sur julatace3535 (10)…** ». Le centre fonctionne.
+➡️ C'est la 4ᵉ fois qu'un compteur de banc ment (§21, §25) : **ouvrir l'écran et lire le texte, jamais conclure sur une regex de HTML.**
+
+**Ce qui reste vrai et a quand même été corrigé** — une VRAIE course dormait là :
+`vintedNotifChecked.current = true` était posé **avant** le travail réseau, et coupait **deux choses distinctes** : le bandeau « nouveautés » (qui doit être unique) ET la cloche (qui est une liste de choses à faire, donc à recalculer). Si `vintedAccounts` changeait pendant le réseau — ça arrive à chaque rafraîchissement de compte — le nettoyage posait `cancelled`, la 1ʳᵉ passe sortait à `if(cancelled) return`, et la 2ᵉ sortait immédiatement sur le drapeau : **la cloche restait vide pour toujours**. Séparé en `dejaVu` (bandeau seulement) ; la cloche se recalcule.
+
+⚠️ **Piège évité de justesse (§26, encore)** : j'avais mis `cloudReady` dans les dépendances — **cette variable n'existe pas** dans `App` (c'est `isCloudReady()`). `npm run build` passe, et le banc a affiché `ReferenceError: cloudReady is not defined` **avant** que ça parte en production. Dépendances remises à `[vintedAccounts]`.
+
+### Vérifié
+`npm run build` OK · smoke app 12 écrans sur les vraies données : **0 PAGEERROR** · cloche ouverte au banc : contenu conforme aux chiffres de la base (37 non lus, 3 à expédier).
