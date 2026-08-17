@@ -2576,3 +2576,26 @@ Deux corrections :
 ⚠️ **Ce qu'on ne peut PAS affirmer** : 142 des 177 verrous ne sont pas vérifiables aujourd'hui (leur transaction n'est pas encore captée). Ils se vérifieront et se répareront tout seuls au fur et à mesure que l'extension capte les transactions. Aucun n'est réputé juste par défaut.
 
 Vérifié : `npm run build` OK · smoke app 12 écrans sur les vraies données, **0 PAGEERROR**.
+
+### 5.34 (suite) — ⚠️ UN ARTICLE DE LOT PORTE SON IDENTIFIANT (j'avais écrit le contraire)
+
+Julien : « dans un lot quand tu cliques, tu vois les deux articles ». **Il a raison, et le paragraphe ci-dessus était faux.**
+
+J'avais écrit « un article dans un lot n'a que son titre (Vinted ne donne ni identifiant ni photo par article) » et livré un N° en orange « titre ? à vérifier ». **Mesuré en base : `transaction.order.items[]` porte `id, url, price, title, photos, size_title, status, is_closed` — 206 articles sur 206 ont leur `id`.** `fetchLotItems` le lisait déjà depuis toujours ; c'est l'affichage qui l'ignorait et repartait sur `entryByTitleLoose`.
+
+- La modale de lot résout désormais chaque article par **son identifiant d'annonce**, sinon par sa photo, **jamais par titre**. Elle affiche aussi la **photo** et la **pointure** de chaque article (`fetchLotItems` les remonte).
+- **`entryByTitleLoose` et `keyOfEntry` sont SUPPRIMÉS** : plus aucun appelant. Un helper de rapprochement par titre laissé dans le fichier est un piège pour la session suivante — un commentaire à leur place explique pourquoi il n'y en a plus.
+
+### ⚠️ LA PHOTO CHANGE DE NOM QUAND ON REPUBLIE (et le dossier, non)
+En cherchant pourquoi 4 articles du lot de 8 ne se résolvaient plus, le diagnostic a montré ceci :
+```
+article du lot : 05_02624_dfaznfhbbwgavj8tfkfe5ttc/1783338221
+paire N°20     : 05_02624_dfaznfhbbwgavj8tfkfe5ttc/1785602038
+```
+**Même dossier, horodatage différent** : republier (supprimer + recréer, §46) **re-téléverse la même image**. `photoKey` inclut le nom de fichier, donc elle ratait ce cas.
+
+⚠️ **Le dossier seul n'est PAS une identité** — mesuré sur 261 annonces : **17 collisions** (contre **0** pour la clé complète) et **4 dossiers portent DEUX numéros différents**. Il ne sert donc qu'en **dernier recours**, via `numerosByPhotoDir`, qui **écarte tout dossier ambigu** (même garde que `numerosByPhoto`). Ordre final de `entryKeyByPhoto` : fichier exact → dossier non ambigu → rien.
+
+**Mesuré : ventes résolues 60 → 65 · articles de lot 4 → 6 · 4 dossiers ambigus refusés.**
+
+Vérifié : `npm run build` OK · smoke app 12 écrans sur les vraies données, **0 PAGEERROR** · `audit-coherence` : 6 règles, 0 désaccord.
