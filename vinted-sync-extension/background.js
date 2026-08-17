@@ -616,6 +616,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true; // reponse asynchrone
     }
+    // PONT APP -> EXTENSION : la photo d'une paire, pour l'imprimer sur un reçu.
+    // ⚠️ POURQUOI PASSER PAR L'EXTENSION : le CDN de Vinted ne renvoie AUCUN
+    // en-tête CORS (vérifié : pas d'`access-control-allow-origin`). Une page web
+    // peut AFFICHER l'image mais pas en LIRE les octets — et la charger dans un
+    // canvas le « tainte », donc l'export devient impossible (§4.93). Le service
+    // worker, lui, a les permissions d'hôte. Sans extension : pas de photo sur
+    // le reçu, et c'est tout — rien ne casse.
+    if (msg && msg.from === 'vmr-bridge' && msg.action === 'photo') {
+      (async () => {
+        try {
+          // Seulement le CDN d'images de Vinted : ce pont ne doit pas devenir un
+          // téléchargeur d'URL arbitraire pour n'importe quelle page.
+          if (!/^https:\/\/[\w.-]*vinted\.net\//i.test(String(msg.url || ''))) { sendResponse({ ok: false, error: 'url non autorisée' }); return; }
+          const r = await photoBytes(msg.url);
+          sendResponse(r);
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     // PANNEAU VRM SUR VINTED : vinted-panel.js demande les données de TON app
     // (numéros, garage, paires qui dorment, stats). Lecture Supabase seule —
     // aucune requête vers Vinted, aucune action automatisée sur le site.

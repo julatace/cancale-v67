@@ -2160,6 +2160,23 @@ function vmrAuthEtat(timeoutMs = 2500) {
     try { window.postMessage({ __vmr: 'authEtat', reqId }, '*'); } catch (_) { fin(null); }
   });
 }
+// Octets d'une photo Vinted, via l'extension. Le CDN Vinted ne renvoie AUCUN
+// en-tête CORS : la page peut afficher l'image, pas en lire les octets (et un
+// canvas nourri d'une image cross-origin devient inexportable, §4.93). Sans
+// extension → null, et le document se génère simplement sans photo.
+function vmrPhoto(url, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve(null); return; }
+    const reqId = 'p' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let done = false;
+    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId) fin(e.data.dataUrl || null); };
+    window.addEventListener('message', onMsg);
+    setTimeout(() => fin(null), timeoutMs);
+    try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin(null); }
+  });
+}
+
 function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
@@ -2447,43 +2464,108 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
 // utile pour le registre d'achats d'un pro (surtout en régime de la marge, où
 // l'achat à un particulier n'a pas de facture TVA mais doit être tracé). Ce
 // n'est pas la facture officielle Vinted, mais un récapitulatif daté et complet.
+// ── LE REÇU D'ACHAT ────────────────────────────────────────────────────────
+// C'est la pièce que Julien garde pour sa compta : elle doit être lisible d'un
+// coup d'œil et identifiable sans réfléchir. L'ancienne version était une liste
+// de champs sans accents, sans photo et sans le numéro de la paire — on ne
+// savait pas de quelle chaussure il s'agissait.
+// ⚠️ Les accents PASSENT avec les polices standard de pdf-lib (encodage
+// WinAnsi) : « Reçu d'achat », « payé », « Numéro » s'écrivent normalement.
 const generateAchatJustificatif = async (o, opts = {}) => {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([420, 560]);
+  const page = pdf.addPage([420, 595]);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
-  const { height } = page.getSize();
-  let y = height - 48;
-  const line = (label, val, o2={}) => {
-    page.drawText(label, { x:32, y, size:9, font:reg, color:rgb(0.45,0.45,0.45) });
-    page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:rgb(0.1,0.1,0.1) });
-    y -= o2.gap || 40;
+  const { width, height } = page.getSize();
+  const M = 34, W = width - M * 2;
+  const ACC = rgb(0, 0.47, 0.51), GRIS = rgb(0.45, 0.45, 0.45), NOIR = rgb(0.1, 0.1, 0.1), TRAIT = rgb(0.88, 0.88, 0.88);
+  const txt = (t, x, y, size, font, color) => page.drawText(String(t), { x, y, size, font, color });
+  const coupe = (t, size, font, max) => { let s = String(t || ''); while (s.length > 3 && font.widthOfTextAtSize(s, size) > max) s = s.slice(0, -2); return s === String(t || '') ? s : s + '…'; };
+
+  let y = height - 46;
+  txt("Reçu d'achat", M, y, 21, bold, ACC);
+  txt(opts.shop || 'Shop Cancale35', M, y - 16, 10, reg, GRIS);
+  const dte = o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—';
+  txt(dte, width - M - reg.widthOfTextAtSize(dte, 11), y, 11, reg, NOIR);
+  y -= 40;
+  page.drawRectangle({ x: M, y, width: W, height: 1.5, color: TRAIT });
+  y -= 20;
+
+  // ── LA PAIRE : photo + titre + numéro de boîte, dans un encadré ──────────
+  // La photo n'est là que si l'extension a pu la rapatrier (le CDN Vinted
+  // refuse la lecture cross-origin depuis la page). Sans elle : pas de trou,
+  // le bloc se resserre.
+  let img = null;
+  try {
+    const src = orderPhoto(o);
+    if (src) {
+      const dataUrl = await vmrPhoto(src);
+      if (dataUrl) {
+        const b64 = dataUrl.split(',')[1];
+        const bin = atob(b64); const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        img = /png/i.test(dataUrl.slice(0, 30)) ? await pdf.embedPng(arr) : await pdf.embedJpg(arr);
+      }
+    }
+  } catch (_) { img = null; }
+
+  const hBloc = img ? 96 : 62;
+  page.drawRectangle({ x: M, y: y - hBloc, width: W, height: hBloc, borderColor: TRAIT, borderWidth: 1, color: rgb(0.985, 0.985, 0.985) });
+  const px = M + 12;
+  let tx = px;
+  if (img) {
+    const côté = 72;
+    const r = Math.min(côté / img.width, côté / img.height);
+    page.drawImage(img, { x: px, y: y - hBloc + (hBloc - img.height * r) / 2, width: img.width * r, height: img.height * r });
+    tx = px + côté + 12;
+  }
+  const largeTitre = W - (tx - M) - 12;
+  // ⚠️ Trois lignes empilées : sans photo le bloc fait 62 px, il faut resserrer
+  // SANS chevaucher (la 1re version écrivait le montant par-dessus la marque).
+  const yT = y - (img ? 26 : 20), yS = y - (img ? 45 : 36), yP = y - (img ? 70 : 54);
+  txt(coupe(o.title || '—', 12, bold, largeTitre), tx, yT, 12, bold, NOIR);
+  const sousLigne = [];
+  if (opts.numero) sousLigne.push('N° ' + opts.numero);
+  const taille = extractSize(o.title || ''); if (taille) sousLigne.push('Pointure ' + taille);
+  const marque = extractBrand(o.title || ''); if (marque) sousLigne.push(marque);
+  if (sousLigne.length) txt(coupe(sousLigne.join('  ·  '), 10, reg, largeTitre), tx, yS, 10, reg, GRIS);
+  const montant = o.price?.amount != null ? `${Number(o.price.amount).toFixed(2).replace('.', ',')} ${o.price.currency_code === 'EUR' ? '€' : o.price.currency_code || ''}` : '—';
+  txt('Payé ' + montant, tx, yP, img ? 16 : 14, bold, ACC);
+  y -= hBloc + 24;
+
+  // ── LE DÉTAIL, en deux colonnes : ça tient sur une page et ça se lit vite ─
+  const duo = (l1, v1, l2, v2) => {
+    const xc = M + W / 2;
+    txt(l1, M, y, 8.5, reg, GRIS); txt(coupe(v1 == null || v1 === '' ? '—' : v1, 11, reg, W / 2 - 14), M, y - 14, 11, reg, NOIR);
+    if (l2 != null) { txt(l2, xc, y, 8.5, reg, GRIS); txt(coupe(v2 == null || v2 === '' ? '—' : v2, 11, reg, W / 2 - 14), xc, y - 14, 11, reg, NOIR); }
+    y -= 34;
   };
-  page.drawText('Recu d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
-  page.drawText(opts.shop || 'Shop Cancale35', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
-  page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 24;
-  line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
-  line('N° de transaction Vinted', o.transaction_id || '—');
-  line('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—');
-  line('Article', o.title || '—');
-  line('Montant payé (TTC)', o.price?.amount!=null ? `${Number(o.price.amount).toFixed(2)} ${o.price.currency_code==='EUR'?'€':o.price.currency_code||''}` : '—', { big:true });
-  line('Compte acheteur', opts.account || '—');
-  y -= 6;
-  const note = opts.regime==='marge'
-    ? 'Achat de seconde main a un particulier : pas de TVA deductible. A conserver pour le regime de la marge (TVA sur la marge a la revente).'
-    : 'Recu d\'achat a conserver avec ta comptabilite.';
-  // Retour à la ligne simple.
-  const wrap = (txt, max) => { const words=txt.split(' '); const rows=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>max){ rows.push(cur.trim()); cur=w; } else cur+=' '+w; } if(cur.trim()) rows.push(cur.trim()); return rows; };
-  wrap(note, 62).forEach((r,i)=> page.drawText(r, { x:32, y:y-i*13, size:8.5, font:reg, color:rgb(0.5,0.5,0.5) }));
+  duo("Date d'achat", dte, 'Compte acheteur', opts.account || '—');
+  duo('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—', 'Transaction Vinted', o.transaction_id || '—');
+  if (o.status) duo('Statut Vinted', o.status, null, null);
+
+  // ── MENTION LÉGALE, en pied de page ──────────────────────────────────────
+  const note = opts.regime === 'marge'
+    ? "Achat de seconde main auprès d'un particulier : pas de TVA déductible. À conserver pour le régime de la marge (TVA sur la marge à la revente)."
+    : "Achat de seconde main auprès d'un particulier. Reçu à conserver avec ta comptabilité.";
+  const wrap = (t, max) => { const mots = String(t).split(' '); const out = []; let cur = '';
+    for (const w of mots) { const essai = (cur + ' ' + w).trim(); if (reg.widthOfTextAtSize(essai, 8.5) > max) { if (cur) out.push(cur); cur = w; } else cur = essai; }
+    if (cur) out.push(cur); return out; };
+  let yf = 78;
+  page.drawRectangle({ x: M, y: yf + 26, width: W, height: 1, color: TRAIT });
+  wrap(note, W).forEach((r, i) => txt(r, M, yf - i * 12, 8.5, reg, GRIS));
+  yf -= wrap(note, W).length * 12 + 8;
+  txt('Document généré par VRM le ' + new Date().toLocaleDateString('fr-FR') + " — ce n'est pas la facture officielle Vinted.", M, yf, 7.5, reg, rgb(0.65, 0.65, 0.65));
 
   const bytes = await pdf.save();
-  const blob = new Blob([bytes], { type:'application/pdf' });
+  const blob = new Blob([bytes], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `recu-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
+  const jour = o.date ? new Date(o.date).toISOString().slice(0, 10) : 'sans-date';
+  a.href = url; a.download = `recu-achat-${jour}-${(o.title || '').replace(/[^\w\-]+/g, '_').slice(0, 28) || o.transaction_id || 'paire'}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 };
 
 // Synchro avec Google Sheets
@@ -13436,7 +13518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
                       title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:10,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}>📄 Reçu</button>
                   ) : (
-                    <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
+                    <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:buyNumByTxn[String(o.transaction_id)]||'' })}
                       title="Télécharger le reçu d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}>📄 Reçu</button>
                   ); })()}
                 </div>
@@ -14585,7 +14667,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
               </div>
