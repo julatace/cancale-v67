@@ -1942,6 +1942,27 @@ const classifyOrderStatus = (status) => {
 // l'intérieur d'un composant, donc invisibles pour `needsBordereau` juste
 // en dessous — d'où le désaccord corrigé ci-après.
 const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+// Fenêtre pendant laquelle une vente mérite encore un numéro de boîte : la paire
+// est passée par le garage récemment, donc le numéro a un sens pour l'historique.
+// ⚠️ C'est CETTE borne qui empêche de renuméroter tout l'historique (140 ventes
+// de plus de 90 jours) et de refaire l'inflation du compteur de juillet.
+const VENTE_NUM_MAX_J = 60;
+const venteRecente = (o) => {
+  const ts = Date.parse((o && o.date) || '') || 0;
+  return ts > 0 && (Date.now() - ts) / 86400000 <= VENTE_NUM_MAX_J;
+};
+// Tri des commandes : la plus récente EN HAUT, à l'HEURE près (plainte de
+// Julien : « respecte bien les horaires de vente »). Les listes venaient de la
+// moisson sans aucun tri : plusieurs comptes mis bout à bout s'entremêlaient et
+// l'ordre n'avait plus de sens. Une date illisible part en bas plutôt que de
+// remonter en tête.
+const tsCommande = (o) => Date.parse((o && o.date) || '') || 0;
+const parDateDesc = (a, b) => tsCommande(b) - tsCommande(a);
+// Heure locale d'une vente (« 14:07 »), affichée à côté de la date.
+const heureCommande = (o) => {
+  const t = tsCommande(o); if (!t) return '';
+  try { return new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
+};
 const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 // Une vente attend une GÉNÉRATION de bordereau quand Vinted dit que le paiement
 // est validé et qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au
@@ -11305,7 +11326,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
       if (reuse) {
         if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
-      } else if (needsBordereau(o.status) && !isHidden(o)) {
+      } else if ((needsBordereau(o.status) || venteRecente(o)) && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled') {
         // ⚠️ LE CAS QUI MANQUAIT — « je me retrouve avec des paires qui n'ont pas
         // de numéro alors que c'est censé être automatique ».
         // La numérotation auto ne tourne que sur `annBase`, c'est-à-dire les
@@ -11320,6 +11341,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // paire occupe VRAIMENT une place (§7 : un numéro = une place au
         // garage), et le numéro repart dans le pool dès que le colis est parti
         // (`freedNums`). Aujourd'hui : 3 ventes concernées, pas 275.
+        //
+        // ⚠️ ÉLARGI (août 2026) aux VENTES RÉCENTES — plainte de Julien : « ça
+        // aurait dû générer un numéro dès que j'ai posté l'annonce ». La
+        // numérotation à la mise en ligne n'attrape que les annonces ENCORE en
+        // ligne au moment où l'app est ouverte : une paire vendue avant qu'il
+        // ouvre l'app n'y passe jamais. Mesuré : 13 ventes des 7 derniers jours
+        // sans numéro, dont 6 dont l'annonce EST captée. La fenêtre
+        // (`VENTE_NUM_MAX_J`) est ce qui empêche de renuméroter les 140 ventes
+        // anciennes — c'est exactement l'inflation de juillet (50 → 120).
         if (!(cur && cur.numero != null && String(cur.numero).trim() !== '')) {
           let cand = 1; while (dejaPris.has(cand)) cand += 1;
           dejaPris.add(cand);
@@ -13249,7 +13279,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ) : null; })()}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; if(vFilter==='sanscout')return isSaleNoBuy(o); return true; }).filter(o=>matchOrd(o)).map(o=>{
+          {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; if(vFilter==='sanscout')return isSaleNoBuy(o); return true; }).filter(o=>matchOrd(o)).sort(parDateDesc).map(o=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
             const e = effEntry(o); const num = e?.numero;
@@ -13805,6 +13835,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {buysBase.filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
+            .sort(parDateDesc)
             .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
             .sort((a,b)=>{ const pr=x=> x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4; const d=pr(a)-pr(b); return d!==0?d:(new Date(b.o.date||0)-new Date(a.o.date||0)); })
             .map(({o,tk,st})=>{
@@ -17959,7 +17990,18 @@ export default function App() {
 
   const vintedNotifChecked = React.useRef(false);
   useEffect(()=>{
-    if(!vintedAccounts || vintedAccounts.length===0 || vintedNotifChecked.current) return;
+    if(!vintedAccounts || vintedAccounts.length===0) return;
+    // ⚠️ DEUX CHOSES DIFFÉRENTES VIVAIENT DANS LE MÊME « UNE SEULE FOIS » :
+    //  · le BANDEAU « nouveautés depuis la dernière ouverture » → doit être unique ;
+    //  · le CENTRE de notifications (la cloche) → c'est une liste de choses À FAIRE,
+    //    elle doit se recalculer quand les données changent.
+    // Le drapeau coupait les DEUX. Or il était posé AVANT le travail réseau :
+    // si `vintedAccounts` changeait pendant ce travail (ça arrive à chaque
+    // rafraîchissement de compte), le nettoyage de l'effet posait `cancelled`,
+    // la 1ʳᵉ exécution sortait à `if(cancelled) return`, et la 2ᵉ sortait
+    // immédiatement sur le drapeau → **la cloche restait vide pour toujours**.
+    // Mesuré en base au même moment : 37 messages non lus et 6 ventes à expédier.
+    const dejaVu = vintedNotifChecked.current;
     vintedNotifChecked.current = true;
     let cancelled=false;
     (async()=>{
@@ -18073,7 +18115,9 @@ export default function App() {
       const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);
       const newSales = prevS<0 ? 0 : Math.max(0, salesCount-prevS);
       save('vinted_notif_last_vsales',salesCount);
-      if(newMsgs>0 || newSales>0){
+      // Le bandeau ne s'affiche qu'à la PREMIÈRE passe : un recalcul déclenché
+      // par un rafraîchissement de comptes ne doit pas re-sonner.
+      if(!dejaVu && (newMsgs>0 || newSales>0)){
         setVintedNotif({messages:newMsgs, ventes:newSales});
         if(notifEnabled){
           const parts=[];
