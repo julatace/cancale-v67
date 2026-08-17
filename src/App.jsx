@@ -1903,6 +1903,18 @@ const classifyOrderStatus = (status) => {
 // en dessous — d'où le désaccord corrigé ci-après.
 const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
 const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+// Une vente attend une GÉNÉRATION de bordereau quand Vinted dit que le paiement
+// est validé et qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au
+// vendeur » veut dire qu'il EXISTE DÉJÀ : la paire attend l'envoi, pas la
+// génération. Les deux libellés se ressemblent — la distinction est ici, et
+// c'est LA MÊME règle que `aGenererBordereau` de l'extension (§5.15 : une seule
+// règle par notion, copiée à l'identique et comparée par audit-coherence).
+const aGenererBordereau = (s) => {
+  const t = String(s || '');
+  if (/bordereau/i.test(t)) return false;
+  if (/annul|cancel|refus|rembours|retour|suspend|finalis/i.test(t)) return false;
+  return /paiement.*valid/i.test(t);
+};
 
 const needsBordereau = (status) => {
   const s = (status || '').toLowerCase();
@@ -14195,7 +14207,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <ScreenHead icon="doc" title="Colis à envoyer" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau reçu par email s'y accroche tout seul — sinon tu le génères sur Vinted. Un colis parti disparaît d'ici sans rien cocher."/>
+        <ScreenHead icon="doc" title="Colis à envoyer" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
         <NoAcc/>
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :
@@ -14215,7 +14227,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2}}>
                     {aPoster.length>0
-                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} déjà reçu${avecPdf.length>1?'s':''} par email${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} à générer sur Vinted`:''}${proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}`
+                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} déjà reçu${avecPdf.length>1?'s':''} par email${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}`
                       : 'Vinted ne te demande aucun envoi en ce moment.'}
                   </div>
                 </div>
@@ -14379,7 +14391,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const inv = b ? invForBord(b) : null;
                 const pdf = !!(b && b.hasPdf);
                 const acc = o ? o._acc : null;
-                const lien = o && o.transaction_id!=null ? `https://www.vinted.fr/transactions/${o.transaction_id}` : null;
                 return (
                   <div key={e.key} data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:16,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'center'}}>
@@ -14432,8 +14443,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
                         style={{flex:'1 1 160px',border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
                       ) : (<>
-                        {lien && <a href={lien} target="_blank" rel="noreferrer" title="Ouvre la vente sur Vinted pour générer le bordereau"
-                          style={{flex:'1 1 160px',textAlign:'center',border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none'}}>📄 Générer sur Vinted ↗</a>}
+                        {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
+                            qui génère le bordereau manquant dès que tu arrives sur
+                            Vinted (aucun argent engagé, aucun choix — c'est une
+                            formalité obligatoire). L'app se contente de dire où on
+                            en est, au lieu de te renvoyer faire le travail. */}
+                        <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
+                          {aGenererBordereau(o && o.status)
+                            ? <>⏳ <b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
+                            : <>✅ <b>Bordereau déjà généré</b> chez Vinted — le PDF arrive par email.</>}
+                        </div>
                         <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
                       </>)}

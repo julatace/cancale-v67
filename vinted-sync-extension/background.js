@@ -1586,6 +1586,9 @@ async function visiteVinted() {
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     const ok = await runActive();
     logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
+    // Les bordereaux manquants, APRÈS la moisson (elle vient de rafraîchir les
+    // statuts : sans elle on travaillerait sur une photo périmée).
+    await genererBordereauxEnAttente(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 try {
@@ -2146,6 +2149,110 @@ async function genererBordereau(uid, tx) {
     { seller_address_id: adr, drop_off_type: null, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GÉNÉRER LES BORDEREAUX MANQUANTS EN ARRIVANT SUR VINTED
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien : « dès que je me connecte sur Vinted, si une vente n'a pas
+// son bordereau, que l'extension appuie et le mette dans l'application ».
+//
+// POURQUOI C'EST ACCEPTÉ ALORS QUE L'AUTO-ACCEPTATION D'OFFRE EST REFUSÉE :
+// générer un bordereau **n'engage aucun argent et ne décide de rien**. La vente
+// est déjà faite, le colis DOIT partir, il n'y a ni prix ni choix — c'est une
+// formalité obligatoire. Accepter une offre, si (§45).
+//
+// LES GARDE-FOUS, TOUS DÉJÀ EN PLACE (§48) :
+//  • UNIQUEMENT le compte connecté dans cet onglet (`garde`) — agir au nom d'un
+//    autre compte est LE signal multi-comptes que Vinted sanctionne (§5) ;
+//  • plafond de 20 actions/heure par compte (`compterAction`) ;
+//  • ⚠️ AU PLUS 3 PAR VISITE. Ce n'est pas un « rythme faussement humain »
+//    (toujours refusé, §32) : c'est une limite de volume, comme le plafond
+//    horaire. Le reste part à la visite suivante. Mesuré sur les vraies
+//    données : il y a 1 vente à générer aujourd'hui, la rafale est théorique.
+//  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
+const BORD_MAX_PAR_VISITE = 3;
+const BORD_RETRY_MS = 6 * 60 * 60 * 1000;
+
+// Une vente attend une GÉNÉRATION quand Vinted dit que le paiement est validé
+// ET qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au vendeur »
+// veut dire qu'il EXISTE DÉJÀ : le regénérer ne sert à rien (et c'est une
+// requête pour rien). Les deux libellés se ressemblent, la distinction est ici.
+const aGenererBordereau = (statut) => {
+  const s = String(statut || '');
+  if (/bordereau/i.test(s)) return false;
+  if (/annul|cancel|refus|rembours|retour|suspend|finalis/i.test(s)) return false;
+  return /paiement.*valid/i.test(s);
+};
+
+// Après génération, on ESSAIE de récupérer le PDF pour le déposer dans l'app.
+// ⚠️ HONNÊTE : l'endpoint `/api/v2/shipments/{id}/label_url` a été VU dans les
+// URL observées (§5.26) mais sa réponse n'a jamais été capturée — on ne connaît
+// donc pas sa forme exacte. Lecture DÉFENSIVE : si ça ne donne rien, on ne
+// prétend rien, le PDF arrivera par email comme aujourd'hui (§3).
+async function recupererLabel(acc, uid, tx) {
+  try {
+    const t = await vintedGet(acc, `/api/v2/transactions/${tx}`);
+    const shipId = t && t.json && (t.json.transaction?.shipment?.id ?? t.json.shipment?.id);
+    if (!shipId) return false;
+    const l = await vintedGet(acc, `/api/v2/shipments/${shipId}/label_url`);
+    const j = (l && l.json) || {};
+    const url = j.url || j.label_url || j.download_url || (j.label && (j.label.url || j.label.download_url)) || null;
+    if (!url) return false;
+    const res = await fetch(url);
+    if (!res.ok) return false;
+    const buf = await res.arrayBuffer();
+    if (!buf.byteLength || buf.byteLength > 12000000) return false;
+    const bytes = new Uint8Array(buf);
+    let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const data = { uid, url, tx: String(tx), capturedAt: new Date().toISOString(), pdfB64: btoa(bin) };
+    await supabaseUpsert('app_data', [{ id: `harvest_${uid}_label_latest`, data }], 'id');
+    await noterUrlLabel(url, true);
+    return true;
+  } catch (_) { return false; }
+}
+
+async function genererBordereauxEnAttente(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    // Les ventes telles que Vinted les a rendues à la dernière moisson.
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const candidates = ventes.filter(o => aGenererBordereau(o && o.status) && (o.transaction_id != null));
+    if (!candidates.length) return 0;
+    // Un bordereau reçu par email prouve qu'il existe déjà : on ne regénère pas.
+    const dejaMail = new Set();
+    try {
+      const mails = await sbGet('app_data?id=like.email_bord_*&select=tx:data->>transaction');
+      for (const m of (mails || [])) if (m && m.tx) dejaMail.add(String(m.tx));
+    } catch (_) { /* sans cette lecture on retombe sur le statut Vinted, qui suffit */ }
+    const memo = (await chrome.storage.local.get('vrmBordFaits')).vrmBordFaits || {};
+    let faits = 0;
+    for (const o of candidates) {
+      if (faits >= BORD_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      if (dejaMail.has(tx)) continue;
+      if (memo[tx] && Date.now() - Number(memo[tx].t || 0) < BORD_RETRY_MS) continue;
+      const r = await genererBordereau(uid, tx);
+      memo[tx] = { t: Date.now(), ok: !!r.ok };
+      if (r.ok) {
+        faits++;
+        const eu = await recupererLabel(acc, uid, tx);
+        logActivity(eu ? `📄 Bordereau généré et rangé dans l'app — ${String(o.title || '').slice(0, 40)}`
+                       : `📄 Bordereau généré — ${String(o.title || '').slice(0, 40)} (le PDF arrivera par email)`);
+      } else {
+        logActivity(`⚠️ Bordereau non généré : ${r.error || 'refus Vinted'}`);
+        // Compte connecté ailleurs / plafond atteint : inutile d'insister sur
+        // les suivantes, elles échoueront pareil.
+        if (r.code === 'autre-compte' || r.code === 'trop-d-actions') break;
+      }
+    }
+    await chrome.storage.local.set({ vrmBordFaits: memo });
+    return faits;
+  } catch (_) { return 0; }
 }
 
 // Couper / réafficher un compte Vinted DEPUIS LE PANNEAU. Ligne DÉDIÉE
