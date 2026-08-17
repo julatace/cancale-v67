@@ -2421,3 +2421,19 @@ Second défaut, plus bête : `if (!candidates.length) return 0;` sortait avant t
 ➡️ **2ᵉ passe** dans `genererBordereauxEnAttente` : toute vente qui attend l'envoi, dont l'étiquette existe, sans PDF connu (ni email, ni `label_latest`), déclenche `recupererLabel`. Mêmes garde-fous (compte connecté, 3 par visite, pas de nouvel essai avant 6 h).
 
 **Vérifié** : banc `vm` sur le vrai code, **14 cas → 0 non conforme** (dont « bordereau envoyé → 0 génération mais le PDF est récupéré », « PDF déjà reçu par email → on ne redemande rien », « vente finalisée → on ne va rien chercher ») · banc app : garage 32 cases, filtre de période mesuré sur les 3 états · smoke 12 écrans **0 PAGEERROR** · `audit-coherence` 6 règles, 0 désaccord. Extension **5.24.0**.
+
+### 5.31 (suite) — L'EXTENSION ENVOIE LE BORDEREAU, L'EMAIL N'EST QU'UNE VÉRIFICATION
+
+Julien : « je veux que l'extension récupère le bordereau et l'envoie dans l'application, pas qu'elle génère et qu'on attende le mail. Le mail doit simplement être une vérification qu'il n'y a pas d'erreur ».
+
+Trois défauts empêchaient ça, tous corrigés :
+
+1. **`harvest_{uid}_label_latest` = UNE SEULE ligne par compte**, écrasée à chaque capture. Avec 3 colis à envoyer, l'app n'en voyait qu'un. ➡️ **une ligne par bordereau** : `harvest_{uid}_label_{tx}` — la clé porte le n° de transaction, c'est-à-dire l'identité de la vente, donc du bordereau (il ne peut pas y avoir de bordereau sans vente, §5.28). `label_latest` reste écrite pour les écrans qui la lisent encore.
+2. **Côté app, on ne lisait que `label_latest`.** ➡️ `fetchCapturedLabelMetas(uid)` lit **toutes** les lignes `harvest_{uid}_label_*` en scalaires (`tx`, `capturedAt`) ; les octets ne partent qu'à l'impression (`fetchLabelPdf(rowId)`) — sinon ouvrir l'écran retéléchargerait un PDF par colis (§34).
+3. **L'email passait en premier à l'impression.** ➡️ **le PDF capté par l'extension est la source**, l'email n'est plus qu'un secours ; la carte le dit : « 📎 Bordereau récupéré chez Vinted par l'extension · ✓ confirmé par l'email » quand les deux sont là.
+
+**Téléchargement manuel relié à sa vente** : `storeLabel` (capture par `chrome.downloads`) ne savait pas à quel colis appartenait le PDF. Il l'attribue désormais **uniquement s'il n'existe qu'UN seul colis possible** pour ce compte — ce n'est pas une devinette (§24), c'est le seul candidat. Sinon le PDF reste « le dernier capté », comme avant.
+
+**Vérifié au banc** : 3 bordereaux captés (un par colis) → **les 3 cartes affichent « 🖨 Imprimer »** + « 🖨 Tout imprimer (3) », pastille « récupéré chez Vinted » sur chacune, **0 PAGEERROR**. Banc `vm` extension : 14 cas, 0 non conforme. Smoke 12 écrans : 0 PAGEERROR. Extension **5.25.0**.
+
+⚠️ **Ce qui reste incertain, dit franchement** : la réponse de `/api/v2/shipments/{id}/label_url` n'a **toujours jamais été observée**. `urlDeLabel` balaie la réponse pour trouver l'URL et un échantillon est conservé dans `panel_diag_capture.rates` — si aucun des trois chemins ne répond, on ne prétend rien et l'email reste le filet. C'est la seule pièce non garantie de la chaîne.
