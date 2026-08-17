@@ -2320,10 +2320,17 @@ const fetchLotItems = async (account, transactionId) => {
     const res = await vintedApiCall(account, `/api/v2/transactions/${transactionId}`);
     const tx = res && res.data && (res.data.transaction || res.data);
     const items = tx && tx.order && Array.isArray(tx.order.items) ? tx.order.items : [];
+    // ⚠️ CHAQUE article d'un lot porte son IDENTIFIANT D'ANNONCE (vérifié en base :
+    // 206 articles sur 206 ont `id`, plus `photos` et `size_title`). C'est donc une
+    // identité certaine, pas un titre — le N° d'une paire d'un lot n'a jamais à
+    // être deviné (§5.34).
     return items.map(it => ({
       title: it.title || it.name || '',
       id: it.id != null ? String(it.id) : null,
       price: (it.price && (it.price.amount ?? it.price)) ?? null,
+      photo: (Array.isArray(it.photos) && it.photos[0] && (it.photos[0].url || it.photos[0])) || null,
+      size: it.size_title || null,
+      url: it.url || null,
     })).filter(x => x.title);
   } catch (_) { return []; }
 };
@@ -8669,6 +8676,21 @@ const photoKey = (url) => {
   const key = segs.slice(-2).join('/').replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase();
   return key || null;
 };
+// DOSSIER de la photo, sans le nom de fichier. Quand une annonce est republiée
+// (supprimer + recréer, §46), Vinted RE-TÉLÉVERSE la même image : le dossier
+// reste identique, seul l'horodatage du fichier change —
+//   article du lot : 05_02624_dfaznfhbbwgavj8tfkfe5ttc/1783338221
+//   paire N°20     : 05_02624_dfaznfhbbwgavj8tfkfe5ttc/1785602038
+// ⚠️ Le dossier seul N'EST PAS une identité : mesuré sur 261 annonces, il donne
+// 17 collisions (contre 0 pour la clé complète) et 4 dossiers portent DEUX
+// numéros différents. Il ne sert donc qu'en dernier recours, et UNIQUEMENT
+// quand toutes les paires qui le partagent portent le MÊME numéro.
+const photoDir = (url) => {
+  const k = photoKey(url);
+  if (!k) return null;
+  const parts = k.split('/');
+  return parts.length >= 2 ? parts[parts.length - 2] : null;
+};
 // Clé photo d'une entrée numéro : on privilégie la clé MÉMORISÉE (photoK) au
 // moment de la numérotation → reste valable même si le format d'URL évolue.
 const entryPhotoKey = (e) => (e && e.photoK) || (e ? photoKey(e.photo) : null);
@@ -10050,40 +10072,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // renvoie une paire QUE si le résultat n'est PAS ambigu (numéros différents).
   // Normalise une taille pour comparaison : « T 36,5 », « 36.5 EU », « 36,5 » → « 36.5 ».
   const normSize = (s) => String(s == null ? '' : s).toLowerCase().replace(',', '.').replace(/[^0-9.]/g, '').replace(/\.0+$/, '').replace(/^\.+|\.+$/g, '').trim();
-  // Retrouve la paire numérotée d'après le titre de l'annonce/bordereau. Si
-  // PLUSIEURS paires portent le MÊME titre (ex. deux « Adidas Spezial » en tailles
-  // différentes), on départage par la TAILLE quand elle est fournie (le bordereau
-  // la contient) : on écarte les paires dont la taille CONNUE diffère, et on garde
-  // celles dont la taille correspond OU est inconnue. Sans taille exploitable, on
-  // reste prudent (null) plutôt que d'attribuer la mauvaise paire.
-  const entryByTitleLoose = (title, size) => {
-    const n = normTitle(title); if (!n) return null;
-    const collect = (pred) => {
-      const byNum = new Map();
-      for (const k in numeros) { const e = numeros[k]; if (e && e.numero != null && pred(normTitle(e.title))) byNum.set(String(e.numero), e); }
-      return [...byNum.values()];
-    };
-    const pick = (cands) => {
-      if (cands.length <= 1) return cands[0] || null;
-      const target = normSize(size);
-      if (target) {
-        const exactSz = cands.filter(e => normSize(e.size) === target);
-        if (exactSz.length === 1) return exactSz[0];
-        // ⚠️ L'ANCIEN REPLI « compatible » ACCEPTAIT UNE POINTURE INCONNUE :
-        // entre deux paires du même titre dont l'une n'a pas de taille
-        // enregistrée, il choisissait celle-là. C'est un pari — et mesuré sur
-        // les vraies données, 6 titres portent des numéros DIFFÉRENTS (« adidas
-        // spezial noir taille 35,5 » : N°36, 25, 4, 134, 156, 161). Un mauvais
-        // numéro envoie la mauvaise chaussure et la paire devient introuvable au
-        // garage. On exige donc une pointure IDENTIQUE, sinon on n'attribue rien
-        // et le numéro reste à poser à la main : mieux vaut un blanc qu'un faux.
-      }
-      return null; // toujours ambigu → on n'attribue rien
-    };
-    const exact = collect(t => t === n);
-    if (exact.length) return pick(exact);                 // des titres exacts existent → on décide parmi eux
-    return pick(collect(t => t && (t.includes(n) || n.includes(t))));
-  };
+  // ⚠️ IL N'Y A PLUS DE RAPPROCHEMENT PAR TITRE (§5.34, août 2026).
+  // `entryByTitleLoose` vivait ici et attribuait un N° d'après le libellé.
+  // Mesuré sur la vraie base : 61 ventes sur 277 (22 %) portent un titre en
+  // double, et le titre a désigné la MAUVAISE annonce 3 fois — donc la mauvaise
+  // boîte à l'expédition. L'identité d'une annonce est l'identifiant que Vinted
+  // donne (transaction → item_id, et order.items[].id pour un lot), sinon la
+  // photo. Voir `identiteAnnonce`. NE PAS réintroduire de repli par titre.
   // Lien VENTE↔PAIRE verrouillé par n° de transaction (robuste, permanent, gère
   // les titres en double une fois établi). L'app le remplit AUTOMATIQUEMENT quand
   // le titre d'une vente correspond à une SEULE annonce numérotée (cas non
@@ -10107,13 +10102,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     dup.forEach(pk => delete m[pk]);
     return m;
   }, [numeros]);
-  const entryKeyByPhoto = (o) => { const pk = o ? photoKey(orderPhoto(o)) : null; return pk ? (numerosByPhoto[pk] || null) : null; };
+  // Même index, mais par DOSSIER de photo — rattrape la paire republiée dont
+  // l'image a été re-téléversée (même dossier, horodatage différent, cf.
+  // `photoDir`). ⚠️ On n'y garde QUE les dossiers non ambigus : dès que deux
+  // numéros différents partagent un dossier, il est écarté (mesuré : 4 cas).
+  const numerosByPhotoDir = useMemo(() => {
+    const m = {}; const dup = new Set();
+    for (const k in numeros) {
+      const d = photoDir((numeros[k] && numeros[k].photo) || null) || (numeros[k] && numeros[k].photoK ? String(numeros[k].photoK).split('/')[0] : null);
+      if (!d) continue;
+      if (m[d]) { if (String(numeros[m[d]].numero) !== String(numeros[k].numero)) dup.add(d); }
+      else m[d] = k;
+    }
+    dup.forEach(d => delete m[d]);
+    return m;
+  }, [numeros]);
+  const entryKeyByPhoto = (o) => {
+    const url = o ? orderPhoto(o) : null;
+    const pk = photoKey(url);
+    if (pk && numerosByPhoto[pk]) return numerosByPhoto[pk];   // même fichier = certain
+    const d = photoDir(url);                                    // même image re-téléversée
+    return (d && numerosByPhotoDir[d]) || null;
+  };
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
   const onlineAnnonceIds = useMemo(() => new Set((listings.items || []).map(it => String(it.id))), [listings.items]);
   // Clé (id d'annonce) d'une entrée numéro, par référence — pour le verrouillage.
-  const keyOfEntry = (e) => { if (!e) return null; for (const k in numeros) { if (numeros[k] === e) return k; } return null; };
   // ⚠️ UNE SEULE RÈGLE D'IDENTITÉ (§11) : « quelle annonce est cette vente ? ».
   // Deux voies, toutes deux certaines, et RIEN d'autre :
   //   1. l'identifiant d'annonce donné par Vinted (transaction → item_id) ;
@@ -15172,17 +15187,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:7}}>
                 {lotView.items.map((it,i)=>{
-                  // ⚠️ Un article DANS UN LOT n'a que son titre (Vinted ne donne
-                  // ni identifiant ni photo par article). On peut donc proposer un
-                  // N°, mais jamais le présenter comme certain : deux paires
-                  // identiques portent le même libellé. Il est affiché en orange
-                  // avec « titre ? » → on vérifie la boîte avant d'expédier.
-                  const e=entryByTitleLoose(it.title,extractSize(it.title));
-                  const num=e&&e.numero?String(e.numero):null;
+                  // Chaque article du lot porte son IDENTIFIANT d'annonce → on
+                  // retrouve son N° avec certitude, jamais par ressemblance de
+                  // titre (§5.34). À défaut, la photo de l'article. Sinon rien.
+                  const e=(it.id&&numeros[String(it.id)])||(it.photo?numeros[entryKeyByPhoto({photo:it.photo})]:null)||null;
+                  const num=e&&e.numero!=null?String(e.numero):null;
                   return (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px'}}>
-                      <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:10,background:num?'#f59e0b':C.border,color:num?'#fff':C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
-                      <span style={{flex:1,fontSize:13,fontWeight:500,color:C.text}}>{it.title}{num && <span style={{marginLeft:6,fontSize:11,fontWeight:600,color:'#f59e0b'}}>titre ? à vérifier</span>}</span>
+                      {it.photo
+                        ? <img src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:10,objectFit:'cover',background:C.border}}/>
+                        : <span style={{flexShrink:0,width:34,height:34,borderRadius:10,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}>👟</span>}
+                      <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:10,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
+                      <span style={{flex:'1 1 120px',minWidth:0,fontSize:13,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis'}}>{it.title}{it.size?<span style={{color:C.muted,fontWeight:400}}> · {it.size}</span>:''}</span>
                       {it.price!=null && <span style={{fontSize:12,fontWeight:600,color:C.muted}}>{Number(it.price).toFixed(0)} €</span>}
                     </div>
                   );
