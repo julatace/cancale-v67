@@ -2160,6 +2160,23 @@ function vmrAuthEtat(timeoutMs = 2500) {
     try { window.postMessage({ __vmr: 'authEtat', reqId }, '*'); } catch (_) { fin(null); }
   });
 }
+// Octets d'une photo Vinted, via l'extension. Le CDN Vinted ne renvoie AUCUN
+// en-tête CORS : la page peut afficher l'image, pas en lire les octets (et un
+// canvas nourri d'une image cross-origin devient inexportable, §4.93). Sans
+// extension → null, et le document se génère simplement sans photo.
+function vmrPhoto(url, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve(null); return; }
+    const reqId = 'p' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let done = false;
+    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId) fin(e.data.dataUrl || null); };
+    window.addEventListener('message', onMsg);
+    setTimeout(() => fin(null), timeoutMs);
+    try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin(null); }
+  });
+}
+
 function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
@@ -2180,6 +2197,22 @@ function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
 // un nombre different). Avec le mauvais id, Vinted renvoie 0 annonce alors que
 // le compte en a. On resout donc d'abord le vrai id via users/current, puis on
 // le garde en cache memoire sur l'objet compte (1 seul appel supplementaire).
+// ⚠️ LA PHOTO D'UNE COMMANDE VINTED S'APPELLE `photo`, PAS `photo_url`.
+// Une commande moissonnée porte `photo: { url, high_resolution }` (vérifié : 219
+// des 275 ventes en base). Or TOUTE l'app affichait `o.photo_url` — un champ que
+// RIEN n'écrit nulle part. Résultat : le pictogramme 👟 sur chaque vente, chaque
+// achat, chaque reçu, alors que l'image était là depuis le début. Une seule
+// fonction, utilisée partout, pour ne plus jamais réécrire cette lecture.
+const orderPhoto = (o) => {
+  if (!o) return null;
+  const p = o.photo;
+  return o.photo_url
+      || (typeof p === 'string' ? p : null)
+      || p?.url || p?.thumbnails?.[0]?.url
+      || o.photos?.[0]?.url || o.photos?.[0]?.thumbnails?.[0]?.url
+      || null;
+};
+
 const mapWardrobeItem = (it) => ({
   id: String(it.id),
   title: it.title || '',
@@ -2431,43 +2464,108 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
 // utile pour le registre d'achats d'un pro (surtout en régime de la marge, où
 // l'achat à un particulier n'a pas de facture TVA mais doit être tracé). Ce
 // n'est pas la facture officielle Vinted, mais un récapitulatif daté et complet.
+// ── LE REÇU D'ACHAT ────────────────────────────────────────────────────────
+// C'est la pièce que Julien garde pour sa compta : elle doit être lisible d'un
+// coup d'œil et identifiable sans réfléchir. L'ancienne version était une liste
+// de champs sans accents, sans photo et sans le numéro de la paire — on ne
+// savait pas de quelle chaussure il s'agissait.
+// ⚠️ Les accents PASSENT avec les polices standard de pdf-lib (encodage
+// WinAnsi) : « Reçu d'achat », « payé », « Numéro » s'écrivent normalement.
 const generateAchatJustificatif = async (o, opts = {}) => {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([420, 560]);
+  const page = pdf.addPage([420, 595]);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
-  const { height } = page.getSize();
-  let y = height - 48;
-  const line = (label, val, o2={}) => {
-    page.drawText(label, { x:32, y, size:9, font:reg, color:rgb(0.45,0.45,0.45) });
-    page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:rgb(0.1,0.1,0.1) });
-    y -= o2.gap || 40;
+  const { width, height } = page.getSize();
+  const M = 34, W = width - M * 2;
+  const ACC = rgb(0, 0.47, 0.51), GRIS = rgb(0.45, 0.45, 0.45), NOIR = rgb(0.1, 0.1, 0.1), TRAIT = rgb(0.88, 0.88, 0.88);
+  const txt = (t, x, y, size, font, color) => page.drawText(String(t), { x, y, size, font, color });
+  const coupe = (t, size, font, max) => { let s = String(t || ''); while (s.length > 3 && font.widthOfTextAtSize(s, size) > max) s = s.slice(0, -2); return s === String(t || '') ? s : s + '…'; };
+
+  let y = height - 46;
+  txt("Reçu d'achat", M, y, 21, bold, ACC);
+  txt(opts.shop || 'Shop Cancale35', M, y - 16, 10, reg, GRIS);
+  const dte = o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—';
+  txt(dte, width - M - reg.widthOfTextAtSize(dte, 11), y, 11, reg, NOIR);
+  y -= 40;
+  page.drawRectangle({ x: M, y, width: W, height: 1.5, color: TRAIT });
+  y -= 20;
+
+  // ── LA PAIRE : photo + titre + numéro de boîte, dans un encadré ──────────
+  // La photo n'est là que si l'extension a pu la rapatrier (le CDN Vinted
+  // refuse la lecture cross-origin depuis la page). Sans elle : pas de trou,
+  // le bloc se resserre.
+  let img = null;
+  try {
+    const src = orderPhoto(o);
+    if (src) {
+      const dataUrl = await vmrPhoto(src);
+      if (dataUrl) {
+        const b64 = dataUrl.split(',')[1];
+        const bin = atob(b64); const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        img = /png/i.test(dataUrl.slice(0, 30)) ? await pdf.embedPng(arr) : await pdf.embedJpg(arr);
+      }
+    }
+  } catch (_) { img = null; }
+
+  const hBloc = img ? 96 : 62;
+  page.drawRectangle({ x: M, y: y - hBloc, width: W, height: hBloc, borderColor: TRAIT, borderWidth: 1, color: rgb(0.985, 0.985, 0.985) });
+  const px = M + 12;
+  let tx = px;
+  if (img) {
+    const côté = 72;
+    const r = Math.min(côté / img.width, côté / img.height);
+    page.drawImage(img, { x: px, y: y - hBloc + (hBloc - img.height * r) / 2, width: img.width * r, height: img.height * r });
+    tx = px + côté + 12;
+  }
+  const largeTitre = W - (tx - M) - 12;
+  // ⚠️ Trois lignes empilées : sans photo le bloc fait 62 px, il faut resserrer
+  // SANS chevaucher (la 1re version écrivait le montant par-dessus la marque).
+  const yT = y - (img ? 26 : 20), yS = y - (img ? 45 : 36), yP = y - (img ? 70 : 54);
+  txt(coupe(o.title || '—', 12, bold, largeTitre), tx, yT, 12, bold, NOIR);
+  const sousLigne = [];
+  if (opts.numero) sousLigne.push('N° ' + opts.numero);
+  const taille = extractSize(o.title || ''); if (taille) sousLigne.push('Pointure ' + taille);
+  const marque = extractBrand(o.title || ''); if (marque) sousLigne.push(marque);
+  if (sousLigne.length) txt(coupe(sousLigne.join('  ·  '), 10, reg, largeTitre), tx, yS, 10, reg, GRIS);
+  const montant = o.price?.amount != null ? `${Number(o.price.amount).toFixed(2).replace('.', ',')} ${o.price.currency_code === 'EUR' ? '€' : o.price.currency_code || ''}` : '—';
+  txt('Payé ' + montant, tx, yP, img ? 16 : 14, bold, ACC);
+  y -= hBloc + 24;
+
+  // ── LE DÉTAIL, en deux colonnes : ça tient sur une page et ça se lit vite ─
+  const duo = (l1, v1, l2, v2) => {
+    const xc = M + W / 2;
+    txt(l1, M, y, 8.5, reg, GRIS); txt(coupe(v1 == null || v1 === '' ? '—' : v1, 11, reg, W / 2 - 14), M, y - 14, 11, reg, NOIR);
+    if (l2 != null) { txt(l2, xc, y, 8.5, reg, GRIS); txt(coupe(v2 == null || v2 === '' ? '—' : v2, 11, reg, W / 2 - 14), xc, y - 14, 11, reg, NOIR); }
+    y -= 34;
   };
-  page.drawText('Recu d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
-  page.drawText(opts.shop || 'Shop Cancale35', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
-  page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 24;
-  line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
-  line('N° de transaction Vinted', o.transaction_id || '—');
-  line('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—');
-  line('Article', o.title || '—');
-  line('Montant payé (TTC)', o.price?.amount!=null ? `${Number(o.price.amount).toFixed(2)} ${o.price.currency_code==='EUR'?'€':o.price.currency_code||''}` : '—', { big:true });
-  line('Compte acheteur', opts.account || '—');
-  y -= 6;
-  const note = opts.regime==='marge'
-    ? 'Achat de seconde main a un particulier : pas de TVA deductible. A conserver pour le regime de la marge (TVA sur la marge a la revente).'
-    : 'Recu d\'achat a conserver avec ta comptabilite.';
-  // Retour à la ligne simple.
-  const wrap = (txt, max) => { const words=txt.split(' '); const rows=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>max){ rows.push(cur.trim()); cur=w; } else cur+=' '+w; } if(cur.trim()) rows.push(cur.trim()); return rows; };
-  wrap(note, 62).forEach((r,i)=> page.drawText(r, { x:32, y:y-i*13, size:8.5, font:reg, color:rgb(0.5,0.5,0.5) }));
+  duo("Date d'achat", dte, 'Compte acheteur', opts.account || '—');
+  duo('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—', 'Transaction Vinted', o.transaction_id || '—');
+  if (o.status) duo('Statut Vinted', o.status, null, null);
+
+  // ── MENTION LÉGALE, en pied de page ──────────────────────────────────────
+  const note = opts.regime === 'marge'
+    ? "Achat de seconde main auprès d'un particulier : pas de TVA déductible. À conserver pour le régime de la marge (TVA sur la marge à la revente)."
+    : "Achat de seconde main auprès d'un particulier. Reçu à conserver avec ta comptabilité.";
+  const wrap = (t, max) => { const mots = String(t).split(' '); const out = []; let cur = '';
+    for (const w of mots) { const essai = (cur + ' ' + w).trim(); if (reg.widthOfTextAtSize(essai, 8.5) > max) { if (cur) out.push(cur); cur = w; } else cur = essai; }
+    if (cur) out.push(cur); return out; };
+  let yf = 78;
+  page.drawRectangle({ x: M, y: yf + 26, width: W, height: 1, color: TRAIT });
+  wrap(note, W).forEach((r, i) => txt(r, M, yf - i * 12, 8.5, reg, GRIS));
+  yf -= wrap(note, W).length * 12 + 8;
+  txt('Document généré par VRM le ' + new Date().toLocaleDateString('fr-FR') + " — ce n'est pas la facture officielle Vinted.", M, yf, 7.5, reg, rgb(0.65, 0.65, 0.65));
 
   const bytes = await pdf.save();
-  const blob = new Blob([bytes], { type:'application/pdf' });
+  const blob = new Blob([bytes], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `recu-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
+  const jour = o.date ? new Date(o.date).toISOString().slice(0, 10) : 'sans-date';
+  a.href = url; a.download = `recu-achat-${jour}-${(o.title || '').replace(/[^\w\-]+/g, '_').slice(0, 28) || o.transaction_id || 'paire'}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 };
 
 // Synchro avec Google Sheets
@@ -8566,7 +8664,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           if (!pair) continue;
           const base = {
             transactionId: o.transaction_id || pair.transactionId || null,
-            photo: pair.photo || o.photo_url || null,
+            photo: pair.photo || orderPhoto(o) || null,
             price: pair.price ?? (o.price?.amount != null ? Number(o.price.amount) : null),
             vintedAccountId: pair.vintedAccountId || acc.vinted_user_id,
           };
@@ -9074,7 +9172,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const man = manualEntry(b); if (man && man.photo) return man.photo;
     if (b.transaction) {
       const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
-      if (so && (so.photo_url || so.photo)) return so.photo_url || (so.photo && (so.photo.url || so.photo)) || null;
+      if (so && orderPhoto(so)) return orderPhoto(so);
     }
     if (b.numero) {
       for (const k in numeros) {
@@ -9122,11 +9220,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Photo de la paire (savoir laquelle on va chercher / si on l'a déjà retirée) :
     // les achats moissonnés portent la vraie photo Vinted → on la retrouve par titre.
     const pt = normTitle(t.artTitle || t.article || t.modele || '');
-    const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && (o.photo || o.photo_url)) || {}) : {};
+    const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && orderPhoto(o)) || {}) : {};
     const base = {
       title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', code2: t.code2 || '', suivi: t.suivi || '',
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
-      photo: t.photo || ph.photo || ph.photo_url || null,
+      photo: t.photo || orderPhoto(ph) || null,
       mode: r.mode, _t: t,
     };
     if (r.mode === 'qr' && t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
@@ -9690,6 +9788,71 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // L'impression reste affichée (pastille « ✓ Imprimé »), mais elle ne retire
   // plus rien. Rien n'est jamais supprimé : « Voir » réaffiche les terminés.
   const isBordDone = (b) => isBordShippedManual(b) || bordShipped(b) || !!panelBordsDone[bordKey(b)];
+
+  // ── LES COLIS À ENVOYER VIENNENT DE LA MOISSON, PAS DES EMAILS ───────────
+  // Avant, l'écran Bordereaux était construit sur les lignes `email_bord_*`.
+  // Deux conséquences mesurées le 17 août sur les vraies données :
+  //   • les 3 ventes qui attendaient réellement un envoi (angeled92 ×2,
+  //     julatace3535) n'avaient AUCUN email → elles n'étaient nulle part en
+  //     haut de l'écran, reléguées dans une seconde liste sans photo ;
+  //   • le seul « bordereau à imprimer » affiché était « nike air max 1
+  //     obsidian lilac bloom », vendu le 16/07 sur `vanessa5723` — un compte
+  //     SUPPRIMÉ. Il restait parce que `bordShipped` refuse de conclure quand
+  //     la vente est inconnue : donc un bordereau orphelin restait à imprimer
+  //     POUR TOUJOURS.
+  // ➡️ La source de vérité est maintenant ce que Vinted dit via l'extension :
+  // une vente qui attend mon envoi. L'email n'apporte plus que le PDF. Ça
+  // marche donc aussi pour quelqu'un qui n'a jamais branché sa boîte mail.
+  const ORPHELIN_MAX_J = 21;
+  const expeditions = () => {
+    const parTxn = {};
+    for (const b of (emailBords || [])) {
+      if (isBordHidden(b) || b.transaction == null) continue;
+      const k = String(b.transaction);
+      if (!parTxn[k]) parTxn[k] = b;                      // le 1er reçu fait foi
+    }
+    // 1) Ce que Vinted attend de moi (identité certaine : le n° de transaction).
+    const items = (sales.items || [])
+      .filter(o => !isHidden(o))
+      .filter(o => needsBordereau(o.status))
+      .map(o => {
+        const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
+        return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
+      })
+      .filter(e => !(e.b && isBordDone(e.b)));            // colis déjà parti : il sort tout seul
+    const vus = new Set(items.map(e => e.txn));
+    // 2) Bordereaux reçus par email SANS vente correspondante dans la moisson.
+    //    On ne les jette pas (la vente peut ne pas être encore captée) mais on
+    //    ne les garde pas éternellement : au-delà de 3 semaines sans vente, ou
+    //    si le compte n'existe plus, c'est un reste — pas un colis à envoyer.
+    const vivants = new Set((accounts || []).map(a => String(a.login || '').toLowerCase()).filter(Boolean));
+    const orphelins = [];
+    for (const b of Object.values(parTxn)) {
+      if (vus.has(String(b.transaction))) continue;
+      if (isBordDone(b)) continue;
+      const j = b.receivedAt ? (Date.now() - new Date(b.receivedAt).getTime()) / 86400000 : 0;
+      if (j > ORPHELIN_MAX_J) continue;                   // reste ancien
+      const compte = String(b.account || '').toLowerCase();
+      if (compte && vivants.size && !vivants.has(compte)) continue;  // compte supprimé
+      orphelins.push({ key: 'b' + bordKey(b), o: null, b, txn: String(b.transaction || '') });
+    }
+    // Délai d'expédition : celui du bordereau quand on l'a (Vinted l'écrit dans
+    // l'email), sinon celui calculé sur la vente (`toShip`). Une seule notion.
+    const urg = {}; (toShip || []).forEach(t => { if (t && t.o && t.o.transaction_id != null) urg[String(t.o.transaction_id)] = t; });
+    const tout = [...items, ...orphelins].map(e => {
+      let dl = null;
+      if (e.b) { const d = bordDeadline(e.b); if (d && d.days != null) dl = d.days; }
+      if (dl == null && urg[e.txn] && urg[e.txn].daysLeft != null) dl = urg[e.txn].daysLeft;
+      return { ...e, dl };
+    });
+    // Le plus urgent en haut ; ce qui est déjà posté à la main descend.
+    tout.sort((a, b) => {
+      const pa = a.o && isShipDone(a.o) ? 1 : 0, pb = b.o && isShipDone(b.o) ? 1 : 0;
+      if (pa !== pb) return pa - pb;
+      return (a.dl == null ? 999 : a.dl) - (b.dl == null ? 999 : b.dl);
+    });
+    return tout;
+  };
   const [listings, setListings] = useState({ loading:false, items:null });
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
@@ -9763,7 +9926,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     dup.forEach(pk => delete m[pk]);
     return m;
   }, [numeros]);
-  const entryKeyByPhoto = (o) => { const pk = o ? photoKey(o.photo_url || (o.photo && o.photo.url)) : null; return pk ? (numerosByPhoto[pk] || null) : null; };
+  const entryKeyByPhoto = (o) => { const pk = o ? photoKey(orderPhoto(o)) : null; return pk ? (numerosByPhoto[pk] || null) : null; };
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
@@ -12239,7 +12402,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // Vinted). Sinon rien (placeholder honnête).
               const photoFor=(t)=>{const n=normTitle(t||''); if(!n) return null;
                 const inList=(listings.items||[]).find(it=>normTitle(it.title)===n); if(inList&&inList.photo) return inList.photo;
-                const inSold=(sales.items||[]).find(o=>normTitle(o.title)===n); if(inSold) return inSold.photo_url||(inSold.photo&&inSold.photo.url)||null;
+                const inSold=(sales.items||[]).find(o=>normTitle(o.title)===n); if(inSold) return orderPhoto(inSold);
                 return null;};
               return (
                 <div style={{marginTop:16}}>
@@ -12755,7 +12918,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'11px 12px'}}>
                <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
                 <div style={{width:56,height:56,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
+                  {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:'1 1 140px',minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
@@ -12861,7 +13024,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // photo Vinted → on la montre à côté du code de retrait (savoir quelle
           // paire on va chercher / si on l'a déjà retirée).
           const photoByTitle = {};
-          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=o.photo||o.photo_url; if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
+          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=orderPhoto(o); if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
           const thumb = (src) => src
             ? <img src={src} alt="" loading="lazy" style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
             : <span style={{fontSize:22,flexShrink:0}}>📦</span>;
@@ -12933,7 +13096,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {avail.length>0 && <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:8}}>📍 En point relais — code à venir</div>}
                   {extra.map((o,i)=>(
                     <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
-                      {thumb(o.photo||o.photo_url||photoByTitle[normTitle(o.title||'')])}
+                      {thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Déposé en point relais (Vinted) · le code arrive par email</div>
@@ -13121,7 +13284,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       return (
                         <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 13px',borderTop:i>0?`1px solid ${C.accent}22`:'none'}}>
                           <div style={{width:40,height:40,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {buy&&buy.photo_url?<img src={buy.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>📦</span>}
+                            {buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>📦</span>}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
@@ -13305,7 +13468,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'11px 12px'}}>
               <div style={{display:'flex',gap:12,alignItems:'center'}}>
                 <div style={{width:56,height:56,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
+                  {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
@@ -13355,7 +13518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
                       title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:10,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}>📄 Reçu</button>
                   ) : (
-                    <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro') })}
+                    <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:buyNumByTxn[String(o.transaction_id)]||'' })}
                       title="Télécharger le reçu d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}>📄 Reçu</button>
                   ); })()}
                 </div>
@@ -13614,7 +13777,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'7px 9px'}}>
                       <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:10,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
                       <div style={{width:34,height:34,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {r.o.photo_url?<img src={r.o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                        {orderPhoto(r.o)?<img src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                       </div>
                       <div style={{flex:'1 1 120px',minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
@@ -14024,39 +14187,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
-        <ScreenHead icon="doc" title="Bordereaux & expéditions" desc="Tes étiquettes d'envoi, tamponnées au numéro de la paire. Imprime-les d'un coup, coche ce qui est posté, et suis les colis."/>
+        <ScreenHead icon="doc" title="Colis à envoyer" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau reçu par email s'y accroche tout seul — sinon tu le génères sur Vinted. Un colis parti disparaît d'ici sans rien cocher."/>
         <NoAcc/>
-        {/* RÉCAP EN HAUT : combien de bordereaux restent à imprimer, et le bouton
-            d'impression groupée juste à côté. Avant, le bouton était enfoui dans
-            la section « reçus par email » et passait inaperçu. On affiche aussi
-            le détail (imprimés / auto-expédiés) pour qu'un 0 s'explique. */}
+        {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
+            Vinted attend de toi (moisson de l'extension), pas les emails reçus :
+            un email peut manquer, une vente à expédier ne ment pas. */}
         {(()=>{
-          if (emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des bordereaux…</div>;
-          if (!Array.isArray(emailBords)) return null;
-          // ⚠️ UN BORDEREAU MASQUÉ NE COMPTE NULLE PART. Ce récap comptait tout,
-          // alors que la ligne « ✅ N colis faits » plus bas exclut les masqués :
-          // le même écran affichait 64 puis 63 pour la même chose (mesuré sur les
-          // 71 bordereaux réels, l'un d'eux étant masqué). Une seule règle.
-          const withPdf = emailBords.filter(b=>b.hasPdf && !isBordHidden(b));
-          const pending = withPdf.filter(b=>!isBordDone(b));
-          const done = withPdf.length - pending.length;
-          const proNb = pending.filter(b=>invForBord(b)).length; // comptes pro : facture jointe
+          if (sales.loading && emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
+          const ex = expeditions();
+          const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
+          const avecPdf = ex.filter(e=>e.b && e.b.hasPdf && !(e.o && isShipDone(e.o)));
+          const proNb = avecPdf.filter(e=>invForBord(e.b)).length;   // comptes pro : facture jointe
           return (
-            <div style={{border:`1px solid ${pending.length?C.accent:C.border}`,background:pending.length?`${C.accent}0e`:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
+            <div style={{border:`1px solid ${aPoster.length?C.accent:C.border}`,background:aPoster.length?`${C.accent}0e`:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                 <div style={{flex:1,minWidth:150}}>
                   <div style={{fontSize:15,fontWeight:700,color:C.text}}>
-                    {pending.length>0 ? `📄 ${pending.length} bordereau${pending.length>1?'x':''} à imprimer` : '✅ Aucun bordereau à imprimer'}
+                    {aPoster.length>0 ? `📦 ${aPoster.length} colis à envoyer` : '✅ Aucun colis à envoyer'}
                   </div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {withPdf.length} reçu{withPdf.length>1?'s':''} au total · {done} colis fait{done>1?'s':''} ou confirmé{done>1?'s':''} par Vinted{proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}
+                    {aPoster.length>0
+                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} déjà reçu${avecPdf.length>1?'s':''} par email${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} à générer sur Vinted`:''}${proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}`
+                      : 'Vinted ne te demande aucun envoi en ce moment.'}
                   </div>
                 </div>
-                {pending.length>0 && (
+                {avecPdf.length>0 && (
                   <button type="button" onClick={batchBordereaux} disabled={batchBusy}
-                    title="Tamponne tous les bordereaux non imprimés (numéro + titre) et les met à la suite dans un seul PDF"
+                    title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
                     style={{flexShrink:0,border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
-                    {batchBusy?'Préparation…':pending.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${pending.length})`}
+                    {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
               </div>
@@ -14139,9 +14298,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
         })()}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
-        {Array.isArray(emailBords) && (()=>{
+        {(()=>{
           let overdue=0, today=0, tomorrow=0;
-          for (const b of emailBords) { if (isBordDone(b)) continue; const dl=bordDeadline(b); if(!dl||dl.days==null) continue; if(dl.days<0) overdue++; else if(dl.days===0) today++; else if(dl.days===1) tomorrow++; }
+          // Même source que la liste : les colis que Vinted attend, avec leur délai.
+          for (const e of expeditions()) { if (e.o && isShipDone(e.o)) continue; if (e.dl==null) continue; if(e.dl<0) overdue++; else if(e.dl===0) today++; else if(e.dl===1) tomorrow++; }
           const total=overdue+today+tomorrow; if(!total) return null;
           const danger = overdue>0 || today>0;
           const parts=[]; if(overdue) parts.push(`${overdue} en retard`); if(today) parts.push(`${today} aujourd'hui`); if(tomorrow) parts.push(`${tomorrow} demain`);
@@ -14154,200 +14314,133 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   « 1 colis à expédier » sur le même écran. On nomme ce qu'on
                   compte au lieu de laisser croire à une contradiction. */}
               <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} à poster en priorité {overdue?'· du retard !':''}</div>
-              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — imprime les bordereaux ci-dessous, les plus urgents sont en haut.</div>
+              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — les plus urgents sont en haut de la liste.</div>
             </div>
           );
         })()}
-        {/* Bordereaux reçus AUTOMATIQUEMENT par email (pipeline usevrm) */}
-        {Array.isArray(emailBords) && emailBords.length>0 && (
-          <div style={{marginBottom:16}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 8px'}}>
-              {/* Le titre annonçait le TOTAL alors que la liste en dessous est
-                  filtrée (masqués, déjà expédiés) : on croyait qu'il en
-                  manquait. On dit maintenant exactement ce qui est affiché. */}
-              {(()=>{
-                const visibles=emailBords.filter(b=>!isBordHidden(b) && (showBordDone || !isBordDone(b))).length;
-                return (
-                  <div style={{fontSize:12,fontWeight:600,color:C.text,flex:1}}>
-                    📧 {visibles} bordereau{visibles>1?'x':''} affiché{visibles>1?'s':''}
-                    {(()=>{ const total=emailBords.filter(b=>!isBordHidden(b)).length;
-                  return visibles!==total ? <span style={{fontWeight:500,color:C.muted}}> · {total} reçus en tout</span> : null; })()}
-                  </div>
-                );
-              })()}
-            </div>
-            {/* Impression EN LOT : tamponne tous les bordereaux non imprimés et les
-                met à la suite dans un seul PDF à imprimer d'un coup. */}
-            {(()=>{ const nPending=(emailBords||[]).filter(b=>b.hasPdf&&!isBordDone(b)).length; return nPending>=1 ? (
-              <button type="button" onClick={batchBordereaux} disabled={batchBusy}
-                title="Tamponne tous les bordereaux non imprimés et les met à la suite dans un seul PDF à imprimer d'un coup"
-                style={{width:'100%',border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'12px',cursor:batchBusy?'default':'pointer',fontSize:15,fontWeight:600,marginBottom:10,opacity:batchBusy?0.6:1}}>
-                {batchBusy?'Préparation…':nPending===1?'🖨 Imprimer le bordereau (tamponné)':`🖨 Tout imprimer à la suite (${nPending})`}
-              </button>
-            ) : null; })()}
-            {(()=>{ const done=[...emailBords].filter(b=>!isBordHidden(b)&&isBordDone(b)); return done.length>0 ? (
-              <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
-                <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {done.length} colis fait{done.length>1?'s':''}</span>
-                <span style={{flex:1,minWidth:0}}>retiré{done.length>1?'s':''} de la liste.</span>
-                <button onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
-              </div>
-            ) : null; })()}
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {[...emailBords].filter(b=>!isBordHidden(b) && (showBordDone || !isBordDone(b))).sort((a,b2)=>{
-                // ORDRE D'ARRIVÉE STRICT, le plus récent en haut. Avant, on
-                // faisait d'abord descendre les bordereaux déjà traités : dès
-                // qu'on en imprimait un, il sautait en bas et la liste ne
-                // suivait plus l'ordre d'arrivée. Un bordereau traité se
-                // reconnaît à son grisé, il n'a pas besoin de changer de place.
-                return new Date(b2.receivedAt||0)-new Date(a.receivedAt||0);
-              }).map((b,i)=>(
-                <div key={i} data-bord-card style={{padding:'11px 12px',border:`1px solid ${INV_STATUS.online.color}44`,...(isBordDone(b)?{opacity:0.45,filter:'grayscale(0.85)'}:{}),background:C.card,borderRadius:16}}>
-                  {/* Ligne haute : photo + infos de la paire */}
-                  <div style={{display:'flex',gap:12,alignItems:'center'}}>
-                    {(()=>{ const ph=bordPhoto(b); return (
-                      <div style={{width:58,height:58,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>📄</span>}
-                      </div>
-                    ); })()}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:'flex',alignItems:'center',gap:6}}>
-                        {(()=>{ const nn=numForBord(b);
-                          // Sans numéro, la pastille était simplement absente : le bordereau
-                          // avait l'air normal alors qu'il n'est rattaché à aucune paire.
-                          // On le DIT, et le bouton « Relier » est juste en dessous.
-                          return nn
-                            ? <span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{nn}</span>
-                            : <span title="Le numéro viendra tout seul dès que la vente correspondante sera moissonnée par l'extension. Tu peux aussi le poser à la main avec « Relier »." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>; })()}
-                        <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.modele||b.article||'Bordereau'}</span>
-                      </div>
-                      {/* Compte de vente + date de la vente : savoir d'où vient
-                          la vente et depuis quand, sans ouvrir l'onglet Ventes. */}
-                      {(()=>{
-                        const o = b.transaction!=null ? soldByTxn[String(b.transaction)] : null;
-                        const sd = o && o.date ? new Date(o.date) : null;
-                        const bits = [];
-                        if (b.taille) bits.push(`Pointure ${b.taille}`);
-                        if (sd && !isNaN(sd)) bits.push(`vendu le ${sd.toLocaleDateString('fr-FR')}`);
-                        else if (b.receivedAt) bits.push(`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`);
-                        const nom = (o && o._acc) ? accNameOf(o._acc) : (b.account || '');
-                        return (
-                          <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                            {o && o._acc ? <AcctTag acc={o._acc} name={nom}/> : (nom ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{nom}</span> : null)}
-                            {bits.length ? <span>{bits.join(' · ')}</span> : null}
-                            {(()=>{ const inv=invForBord(b); return inv ? <span title="Compte pro : une facture (reçue par email) est jointe à l'impression" style={{display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span> : null; })()}
-                          </div>
-                        );
-                      })()}
-                      {/* ⚠️ Le numéro écrit dans l'email vient d'un rapprochement
-                          PAR TITRE côté serveur ; celui de la transaction est une
-                          identité. Quand les deux se contredisent, on affiche
-                          lequel on retient et pourquoi — tamponner en silence, ce
-                          serait la mauvaise chaussure dans le carton. */}
-                      {(()=>{ const lit=numLitige(b); return lit ? (
-                        <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
-                          <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>choisir</button>
-                        </div>
-                      ) : null; })()}
-                      {(()=>{ const dl=bordDeadline(b); return dl && !isBordDone(b) ? <div style={{display:'inline-block',fontSize:11,fontWeight:600,marginTop:5,color:dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted,background:`${dl.level==='danger'?C.danger:dl.level==='warn'?C.warn:C.muted}14`,borderRadius:10,padding:'2px 8px'}}>📮 {dl.days!=null&&dl.days<0?'En retard !':dl.days===0?"À poster aujourd'hui":dl.days===1?'À poster demain':'À poster avant'} {dl.text}</div> : null; })()}
-                      {bordShipped(b) && !isBordPrinted(b) && <div style={{fontSize:11,fontWeight:600,marginTop:5,color:INV_STATUS.online.color}}>✓ Expédié (Vinted)</div>}
-                    </div>
-                    <button type="button" onClick={async ()=>{ if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }} title="Masquer ce bordereau" aria-label="Masquer ce bordereau" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:17,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
-                  </div>
-                  {/* ACTIONS : une hiérarchie claire au lieu de 5 boutons de même
-                      poids qui se bousculaient. L'action principale (Imprimer)
-                      prend toute la largeur ; le suivi de statut passe en dessous,
-                      plus discret. */}
-                  {(()=>{
-                    const sec = { flexShrink:0, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
-                    return (<>
-                      <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12}}>
-                        {(()=>{ const hasInv=!!invForBord(b); return (
-                        <button type="button" onClick={async ()=>{
-                          if (hasInv) { await printBordAndInvoice(b); return; }
-                          const pdf=await fetchBordPdf(b._row);
-                          const bytes=pdf&&pdf.pdfB64?b64ToBytes(pdf.pdfB64):null; if(!bytes){toast('PDF illisible.');return;}
-                          processBordereau(numForBord(b), b.modele||b.article||'', bytes);
-                        }} title={hasInv?'Génère le bordereau tamponné + la facture pro et lance l\'impression':'Génère le bordereau tamponné et lance l\'impression'} style={{flex:1,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{hasInv?' + facture':''}</button>
-                        ); })()}
-                        {!numForBord(b) && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}
-                      </div>
-                      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
-                        <button type="button" onClick={()=>toggleBordPrinted(b)}
-                          title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
-                          style={{...sec,border:`1px solid ${isBordPrinted(b)?C.accent:C.border}`,background:isBordPrinted(b)?`${C.accent}18`:'transparent',color:isBordPrinted(b)?C.accent:C.muted}}>
-                          {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
-                        </button>
-                        <button type="button" onClick={()=>{ if(isBordShippedManual(b)) unmarkBordShipped(b); else markBordShipped(b); }}
-                          title={isBordShippedManual(b)?'Annuler « expédié »':'Marquer comme expédié → le retire de la liste'}
-                          style={{...sec,border:`1px solid ${isBordShippedManual(b)?INV_STATUS.online.color:C.border}`,background:isBordShippedManual(b)?`${INV_STATUS.online.color}18`:'transparent',color:isBordShippedManual(b)?INV_STATUS.online.color:C.muted}}>
-                          {isBordShippedManual(b)?'↺ Pas encore':'✓ Colis fait'}
-                        </button>
-                        {b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
-                      </div>
-                    </>);
-                  })()}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <div style={{fontSize:12,color:C.muted,marginBottom:12}}>Ventes à expédier <b>dont le bordereau n'est pas encore arrivé</b> — génère-le ici (numéro pré-rempli) :</div>
+        {/* ── LA LISTE : UN COLIS = UNE VENTE QUI ATTEND MON ENVOI ───────────
+            Une seule liste, construite sur la moisson de l'extension. Le
+            bordereau (PDF reçu par email) n'est qu'un COMPLÉMENT de la ligne :
+            avec lui on imprime en un clic, sans lui on le génère sur Vinted.
+            Avant il y avait deux listes — les emails en haut, les vraies ventes
+            en bas — et la paire à envoyer se retrouvait sous un bordereau
+            fantôme d'un compte supprimé. */}
         {sales.loading && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
-        {(() => {
-          if (sales.loading || sales.error) return null;
-          // Uniquement les ventes À EXPÉDIER (ni expédiées, ni finalisées, ni annulées).
-          // FUSION avec l'ancien onglet « Expédition » : même liste, mais avec
-          // l'URGENCE, la CASE AU GARAGE et la coche « posté » — plus besoin de
-          // deux onglets qui montraient la même chose.
-          const urg = {}; (toShip||[]).forEach(t=>{ if(t && t.o && t.o.transaction_id!=null) urg[String(t.o.transaction_id)] = t; });
-          // On EXCLUT les ventes dont le bordereau est déjà listé plus haut :
-          // sinon la même paire apparaissait deux fois sur l'écran.
-          const bordTxns = new Set((emailBords||[]).filter(b=>!isBordHidden(b)).map(b=>String(b.transaction||'')).filter(Boolean));
-          const all = (sales.items||[])
-            .filter(o=>!isHidden(o))   // compte masqué/bloqué ou vente masquée : jamais dans « à expédier »
-            .filter(o=>needsBordereau(o.status))
-            .filter(o=>!bordTxns.has(String(o.transaction_id)))
-            .filter(o=>matchOrd(o));
-          const list = [...all].sort((a,b)=>{
-            const da = urg[String(a.transaction_id)], db = urg[String(b.transaction_id)];
-            const va = da && da.daysLeft!=null ? da.daysLeft : 999;
-            const vb = db && db.daysLeft!=null ? db.daysLeft : 999;
-            if (va!==vb) return va-vb;                    // le plus urgent en haut
-            return (isShipDone(a)?1:0)-(isShipDone(b)?1:0); // déjà postés en bas
-          });
-          if (sales.items && list.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'18px 16px',lineHeight:1.5}}>✅ Toutes tes ventes à expédier ont déjà leur bordereau ci-dessus.</div>;
+        {!sales.loading && !sales.error && (()=>{
+          const ex = expeditions().filter(e => !e.o || matchOrd(e.o));
+          if (!ex.length) return (
+            <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
+              ✅ Aucun colis à envoyer.<br/>
+              <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
+            </div>
+          );
+          const sec = { flexShrink:0, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {list.map(o=>{ const num=effEntry(o)?.numero||''; const st=classifyOrderStatus(o.status);
-                const t = urg[String(o.transaction_id)];
-                const dl = t && t.daysLeft!=null ? t.daysLeft : null;
-                const posted = isShipDone(o);
+              {ex.map(e=>{
+                const o=e.o, b=e.b;
+                // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
+                // l'a (le n° de transaction est une identité certaine), jamais
+                // d'un rapprochement par titre (§24).
+                const ph = o ? orderPhoto(o) : bordPhoto(b);
+                const titre = o ? o.title : (b.modele||b.article||'Bordereau');
+                const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero||'') : '');
+                const posted = o ? isShipDone(o) : isBordShippedManual(b);
                 const cell = num ? garageCellOf(garageGrid, num) : null;
+                const dl = e.dl;
                 const urgCol = dl==null ? C.muted : dl<0 ? C.danger : dl<=1 ? C.warn : C.muted;
                 const urgTxt = dl==null ? null : dl<0 ? `⚠️ ${-dl}j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl}j pour poster`;
+                const inv = b ? invForBord(b) : null;
+                const pdf = !!(b && b.hasPdf);
+                const acc = o ? o._acc : null;
+                const lien = o && o.transaction_id!=null ? `https://www.vinted.fr/transactions/${o.transaction_id}` : null;
                 return (
-                  <div key={o.transaction_id} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${dl!=null&&dl<0?C.danger+'66':C.border}`,background:C.card,opacity:posted?0.6:1}}>
-                    <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{o.photo_url?<img src={o.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{o.title}</div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                        <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                    {/* Ligne reconstituée depuis l'email (filet quand la moisson
-                        Vinted manque). On le DIT : sinon on cherche d'où sort une
-                        ligne sans statut ni n° de transaction Vinted. */}
-                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
-                        {urgTxt && <span style={{color:urgCol,fontWeight:600}}>{urgTxt}</span>}
-                        {cell
-                          ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>
-                          : (num ? <span>🏠 pas rangée</span> : <span>titre seul</span>)}
-                        {posted && <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✓ posté</span>}
+                  <div key={e.key} data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:16,opacity:posted?0.55:1}}>
+                    <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                      <div style={{width:58,height:58,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
                       </div>
+                      <div style={{flex:'1 1 150px',minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          {num
+                            ? <span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{num}</span>
+                            : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
+                          <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{titre}</span>
+                        </div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
+                          {o && o.date && <span style={{flexShrink:0}}>vendu le {new Date(o.date).toLocaleDateString('fr-FR')}</span>}
+                          {o && o.price && <span style={{flexShrink:0,fontWeight:600,color:C.text}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
+                          {urgTxt && <span style={{flexShrink:0,color:urgCol,fontWeight:600}}>{urgTxt}</span>}
+                          {cell
+                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>
+                            : (num ? <span style={{flexShrink:0}}>🏠 pas rangée</span> : null)}
+                          {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span>}
+                          {posted && <span style={{flexShrink:0,color:INV_STATUS.online.color,fontWeight:600}}>✓ posté</span>}
+                        </div>
+                        {/* Le numéro de l'email vient d'un rapprochement par titre,
+                            celui de la transaction est une identité : quand les deux
+                            se contredisent on dit lequel on garde (§5.17). */}
+                        {b && (()=>{ const lit=numLitige(b); return lit ? (
+                          <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                            <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
+                            <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>choisir</button>
+                          </div>
+                        ) : null; })()}
+                      </div>
+                      <button type="button" onClick={async ()=>{
+                        if (b) { if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }
+                        else if (o && o.transaction_id!=null && await askConfirm('Masquer ce colis ? (il disparaît de la liste)')) toggleHidden(o.transaction_id);
+                      }} title="Masquer" aria-label="Masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:17,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
                     </div>
-                    <div style={{display:'flex',flexDirection:'column',gap:4,flexShrink:0}}>
-                      <button type="button" onClick={()=>startBordereau(num,o.title,o._acc)} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'7px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Bordereau</button>
-                      <button type="button" onClick={()=>toggleShipDone(o)} title={posted?'Annuler « posté »':'Marquer comme posté'} style={{border:`1px solid ${posted?INV_STATUS.online.color:C.border}`,background:'transparent',color:posted?INV_STATUS.online.color:C.muted,borderRadius:10,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>{posted?'↩︎ annuler':'✓ Posté'}</button>
+                    {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
+                        le générer sur Vinted. Le glisser-fichier reste dispo pour
+                        celui qui n'a pas branché sa boîte mail. */}
+                    <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
+                      {pdf ? (
+                        <button type="button" onClick={async ()=>{
+                          if (inv) { await printBordAndInvoice(b); return; }
+                          const p=await fetchBordPdf(b._row);
+                          const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){toast('PDF illisible.');return;}
+                          processBordereau(num, titre, bytes);
+                        }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
+                        style={{flex:'1 1 160px',border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
+                      ) : (<>
+                        {lien && <a href={lien} target="_blank" rel="noreferrer" title="Ouvre la vente sur Vinted pour générer le bordereau"
+                          style={{flex:'1 1 160px',textAlign:'center',border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none'}}>📄 Générer sur Vinted ↗</a>}
+                        <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
+                          style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
+                      </>)}
+                      {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}
+                      {/* Sans bordereau, il n'y avait AUCUN moyen de poser le numéro
+                          sur cette vente — or c'est lui qu'on tamponne. Le numéro
+                          n'est pas deviné (le titre de revente diffère souvent de
+                          celui de l'annonce, §24) : c'est toi qui le donnes, et il
+                          est mémorisé sur la vente (`vinted_sale_overrides`). */}
+                      {!num && !b && o && o.transaction_id!=null && <button type="button" onClick={async ()=>{
+                        const v=(await askText({numeric:true,desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
+                        if(v) setSaleOverride(o.transaction_id,{numero:v});
+                      }} title="Poser le numéro de boîte de cette paire" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔢 Poser le N°</button>}
+                    </div>
+                    <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+                      {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
+                        title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
+                        style={{...sec,border:`1px solid ${isBordPrinted(b)?C.accent:C.border}`,background:isBordPrinted(b)?`${C.accent}18`:'transparent',color:isBordPrinted(b)?C.accent:C.muted}}>
+                        {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
+                      </button>}
+                      {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
+                          deux marqueurs pour un même carton, c'était deux chiffres
+                          qui divergeaient. */}
+                      <button type="button" onClick={()=>{
+                        if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
+                        else { if(o && !isShipDone(o)) toggleShipDone(o); if(b) markBordShipped(b); }
+                      }} title={posted?'Annuler « colis fait »':'Marquer comme posté → il sort de la liste'}
+                        style={{...sec,border:`1px solid ${posted?INV_STATUS.online.color:C.border}`,background:posted?`${INV_STATUS.online.color}18`:'transparent',color:posted?INV_STATUS.online.color:C.muted}}>
+                        {posted?'↺ Pas encore':'✓ Colis fait'}
+                      </button>
+                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
+                      {!pdf && <span style={{fontSize:11,color:C.muted}}>Bordereau pas encore reçu par email</span>}
                     </div>
                   </div>
                 );
@@ -14355,6 +14448,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* Historique : les bordereaux déjà partis restent consultables, mais ils
+            n'encombrent plus la liste de travail. */}
+        {Array.isArray(emailBords) && (()=>{
+          const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
+          if (!faits.length) return null;
+          return (
+            <div style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'9px 12px'}}>
+              <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {faits.length} colis parti{faits.length>1?'s':''}</span>
+              <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
+              <button onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
+            </div>
+          );
+        })()}
+        {showBordDone && Array.isArray(emailBords) && (
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:8}}>
+            {emailBords.filter(b=>!isBordHidden(b) && isBordDone(b))
+              .sort((a,b2)=>new Date(b2.receivedAt||0)-new Date(a.receivedAt||0))
+              .map((b,i)=>(
+                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,opacity:0.7}}>
+                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    {bordPhoto(b)?<img src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
+                  </div>
+                  <div style={{flex:'1 1 120px',minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
+                    <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
+                  </div>
+                  {b.hasPdf && <button type="button" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
+                </div>
+              ))}
+          </div>
+        )}
       </>)}
 
       {/* Modale : relier un achat (depuis Annonces) */}
@@ -14376,7 +14500,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // commencer, et le prix d'achat finit par ne jamais être saisi.
                 return avail.map((p, iP) => (
                   <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{p.photo_url?<img src={p.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
+                    <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
@@ -14543,7 +14667,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
               </div>
@@ -15223,7 +15347,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',flexDirection:'column'}}>
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
-                        <div style={{width:32,height:32,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&buy.photo_url?<img src={buy.photo_url} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
+                        <div style={{width:32,height:32,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{t.code&&<div style={{fontSize:11,color:C.muted}}>code {t.code}</div>}</div>
                         <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
@@ -17786,7 +17910,7 @@ export default function App() {
             {ventes.map((o,i)=>(
               <button key={'v'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_ventes')}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(o.photo_url,'💸')}
+                {thumb(orderPhoto(o),'💸')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{o.status||'vente'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
@@ -17798,7 +17922,7 @@ export default function App() {
             {achats.map((o,i)=>(
               <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_achats')}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {thumb(o.photo_url,'📦')}
+                {thumb(orderPhoto(o),'📦')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2}}>{o.status||'achat'}{o.date?' · '+new Date(o.date).toLocaleDateString('fr-FR'):''}</div>
