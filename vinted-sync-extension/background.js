@@ -2250,7 +2250,9 @@ async function genererBordereauxEnAttente(uid) {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const candidates = ventes.filter(o => aGenererBordereau(o && o.status) && (o.transaction_id != null));
-    if (!candidates.length) return 0;
+    // ⚠️ PAS DE SORTIE ANTICIPÉE ICI : même sans rien à générer, la 2ᵉ passe doit
+    // tourner pour aller chercher les bordereaux DÉJÀ émis (c'est le cas le plus
+    // fréquent — 2 des 3 colis de Julien).
     // Un bordereau reçu par email prouve qu'il existe déjà : on ne regénère pas.
     const dejaMail = new Set();
     try {
@@ -2278,8 +2280,34 @@ async function genererBordereauxEnAttente(uid) {
         if (r.code === 'autre-compte' || r.code === 'trop-d-actions') break;
       }
     }
+    // ── 2ᵉ PASSE : LE BORDEREAU EXISTE DÉJÀ, ON VA LE CHERCHER ──────────────
+    // ⚠️ LE TROU QUE JULIEN A VU (« ça ne capte pas le bordereau »). On n'allait
+    // chercher le PDF qu'APRÈS l'avoir généré nous-mêmes. Or une vente au statut
+    // « Bordereau envoyé au vendeur » a DÉJÀ son étiquette chez Vinted : il n'y
+    // a rien à générer, donc on ne passait jamais la chercher. Mesuré : 2 de ses
+    // 3 colis étaient exactement dans ce cas, et le diagnostic ne portait aucune
+    // clé « label » — la fonction n'avait jamais été atteinte.
+    const dejaCapte = new Set();
+    try {
+      const cur = await sbGet(`app_data?id=eq.harvest_${uid}_label_latest&select=tx:data->>tx`);
+      if (cur && cur[0] && cur[0].tx) dejaCapte.add(String(cur[0].tx));
+    } catch (_) { /* pas de ligne : rien de capté, on tente */ }
+    let recup = 0;
+    for (const o of ventes) {
+      if (recup >= BORD_MAX_PAR_VISITE) break;
+      if (!o || o.transaction_id == null) continue;
+      const tx = String(o.transaction_id);
+      // Une vente qui attend l'envoi ET dont l'étiquette existe déjà.
+      if (!AWAITING_SHIP(o.status) || aGenererBordereau(o.status)) continue;
+      if (dejaMail.has(tx) || dejaCapte.has(tx)) continue;
+      const mk = 'get' + tx;
+      if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) continue;
+      memo[mk] = { t: Date.now() };
+      const eu = await recupererLabel(acc, uid, tx);
+      if (eu) { recup++; logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`); }
+    }
     await chrome.storage.local.set({ vrmBordFaits: memo });
-    return faits;
+    return faits + recup;
   } catch (_) { return 0; }
 }
 
