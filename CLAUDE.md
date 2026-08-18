@@ -2869,3 +2869,24 @@ Un **email de vente ne porte pas d'identifiant d'annonce** — il n'y a que le t
 
 **Mesuré sur les données du jour** : 2 titres portés par 2 annonces en ligne chacun (« adidas spezial gris taille 38 », « adidas spezial noir taille 35,5 ») et **6 clés titre+taille ambiguës** parmi les paires numérotées (dont « spezial noir 35,5 » ×6 et « p-6000 argenté 37,5 » ×4). Sur ces 6 groupes, **l'auto-retrait est désactivé** : aucune paire ne peut être masquée à tort.
 ➡️ La contrepartie assumée : sur ces groupes, une paire vendue reste affichée « en ligne » jusqu'à ce que la moisson Vinted la ferme. **Afficher une paire de trop plutôt que masquer une paire encore en stock.**
+
+### 5.39 (suite) — ⚠️ VINTED NE SUPPRIME PAS UNE ANNONCE VENDUE, il la ferme en « sold »
+
+Julien : « en fait, Vinted ne supprime pas l'annonce, elle la met simplement dans la catégorie vendue ». **Il a raison, et ça ferme le dernier trou** — celui que la section précédente laissait ouvert (l'auto-retrait par email, seul chemin sans identité).
+
+**Vérifié en base** : 261 articles captés, **235 fermés** (`is_closed`), et le champ qui dit POURQUOI existe :
+```
+id 9413157752  is_closed true   item_closing_action = 'sold'    (vendue)
+id 9421527393  is_closed false  item_closing_action = null      (en ligne)
+```
+
+⚠️ **Mais l'allègement le JETAIT.** `CHAMPS_ARTICLE` (§23) ne gardait pas `item_closing_action` : l'information arrivait de Vinted et était supprimée à l'écriture — d'où sa présence sur **3 articles seulement** (captés avant l'allègement). Sans elle, `is_closed` mélange « vendue » et « retirée par moi », deux choses différentes pour la compta comme pour le taux d'écoulement.
+
+- **Extension (5.31.0)** : `item_closing_action` et `is_reserved` sont conservés. Quelques octets par article.
+- **App** : `venduChezVinted(it)` = `is_closed && item_closing_action ~ 'sold'`. `fetchVintedListings` remonte `soldIds` — **calculé sur des données déjà en mémoire, 0 requête et 0 octet de plus**. `loadListings` les range dans `venduesVinted`.
+- **L'audit du stock** écarte désormais une paire vendue **par son identifiant**, en remplacement du test par titre retiré juste avant. La boucle est fermée : ce n'est plus une ressemblance, c'est Vinted qui désigne l'annonce.
+- ⚠️ `etatConnuChezVinted(it)` distingue « Vinted n'a rien dit » de « Vinted dit non » : sur une annonce captée avant la 5.31 le champ est absent, et **on ne conclut rien** plutôt que de deviner.
+
+**Honnêteté** : le champ n'existe aujourd'hui que sur 1 des 235 articles fermés. L'effet est donc nul tant que l'extension n'a pas recapté le dressing — il grandit à chaque visite sur Vinted. `audit-identite.cjs` passe à **16 contrôles**.
+
+**Vérifié** : smoke app 12 écrans **0 PAGEERROR** · banc bordereau (deux annonces identiques → N°99, jamais N°7) · bancs colis conformes · `audit-coherence` 6 règles / 0 désaccord · `node --check` OK.
