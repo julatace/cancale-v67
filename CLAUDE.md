@@ -2834,3 +2834,17 @@ Le script pose **50 paires rigoureusement identiques** (même titre, taille, cou
 `openPicker` boucle sur `accounts` (= tous les comptes captés) **sans filtre `acctOff`** : un achat fait sur le compte A peut donc être relié à une annonce du compte B, comptes masqués compris, et chaque candidat porte son étiquette de compte (`AcctTag`). Rien à changer.
 
 **Vérifié** : `npm run build` OK · `audit-identite` 8/8 · smoke app 12 écrans **0 PAGEERROR** · bancs colis (grisé, retrait ailleurs, faux QR, faux code) conformes · `audit-coherence` **6 règles, 0 désaccord**.
+
+### 5.39 (suite) — LE BORDEREAU TRANSPORTE L'IDENTITÉ DE L'ANNONCE (extension 5.30.0)
+
+Julien : « par annonce, comme ça au moins t'es sûr de ne jamais te tromper… et après on envoie le bordereau et t'envoies directement l'identité de l'annonce, comme ça l'application ne se trompe plus. »
+
+C'est la bonne architecture, et elle est **gratuite** : `recupererLabel` charge déjà `GET /api/v2/transactions/{tx}` pour trouver l'expédition — `transaction.item_id` y est donc sous la main, sans une requête de plus.
+
+- **Extension** : la ligne `harvest_{uid}_label_{tx}` porte désormais **`item`** (l'identifiant d'annonce Vinted) et **`items`** (tous les articles quand c'est un lot — un bordereau de lot couvre plusieurs paires, on ne veut pas en désigner une au hasard).
+- **App** : `fetchCapturedLabelMetas` remonte `item` (scalaire — les octets du PDF ne partent toujours qu'à l'impression, §34), et **`numFromLabelItem` passe AVANT tout le reste** dans `numForBord` : `vinted_annonce_numeros` étant indexé par id d'annonce, la lecture est directe. Plus de chaîne bordereau → transaction → vente → annonce.
+- `numLitige` compare l'email au plus sûr des deux chemins certains (identité d'annonce si elle est là, sinon transaction).
+
+**Pourquoi ça ferme définitivement le sujet** : deux articles rigoureusement identiques ont **deux identifiants différents**. Le titre, la couleur, la taille et la description ne rentrent plus jamais dans la décision.
+
+**Vérifié de bout en bout, au rendu réel** (banc dédié : deux annonces au même titre / même taille / même couleur, N°7 et N°99 ; Vinted désigne la seconde) : l'écran tamponne **N°99**, et **N°7 n'apparaît nulle part**. 0 PAGEERROR.
