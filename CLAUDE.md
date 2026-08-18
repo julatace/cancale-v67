@@ -2848,3 +2848,24 @@ C'est la bonne architecture, et elle est **gratuite** : `recupererLabel` charge 
 **Pourquoi ça ferme définitivement le sujet** : deux articles rigoureusement identiques ont **deux identifiants différents**. Le titre, la couleur, la taille et la description ne rentrent plus jamais dans la décision.
 
 **Vérifié de bout en bout, au rendu réel** (banc dédié : deux annonces au même titre / même taille / même couleur, N°7 et N°99 ; Vinted désigne la seconde) : l'écran tamponne **N°99**, et **N°7 n'apparaît nulle part**. 0 PAGEERROR.
+
+### 5.39 (suite) — AUDIT DEMANDÉ : « aucun risque de se tromper d'annonce ? »
+
+Julien : « vérifie bien, il n'y a bien aucun risque que l'application se trompe sur une annonce, que ce soit sur un litige, sur une vente, sur une mise en ligne, sur une annulation de commande ». Traité comme un audit, pas comme une affirmation — et transformé en **contrôles permanents** (`scripts/audit-identite.cjs`, 14 contrôles).
+
+| chemin | d'où vient l'identité | verdict |
+|---|---|---|
+| **vente** | `effEntry` → `resolvedEntry` → `identiteAnnonce` = id d'annonce Vinted, sinon photo | identité |
+| **litige / annulation** | même porte (`effEntry`) — vérifié : `saleOutcome` n'identifie rien lui-même | identité |
+| **mise en ligne** | `updatePair` écrit dans `vinted_annonce_numeros[item.id]` | identité (par construction) |
+| **bordereau** | `item` joint par l'extension, sinon transaction | identité |
+| **auto-retrait d'une annonce d'après un EMAIL de vente** | titre + taille | ⚠️ **seul chemin sans identité** |
+
+### Un dernier rapprochement par titre retiré
+L'audit du stock (« paires numérotées qui ne sont plus en ligne ») écartait une paire dès qu'une **vente portait le même titre** — donc une seule vente masquait TOUTES les paires au même libellé, et une paire réellement perdue passait inaperçue. Le numéro, juste au-dessus, est une identité et suffit. Le nouveau contrôle **détecte bien ce défaut sur le code d'avant** (1 échec) et passe après.
+
+### ⚠️ Ce qui reste sans identité, dit franchement
+Un **email de vente ne porte pas d'identifiant d'annonce** — il n'y a que le titre et la taille. `emailSoldIds` retire donc une annonce en ligne sur cette base, avec trois garde-fous : clé titre+taille portée par plusieurs paires ⟹ **on ne retire rien** ; il faut **autant de ventes que d'annonces** du groupe ; une annonce renumérotée après la vente (paire republiée) est épargnée.
+
+**Mesuré sur les données du jour** : 2 titres portés par 2 annonces en ligne chacun (« adidas spezial gris taille 38 », « adidas spezial noir taille 35,5 ») et **6 clés titre+taille ambiguës** parmi les paires numérotées (dont « spezial noir 35,5 » ×6 et « p-6000 argenté 37,5 » ×4). Sur ces 6 groupes, **l'auto-retrait est désactivé** : aucune paire ne peut être masquée à tort.
+➡️ La contrepartie assumée : sur ces groupes, une paire vendue reste affichée « en ligne » jusqu'à ce que la moisson Vinted la ferme. **Afficher une paire de trop plutôt que masquer une paire encore en stock.**

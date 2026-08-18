@@ -10648,7 +10648,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (soldManual.has(String(k))) continue;                      // marquée vendue à la main
       if (emailSoldIds.has(String(k))) continue;                    // vendue d'après les emails
       if (vendus.has(raw.toLowerCase())) continue;                  // numéro porté par une vente
-      if (vendus.has('t:' + normTitle(e.title || ''))) continue;    // même titre qu'une vente
+      // ⚠️ Le test « même TITRE qu'une vente » a été retiré : avec plusieurs paires
+      //    au même libellé, une seule vente les masquait TOUTES de l'audit — donc
+      //    une paire réellement perdue passait inaperçue. Le numéro (juste au-dessus)
+      //    est une identité et suffit ; le titre n'en est pas une.
       if (pairsLost[raw]) continue;                                 // déjà déclarée perdue
       out.push({ id: String(k), e, numero: raw });
     }

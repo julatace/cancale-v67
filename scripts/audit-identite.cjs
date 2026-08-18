@@ -98,5 +98,50 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('reprise de N° : la photo (identité) passe avant le titre');
 }
 
+// ── 5) LES QUATRE CHEMINS QUE JULIEN A NOMMÉS ────────────────────────────────
+//     « une vente, un litige, une mise en ligne, une annulation de commande ».
+//     Pour chacun : d'où vient l'identité de la paire, et est-ce une identité ?
+{
+  // VENTE + LITIGE + ANNULATION passent tous par la MÊME porte : `effEntry(o)`
+  // → `resolvedEntry(o)` → `identiteAnnonce(o)` (id Vinted, sinon photo).
+  // Le contrôle 3 ci-dessus a déjà prouvé qu'aucune n'utilise de titre. Ici on
+  // vérifie que les écrans litige/annulation ne rouvrent pas une autre porte.
+  const zoneLitige = SRC.slice(SRC.indexOf('const saleOutcome'), SRC.indexOf('const saleOutcome') + 900);
+  /normTitle|ByTitle/.test(zoneLitige.split('\n').filter(l => !l.trim().startsWith('//')).join('\n'))
+    ? nok('litige / annulation : aucune identification par titre')
+    : ok('litige / annulation : aucune identification par titre', 'passe par effEntry');
+
+  // Le numéro affiché sur une vente annulée/en litige vient de `effEntry`, pas
+  // d'un rapprochement local : on vérifie qu'aucun `entryBy...(o.title)` ne
+  // subsiste dans l'écran Ventes.
+  /entryBy\w*\(\s*o\.title/.test(SRC)
+    ? nok('écran Ventes : aucun « retrouve la paire par o.title »')
+    : ok('écran Ventes : aucun « retrouve la paire par o.title »');
+
+  // MISE EN LIGNE : la numérotation s'écrit dans `vinted_annonce_numeros`, qui
+  // est indexé par ID D'ANNONCE — `updatePair(item, …)` utilise `item.id`.
+  /const u = \{ \.\.\.prev \}; const c = u\[item\.id\]/.test(SRC)
+    ? ok('mise en ligne : le numéro est écrit par ID d\'annonce', 'pas par titre')
+    : nok('mise en ligne : le numéro est écrit par ID d\'annonce');
+
+  // AUTO-RETRAIT d'une annonce en ligne d'après un email de vente : c'est le
+  // SEUL chemin qui utilise encore titre+taille (un email ne porte pas d'id).
+  // Il DOIT refuser dès que deux paires partagent la clé.
+  /ambiguousKey\.has\(k\)\) continue;/.test(SRC)
+    ? ok('auto-retrait d\'une annonce (email) : refuse titre+taille en double')
+    : nok('auto-retrait d\'une annonce (email) : refuse titre+taille en double');
+
+  // BORDEREAU ↔ annonce par titre : doit refuser un titre ambigu.
+  /if \(!n \|\| titleAmbiguous\(title\)\) return null;/.test(SRC)
+    ? ok('bordereau ↔ annonce : refuse un titre porté par plusieurs paires')
+    : nok('bordereau ↔ annonce : refuse un titre porté par plusieurs paires');
+
+  // AUDIT DU STOCK : ne doit plus masquer une paire parce qu'une VENTE porte le
+  // même titre (sinon une paire perdue passe inaperçue).
+  /vendus\.has\('t:'/.test(SRC)
+    ? nok('audit du stock : aucune paire masquée à cause d\'un titre identique')
+    : ok('audit du stock : aucune paire masquée à cause d\'un titre identique');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
