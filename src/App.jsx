@@ -2334,6 +2334,9 @@ const mapWardrobeItem = (it) => ({
   brand: it.brand_title || (typeof it.brand === 'string' ? it.brand : (it.brand && it.brand.title)) || null,
   size: it.size_title || (typeof it.size === 'string' ? it.size : (it.size && it.size.title)) || null,
   condition: it.status || null,
+  // Pourquoi l'annonce est fermée, quand Vinted l'a dit ('sold' = vendue).
+  closingAction: it.item_closing_action || null,
+  reserved: !!it.is_reserved,
   // Engagement (défensif : présent sur la plupart des articles wardrobe, mais on
   // ne suppose rien — n'affiché que si c'est bien un nombre). Précieux pour un
   // revendeur : beaucoup de vues sans vente = prix trop haut ; favoris = proche
@@ -2360,6 +2363,17 @@ const mapWardrobeItem = (it) => ({
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
 // vendus/fermes (is_closed=true) : on ne veut garder que les actives.
 const isOnlineListing = (it) => it && !it.is_closed && !it.is_hidden && !it.is_draft;
+// ⚠️ VINTED NE SUPPRIME PAS UNE ANNONCE VENDUE — il la ferme en disant POURQUOI
+// (`item_closing_action: 'sold'`). C'est donc Vinted lui-même qui désigne la
+// paire partie, PAR IDENTIFIANT : aucune ressemblance de titre là-dedans, même
+// avec cinquante articles rigoureusement identiques.
+// Sans ce champ, `is_closed` mélange « vendue » et « retirée par moi » — deux
+// choses différentes pour la compta comme pour le taux d'écoulement.
+const venduChezVinted = (it) => !!(it && it.is_closed && /sold/i.test(String(it.item_closing_action || '')));
+// ⚠️ HONNÊTE : le champ n'arrive que depuis l'extension 5.31 (l'allègement le
+// jetait avant). Sur une annonce captée plus tôt il est absent — on ne conclut
+// alors RIEN (ni vendue, ni pas vendue), on ne devine pas.
+const etatConnuChezVinted = (it) => !!(it && it.item_closing_action != null);
 // LOT / BUNDLE : Vinted range le détail des articles d'un lot dans la
 // transaction. GET /api/v2/transactions/{id} → transaction.order.items = les
 // paires du lot. Renvoie [{ title, id, price }] ou [] si indisponible.
@@ -2396,7 +2410,13 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     // argent comptant : d'où les bandeaux « compte muet » et « annonces
     // disparues » alors que les annonces étaient bien en ligne.
     if (h && Array.isArray(h.items) && h.items.length > 0) {
-      return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem), pagination: h.pagination || null, source: 'harvest' };
+      // ⚠️ On remonte AUSSI les annonces que Vinted a fermées en disant « vendue ».
+      //    Elles sortent des « en ligne » (c'est leur place), mais leur IDENTIFIANT
+      //    est la seule preuve sans ressemblance qu'une paire numérotée est bien
+      //    partie. Calculé sur des données déjà en mémoire : 0 requête, 0 octet.
+      return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem),
+               soldIds: h.items.filter(venduChezVinted).map(x => String(x.id)),
+               pagination: h.pagination || null, source: 'harvest' };
     }
   }
   // Mode "moisson seulement" : aucun appel Vinted.
@@ -9297,6 +9317,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // qui permet de mettre « 🖨 Imprimer » sur LA bonne ligne (identité certaine),
   // au lieu du bandeau générique « un bordereau a été téléchargé quelque part ».
   const [labelsCaptes, setLabelsCaptes] = useState({});
+  // Identifiants des annonces que Vinted lui-même a fermées en « vendue ».
+  // Vinted ne supprime pas une annonce vendue (Julien) : il la range dans cette
+  // catégorie. C'est donc une preuve PAR IDENTIFIANT qu'une paire est partie.
+  const [venduesVinted, setVenduesVinted] = useState(new Set());
   // transaction → id d'annonce, tel que Vinted le dit (cf. fetchTxnItemIds).
   const [txnItem, setTxnItem] = useState({});
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
@@ -10650,15 +10674,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (vendus.has(raw.toLowerCase())) continue;                  // numéro porté par une vente
       // ⚠️ Le test « même TITRE qu'une vente » a été retiré : avec plusieurs paires
       //    au même libellé, une seule vente les masquait TOUTES de l'audit — donc
-      //    une paire réellement perdue passait inaperçue. Le numéro (juste au-dessus)
-      //    est une identité et suffit ; le titre n'en est pas une.
+      //    une paire réellement perdue passait inaperçue. Le titre n'est pas une
+      //    identité. Il est REMPLACÉ par celle-ci : Vinted ne supprime pas une
+      //    annonce vendue, il la ferme en « vendue » — et ça se lit par IDENTIFIANT.
+      if (venduesVinted.has(String(k))) continue;                   // Vinted dit : vendue
       if (pairsLost[raw]) continue;                                 // déjà déclarée perdue
       out.push({ id: String(k), e, numero: raw });
     }
     out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, sales.items, numeros, saleOv, soldManual, emailSoldIds, pairsLost]);
+  }, [listings.items, sales.items, numeros, saleOv, soldManual, emailSoldIds, pairsLost, venduesVinted]);
 
   // Compte entièrement muet : il a des paires numérotées mais renvoie ZÉRO
   // annonce. C'est la signature d'un compte masqué par Vinted (ou fermé).
@@ -11578,9 +11604,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const out = []; let anyOk=false, anyErr=false;
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
     const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedListings(acc, 1, { force }); noteAcctLive(acc.vinted_user_id, r, force); return { acc, r }; }));
-    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); } else anyErr=true; }
+    const vendues = new Set();
+    for (const { acc, r } of results) {
+      if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); (r.soldIds || []).forEach(id => vendues.add(String(id))); }
+      else anyErr=true;
+    }
     const error = out.length===0 && anyErr && !anyOk;
     if (!error) putCache('listings', out);
+    // Annonces que VINTED a marquées vendues (identité, jamais un titre).
+    if (vendues.size) setVenduesVinted(vendues);
     setListings({ loading:false, items: out, error });
   };
   const loadConvs = async (force) => {

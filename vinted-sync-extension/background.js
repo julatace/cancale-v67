@@ -1099,9 +1099,16 @@ async function vintedSend(acc, method, endpoint, body) {
 // perdait sa marque ET sa taille, et l'app affichait « marque manquante ·
 // taille manquante » sur tout le stock (note d'annonce faussée, conseils faux).
 // Les deux orthographes sont conservées : Vinted a déjà renommé des champs.
+// ⚠️ `item_closing_action` : Vinted NE SUPPRIME PAS une annonce vendue, il la
+// ferme en marquant POURQUOI — 'sold' quand elle est partie (vérifié sur les
+// données réelles). C'est donc Vinted lui-même qui dit « cette annonce-là est
+// vendue », par IDENTIFIANT : l'identité qui manquait pour ne plus jamais
+// deviner par titre. Sans ce champ, `is_closed` mélange « vendue » et « retirée
+// par moi » — 235 articles fermés en base, indiscernables.
+// Il arrivait bien dans la réponse Vinted mais l'allègement le JETAIT.
 const CHAMPS_ARTICLE = ['id','title','price','url','brand','size','brand_title','size_title','status',
   'view_count','favourite_count','favourites_count','created_at_ts',
-  'is_closed','is_hidden','is_draft'];
+  'is_closed','is_hidden','is_draft','item_closing_action','is_reserved'];
 
 function photoUtile(it) {
   const p = it.photo || (Array.isArray(it.photos) ? it.photos[0] : null) || null;
