@@ -13171,7 +13171,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               })()}
               <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
                 ? <>Ce que Vinted retient <b>en attente</b> (pas encore virable), lu sur {reel.accounts} porte-monnaie.{reel.dispo>0?<> À côté, tu as <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> déjà <b>disponibles</b> à virer — les deux ne se confondent pas.</>:null}</>
-                : <>Estimation d'après tes ventes en cours. Ouvre une fois ton porte-monnaie sur Vinted : l'app affichera ensuite le montant exact.</>}</div>
+                : <>Estimation calculée sur tes ventes en cours — le montant exact arrive dès que l'extension a lu les porte-monnaie.</>}</div>
               {/* ⚠️ CE TOTAL EST PARTIEL TANT QUE TOUS LES PORTE-MONNAIE N'ONT PAS
                   ÉTÉ LUS. Julien : « j'ai 323 € en attente sur un seul compte, ce
                   n'est pas possible que le total soit 504 € avec sept comptes » —
@@ -13218,7 +13218,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
-            {totals.nbAttente>0 && (()=>{ const esc=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null; return <StatBox label="💰 En attente" value={fmtE0(esc?esc.total:totals.enAttente)} color={C.warn} sub={esc?(esc.plusVieuxJours>1?`${esc.accounts} porte-monnaie · le plus ancien ${esc.plusVieuxJours} j`:`réel · ${esc.accounts} porte-monnaie`):`${totals.nbAttente} en cours · estimation`}/>; })()}
+            {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
+                affiche déjà ce montant, avec le détail par compte et l'avertissement
+                d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
+                dix lignes plus bas, « 807 € · 25 en cours » — la même chose deux fois
+                sur le même écran (§11 : une seule règle, et un seul endroit). */}
             <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
             {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
@@ -13586,6 +13590,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='achats' && (<>
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
         <NoAcc/>
+        {/* ⚠️ MÊME ORDRE QUE L'ÉCRAN VENTES. Ici la période arrivait en 19e position,
+            après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
+            jumeaux organisés différemment, c'est ce qui rend la navigation
+            hésitante : ce qu'on manipule tous les jours passe en premier. */}
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+          {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
+            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+          ))}
+          {accounts.length>0 && (
+            <button onClick={()=>loadOrders('purchased',setBuys,true)} disabled={buys.loading} title="Va chercher tes achats en direct sur Vinted (tous comptes)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:buys.loading?'default':'pointer',opacity:buys.loading?0.6:1}}>{buys.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
+          )}
+        </div>
+        {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
+        {buysBase.length>0 && (
+          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
+            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
+        )}
         {/* À RETIRER — liste simple façon appli de colis : groupée par point relais,
             avec LE CODE de retrait en gros (c'est ça qu'on donne au comptoir) et un
             « Y aller ». Source = emails transporteur (qui portent le code), et non
@@ -14065,19 +14086,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </>)}
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
-        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
-          {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
-            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
-          ))}
-          {accounts.length>0 && (
-            <button onClick={()=>loadOrders('purchased',setBuys,true)} disabled={buys.loading} title="Va chercher tes achats en direct sur Vinted (tous comptes)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:buys.loading?'default':'pointer',opacity:buys.loading?0.6:1}}>{buys.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
-          )}
-        </div>
-        {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
-        {buysBase.length>0 && (
-          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
-            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
-        )}
+        {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
         {buys.loading && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
         {buys.items && !buys.error && buysBase.length===0 && (
