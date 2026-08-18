@@ -2673,3 +2673,50 @@ Le sélecteur d'achat (§5.23) montrait déjà la photo **au moment de choisir**
 - Sur les ventes, l'entrée vient de `effEntry(o)` → identité certaine (id Vinted, sinon photo, §5.34) — **jamais un rapprochement par titre**.
 
 **Vérifié au banc sur les vraies données** (fixture de banc : un achat relié à chaque paire numérotée, jamais écrite en base) : **25 blocs sur Annonces** (= les 25 annonces en ligne), **57 sur Ventes**, et le bouton 📄 télécharge un vrai PDF dont le contenu décompressé porte `N° de la paire | N°36` — le numéro de la paire vendue, pas celui de la transaction. **0 PAGEERROR** · smoke 12 écrans : **0 PAGEERROR, 0 artefact d'affichage**.
+
+---
+
+## 5.37 — ⚠️ CHRONOPOST : le « QR » affiché était un PIXEL DE TRACKING, et un code était le mot « suivant »
+
+Julien va faire supprimer son compte Mondial Relay : **les emails deviennent sa seule façon de retirer un colis**. Donc plus aucune donnée fausse ne peut passer. Méthode habituelle : lire la base avant de coder.
+
+### ⚠️ CORRECTION DE §17 ET §28 — Chronopost n'a JAMAIS envoyé un seul vrai QR capté
+J'avais écrit « Chronopost : 11 vrais QR en image hébergée (`qrUrl`) ». **C'est faux.** Mesuré sur les 26 emails Chronopost réels, 21 portent une `qrUrl` et **aucune n'est un QR** :
+
+| ce que contenait `qrUrl` | nombre |
+|---|---|
+| **pixel de tracking** (`tracking.network1.pickup.fr/tracking/1/open/…`) | 9 |
+| **illustration marketing** (`avn-webexternal.azureedge.net/avn-prod/FRA_DROPOFF_PICKUP_PARCEL`) | 11 |
+| bannière enquête de satisfaction | 1 |
+
+Devant la consigne, l'app affichait donc **une image invisible ou un dessin publicitaire** à la place du Pickup Pass.
+
+**CAUSE, dans `extractPickupQr` étape 3** : le contexte testé pour les mots-clés incluait **l'URL elle-même** (`ctx = html_avant + ' ' + url`). Or `pickup` est dans *toutes* les URL Pickup — mouchard compris. La première image de l'email gagnait, et la fonction s'arrêtait là : **le vrai QR, plus bas dans l'email, n'était jamais atteint.**
+
+### Les trois règles posées
+1. **`URL_PAS_UN_QR`** — liste noire (`/tracking/`, `/open/`, `pixel`, `banner`, `avn-prod`, `azureedge`, `drop_off`, `enquete`, réseaux sociaux…) **+ rejet des `<img>` de 1×4 px** (`width`/`height` ≤ 4).
+2. **Le mot-clé doit venir du HTML AUTOUR de l'image, jamais de l'URL** (`INDICE_QR_FORT` : `qr`, `pickup pass`, `à scanner`, `code-barre`, `présentez ce code`). « pickup » seul ne suffit plus.
+3. **⚠️ UN CODE DE RETRAIT EST NUMÉRIQUE.** L'ancien motif acceptait des lettres (`[A-Z0-9]{4,8}`) : sur un vrai email il a capté le mot **« suivant »** et l'affichait en gros comme code à donner au comptoir (ligne `email_track_chronopost_XW476115185SP`, toujours en base). Désormais `\d{4,10}` uniquement.
+
+### ⚠️ LE FILTRE VIT AUSSI À LA LECTURE (le point qui compte)
+Les 21 fausses `qrUrl` et le code « suivant » **sont déjà en base et ne seront jamais réécrits** — l'email ne repassera pas. Un correctif uniquement dans `api/email-inbound.js` n'aurait donc rien changé à ce que Julien voit. `src/App.jsx` porte la **même liste noire** (`URL_PAS_UN_QR` → `qrImage(t)`) et la **même règle de code** (`codeRetrait`).
+➡️ **Mesuré : sur les 25 `qrUrl` en base, 25 sont écartées** — plus une seule fausse image affichable.
+
+`codeRetrait` remplace **trois copies** de la même règle qui traînaient (`okCode` local, un `/^\d{3,8}$/` en dur dans `isColisRetirable`, et le test de `retraitMode`) — le doublon que §11 interdit.
+
+### Ce que l'email Chronopost Pickup donne vraiment (relevé sur les captures de Julien)
+Numéro de colis · transporteur · statut · **à retirer jusqu'au vendredi 21 août 2026** · nom + adresse de la consigne · le QR « Pickup Pass » · **Identifiant : 8156** ET **Code d'ouverture : 9539**.
+
+- **DATE LIMITE (`limite`)** — captée (« jusqu'au 21 août 2026 », « jusqu'au 21/08/2026 »), **jamais déduite**. Affichée sur la carte du colis ET dans la modale, en rouge à ≤ 2 jours : passé la date, le colis repart chez l'expéditeur et rien ne le disait.
+- **CONSIGNE ≠ COMPTOIR (`consigne`)** — au casier on **saisit l'identifiant puis le code d'ouverture** ; il n'y a pas de comptoir. Le texte de la carte et de la modale suit.
+- ⚠️ **LES DEUX NOMBRES SONT AFFICHÉS.** Ma première version ne montrait que le code d'ouverture — **avec lui seul la porte ne s'ouvre pas**. Défaut vu au rendu réel, pas à la relecture.
+- Le **lieu** se lit désormais **ligne par ligne** sur le texte : sur `all` (sujet + HTML), « Votre colis est arrivé en consigne Pickup » gagnait et le lieu devenait une phrase. Nom court (une enseigne) + lignes d'adresse suivantes.
+
+### Vérifié
+Banc unitaire sur les **vraies fonctions découpées du fichier**, avec l'email de Julien reconstruit d'après ses captures — **9/9** : le vrai QR (`/pass/…png`) est retenu, le pixel et la bannière écartés, code d'ouverture 9539, identifiant 8156, limite `2026-08-21`, consigne `true`, lieu « Consigne Pickup Super U Cancale, RUE DE LA BRETONNIERE, 35260 CANCALE », et le mot « suivant » n'est plus un code.
+**Non-régression Mondial Relay — 5/5** : code 077831, lieu « MAISON DE LA PRESSE, 40 RUE DU PORT, 35260 CANCALE », date limite 25/08, `consigne:false`, **aucun QR fabriqué** (§17 tient toujours : MR fonctionne au CODE).
+Rendu réel (banc §20, vraies données + les deux colis en fixture) : Mondial Relay → « Donne ce code au comptoir » + CODE 077831 + « à retirer avant le 25/08 · 8 j » ; Chronopost → « Saisis ces nombres sur le casier » + IDENTIFIANT 8156 + CODE D'OUVERTURE 9539 + « à retirer avant le 20/08 · 3 j ». **0 image QR affichée, 0 PAGEERROR.**
+Smoke 12 écrans : **0 PAGEERROR** · `audit-coherence` : **6 règles, 0 désaccord**.
+
+### ⚠️ Ce que je ne peux PAS réparer, dit franchement
+Le **corps brut des emails n'est pas conservé** en base : les 94 lignes existantes ne peuvent pas être re-parsées. Elles n'auront donc jamais leur date limite ni leur identifiant — seuls les **prochains** emails les auront. Ce qui est réparé pour l'existant, c'est l'affichage : plus aucune fausse image ni faux code.
