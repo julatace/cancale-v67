@@ -152,5 +152,24 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('audit du stock : une paire vendue est écartée PAR IDENTIFIANT');
 }
 
+// ── 6) UN NUMÉRO N'EST JAMAIS RÉATTRIBUÉ ─────────────────────────────────────
+//     « Il faut que les chaussures vendues gardent quand même leur numéro pour
+//      ne pas qu'il y ait d'erreur… si je me prends un retour en litige, je
+//      pourrai attribuer le numéro à la paire. » — Julien
+//     Rendre un numéro au pot, c'est risquer que deux paires le portent : la
+//     première peut revenir. Mesuré : 13 numéros portés par plusieurs paires,
+//     le N°4 par quatre.
+{
+  /const freedNums = useMemo/.test(SRC)
+    ? nok('aucun numéro n\'est rendu au pot', '`freedNums` est de retour')
+    : ok('aucun numéro n\'est rendu au pot');
+  // Personne ne doit RETIRER d'entrée de la mémoire des numéros utilisés.
+  const retraits = SRC.split('\n').filter(l =>
+    /vinted_used_numeros/.test(l) && /\.filter\(/.test(l) && !l.trim().startsWith('//'));
+  retraits.length
+    ? nok('la mémoire des numéros ne perd jamais d\'entrée', retraits.length + ' filtre(s) la réduisent encore')
+    : ok('la mémoire des numéros ne perd jamais d\'entrée');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);

@@ -10359,60 +10359,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // annonces numérotées, ET numéros posés sur les ventes (saleOv, déclaré
   // juste au-dessus) — sinon on resuggère un numéro déjà donné (doublon !).
   // ── UN NUMÉRO = UNE PLACE AU GARAGE, PAS UN NUMÉRO DE FACTURE ─────────────
-  // Avant, tout numéro donné une fois restait pris À VIE (vinted_used_numeros) :
-  // avec 116 paires en ligne, le compteur en était déjà à 181. Or le numéro sert
-  // à retrouver un carton sur l'étagère — quand la paire est partie, la place est
-  // libre et le numéro doit revenir dans le pool.
-  // Un numéro reste PRIS tant qu'une paire l'occupe vraiment :
-  //   • son annonce est encore en ligne,
-  //   • il est posé quelque part au garage,
-  //   • la vente n'est pas terminée (le carton est encore chez toi).
-  // L'historique n'y perd rien : chaque vente garde SON numéro dans sa propre
-  // ligne, indépendamment du pool.
-  // ⚠️ GARDE-FOU ANTI-DOUBLON : on ne libère le numéro d'une annonce disparue que
-  // si les ventes sont chargées ET si le compte de cette annonce a bien renvoyé
-  // ses annonces cette fois-ci. Un chargement partiel ne doit JAMAIS libérer un
-  // numéro encore utilisé — sinon deux cartons porteraient le même.
-  const freedNums = useMemo(() => {
-    const freed = new Set();
-    if (!listings.items || !listings.items.length) return freed;   // rien de sûr à libérer
-    if (!sales.items) return freed;                                // ventes inconnues → prudence
-    const onlineIds = new Set(); const presentAcc = new Set();
-    for (const it of listings.items) { onlineIds.add(String(it.id)); const u = String(it._acc?.vinted_user_id || ''); if (u) presentAcc.add(u); }
-    // Une vente n'immobilise la place QUE tant que le colis n'est pas parti :
-    // une fois expédié, le carton a quitté l'étagère et le numéro est libre.
-    // (On lit saleOv directement — effEntry n'est pas encore déclaré ici.)
-    const busy = new Set();
-    for (const o of (sales.items || [])) {
-      if (!needsBordereau(o.status)) continue;
-      const e = saleOv[String(o.transaction_id)];
-      const n = String((e && e.numero) || '').trim().toLowerCase();
-      if (n) busy.add(n);
-    }
-    for (const k in numeros) {
-      const e = numeros[k]; const raw = String((e && e.numero) || '').trim();
-      const n = parseInt(raw, 10); if (!raw || isNaN(n)) continue;
-      if (onlineIds.has(String(k))) continue;                       // encore en ligne
-      if (!presentAcc.has(String((e && e.accountId) || ''))) continue; // compte non rafraîchi
-      if (garageNums.has(raw.toLowerCase())) continue;              // carton encore rangé
-      if (busy.has(raw.toLowerCase())) continue;                    // vente en cours
-      freed.add(n);
-    }
-    return freed;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, sales.items, numeros, garageNums, saleOv]);
-  // Numéros réellement pris (toutes sources), moins ceux redevenus libres.
+  // ── ⚠️ UN NUMÉRO N'EST JAMAIS RÉATTRIBUÉ ────────────────────────────────────
+  // Julien : « il faut que les chaussures vendues gardent quand même leur numéro
+  // pour ne pas qu'il y ait d'erreur. C'est normal si ça monte à 124, ça veut
+  // dire qu'il y en a eu 100 autres avant. Si je me prends un retour en litige,
+  // je pourrai attribuer le numéro à la paire de chaussures. »
+  //
+  // C'est lui qui a raison, et l'ancienne règle était une source de COLLISION :
+  // elle rendait au pot le numéro d'une paire partie (`freedNums`). Mesuré sur
+  // la vraie base : **13 numéros portés par plusieurs paires différentes** — le
+  // N°4 par QUATRE (spezial noir 35,5 / zoom fly blanc rose / spezial kaki 38,5 /
+  // 3 manuels ST2S). Si l'une revient en litige, plus personne ne sait laquelle
+  // porte le N°4 — exactement l'erreur qu'on cherche à rendre impossible.
+  //
+  // Un numéro est donc PRIS À VIE dès qu'il a été donné une fois. La mémoire est
+  // `vinted_used_numeros` (append-only, 249 entrées en base). Le compteur monte,
+  // et c'est le comportement voulu : il compte les paires passées, pas le stock.
+  // Numéros pris : toutes les sources, et on n'en retire JAMAIS aucun.
   const takenNums = useMemo(() => {
     const taken = new Set();
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});
     Object.values(numeros).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n))taken.add(n);});
     Object.values(saleOv).forEach(e=>{const n=parseInt(String(e&&e.numero),10);if(!isNaN(n))taken.add(n);});
-    freedNums.forEach(n=>taken.delete(n));
     // Ce qui est en ligne / au garage reste pris quoi qu'il arrive.
     for (const it of (listings.items||[])) { const n=parseInt(String(numeros[it.id]?.numero),10); if(!isNaN(n)) taken.add(n); }
     garageNums.forEach(g=>{ const n=parseInt(String(g),10); if(!isNaN(n)) taken.add(n); });
     return taken;
-  }, [usedNumeros, numeros, saleOv, freedNums, listings.items, garageNums]);
+  }, [usedNumeros, numeros, saleOv, listings.items, garageNums]);
   const nextNumero = useMemo(() => { let n=1; while(takenNums.has(n)) n++; return n; }, [takenNums]);
 
 
@@ -10423,7 +10396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // vider n'est plus une alerte, c'est du décor.
   // Une paire occupe une place tant que : son annonce est EN LIGNE, ou sa vente
   // n'est pas encore expédiée (le carton est encore à la maison). Exactement la
-  // règle de `freedNums` ci-dessus — on la PUBLIE au lieu de la refaire ailleurs
+  // règle « la paire est physiquement là » — on la PUBLIE au lieu de la refaire ailleurs
   // (§11 : une seule règle par notion). Clé LOCALE (pas dans SYNC_KEYS) : c'est
   // une photo recalculable, elle n'a rien à faire dans le nuage.
   useEffect(() => {
@@ -10980,10 +10953,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_numeros', u);
       return u;
     });
-    // Le numéro auto est rendu au pot SEULEMENT s'il n'est pas rangé au garage.
-    if (!garageCellOf(garageGrid, autoNum2)) {
-      setUsedNumeros(prev => { const u = prev.filter(x => String(x) !== autoNum2); save('vinted_used_numeros', u); return u; });
-    }
+    // ⚠️ ON NE REND PLUS LE NUMÉRO AU POT. Un numéro donné une fois est pris à vie
+    //    (règle de Julien) : le rendre, c'est risquer qu'une autre paire le
+    //    reçoive alors que la première peut revenir en litige. Un numéro « brûlé »
+    //    ne coûte rien — le compteur monte, c'est normal ; une collision, si.
   };
 
   // AUTO-REPRISE : quand une annonce republiée (nouvelles photos → numéro auto
@@ -11009,8 +10982,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     if (changed) {
       setNumeros(u); save('vinted_annonce_numeros', u);
-      // Rend les numéros auto libérés — sauf s'ils sont (par hasard) rangés au garage.
-      setUsedNumeros(prev => { const keep = prev.filter(x => !freed.includes(String(x)) || garageCellOf(garageGrid, String(x))); save('vinted_used_numeros', keep); return keep; });
+      // ⚠️ Les numéros auto remplacés ne sont PAS rendus au pot (même raison qu'au-
+      //    dessus). C'est ce filtre qui retirait des numéros de la mémoire — mesuré
+      //    au banc : le N°134, pourtant porté par une paire, redevenait proposable.
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numeroReprises, autoNum, cloudReady]);
@@ -11505,7 +11479,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (50 → 120) qui avait fait supprimer l'invention de numéros. Ici la
         // paire occupe VRAIMENT une place (§7 : un numéro = une place au
         // garage), et le numéro repart dans le pool dès que le colis est parti
-        // (`freedNums`). Aujourd'hui : 3 ventes concernées, pas 275.
+        // Aujourd'hui : 3 ventes concernées, pas 275.
         //
         // ⚠️ ÉLARGI (août 2026) aux VENTES RÉCENTES — plainte de Julien : « ça
         // aurait dû générer un numéro dès que j'ai posté l'annonce ». La
@@ -11542,7 +11516,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   • numéros saisis À LA MAIN sur des ventes (saleOv non auto).
   // Les numéros fantômes disparaissent → la prochaine paire repart au 1er trou
   // réel (43). Aucune vraie boîte ne perd son numéro. Idempotent + une seule fois.
+  // ⚠️ DÉSACTIVÉ (août 2026) — un numéro est désormais PRIS À VIE (voir plus haut).
+  //    Ce nettoyage retirait des numéros de `vinted_used_numeros`, donc les
+  //    remettait en circulation : c'est exactement ce qui crée deux paires au
+  //    même numéro quand l'une revient en litige. Le code est conservé pour
+  //    mémoire, mais il ne s'exécute plus.
   useEffect(() => {
+    if (true) return;                                        // règle « jamais réattribué »
     if (!cloudReady) return;
     if (load('vinted_used_cleaned_v1', false)) return;      // déjà nettoyé sur cet appareil
     if (!numeros || !Object.keys(numeros).length) return;    // données pas prêtes → on ne touche à rien

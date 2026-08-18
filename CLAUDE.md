@@ -2890,3 +2890,35 @@ id 9421527393  is_closed false  item_closing_action = null      (en ligne)
 **Honnêteté** : le champ n'existe aujourd'hui que sur 1 des 235 articles fermés. L'effet est donc nul tant que l'extension n'a pas recapté le dressing — il grandit à chaque visite sur Vinted. `audit-identite.cjs` passe à **16 contrôles**.
 
 **Vérifié** : smoke app 12 écrans **0 PAGEERROR** · banc bordereau (deux annonces identiques → N°99, jamais N°7) · bancs colis conformes · `audit-coherence` 6 règles / 0 désaccord · `node --check` OK.
+
+---
+
+## 5.40 — ⚠️ RÈGLE INVERSÉE : UN NUMÉRO N'EST JAMAIS RÉATTRIBUÉ (§7 est annulé)
+
+Julien : « il faut que les chaussures vendues gardent quand même leur numéro pour ne pas qu'il y ait d'erreur. C'est normal si ça monte à 124, ça veut dire qu'il y en a eu 100 autres avant. Si je me prends un retour en litige, je pourrai attribuer le numéro à la paire de chaussures. »
+
+⚠️ **Ceci ANNULE la règle de §7** (« un numéro = une place au garage, il retourne dans le pool quand la paire part »), posée après sa plainte « pourquoi N°156 alors que j'ai à peine 50 paires ». Il tranche dans l'autre sens, et **il a raison** : la libération est une source de COLLISION.
+
+### Ce que la vraie base disait
+| | |
+|---|---|
+| paires numérotées | 198 · **176 numéros distincts** |
+| **numéros portés par PLUSIEURS paires** | **13** — le N°4 par **quatre** (spezial noir 35,5 / zoom fly blanc rose / spezial kaki 38,5 / 3 manuels ST2S), les N°1, 2, 3, 8, 11 par trois ou quatre |
+| `vinted_used_numeros` (mémoire) | 249 entrées, **aucun trou entre 1 et 249** |
+
+Si l'une de ces paires revient en litige, **plus personne ne sait laquelle porte le N°4**. C'est exactement l'erreur qu'on cherche à rendre impossible.
+
+### Le correctif
+- **`freedNums` est SUPPRIMÉ.** C'est lui qui rendait au pot le numéro d'une paire partie.
+- **Deux endroits retiraient encore des entrées de `vinted_used_numeros`** (`applyReprise` et l'effet d'auto-reprise, via `.filter(...)`) : supprimés. Le raisonnement d'origine (« ce numéro auto n'a jamais été écrit sur une boîte ») est vrai mais ouvre la porte à la réattribution. Un numéro brûlé ne coûte rien ; une collision, si.
+- Le **« nettoyage v1 »** (qui reconstruisait `vinted_used_numeros` en jetant les numéros « fantômes ») est **désactivé** : il remettait des numéros en circulation.
+
+### ⚠️ MESURÉ AU BANC — le défaut était visible, pas théorique
+Avant : le champ N° proposait **134** comme prochain numéro… alors que le N°134 est **porté par une paire**. Cause : l'effet d'auto-reprise avait retiré 134 de la mémoire (`used134: false` dans le localStorage). Après correctif : `used134: true`, prochain numéro **341** au banc.
+**Sur la vraie base, la règle donne 250** (vérifié en exécutant le vrai `takenNums` découpé du fichier : 249 numéros pris, aucun trou). L'ancienne règle aurait rendu **198 numéros au pot → prochain = 1**, donc collision garantie.
+
+⚠️ Ne pas « corriger » la montée du compteur : elle est VOULUE. 250 ne veut pas dire 250 paires en stock, ça veut dire 249 paires passées. Ne pas remettre en avant « Renuméroter à la suite » (§19) : ça réattribuerait des numéros.
+
+`audit-identite.cjs` passe à **18 contrôles**, dont deux nouveaux qui **détectent bien le défaut sur le code d'avant** : « aucun numéro n'est rendu au pot » et « la mémoire des numéros ne perd jamais d'entrée ».
+
+**Vérifié** : smoke app 12 écrans **0 PAGEERROR** · banc bordereau (deux annonces identiques → N°99) · `audit-coherence` 6 règles / 0 désaccord.
