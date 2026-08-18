@@ -2803,3 +2803,34 @@ Les 7 restantes sont toutes cohérentes : « spezial noir 38 » → « Adidas Sp
 ⚠️ Le banc (`prix.mjs`) utilise les **vraies** `extractBrand`/`extractSize`/`extractModel`/`extractColor` découpées du fichier, mais **recopie les poids** du score (qui vit dans `openPicker`, à l'intérieur d'un composant). Si les poids changent d'un côté, les remettre des deux.
 
 **Vérifié** : `npm run build` OK · smoke app 12 écrans sur les vraies données **0 PAGEERROR** · banc email 15/15 · bancs colis (grisé + retrait ailleurs) conformes · `audit-coherence` 6 règles, 0 désaccord.
+
+---
+
+## 5.39 — ⚠️ « MÊME AVEC 50 ARTICLES IDENTIQUES, TU NE DOIS PAS POUVOIR TE TROMPER »
+
+Exigence de Julien, et elle change la règle : **tout rapprochement par ressemblance est disqualifié par principe**, pas seulement quand il donne un mauvais résultat aujourd'hui. Seules les identités comptent : identifiant d'annonce Vinted, n° de transaction, n° de suivi, photo.
+
+Audit systématique de tous les `normTitle(` du fichier. Quatre défauts trouvés, tous corrigés :
+
+### 1. Deux helpers dormants qui rendaient « la première paire au même titre »
+`entryByTitle` / `entryKeyByTitle` : **plus aucun appelant**, mais laissés dans le fichier. C'est exactement le piège de `entryByTitleLoose` (§5.34) — la session suivante les rebranche. **Supprimés**, avec un commentaire à leur place.
+
+### 2. ⚠️ COLIS ↔ ACHAT : le code de retrait d'un AUTRE colis pouvait s'afficher
+`buyForTrack` / `trackForBuy` prenaient **le premier** titre égal, et retombaient même sur un `.includes()`. Avec plusieurs paires au même libellé, elles désignaient une paire **au hasard** — visible à l'écran : la photo d'une autre paire, ou l'étape de suivi (« au relais », avec SON code) posée sur le mauvais achat.
+➡️ Règle : **titre exactement égal ET un seul candidat des deux côtés, sinon rien**. Le `.includes()` est supprimé — ce n'est pas une identité. Helper `unique(liste, clé, valeur)`.
+
+### 3. La reprise de numéro après republication s'appuyait sur le titre
+`numeroReprises` exigeait déjà un candidat unique (elle résistait donc au scénario des 50), mais tranchait par titre + pointure. Or republier **re-téléverse la même image dans le même dossier** (§5.34) : c'est une identité. `photoDir` passe désormais **avant** le titre — deux dossiers connus et différents ⟹ ce n'est pas la même paire, quel que soit le libellé.
+
+### 4. La photo de la modale de retrait
+`openQrView` prenait le premier achat au même titre. Montrer la chaussure d'une autre paire à côté d'un code de retrait est pire que de n'en montrer aucune → **un seul candidat, ou pas de photo**.
+
+### ✅ `scripts/audit-identite.cjs` — le scénario des 50, en test permanent
+Le script pose **50 paires rigoureusement identiques** (même titre, taille, couleur, description) et vérifie qu'aucune règle n'en désigne une. Il contrôle aussi le **cas inverse** : avec un seul exemplaire, le rapprochement doit encore fonctionner — un garde-fou qui bloque tout serait pire que le défaut.
+
+⚠️ **Le test a été validé dans les deux sens** (§21 : un test qui passe toujours ne prouve rien) : rejoué sur le code d'avant les correctifs, il sort **4 échecs** ; après, **8 contrôles au vert**. À relancer après toute modification d'une règle qui relie deux choses.
+
+### Relier les achats entre TOUS les comptes — déjà en place, vérifié
+`openPicker` boucle sur `accounts` (= tous les comptes captés) **sans filtre `acctOff`** : un achat fait sur le compte A peut donc être relié à une annonce du compte B, comptes masqués compris, et chaque candidat porte son étiquette de compte (`AcctTag`). Rien à changer.
+
+**Vérifié** : `npm run build` OK · `audit-identite` 8/8 · smoke app 12 écrans **0 PAGEERROR** · bancs colis (grisé, retrait ailleurs, faux QR, faux code) conformes · `audit-coherence` **6 règles, 0 désaccord**.

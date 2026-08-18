@@ -9452,10 +9452,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // UNE seule règle décide quoi présenter au comptoir, selon le transporteur
     // (retraitMode) — plus de logique QR/code éparpillée ici.
     const r = retraitMode(t);
-    // Photo de la paire (savoir laquelle on va chercher / si on l'a déjà retirée) :
-    // les achats moissonnés portent la vraie photo Vinted → on la retrouve par titre.
+    // Photo de la paire (savoir laquelle on va chercher). ⚠️ On la retrouve par
+    // TITRE, faute de mieux : un email de suivi n'a pas d'autre lien avec l'achat.
+    // Donc UN SEUL candidat, ou aucune photo — montrer la chaussure d'une autre
+    // paire à côté d'un code de retrait est pire que de n'en montrer aucune.
     const pt = normTitle(t.artTitle || t.article || t.modele || '');
-    const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && orderPhoto(o)) || {}) : {};
+    const cands = pt ? buysBase.filter(o => normTitle(o.title || '') === pt && orderPhoto(o)) : [];
+    const ph = cands.length === 1 ? cands[0] : {};
     const base = {
       title: t.artTitle || (t.subject || 'Colis'), code: codeRetrait(t.code), code2: codeRetrait(t.code2), suivi: t.suivi || '',
       limite: t.limite || '', consigne: !!t.consigne,
@@ -10203,8 +10206,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [bordResult, setBordResult] = useState(null);
   const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
 
-  const entryByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return numeros[k]; } return null; };
-  const entryKeyByTitle = (title) => { const t = normTitle(title); for (const k in numeros) { if (normTitle(numeros[k].title) === t) return k; } return null; };
+  // ⚠️ `entryByTitle` / `entryKeyByTitle` ont été SUPPRIMÉS : ils rendaient la
+  // PREMIÈRE entrée au titre égal, donc une paire au hasard dès qu'il y en a
+  // plusieurs identiques. Plus aucun appelant, mais un helper de rapprochement
+  // par titre laissé dans le fichier est un piège pour la session suivante —
+  // c'est exactement ce qui était arrivé à `entryByTitleLoose` (§5.34).
   // Version TOLÉRANTE (pour les bordereaux reçus par email dont le titre est
   // souvent plus court/différent) : exact d'abord, puis « contient » ; on ne
   // renvoie une paire QUE si le résultat n'est PAS ambigu (numéros différents).
@@ -10905,8 +10911,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // numéro que tu as tapé toi-même n'est jamais remis en cause).
       if (!cur || !cur.auto || !String(cur.numero || '').trim()) continue;
       const t = normTitle(it.title), sz = sizeOf(it.title, it.size);
+      // ⚠️ LA PHOTO PASSE AVANT LE TITRE. Republier re-téléverse la MÊME image
+      //    sous un nouveau nom, mais dans le même dossier (§5.34) — c'est donc
+      //    une identité, là où le titre n'est qu'une ressemblance. Avec plusieurs
+      //    paires au même libellé, le titre seul désignerait la mauvaise.
+      const dirIt = photoDir(it.photo);
       const cands = orphans.filter(o => {
         if (String(o.e.numero) === String(cur.numero)) return false;
+        const dirO = photoDir(o.e.photo);
+        // Deux dossiers connus et différents = ce n'est pas la même paire, quel
+        // que soit le titre. Deux dossiers connus et identiques = c'est elle.
+        if (dirIt && dirO) { if (dirIt !== dirO) return false; return true; }
         const ot = normTitle(o.e.title), osz = sizeOf(o.e.title, o.e.size);
         if (!ot || ot !== t) return false;
         if (sz && osz && sz !== osz) return false; // pointures connues et différentes → non
@@ -11643,20 +11658,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   /* eslint-disable-next-line */ }, [curSub, accounts.length]);
-  // Achat correspondant à un suivi : par titre d'article extrait de l'email.
-  const buyForTrack = (t) => {
-    const items = buysBase;
-    if (!t || !t.artTitle) return null;
-    const n = normTitle(t.artTitle);
-    if (!n) return null;
-    return items.find(o => normTitle(o.title) === n)
-        || items.find(o => normTitle(o.title).includes(n) || n.includes(normTitle(o.title)))
-        || null;
+  // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
+  // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
+  // lien avec l'achat Vinted (vérifié — aucun n° de suivi côté Vinted, §5.37).
+  // ⚠️ Les deux fonctions prenaient LE PREMIER titre égal, et retombaient même
+  // sur un « contient ». Avec plusieurs paires au même titre, elles désignaient
+  // donc une paire AU HASARD — et ça se voyait à l'écran : la photo d'une autre
+  // paire, ou l'étape de suivi (« au relais », avec SON code de retrait) posée
+  // sur le mauvais achat. Julien : « même si j'ai 50 fois le même article, tu ne
+  // dois pas pouvoir te tromper ».
+  // Règle : titre EXACTEMENT égal, et UN SEUL candidat des deux côtés. Sinon rien.
+  // Le « contient » est supprimé : ce n'est pas une identité.
+  const unique = (liste, cle, valeur) => {
+    let trouve = null;
+    for (const x of liste) { if (cle(x) === valeur) { if (trouve) return null; trouve = x; } }
+    return trouve;
   };
-  // Suivi (email transporteur) correspondant à un achat, par titre d'article.
+  const buyForTrack = (t) => {
+    const n = normTitle(t && t.artTitle); if (!n) return null;
+    // Le titre doit aussi être unique côté COLIS : deux colis au même libellé ne
+    // peuvent pas revendiquer le même achat.
+    if (!unique(tracking || [], (x) => normTitle(x.artTitle || ''), n)) return null;
+    return unique(buysBase, (o) => normTitle(o.title || ''), n);
+  };
   const trackForBuy = (o) => {
-    const items = tracking || []; const n = normTitle(o && o.title); if (!n) return null;
-    return items.find(t => t.artTitle && (normTitle(t.artTitle) === n || normTitle(t.artTitle).includes(n) || n.includes(normTitle(t.artTitle)))) || null;
+    const n = normTitle(o && o.title); if (!n) return null;
+    if (!unique(buysBase, (x) => normTitle(x.title || ''), n)) return null;
+    return unique(tracking || [], (t) => normTitle(t.artTitle || ''), n);
   };
   // Étape de suivi d'un achat (payé → expédié → au relais → reçu) à partir du
   // statut Vinted + de l'email transporteur. step: 1=payé 2=transit 3=relais 4=reçu.
