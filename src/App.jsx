@@ -8622,6 +8622,7 @@ const isColisActive = (t, collected) => {
 // Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller, ou on a
 // un code de retrait). Écarte les lignes de suivi parasites.
 const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || !!codeRetrait(t && t.code));
+<<<<<<< HEAD
 // ⚠️ UN MÊME COLIS PEUT AVOIR PLUSIEURS LIGNES. Mesuré en base : 3 n° de suivi
 // existent en double (`email_track_vinted_04103186091937` ET
 // `email_track_chronopost_04103186091937`) — le transporteur et Vinted envoient
@@ -8636,6 +8637,8 @@ const suivisRetires = (tracking) => {
   return s;
 };
 const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(String(t.suivi).trim().toUpperCase()));
+=======
+>>>>>>> origin/main
 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
