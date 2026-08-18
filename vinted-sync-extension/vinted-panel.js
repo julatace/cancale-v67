@@ -103,6 +103,9 @@
   // exclut d'elle-même (buildPanelData lit panel_bords_done).
   const bordDoneLocal = new Set();
   let bordQuery = ''; // filtre texte de la liste « bordereaux à imprimer »
+  // Ventes cochees pour un lot de bordereaux (par n° de transaction). Gardé
+  // entre deux rendus : un `load()` ne doit pas vider la selection en cours.
+  const bordPick = new Set();
   // Mêmes files pilotées par TA sélection pour : répondre aux messages, et
   // relancer les personnes qui ont mis en favori (offre native Vinted). Tu
   // sélectionnes, l'extension t'ouvre chaque élément, TU agis (réponds / proposes),
@@ -1246,6 +1249,57 @@
         } catch (e) { b.disabled = false; b.textContent = avant; alerte = String(e).slice(0, 120); render(); }
       };
     });
+    // ── UN LOT DE BORDEREAUX, MAIS UN PAR UN ──────────────────────────────
+    // Julien : « je veux pouvoir sélectionner plusieurs ventes pour générer des
+    // bordereaux ». Ce qui reste refusé, c'est la RAFALE : N requêtes lâchées
+    // d'un coup. Ici la boucle attend la réponse de Vinted avant la suivante —
+    // c'est le rythme du réseau, pas une temporisation déguisée (§32) — et le
+    // plafond existant de 20 actions/h par compte reste le vrai garde-fou : dès
+    // qu'il refuse, on ARRÊTE le lot au lieu de s'acharner.
+    const majPick = () => {
+      bordPick.clear();
+      panel.querySelectorAll('.vrm-bord-pick').forEach(c => { if (c.checked) bordPick.add(String(c.dataset.tx)); });
+    };
+    panel.querySelectorAll('.vrm-bord-pick').forEach(c => { c.onchange = majPick; });
+    panel.querySelectorAll('.vrm-bord-all').forEach(a => {
+      a.onchange = () => {
+        panel.querySelectorAll('.vrm-bord-pick').forEach(c => { if (c.dataset.uid === a.dataset.uid) c.checked = a.checked; });
+        majPick();
+      };
+    });
+    panel.querySelectorAll('.vrm-bord-lot').forEach(btn => {
+      btn.onclick = async () => {
+        majPick();
+        const cases = [...panel.querySelectorAll('.vrm-bord-pick')].filter(c => c.checked && c.dataset.uid === btn.dataset.uid);
+        const etat = panel.querySelector(`.vrm-bord-lot-etat[data-uid="${btn.dataset.uid}"]`);
+        if (!cases.length) { if (etat) etat.textContent = 'coche au moins une vente'; return; }
+        btn.disabled = true;
+        let faits = 0, rates = 0;
+        for (let i = 0; i < cases.length; i++) {
+          const c = cases[i];
+          const carte = c.closest('.vrm-card');
+          const bAct = carte ? carte.querySelector('.vrm-bord-act') : null;
+          if (etat) etat.textContent = `⏳ ${i + 1}/${cases.length}…`;
+          if (bAct) { bAct.disabled = true; bAct.textContent = '⏳'; }
+          const r = await new Promise(res => chrome.runtime.sendMessage(
+            { from: 'cancale-vpanel', action: c.dataset.act === 'gen' ? 'genererBord' : 'recupBord', uid: c.dataset.uid, tx: c.dataset.tx },
+            (x) => res(chrome.runtime.lastError ? { ok: false, error: chrome.runtime.lastError.message } : x)));
+          if (r && r.ok) {
+            faits++; c.checked = false; bordPick.delete(String(c.dataset.tx));
+            if (bAct) { bAct.textContent = r.envoye ? '✓ envoyé à l\'app' : '✓ généré'; bAct.style.background = '#0f6b4f'; }
+          } else {
+            rates++;
+            if (bAct) { bAct.disabled = false; bAct.textContent = '❌'; bAct.title = (r && r.error) || 'échec'; }
+            // Refus du garde-fou (autre compte, trop d'actions) : inutile de
+            // continuer, les suivantes tomberaient sur le même mur.
+            if (r && r.code) { alerte = r.error; if (etat) etat.textContent = `arrêté après ${faits} — ${r.error}`; btn.disabled = false; render(); return; }
+          }
+        }
+        if (etat) etat.textContent = `✓ ${faits} traité${faits > 1 ? 's' : ''}${rates ? ` · ${rates} en échec` : ''}`;
+        btn.disabled = false;
+        setTimeout(load, 1400);
+      };
+    });
     // Aller chercher le texte d'une annonce (lecture de ta propre annonce).
     const gt = panel.querySelector('#vrm-gab');
     if (gt) gt.oninput = () => { gabarit = gt.value; };   // pas de re-render : on garde le focus
@@ -1781,7 +1835,7 @@
     };
     const parCompteSection = list.length ? `
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px">📮 ${list.length} vente${list.length > 1 ? 's' : ''} à expédier</div>
-      <div class="vrm-m" style="margin-bottom:8px;opacity:.85">Tu appuies, l'extension génère le bordereau chez Vinted et l'envoie dans l'app avec le N° de la paire. La colonne de droite dit où ça en est.</div>
+      <div class="vrm-m" style="margin-bottom:8px;opacity:.85">Tu appuies, l'extension génère le bordereau chez Vinted, <b>va chercher le PDF</b> et l'envoie dans l'app avec le N° de la paire. La colonne de droite dit où ça en est.<br>Coche plusieurs ventes puis « Traiter la sélection » : elles sont faites <b>l'une après l'autre</b>, jamais en rafale, et le plafond de 20 actions/heure par compte s'applique toujours.</div>
       ${groupes.map(g => {
         const estActif = actifUid && g.uid === actifUid;
         return `
@@ -1793,8 +1847,15 @@
               : '<span style="font-size:11px;font-weight:700;color:#9a5b16;background:rgba(154,91,22,.1);border-radius:999px;padding:2px 8px">connecte-toi à ce compte pour agir</span>'}
           </div>
           <div style="${estActif ? '' : 'filter:blur(1.6px);opacity:.55;pointer-events:none;user-select:none'}">
+          ${estActif && g.lignes.some(t => etatVente(t).act) ? `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;cursor:pointer"><input type="checkbox" class="vrm-bord-all" data-uid="${esc(g.uid)}"> tout cocher</label>
+              <button class="vrm-bord-lot" data-uid="${esc(g.uid)}" style="border:none;background:#09b1ba;color:#fff;border-radius:9px;padding:6px 11px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">▶ Traiter la sélection</button>
+              <span class="vrm-bord-lot-etat vrm-m" data-uid="${esc(g.uid)}"></span>
+            </div>` : ''}
           ${g.lignes.map(t => { const e = etatVente(t); return `
-            <div class="vrm-card" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
+            <div class="vrm-card" data-tx="${esc(t.transaction || '')}" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:8px">
+              ${estActif && e.act ? `<input type="checkbox" class="vrm-bord-pick" data-uid="${esc(t.uid || '')}" data-tx="${esc(t.transaction || '')}" data-act="${e.act}"${bordPick.has(String(t.transaction)) ? ' checked' : ''} style="flex-shrink:0;cursor:pointer">` : ''}
               ${pairThumb(t, 40)}
               <span style="flex-shrink:0;min-width:34px;text-align:center;font-weight:800;font-size:12px;border-radius:8px;padding:5px 6px;color:${t.numero ? '#0f6b4f' : '#c53030'};background:${t.numero ? 'rgba(15,107,79,.1)' : 'rgba(197,48,48,.1)'}">${t.numero ? 'N°' + esc(t.numero) : 'N° ?'}</span>
               <div style="flex:1 1 90px;min-width:0">
