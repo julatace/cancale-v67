@@ -141,6 +141,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   /vendus\.has\('t:'/.test(SRC)
     ? nok('audit du stock : aucune paire masquée à cause d\'un titre identique')
     : ok('audit du stock : aucune paire masquée à cause d\'un titre identique');
+<<<<<<< HEAD
 
   // VINTED NE SUPPRIME PAS UNE ANNONCE VENDUE : il la ferme en « sold ». C'est la
   // preuve PAR IDENTIFIANT qu'une paire est partie — elle doit remplacer le titre.
@@ -150,6 +151,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   /venduesVinted\.has\(String\(k\)\)\) continue;/.test(SRC)
     ? ok('audit du stock : une paire vendue est écartée PAR IDENTIFIANT')
     : nok('audit du stock : une paire vendue est écartée PAR IDENTIFIANT');
+=======
+>>>>>>> origin/main
 }
 
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
