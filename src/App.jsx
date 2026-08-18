@@ -10674,15 +10674,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (vendus.has(raw.toLowerCase())) continue;                  // numéro porté par une vente
       // ⚠️ Le test « même TITRE qu'une vente » a été retiré : avec plusieurs paires
       //    au même libellé, une seule vente les masquait TOUTES de l'audit — donc
-<<<<<<< HEAD
       //    une paire réellement perdue passait inaperçue. Le titre n'est pas une
       //    identité. Il est REMPLACÉ par celle-ci : Vinted ne supprime pas une
       //    annonce vendue, il la ferme en « vendue » — et ça se lit par IDENTIFIANT.
       if (venduesVinted.has(String(k))) continue;                   // Vinted dit : vendue
-=======
-      //    une paire réellement perdue passait inaperçue. Le numéro (juste au-dessus)
-      //    est une identité et suffit ; le titre n'en est pas une.
->>>>>>> origin/main
       if (pairsLost[raw]) continue;                                 // déjà déclarée perdue
       out.push({ id: String(k), e, numero: raw });
     }
