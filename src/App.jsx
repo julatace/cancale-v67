@@ -1657,7 +1657,11 @@ const fetchCapturedLabel = async (uid) => {
 const fetchCapturedLabelMetas = async (uid) => {
   if (!uid) return [];
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_label_%25&select=id,tx:data->>tx,capturedAt:data->>capturedAt`, { headers: sbAuth() });
+    // ⚠️ `item` = l'identifiant d'annonce que l'extension attache au bordereau au
+    //    moment de la capture (elle a la transaction sous la main, c'est gratuit).
+    //    C'est LA voie sans déduction pour savoir quelle paire part dans ce carton.
+    //    Scalaires uniquement : les octets du PDF ne partent qu'à l'impression (§34).
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_label_%25&select=id,tx:data->>tx,item:data->>item,capturedAt:data->>capturedAt`, { headers: sbAuth() });
     if (!res.ok) return [];
     return await res.json();
   } catch (_) { return []; }
@@ -11616,7 +11620,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const idx = {};
     for (const a of accounts) {
       for (const meta of await fetchCapturedLabelMetas(a.vinted_user_id)) {
-        if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null };
+        if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null, item: meta.item || '' };
       }
     }
     setLabelsCaptes(idx);
@@ -12621,8 +12625,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const e = effEntry(so);
     return e && e.numero ? String(e.numero) : '';
   };
+  // ── L'IDENTITÉ D'ANNONCE, ATTACHÉE AU BORDEREAU PAR L'EXTENSION ───────────
+  // Idée de Julien : « on envoie le bordereau et tu envoies directement
+  // l'identité de l'annonce, comme ça l'application ne se trompe plus ».
+  // C'est la voie la plus courte et la seule sans aucune déduction : Vinted
+  // lui-même a dit quelle annonce correspond à cette transaction, et
+  // `vinted_annonce_numeros` est indexé par id d'annonce. Deux articles
+  // rigoureusement identiques ont deux identifiants différents : impossible de
+  // les confondre, quel que soit leur titre, leur couleur ou leur taille.
+  const numFromLabelItem = (b) => {
+    const tx = String((b && b.transaction) || '').trim(); if (!tx) return '';
+    const cap = labelsCaptes[tx]; const id = cap && cap.item ? String(cap.item) : '';
+    if (!id) return '';
+    const e = numeros[id];
+    return e && String(e.numero || '').trim() ? String(e.numero).trim() : '';
+  };
   const numForBord = (b) => {
     const man = manualEntry(b); if (man && man.numero) return String(man.numero);
+    const parItem = numFromLabelItem(b); if (parItem) return parItem;   // identité Vinted, zéro déduction
     const parTxn = numFromTxn(b); if (parTxn) return parTxn;
     if (b.numero) return String(b.numero);
     return '';
@@ -12630,7 +12650,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Le numéro de l'email contredit-il celui de la transaction ? On le signale au
   // lieu de choisir en silence — c'est le seul cas où la paire peut être fausse.
   const numLitige = (b) => {
-    const parTxn = numFromTxn(b); const parMail = String((b && b.numero) || '').trim();
+    // On compare au plus sûr des deux chemins certains : l'identité d'annonce si
+    // l'extension l'a jointe au bordereau, sinon la transaction.
+    const parTxn = numFromLabelItem(b) || numFromTxn(b);
+    const parMail = String((b && b.numero) || '').trim();
     return parTxn && parMail && parTxn !== parMail ? { txn: parTxn, mail: parMail } : null;
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la

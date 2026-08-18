@@ -2286,7 +2286,20 @@ async function recupererLabel(acc, uid, tx) {
     // écrasée à chaque capture : avec 3 colis à envoyer, l'app n'en voyait qu'UN.
     // La clé porte donc le n° de transaction — c'est l'identité de la vente, donc
     // du bordereau (il ne peut pas y avoir de bordereau sans vente, §5.28).
-    const data = { uid, url, tx: String(tx), capturedAt: new Date().toISOString(), pdfB64: btoa(bin) };
+    // ⚠️ ON ENVOIE L'IDENTITÉ DE L'ANNONCE AVEC LE BORDEREAU (idée de Julien).
+    //    La transaction est DÉJÀ chargée juste au-dessus : `item_id` est donc
+    //    gratuit — zéro requête de plus. Avec lui, l'app n'a plus rien à déduire
+    //    pour savoir quelle paire part dans ce carton : elle lit directement
+    //    `vinted_annonce_numeros[item]`, qui est indexé par id d'annonce. Fini
+    //    la chaîne bordereau → transaction → vente → annonce, et fini le moindre
+    //    risque de confondre deux articles identiques.
+    const trx = (t && t.json && (t.json.transaction || t.json)) || {};
+    const item = trx.item_id != null ? String(trx.item_id) : '';
+    // Un LOT porte plusieurs articles : on les transporte tous (l'app saura dire
+    // « ce bordereau couvre 3 paires » au lieu d'en désigner une au hasard).
+    const items = Array.isArray(trx.order && trx.order.items)
+      ? trx.order.items.map(x => x && x.id != null ? String(x.id) : '').filter(Boolean) : [];
+    const data = { uid, url, tx: String(tx), item, items, capturedAt: new Date().toISOString(), pdfB64: btoa(bin) };
     await supabaseUpsert('app_data', [
       { id: `harvest_${uid}_label_${tx}`, data },
       { id: `harvest_${uid}_label_latest`, data },   // gardée : d'anciens écrans la lisent
