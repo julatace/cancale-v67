@@ -8622,6 +8622,20 @@ const isColisActive = (t, collected) => {
 // Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller, ou on a
 // un code de retrait). Écarte les lignes de suivi parasites.
 const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || !!codeRetrait(t && t.code));
+// ⚠️ UN MÊME COLIS PEUT AVOIR PLUSIEURS LIGNES. Mesuré en base : 3 n° de suivi
+// existent en double (`email_track_vinted_04103186091937` ET
+// `email_track_chronopost_04103186091937`) — le transporteur et Vinted envoient
+// chacun leur email. Si l'une des deux dit « livré / retiré », le colis EST
+// retiré : le laisser affiché sur l'autre ligne, c'est courir au relais pour rien.
+// Le n° de suivi est une identité, pas une ressemblance (§24) : aucun risque.
+const suivisRetires = (tracking) => {
+  const s = new Set();
+  for (const t of (tracking || [])) {
+    if (t && t.status === 'delivered' && t.suivi) s.add(String(t.suivi).trim().toUpperCase());
+  }
+  return s;
+};
+const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(String(t.suivi).trim().toUpperCase()));
 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
@@ -9951,7 +9965,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // avec leur code) ; `extra` = colis vus par Vinted mais dont le code n'est pas
   // encore arrivé par email. Utilisé À L'IDENTIQUE par Ma journée ET l'onglet Achats.
   const pickupUnion = useMemo(() => {
-    const emailList = (tracking || []).filter(t => isColisRetirable(t, collected));
+    const retires = suivisRetires(tracking);
+    const emailList = (tracking || []).filter(t => isColisRetirable(t, collected) && !colisRetireAilleurs(t, retires));
     const seen = new Set(emailList.map(t => normTitle(t.artTitle || t.article || t.modele || '')).filter(Boolean));
     const extra = vintedToPickup.filter(o => { const n = normTitle(o.title || ''); return !n || !seen.has(n); });
     return { emailList, extra, total: emailList.length + extra.length };
@@ -18155,7 +18170,7 @@ export default function App() {
       }
       // Colis à retirer (emails transporteurs) : source légère, module-level.
       let colisCount=0;
-      try{ const tr=await fetchEmailTracking(); const col=loadCollected(); colisCount=(tr||[]).filter(t=>isColisRetirable(t,col)).length; }catch(_){}
+      try{ const tr=await fetchEmailTracking(); const col=loadCollected(); const ret=suivisRetires(tr); colisCount=(tr||[]).filter(t=>isColisRetirable(t,col) && !colisRetireAilleurs(t,ret)).length; }catch(_){}
       // Leboncoin : paires publiées sur LBC mais VENDUES sur Vinted (plus en ligne)
       // → à retirer de Leboncoin pour ne pas les vendre deux fois.
       let lbcRemoveCount=0;

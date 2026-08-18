@@ -2720,3 +2720,31 @@ Smoke 12 écrans : **0 PAGEERROR** · `audit-coherence` : **6 règles, 0 désacc
 
 ### ⚠️ Ce que je ne peux PAS réparer, dit franchement
 Le **corps brut des emails n'est pas conservé** en base : les 94 lignes existantes ne peuvent pas être re-parsées. Elles n'auront donc jamais leur date limite ni leur identifiant — seuls les **prochains** emails les auront. Ce qui est réparé pour l'existant, c'est l'affichage : plus aucune fausse image ni faux code.
+
+### 5.37 (suite) — ⚠️ 5 COLIS À RETIRER ÉTAIENT CLASSÉS « LIVRÉS » (le défaut inverse de celui signalé)
+
+Demande de Julien : « dès que tu reçois le mail comme quoi le colis a été retiré, tu peux supprimer l'achat en attente ; sinon tu attends de capter ça dans l'extension ». Mesure d'abord : **le défaut trouvé est l'inverse, et plus grave.**
+
+| statut en base | lignes |
+|---|---|
+| transit | 54 · available **15** · delivered **18** · info 7 |
+
+Parmi les 18 `delivered` : **5 emails Mondial Relay dont le SUJET dit « Votre colis 60385202 est DISPONIBLE »**. Ces 5 colis à retirer n'apparaissaient donc nulle part — et au bout de 14 jours (`PICKUP_MAX_DAYS`) un point relais rend le colis à l'expéditeur. Rater un colis coûte plus cher qu'en afficher un de trop.
+
+**CAUSE** : le classement lisait **tout le texte** (`all` = sujet + corps). Or le corps d'un email « disponible » contient les consignes de retrait (« venez récupérer votre colis », « à retirer avec ce code »…), qui font matcher les motifs de « déjà retiré ».
+➡️ **LE SUJET TRANCHE AVANT LE CORPS** (`SUJ_RETIRE` / `SUJ_DISPO`) : c'est lui qui porte l'état COURANT, c'est pour ça que le transporteur l'écrit. Le corps ne sert plus que de repli quand le sujet ne dit rien.
+
+**Rejoué sur les 94 sujets réels : 31 sujets tranchent, 6 classements corrigés — 6 colis redeviennent « à retirer », 0 régression.** Les 10 « Votre colis a été retiré » Chronopost restent bien `delivered` (le bug de §5.37 précédent ne revient pas).
+
+### Un colis retiré s'éteint sur TOUTES ses lignes
+Mesuré : **3 n° de suivi existent en double** (`email_track_vinted_04103186091937` ET `email_track_chronopost_04103186091937`) — le transporteur et Vinted envoient chacun leur email, donc deux lignes pour un seul colis. Si l'une passe « retiré » et l'autre reste « disponible », le colis restait affiché : Julien serait allé au relais pour rien.
+`suivisRetires(tracking)` + `colisRetireAilleurs(t, retires)` : **le n° de suivi est une identité, pas une ressemblance** (§24) — aucun risque de devinette. Appliqué à `pickupUnion` ET au compteur de notifications (sinon deux chiffres pour la même chose, §11).
+
+**Vérifié au banc, dans les deux sens** (fixture : un colis « disponible » dont l'email de retrait est arrivé sur une autre ligne) : **sans le correctif → 5 colis à retirer dont un déjà récupéré ; avec → 4, le bon écarté.** 0 PAGEERROR.
+
+### ⚠️ Ce que je ne fais PAS, et pourquoi
+Julien demande de « supprimer l'achat en attente » quand le colis est retiré. **Il n'existe aujourd'hui aucun lien certain entre un email de suivi et un achat Vinted** : vérifié sur les 431 achats moissonnés, les champs sont `date, photo, price, title, status, transaction_id, conversation_id, transaction_user_status` — **aucun n° de suivi**. Et le `shipment` du détail de transaction ne porte que `{id, status, status_title, status_updated_at}` (§16, reconfirmé). Le seul rapprochement possible serait **par titre**, précisément ce que §24 interdit : marquer « reçue » une paire qui ne l'est pas est pire que de la laisser en attente.
+➡️ L'achat bascule donc sur le **statut Vinted** capté par l'extension (« Commande livrée ! ») — le seul lien certain, et il se met à jour tout seul. Pour rendre ça automatique depuis l'email il faudrait capter un n° de suivi côté Vinted (piste : `harvest_*_ship_*`, §5.27 — **0 ligne en base à ce jour**).
+
+### ⚠️ Le correctif ne répare pas les 5 lignes déjà en base
+Elles gardent leur statut `delivered` (l'email ne repassera pas, et le corps brut n'est pas conservé). Elles datent du 28/07 au 06/08 : au-delà des 14 jours, elles seraient de toute façon écartées. **La protection vaut pour les prochains colis.**
