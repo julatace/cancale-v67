@@ -2768,3 +2768,38 @@ Cocher ✓ faisait **disparaître** la ligne d'un coup. Désormais elle reste **
 - `PICKUP_CONFIRM_DAYS = 7` : au-delà on n'attend plus, sinon un statut Vinted qui ne bouge jamais encombrerait la liste pour toujours.
 
 **Vérifié au banc** (les 3 vraies transactions « déposées » cochées comme récupérées) : le compteur passe de 4 à **2 colis à retirer**, et le bloc gris affiche « ✓ 2 retirés — Vinted n'a pas encore enregistré » avec les deux vraies paires et leur bouton ↺. Smoke 12 écrans **0 PAGEERROR**, banc email 15/15, cohérence 6 règles / 0 désaccord.
+
+---
+
+## 5.38 — LE PRIX D'ACHAT : la couleur et la pointure tranchent (3 suggestions fausses sur 9)
+
+État relevé du jour : **24 annonces en ligne, 24 avec un N°, 0 avec un prix d'achat** (198 entrées numérotées, **0 prix**, miroir `vinted_buyprice_by_num` vide). Le bénéfice, la marge, la « meilleure marque » et le rapport comptable tournent donc toujours avec un coût nul.
+
+⚠️ En mesurant les candidats proposés par `openPicker` (§5.23) sur les vraies données, le vrai défaut n'était pas le nombre de suggestions mais **leur justesse** :
+
+| paire en ligne | candidat « suggéré » proposé | verdict |
+|---|---|---|
+| adidas spezial **noir** taille 38 | Adidas Spezial **blu** n. 38 | ❌ couleur |
+| adidas spezial gris **taille 38** | Adidas spezial **maat 41** grijs | ❌ pointure |
+| adidas spezial gris **taille 39,5** | Adidas spezial **maat 41** grijs | ❌ pointure |
+| adidas spezial gris **taille 36,5** | Adidas spezial **maat 41** grijs | ❌ pointure |
+
+Marque + modèle suffisaient à franchir le seuil de 12 : **ni la couleur ni une pointure DIFFÉRENTE ne pesaient**. Un prix d'achat faux ne se voit jamais — il produit une marge crédible, pour toujours.
+
+### Deux règles ajoutées à `openPicker`
+1. **`extractColor(text)`** (module-level, à côté de `extractBrand`/`extractSize`/`extractModel`) : 12 couleurs × 6 langues (fr/en/it/es/de/nl — ses achats viennent de toute l'Europe). Même couleur **+4**, couleurs reconnues mais **différentes −8**. ⚠️ Deux couleurs dans un titre (bicolore) ⟹ `null` : on ne se prononce pas plutôt que de trancher.
+2. **Pointure différente −10** — le signal le PLUS discriminant, et il ne pénalisait rien. Une pointure différente, ce n'est pas la même paire.
+
+### Mesuré sur les 24 annonces en ligne et 315 achats
+| | avant | après |
+|---|---|---|
+| paires avec un candidat « suggéré » | 9 | **7** |
+| dont **fausses** (couleur ou pointure incompatible) | **4** | **0** |
+
+Les 7 restantes sont toutes cohérentes : « spezial noir 38 » → « Adidas Spezial **schwarz** », « spezial gris 39,5 » → « Adidas spezial **39.5** », « zoom fly 5 orange 41 » → « zoom fly 5 **maat 41 oranje** » (score 18, le plus fort). **Moins de suggestions, mais plus une seule fausse** — c'est le sens de « mieux vaut un blanc qu'un faux ».
+
+⚠️ Il reste un cas non traité, et il est sans danger : deux annonces en ligne au titre identique (« adidas spezial noir taille 35,5 », N°134 et N°156) se voient proposer le MÊME achat. `linkedBuyIds` empêche déjà de relier deux fois le même achat, donc pas de double comptage — seul le badge est optimiste.
+
+⚠️ Le banc (`prix.mjs`) utilise les **vraies** `extractBrand`/`extractSize`/`extractModel`/`extractColor` découpées du fichier, mais **recopie les poids** du score (qui vit dans `openPicker`, à l'intérieur d'un composant). Si les poids changent d'un côté, les remettre des deux.
+
+**Vérifié** : `npm run build` OK · smoke app 12 écrans sur les vraies données **0 PAGEERROR** · banc email 15/15 · bancs colis (grisé + retrait ailleurs) conformes · `audit-coherence` 6 règles, 0 désaccord.
