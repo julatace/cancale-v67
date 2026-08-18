@@ -2690,6 +2690,38 @@ function extractSize(text){
 // de paires : ça ne suffit pas à trancher, et un mauvais prix d'achat fausse le
 // bénéfice en silence — c'est pire que pas de prix du tout.
 // Avec le modèle exigé, les rapprochements uniques deviennent **4 sur 4 justes**.
+// ⚠️ LA COULEUR DISTINGUE DEUX PAIRES DU MÊME MODÈLE ET DE LA MÊME TAILLE.
+// Mesuré sur les 24 annonces en ligne : « adidas spezial NOIR taille 38 » se
+// voyait proposer « Adidas Spezial BLU n. 38 » avec un score de 14 (marque +
+// taille + modèle) et le badge « suggéré » — un prix d'achat faux, et un faux
+// prix d'achat ne se voit jamais : il produit une marge crédible, pour toujours.
+// Julien met systématiquement la couleur dans ses titres, des deux côtés.
+// Les variantes couvrent le français, l'anglais, l'italien, l'espagnol,
+// l'allemand et le néerlandais : ses achats viennent de toute l'Europe.
+const COULEURS = {
+  noir:   ['noir','noire','black','nero','negro','schwarz','zwart'],
+  blanc:  ['blanc','blanche','white','bianco','blanco','weiss','wit'],
+  gris:   ['gris','grise','grey','gray','grigio','grau','grijs'],
+  bleu:   ['bleu','bleue','blue','blu','azul','blau','blauw','marine','navy'],
+  vert:   ['vert','verte','green','verde','grun','grün','groen','mineral green'],
+  rouge:  ['rouge','red','rosso','rojo','rot','rood'],
+  rose:   ['rose','pink','rosa','roze'],
+  jaune:  ['jaune','yellow','giallo','amarillo','gelb','geel'],
+  orange: ['orange','arancione','naranja','oranje'],
+  violet: ['violet','purple','viola','morado','lila','paars'],
+  beige:  ['beige','sable','sand','crema','creme','crème','cream'],
+  marron: ['marron','brown','marrone','braun','bruin'],
+};
+// Renvoie la couleur reconnue dans un titre, ou null si aucune / plusieurs
+// (deux couleurs = bicolore, on ne se prononce pas plutôt que de trancher).
+function extractColor(text){
+  if(!text) return null;
+  const t = String(text).toLowerCase().replace(/[^a-zà-ÿ0-9]+/g,' ');
+  const vues = new Set();
+  for(const [nom, mots] of Object.entries(COULEURS))
+    for(const m of mots) if(new RegExp('(^| )'+m+'( |$)').test(t)) { vues.add(nom); break; }
+  return vues.size === 1 ? [...vues][0] : null;
+}
 const KNOWN_MODELS = [
   'zoom fly','p-6000','p6000','p 6000','air max 95','air max 97','air max 1','air max 90','air max',
   'air force','pegasus','vaporfly','alphafly','dunk','blazer','cortez',
@@ -9801,18 +9833,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const marqueRef = (extractBrand(item?.title) || '').toLowerCase();
     const tailleRef = String(extractSize(item?.title) || '').toLowerCase();
     const modeleRef = extractModel(item?.title);
+    const couleurRef = extractColor(item?.title);
     const prixVente = Number(item?.price?.amount ?? item?.price ?? 0) || 0;
     const score = (o) => {
       let pts = 0;
       const t = o.title || '';
       if (marqueRef && (extractBrand(t) || '').toLowerCase() === marqueRef) pts += 4;
-      if (tailleRef && String(extractSize(t) || '').toLowerCase() === tailleRef) pts += 4;
+      // ⚠️ UNE POINTURE DIFFÉRENTE = CE N'EST PAS LA MÊME PAIRE. C'est le signal le
+      // plus discriminant de tous, et il ne pénalisait RIEN : « adidas spezial gris
+      // taille 38 » se voyait proposer « Adidas spezial maat 41 grijs » avec le badge
+      // « suggéré » (marque + modèle + couleur suffisaient à atteindre le seuil).
+      // Trois paires en ligne étaient dans ce cas, mesuré sur les vraies données.
+      const ta = String(extractSize(t) || '').toLowerCase();
+      if (tailleRef && ta === tailleRef) pts += 4;
+      else if (tailleRef && ta && ta !== tailleRef) pts -= 10;
       // ⚠️ LE MODÈLE TRANCHE. Même modèle = le signal le plus fort après le
       // titre exact ; modèles reconnus mais DIFFÉRENTS = on écarte franchement
       // (c'est ce qui reliait un p-6000 à des « Nike speakers »).
       const mo = extractModel(t);
       if (modeleRef && mo === modeleRef) pts += 5;
       else if (modeleRef && mo && mo !== modeleRef) pts -= 6;
+      // ⚠️ LA COULEUR TRANCHE AUTANT QUE LE MODÈLE. Sans elle, « spezial noir 38 »
+      // et « spezial blu 38 » avaient le MÊME score : marque + taille + modèle.
+      // Deux couleurs reconnues et différentes = ce n'est pas la même paire.
+      const co = extractColor(t);
+      if (couleurRef && co === couleurRef) pts += 4;
+      else if (couleurRef && co && co !== couleurRef) pts -= 8;
       const pa = Number(o.price?.amount);
       if (!isNaN(pa) && prixVente > 0 && pa > 0 && pa < prixVente) pts += 1; // un achat coûte moins cher que la revente
       if (normTitle(t) === normTitle(item?.title || '')) pts += 6;            // titre identique : quasi sûr
