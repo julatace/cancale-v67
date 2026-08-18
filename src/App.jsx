@@ -10725,9 +10725,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'acheteur reçoit autre chose. Rien ne le signalait : le Garage détectait
   // les doublons de case, jamais les doublons d'annonce.
   // Constaté en base le 2 août : le N°1 était porté par deux annonces.
+  // ⚠️ SUR TOUTES LES ANNONCES EN LIGNE, TOUS COMPTES CONFONDUS — pas sur
+  //    `annBase`, qui écarte les comptes masqués et les paires données pour
+  //    vendues. Masquer un compte cache sa comptabilité, ça ne sort pas le
+  //    carton de l'étagère (§5.33). Mesuré : le **N°4 était porté par DEUX
+  //    paires en ligne** (« adidas spezial noir 35,5 » et « 3 manuels ST2S »)
+  //    et le détecteur ne le voyait pas, l'une étant sur un compte écarté.
+  //    Deux paires au même numéro = la mauvaise chose part dans le carton.
   const numDoublons = useMemo(() => {
     const par = new Map();
-    for (const it of annBase) {
+    for (const it of (listings.items || [])) {
       const n = String((numeros[it.id] || {}).numero || '').trim();
       if (!n) continue;
       if (!par.has(n)) par.set(n, []);
@@ -10738,7 +10745,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       .map(([numero, list]) => ({ numero, items: list }))
       .sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros]);
+  }, [listings.items, numeros]);
 
   // Un numéro en double est trop grave pour rester derrière une barre repliée :
   // on déplie tout seul. Les autres signalements restent discrets.
@@ -11799,8 +11806,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         continue;
       }
       let num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
-      // Prochain numéro = plus PETIT libre (on comble les trous) → la séquence
-      // reste basse et continue au lieu de sauter (ex. 50 → 120).
+      // Prochain numéro = le premier JAMAIS UTILISÉ. `taken` contient tous les
+      // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
+      // pas. C'est voulu — elle compte les paires passées, pas le stock.
       if (!num) { let cand = 1; while (taken.has(cand)) cand += 1; num = String(cand); taken.add(cand); }
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       nextUsed.add(parseInt(num, 10));
@@ -14163,9 +14171,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ligne, dépliable, et n'apparaissent que s'il y a vraiment quelque
             chose à signaler. */}
         {(() => {
-          const nn = annBase.map(it => parseInt(String((numeros[it.id]||{}).numero||''), 10)).filter(x => !isNaN(x));
-          const trous = nn.length >= 5 ? Math.max(...nn) - nn.length : 0;
-          const n = numDoublons.length + comptesMuets.length + (disparues.length ? 1 : 0) + (blockedList.length ? 1 : 0) + (trous >= 15 ? 1 : 0);
+          // ⚠️ Les « trous » de numérotation ne sont PLUS un signalement (§5.40) :
+          //    un numéro est pris à vie, la séquence monte, c'est normal.
+          const n = numDoublons.length + comptesMuets.length + (disparues.length ? 1 : 0) + (blockedList.length ? 1 : 0);
           if (!n) return null;
           // Un numéro en double fait expédier la mauvaise paire : la barre passe
           // en rouge et le dit, au lieu de se fondre dans les avertissements.
@@ -14190,24 +14198,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             peine 50 paires ? ». L'outil de renumérotation existait mais était
             enfoui dans « ⋯ Outils » : personne ne le trouvait. On le propose
             quand l'écart devient visible (plus de 15 numéros perdus). */}
-        {(() => {
-          const nums = annBase.map(it => parseInt(String((numeros[it.id]||{}).numero||''), 10)).filter(n => !isNaN(n));
-          if (nums.length < 5) return null;
-          const haut = Math.max(...nums), trous = haut - nums.length;
-          if (trous < 15) return null;
-          return (
-            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
-              <div style={{fontSize:13.5,fontWeight:600,color:C.text}}>Tes numéros montent jusqu'à {haut} pour {nums.length} paires</div>
-              <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
-                {trous} numéros sont libres entre les deux. Les remettre à la suite rend le garage plus simple — les paires déjà rangées et celles d'une vente en cours ne bougent pas.
-              </div>
-              <button type="button" onClick={()=>setRenumOpen(true)}
-                style={{marginTop:9,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                🔢 Voir la renumérotation
-              </button>
-            </div>
-          );
-        })()}
+        {/* ⚠️ LE PANNEAU « TES NUMÉROS MONTENT TROP HAUT » A ÉTÉ RETIRÉ (§5.40).
+            Il annonçait « N numéros sont libres entre les deux » et poussait à
+            renuméroter — deux choses désormais FAUSSES et dangereuses :
+            un numéro donné une fois est pris à vie, et renuméroter le
+            réattribuerait à une autre paire. Or une paire peut revenir (litige,
+            retour, annulation) et doit retrouver SON numéro.
+            Que le compteur monte est NORMAL : il compte les paires passées, pas
+            le stock. « Renuméroter à la suite » reste dans ⋯ Outils pour un cas
+            exceptionnel, mais on ne le suggère plus jamais. */}
         {/* NUMÉROS EN DOUBLE — le plus grave : deux paires dans la même boîte,
             donc la mauvaise chaussure part à l'expédition. */}
         {numDoublons.length > 0 && (
@@ -14216,7 +14215,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {numDoublons.length} numéro{numDoublons.length>1?'x':''} porté{numDoublons.length>1?'s':''} par deux annonces
             </div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
-              Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Donne un numéro libre à l'une des deux.
+              Deux paires rangées dans la même boîte : à l'expédition, tu risques d'envoyer la mauvaise. Donne un numéro NEUF à l'une des deux (les numéros ne se réutilisent jamais).
             </div>
             {numDoublons.map(g => (
               <div key={g.numero} style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
@@ -14224,11 +14223,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {g.items.map(it => (
                   <div key={it.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
                     {it.photo && <img src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
-                    <div style={{flex:1,minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
+                      <div style={{fontSize:10,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/></div>
+                    </div>
                     <button type="button" onClick={async ()=>{
                       const libre = String(nextNumero);
                       if (!await askConfirm({ title:`Donner le N°${libre} à cette paire ?`, desc:`« ${it.title} »\n\nElle quitte le N°${g.numero}, qui reste à l'autre paire. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
                       setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre}; save('vinted_annonce_numeros',u); return u; });
+                      recordUsed(libre);   // le numéro est pris à vie (§5.40)
                       toast(`✓ Cette paire est maintenant le N°${libre}.`);
                     }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       → N°{nextNumero}
