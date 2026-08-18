@@ -2922,3 +2922,35 @@ Avant : le champ N° proposait **134** comme prochain numéro… alors que le N�
 `audit-identite.cjs` passe à **18 contrôles**, dont deux nouveaux qui **détectent bien le défaut sur le code d'avant** : « aucun numéro n'est rendu au pot » et « la mémoire des numéros ne perd jamais d'entrée ».
 
 **Vérifié** : smoke app 12 écrans **0 PAGEERROR** · banc bordereau (deux annonces identiques → N°99) · `audit-coherence` 6 règles / 0 désaccord.
+
+### 5.40 (suite) — LE DÉTECTEUR DE DOUBLONS ÉTAIT AVEUGLE SUR LA MOITIÉ DU STOCK
+
+Une fois la réattribution supprimée, restait à traiter les collisions **déjà en base**. Mesuré :
+
+| | |
+|---|---|
+| numéros portés par plusieurs entrées | **13** |
+| dont **deux paires PRÉSENTES** (donc dangereux aujourd'hui) | **1 — le N°4** |
+
+Le N°4 est porté par **deux annonces actuellement en ligne** : « adidas spezial noir taille 35,5 » et « 3 manuels première ST2S » (compte `llloollllaa`). Si l'une se vend, le bordereau est tamponné N°4 et **la mauvaise chose part dans le carton**.
+
+⚠️ **Et le détecteur ne le voyait pas** : `numDoublons` bouclait sur `annBase`, qui écarte les comptes masqués et les paires données pour vendues. Or masquer un compte cache sa comptabilité — **ça ne sort pas le carton de l'étagère** (§5.33). Il boucle désormais sur `listings.items` : **toutes les annonces réellement en ligne, tous comptes confondus**. Chaque ligne porte son étiquette de compte, pour savoir où chercher.
+La réattribution appelle maintenant `recordUsed(libre)` : le numéro neuf est brûlé à vie, comme les autres.
+
+### ⚠️ Un panneau contredisait la nouvelle règle — retiré
+L'écran Annonces affichait « **Tes numéros montent jusqu'à 178 pour 22 paires — 156 numéros sont libres entre les deux** » avec un bouton « 🔢 Voir la renumérotation ». Deux affirmations devenues fausses et dangereuses : ces numéros ne sont **pas** libres (ils sont pris à vie), et renuméroter les **réattribuerait** — précisément ce qui empêche une paire revenue en litige de retrouver le sien. Supprimé, ainsi que le signalement « trous ≥ 15 » qui le comptait. « Renuméroter à la suite » reste dans ⋯ Outils pour un cas exceptionnel, mais **n'est plus jamais suggéré**.
+
+**Vérifié au rendu réel** : le bandeau 🚨 affiche « 1 numéro porté par deux annonces », les deux paires avec leur compte, et le bouton « → N°339 » (250 sur la vraie base). Le panneau « numéros trop hauts » a disparu. Smoke 12 écrans **0 PAGEERROR** · `audit-identite` 18/18 · `audit-coherence` 6/0.
+
+### 5.40 (suite) — VENTES & ACHATS : une info affichée deux fois, un conseil faux, deux écrans jumeaux mal alignés
+
+Julien : « les onglets ne sont pas forcément assez intuitifs, fais quelque chose de très professionnel ». Méthode : **relever ce qui s'affiche, dans l'ordre**, plutôt que de juger à l'œil.
+
+**1. La même information deux fois sur le même écran (Ventes).** La grande carte « ARGENT EN ATTENTE (ESTIMATION) ≈ 807 € · 25 ventes en cours », puis dix lignes plus bas la StatBox « 💰 En attente · 807 € · 25 en cours · estimation ». La StatBox est retirée : la carte porte déjà le montant, le détail par compte et l'avertissement d'incomplétude (§11 — une seule notion, un seul endroit).
+
+**2. Un conseil FAUX était revenu.** « Ouvre une fois ton porte-monnaie sur Vinted » — invalidé depuis la 5.20 (§5.27 : la lecture du solde est automatique). Remplacé.
+⚠️ En le corrigeant j'ai créé un **nouveau doublon** (le texte d'estimation répétait la marche à suivre déjà donnée par l'avertissement juste en dessous) — vu au relevé, corrigé dans la foulée.
+
+**3. Deux écrans jumeaux organisés différemment.** Sur **Ventes**, la barre d'outils (période, filtres, recherche) est en 1re position sous le titre. Sur **Achats**, elle arrivait en **19e**, après les cartes. C'est ça qui rend la navigation hésitante. Achats suit désormais le même ordre : **titre → outils → cartes → liste**.
+
+**Vérifié au relevé, dans l'ordre** : Ventes n'affiche plus qu'une fois l'argent en attente ; Achats commence par ses filtres + période (2e à 11e position) puis les colis. Smoke 12 écrans **0 PAGEERROR** · `audit-identite` 18/18 · `audit-coherence` 6/0.
