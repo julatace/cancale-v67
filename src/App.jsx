@@ -2551,101 +2551,52 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
 // savait pas de quelle chaussure il s'agissait.
 // ⚠️ Les accents PASSENT avec les polices standard de pdf-lib (encodage
 // WinAnsi) : « Reçu d'achat », « payé », « Numéro » s'écrivent normalement.
+// ⚠️ REÇU D'ACHAT — VERSION D'ORIGINE, RESTAURÉE (août 2026).
+// Julien, deux fois : « les reçus c'est pas ouf, je préférais celui d'avant, il
+// était super ». Je l'avais refait à ma façon (photo, encadré, deux colonnes) ;
+// c'est SA version qui est reprise ici, telle qu'elle était avant le commit
+// 7256d7e — mise en page en une colonne, une étiquette grise puis la valeur.
+// Le N° de la paire est ajouté (il est passé par `opts.numero` depuis les trois
+// boutons appelants) : c'est la seule chose qui manquait vraiment.
 const generateAchatJustificatif = async (o, opts = {}) => {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([420, 595]);
+  const page = pdf.addPage([420, 560]);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
-  const { width, height } = page.getSize();
-  const M = 34, W = width - M * 2;
-  const ACC = rgb(0, 0.47, 0.51), GRIS = rgb(0.45, 0.45, 0.45), NOIR = rgb(0.1, 0.1, 0.1), TRAIT = rgb(0.88, 0.88, 0.88);
-  const txt = (t, x, y, size, font, color) => page.drawText(String(t), { x, y, size, font, color });
-  const coupe = (t, size, font, max) => { let s = String(t || ''); while (s.length > 3 && font.widthOfTextAtSize(s, size) > max) s = s.slice(0, -2); return s === String(t || '') ? s : s + '…'; };
-
-  let y = height - 46;
-  txt("Reçu d'achat", M, y, 21, bold, ACC);
-  txt(opts.shop || 'Shop Cancale35', M, y - 16, 10, reg, GRIS);
-  const dte = o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—';
-  txt(dte, width - M - reg.widthOfTextAtSize(dte, 11), y, 11, reg, NOIR);
-  y -= 40;
-  page.drawRectangle({ x: M, y, width: W, height: 1.5, color: TRAIT });
-  y -= 20;
-
-  // ── LA PAIRE : photo + titre + numéro de boîte, dans un encadré ──────────
-  // La photo n'est là que si l'extension a pu la rapatrier (le CDN Vinted
-  // refuse la lecture cross-origin depuis la page). Sans elle : pas de trou,
-  // le bloc se resserre.
-  let img = null;
-  try {
-    const src = orderPhoto(o);
-    if (src) {
-      const dataUrl = await vmrPhoto(src);
-      if (dataUrl) {
-        const b64 = dataUrl.split(',')[1];
-        const bin = atob(b64); const arr = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        img = /png/i.test(dataUrl.slice(0, 30)) ? await pdf.embedPng(arr) : await pdf.embedJpg(arr);
-      }
-    }
-  } catch (_) { img = null; }
-
-  const hBloc = img ? 96 : 62;
-  page.drawRectangle({ x: M, y: y - hBloc, width: W, height: hBloc, borderColor: TRAIT, borderWidth: 1, color: rgb(0.985, 0.985, 0.985) });
-  const px = M + 12;
-  let tx = px;
-  if (img) {
-    const côté = 72;
-    const r = Math.min(côté / img.width, côté / img.height);
-    page.drawImage(img, { x: px, y: y - hBloc + (hBloc - img.height * r) / 2, width: img.width * r, height: img.height * r });
-    tx = px + côté + 12;
-  }
-  const largeTitre = W - (tx - M) - 12;
-  // ⚠️ Trois lignes empilées : sans photo le bloc fait 62 px, il faut resserrer
-  // SANS chevaucher (la 1re version écrivait le montant par-dessus la marque).
-  const yT = y - (img ? 26 : 20), yS = y - (img ? 45 : 36), yP = y - (img ? 70 : 54);
-  txt(coupe(o.title || '—', 12, bold, largeTitre), tx, yT, 12, bold, NOIR);
-  const sousLigne = [];
-  if (opts.numero) sousLigne.push('N° ' + opts.numero);
-  const taille = extractSize(o.title || ''); if (taille) sousLigne.push('Pointure ' + taille);
-  const marque = extractBrand(o.title || ''); if (marque) sousLigne.push(marque);
-  if (sousLigne.length) txt(coupe(sousLigne.join('  ·  '), 10, reg, largeTitre), tx, yS, 10, reg, GRIS);
-  const montant = o.price?.amount != null ? `${Number(o.price.amount).toFixed(2).replace('.', ',')} ${o.price.currency_code === 'EUR' ? '€' : o.price.currency_code || ''}` : '—';
-  txt('Payé ' + montant, tx, yP, img ? 16 : 14, bold, ACC);
-  y -= hBloc + 24;
-
-  // ── LE DÉTAIL, en deux colonnes : ça tient sur une page et ça se lit vite ─
-  const duo = (l1, v1, l2, v2) => {
-    const xc = M + W / 2;
-    txt(l1, M, y, 8.5, reg, GRIS); txt(coupe(v1 == null || v1 === '' ? '—' : v1, 11, reg, W / 2 - 14), M, y - 14, 11, reg, NOIR);
-    if (l2 != null) { txt(l2, xc, y, 8.5, reg, GRIS); txt(coupe(v2 == null || v2 === '' ? '—' : v2, 11, reg, W / 2 - 14), xc, y - 14, 11, reg, NOIR); }
-    y -= 34;
+  const { height } = page.getSize();
+  let y = height - 48;
+  const line = (label, val, o2={}) => {
+    page.drawText(label, { x:32, y, size:9, font:reg, color:rgb(0.45,0.45,0.45) });
+    page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:rgb(0.1,0.1,0.1) });
+    y -= o2.gap || 40;
   };
-  duo("Date d'achat", dte, 'Compte acheteur', opts.account || '—');
-  duo('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—', 'Transaction Vinted', o.transaction_id || '—');
-  if (o.status) duo('Statut Vinted', o.status, null, null);
-
-  // ── MENTION LÉGALE, en pied de page ──────────────────────────────────────
-  const note = opts.regime === 'marge'
-    ? "Achat de seconde main auprès d'un particulier : pas de TVA déductible. À conserver pour le régime de la marge (TVA sur la marge à la revente)."
-    : "Achat de seconde main auprès d'un particulier. Reçu à conserver avec ta comptabilité.";
-  const wrap = (t, max) => { const mots = String(t).split(' '); const out = []; let cur = '';
-    for (const w of mots) { const essai = (cur + ' ' + w).trim(); if (reg.widthOfTextAtSize(essai, 8.5) > max) { if (cur) out.push(cur); cur = w; } else cur = essai; }
-    if (cur) out.push(cur); return out; };
-  let yf = 78;
-  page.drawRectangle({ x: M, y: yf + 26, width: W, height: 1, color: TRAIT });
-  wrap(note, W).forEach((r, i) => txt(r, M, yf - i * 12, 8.5, reg, GRIS));
-  yf -= wrap(note, W).length * 12 + 8;
-  txt('Document généré par VRM le ' + new Date().toLocaleDateString('fr-FR') + " — ce n'est pas la facture officielle Vinted.", M, yf, 7.5, reg, rgb(0.65, 0.65, 0.65));
+  page.drawText('Re\u00e7u d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
+  page.drawText(opts.shop || 'Shop Cancale35', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
+  page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 24;
+  line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
+  line('N° de transaction Vinted', o.transaction_id || '—');
+  line('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—');
+  line('Article', o.title || '—');
+  if (opts.numero) line('N\u00b0 de la paire', `N\u00b0${opts.numero}`);
+  // Virgule decimale : c'est un document comptable francais (le reste est repris tel quel).
+  line('Montant payé (TTC)', o.price?.amount!=null ? `${Number(o.price.amount).toFixed(2).replace('.',',')} ${o.price.currency_code==='EUR'?'€':o.price.currency_code||''}` : '—', { big:true });
+  line('Compte acheteur', opts.account || '—');
+  y -= 6;
+  const note = opts.regime==='marge'
+    ? 'Achat de seconde main \u00e0 un particulier : pas de TVA d\u00e9ductible. \u00c0 conserver pour le r\u00e9gime de la marge (TVA sur la marge \u00e0 la revente).'
+    : 'Re\u00e7u d\'achat \u00e0 conserver avec ta comptabilit\u00e9.';
+  // Retour à la ligne simple.
+  const wrap = (txt, max) => { const words=txt.split(' '); const rows=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>max){ rows.push(cur.trim()); cur=w; } else cur+=' '+w; } if(cur.trim()) rows.push(cur.trim()); return rows; };
+  wrap(note, 62).forEach((r,i)=> page.drawText(r, { x:32, y:y-i*13, size:8.5, font:reg, color:rgb(0.5,0.5,0.5) }));
 
   const bytes = await pdf.save();
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const jour = o.date ? new Date(o.date).toISOString().slice(0, 10) : 'sans-date';
-  a.href = url; a.download = `recu-achat-${jour}-${(o.title || '').replace(/[^\w\-]+/g, '_').slice(0, 28) || o.transaction_id || 'paire'}.pdf`;
+  a.href = url; a.download = `recu-achat-${o.transaction_id || (o.title||'').replace(/[^\w\-]+/g,'_').slice(0,24)}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
 };
 
 // Synchro avec Google Sheets
@@ -9758,7 +9709,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const applyLot = () => {
     const sh = lotShares();
-    Object.entries(sh).forEach(([id,val])=>{ const x=(listings.items||[]).find(y=>y.id===id); if(x) updatePair({id:x.id,title:x.title,photo:x.photo,price:x.price,_acc:x._acc},{buyPrice:String(val).replace('.',','),buyFromId:null}); });
+    Object.entries(sh).forEach(([id,val])=>{ const x=(listings.items||[]).find(y=>y.id===id); if(x) updatePair({id:x.id,title:x.title,photo:x.photo,price:x.price,_acc:x._acc},{buyPrice:String(val).replace('.',','),buyFromId:null,buyFrom:null}); });
     setLotOpen(false);
   };
   const [showReprice, setShowReprice] = useState(true); // panneau repricing déplié
@@ -9827,7 +9778,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a,b) => (b._score - a._score) || (new Date(b.date||0) - new Date(a.date||0)));
     setPurchasesPick({loading:false,items:out});
   };
-  const choosePick = (p) => { const price=p.price?.amount!=null?Number(p.price.amount):null; updatePair(pickerFor,{buyPrice:price!=null?String(price):'',buyFromId:p.transaction_id?String(p.transaction_id):null}); setPickerFor(null); };
+  // ⚠️ ON GARDE UN INSTANTANÉ DE L'ACHAT sur la paire (`buyFrom`), pas seulement
+  // son n° de transaction. Sans lui, réafficher « l'achat relié » (photo, reçu)
+  // depuis l'écran Annonces obligerait à recharger les ~700 achats de tous les
+  // comptes à chaque ouverture — exactement le trou d'égress de §34. Ici la
+  // donnée est déjà sous la main au moment du clic : 6 champs courts, écrits une
+  // fois, et le reçu d'achat reste générable même hors ligne.
+  const choosePick = (p) => {
+    const price = p.price?.amount!=null ? Number(p.price.amount) : null;
+    updatePair(pickerFor, {
+      buyPrice: price!=null?String(price):'',
+      buyFromId: p.transaction_id?String(p.transaction_id):null,
+      buyFrom: {
+        title: p.title||'', date: p.date||'', photo: orderPhoto(p)||'',
+        price: price, devise: p.price?.currency_code||'EUR',
+        seller: p.seller||p.user_login||'', status: p.status||'',
+        account: accNameOf(p._acc)||'',
+      },
+    });
+    setPickerFor(null);
+  };
+  // L'achat relié à une paire, tel qu'on peut l'AFFICHER : la commande vivante
+  // si elle est déjà chargée (statut à jour), sinon l'instantané pris au lien.
+  // Renvoie toujours la forme d'une commande Vinted, pour que `orderPhoto` et
+  // `generateAchatJustificatif` la lisent sans cas particulier.
+  const achatRelie = (e) => {
+    if (!e || !e.buyFromId) return null;
+    const live = (buys.items||[]).find(b => String(b.transaction_id)===String(e.buyFromId));
+    if (live) return live;
+    const s = e.buyFrom;
+    if (!s) return null;
+    return { transaction_id: e.buyFromId, title: s.title, date: s.date, status: s.status,
+             seller: s.seller, photo: s.photo ? { url: s.photo } : null,
+             price: s.price!=null ? { amount: s.price, currency_code: s.devise||'EUR' } : null,
+             _snapshot: true, _accName: s.account };
+  };
+  // Le bloc « achat relié » : photo de l'achat, prix payé, et SON reçu.
+  // Le même sur l'écran Annonces et sur les lignes de vente — une seule
+  // définition, sinon les deux écrans finissent par ne plus dire la même chose (§11).
+  const AchatRelie = ({ entry, numero }) => {
+    const a = achatRelie(entry);
+    if (!a) return null;
+    const ph = orderPhoto(a);
+    return (
+      <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:10,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
+        <div style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          {ph ? <img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
+        </div>
+        <div style={{flex:'1 1 90px',minWidth:0}}>
+          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}>{a.title||'Achat relié'}</div>
+          <div style={{fontSize:10,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+            Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')} ${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
+          </div>
+        </div>
+        <button type="button" onClick={()=>generateAchatJustificatif(a,{ account:a._accName||accNameOf(a._acc), regime:load('vinted_regime','micro'), numero:numero||'' })}
+          title="Reçu d'achat PDF (avec le N° de la paire)" aria-label="Reçu d'achat"
+          style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:9,background:C.bg,color:C.text,cursor:'pointer',fontSize:11,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}><Icon name="doc" size={14}/> Reçu</button>
+      </div>
+    );
+  };
   const [vFilter, setVFilter] = useState('all'); // encours | finalisees | annulees | all
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
@@ -13380,6 +13389,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:9,color:INV_STATUS.online.color,fontWeight:600,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
                  </div>
                )}
+               {/* « je veux que ça fasse également ça dans les ventes, donc avec le
+                   numéro et l'achat qui correspond » — le N° est dans le titre de la
+                   ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
+                   identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
+               {!hidden && <div style={{marginTop:8}}><AchatRelie entry={e} numero={num}/></div>}
               </div>
             );
           })}
@@ -14405,11 +14419,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <input value={num} onChange={ev=>updatePair(item,{numero:ev.target.value})} onBlur={ev=>recordUsed(ev.target.value)} placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                   </div>
                   <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
-                    <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                   <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
                 </div>
+                {/* L'achat relié, avec SA photo et SON reçu — demande de Julien :
+                    « quand l'annonce est en ligne, pouvoir relier un achat avec la
+                    photo de l'achat ainsi que sa facture d'achat ». */}
+                <div style={{padding:'0 10px'}}><AchatRelie entry={e} numero={num}/></div>
                 {num && (
                   <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>💡 boost</span>

@@ -670,10 +670,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Une offre, sur TON clic uniquement (jamais en arrière-plan).
           if (msg.action === 'offre') { const r = await repondreOffre(msg); sendResponse(r); return; }
           // Générer un bordereau (formalité obligatoire, aucun argent engagé).
-          // ⚠️ UN CLIC = UN BORDEREAU, volontairement. Une version « générer mes
-          //    25 sélectionnés » a été écrite puis retirée : 25 PUT enchaînés
-          //    depuis un seul clic, c'est la rafale qu'on refuse partout ailleurs
-          //    (§32/§43). Ici chaque requête correspond à un geste réel.
+          // ⚠️ UN MESSAGE = UN BORDEREAU, volontairement. Le panneau sait
+          //    traiter une SÉLECTION, mais il envoie un message par vente et
+          //    ATTEND la réponse avant la suivante : le service worker ne reçoit
+          //    donc jamais un lot à lâcher d'un coup. C'est ce qui différencie
+          //    une file séquentielle d'une rafale (§32/§43), et le plafond de
+          //    20 actions/h par compte (`garde`) reste le vrai garde-fou.
           if (msg.action === 'genererBord') {
             // Un clic = un bordereau : on génère, puis on va CHERCHER le PDF et
             // on l'envoie dans l'app. Le compte rendu remonte au panneau pour
