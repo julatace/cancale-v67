@@ -8612,6 +8612,10 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // Tout passe désormais par ces fonctions, module-level, lisibles de partout.
 const colisKey = (t) => String((t && (t.suivi || t.subject)) || '').trim();
 const PICKUP_MAX_DAYS = 14;   // au-delà, un point relais a forcément rendu le colis
+// Combien de temps on affiche un colis coché « retiré » en gris, le temps que
+// Vinted enregistre le retrait. Au-delà on n'attend plus : la ligne s'efface,
+// sinon un statut Vinted qui ne bouge jamais encombrerait la liste pour toujours.
+const PICKUP_CONFIRM_DAYS = 7;
 const loadCollected = () => new Set((load('vrm_colis_collected', []) || []).map(String));
 const isColisActive = (t, collected) => {
   if (!t || t.status !== 'available') return false;
@@ -9922,6 +9926,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { alive = false; };
   }, []);
   const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev,[k]:new Date().toISOString()}; save('vinted_pickup_done',u); return u; }); };
+  const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
   const [bordsHidden, setBordsHidden] = useState(() => load('vinted_bords_hidden', {}));
@@ -9969,9 +9974,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const emailList = (tracking || []).filter(t => isColisRetirable(t, collected) && !colisRetireAilleurs(t, retires));
     const seen = new Set(emailList.map(t => normTitle(t.artTitle || t.article || t.modele || '')).filter(Boolean));
     const extra = vintedToPickup.filter(o => { const n = normTitle(o.title || ''); return !n || !seen.has(n); });
-    return { emailList, extra, total: emailList.length + extra.length };
+    // ── « JE L'AI RETIRÉ » : GRISÉ, PAS DISPARU ───────────────────────────────
+    // Idée de Julien, et c'est la bonne : cocher ✓ faisait disparaître le colis
+    // d'un coup, alors que Vinted, lui, dit encore « déposé en point relais ».
+    // Mesuré : sur une capture vieille de 2 h, ses deux colis récupérés étaient
+    // TOUJOURS « déposés » côté Vinted — ce n'est donc pas un retard de
+    // l'extension, c'est Vinted qui met du temps à enregistrer le retrait.
+    // Tant qu'il n'a pas confirmé, on garde la ligne EN GRIS : on voit que c'est
+    // fait, on peut annuler si on s'est trompé, et ça sort tout seul dès que
+    // Vinted est d'accord. Ça ne compte JAMAIS dans le total.
+    const attente = buysBase.filter(o => {
+      const k = String(o.transaction_id || ''); if (!k) return false;
+      const quand = pickupDone[k]; if (!quand) return false;          // pas coché
+      if (!isAtRelayStatus(o.status)) return false;                   // Vinted a confirmé → plus rien à montrer
+      const j = (Date.now() - new Date(quand).getTime()) / 86400000;
+      return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;                 // au-delà, on n'attend plus
+    });
+    return { emailList, extra, attente, total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, vintedToPickup]);
+  }, [tracking, collected, vintedToPickup, buysBase, pickupDone]);
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
@@ -13565,7 +13586,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ))}
                 </div>
               )}
-              <div style={{fontSize:11,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — ou ça se met à jour tout seul.</div>
+              {/* Colis cochés « retiré » que Vinted n'a pas encore confirmés :
+                  on les garde EN GRIS plutôt que de les faire disparaître d'un
+                  coup — on voit que c'est fait, et on peut annuler. Ils sortent
+                  tout seuls dès que Vinted enregistre le retrait. */}
+              {pickupUnion.attente.length>0 && (
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:C.muted,marginBottom:8}}>✓ {pickupUnion.attente.length} retiré{pickupUnion.attente.length>1?'s':''} — Vinted n'a pas encore enregistré</div>
+                  {pickupUnion.attente.map((o,i)=>(
+                    <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7,opacity:0.55}}>
+                      {thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}
+                      <div style={{flex:'1 1 150px',minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>
+                      </div>
+                      <button type="button" onClick={()=>unmarkPickupDone(o)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{fontSize:11,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — il passe en gris le temps que Vinted l'enregistre, puis disparaît tout seul.</div>
             </div>
           );
         })()}

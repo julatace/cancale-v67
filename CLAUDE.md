@@ -2748,3 +2748,23 @@ Julien demande de « supprimer l'achat en attente » quand le colis est retiré.
 
 ### ⚠️ Le correctif ne répare pas les 5 lignes déjà en base
 Elles gardent leur statut `delivered` (l'email ne repassera pas, et le corps brut n'est pas conservé). Elles datent du 28/07 au 06/08 : au-delà des 14 jours, elles seraient de toute façon écartées. **La protection vaut pour les prochains colis.**
+
+### 5.37 (suite) — « J'ai retiré mes colis, ils sont encore là » : GRISÉ, PAS DISPARU
+
+Julien : « j'ai reçu les deux colis, je suis allé les retirer, ils sont encore dans l'application… est-ce que ça peut être fait en automatique ? Ça peut peut-être griser en attendant que l'extension vérifie par elle-même ».
+
+### ⚠️ Ce n'est PAS un retard de l'extension — mesuré avant de coder
+| paire | statut Vinted | fraîcheur de la capture |
+|---|---|---|
+| Salomon XT-6 | « La livraison n'a pas encore eu lieu — colis déposé en point relais » | **2 h** |
+| Adidas 37,5 | idem | 18 h |
+
+**Vinted lui-même dit encore « déposé », sur une capture vieille de 2 heures.** L'automatique existe déjà et fonctionne (`isAtRelayStatus` cesse de compter dès « Commande livrée ! ») — ce qui traîne, c'est le relais qui remonte le retrait à Vinted, pas la capture. On ne peut pas aller plus vite sans une autre source, et il n'y en a pas (l'email de retrait n'est rattachable à aucun achat, §5.37 précédent).
+
+### Sa proposition était la bonne
+Cocher ✓ faisait **disparaître** la ligne d'un coup. Désormais elle reste **en gris**, barrée, avec « Tu l'as coché récupéré · Vinted dit encore "déposé" — ça se règle tout seul » et un bouton **↺ Remettre**.
+- Elle **ne compte jamais** dans le total (le compteur reste juste).
+- Elle **sort toute seule** dès que Vinted enregistre le retrait — c'est l'extension qui confirme, exactement ce qu'il demandait.
+- `PICKUP_CONFIRM_DAYS = 7` : au-delà on n'attend plus, sinon un statut Vinted qui ne bouge jamais encombrerait la liste pour toujours.
+
+**Vérifié au banc** (les 3 vraies transactions « déposées » cochées comme récupérées) : le compteur passe de 4 à **2 colis à retirer**, et le bloc gris affiche « ✓ 2 retirés — Vinted n'a pas encore enregistré » avec les deux vraies paires et leur bouton ↺. Smoke 12 écrans **0 PAGEERROR**, banc email 15/15, cohérence 6 règles / 0 désaccord.
