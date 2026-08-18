@@ -406,9 +406,23 @@ function parseCarrierEmail(mail, carrier) {
   }
   if (!suivi) { const m = all.match(/\b(\d{8,14})\b/); if (m) suivi = m[1]; }
 
-  // Étape du colis (du plus avancé au moins avancé)
+  // ── ÉTAPE DU COLIS ────────────────────────────────────────────────────────
+  // ⚠️ LE SUJET TRANCHE AVANT LE CORPS. Mesuré en base : 5 emails Mondial Relay
+  // « Votre colis 60385202 est DISPONIBLE » étaient classés `delivered` — donc
+  // 5 colis réellement à retirer avaient disparu de la liste, et au bout de 14 j
+  // ils repartent chez l'expéditeur. Cause : le classement lisait TOUT le texte,
+  // or le corps d'un email « disponible » contient les consignes de retrait
+  // (« venez récupérer votre colis », « à retirer avec ce code »…) qui font
+  // matcher les motifs de « déjà retiré ».
+  // Le SUJET, lui, dit l'état COURANT — c'est pour ça que le transporteur l'écrit.
   const t = all.toLowerCase();
+  const suj = String(mail.subject || '').toLowerCase();
   let status = 'info', label = 'Mise à jour';
+  const SUJ_RETIRE = /a\s+[ée]t[ée]\s+(?:retir[ée]|livr[ée]|remis)|colis\s+retir[ée]|livraison\s+de\s+votre\s+colis|bien\s+re[çc]u/;
+  const SUJ_DISPO  = /disponible|à\s+retirer|a\s+retirer|arriv[ée]\s+(?:en|au|dans)|vous\s+attend|pr[êe]t/;
+  if (suj && SUJ_RETIRE.test(suj))      { status = 'delivered'; label = 'Livré / retiré'; }
+  else if (suj && SUJ_DISPO.test(suj))  { status = 'available'; label = 'Arrivé au point de retrait'; }
+  else
   // Priorité STRICTE : livré/retiré > disponible > en transit. Les trois sont
   // mutuellement exclusifs — sinon un email « colis retiré » qui contient aussi
   // l'historique du trajet (« déposé », « pris en charge », « acheminement »)
