@@ -9709,7 +9709,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const applyLot = () => {
     const sh = lotShares();
-    Object.entries(sh).forEach(([id,val])=>{ const x=(listings.items||[]).find(y=>y.id===id); if(x) updatePair({id:x.id,title:x.title,photo:x.photo,price:x.price,_acc:x._acc},{buyPrice:String(val).replace('.',','),buyFromId:null}); });
+    Object.entries(sh).forEach(([id,val])=>{ const x=(listings.items||[]).find(y=>y.id===id); if(x) updatePair({id:x.id,title:x.title,photo:x.photo,price:x.price,_acc:x._acc},{buyPrice:String(val).replace('.',','),buyFromId:null,buyFrom:null}); });
     setLotOpen(false);
   };
   const [showReprice, setShowReprice] = useState(true); // panneau repricing déplié
@@ -9778,7 +9778,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a,b) => (b._score - a._score) || (new Date(b.date||0) - new Date(a.date||0)));
     setPurchasesPick({loading:false,items:out});
   };
-  const choosePick = (p) => { const price=p.price?.amount!=null?Number(p.price.amount):null; updatePair(pickerFor,{buyPrice:price!=null?String(price):'',buyFromId:p.transaction_id?String(p.transaction_id):null}); setPickerFor(null); };
+  // ⚠️ ON GARDE UN INSTANTANÉ DE L'ACHAT sur la paire (`buyFrom`), pas seulement
+  // son n° de transaction. Sans lui, réafficher « l'achat relié » (photo, reçu)
+  // depuis l'écran Annonces obligerait à recharger les ~700 achats de tous les
+  // comptes à chaque ouverture — exactement le trou d'égress de §34. Ici la
+  // donnée est déjà sous la main au moment du clic : 6 champs courts, écrits une
+  // fois, et le reçu d'achat reste générable même hors ligne.
+  const choosePick = (p) => {
+    const price = p.price?.amount!=null ? Number(p.price.amount) : null;
+    updatePair(pickerFor, {
+      buyPrice: price!=null?String(price):'',
+      buyFromId: p.transaction_id?String(p.transaction_id):null,
+      buyFrom: {
+        title: p.title||'', date: p.date||'', photo: orderPhoto(p)||'',
+        price: price, devise: p.price?.currency_code||'EUR',
+        seller: p.seller||p.user_login||'', status: p.status||'',
+        account: accNameOf(p._acc)||'',
+      },
+    });
+    setPickerFor(null);
+  };
+  // L'achat relié à une paire, tel qu'on peut l'AFFICHER : la commande vivante
+  // si elle est déjà chargée (statut à jour), sinon l'instantané pris au lien.
+  // Renvoie toujours la forme d'une commande Vinted, pour que `orderPhoto` et
+  // `generateAchatJustificatif` la lisent sans cas particulier.
+  const achatRelie = (e) => {
+    if (!e || !e.buyFromId) return null;
+    const live = (buys.items||[]).find(b => String(b.transaction_id)===String(e.buyFromId));
+    if (live) return live;
+    const s = e.buyFrom;
+    if (!s) return null;
+    return { transaction_id: e.buyFromId, title: s.title, date: s.date, status: s.status,
+             seller: s.seller, photo: s.photo ? { url: s.photo } : null,
+             price: s.price!=null ? { amount: s.price, currency_code: s.devise||'EUR' } : null,
+             _snapshot: true, _accName: s.account };
+  };
+  // Le bloc « achat relié » : photo de l'achat, prix payé, et SON reçu.
+  // Le même sur l'écran Annonces et sur les lignes de vente — une seule
+  // définition, sinon les deux écrans finissent par ne plus dire la même chose (§11).
+  const AchatRelie = ({ entry, numero }) => {
+    const a = achatRelie(entry);
+    if (!a) return null;
+    const ph = orderPhoto(a);
+    return (
+      <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:10,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
+        <div style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          {ph ? <img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
+        </div>
+        <div style={{flex:'1 1 90px',minWidth:0}}>
+          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}>{a.title||'Achat relié'}</div>
+          <div style={{fontSize:10,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+            Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')} ${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
+          </div>
+        </div>
+        <button type="button" onClick={()=>generateAchatJustificatif(a,{ account:a._accName||accNameOf(a._acc), regime:load('vinted_regime','micro'), numero:numero||'' })}
+          title="Reçu d'achat PDF (avec le N° de la paire)" aria-label="Reçu d'achat"
+          style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:9,background:C.bg,color:C.text,cursor:'pointer',fontSize:11,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}><Icon name="doc" size={14}/> Reçu</button>
+      </div>
+    );
+  };
   const [vFilter, setVFilter] = useState('all'); // encours | finalisees | annulees | all
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
@@ -13331,6 +13389,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:9,color:INV_STATUS.online.color,fontWeight:600,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
                  </div>
                )}
+               {/* « je veux que ça fasse également ça dans les ventes, donc avec le
+                   numéro et l'achat qui correspond » — le N° est dans le titre de la
+                   ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
+                   identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
+               {!hidden && <div style={{marginTop:8}}><AchatRelie entry={e} numero={num}/></div>}
               </div>
             );
           })}
@@ -14356,11 +14419,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <input value={num} onChange={ev=>updatePair(item,{numero:ev.target.value})} onBlur={ev=>recordUsed(ev.target.value)} placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                   </div>
                   <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
-                    <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                   <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
                 </div>
+                {/* L'achat relié, avec SA photo et SON reçu — demande de Julien :
+                    « quand l'annonce est en ligne, pouvoir relier un achat avec la
+                    photo de l'achat ainsi que sa facture d'achat ». */}
+                <div style={{padding:'0 10px'}}><AchatRelie entry={e} numero={num}/></div>
                 {num && (
                   <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>💡 boost</span>

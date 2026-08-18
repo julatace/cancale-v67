@@ -2634,3 +2634,16 @@ Plainte : « je n'ai plus les notifications dans l'app ». Ma première sonde de
 
 ### Vérifié
 `npm run build` OK · smoke app 12 écrans sur les vraies données : **0 PAGEERROR** · cloche ouverte au banc : contenu conforme aux chiffres de la base (37 non lus, 3 à expédier).
+
+### 5.36 (suite) — L'ACHAT RELIÉ : sa photo et SON reçu, sur l'annonce ET sur la vente
+
+Julien : « quand l'annonce est en ligne, pouvoir relier un achat à la vente, donc avec la photo de l'achat ainsi que sa facture d'achat générée par l'application… et je veux que ça fasse également ça dans les ventes, avec le numéro et l'achat qui correspond ».
+
+Le sélecteur d'achat (§5.23) montrait déjà la photo **au moment de choisir**, puis tout disparaissait : il ne restait qu'un prix dans un champ. Rien ne disait *quel* achat était relié, et son reçu n'était atteignable que depuis l'onglet Achats.
+
+- **`AchatRelie`** (composant unique, utilisé aux DEUX endroits — §11 : une seule définition, sinon les deux écrans finissent par ne plus dire la même chose) : vignette de l'achat, titre, « Acheté X € · date », et un bouton **📄 Reçu** qui génère le reçu d'achat **avec le N° de la paire**.
+- **⚠️ Un INSTANTANÉ de l'achat est écrit sur la paire au moment du lien** (`buyFrom` : titre, date, photo, prix, vendeur, compte). Sans lui, réafficher le bloc obligerait à recharger les ~700 achats de tous les comptes à chaque ouverture de l'écran Annonces — exactement le trou d'égress de §34. La donnée est déjà sous la main au clic : 6 champs courts, écrits une fois, et le reçu reste générable hors ligne. `achatRelie(e)` préfère la commande vivante quand elle est déjà chargée (statut à jour), sinon l'instantané.
+- Saisir un prix d'achat **à la main** efface le lien ET l'instantané (`buyFromId:null, buyFrom:null`) : sinon la carte affichait un achat qui n'avait plus rien à voir avec le chiffre saisi.
+- Sur les ventes, l'entrée vient de `effEntry(o)` → identité certaine (id Vinted, sinon photo, §5.34) — **jamais un rapprochement par titre**.
+
+**Vérifié au banc sur les vraies données** (fixture de banc : un achat relié à chaque paire numérotée, jamais écrite en base) : **25 blocs sur Annonces** (= les 25 annonces en ligne), **57 sur Ventes**, et le bouton 📄 télécharge un vrai PDF dont le contenu décompressé porte `N° de la paire | N°36` — le numéro de la paire vendue, pas celui de la transaction. **0 PAGEERROR** · smoke 12 écrans : **0 PAGEERROR, 0 artefact d'affichage**.
