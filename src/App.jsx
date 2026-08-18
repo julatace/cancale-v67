@@ -1443,10 +1443,35 @@ const CARRIERS = {
 // Ce qu'il faut présenter au comptoir pour CE colis, selon son transporteur ET
 // ce qu'on a réellement reçu. Une seule règle, utilisée partout (modale de
 // retrait, carte relais). Renvoie { mode:'qr'|'code'|'numero'|'home', ... }.
+// ⚠️ UNE URL D'IMAGE D'EMAIL N'EST PAS FORCÉMENT UN QR — et 21 lignes déjà en
+// base en portent une fausse : 9 pixels de tracking
+// (`tracking.network1.pickup.fr/tracking/1/open/…`) et des bannières marketing.
+// Elles ne seront JAMAIS réécrites (l'email ne repassera pas), donc le filtre
+// doit exister ICI, à la lecture, pas seulement dans `api/email-inbound.js`.
+// Sans lui, devant la consigne Pickup l'app affiche une image invisible à la
+// place du Pickup Pass. Même liste noire des deux côtés.
+// Mesuré sur les 25 `qrUrl` réellement en base : 14 mouchards/bannières évidents,
+// et 11 fois la MÊME illustration marketing Chronopost
+// (`avn-webexternal.azureedge.net/avn-prod/FRA_DROPOFF_PICKUP_PARCEL`) — un
+// dessin de dépôt de colis, affiché jusqu'ici comme « le QR à scanner ».
+const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banniere|banni[eè]re|logo|header|footer|enquete|enqu[eê]te|satisfaction|unsubscribe|desabonn|d[eé]sabonn|facebook|instagram|twitter|linkedin|youtube|email-messaging\.com|avn-prod|azureedge|drop[_-]?off|dropoff|_parcel|illustration|visuel|\.svg(\?|$)/i;
+// ⚠️ UN CODE DE RETRAIT EST NUMÉRIQUE — et une ligne en base porte le mot
+// « suivant » comme code (capté par un ancien motif trop large). Elle ne sera
+// jamais réécrite : le filtre doit donc vivre ici aussi. Mieux vaut n'afficher
+// aucun code qu'un mot inventé devant le comptoir.
+const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^\d{3,10}$/.test(c) ? c : ''; };
+// L'image de QR réellement affichable pour ce colis (pièce jointe d'abord, puis
+// URL hébergée si elle est plausible). `null` = on n'affiche AUCUNE image.
+const qrImage = (t) => {
+  if (!t) return null;
+  if (t.qrB64) return `data:${t.qrType || 'image/png'};base64,${t.qrB64}`;
+  if (t.qrUrl && !URL_PAS_UN_QR.test(t.qrUrl)) return t.qrUrl;
+  return null;
+};
 const retraitMode = (t) => {
   const c = CARRIERS[carrierKey(t && t.carrier)] || {};
-  const qr = (t && (t.qrB64 || t.qrUrl)) || null;
-  const code = (t && t.code && String(t.code).trim()) || '';
+  const qr = qrImage(t);
+  const code = codeRetrait(t && t.code);
   const pref = c.retrait || 'auto';
   if (pref === 'home') return { mode: 'home', carrier: c.name || 'Transporteur' };
   if (pref === 'qr'   && qr)   return { mode: 'qr',   qr, code, carrier: c.name };
@@ -8596,7 +8621,7 @@ const isColisActive = (t, collected) => {
 };
 // Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller, ou on a
 // un code de retrait). Écarte les lignes de suivi parasites.
-const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || /^\d{3,8}$/.test(String((t && t.code) || '').trim()));
+const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || !!codeRetrait(t && t.code));
 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
@@ -9382,13 +9407,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pt = normTitle(t.artTitle || t.article || t.modele || '');
     const ph = pt ? (buysBase.find(o => normTitle(o.title || '') === pt && orderPhoto(o)) || {}) : {};
     const base = {
-      title: t.artTitle || (t.subject || 'Colis'), code: t.code || '', code2: t.code2 || '', suivi: t.suivi || '',
+      title: t.artTitle || (t.subject || 'Colis'), code: codeRetrait(t.code), code2: codeRetrait(t.code2), suivi: t.suivi || '',
+      limite: t.limite || '', consigne: !!t.consigne,
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
       photo: t.photo || orderPhoto(ph) || null,
       mode: r.mode, _t: t,
     };
     if (r.mode === 'qr' && t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
-    if (r.mode === 'qr' && t.qrUrl) { setQrView({ ...base, img: t.qrUrl, real: true, hosted: true }); return; }
+    if (r.mode === 'qr' && !t.qrB64 && qrImage(t)) { setQrView({ ...base, img: qrImage(t), real: true, hosted: true }); return; }
     setQrView({ ...base, img: null, real: false });
   };
   // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
@@ -13411,7 +13437,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(()=>{
           const avail = pickupUnion.emailList;   // colis avec CODE/lieu (email transporteur)
           const extra = pickupUnion.extra;       // colis « déposé » (statut Vinted) sans code encore
-          const okCode = (c) => { const s = String(c||'').trim(); return /^\d{3,8}$/.test(s) ? s : null; };
+          // (la règle « un code de retrait est numérique » vit au niveau module :
+          //  `codeRetrait`. Trois copies traînaient, c'est le doublon que §11 interdit.)
           if (!avail.length && !extra.length) return null;
           // Photo de la paire par titre : les achats moissonnés portent la vraie
           // photo Vinted → on la montre à côté du code de retrait (savoir quelle
@@ -13460,19 +13487,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
                   </div>
                   {g.colis.map((t,i)=>{
-                    const code=okCode(t.code);
+                    const code=codeRetrait(t.code);
+                    const ident=codeRetrait(t.code2);   // consigne Pickup : identifiant du casier
+                    // ⚠️ AU CASIER IL FAUT LES DEUX NOMBRES. N'afficher que le code
+                    //    d'ouverture ne permet PAS d'ouvrir la porte — défaut vu au
+                    //    rendu réel, pas à la relecture. Et une consigne n'a pas de
+                    //    comptoir : le geste n'est pas le même, le texte non plus.
+                    const casier = !!t.consigne || !!ident;
+                    const jours = t.limite ? Math.ceil((new Date(t.limite+'T23:59:59') - Date.now())/86400000) : null;
                     return (
                       <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
                         {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                           <div style={{fontSize:11,fontWeight:600,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}{g.guessed?<span style={{color:C.muted,fontWeight:600}}> (relais habituel)</span>:''}</div>
-                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{code?'Donne ce code au comptoir 👉':'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
+                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{code?(casier?'Saisis ces nombres sur le casier 👉':'Donne ce code au comptoir 👉'):'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
+                          {/* DATE LIMITE : passé cette date le colis repart chez
+                              l'expéditeur. Captée dans l'email, jamais déduite. */}
+                          {jours!=null && (
+                            <div style={{fontSize:11,fontWeight:jours<=2?700:600,color:jours<=2?C.danger:C.warn,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {jours<0?'⚠️ délai de retrait dépassé':jours===0?'⏰ dernier jour pour le retirer':jours===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} · ${jours} j`}
+                            </div>
+                          )}
                         </div>
-                        {code && (
-                          <div style={{flexShrink:0,textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 13px'}}>
-                            <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Code</div>
-                            <div style={{fontSize:22,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{code}</div>
+                        {(code||ident) && (
+                          <div style={{flexShrink:0,display:'flex',gap:6}}>
+                            {ident && (
+                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 11px'}}>
+                                <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div>
+                                <div style={{fontSize:22,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{ident}</div>
+                              </div>
+                            )}
+                            {code && (
+                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 11px'}}>
+                                <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{ident?"Code d'ouverture":'Code'}</div>
+                                <div style={{fontSize:22,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{code}</div>
+                              </div>
+                            )}
                           </div>
                         )}
                         <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'8px 11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
@@ -13598,8 +13649,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:2,WebkitOverflowScrolling:'touch'}}>
                   {avail.map((t,i)=>(
                     <button key={i} type="button" onClick={()=>openQrView(t)} title="Afficher le QR/code en grand" style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:3,border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'7px 9px',cursor:'pointer',fontFamily:'inherit',minWidth:70}}>
-                      <div style={{width:44,height:44,borderRadius:6,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{t.qrB64?<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:t.qrUrl?<img src={t.qrUrl} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:20}}>🎫</span>}</div>
-                      <span style={{fontSize:9,color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{t.code?t.code:(t.suivi?'n°'+String(t.suivi).slice(-5):'Retrait')}</span>
+                      <div style={{width:44,height:44,borderRadius:6,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{qrImage(t)?<img src={qrImage(t)} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:20}}>🎫</span>}</div>
+                      <span style={{fontSize:9,color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{codeRetrait(t.code)||(t.suivi?'n°'+String(t.suivi).slice(-5):'Retrait')}</span>
                     </button>
                   ))}
                 </div>
@@ -13681,21 +13732,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
-                            <div style={{fontSize:11,color:C.muted}}>{carrierName(t.carrier)}{t.suivi?` · ${t.suivi}`:''}{t.account?` · ${t.account}`:''}</div>
+                            <div style={{fontSize:11,color:C.muted}}>{carrierName(t.carrier)}{t.consigne?' · consigne':''}{t.suivi?` · ${t.suivi}`:''}{t.account?` · ${t.account}`:''}</div>
+                            {/* DATE LIMITE DE RETRAIT — passé cette date le colis
+                                repart chez l'expéditeur, et rien ne le disait.
+                                Captée dans l'email, jamais déduite : pas de date
+                                dans l'email ⟹ rien d'affiché (§ email-inbound). */}
+                            {t.limite && (()=>{
+                              const j = Math.ceil((new Date(t.limite+'T23:59:59') - Date.now())/86400000);
+                              const urgent = j<=2;
+                              return <div style={{fontSize:11,fontWeight:urgent?700:500,color:urgent?C.danger:C.warn,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                                {j<0?'⚠️ délai dépassé':j===0?"⏰ dernier jour pour le retirer":j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} (${j} j)`}
+                              </div>;
+                            })()}
                           </div>
-                          {t.code&&(
+                          {codeRetrait(t.code)&&(
                             <button type="button" onClick={()=>openQrView(t)} title="Afficher en grand pour scanner" style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:10,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                               <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Code</div>
-                              <div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1.5}}>{t.code}</div>
+                              <div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1.5}}>{codeRetrait(t.code)}</div>
                             </button>
                           )}
                           {/* QR de retrait : UNIQUEMENT le vrai QR de Vinted (qrB64/qrUrl)
                               s'il a été capté. Mondial Relay n'en envoie pas → on ne montre
                               pas de faux QR, le code ci-dessus suffit au comptoir. */}
-                          {(t.qrB64||t.qrUrl)&&(
+                          {qrImage(t)&&(
                             <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
                               style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:10,padding:0,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                              {t.qrB64?<img src={`data:${t.qrType||'image/png'};base64,${t.qrB64}`} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:t.qrUrl?<img src={t.qrUrl} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
+                              {qrImage(t)?<img src={qrImage(t)} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
                             </button>
                           )}
                           <button onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'6px 9px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Retiré</button>
@@ -13905,7 +13967,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {suivi && (st.step===2||st.step===3) && (
                   <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 11px',fontSize:12,fontWeight:600}}>🔍 Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
                 )}
-                {st.step===3 && tk && (tk.qrB64||tk.qrUrl||tk.code) && (
+                {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
                   <button type="button" onClick={()=>openQrView(tk)} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:10,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🎫 Code de retrait</button>
                 )}
                 <div style={{marginLeft:'auto'}}>
@@ -15808,7 +15870,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
                         <div style={{width:32,height:32,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
-                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{t.code&&<div style={{fontSize:11,color:C.muted}}>code {t.code}</div>}</div>
+                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{codeRetrait(t.code)&&<div style={{fontSize:11,color:C.muted}}>code {codeRetrait(t.code)}</div>}</div>
                         <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
                     ); })}
@@ -16202,11 +16264,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
             {qrView.lieu && <div style={{fontSize:12.5,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>📍 {qrView.lieu}</div>}
+            {qrView.limite && (()=>{ const j=Math.ceil((new Date(qrView.limite+'T23:59:59')-Date.now())/86400000);
+              return <div style={{fontSize:12,fontWeight:700,color:j<=2?'#c53030':'#9a5b16',textAlign:'center'}}>
+                {j<0?'⚠️ délai de retrait dépassé':j===0?'⏰ dernier jour pour le retirer':j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(qrView.limite).toLocaleDateString('fr-FR')} · ${j} j`}
+              </div>; })()}
             {qrView.suivi && (qrView.img || qrView.code) && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
             <div style={{fontSize:11,color:'#999',textAlign:'center',lineHeight:1.4}}>
               {(()=>{ const cn=qrView.carrierName||carrierName(qrView.carrier);
                 if(qrView.mode==='home') return `${cn} livre à ton adresse : rien à retirer au comptoir.`;
-                if(qrView.code2) return `Consigne Pickup : scanne le QR au casier, ou saisis l'identifiant + le code d'ouverture.`;
+                if(qrView.code2) return qrView.img
+                  ? `Consigne Pickup : scanne le QR au casier, ou saisis l'identifiant puis le code d'ouverture.`
+                  : `Consigne Pickup : saisis l'identifiant puis le code d'ouverture sur l'écran du casier. Pas de comptoir.`;
+                if(qrView.consigne && qrView.code) return `Consigne Pickup : saisis ce code sur l'écran du casier. Pas de comptoir.`;
                 if(qrView.real) return `QR ${cn} — présente-le au comptoir, le scan suffit.`;
                 if(qrView.code) return `${cn} fonctionne au CODE (pas de QR). Donne ce code au comptoir avec ta pièce d'identité.`;
                 return `Ni QR ni code reçus. Donne le numéro ci-dessus et ta pièce d'identité à ${cn}.`; })()}

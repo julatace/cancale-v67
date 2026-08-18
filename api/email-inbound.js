@@ -423,9 +423,14 @@ function parseCarrierEmail(mail, carrier) {
   if (status === 'available' && !suivi) { status = 'info'; label = 'Info'; }
 
   // Code de retrait (PIN) : « code de retrait : 123456 », « PIN : 1234 »...
-  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)\s*[:\-]?\s*([A-Z0-9]{4,8})\b/i) || [])[1] || null;
+  // ⚠️ UN CODE DE RETRAIT EST NUMÉRIQUE. L'ancien motif acceptait des LETTRES
+  //    (`[A-Z0-9]{4,8}`) : sur un vrai email Chronopost il a capté le mot
+  //    « suivant » et l'a affiché en gros comme code à donner au comptoir
+  //    (vérifié en base, ligne `email_track_chronopost_XW476115185SP`).
+  //    Aucun transporteur observé n'utilise de lettres. On n'accepte que des chiffres.
+  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)\s*[:\-]?\s*(\d{4,10})\b/i) || [])[1] || null;
   if (!code) {
-    const m = all.match(/\bcode\s*[:\-]\s*([A-Z0-9]{4,8})\b/i);
+    const m = all.match(/\bcode\s*[:\-]\s*(\d{4,10})\b/i);
     // garde-fou : ne pas confondre avec un code postal
     if (m && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
   }
@@ -477,15 +482,54 @@ function parseCarrierEmail(mail, carrier) {
   // Consigne Pickup (casier automatique) : « Consigne Pickup <enseigne> » + adresse
   // « RUE … 35260 CANCALE ». Format réel des emails de casier (août 2026).
   if (!lieu) {
-    const mC = all.match(/consigne\s+pickup\s+([^\n]{3,50})/i);
-    if (mC) {
-      const nom = ('Consigne Pickup ' + mC[1]).replace(/\s{2,}/g, ' ').replace(/[.,;\s]+$/, '').trim();
-      const mA = all.match(/((?:\d{1,4}\s+)?(?:rue|avenue|av\.|boulevard|bd|impasse|chemin|place|route|all[ée]e)\s[^\n]{2,50}?\b\d{5}\s+[A-Za-zÀ-ÿ' -]{2,40})/i);
-      lieu = mA ? `${nom}, ${mA[1].replace(/\s{2,}/g, ' ').trim()}` : nom;
+    // ⚠️ On travaille LIGNE PAR LIGNE sur le texte, pas sur `all` (qui contient le
+    //    sujet et tout le HTML). Sans ça, « Votre colis est arrivé en consigne
+    //    Pickup » du sujet gagnait, et le lieu devenait une phrase — défaut trouvé
+    //    au banc, pas à la relecture. Le vrai nom est une ligne COURTE (une
+    //    enseigne), suivie de l'adresse sur les lignes d'après.
+    const MOTS_DE_PHRASE = /\b(votre|ton|le|la|les|est|sont|arriv|pr[ée]sent|devant|lecteur|colis|retirer|r[ée]cup)/i;
+    const lignes = txt.split('\n').map(l => l.trim());
+    for (let i = 0; i < lignes.length; i++) {
+      const mL = lignes[i].match(/^consigne\s+pickup\s+(.{2,40})$/i);
+      if (!mL || MOTS_DE_PHRASE.test(mL[1])) continue;
+      const nom = ('Consigne Pickup ' + mL[1]).replace(/\s{2,}/g, ' ').replace(/[.,;\s]+$/, '').trim();
+      const suite = [];
+      for (let j = i + 1; j < lignes.length && suite.length < 2; j++) {
+        const l = lignes[j];
+        if (!l) { if (suite.length) break; else continue; }
+        if (!/\d{5}|rue|avenue|av\.|boulevard|bd|impasse|chemin|place|route|all[ée]e|zone|centre/i.test(l)) break;
+        suite.push(l.replace(/\s+/g, ' '));
+      }
+      lieu = suite.length ? `${nom}, ${suite.join(', ')}` : nom;
+      break;
     }
   }
 
-  return { suivi, status, label, code, code2, artTitle, lieu };
+  // ── DATE LIMITE DE RETRAIT ────────────────────────────────────────────────
+  // « À retirer jusqu'au vendredi 21 août 2026 », « Récupérez votre colis
+  // jusqu'au 21 août 2026 inclus », « jusqu'au 21/08/2026 ». C'est LA donnée qui
+  // manquait : passé cette date le colis repart chez l'expéditeur, et rien dans
+  // l'app ne le disait. On ne la déduit jamais — si l'email ne la donne pas, on
+  // ne met rien (une fausse échéance ferait courir pour rien, ou rater le colis).
+  let limite = null;
+  {
+    const MOIS = { janvier:1, février:2, fevrier:2, mars:3, avril:4, mai:5, juin:6, juillet:7,
+                   août:8, aout:8, septembre:9, octobre:10, novembre:11, décembre:12, decembre:12 };
+    const mTxt = all.match(/jusqu['’]au\s+(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\s*(\d{1,2})\s+([a-zà-ÿ]+)\s+(\d{4})/i);
+    const mNum = all.match(/jusqu['’]au\s+(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/i);
+    if (mTxt) {
+      const mo = MOIS[mTxt[2].toLowerCase()];
+      if (mo) limite = `${mTxt[3]}-${String(mo).padStart(2,'0')}-${String(+mTxt[1]).padStart(2,'0')}`;
+    } else if (mNum) {
+      limite = `${mNum[3]}-${String(+mNum[2]).padStart(2,'0')}-${String(+mNum[1]).padStart(2,'0')}`;
+    }
+  }
+  // Consigne automatique (casier Pickup) ou point relais avec comptoir ? Le geste
+  // n'est pas le même : au casier on saisit identifiant + code d'ouverture (ou on
+  // scanne), au comptoir on présente un code et une pièce d'identité.
+  const consigne = /consigne\s+pickup|casier|locker/i.test(all);
+
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -515,6 +559,29 @@ const isSquareish = (d) => d && d.w >= 60 && d.h >= 60 && Math.abs(d.w - d.h) <=
 //   3. balise <img src="https://…"> hébergée près d'un mot-clé (→ qrUrl)
 //   4. pièce jointe CARRÉE (heuristique QR) si l'email parle de scan/retrait
 //   5. email « à retirer » avec une seule image jointe
+// ⚠️ UNE IMAGE D'EMAIL N'EST PAS UN QR — mesuré sur les 26 emails Chronopost
+// réels : 21 portaient une `qrUrl`, dont **9 pixels de tracking**
+// (`tracking.network1.pickup.fr/tracking/1/open/…`) et le reste des bannières
+// marketing (`FRA_DROPOFF_PICKUP_PARCEL`, `banner-mail-enquete-satisfaction`).
+// CAUSE : l'étape 3 mettait l'URL ELLE-MÊME dans le contexte de mots-clés — or
+// « pickup » est dans toutes les URL Pickup, y compris celle du mouchard. Résultat :
+// devant la consigne, l'app affichait une image invisible à la place du Pickup Pass.
+// Deux verrous désormais : une liste noire d'URL, et un mot-clé FORT exigé dans le
+// HTML autour de l'image (jamais dans l'URL).
+const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banniere|banni[eè]re|logo|header|footer|enquete|enqu[eê]te|satisfaction|unsubscribe|desabonn|d[eé]sabonn|facebook|instagram|twitter|linkedin|youtube|email-messaging\.com|\.svg(\?|$)/i;
+// Mot-clé FORT = celui qui ne peut pas apparaître par hasard dans une URL de suivi.
+const INDICE_QR_FORT = /qr\b|qr[- ]?code|pickup\s*pass|à\s*scanner|a\s*scanner|scannez|scanne\s|code[- ]?barre|barcode|pr[ée]sente[rz]?\s+ce\s+(?:code|pass)/i;
+const imgMinuscule = (balise) => {
+  const w = (balise.match(/\bwidth\s*=\s*["']?(\d+)/i) || [])[1];
+  const h = (balise.match(/\bheight\s*=\s*["']?(\d+)/i) || [])[1];
+  return (w != null && +w <= 4) || (h != null && +h <= 4);   // mouchard 1×1
+};
+function qrUrlPlausible(url, balise, ctx) {
+  if (!url || URL_PAS_UN_QR.test(url)) return false;         // mouchard / bannière
+  if (balise && imgMinuscule(balise)) return false;          // 1×1 invisible
+  return INDICE_QR_FORT.test(ctx || '');                     // le HTML doit le dire
+}
+
 function extractPickupQr(mail, status) {
   const imgs = (mail.attachments || []).filter(a => /image\//i.test(a.contentType || '') && a.contentB64);
   const html = mail.html || '';
@@ -543,8 +610,10 @@ function extractPickupQr(mail, status) {
     const re = /<img[^>]+src=["'](https?:\/\/[^"']+)["'][^>]*>/gi;
     let m;
     while ((m = re.exec(html)) !== null) {
-      const ctx = (html.slice(Math.max(0, m.index - 300), m.index) + ' ' + m[1]).toLowerCase();
-      if (/qr|scanne|à scanner|a scanner|retrait|pickup|barcode|code[- ]?barre/.test(ctx)) {
+      // ⚠️ Le contexte est le HTML AUTOUR de l'image, JAMAIS l'URL : c'est
+      //    exactement ce qui faisait passer un pixel de tracking pour un QR.
+      const ctx = html.slice(Math.max(0, m.index - 260), m.index + 260);
+      if (qrUrlPlausible(m[1], m[0], ctx)) {
         return { qrB64: null, qrType: null, qrUrl: m[1] };
       }
     }
@@ -736,7 +805,7 @@ export async function traiterEmail(req, res) {
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
-      if (!qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle) {
+      if (!qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
         const prev = await supabaseGetRow(rowId);
         if (prev) {
           if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
@@ -744,6 +813,8 @@ export async function traiterEmail(req, res) {
           if (!track.code && prev.code) track.code = prev.code;
           if (!track.code2 && prev.code2) track.code2 = prev.code2;
           if (!track.lieu && prev.lieu) track.lieu = prev.lieu;
+          if (!track.limite && prev.limite) track.limite = prev.limite;
+          if (!track.consigne && prev.consigne) track.consigne = true;
           if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
         }
       }
@@ -751,6 +822,7 @@ export async function traiterEmail(req, res) {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
+        limite: track.limite || null, consigne: !!track.consigne,
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         account: acc.login || '',
       } }]);
