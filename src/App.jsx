@@ -2910,6 +2910,42 @@ function Input({label,...p}) {
     </label>
   );
 }
+/* ── UN CHAMP QUI NE VALIDE QU'À LA SORTIE ─────────────────────────────────
+   ⚠️ Julien : « quand je remplis les prix d'achat, dès que je mets 2 pour
+   mettre 20, ça le rentre et je ne peux plus mettre plus que 2 ».
+   Cause : le champ écrivait à CHAQUE frappe. `updatePair` réécrit
+   `vinted_annonce_numeros`, la grille Annonces se retrie (tri par prix, par
+   N°…), l'input est remonté ailleurs dans le DOM et le focus part — donc on
+   ne pouvait taper qu'un seul caractère.
+   Ici la saisie reste EN LOCAL tant que le champ a le focus ; on ne valide
+   qu'à la sortie du champ ou sur Entrée (Échap annule). Tant qu'on n'écrit
+   pas dedans, il suit la donnée (numéro posé automatiquement, prix repris
+   d'un achat relié…). `onCommit` n'est appelé QUE si la valeur a changé —
+   sinon entrer puis sortir d'un champ prix effacerait l'achat relié. */
+function ChampSaisie({ value, onCommit, style, ...p }) {
+  const [txt, setTxt] = useState(value == null ? '' : String(value));
+  const [actif, setActif] = useState(false);
+  const avantRef = useRef(value == null ? '' : String(value));
+  const annuleRef = useRef(false);
+  useEffect(() => { if (!actif) setTxt(value == null ? '' : String(value)); }, [value, actif]);
+  const sortir = (v) => {
+    setActif(false);
+    if (annuleRef.current) { annuleRef.current = false; setTxt(avantRef.current); return; }
+    if (String(v) !== String(avantRef.current)) onCommit(v, avantRef.current);
+    else setTxt(value == null ? '' : String(value));
+  };
+  return (
+    <input {...p} value={txt} style={style}
+      onFocus={() => { setActif(true); avantRef.current = value == null ? '' : String(value); annuleRef.current = false; }}
+      onChange={ev => setTxt(ev.target.value)}
+      onBlur={ev => sortir(ev.target.value)}
+      onKeyDown={ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur(); }
+        else if (ev.key === 'Escape') { annuleRef.current = true; ev.currentTarget.blur(); }
+      }}
+    />
+  );
+}
 function Card({children,style={}}) {
   return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,...style}}>{children}</div>;
 }
@@ -10596,16 +10632,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //      dans le carton (§19, le risque n°1). On propose le prochain libre.
   // ⚠️ Le contrôle se fait au BLUR, pas à chaque frappe : en tapant « 15 » on
   //    passe par « 1 », qui déclencherait une fausse alerte.
-  const numAvantRef = useRef('');
-  // `avant` = la valeur du champ AU MOMENT OÙ ON L'A OUVERT (mémorisée au
-  // focus) : `onChange` a déjà écrit la nouvelle, on ne pourrait plus la relire.
+  // `avant` = la valeur du champ AU MOMENT OÙ ON L'A OUVERT (mémorisée par
+  // `ChampSaisie` au focus), pour pouvoir la remettre si on refuse le nouveau.
   const poserNumero = async (item, valeur, avant) => {
     const n = String(valeur || '').trim();
+    // Champ vidé : on ne retire JAMAIS un numéro (§5.40, il est écrit sur une
+    // boîte). L'affichage se remet tout seul sur la valeur enregistrée.
     if (!n) return;
     const moi = String(item.id);
     avant = String(avant ?? '');
+    if (n === avant) return;                                   // rien n'a changé
     const autres = Object.keys(numeros).filter(k => k !== moi && String((numeros[k] || {}).numero || '').trim() === n);
-    if (!autres.length) { recordUsed(n); return; }
+    // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
+    //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
+    if (!autres.length) { updatePair(item, { numero: n }); recordUsed(n); return; }
     const presents = (porteursNum[n] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
       const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
@@ -11092,6 +11132,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // On ne propose que pour les annonces numérotées AUTOMATIQUEMENT (un
       // numéro que tu as tapé toi-même n'est jamais remis en cause).
       if (!cur || !cur.auto || !String(cur.numero || '').trim()) continue;
+      // ⚠️ RANGÉE AU GARAGE = LE NUMÉRO EST ÉCRIT SUR LA BOÎTE. Julien : « sois
+      //    sûr que les numéros attribués aux paires ne bougent plus jamais,
+      //    parce que je vais commencer à les mettre dans les boîtes. » Même si
+      //    le numéro vient de l'attribution automatique, dès qu'une case du
+      //    garage le porte, plus rien ne le change tout seul.
+      if ((porteursNum[String(cur.numero)] || []).some(x => x.type === 'garage')) continue;
       const t = normTitle(it.title), sz = sizeOf(it.title, it.size);
       // ⚠️ LA PHOTO PASSE AVANT LE TITRE. Republier re-téléverse la MÊME image
       //    sous un nouveau nom, mais dans le même dossier (§5.34) — c'est donc
@@ -11115,7 +11161,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, onlineAnnonceIds, pairesVendues, pairsLost]);
+  }, [annBase, numeros, onlineAnnonceIds, pairesVendues, pairsLost, porteursNum]);
 
   // Applique la reprise : l'annonce en ligne récupère l'ancien numéro, et le
   // numéro auto tout juste créé est rendu (il n'a jamais été écrit sur une boîte).
@@ -13791,10 +13837,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center'}}>
                    <div style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.numero!=null?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'3px 6px',background:C.bg,width:78,flexShrink:0}}>
                      <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                     <input value={ov.numero ?? ''} onChange={ev=>setSaleOverride(o.transaction_id,{numero:ev.target.value})} placeholder={baseNum||'—'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                     <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'—'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                    </div>
                    <div style={{flex:1,display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.buyPrice!=null?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'3px 8px',background:C.bg}}>
-                     <input value={ov.buyPrice ?? ''} onChange={ev=>setSaleOverride(o.transaction_id,{buyPrice:ev.target.value})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"ajouter le prix d'achat €"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                     <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"ajouter le prix d'achat €"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                      <span style={{fontSize:11,color:C.muted}}>€</span>
                    </div>
                    {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:9,color:INV_STATUS.online.color,fontWeight:600,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
@@ -14995,10 +15041,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
                   <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                    <input value={num} onChange={ev=>updatePair(item,{numero:ev.target.value})} onFocus={ev=>{numAvantRef.current=ev.target.value;}} onBlur={ev=>poserNumero(item,ev.target.value,numAvantRef.current)} inputMode="numeric" placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    <ChampSaisie value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode="numeric" placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                   </div>
                   <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
-                    <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    <ChampSaisie value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                   <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',fontSize:13,padding:'2px 8px'}}>🔗</button>
@@ -15010,7 +15056,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {num && (
                   <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>💡 boost</span>
-                    <input value={e.fees ?? ''} onChange={ev=>updatePair(item,{fees:ev.target.value})} placeholder="0" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    <ChampSaisie value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} placeholder="0" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                 )}
