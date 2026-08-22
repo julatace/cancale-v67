@@ -458,7 +458,7 @@ function parseCarrierEmail(mail, carrier) {
   //    « suivant » et l'a affiché en gros comme code à donner au comptoir
   //    (vérifié en base, ligne `email_track_chronopost_XW476115185SP`).
   //    Aucun transporteur observé n'utilise de lettres. On n'accepte que des chiffres.
-  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)\s*[:\-]?\s*(\d{4,10})\b/i) || [])[1] || null;
+  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/i) || [])[1] || null;
   if (!code) {
     const m = all.match(/\bcode\s*[:\-]\s*(\d{4,10})\b/i);
     // garde-fou : ne pas confondre avec un code postal
@@ -471,8 +471,15 @@ function parseCarrierEmail(mail, carrier) {
   //    « identifiant » → aucun code affiché : c'est LE bug Chronopost signalé. ──
   let code2 = null; // second code (identifiant du casier), en plus du code d'ouverture
   {
-    const mOuv = all.match(/code\s+d['e’]?\s*ouverture\s*[:\-]?\s*(\d{3,8})/i);
-    const mId = all.match(/identifiant\s*[:\-]?\s*(\d{3,8})/i);
+    // ⚠️ La version TEXTE de l'email met les valeurs en gras à la façon markdown :
+    //      « Identifiant : *8156* » · « Code d’ouverture : *9539* »
+    //    Sans tolérer ces astérisques (et l'apostrophe typographique), les deux
+    //    nombres n'étaient PAS captés — mesuré sur l'email du 17 août, alors même
+    //    que la date limite et le lieu, eux, passaient. Au casier, sans ces deux
+    //    nombres la porte ne s'ouvre pas.
+    const DECOR = "[\\s*_\\-–—]*";
+    const mOuv = all.match(new RegExp(`code${DECOR}d['e’]?${DECOR}ouverture${DECOR}[:：]?${DECOR}(\\d{3,8})`, 'i'));
+    const mId = all.match(new RegExp(`identifiant${DECOR}[:：]?${DECOR}(\\d{3,8})`, 'i'));
     if (mOuv) code = mOuv[1];   // le code d'ouverture devient le code principal
     if (mId) code2 = mId[1];    // l'identifiant l'accompagne (les DEUX servent au casier)
   }
@@ -598,18 +605,33 @@ const isSquareish = (d) => d && d.w >= 60 && d.h >= 60 && Math.abs(d.w - d.h) <=
 // devant la consigne, l'app affichait une image invisible à la place du Pickup Pass.
 // Deux verrous désormais : une liste noire d'URL, et un mot-clé FORT exigé dans le
 // HTML autour de l'image (jamais dans l'URL).
-const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banniere|banni[eè]re|logo|header|footer|enquete|enqu[eê]te|satisfaction|unsubscribe|desabonn|d[eé]sabonn|facebook|instagram|twitter|linkedin|youtube|email-messaging\.com|\.svg(\?|$)/i;
+const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banniere|banni[eè]re|logo|header|footer|enquete|enqu[eê]te|satisfaction|unsubscribe|desabonn|d[eé]sabonn|facebook|instagram|twitter|linkedin|youtube|email-messaging\.com|avn-prod|azureedge|drop[_-]?off|dropoff|_parcel|illustration|visuel|\.svg(\?|$)/i;
 // Mot-clé FORT = celui qui ne peut pas apparaître par hasard dans une URL de suivi.
 const INDICE_QR_FORT = /qr\b|qr[- ]?code|pickup\s*pass|à\s*scanner|a\s*scanner|scannez|scanne\s|code[- ]?barre|barcode|pr[ée]sente[rz]?\s+ce\s+(?:code|pass)/i;
+// ⚠️⚠️ LE VRAI PICKUP PASS N'A NI ALT NI MOT-CLÉ AUTOUR (22 août).
+// Relevé sur les emails réels de Julien, le code scannable est servi par un
+// générateur, dans une balise nue :
+//   <img width="218" src="…pickup-services.com/api/barcode/DataMatrix?d=FR1971A;09843408317167|81569539" alt="">
+//   <img …/api/barcode/AztecCode?d=PICKUPPASS:2.00:FR93638;09447431562792;;">
+// Le HTML autour n'est que du `<table>` : la règle de §5.37 (« le mot-clé doit
+// venir du HTML, jamais de l'URL ») rejetait donc LE code, pendant que le
+// mouchard passait. Cette règle reste juste pour « pickup » — mais un chemin qui
+// dit `/api/barcode/DataMatrix` n'est pas un indice marketing, c'est la NATURE
+// de la ressource. On l'accepte donc sans rien exiger d'autre.
+// ⚠️ Un colis non retiré repart chez l'expéditeur : ne jamais durcir ça sans
+//    avoir sous les yeux un email réel qui prouve un faux positif.
+const URL_QR_CERTAIN = /\/(?:api\/)?barcode\/(?:datamatrix|azteccode|aztec|qrcode|qr|pdf417|code128|code39|ean13)\b/i;
 const imgMinuscule = (balise) => {
   const w = (balise.match(/\bwidth\s*=\s*["']?(\d+)/i) || [])[1];
   const h = (balise.match(/\bheight\s*=\s*["']?(\d+)/i) || [])[1];
   return (w != null && +w <= 4) || (h != null && +h <= 4);   // mouchard 1×1
 };
 function qrUrlPlausible(url, balise, ctx) {
-  if (!url || URL_PAS_UN_QR.test(url)) return false;         // mouchard / bannière
+  if (!url) return false;
+  if (URL_QR_CERTAIN.test(url)) return true;                 // générateur de code-barre : c'est LE pass
+  if (URL_PAS_UN_QR.test(url)) return false;                 // mouchard / bannière
   if (balise && imgMinuscule(balise)) return false;          // 1×1 invisible
-  return INDICE_QR_FORT.test(ctx || '');                     // le HTML doit le dire
+  return INDICE_QR_FORT.test(ctx || '');                     // sinon le HTML doit le dire
 }
 
 function extractPickupQr(mail, status) {
@@ -618,6 +640,15 @@ function extractPickupQr(mail, status) {
   const hint = /qr|à scanner|a scanner|scanne|code[- ]?barre|pr[ée]sente (?:ce|le) code|pickup|retrait/i
     .test(`${mail.subject || ''}\n${mail.text || ''}\n${html}`);
   const none = { qrB64: null, qrType: null, qrUrl: null };
+
+  // 0) LE GÉNÉRATEUR DE CODE-BARRE — la seule source certaine, donc la première.
+  if (html) {
+    const re0 = /<img[^>]+src=["'](https?:\/\/[^"']+)["'][^>]*>/gi;
+    let m0;
+    while ((m0 = re0.exec(html)) !== null) {
+      if (URL_QR_CERTAIN.test(m0[1])) return { qrB64: null, qrType: null, qrUrl: m0[1] };
+    }
+  }
 
   // 1) Pièce jointe explicitement nommée.
   const named = imgs.find(a => /qr|barre|barcode|retrait|pickup|scan/i.test(a.filename || ''));
@@ -772,9 +803,21 @@ export async function traiterEmail(req, res) {
     ? { owner: String(req.__ownerForce), via: 'rattachement' }
     : resoudreProprietaire(adresses, registre, process.env.VRM_OWNER_UID || '');
   { const st = contexteVendeur.getStore(); if (st) st.owner = proprio.owner || ''; }
-  if (!proprio.owner) {
-    // ⚠️ ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec
-    // sa raison ; l'app le signale et permet de le rattacher. Un email égaré se
+  // ⚠️⚠️ INCIDENT DU 16 AU 22 AOÛT — À NE JAMAIS REFAIRE.
+  // La quarantaine (§5.16) a été posée AVANT que la base sache séparer les
+  // vendeurs. `VRM_OWNER_UID` n'étant pas réglé en production, chaque email
+  // tombait à l'étape 4 de `resoudreProprietaire` → quarantaine. Résultat :
+  // **593 emails mis de côté en six jours**, zéro traité — dont « Votre colis
+  // Chronopost est arrivé en consigne Pickup ». Julien n'avait plus ses codes
+  // de retrait, et un colis non retiré repart chez l'expéditeur.
+  //
+  // LA RÈGLE : la quarantaine n'a de sens QUE si la base peut séparer les
+  // vendeurs. Tant que la colonne `owner` n'existe pas, il n'y a qu'une seule
+  // boutique et une seule ligne `main` : rien à protéger, donc rien à mettre de
+  // côté. On traite l'email exactement comme avant §5.16.
+  if (!proprio.owner && await baseCloisonnee()) {
+    // ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec sa
+    // raison ; l'app le signale et permet de le rattacher. Un email égaré se
     // répare, un email livré au mauvais vendeur non.
     await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué');
     res.status(200).json({ ok: true, quarantaine: true, raison: proprio.raison, adresses });

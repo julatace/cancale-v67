@@ -1462,9 +1462,16 @@ const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banni
 const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^\d{3,10}$/.test(c) ? c : ''; };
 // L'image de QR réellement affichable pour ce colis (pièce jointe d'abord, puis
 // URL hébergée si elle est plausible). `null` = on n'affiche AUCUNE image.
+// ⚠️ LE VRAI PICKUP PASS EST SERVI PAR UN GÉNÉRATEUR (22 août).
+// Relevé sur les emails réels : `…pickup-services.com/api/barcode/DataMatrix?d=…`
+// et `…/api/barcode/AztecCode?d=PICKUPPASS:…`. Un chemin qui dit `barcode/…`
+// EST le code : il passe avant la liste noire, sinon un mot innocent de l'URL
+// pourrait faire disparaître le seul moyen de retirer le colis.
+const URL_QR_CERTAIN = /\/(?:api\/)?barcode\/(?:datamatrix|azteccode|aztec|qrcode|qr|pdf417|code128|code39|ean13)\b/i;
 const qrImage = (t) => {
   if (!t) return null;
   if (t.qrB64) return `data:${t.qrType || 'image/png'};base64,${t.qrB64}`;
+  if (t.qrUrl && URL_QR_CERTAIN.test(t.qrUrl)) return t.qrUrl;
   if (t.qrUrl && !URL_PAS_UN_QR.test(t.qrUrl)) return t.qrUrl;
   return null;
 };

@@ -3030,3 +3030,65 @@ Les deux se ressemblent à l'écran (l'annonce redevient en ligne). Ce qui les s
 
 ### Vérifié
 `npm run build` OK · banc dédié (`num_manuel.cjs`, vraies données, les deux cas dans des sessions séparées) : **CAS 1** feuille « a déjà servi » → le N°154 passe sur l'annonce en ligne, **prix d'achat 23,50 récupéré**, ancienne fiche libérée ; **CAS 2** refus affiché, N°335 (libre) posé à la place, **le N°5 n'est pas dupliqué** — **0 erreur d'app** dans les deux · smoke 12 écrans **0 PAGEERROR, 0 artefact** · `audit-identite` **22 contrôles** (les 4 nouveaux **échouent bien sur le code d'avant**, §21) · `audit-coherence` 6 règles / 0 désaccord.
+
+---
+
+## 5.43 — ⚠️⚠️ INCIDENT : 593 EMAILS MIS EN QUARANTAINE À TORT, ET LE VRAI PICKUP PASS JAMAIS RECONNU
+
+Julien, en urgence : « j'ai plein de colis arrivés chez Chronopost Super U et je n'ai pas les QR codes dans l'application… les personnes ne peuvent pas récupérer leurs colis et perdre de l'argent car les colis sont retournés. »
+
+Méthode habituelle : lire la base avant de coder. **Trois causes empilées, dont deux que j'avais introduites.**
+
+### 1. ⚠️⚠️ LA CAUSE PRINCIPALE : plus AUCUN email n'était traité depuis le 16 août
+
+| famille | dernière ligne |
+|---|---|
+| `email_track_` | **16 août 14:56** |
+| `email_bord_` | 16 août 08:38 |
+| `email_sale_` | 15 août 23:44 |
+| **`email_quarantaine_`** | **593 lignes · la dernière il y a 16 minutes** |
+
+**Six jours d'emails entiers mis de côté, zéro traité** — dont « Votre colis Chronopost est arrivé en consigne Pickup » (17 août) et « Votre colis VINTED est arrivé en relais Pickup » (19 août). Raison inscrite sur les 593 : *« adresse de réception inconnue »*.
+
+**C'est §5.16.** J'y avais écrit : « `VRM_OWNER_UID` reste le propriétaire par défaut : tant qu'il n'y a qu'un vendeur, **rien ne change** pour lui. » **Faux en production** : la variable n'est pas réglée sur Vercel, aucune adresse de réception n'est déclarée, donc `resoudreProprietaire` tombait à l'étape 4 → quarantaine, pour **chaque** email.
+
+➡️ **LA RÈGLE : la quarantaine n'a de sens QUE si la base sait séparer les vendeurs.** Tant que la colonne `owner` n'existe pas, il n'y a qu'une boutique et une ligne `main` : rien à protéger, donc rien à mettre de côté.
+```js
+if (!proprio.owner && await baseCloisonnee()) { …quarantaine… }
+```
+⚠️ **Ne jamais reposer un filtre de propriétaire avant que la base sache l'honorer.** Un garde-fou qui s'active dans le vide ne protège personne — il coupe l'outil.
+
+### 2. ⚠️ LE VRAI PICKUP PASS N'A NI `alt` NI MOT-CLÉ AUTOUR
+Relevé dans l'email du 17 août :
+```html
+<img width="218" src="…pickup-services.com/api/barcode/DataMatrix?d=FR1971A;09843408317167|81569539" alt="">
+<img              src="…pickup-services.com/api/barcode/AztecCode?d=PICKUPPASS:2.00:FR93638;09447431562792;;">
+```
+Le HTML autour n'est que du `<table>`. Or §5.37 exigeait un **mot-clé dans le HTML, jamais dans l'URL** — règle juste pour « pickup » (présent dans TOUTES les URL Pickup, mouchard compris), mais qui **rejetait le code lui-même**.
+
+➡️ **`URL_QR_CERTAIN`** = `/(api/)?barcode/(datamatrix|azteccode|aztec|qrcode|qr|pdf417|code128…)/`. Un chemin qui dit `barcode/DataMatrix` n'est pas un indice marketing : c'est **la nature de la ressource**. Il passe avant la liste noire, dans `api/email-inbound.js` (extraction) **et** dans `src/App.jsx` (affichage) — sinon un mot innocent de l'URL ferait disparaître le seul moyen de retirer le colis. Une passe **0)** dans `extractPickupQr` le cherche en premier.
+
+### 3. Les deux nombres du casier étaient dans le texte, en gras markdown
+```
+Identifiant : *8156*
+Code d’ouverture : *9539*
+```
+Les regex de §5.37 ne toléraient ni les **astérisques** ni l'apostrophe typographique → `code` vide alors que la date limite et le lieu, eux, passaient. ⚠️ **Au casier, sans ces deux nombres la porte ne s'ouvre pas.**
+
+### ✅ `scripts/audit-qr.cjs` — contrôle permanent
+Fige les **vraies URL relevées** dans ses emails (2 Pickup Pass) et les fausses (mouchard `tracking/1/open`, `avn-prod`, logo, bannière VintedGo, enquête). Vérifie que les deux fichiers **acceptent les vraies, rejettent les fausses, et tranchent pareil**. Il a immédiatement trouvé un défaut réel : la liste noire du serveur n'avait jamais reçu les ajouts de §5.37 faits côté app (`avn-prod`, `azureedge`, `dropoff`, `_parcel`…) — alignée.
+
+### Mesuré
+| | |
+|---|---|
+| anciennes `qrUrl` en base (les fausses de §5.37) | **25 · 0 affichée** — la protection tient |
+| emails transporteur bloqués en quarantaine | 23, dont **2 « à retirer »** |
+| ces 2 emails après correctif | **2 vrais QR**, 1 code + identifiant, 2 dates limites, 1 lieu |
+
+### ⚠️ RESTE À FAIRE — LE REJEU DES 593 EMAILS
+Le correctif répare l'avenir ; **les 593 emails déjà en quarantaine ne se traitent pas tout seuls**. Le harnais existe (`rejouer.mjs` : relit chaque ligne, appelle le VRAI `traiterEmail`, éteint les notifications le temps du rejeu via `push_prefs`, puis marque la ligne rejouée). **Il écrit en base de production : l'action a été bloquée, elle demande le feu vert de Julien.**
+⚠️ Deux points à redire avant de lancer : les **pièces jointes ne sont pas conservées** en quarantaine (seuls `filename`/`contentType`), donc les **PDF de bordereaux de ces 6 jours sont perdus** — le QR, lui, est une URL dans le HTML, il revient ; et `vrm_pro_facture.actif = true` mais `autoSend: false`, donc le rejeu **prépare** les factures sans en envoyer aucune.
+
+### Vérifié
+`npm run build` OK · `node --check` sur `api/email-inbound.js` · `scripts/audit-qr.cjs` **5/5** · banc unitaire sur les VRAIES fonctions découpées du fichier, contre les emails réels en quarantaine · `audit-identite` 22/22 · `audit-coherence` 6 règles / 0 désaccord.
+⚠️ Piège de banc (§21, encore) : `extractPickupQr` est appelée par le **handler**, pas par `parseCarrierEmail` — lire `t.qrUrl` affichait « AUCUN » quoi qu'il arrive. Et `.replace(/^export\s+/gm,'')` sur le code découpé **effaçait l'export ajouté à la fin** : la fonction paraissait absente du module.
