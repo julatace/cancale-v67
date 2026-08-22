@@ -3286,3 +3286,59 @@ Les 13 Mondial Relay ne s'affichent pas parce qu'ils ont **21 à 37 jours** et q
 - Les points relais sont regroupés **par transporteur** (`parTr`), avec un en-tête (logo + nom + nombre de colis) **toujours affiché**, même s'il n'y a qu'un transporteur : chacun a sa façon de remettre le colis (§28 — Chronopost au QR, Mondial Relay au code), et les mélanger obligeait à relire le logo de chaque ligne pour savoir quoi présenter au comptoir.
 
 **Vérifié au banc** : section transporteur rendue, `n° 09843408317167 · arrivé le 22/08`, vignette QR, modale plein écran, identifiant 8156 + code 9539, lieu Super U, QR conservé après le ✓ — **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
+
+### 5.43 (suite) — LA SAISIE NE VALIDE QU'À LA SORTIE (Entrée ou clic ailleurs)
+
+Julien : « quand je remplis les prix d'achat, dès que je mets 2 pour mettre 20 ça
+le rentre et je ne peux plus mettre plus que 2 — actionne le bouton entrer pour
+que je puisse taper 20. »
+
+**Cause de la famille de bugs** : cinq champs écrivaient à **chaque frappe**
+(`onChange` → `updatePair` / `setSaleOverride` / `poserNumero`). Chaque frappe
+réécrivait `vinted_annonce_numeros` ou `vinted_sale_overrides`, l'écran se
+re-rendait et se retriait, l'input pouvait être remonté ailleurs — et le focus
+partait après le premier caractère.
+
+➡️ **`ChampSaisie`** (module-level) : la valeur reste **locale** pendant la
+saisie, et n'est validée qu'à la **sortie du champ** ou sur **Entrée** (Échap
+annule). Tant qu'on n'écrit pas dedans, le champ suit la donnée (numéro posé
+automatiquement, prix repris d'un achat relié). **`onCommit` n'est appelé que si
+la valeur a CHANGÉ** — sinon entrer puis sortir d'un champ prix effaçait l'achat
+relié (`buyFromId`/`buyFrom` sont remis à `null` à toute saisie manuelle).
+
+Les 5 champs convertis : **N° de la paire**, **prix d'achat** et **boost** sur
+l'écran Annonces ; **N°** et **prix d'achat** sur une ligne de vente.
+⚠️ `poserNumero` **écrit maintenant lui-même le numéro** dans le cas « numéro
+libre » (avant, c'est `onChange` qui l'avait déjà posé) — donc le numéro n'est
+écrit qu'**après** les contrôles de collision, jamais pendant la frappe. Un champ
+vidé ne retire jamais un numéro (§5.40) : l'affichage revient à la valeur en base.
+
+### « Les numéros ne doivent plus jamais bouger » (il va les écrire sur les boîtes)
+Ce qui était déjà garanti : l'auto-numérotation **saute toute annonce qui a déjà
+un numéro** ; la reprise auto ne touche que les numéros **posés automatiquement**
+(`auto:true`), jamais un numéro tapé à la main ; aucun numéro n'est rendu au pot
+(§5.40).
+➡️ **Garantie ajoutée** : la reprise automatique **ne touche jamais une paire
+rangée au garage** (`porteursNum[n]` contient un porteur `garage`). Un numéro
+écrit sur un carton réel ne peut plus changer tout seul, même s'il vient de
+l'attribution automatique.
+
+### ⚠️ HONNÊTETÉ — je n'ai PAS reproduit sa perte de focus au banc
+Testé sur les vraies données, écran Annonces ET écran Ventes, en tapant « 20 »
+caractère par caractère (300 ms entre les frappes) : **l'ancien code passait
+aussi**. Sa configuration réelle diffère donc de la mienne (tri actif, données,
+aller-retour cloud). Le correctif reste juste — c'est exactement ce qu'il a
+demandé, et il rend la famille entière impossible : **plus aucune écriture
+pendant la frappe**, donc plus rien qui puisse re-trier la liste sous ses doigts.
+Ne pas écrire ailleurs « bug de focus reproduit puis corrigé » : ce serait faux.
+
+### Vérifié
+`npm run build` OK · banc dédié (`saisie.cjs`, vraies données) : « 20 » tapé en
+deux frappes → **valeur « 20 », focus gardé**, Entrée → `buyPrice = "20"` en
+base ; entrer/sortir sans rien changer → **la fiche n'est pas réécrite** ; champ
+N° → « 335 » tapé et enregistré · `num_manuel.cjs` cas 1 et 2 rejoués (reprise
+d'une paire absente avec son prix d'achat ✅, refus sur une paire présente ✅) ·
+smoke 12 écrans **0 PAGEERROR** · `audit-identite` **26 contrôles** (les 4
+nouveaux **échouent bien sur le code d'avant** : 5 champs écrivaient lettre par
+lettre, la reprise auto touchait une paire au garage) · `audit-qr` 5/5 ·
+`audit-coherence` 6 règles / 0 désaccord.

@@ -200,5 +200,36 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('changer un N° à la main : refus si une paire le porte encore');
 }
 
+// ── 8) UN NUMÉRO POSÉ NE BOUGE PLUS TOUT SEUL ───────────────────────────────
+//     Julien : « sois sûr que les numéros attribués aux paires de chaussures ne
+//     bougent plus jamais parce que je vais commencer à les mettre dans les
+//     boîtes. » Deux garanties, et elles doivent tenir dans le code :
+//     a) la reprise automatique ne touche jamais une paire RANGÉE AU GARAGE
+//        (le numéro y est écrit sur un carton réel) ;
+//     b) le champ N° ne valide qu'à la SORTIE du champ, jamais à chaque frappe —
+//        sinon taper « 20 » posait d'abord le N°2 sur la paire (et brûlait ce
+//        numéro au passage).
+{
+  /\(porteursNum\[String\(cur\.numero\)\] \|\| \[\]\)\.some\(x => x\.type === 'garage'\)/.test(SRC)
+    ? ok('la reprise auto ne touche jamais une paire rangée au garage')
+    : nok('la reprise auto ne touche jamais une paire rangée au garage',
+          'une paire déjà dans sa boîte peut encore changer de numéro toute seule');
+  // Le champ N° / prix d'achat / boost doit passer par `ChampSaisie` (validation
+  // à la sortie). Un `onChange` qui appelle `updatePair` ou `poserNumero`
+  // écrirait à chaque caractère.
+  const frappe = SRC.split('\n').filter(l =>
+    /<input /.test(l) && /onChange=\{ev=>(updatePair|poserNumero|setSaleOverride)\(/.test(l));
+  frappe.length
+    ? nok('aucun champ N°/prix n\'écrit à chaque frappe', frappe.length + ' champ(s) écrivent encore lettre par lettre')
+    : ok('aucun champ N°/prix n\'écrit à chaque frappe');
+  /function ChampSaisie\(/.test(SRC) && /onKeyDown=\{ev => \{[\s\S]{0,120}Enter/.test(SRC)
+    ? ok('la saisie se valide sur Entrée ou à la sortie du champ')
+    : nok('la saisie se valide sur Entrée ou à la sortie du champ');
+  // Et c'est `poserNumero` — donc après les contrôles — qui écrit le numéro.
+  /if \(!autres\.length\) \{ updatePair\(item, \{ numero: n \}\); recordUsed\(n\); return; \}/.test(SRC)
+    ? ok('le numéro n\'est écrit qu\'après les contrôles de collision')
+    : nok('le numéro n\'est écrit qu\'après les contrôles de collision');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
