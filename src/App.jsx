@@ -534,7 +534,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
@@ -9492,8 +9492,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
   const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
   const [qrView, setQrView] = useState(null); // colis affiché en grand pour le scan { title, code, suivi, carrier, img }
-  const markCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.add(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(t); };
-  const unmarkCollected = (t) => { setCollected(prev => { const n = new Set(prev); n.delete(colisKey(t)); save('vrm_colis_collected', [...n]); return n; }); setLastCollected(null); };
+  // ⚠️ QUAND le colis a été coché — le Set seul ne le dit pas, et sans la date on
+  //    ne peut pas le garder EN GRIS « le temps que ce soit confirmé ». Clé à
+  //    part pour ne rien casser : un colis coché avant ce changement n'a pas de
+  //    date, il se comporte simplement comme avant (il disparaît).
+  const [collectedAt, setCollectedAt] = useState(() => load('vrm_colis_collected_at', {}));
+  const markCollected = (t) => {
+    const k = colisKey(t);
+    setCollected(prev => { const n = new Set(prev); n.add(k); save('vrm_colis_collected', [...n]); return n; });
+    setCollectedAt(prev => { const u = { ...prev, [k]: new Date().toISOString() }; save('vrm_colis_collected_at', u); return u; });
+    setLastCollected(t);
+  };
+  const unmarkCollected = (t) => {
+    const k = colisKey(t);
+    setCollected(prev => { const n = new Set(prev); n.delete(k); save('vrm_colis_collected', [...n]); return n; });
+    setCollectedAt(prev => { if (prev[k] == null) return prev; const u = { ...prev }; delete u[k]; save('vrm_colis_collected_at', u); return u; });
+    setLastCollected(null);
+  };
   // Tout marquer retiré en un tap (les transporteurs n'envoient pas d'email « récupéré »).
   const markAllCollected = (list) => { setCollected(prev => { const n = new Set(prev); (list || []).forEach(t => n.add(colisKey(t))); save('vrm_colis_collected', [...n]); return n; }); };
   const isCollected = (t) => collected.has(colisKey(t));
@@ -10104,9 +10119,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const j = (Date.now() - new Date(quand).getTime()) / 86400000;
       return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;                 // au-delà, on n'attend plus
     });
-    return { emailList, extra, attente, total: emailList.length + extra.length };
+    // Même chose pour un colis venu d'un EMAIL transporteur : cocher ✓ le faisait
+    // disparaître d'un coup, QR compris. Or c'est justement là qu'on peut en
+    // avoir encore besoin (« si jamais il y a un problème, j'ai quand même le QR
+    // code »). Il reste donc EN GRIS, avec son QR, jusqu'à ce que le transporteur
+    // confirme le retrait — ou au plus PICKUP_CONFIRM_DAYS.
+    const attenteMail = (tracking || []).filter(t => {
+      if (!t || t.status !== 'available') return false;
+      const k = colisKey(t);
+      if (!collected || !collected.has(k)) return false;             // pas coché
+      const quand = collectedAt[k]; if (!quand) return false;        // coché avant ce changement
+      if (colisRetireAilleurs(t, retires)) return false;             // le transporteur a confirmé
+      const j = (Date.now() - new Date(quand).getTime()) / 86400000;
+      return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;
+    });
+    return { emailList, extra, attente, attenteMail, total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, vintedToPickup, buysBase, pickupDone]);
+  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone]);
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
@@ -11784,7 +11813,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Aucun bouton : on répare, on montre l'avancement, et les colis apparaissent
   // au fur et à mesure. `silencieux` coupe les notifications — on rattrape de
   // l'historique, pas des nouveautés.
-  const [rattrapage, setRattrapage] = useState(null);   // { fait, total }
+  // ⚠️ AUCUN INDICATEUR : Julien ne veut rien voir du rattrapage (« je ne veux
+  //    pas qu'il y ait marqué traité »). Il tourne en fond ; ce qui apparaît,
+  //    ce sont les colis eux-mêmes, au fur et à mesure.
   useEffect(() => {
     if (curSub !== 'achats' || _rattrapageLance) return;
     _rattrapageLance = true;
@@ -11800,7 +11831,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Les colis passent devant : c'est ce qu'on attend à l'écran.
       lignes.sort((a, b) => (SUJET_COLIS.test(b.sujet || '') ? 1 : 0) - (SUJET_COLIS.test(a.sujet || '') ? 1 : 0));
       const nColis = lignes.filter(x => SUJET_COLIS.test(x.sujet || '')).length;
-      setRattrapage({ fait: 0, total: lignes.length });
       let ratesDeSuite = 0;
       for (let i = 0; i < lignes.length && !mort; i++) {
         try {
@@ -11814,12 +11844,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         } catch (_) { ratesDeSuite++; }
         // Réseau coupé / serveur en panne : on s'arrête au lieu d'insister 600 fois.
         if (ratesDeSuite >= 8) break;
-        if (!mort) setRattrapage({ fait: i + 1, total: lignes.length });
         // Dès que les colis sont passés, on rafraîchit : le QR et le code
         // apparaissent sans attendre la fin du reste.
         if (i + 1 === nColis || (i + 1) % 40 === 0) { try { const t = await fetchEmailTracking(); if (!mort) setTracking(t); } catch (_) {} }
       }
-      if (!mort) { setRattrapage(null); try { const t = await fetchEmailTracking(); if (!mort) setTracking(t); } catch (_) {} }
+      if (!mort) { try { const t = await fetchEmailTracking(); if (!mort) setTracking(t); } catch (_) {} }
     })();
     return () => { mort = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -13763,16 +13792,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='achats' && (<>
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
         <NoAcc/>
-        {/* Pas un bouton : un compte rendu. Le rattrapage tourne tout seul. */}
-        {rattrapage && (
-          <div style={{border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:12,padding:'9px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:9}}>
-            <span style={{fontSize:15}}>📥</span>
-            <div style={{flex:'1 1 140px',minWidth:0}}>
-              <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>Récupération de tes emails… {rattrapage.fait}/{rattrapage.total}</div>
-              <div style={{fontSize:11,color:C.muted}}>Tes colis à retirer apparaissent au fur et à mesure.</div>
-            </div>
-          </div>
-        )}
         {/* ⚠️ MÊME ORDRE QUE L'ÉCRAN VENTES. Ici la période arrivait en 19e position,
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
@@ -13861,7 +13880,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                           <div style={{fontSize:11,fontWeight:600,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}{g.guessed?<span style={{color:C.muted,fontWeight:600}}> (relais habituel)</span>:''}</div>
-                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{qrImage(t)?(code?(casier?'Scanne le QR, ou saisis ces nombres 👉':'Présente le QR au comptoir 👉'):'Présente ce QR pour retirer 👉'):code?(casier?'Saisis ces nombres sur le casier 👉':'Donne ce code au comptoir 👉'):'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
+                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{qrImage(t)?(code?(casier?'Scanne le QR, ou saisis ces nombres 👉':'Présente le QR au comptoir 👉'):'Présente ce QR pour retirer 👉'):code?(casier?'Saisis ces nombres sur le casier 👉':'Donne ce code au comptoir 👉'):'Code pas encore reçu'}</div>
+                          {/* Le n° de suivi sur SA ligne, en chiffres lisibles :
+                              au comptoir c'est ce qu'on demande quand le scan
+                              ou le code ne passe pas. */}
+                          {t.suivi && <div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
@@ -13927,22 +13950,80 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   on les garde EN GRIS plutôt que de les faire disparaître d'un
                   coup — on voit que c'est fait, et on peut annuler. Ils sortent
                   tout seuls dès que Vinted enregistre le retrait. */}
+              {/* Colis d'EMAIL cochés : en gris, AVEC leur QR (voir pickupUnion). */}
+              {pickupUnion.attenteMail.length>0 && (
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:C.muted,marginBottom:8}}>✓ {pickupUnion.attenteMail.length} retiré{pickupUnion.attenteMail.length>1?'s':''} — en attente de confirmation</div>
+                  {pickupUnion.attenteMail.map((t,i)=>{
+                    const qi = qrImage(t), cd = codeRetrait(t.code), id2 = codeRetrait(t.code2);
+                    return (
+                    <div key={'m'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}</span>
+                      <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
+                        <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · en attente de confirmation — son QR reste dispo</div>
+                        {t.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
+                      </div>
+                      {qi && (
+                        <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
+                          style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:10,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                          <img src={qi} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                        </button>
+                      )}
+                      {!qi && (cd||id2) && (
+                        <div style={{flexShrink:0,display:'flex',gap:5}}>
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?'Ouverture':'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                        </div>
+                      )}
+                      <button type="button" onClick={()=>unmarkCollected(t)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
+                    </div>
+                    );
+                  })}
+                </div>
+              )}
               {pickupUnion.attente.length>0 && (
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:12.5,fontWeight:700,color:C.muted,marginBottom:8}}>✓ {pickupUnion.attente.length} retiré{pickupUnion.attente.length>1?'s':''} — Vinted n'a pas encore enregistré</div>
-                  {pickupUnion.attente.map((o,i)=>(
-                    <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7,opacity:0.55}}>
-                      {thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}
-                      <div style={{flex:'1 1 150px',minWidth:0}}>
+                  {pickupUnion.attente.map((o,i)=>{
+                    // ⚠️ LE QR RESTE ACCESSIBLE TANT QUE CE N'EST PAS CONFIRMÉ.
+                    //    « Si jamais il y a un problème, j'ai quand même le QR
+                    //    code » — au comptoir, un colis qu'on croyait retiré peut
+                    //    devoir être rescanné. Le colis reliée par `trackForBuy`
+                    //    (titre exact ET candidat unique des deux côtés, §5.39) :
+                    //    jamais le QR d'un autre colis.
+                    // ⚠️ L'opacité N'EST PAS sur la carte : elle se transmet aux
+                    //    enfants et on ne peut pas la « défaire ». On grise donc
+                    //    le texte et la photo, et le QR reste net.
+                    const tk = trackForBuy(o);
+                    const qi = qrImage(tk), cd = codeRetrait(tk&&tk.code), id2 = codeRetrait(tk&&tk.code2);
+                    return (
+                    <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}</span>
+                      <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>
+                        {tk&&tk.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {tk.suivi}</div>}
                       </div>
+                      {qi && (
+                        <button type="button" onClick={()=>openQrView(tk)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
+                          style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:10,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                          <img src={qi} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                        </button>
+                      )}
+                      {!qi && (cd||id2) && (
+                        <div style={{flexShrink:0,display:'flex',gap:5}}>
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?"Ouverture":'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                        </div>
+                      )}
                       <button type="button" onClick={()=>unmarkPickupDone(o)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
-              <div style={{fontSize:11,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — il passe en gris le temps que Vinted l'enregistre, puis disparaît tout seul.</div>
+              <div style={{fontSize:11,color:C.muted,lineHeight:1.4}}>Coche <b>✓</b> quand tu l'as récupéré — il passe en gris le temps que Vinted l'enregistre, puis disparaît tout seul. <b>Son QR et son code restent accessibles</b> tant que ce n'est pas confirmé.</div>
             </div>
           );
         })()}
