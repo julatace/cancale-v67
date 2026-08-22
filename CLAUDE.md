@@ -3261,3 +3261,28 @@ Julien : « ce colis-là n'est pas dans l'app, regarde pourquoi et corrige pour 
 **Et le rattrapage part aussi depuis Ma journée**, plus seulement depuis Achats : attendre qu'il ouvre précisément l'onglet Achats retardait l'apparition d'un colis pour rien.
 
 **Vérifié** : chaîne de filtres rejouée sur les 109 lignes réelles → **2 colis affichés**, dont celui de Julien (9539 / 8156), et les 16 écartés le sont pour une raison nommée (coché récupéré, ou > 14 j sans limite) · **6 cas sur 6** au contrôle unitaire de la nouvelle règle (vieux + limite demain → visible ; vieux + limite d'hier → visible ; limite dépassée de 20 j → non ; sans limite → inchangé ; coché → non) · écran Achats rendu : vignette QR, modale, QR conservé après le ✓ · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
+
+### 5.43 (suite) — UN ENDROIT PAR TRANSPORTEUR + le jour d'arrivée + la date d'origine au rejeu
+
+Julien : « pourquoi il y en a que deux, mets le jour d'arrivée, et prépare un endroit dédié pour chaque transporteur ».
+
+### « Pourquoi seulement deux » — mesuré, il n'y en a pas d'autres
+| | |
+|---|---|
+| quarantaine | 593 lignes · **38 traitées · 555 restantes** |
+| **parmi les 555 restantes, emails qui parlent de colis** | **0** — tous les emails de colis sont passés |
+| lignes de suivi | 109 : Mondial Relay 67, Chronopost 32, Vinted 5, Colissimo 4, Shop2Shop 1 |
+| « à retirer » | MR **13** (11 avec code) · Chronopost **4** (2 avec vrai QR) |
+| **affichés par l'app** | **2** |
+
+Les 13 Mondial Relay ne s'affichent pas parce qu'ils ont **21 à 37 jours** et que **12 sont cochés « récupéré »**. Ce n'est donc ni une perte ni un filtre trop dur : il n'y a réellement que 2 colis en attente.
+
+### ⚠️ La date d'origine est conservée au rejeu
+`traiterEmail` datait la ligne à `Date.now()`. Un email d'il y a six jours rejoué ressortait donc daté d'**aujourd'hui** : le colis aurait affiché « arrivé le 22 » alors qu'il attend depuis le 17, et la fenêtre d'ancienneté (§`isColisActive`) aurait été fausse. `api/email-rattacher.js` passe désormais `__recuLe` (le `at` de la ligne conservée) et `traiterEmail` l'utilise.
+⚠️ **Les deux colis déjà récupérés aujourd'hui gardent la date du rejeu** (22/08) — leur ligne est déjà écrite. Ça se corrige tout seul pour les suivants.
+
+### Le jour d'arrivée, et un endroit par transporteur
+- Chaque colis affiche **`n° 0984… · arrivé le 17/08 · il y a 6 j`**. Savoir depuis quand il attend, c'est ce qui dit s'il faut y aller aujourd'hui.
+- Les points relais sont regroupés **par transporteur** (`parTr`), avec un en-tête (logo + nom + nombre de colis) **toujours affiché**, même s'il n'y a qu'un transporteur : chacun a sa façon de remettre le colis (§28 — Chronopost au QR, Mondial Relay au code), et les mélanger obligeait à relire le logo de chaque ligne pour savoir quoi présenter au comptoir.
+
+**Vérifié au banc** : section transporteur rendue, `n° 09843408317167 · arrivé le 22/08`, vignette QR, modale plein écran, identifiant 8156 + code 9539, lieu Super U, QR conservé après le ✓ — **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
