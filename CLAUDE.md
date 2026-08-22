@@ -2990,3 +2990,43 @@ Chaque `pushOnce` porte sa catégorie (2ᵉ argument, ou champ `_cat`) ; les col
 ⚠️ Une catégorie absente de la ligne ⟹ **le défaut ci-dessus**, jamais « muet ». Un réglage qu'on ne trouve pas ne doit pas éteindre une vente.
 
 **Vérifié** : `npm run build` OK · `node --check` sur les 3 fichiers `api/` · banc app, écran Réglages RENDU sur les vraies données → « Ce que tu reçois sur ton téléphone — **5 types de notification sur 10** », les 10 lignes présentes avec le bon état par défaut · smoke 12 écrans **0 PAGEERROR, 0 artefact** · `audit-identite` 18/18 · `audit-coherence` 6 règles / 0 désaccord.
+
+---
+
+## 5.42 — ANNULATION vs LITIGE : le numéro suit la paire PHYSIQUE
+
+Julien : « je ne veux pas ne pas utiliser un numéro pour une publication, il faut réattribuer un nouveau — **sauf** si c'est une annulation et qu'on appuie sur republier dans Vinted ; et si c'est un **litige**, qu'on reçoit la paire et qu'on la reposte nous-mêmes, là il faut prendre un **nouveau numéro**. On peut donner la possibilité aux gens de changer de numéro, et lorsqu'ils mettent un numéro déjà attribué, il demande si c'était bien un litige et relit ensuite les informations de l'ancienne paire. »
+
+### La question à laquelle tout se ramène : la chaussure a-t-elle quitté la maison ?
+- **annulation / retrait puis republication** → elle n'a jamais bougé, sa boîte porte toujours son numéro → **il reste** ;
+- **litige / retour** → elle revient dans un autre carton, on la repose nous-mêmes → **numéro NEUF**.
+
+Les deux se ressemblent à l'écran (l'annonce redevient en ligne). Ce qui les sépare : **une VENTE existe**.
+
+### ⚠️ Le défaut mesuré (22 août, vraie base)
+`numeroReprises` excluait les paires « vendues » en lisant `vinted_txn_link`. Or **ce verrou ne se pose que sur les ventes FINALISÉES** (`classifyOrderStatus === 'completed'`). Résultat :
+
+| | |
+|---|---|
+| ventes rattachées à une paire numérotée hors ligne | **58** — dont **18 sans verrou** |
+| paires en **litige** | **3** — N°115 « Retour initié », N°169 « non réclamée », N°167 « Remboursement effectué » |
+| ces 3 paires avaient-elles un verrou ? | **AUCUNE** |
+
+➡️ Les trois paires en litige auraient **repris leur ancien numéro toutes seules** en étant reposées.
+
+### Ce qui a changé
+- **`pairesVendues`** (memo) = `vinted_txn_link` **+ toute vente, quel que soit son statut**, résolue par `identiteAnnonce` (identifiant Vinted, sinon photo — §5.34). Jamais par titre.
+- Une paire marquée `vendue` reste **proposée** dans le bandeau ♻️ (avec un avertissement orange : « cette paire a été VENDUE sous le N°X — ne le remets que si elle t'est revenue et qu'elle est dans sa boîte ») mais **l'effet automatique la saute** (`if (r.vendue) continue;`). Une paire jamais vendue garde son numéro sans un clic, comme avant.
+
+### Changer un N° à la main — trois cas, un seul refus
+`poserNumero(item, valeur, avant)`, au **blur** du champ N° (⚠️ pas à chaque frappe : en tapant « 15 » on passe par « 1 », qui déclencherait une fausse alerte) :
+1. **numéro libre** → posé, et brûlé à vie (`recordUsed`) ;
+2. **numéro d'une paire ABSENTE** → « Le N°X a déjà servi… Est-ce bien la MÊME paire qui te revient (litige, retour, annulation) ? » → **oui** ⟹ elle récupère **prix d'achat, achat relié, boost et pointure** de l'ancienne fiche, qui lui cède la place ; **non** ⟹ prochain numéro libre ;
+3. **numéro d'une paire ENCORE PRÉSENTE** (en ligne / à expédier / au garage, via `porteursNum`) → **REFUS**, avec le nom du porteur et un bouton « Prendre le N°X ». Deux paires dans la même boîte, c'est la mauvaise chaussure dans le carton (§19, risque n°1).
+
+### ⚠️ Deux pièges rencontrés
+- **`useRef` n'était pas importé** (`import React, { useState, useMemo, useEffect }`). `npm run build` passe, mais l'écran tombe au premier rendu. `EcranGardeFou` (§5.14) l'a attrapé au banc : « Cet écran n'a pas pu s'afficher — useRef is not defined ». ⚠️ **`PhotoEditor` (2 `useRef` nus, ligne ~2934) était donc cassé depuis sa création** — corrigé au passage par le même import.
+- **Piège de banc** : taper le numéro caractère par caractère **re-rend la grille** (le tri bouge) et le handle Playwright se détache — on mesurait « champ = 1 » au lieu de « 154 ». Il faut poser la valeur **en un coup** (setter natif + événement `input`, comme §5.04), et **repérer chaque champ par l'identifiant de son annonce**, jamais par un index figé. Idem : une annonce d'un **compte supprimé** existe en base mais n'est ni rendue ni comptée comme « présente » — la choisir comme fixture faisait mesurer un artefact.
+
+### Vérifié
+`npm run build` OK · banc dédié (`num_manuel.cjs`, vraies données, les deux cas dans des sessions séparées) : **CAS 1** feuille « a déjà servi » → le N°154 passe sur l'annonce en ligne, **prix d'achat 23,50 récupéré**, ancienne fiche libérée ; **CAS 2** refus affiché, N°335 (libre) posé à la place, **le N°5 n'est pas dupliqué** — **0 erreur d'app** dans les deux · smoke 12 écrans **0 PAGEERROR, 0 artefact** · `audit-identite` **22 contrôles** (les 4 nouveaux **échouent bien sur le code d'avant**, §21) · `audit-coherence` 6 règles / 0 désaccord.
