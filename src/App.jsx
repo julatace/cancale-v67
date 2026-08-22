@@ -16688,6 +16688,87 @@ function LeboncoinScreen() {
     </div>
   );
 }
+
+// ── QUOI RECEVOIR SUR LE TÉLÉPHONE ──────────────────────────────────────────
+// Julien : « des fois je reçois des choses complètement débiles ». Mesuré : un
+// push partait à chaque étape de colis — 61 de ses 94 emails de suivi
+// n'appelaient aucune action. Les défauts ne sonnent plus que pour l'argent et
+// ce qu'il y a à faire ; le reste reste consultable dans l'app.
+// ⚠️ Écrit dans la ligne `push_prefs`, que le SERVEUR lit avant d'envoyer
+//    (api/_lib/push.js). Ce n'est donc pas un filtre d'affichage : la
+//    notification n'est pas envoyée du tout.
+const PUSH_CATS = [
+  { id:'vente',    def:true,  titre:'💸 Vendu',            desc:"Une paire vient d'être vendue." },
+  { id:'argent',   def:true,  titre:'💰 Argent viré',       desc:'Vinted a versé ton argent.' },
+  { id:'colis',    def:true,  titre:'📍 Colis à retirer',   desc:'Arrivé au relais, avec le code de retrait.' },
+  { id:'expedier', def:true,  titre:'📮 Colis à poster',    desc:"Rappel du matin, avec l'échéance." },
+  { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
+  { id:'suivi',    def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
+  { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
+  { id:'message',  def:false, titre:'💬 Message',           desc:"Le badge de l'app suffit." },
+  { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
+  { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
+];
+function PushPrefsSetting() {
+  const [prefs, setPrefs] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { let mort = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`, { headers: sbAuth() });
+        const rows = r.ok ? await r.json() : [];
+        if (!mort) setPrefs((rows && rows[0] && rows[0].data) || {});
+      } catch (_) { if (!mort) setPrefs({}); }
+    })();
+    return () => { mort = true; };
+  }, []);
+  const actif = (c) => { const v = prefs && prefs[c.id]; return typeof v === 'boolean' ? v : c.def; };
+  const bascule = async (c) => {
+    if (busy) return; setBusy(true);
+    const next = { ...(prefs || {}), [c.id]: !actif(c) };
+    setPrefs(next);
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method: 'POST',
+        headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([withOwner({ id: 'push_prefs', data: next })]),
+      });
+    } catch (_) { toast("Réglage non enregistré — réessaie quand tu as du réseau."); }
+    setBusy(false);
+  };
+  const n = prefs ? PUSH_CATS.filter(actif).length : 0;
+  return (
+    <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px'}}>
+      <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
+          <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
+            {prefs ? `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.` : 'Chargement…'}
+          </div>
+        </div>
+        <span style={{color:C.muted,fontSize:13,flexShrink:0}}>▾</span>
+      </summary>
+      <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:2}}>
+        {PUSH_CATS.map(c => {
+          const on = actif(c);
+          return (
+            <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{c.titre}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1,lineHeight:1.35}}>{c.desc}</div>
+              </div>
+              <button type="button" onClick={()=>bascule(c)} disabled={!prefs||busy} aria-label={`${c.titre} : ${on?'activé':'désactivé'}`}
+                style={{flexShrink:0,padding:'5px 13px',borderRadius:999,fontSize:11.5,fontWeight:600,cursor:prefs?'pointer':'default',fontFamily:'inherit',
+                  background:on?C.accent:'transparent',color:on?'#fff':C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>
+                {on?'ON':'OFF'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
 function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif, customLogo, onPickLogo, onResetLogo }) {
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
@@ -16932,6 +17013,8 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Notifications</div>
       <PushSetting/>
+      <div style={{height:10}}/>
+      <PushPrefsSetting/>
       <div style={{height:10}}/>
       {/* Alertes locales (l'ancien bouton 🔔 du haut, déplacé ici) : bandeau +
           notification quand l'app est OUVERTE (ventes comptabilisées, factures). */}

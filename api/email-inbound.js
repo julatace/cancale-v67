@@ -17,7 +17,7 @@
 // contentType, content(base64)}] } — ce que renvoie un Worker Cloudflare.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { sendPushToAll } from './_lib/push.js';
+import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
@@ -322,9 +322,25 @@ async function shouldNotify(key) {
     return true;
   } catch (_) { return true; }
 }
-// Envoie une notification UNE seule fois (clé = son tag, déjà unique).
-async function pushOnce(payload) {
-  try { if (await shouldNotify(payload && payload.tag)) await sendPushToAll(payload); } catch (_) {}
+// ── CE QU'ON NOTIFIE, ET CE QU'ON NE NOTIFIE PAS ────────────────────────────
+// Julien : « des fois je reçois des choses complètement débiles ». Il a raison :
+// un push partait à CHAQUE étape de colis, transit compris — sur ses 94 emails
+// de suivi, **54 sont "en transit" et 7 "info"**, soit 61 notifications qui
+// n'appellent aucune action. Idem pour « achat confirmé » (il vient de
+// l'acheter), les favoris et chaque message.
+//
+// RÈGLE : on ne sonne que pour de l'ARGENT ou une ACTION à faire. Le reste se
+// consulte dans l'app, où le badge suffit.
+// Envoie une notification UNE seule fois (clé = son tag, déjà unique), et
+// seulement si cette catégorie est active.
+async function pushOnce(payload, categorie) {
+  try {
+    const cat = categorie || (payload && payload._cat) || null;
+    if (!(await pushCategorieActive(cat))) return;
+    // `_cat` est un marqueur interne : il ne part pas dans la notification.
+    const { _cat, ...notif } = payload || {};
+    if (await shouldNotify(notif.tag)) await sendPushToAll(notif);
+  } catch (_) {}
 }
 
 async function logEmail(entry) {
@@ -847,7 +863,7 @@ export async function traiterEmail(req, res) {
         title: `${icons[track.status]} ${titles[track.status]}`,
         body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : carrier === 'chronopost' ? 'Chronopost' : 'Vinted'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.${track.status === 'available' && track.code ? ` Code de retrait : ${track.code}` : ''}`,
         tag: `track-${track.suivi || rowId}`, url: '/?tab=cat_achats',
-      }); } catch (_) {}
+      }, track.status === 'available' ? 'colis' : 'suivi'); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       res.status(200).json({ ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;
@@ -883,7 +899,7 @@ export async function traiterEmail(req, res) {
       };
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
-      try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }); } catch (_) {}
+      try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }, 'expedier'); } catch (_) {}
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
       res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
@@ -914,6 +930,7 @@ export async function traiterEmail(req, res) {
         title: '💰 Argent reçu',
         body: `${montant ? montant + ' € viré sur ton compte Vinted' : 'Transaction finalisée'}${article ? ' — ' + article.slice(0, 50) : ''}${acc.login ? ` (${acc.login})` : ''}.`,
         tag: `final-${key}`, url: '/?tab=cat_ventes',
+        _cat: 'argent',
       }); } catch (_) {}
       await logEmail({ type: 'finalisation', subject, from: mail.from, montant, article, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'finalisation', montant, article });
@@ -951,6 +968,7 @@ export async function traiterEmail(req, res) {
         title: '🛍 Achat confirmé',
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
         tag: `achat-${key}`, url: '/?tab=cat_achats',
+        _cat: 'achat',
       }); } catch (_) {}
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
@@ -964,7 +982,7 @@ export async function traiterEmail(req, res) {
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }); } catch (_) {}
+      try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }, 'vente'); } catch (_) {}
       // Facturation Pro : ne se déclenche que si activée dans l'app ET que
       // l'email contient l'adresse email de l'acheteur (comptes Pro).
       let facture = null;
@@ -977,6 +995,7 @@ export async function traiterEmail(req, res) {
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
               body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
               tag: `inv-${facture.number}`, url: '/?tab=invoices',
+              _cat: 'facture',
             }); } catch (_) {}
           }
         }
@@ -1025,6 +1044,7 @@ export async function traiterEmail(req, res) {
         title: `💰 Offre ${montant ? montant + ' €' : ''}${qui ? ' de ' + qui : ''}`,
         body: `${article ? `« ${article.trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${acc.login ? ` (${acc.login})` : ''}${advice || ' — expire en 24h.'}`,
         tag: `offer-${key}`, url: '/?tab=cat_msg',
+        _cat: 'offre',
       }); } catch (_) {}
       // Archive l'offre + le conseil pour le panneau « Copilote d'offres » de l'app.
       try { await supabaseUpsert([{ id: `email_offer_${key}`, data: {
@@ -1045,6 +1065,7 @@ export async function traiterEmail(req, res) {
         title: `💬 ${qui || 'Message Vinted'}${acc.login ? ` → ${acc.login}` : ''}`,
         body: extrait ? `« ${extrait} »` : 'Nouveau message — ouvre Vinted pour répondre.',
         tag: `msg-${key}`, url: '/?tab=cat_msg',
+        _cat: 'message',
       }); } catch (_) {}
       await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'message', de: qui, extrait });
@@ -1062,6 +1083,7 @@ export async function traiterEmail(req, res) {
         title: '❤️ Nouveau favori !',
         body: `${qui || 'Quelqu\'un'} craque sur « ${(article || 'ton article').slice(0, 45)} »${prix ? ` (${prix} €)` : ''}${acc.login ? ` (${acc.login})` : ''} — fais-lui une offre !`,
         tag: `fav-${key}`, url: '/?tab=cat_annonces',
+        _cat: 'favori',
       }); } catch (_) {}
       await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
       res.status(200).json({ ok: true, type: 'favori', de: qui, article });

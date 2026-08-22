@@ -44,6 +44,42 @@ const HEADERS = {
   'Content-Type': 'application/json',
 };
 
+// ── CE QU'ON NOTIFIE, ET CE QU'ON NE NOTIFIE PAS ────────────────────────────
+// Julien : « des fois je reçois des choses complètement débiles ». Mesuré : un
+// push partait à CHAQUE étape de colis — sur ses 94 emails de suivi, **54 sont
+// "en transit" et 7 "info"**, soit 61 notifications qui n'appellent aucune
+// action. Idem « achat confirmé » (il vient de l'acheter), favoris, messages.
+//
+// RÈGLE : on ne sonne que pour de l'ARGENT ou une ACTION à faire. Le reste se
+// consulte dans l'app, où le badge suffit.
+// ⚠️ Une seule définition, partagée par le pipeline email ET le rappel quotidien
+//    (§11) — sinon les deux finiraient par ne pas notifier la même chose.
+export const PUSH_DEFAUT = {
+  vente:    true,   // une paire est vendue
+  argent:   true,   // virement reçu
+  colis:    true,   // colis à retirer (porte le code de retrait)
+  offre:    true,   // une offre attend une réponse
+  expedier: true,   // colis à poster (rappel quotidien)
+  suivi:    false,  // « en transit », « livré » : rien à faire
+  achat:    false,  // tu viens de l'acheter, tu le sais
+  message:  false,  // le badge de l'app suffit
+  favori:   false,  // Vinted en envoie beaucoup
+  facture:  false,
+};
+// Réglage du vendeur (Réglages → Notifications), lu depuis la base.
+// Absent ⟹ on prend le défaut ci-dessus.
+export async function pushCategorieActive(cat) {
+  if (!cat) return true;
+  try {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`, await cloisonnee()), { headers: HEADERS });
+    if (!res.ok) return PUSH_DEFAUT[cat] !== false;
+    const rows = await res.json();
+    const prefs = (rows && rows[0] && rows[0].data) || {};
+    const v = prefs[cat];
+    return typeof v === 'boolean' ? v : (PUSH_DEFAUT[cat] !== false);
+  } catch (_) { return PUSH_DEFAUT[cat] !== false; }
+}
+
 export async function loadSubs() {
   try {
     // ⚠️ Les abonnements sont PAR VENDEUR : sans ce filtre, une vente de Julien
