@@ -1487,67 +1487,19 @@ const joursAvant = (limite) => {
   const auj = new Date(); auj.setHours(0, 0, 0, 0);
   return Math.round((fin - auj) / 86400000);
 };
-// ── LES EMAILS PAS ENCORE TRAITÉS, LÀ OÙ ON LES CHERCHE ─────────────────────
-// Julien : « il n'y a aucun QR code ni de code de retrait ». Mesuré : ses colis
-// à retirer sont dans des emails MIS DE CÔTÉ (incident §5.43) — l'écran n'a donc
-// rien à afficher, et les 15 anciens colis en base ont tous plus de 14 jours.
-// Le bouton de rattrapage existait, mais dans Réglages : il regarde Achats, il
-// ne l'a jamais vu. Un outil de travail doit proposer la réparation À L'ENDROIT
-// où le manque se constate.
-// ⚠️ UN PAR UN + `silencieux` : mêmes garde-fous que dans Réglages (on ne lâche
-//    pas 600 requêtes d'un coup, et on ne renotifie pas six jours d'historique).
-function RejeuEnAttente({ onFini }) {
-  const [ids, setIds] = useState(null);
-  const [lot, setLot] = useState(null);
-  useEffect(() => { let mort = false; (async () => {
-    try {
-      // Scalaire : on ne lit QUE les identifiants (une ligne de quarantaine
-      // contient l'email entier — §34).
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id`, { headers: sbAuth() });
-      if (!r.ok) return;
-      const j = await r.json();
-      if (!mort) setIds((j || []).map(x => x.id).filter(Boolean));
-    } catch (_) {}
-  })(); return () => { mort = true; }; }, []);
-  if (!ids || !ids.length) return null;
-  const lancer = async () => {
-    const go = await askConfirm({
-      title: `Traiter ${ids.length} email${ids.length > 1 ? 's' : ''} en attente ?`,
-      desc: "Tes colis à retirer, leurs QR et leurs codes sont dedans, avec les bordereaux et les ventes.\n\nAucune notification ne part, et rien n'est supprimé tant que le traitement n'a pas abouti.",
-      ok: 'Traiter maintenant',
-    });
-    if (!go) return;
-    let ok = 0;
-    setLot({ fait: 0, total: ids.length });
-    for (let i = 0; i < ids.length; i++) {
-      try {
-        const r = await fetch('/api/email-rattacher', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) },
-          body: JSON.stringify({ id: ids[i], silencieux: true }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (j && j.ok) ok++;
-      } catch (_) {}
-      setLot({ fait: i + 1, total: ids.length });
-    }
-    setLot(null);
-    toast(`${ok} email${ok > 1 ? 's' : ''} traité${ok > 1 ? 's' : ''}.`);
-    if (onFini) onFini(); else location.reload();
-  };
-  return (
-    <div style={{border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
-      <div style={{fontSize:13.5,fontWeight:700,color:C.warn,marginBottom:3}}>📥 {ids.length} email{ids.length>1?'s':''} pas encore traité{ids.length>1?'s':''}</div>
-      <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginBottom:9}}>
-        Tes colis à retirer — avec leur QR et leur code — sont dedans, ainsi que tes bordereaux et tes ventes. Ils ont été mis de côté par erreur et sont conservés entiers.
-      </div>
-      <button type="button" disabled={!!lot} onClick={lancer}
-        style={{width:'100%',border:'none',background:lot?C.border:C.warn,color:lot?C.muted:'#fff',borderRadius:10,padding:'11px 12px',fontSize:13,fontWeight:700,cursor:lot?'default':'pointer',fontFamily:'inherit'}}>
-        {lot ? `Traitement… ${lot.fait}/${lot.total}` : `▶ Traiter maintenant (${ids.length})`}
-      </button>
-    </div>
-  );
-}
+// ── RATTRAPAGE AUTOMATIQUE DES EMAILS MIS DE CÔTÉ ───────────────────────────
+// Julien : « je ne veux pas qu'il y ait un bouton pour traiter les mails, dès
+// que ça arrive ça doit apparaître ». Les emails qui arrivent MAINTENANT sont
+// déjà traités tout seuls (§5.43) ; ce qui restait manuel, c'était le retard.
+// Il ne l'est plus : l'écran Achats le résorbe de lui-même, en silence.
+//
+// ⚠️ LES COLIS D'ABORD. 593 emails à la file, c'est plusieurs minutes ; ce qu'il
+//    attend (le QR, le code de retrait) doit apparaître en quelques secondes.
+//    On trie donc sur le SUJET — lu en scalaire, jamais le corps (§34).
+const SUJET_COLIS = /colis|pickup|relais|retir|disponible|chronopost|mondial|consigne|livrais|d[ée]p[ôo]t|suivi/i;
+// Une seule passe par chargement de page : sans ce garde-fou, revenir sur
+// l'onglet Achats relancerait la boucle.
+let _rattrapageLance = false;
 
 const retraitMode = (t) => {
   const c = CARRIERS[carrierKey(t && t.carrier)] || {};
@@ -11828,6 +11780,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // scalaires : elle sert au N°, au bordereau, au prix d'achat et à la photo.
   useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (!mort && m && Object.keys(m).length) setTxnItem(m); }); return () => { mort = true; }; }, []);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
+  // RATTRAPAGE AUTOMATIQUE (voir le commentaire au-dessus de `SUJET_COLIS`).
+  // Aucun bouton : on répare, on montre l'avancement, et les colis apparaissent
+  // au fur et à mesure. `silencieux` coupe les notifications — on rattrape de
+  // l'historique, pas des nouveautés.
+  const [rattrapage, setRattrapage] = useState(null);   // { fait, total }
+  useEffect(() => {
+    if (curSub !== 'achats' || _rattrapageLance) return;
+    _rattrapageLance = true;
+    let mort = false;
+    (async () => {
+      let lignes = [];
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject`, { headers: sbAuth() });
+        if (!r.ok) return;
+        lignes = (await r.json()) || [];
+      } catch (_) { return; }
+      if (!lignes.length || mort) return;
+      // Les colis passent devant : c'est ce qu'on attend à l'écran.
+      lignes.sort((a, b) => (SUJET_COLIS.test(b.sujet || '') ? 1 : 0) - (SUJET_COLIS.test(a.sujet || '') ? 1 : 0));
+      const nColis = lignes.filter(x => SUJET_COLIS.test(x.sujet || '')).length;
+      setRattrapage({ fait: 0, total: lignes.length });
+      let ratesDeSuite = 0;
+      for (let i = 0; i < lignes.length && !mort; i++) {
+        try {
+          const r = await fetch('/api/email-rattacher', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) },
+            body: JSON.stringify({ id: lignes[i].id, silencieux: true }),
+          });
+          const j = await r.json().catch(() => ({}));
+          ratesDeSuite = (j && j.ok) ? 0 : ratesDeSuite + 1;
+        } catch (_) { ratesDeSuite++; }
+        // Réseau coupé / serveur en panne : on s'arrête au lieu d'insister 600 fois.
+        if (ratesDeSuite >= 8) break;
+        if (!mort) setRattrapage({ fait: i + 1, total: lignes.length });
+        // Dès que les colis sont passés, on rafraîchit : le QR et le code
+        // apparaissent sans attendre la fin du reste.
+        if (i + 1 === nColis || (i + 1) % 40 === 0) { try { const t = await fetchEmailTracking(); if (!mort) setTracking(t); } catch (_) {} }
+      }
+      if (!mort) { setRattrapage(null); try { const t = await fetchEmailTracking(); if (!mort) setTracking(t); } catch (_) {} }
+    })();
+    return () => { mort = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub]);
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && vintedPoints===null) fetchHarvestPickupPoints().then(setVintedPoints); /* eslint-disable-next-line */ }, [sub]);
@@ -13767,7 +13763,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='achats' && (<>
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
         <NoAcc/>
-        <RejeuEnAttente/>
+        {/* Pas un bouton : un compte rendu. Le rattrapage tourne tout seul. */}
+        {rattrapage && (
+          <div style={{border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:12,padding:'9px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:9}}>
+            <span style={{fontSize:15}}>📥</span>
+            <div style={{flex:'1 1 140px',minWidth:0}}>
+              <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>Récupération de tes emails… {rattrapage.fait}/{rattrapage.total}</div>
+              <div style={{fontSize:11,color:C.muted}}>Tes colis à retirer apparaissent au fur et à mesure.</div>
+            </div>
+          </div>
+        )}
         {/* ⚠️ MÊME ORDRE QUE L'ÉCRAN VENTES. Ici la période arrivait en 19e position,
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
