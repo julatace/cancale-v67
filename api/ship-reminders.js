@@ -12,7 +12,7 @@
 //   Supabase et envoie une notification. Déclenché par le cron Vercel (vercel.json).
 // ────────────────────────────────────────────────────────────────────────────
 
-import { sendPushToAll } from './_lib/push.js';
+import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 
 import { withOwnerAll, conflictTarget } from './_lib/owner.js';
 
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, skipped: 'déjà notifié', total }); return;
     }
 
-    if (total > 0) {
+    if (total > 0 && await pushCategorieActive('expedier')) {
       const parts = [];
       if (overdue) parts.push(`${overdue} en retard`);
       if (dueToday) parts.push(`${dueToday} aujourd'hui`);

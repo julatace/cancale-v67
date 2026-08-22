@@ -2954,3 +2954,39 @@ Julien : « les onglets ne sont pas forcément assez intuitifs, fais quelque cho
 **3. Deux écrans jumeaux organisés différemment.** Sur **Ventes**, la barre d'outils (période, filtres, recherche) est en 1re position sous le titre. Sur **Achats**, elle arrivait en **19e**, après les cartes. C'est ça qui rend la navigation hésitante. Achats suit désormais le même ordre : **titre → outils → cartes → liste**.
 
 **Vérifié au relevé, dans l'ordre** : Ventes n'affiche plus qu'une fois l'argent en attente ; Achats commence par ses filtres + période (2e à 11e position) puis les colis. Smoke 12 écrans **0 PAGEERROR** · `audit-identite` 18/18 · `audit-coherence` 6/0.
+
+---
+
+## 5.41 — LES NOTIFICATIONS : « des fois je reçois des choses complètement débiles »
+
+Julien : « remets les notifications et améliore les notifications ». Mesure avant de coder.
+
+### Le canal marche — ce n'est pas ça, le problème
+`push_subs` est une **ligne dans `app_data`**, pas une table (`/rest/v1/push_subs` → PGRST205 : ce piège m'a fait conclure une fois « aucun abonné »). Relevé : **2 appareils abonnés** (FCM + Apple), mis à jour le 22 août 06:33. Les notifications partent donc bien.
+
+### Le vrai défaut : un push à CHAQUE étape de colis
+Sur ses **94 emails de suivi** en base :
+| statut | lignes | ça appelle une action ? |
+|---|---|---|
+| **transit** | **54** | non |
+| available | 15 | **oui** — c'est là qu'est le code de retrait |
+| delivered | 18 | non |
+| **info** | **7** | non |
+
+➡️ **61 des 94 notifications de colis ne demandaient rien.** Même chose pour « 🛍 Achat confirmé » (il vient de cliquer sur Acheter), les favoris et chaque message.
+
+### La règle : on ne sonne que pour de l'ARGENT ou une ACTION
+`PUSH_DEFAUT` + **`pushCategorieActive(cat)`** vivent dans **`api/_lib/push.js`** — une seule définition (§11), importée par `api/email-inbound.js` ET `api/ship-reminders.js` ; deux copies finiraient par ne pas notifier la même chose.
+
+| catégorie | par défaut | pourquoi |
+|---|---|---|
+| 💸 vente · 💰 argent · 📦 colis à retirer · 📮 à poster · 🏷 offre | **ON** | argent, ou un geste à faire |
+| 🚚 suivi · 🛍 achat · 💬 message · ❤️ favori · 🧾 facture | **OFF** | le badge de l'app suffit |
+
+Chaque `pushOnce` porte sa catégorie (2ᵉ argument, ou champ `_cat`) ; les colis prennent `available → 'colis'`, tout le reste `'suivi'`. ⚠️ `_cat` est **retiré du payload** avant l'envoi — c'est un marqueur interne, il n'a rien à faire dans la notification.
+
+### Le vendeur peut tout rouvrir
+**Réglages → Notifications** (`PushPrefsSetting`, sous l'interrupteur push existant) : les 10 catégories, une ligne chacune, avec ce que ça déclenche. Écrit dans la ligne **`push_prefs`** via `sbAuth()` / `withOwner()` / `SB_CONFLICT` — donc déjà prête pour le cloisonnement (§12), et la lecture serveur passe par `duVendeur` (§5.16 : la clé de service contourne RLS, chaque lecture doit être cadrée).
+⚠️ Une catégorie absente de la ligne ⟹ **le défaut ci-dessus**, jamais « muet ». Un réglage qu'on ne trouve pas ne doit pas éteindre une vente.
+
+**Vérifié** : `npm run build` OK · `node --check` sur les 3 fichiers `api/` · banc app, écran Réglages RENDU sur les vraies données → « Ce que tu reçois sur ton téléphone — **5 types de notification sur 10** », les 10 lignes présentes avec le bon état par défaut · smoke 12 écrans **0 PAGEERROR, 0 artefact** · `audit-identite` 18/18 · `audit-coherence` 6 règles / 0 désaccord.
