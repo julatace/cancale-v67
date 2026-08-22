@@ -17662,18 +17662,50 @@ function EmailsSetting() {
     if (!ok) return;
     const u = { ...(reg || {}) }; delete u[adr]; await ecrire(u);
   };
+  const rejouerUn = async (id, silencieux) => {
+    const r = await fetch('/api/email-rattacher', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) },
+      body: JSON.stringify({ id, silencieux: !!silencieux }),
+    });
+    const j = await r.json().catch(() => ({}));
+    return !!(j && j.ok);
+  };
   const rattacher = async (id) => {
     setBusy(id);
     try {
-      const r = await fetch('/api/email-rattacher', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) },
-        body: JSON.stringify({ id }),
-      });
-      const j = await r.json().catch(() => ({}));
-      toast(j && j.ok ? 'Email rattaché — il apparaît maintenant dans tes écrans.' : "Ce mail n'a pas pu être rattaché (format non reconnu). Il reste conservé.");
+      const ok = await rejouerUn(id, false);
+      toast(ok ? 'Email rattaché — il apparaît maintenant dans tes écrans.' : "Ce mail n'a pas pu être rattaché (format non reconnu). Il reste conservé.");
     } catch (_) { toast('Réseau indisponible — réessaie.'); }
     setBusy(''); charger();
+  };
+  // ── TOUT REJOUER ────────────────────────────────────────────────────────────
+  // Après l'incident du 16→22 août (§5.43), 593 emails s'étaient accumulés ici
+  // alors qu'ils auraient dû être traités : les colis à retirer, leurs QR et
+  // leurs codes n'apparaissaient nulle part. Ce bouton les repasse dans le même
+  // traitement que s'ils venaient d'arriver.
+  // ⚠️ UN PAR UN, en attendant la réponse : on ne lâche pas 600 requêtes d'un
+  //    coup sur la fonction serveur. Et `silencieux` coupe les notifications —
+  //    sinon c'est 600 alertes pour des choses déjà faites.
+  const [lot, setLot] = useState(null);   // { fait, total, ok } pendant le rejeu
+  const toutRejouer = async () => {
+    const ids = (quarantaine || []).map(q => q.id);
+    if (!ids.length) return;
+    const go = await askConfirm({
+      title: `Rejouer ${ids.length} email${ids.length > 1 ? 's' : ''} ?`,
+      desc: "Ils repassent dans le traitement normal : colis à retirer avec leur QR et leur code, bordereaux, ventes, offres.\n\nAucune notification ne sera envoyée, et rien n'est supprimé tant que le traitement n'a pas abouti.",
+      ok: 'Tout rejouer',
+    });
+    if (!go) return;
+    let ok = 0;
+    setLot({ fait: 0, total: ids.length, ok: 0 });
+    for (let i = 0; i < ids.length; i++) {
+      try { if (await rejouerUn(ids[i], true)) ok++; } catch (_) {}
+      setLot({ fait: i + 1, total: ids.length, ok });
+    }
+    setLot(null);
+    toast(`${ok} email${ok > 1 ? 's' : ''} traité${ok > 1 ? 's' : ''} sur ${ids.length}.`);
+    charger();
   };
   const liste = Object.keys(reg || {});
   const enAttente = quarantaine || [];
@@ -17702,6 +17734,10 @@ function EmailsSetting() {
         <div style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés sur une adresse non déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
+          <button type="button" disabled={!!lot} onClick={toutRejouer}
+            style={{width:'100%',marginBottom:10,border:'none',background:lot?C.border:C.accent,color:lot?C.muted:(C.onAccent||'#fff'),borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:700,cursor:lot?'default':'pointer',fontFamily:'inherit'}}>
+            {lot ? `Traitement… ${lot.fait}/${lot.total}` : `▶ Tout rejouer (${enAttente.length})`}
+          </button>
           {enAttente.slice(0,8).map(q => (
             <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 130px',minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>

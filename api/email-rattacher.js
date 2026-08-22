@@ -11,6 +11,7 @@
 // Supabase avant toute chose — sinon n'importe qui pourrait s'attribuer les
 // emails d'un autre vendeur, ce qui serait pire que le problème d'origine.
 import { traiterEmail } from './email-inbound.js';
+import { contexteVendeur } from './_lib/owner.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -61,7 +62,8 @@ export default async function handler(req, res) {
   };
   let resultat = null;
   const capture = { setHeader() {}, status() { return this; }, json(o) { resultat = o; return this; } };
-  await traiterEmail(faux, capture);
+  // `silencieux` : rejeu en lot → on ne renotifie pas. Isolé par requête.
+  await contexteVendeur.run({ owner: owner || '', silence: !!corps.silencieux }, () => traiterEmail(faux, capture));
 
   // Rattaché avec succès → la ligne de quarantaine n'a plus lieu d'être.
   // ⚠️ On ne supprime QUE si le traitement a réellement abouti : sinon on
