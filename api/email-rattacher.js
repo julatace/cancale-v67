@@ -59,6 +59,10 @@ export default async function handler(req, res) {
     method: 'POST', query: { key: process.env.EMAIL_INBOUND_SECRET || '' }, headers: {},
     body: { from: ligne.from, to: ligne.to, subject: ligne.subject, text: ligne.text, html: ligne.html },
     __ownerForce: owner || '',
+    // ⚠️ LA DATE D'ORIGINE, PAS CELLE DU REJEU. Sans ça, un email d'il y a six
+    //    jours ressort daté d'aujourd'hui : le colis afficherait « arrivé le 22 »
+    //    alors qu'il attend depuis le 17, et la fenêtre d'ancienneté serait fausse.
+    __recuLe: ligne.at || null,
   };
   let resultat = null;
   const capture = { setHeader() {}, status() { return this; }, json(o) { resultat = o; return this; } };

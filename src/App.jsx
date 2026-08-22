@@ -13876,7 +13876,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>📦 {pickupUnion.total} colis à retirer</div>
                 <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{border:`1px solid ${C.accent}`,background:showRelais?C.accent:'transparent',color:showRelais?'#fff':C.accent,borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🗺️ {showRelais?'Masquer la carte':'Carte'}</button>
               </div>
-              {Object.entries(groups).map(([nom,g])=>(
+              {/* ⚠️ UN ENDROIT DÉDIÉ PAR TRANSPORTEUR (demande de Julien). Chaque
+                  transporteur a sa façon de remettre le colis (§28) : Chronopost
+                  au QR, Mondial Relay au code. Les mélanger obligeait à relire le
+                  logo de chaque ligne pour savoir quoi présenter. */}
+              {(()=>{ const parTr={};
+                Object.entries(groups).forEach(([nom,g])=>{ const k=carrierName(g.carrier)||'Autre';
+                  (parTr[k]=parTr[k]||{carrier:g.carrier,relais:[],n:0}); parTr[k].relais.push([nom,g]); parTr[k].n+=g.colis.length; });
+                const ordre=Object.entries(parTr).sort((a,b)=>b[1].n-a[1].n);
+                return ordre.map(([tr,bloc])=>(
+                  <div key={'tr'+tr} style={{marginBottom:14}}>
+                    {/* En-tête TOUJOURS affiché, même s'il n'y a qu'un transporteur :
+                        savoir à qui on a affaire décide du geste (QR ou code). */}
+                    {(
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,paddingBottom:6,borderBottom:`1px solid ${C.border}`}}>
+                        {bloc.carrier&&<CarrierBadge carrier={bloc.carrier} size={20}/>}
+                        <div style={{flex:1,fontSize:13.5,fontWeight:700,color:C.text}}>{tr}</div>
+                        <div style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{bloc.n} colis</div>
+                      </div>
+                    )}
+                    {bloc.relais.map(([nom,g])=>(
                 <div key={nom} style={{marginBottom:12}}>
                   <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:8}}>
                     {g.carrier&&<CarrierBadge carrier={g.carrier} size={22}/>}
@@ -13907,7 +13926,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* Le n° de suivi sur SA ligne, en chiffres lisibles :
                               au comptoir c'est ce qu'on demande quand le scan
                               ou le code ne passe pas. */}
-                          {t.suivi && <div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
+                          {/* n° de suivi + JOUR D'ARRIVÉE (demande de Julien) : savoir
+                              depuis quand le colis attend, c'est ce qui dit s'il faut y
+                              aller aujourd'hui. La date vient de l'email lui-même — et
+                              un email rejoué garde SA date d'origine (api/email-rattacher). */}
+                          {(t.suivi || t.receivedAt) && (()=>{
+                            const d = t.receivedAt ? new Date(t.receivedAt) : null;
+                            const ok = d && !isNaN(d);
+                            const j = ok ? Math.round((Date.now() - d.getTime()) / 86400000) : null;
+                            return <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {t.suivi && <span style={{fontFamily:'monospace',letterSpacing:.5}}>n° {t.suivi}</span>}
+                              {t.suivi && ok && ' · '}
+                              {ok && <span>arrivé le {d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}{j>0?` · il y a ${j} j`:j===0?" · aujourd'hui":''}</span>}
+                            </div>;
+                          })()}
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
@@ -13950,7 +13982,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     );
                   })}
                 </div>
-              ))}
+                    ))}
+                  </div>
+                )); })()}
               {/* Colis vus « déposés » par Vinted mais dont le CODE n'est pas
                   encore arrivé par email → on les montre quand même (sinon le
                   compteur dirait 2 et la liste n'en montrerait qu'1). */}

@@ -863,7 +863,9 @@ export async function traiterEmail(req, res) {
   const subject = mail.subject || '';
   const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${mail.text}`;
   const acc = await detectAccount(rawForDetect);
-  const now = new Date().toISOString();
+  // Date de RÉCEPTION de l'email : celle d'origine si on rejoue un email conservé
+  // (voir api/email-rattacher.js), sinon maintenant.
+  const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();
 
   try {
     // 0) SUIVI DE COLIS.
