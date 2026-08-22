@@ -3152,3 +3152,17 @@ Donc : les vrais colis sont dans les emails mis de côté, et les 15 anciens son
 ➡️ **`RejeuEnAttente`** (composant module-level) monté en tête de l'écran **Achats** : bandeau orange « 📥 N emails pas encore traités — tes colis à retirer, avec leur QR et leur code, sont dedans » + bouton **« ▶ Traiter maintenant (N) »**. Mêmes garde-fous que dans Réglages : confirmation, **un par un** en attendant la réponse, **`silencieux: true`**, rien n'est supprimé sans traitement abouti, puis rechargement. Lecture **scalaire** des identifiants seuls (une ligne de quarantaine contient l'email entier — §34). Le bandeau disparaît de lui-même quand la quarantaine est vide.
 
 **Vérifié au banc** (écran Achats rendu, 12 lignes de quarantaine + les 2 vrais colis du rejeu) : bandeau affiché, confirmation, **12 appels sur 12** tous en `silencieux` ; et sur la même page **2 vignettes QR**, modale avec le QR en grand, identifiant 8156 + code 9539, lieu Super U, délais justes. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22 · `audit-coherence` 6/0.
+
+### 5.43 (suite) — PLUS DE BOUTON : LE RETARD SE RÉSORBE TOUT SEUL
+
+Julien : « je ne veux pas qu'il y ait un bouton pour traiter les mails, dès que ça arrive ça doit apparaître ».
+
+Les emails qui arrivent **maintenant** sont déjà traités tout seuls depuis le correctif de quarantaine. Ce qui restait manuel, c'était le **retard**. Il ne l'est plus.
+
+- **`RejeuEnAttente` (le bandeau à bouton) est SUPPRIMÉ.** À la place, un effet dans `Comptabilite` : à l'ouverture de l'onglet **Achats**, s'il reste des lignes `email_quarantaine_*`, elles sont repassées dans le traitement normal, sans rien demander.
+- ⚠️ **LES COLIS D'ABORD.** 593 emails à la file, c'est plusieurs minutes ; ce qu'il attend (le QR, le code) doit apparaître en quelques secondes. On trie sur le **SUJET** (`SUJET_COLIS`), lu en **scalaire** — jamais le corps (§34). Dès que les colis sont passés, `fetchEmailTracking()` rafraîchit l'écran : le QR s'affiche sans attendre la fin du reste (puis tous les 40).
+- **`silencieux: true`** partout : on rattrape de l'historique, pas des nouveautés.
+- Garde-fous : **`_rattrapageLance`** (module-level) → une seule passe par chargement de page, sinon revenir sur l'onglet relancerait la boucle ; **arrêt après 8 échecs d'affilée** (réseau coupé) au lieu d'insister 600 fois ; `mort` au démontage.
+- À l'écran, plus un bouton mais **un compte rendu** : « 📥 Récupération de tes emails… 12/593 · Tes colis à retirer apparaissent au fur et à mesure. »
+
+**Vérifié au banc** (écran Achats, quarantaine mêlant colis et autres sujets) : **aucun bouton « Traiter »**, rattrapage **lancé tout seul** (8 emails), **les 3 colis traités EN PREMIER** (a2, a4, a6 avant les ventes/favoris/évaluations), tous en `silencieux` ; et sur la même page 2 vignettes QR, modale, identifiant 8156 + code 9539, délais justes. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
