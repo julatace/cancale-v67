@@ -3166,3 +3166,19 @@ Les emails qui arrivent **maintenant** sont déjà traités tout seuls depuis le
 - À l'écran, plus un bouton mais **un compte rendu** : « 📥 Récupération de tes emails… 12/593 · Tes colis à retirer apparaissent au fur et à mesure. »
 
 **Vérifié au banc** (écran Achats, quarantaine mêlant colis et autres sujets) : **aucun bouton « Traiter »**, rattrapage **lancé tout seul** (8 emails), **les 3 colis traités EN PREMIER** (a2, a4, a6 avant les ventes/favoris/évaluations), tous en `silencieux` ; et sur la même page 2 vignettes QR, modale, identifiant 8156 + code 9539, délais justes. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
+
+### 5.43 (suite) — LE COLIS COCHÉ RESTE EN GRIS **AVEC SON QR**, et le rattrapage devient invisible
+
+Julien : « je ne veux pas qu'il y ait marqué traité, je veux que ce soit automatique… et grisé en attendant que ce soit confirmé, comme ça si jamais il y a un problème, j'ai quand même le QR code ».
+
+**1. Le rattrapage ne se voit plus.** L'indicateur « Récupération de tes emails… n/N » est retiré : l'effet tourne en fond, ce qui apparaît ce sont les colis eux-mêmes.
+
+**2. ⚠️ LE TROU RÉEL : cocher ✓ faisait disparaître le colis, QR compris.** Le mode « grisé, pas disparu » (§5.37) n'existait que pour les colis déduits du **statut Vinted** (`markPickupDone`). Un colis venu d'un **email transporteur** passe par `markCollected`, qui le sort de `isColisActive` → il s'évaporait d'un coup. C'est exactement le cas de ses Chronopost.
+- **`vrm_colis_collected_at`** (nouvelle clé, synchronisée) mémorise **QUAND** on a coché — le Set `vrm_colis_collected` ne le disait pas, et sans la date on ne peut pas garder la ligne « le temps que ce soit confirmé ». Clé à part : un colis coché avant ce changement n'a pas de date et se comporte comme avant (aucune régression).
+- **`pickupUnion.attenteMail`** : les colis d'email cochés restent affichés **en gris, avec leur QR, leur code et leur n° de suivi**, jusqu'à ce que le transporteur confirme (`colisRetireAilleurs`) ou au plus `PICKUP_CONFIRM_DAYS`. Bouton **↺ Remettre**.
+- ⚠️ **L'opacité n'est PAS sur la carte** : elle se transmet aux enfants et ne se « défait » pas. On grise le texte et la photo séparément — **le QR reste net et scannable**.
+- Le bloc « retirés » côté Vinted (`attente`) gagne la même chose, via `trackForBuy(o)` (titre exact ET candidat unique des deux côtés, §5.39) — jamais le QR d'un autre colis.
+
+**3. Le n° de suivi sur sa propre ligne**, en chiffres monospace : au comptoir c'est ce qu'on demande quand le scan ou le code ne passe pas.
+
+**Vérifié au banc** : aucun bouton « Traiter », **aucun indicateur** de traitement, rattrapage lancé tout seul (**colis en premier**, tous en `silencieux`), `n° 09843408317167` visible, 2 vignettes QR, modale plein écran, identifiant 8156 + code 9539, délais justes — puis **après le ✓** : bloc « en attente de confirmation », **le QR toujours accessible dessus**, bouton ↺ Remettre. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22 · `audit-coherence` 6/0.
