@@ -3234,3 +3234,30 @@ Après correctif, re-scan de **tous** les emails conservés :
 ⚠️ **La prochaine question à poser à Julien est donc l'ADRESSE**, pas le code : quelles boîtes transfèrent vers l'app (relevé : `shopcancale35@`, `lolanisse35@`, `tomjeancanc35@`, `vinted35260@icloud`, `traces_etage_3i@icloud`, 2 `privaterelay`), et sur laquelle arrivent ses emails Pickup.
 
 **Vérifié** : `npm run build` OK · le parseur rend toujours code 9539 + identifiant 8156 + lieu + QR sur l'email réel · écran Achats : vignette QR, modale, QR conservé après le ✓ · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
+
+### 5.43 (suite) — POURQUOI LE COLIS 8156/9539 N'ÉTAIT PAS LÀ, ET LA RÈGLE QUI POUVAIT EN CACHER D'AUTRES
+
+Julien : « ce colis-là n'est pas dans l'app, regarde pourquoi et corrige pour que ça n'arrive pas. Identifiant 8156, code 9539. »
+
+**Tracé ligne par ligne dans la vraie base** (`colis8156.mjs`, puis `filtre.mjs` qui rejoue la CHAÎNE DE FILTRES de l'app sur les vraies lignes) :
+
+| contrôle | résultat |
+|---|---|
+| ligne `email_track_chronopost_09843408317167` | **existe**, `status=available`, code 9539, ident 8156, QR réel, lieu Super U |
+| coché « récupéré » ? | non |
+| un email « colis retiré » pour ce suivi ? | non |
+| **la chaîne de filtres de l'app l'affiche-t-elle ?** | **OUI** |
+
+➡️ **Il n'y avait pas de bug d'affichage : la ligne n'a été créée qu'à 21:00**, quand le rattrapage automatique est arrivé à cet email. Julien regardait avant.
+
+### Ce qui a quand même été corrigé — la règle des 14 jours pouvait cacher un vrai colis
+`isColisActive` écartait tout colis reçu il y a plus de `PICKUP_MAX_DAYS` (14). C'est une **supposition** (« un relais ne garde pas plus longtemps »). Or quand le transporteur **écrit** la date limite, c'est lui qui a raison — mesuré : un Chronopost de 15 jours était écarté par la supposition.
+
+➡️ **La `limite` de l'email prime sur les 14 jours, dans UN SEUL SENS :**
+- limite **connue et pas encore dépassée de plus de `PICKUP_GRACE_DAYS` (10 j)** ⟹ le colis reste visible, même vieux ;
+- ⚠️ **jamais l'inverse** : une limite dépassée ne fait PAS disparaître le colis. Celui de Julien avait sa limite au 21 août et n'était toujours pas retiré le 23. **Un colis caché est un colis perdu** — on l'affiche en rouge « délai dépassé », c'est à lui de trancher.
+- Sans limite dans l'email : comportement inchangé (14 jours).
+
+**Et le rattrapage part aussi depuis Ma journée**, plus seulement depuis Achats : attendre qu'il ouvre précisément l'onglet Achats retardait l'apparition d'un colis pour rien.
+
+**Vérifié** : chaîne de filtres rejouée sur les 109 lignes réelles → **2 colis affichés**, dont celui de Julien (9539 / 8156), et les 16 écartés le sont pour une raison nommée (coché récupéré, ou > 14 j sans limite) · **6 cas sur 6** au contrôle unitaire de la nouvelle règle (vieux + limite demain → visible ; vieux + limite d'hier → visible ; limite dépassée de 20 j → non ; sans limite → inchangé ; coché → non) · écran Achats rendu : vignette QR, modale, QR conservé après le ✓ · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.

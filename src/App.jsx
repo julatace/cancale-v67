@@ -8700,15 +8700,33 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // les filtres d'ancienneté/lieu) → trois nombres différents pour les mêmes colis.
 // Tout passe désormais par ces fonctions, module-level, lisibles de partout.
 const colisKey = (t) => String((t && (t.suivi || t.subject)) || '').trim();
-const PICKUP_MAX_DAYS = 14;   // au-delà, un point relais a forcément rendu le colis
+const PICKUP_MAX_DAYS = 14;
+// Après la date limite, on garde encore le colis affiché quelques jours : le
+// relais rend rarement le colis le jour même, et un colis caché est perdu.
+const PICKUP_GRACE_DAYS = 10;   // au-delà, un point relais a forcément rendu le colis
 // Combien de temps on affiche un colis coché « retiré » en gris, le temps que
 // Vinted enregistre le retrait. Au-delà on n'attend plus : la ligne s'efface,
 // sinon un statut Vinted qui ne bouge jamais encombrerait la liste pour toujours.
 const PICKUP_CONFIRM_DAYS = 7;
 const loadCollected = () => new Set((load('vrm_colis_collected', []) || []).map(String));
+// ⚠️ LA DATE LIMITE DE L'EMAIL PRIME SUR LES 14 JOURS — dans UN SEUL SENS.
+// Les 14 jours (`PICKUP_MAX_DAYS`) sont une supposition : « un point relais ne
+// garde pas un colis plus longtemps ». Mais quand le transporteur ÉCRIT la date
+// limite (« à retirer jusqu'au 21 août »), c'est LUI qui a raison — mesuré : un
+// colis Chronopost de 15 jours était écarté par la supposition alors que rien
+// ne disait qu'il était parti.
+// ⚠️ Et JAMAIS l'inverse : une limite dépassée ne fait PAS disparaître le colis.
+//    Celui de Julien (identifiant 8156, code 9539) avait sa limite au 21 août et
+//    n'était toujours pas retiré le 23. Un colis qu'on cache est un colis perdu ;
+//    on l'affiche en rouge « délai dépassé », c'est à lui de décider.
 const isColisActive = (t, collected) => {
   if (!t || t.status !== 'available') return false;
   if (collected && collected.has(colisKey(t))) return false;
+  // Une limite annoncée par le transporteur garde le colis visible, même vieux.
+  if (t && t.limite) {
+    const j = joursAvant(t.limite);
+    if (j != null && j >= -PICKUP_GRACE_DAYS) return true;
+  }
   const d = new Date(t.receivedAt); if (isNaN(d)) return true;
   return (Date.now() - d.getTime()) / 86400000 <= PICKUP_MAX_DAYS;
 };
@@ -11817,7 +11835,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    pas qu'il y ait marqué traité »). Il tourne en fond ; ce qui apparaît,
   //    ce sont les colis eux-mêmes, au fur et à mesure.
   useEffect(() => {
-    if (curSub !== 'achats' || _rattrapageLance) return;
+    // Achats ET Ma journée : c'est là qu'il regarde en premier. Attendre qu'il
+    // ouvre précisément Achats retardait l'apparition d'un colis pour rien.
+    if (!(curSub === 'achats' || curSub === 'journee') || _rattrapageLance) return;
     _rattrapageLance = true;
     let mort = false;
     (async () => {
