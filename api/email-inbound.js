@@ -35,14 +35,44 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KE
 
 // ── Utilitaires ─────────────────────────────────────────────────────────────
 
+// ⚠️⚠️ LE CSS N'EST PAS DU TEXTE (22 août). `<style>` n'était pas retiré : sur
+// TOUT email Mondial Relay / Vinted-relay, la feuille de style se retrouvait
+// dans le « texte » de l'email — des milliers de caractères de `!important`,
+// `mso-`, `@media`… avant la moindre phrase. Conséquences mesurées : le statut
+// tombait en « en transit » par défaut, et le lieu / la date limite / le code
+// n'étaient jamais trouvés. Pire, des chiffres de CSS peuvent se faire prendre
+// pour un code de retrait.
+// ⚠️ Certains services de réception fournissent DÉJÀ un `text` qui n'est que
+//    cette feuille de style (mesuré sur « Votre colis est entre de bonnes
+//    mains ») — d'où `texteUtile()` plus bas, qui choisit la meilleure source.
 function htmlToText(html) {
   if (!html) return '';
   return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n')
     .replace(/<\/li>/gi, '\n').replace(/<\/tr>/gi, '\n').replace(/<\/td>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&euro;/g, '€')
     .replace(/&#8364;/g, '€').replace(/&#\d+;/g, ' ');
+}
+
+// Du CSS n'est pas un message. Un `text` qui porte les marqueurs d'une feuille
+// de style (ou qui est plus pauvre que le HTML nettoyé) est écarté au profit du
+// HTML. Sans ça, l'email « Votre colis est entre de bonnes mains » n'était que
+// du CSS : ni statut, ni lieu, ni code.
+const RESSEMBLE_A_DU_CSS = /!important|mso-[a-z-]+\s*:|@media\s+screen|-webkit-text-size-adjust|\{[^{}]*:[^{}]*;[^{}]*\}/i;
+function texteUtile(mail) {
+  const brut = String((mail && mail.text) || '');
+  const duHtml = htmlToText((mail && mail.html) || '');
+  const propre = brut && !RESSEMBLE_A_DU_CSS.test(brut) ? brut : '';
+  if (propre) return propre;
+  if (duHtml && !RESSEMBLE_A_DU_CSS.test(duHtml)) return duHtml;
+  // Les deux sont pollués : on garde le plus long des deux nettoyés grossièrement.
+  const netto = (x) => String(x).replace(/\{[^{}]*\}/g, ' ').replace(/[.#@][\w-]+\s*(?=\{)/g, ' ');
+  const a = netto(brut), b = netto(duHtml);
+  return (b.length > a.length ? b : a);
 }
 
 // Normalise le corps de requête (selon le service de réception) vers une forme
@@ -415,7 +445,7 @@ async function findBuyPriceByTitle(title) {
 
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
 function parseCarrierEmail(mail, carrier) {
-  const txt = mail.text || htmlToText(mail.html) || '';
+  const txt = texteUtile(mail);
   const all = (mail.subject || '') + '\n' + txt;
 
   // N° de suivi / d'expédition
