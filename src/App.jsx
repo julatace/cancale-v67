@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -10496,6 +10496,67 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   }, [porteursNum]);
+  // ── CHANGER LE NUMÉRO D'UNE PAIRE À LA MAIN ────────────────────────────────
+  // Julien : « on peut donner la possibilité aux gens de changer de numéro, et
+  // lorsqu'ils mettent un numéro qui a déjà été attribué, il demande si c'était
+  // bien un litige et relit ensuite les informations de l'ancienne paire. »
+  //
+  // Trois cas, un seul aboutirait à un doublon — c'est celui qu'on refuse :
+  //   1. numéro LIBRE            → posé, et brûlé à vie (`recordUsed`) ;
+  //   2. numéro d'une paire ABSENTE (vendue, partie, retirée) → on demande si
+  //      c'est la MÊME paire qui revient ; oui ⟹ elle récupère le prix d'achat,
+  //      l'achat relié, le boost et la pointure de l'ancienne fiche, qui lui
+  //      cède la place ;
+  //   3. numéro d'une paire ENCORE PRÉSENTE (en ligne / à expédier / au garage)
+  //      → REFUS. Deux paires dans la même boîte, c'est la mauvaise chaussure
+  //      dans le carton (§19, le risque n°1). On propose le prochain libre.
+  // ⚠️ Le contrôle se fait au BLUR, pas à chaque frappe : en tapant « 15 » on
+  //    passe par « 1 », qui déclencherait une fausse alerte.
+  const numAvantRef = useRef('');
+  // `avant` = la valeur du champ AU MOMENT OÙ ON L'A OUVERT (mémorisée au
+  // focus) : `onChange` a déjà écrit la nouvelle, on ne pourrait plus la relire.
+  const poserNumero = async (item, valeur, avant) => {
+    const n = String(valeur || '').trim();
+    if (!n) return;
+    const moi = String(item.id);
+    avant = String(avant ?? '');
+    const autres = Object.keys(numeros).filter(k => k !== moi && String((numeros[k] || {}).numero || '').trim() === n);
+    if (!autres.length) { recordUsed(n); return; }
+    const presents = (porteursNum[n] || []).filter(p => String(p.id) !== moi);
+    if (presents.length) {
+      const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
+        : p.type === 'vente' ? `📮 à expédier « ${p.titre} »` : `🏠 ${p.titre}`).join('\n');
+      const prendre = await askConfirm({
+        title: `Le N°${n} est déjà pris`,
+        desc: `Une paire le porte encore :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
+        ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
+      });
+      updatePair(item, { numero: prendre ? String(nextNumero) : avant });
+      if (prendre) recordUsed(nextNumero);
+      return;
+    }
+    const anc = numeros[autres[0]] || {};
+    const meme = await askConfirm({
+      title: `Le N°${n} a déjà servi`,
+      desc: `Il était sur « ${anc.title || 'une autre paire'} », qui n'est plus en ligne.\n\nEst-ce bien la MÊME paire qui te revient (litige, retour, annulation) ?\n\nSi oui, elle reprend son prix d'achat et ses infos. Si c'est une autre paire, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
+      ok: 'Oui, la même paire revient', cancel: `Non — N°${nextNumero}`,
+    });
+    if (!meme) { updatePair(item, { numero: String(nextNumero) }); recordUsed(nextNumero); return; }
+    setNumeros(prev => {
+      const u = { ...prev }; const a = u[autres[0]] || {};
+      u[moi] = { ...(u[moi] || {}),
+        buyPrice: a.buyPrice, buyFromId: a.buyFromId ?? null, buyFrom: a.buyFrom ?? null,
+        fees: a.fees, size: (u[moi] || {}).size ?? a.size ?? null,
+        numero: n, title: item.title, photo: item.photo || null, photoK: photoKey(item.photo) || null,
+        price: item.price ?? null, accountId: item._acc?.vinted_user_id,
+        auto: false, repriseAt: new Date().toISOString() };
+      delete u[autres[0]];                       // l'ancienne fiche devient celle-ci
+      save('vinted_annonce_numeros', u); return u;
+    });
+    recordUsed(n);
+    toast(`N°${n} repris — les infos de l'ancienne paire sont revenues avec lui`);
+  };
+
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
   const buyOf = (o) => { const e = effEntry(o); const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null; return (b!=null && !isNaN(b)) ? b : null; };
   // Vente finalisée SANS prix d'achat renseigné → fausse le bénéfice (comptée
@@ -10901,19 +10962,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // numérotée, ni en ligne, ni vendue) qui correspond en titre+pointure à une
   // annonce fraîchement numérotée automatiquement. Un clic remet l'ancien
   // numéro. Jamais automatique : deux paires identiques existent vraiment.
+  // ⚠️ LE NUMÉRO SUIT LA PAIRE PHYSIQUE — une paire VENDUE ne récupère jamais
+  // son numéro toute seule (règle de Julien, août 2026) :
+  //   • annulation / retrait puis « republier » → la chaussure n'a jamais quitté
+  //     sa boîte, le numéro écrit dessus reste le bon → reprise automatique ;
+  //   • LITIGE / retour → la paire revient dans un autre carton, on la repose
+  //     nous-mêmes → elle prend un NUMÉRO NEUF.
+  // Les deux se ressemblent (l'annonce redevient en ligne) ; ce qui les sépare,
+  // c'est qu'une VENTE existe. Donc : dès qu'une vente — quel que soit son
+  // statut — désigne cette paire par une IDENTITÉ CERTAINE (identifiant Vinted
+  // sinon photo, §5.34), la reprise automatique s'arrête là. Julien peut encore
+  // lui rendre son ancien numéro à la main (le champ N° demande alors
+  // confirmation et récupère les infos de l'ancienne paire).
+  // ⚠️ Pourquoi ça ne suffisait PAS de lire `vinted_txn_link` : le verrou ne se
+  // pose que sur les ventes FINALISÉES. Mesuré le 22 août — les 3 seules paires
+  // en litige (N°115 « Retour initié », N°169 « non réclamée », N°167
+  // « Remboursement effectué ») n'ont AUCUN verrou, et 18 des 58 paires vendues
+  // non plus : toutes auraient repris leur ancien numéro.
+  const pairesVendues = useMemo(() => {
+    const set = new Set(Object.values(txnLink || {}).map(String));
+    for (const o of (sales.items || [])) { const k = identiteAnnonce(o); if (k) set.add(String(k)); }
+    return set;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, txnLink, txnItem, numeros]);
+
   const numeroReprises = useMemo(() => {
     const online = annBase;
     if (!online.length || !Object.keys(numeros).length) return [];
-    const soldKeys = new Set(Object.values(txnLink || {}).map(String));
-    // Orphelins : numérotés, plus en ligne, pas vendus, pas déclarés perdus.
+    // Orphelins : numérotés, plus en ligne, pas déclarés perdus. On garde AUSSI
+    // les paires vendues — mais MARQUÉES : elles seront PROPOSÉES, jamais
+    // appliquées toutes seules. C'est là que se joue annulation vs litige.
     const orphans = [];
     for (const k in numeros) {
       const e = numeros[k];
       if (!e || !String(e.numero || '').trim()) continue;
       if (onlineAnnonceIds.has(String(k))) continue;
-      if (soldKeys.has(String(k))) continue;
       if (pairsLost[String(e.numero)]) continue;
-      orphans.push({ key: k, e });
+      orphans.push({ key: k, e, vendue: pairesVendues.has(String(k)) });
     }
     if (!orphans.length) return [];
     const sizeOf = (t, fallback) => normSize(extractSize(t) || fallback || '');
@@ -10942,17 +11027,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       });
       // Ambigu (plusieurs orphelins possibles) → on ne propose rien plutôt que
       // de risquer d'attribuer le numéro d'une autre paire.
-      if (cands.length === 1) out.push({ item: it, current: cur, orphan: cands[0] });
+      if (cands.length === 1) out.push({ item: it, current: cur, orphan: cands[0], vendue: !!cands[0].vendue });
     }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, onlineAnnonceIds, txnLink, pairsLost]);
+  }, [annBase, numeros, onlineAnnonceIds, pairesVendues, pairsLost]);
 
   // Applique la reprise : l'annonce en ligne récupère l'ancien numéro, et le
   // numéro auto tout juste créé est rendu (il n'a jamais été écrit sur une boîte).
   const applyReprise = async (r)=>{
     const oldNum = String(r.orphan.e.numero), autoNum2 = String(r.current.numero);
-    if (!await askConfirm(`Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, sera rendu.`)) return;
+    const q = r.vendue
+      ? `Cette paire t'est REVENUE (litige, retour, annulation) ?\n\n« ${r.item.title} »\n\nElle a été vendue sous le N°${oldNum}. Si tu l'as remise dans SA boîte, elle peut le reprendre — sinon garde le N°${autoNum2}, qui est neuf.`
+      : `Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, sera rendu.`;
+    if (!await askConfirm(q)) return;
     setNumeros(prev => {
       const u = { ...prev };
       u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
@@ -10981,6 +11069,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const freed = [];
     let changed = false;
     for (const r of numeroReprises) {
+      // ⚠️ PAIRE VENDUE : jamais toute seule. Elle est partie ; si elle revient
+      //    (litige, retour), elle revient dans un autre carton → numéro NEUF par
+      //    défaut. Le bandeau propose quand même de lui rendre le sien, en un tap.
+      if (r.vendue) continue;
       const oldNum = String(r.orphan.e.numero);
       u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
       if (r.orphan.key !== r.item.id) delete u[r.orphan.key]; // l'ancienne fiche devient l'annonce actuelle
@@ -14435,8 +14527,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           )}
           {numeroReprises.length > 0 && (
             <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:12,padding:'10px 12px'}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} annonce{numeroReprises.length>1?'s':''} republiée{numeroReprises.length>1?'s':''} ?</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Tu as repris ces paires en photo : l'app ne les a pas reconnues et leur a donné un numéro neuf. Si c'est bien la même paire, remets son numéro d'origine — celui écrit sur sa boîte.</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} paire{numeroReprises.length>1?'s':''} déjà connue{numeroReprises.length>1?'s':''} ?</div>
+              {/* ⚠️ Une paire VENDUE n'est jamais remise à son ancien numéro toute
+                  seule : elle est partie, et si elle revient (litige, retour) elle
+                  revient dans un autre carton. On le PROPOSE, il tranche. */}
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Ces annonces ont reçu un numéro NEUF. Si c'est bien la même paire et qu'elle est toujours dans SA boîte, remets son numéro d'origine.</div>
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {numeroReprises.slice(0,8).map((r,i)=>(
                   <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 9px'}}>
@@ -14445,7 +14540,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (auto) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · 🏠 ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · 🏠 ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                      {r.vendue && <div style={{fontSize:10,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cette paire a été VENDUE sous le N°{r.orphan.e.numero} — ne le remets que si elle t'est revenue et qu'elle est dans sa boîte</div>}
                     </div>
                     <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:10,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
                   </div>
@@ -14657,7 +14753,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
                   <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                    <input value={num} onChange={ev=>updatePair(item,{numero:ev.target.value})} onBlur={ev=>recordUsed(ev.target.value)} placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    <input value={num} onChange={ev=>updatePair(item,{numero:ev.target.value})} onFocus={ev=>{numAvantRef.current=ev.target.value;}} onBlur={ev=>poserNumero(item,ev.target.value,numAvantRef.current)} inputMode="numeric" placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                   </div>
                   <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
                     <input value={buy} onChange={ev=>updatePair(item,{buyPrice:ev.target.value,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>

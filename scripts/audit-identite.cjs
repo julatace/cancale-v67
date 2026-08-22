@@ -171,5 +171,34 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : ok('la mémoire des numéros ne perd jamais d\'entrée');
 }
 
+// ── 7) UNE PAIRE VENDUE NE REPREND JAMAIS SON NUMÉRO TOUTE SEULE ─────────────
+//     « Si c'est une annulation et qu'on appuie sur republier dans Vinted [le
+//      numéro reste] ; et si c'est un litige, qu'on reçoit la paire et qu'on la
+//      reposte nous-mêmes, là il faut prendre un nouveau numéro. » — Julien
+//     Les deux se ressemblent (l'annonce redevient en ligne) ; ce qui les sépare,
+//     c'est qu'une VENTE existe. Mesuré le 22 août : lire `vinted_txn_link` ne
+//     suffit pas — le verrou ne se pose que sur les ventes FINALISÉES, donc les
+//     3 paires en litige (N°115, N°169, N°167) et 18 des 58 paires vendues
+//     auraient repris leur ancien numéro.
+{
+  /const pairesVendues = useMemo/.test(SRC) && /identiteAnnonce\(o\); if \(k\) set\.add/.test(SRC)
+    ? ok('une paire vendue est écartée de la reprise auto (identité certaine)')
+    : nok('une paire vendue est écartée de la reprise auto (identité certaine)');
+  // Le drapeau vient de `pairesVendues` (toutes les ventes), et l'effet
+  // automatique doit le SAUTER : une paire vendue ne reprend jamais son numéro
+  // sans un geste de l'utilisateur.
+  /vendue: pairesVendues\.has\(String\(k\)\)/.test(SRC)
+    ? ok('la reprise marque les paires vendues (toutes les ventes, pas que les finalisées)')
+    : nok('la reprise marque les paires vendues (toutes les ventes, pas que les finalisées)',
+          'elle repart de `txnLink`, qui ignore litiges et remboursements');
+  /if \(r\.vendue\) continue;/.test(SRC)
+    ? ok('la reprise AUTOMATIQUE saute les paires vendues')
+    : nok('la reprise AUTOMATIQUE saute les paires vendues');
+  // Saisie manuelle : un numéro déjà porté par une paire PRÉSENTE doit être refusé.
+  /const poserNumero = async/.test(SRC) && /porteursNum\[n\] \|\| \[\]/.test(SRC)
+    ? ok('changer un N° à la main : refus si une paire le porte encore')
+    : nok('changer un N° à la main : refus si une paire le porte encore');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
