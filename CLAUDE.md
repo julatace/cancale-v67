@@ -3133,3 +3133,22 @@ J'avais vérifié l'**extraction** (le QR sort bien de l'email) et le **filtre**
 ⚠️ Trois de mes assertions de banc étaient fausses avant l'app (date affichée en « demain », en « dépassé ») — **relire l'attendu avant d'accuser le code**.
 
 Smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
+
+### 5.43 (suite) — LE RATTRAPAGE EST SUR L'ÉCRAN ACHATS, PAS DANS LES RÉGLAGES
+
+Julien : « regarde, il n'y a aucun QR code comme avant ni de code de retrait ». **Mesuré avant de coder, et l'écran a raison d'être vide** :
+
+| | |
+|---|---|
+| emails encore en quarantaine | **593** (le rejeu n'a jamais été lancé) |
+| dernière ligne `email_track_` | toujours **16 août** |
+| colis « à retirer » en base | 15 — **le plus récent a 15 jours**, les autres 21 à 37 |
+| colis « à retirer » de moins de 14 j (`PICKUP_MAX_DAYS`) | **0** |
+
+Donc : les vrais colis sont dans les emails mis de côté, et les 15 anciens sont tous périmés. L'app n'avait **rien** à afficher — ce n'était ni un défaut d'extraction ni un défaut d'affichage cette fois.
+
+⚠️ **Le vrai défaut était produit** : le bouton de rattrapage vivait dans **Réglages → Mes adresses de réception**. Il regarde **Achats**. Un outil de travail doit proposer la réparation **là où le manque se constate**.
+
+➡️ **`RejeuEnAttente`** (composant module-level) monté en tête de l'écran **Achats** : bandeau orange « 📥 N emails pas encore traités — tes colis à retirer, avec leur QR et leur code, sont dedans » + bouton **« ▶ Traiter maintenant (N) »**. Mêmes garde-fous que dans Réglages : confirmation, **un par un** en attendant la réponse, **`silencieux: true`**, rien n'est supprimé sans traitement abouti, puis rechargement. Lecture **scalaire** des identifiants seuls (une ligne de quarantaine contient l'email entier — §34). Le bandeau disparaît de lui-même quand la quarantaine est vide.
+
+**Vérifié au banc** (écran Achats rendu, 12 lignes de quarantaine + les 2 vrais colis du rejeu) : bandeau affiché, confirmation, **12 appels sur 12** tous en `silencieux` ; et sur la même page **2 vignettes QR**, modale avec le QR en grand, identifiant 8156 + code 9539, lieu Super U, délais justes. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22 · `audit-coherence` 6/0.
