@@ -3205,3 +3205,32 @@ Détection VOLONTAIREMENT LARGE (n'importe quelle mention de chronopost / pickup
 ⚠️ **À dire tel quel : les autres emails Chronopost ne sont pas des colis qui l'attendent, ce sont les siens qui partent.** Chercher plus loin dans ces 593 ne donnera rien de plus — c'est mesuré, pas supposé. S'il en attend d'autres, leurs emails **ne sont jamais arrivés à l'app** (une boîte qui ne transfère pas) ou datent d'**avant le 16 août** (donc déjà traités, mais extraits par l'ancien code : le corps brut n'étant pas conservé, leur QR est définitivement perdu — §5.37).
 
 **Vérifié au banc** : les lignes déjà rejouées sont **ignorées** (elles ne repartent pas dans la boucle), aucun indicateur, colis en premier, n° de suivi visible, 2 vignettes QR, modale, 8156/9539, et après le ✓ le QR reste accessible. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
+
+### 5.43 (suite) — ⚠️⚠️ LE CSS ÉTAIT LU COMME DU TEXTE (tout email Mondial Relay)
+
+Julien : « j'ai les QR code qui sont arrivés hier que je ne suis pas allé retirer et qui ne sont pas affichés ».
+
+**Un vrai défaut, général, trouvé en lisant un email au lieu de faire confiance à mon classement.**
+`htmlToText` ne retirait **ni `<style>` ni `<script>` ni les commentaires**. Or les emails Mondial Relay / Vinted-relay embarquent une feuille de style de plusieurs milliers de caractères — et certains services de réception fournissent un `text` qui **n'est QUE cette feuille de style**. Relevé sur « Votre colis est entre de bonnes mains 📦 » : le champ `text` commence par `body { margin: 0 !important; … }` et ne contient **aucune phrase**.
+
+Conséquences : le statut tombait en « en transit » par défaut, le lieu / la date limite / le code n'étaient jamais cherchés au bon endroit — et des **chiffres de CSS** pouvaient être pris pour un code de retrait.
+
+- `htmlToText` retire désormais `<style>`, `<script>` et les commentaires.
+- **`texteUtile(mail)`** choisit la meilleure source : le `text` fourni s'il ressemble à un message, sinon le HTML nettoyé, sinon le moins pollué des deux (`RESSEMBLE_A_DU_CSS`). `parseCarrierEmail` part de là.
+- **Prouvé** : le même email rend maintenant « *Bonne nouvelle Julien, votre colis n° 65811418 déposé a été pris en charge. Cet email fait office de preuve de dépôt.* » — donc un colis **qu'il DÉPOSE**, pas un colis à retirer.
+
+### Le compte, mesuré deux fois et par deux chemins
+Après correctif, re-scan de **tous** les emails conservés :
+
+| | |
+|---|---|
+| emails conservés | 593 (581 encore à traiter, 12 déjà consommés) |
+| emails contenant **un vrai code-barre** (recherche brute de `barcode/…` dans le HTML) | **1** restant + 1 déjà traité |
+| emails « arrivé / à retirer » | **2 au total**, 17 et 19 août |
+| statuts changés par le correctif CSS | **0** (le classement était juste, par chance) |
+| emails du **21 août** | 9, tous « bonnes mains » / « dépôt » / « bordereau » — **aucune arrivée** |
+
+➡️ **Aucun email d'arrivée du 21 août n'a atteint l'app.** Ce n'est pas un défaut de lecture : le code-barre est cherché **en brut dans le HTML**, indépendamment de tout classement, et il n'y en a pas. Soit Chronopost n'en a pas envoyé, soit il est parti sur une boîte qui ne transfère pas.
+⚠️ **La prochaine question à poser à Julien est donc l'ADRESSE**, pas le code : quelles boîtes transfèrent vers l'app (relevé : `shopcancale35@`, `lolanisse35@`, `tomjeancanc35@`, `vinted35260@icloud`, `traces_etage_3i@icloud`, 2 `privaterelay`), et sur laquelle arrivent ses emails Pickup.
+
+**Vérifié** : `npm run build` OK · le parseur rend toujours code 9539 + identifiant 8156 + lieu + QR sur l'email réel · écran Achats : vignette QR, modale, QR conservé après le ✓ · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
