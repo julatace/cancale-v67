@@ -3092,3 +3092,26 @@ Le correctif répare l'avenir ; **les 593 emails déjà en quarantaine ne se tra
 ### Vérifié
 `npm run build` OK · `node --check` sur `api/email-inbound.js` · `scripts/audit-qr.cjs` **5/5** · banc unitaire sur les VRAIES fonctions découpées du fichier, contre les emails réels en quarantaine · `audit-identite` 22/22 · `audit-coherence` 6 règles / 0 désaccord.
 ⚠️ Piège de banc (§21, encore) : `extractPickupQr` est appelée par le **handler**, pas par `parseCarrierEmail` — lire `t.qrUrl` affichait « AUCUN » quoi qu'il arrive. Et `.replace(/^export\s+/gm,'')` sur le code découpé **effaçait l'export ajouté à la fin** : la fonction paraissait absente du module.
+
+### 5.43 (suite) — LE REJEU EST DANS L'APP, PAS DANS UN SCRIPT
+
+Le correctif ci-dessus répare l'avenir ; les **593 emails déjà mis de côté** ne repartent pas seuls. Lancer un script qui écrit en base de production a été **refusé par la sécurité**, deux fois — et c'était la bonne réponse : ce geste appartient au propriétaire des données, pas à l'agent.
+
+➡️ **Bouton « ▶ Tout rejouer (N) »** dans Réglages → *Mes adresses de réception*, sous la liste des emails en attente (`EmailsRecuSetting`). Il repasse chaque email dans **exactement** le traitement d'un email qui vient d'arriver (`api/email-rattacher` → `traiterEmail`).
+
+- **UN PAR UN, en attendant la réponse** : on ne lâche pas 600 requêtes d'un coup sur la fonction serverless. Barre d'avancement « Traitement… 137/593 ».
+- ⚠️ **`silencieux: true`** : sans ça, rattraper six jours d'emails enverrait **600 notifications** pour des choses déjà faites. Le drapeau vit dans le **contexte de la requête** (`AsyncLocalStorage`, §5.16) et `pushOnce` en sort immédiatement — il ne peut donc pas éteindre un email qui arrive vraiment au même moment.
+- Une ligne de quarantaine n'est effacée **que si le traitement a abouti** (déjà le cas) : on ne détruit jamais le seul exemplaire.
+
+### Ce que le backlog contient vraiment (mesuré, avant rejeu)
+23 emails de transporteur sur les 593 :
+| | |
+|---|---|
+| **colis à retirer** | **2** — les deux rendent leur **vrai QR** ; l'un avec code **9539** + identifiant **8156**, l'autre en relais |
+| Mondial Relay | 12, **tous « en transit »** (ses colis vendus qui partent) — aucun code à afficher, c'est normal |
+| « colis retiré » | 3 — ils éteindront d'anciens colis restés « à retirer » |
+| dépôts / en chemin | 6 |
+
+⚠️ À dire à Julien plutôt que de le laisser croire : **le retard ne contient que 2 colis à retirer**, pas « plein ». S'il en attend davantage, leurs emails sont soit arrivés avant le 16 août (donc déjà traités), soit jamais arrivés à l'app.
+
+**Vérifié au banc** (Réglages rendu, 12 lignes de quarantaine, `/api/email-rattacher` simulé) : carte affichée, bouton « ▶ Tout rejouer (12) », feuille de confirmation, **12 appels sur 12**, tous en `silencieux`, **envoyés l'un après l'autre** (écarts 6–9 ms), ids distincts, **0 erreur d'app**.

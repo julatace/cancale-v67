@@ -335,6 +335,12 @@ async function shouldNotify(key) {
 // seulement si cette catégorie est active.
 async function pushOnce(payload, categorie) {
   try {
+    // ⚠️ REJEU EN LOT : on rattrape des emails vieux de plusieurs jours. Sonner
+    //    pour chacun, c'est des centaines de notifications d'un coup pour des
+    //    choses déjà faites. Le drapeau vit dans le contexte de la requête
+    //    (AsyncLocalStorage), donc il ne peut pas déborder sur un email qui
+    //    arrive vraiment en même temps.
+    if ((contexteVendeur.getStore() || {}).silence) return;
     const cat = categorie || (payload && payload._cat) || null;
     if (!(await pushCategorieActive(cat))) return;
     // `_cat` est un marqueur interne : il ne part pas dans la notification.
