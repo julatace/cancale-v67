@@ -1475,6 +1475,18 @@ const qrImage = (t) => {
   if (t.qrUrl && !URL_PAS_UN_QR.test(t.qrUrl)) return t.qrUrl;
   return null;
 };
+// ⚠️ « DÉLAI DÉPASSÉ » NE DOIT PAS S'AFFICHER « DERNIER JOUR ».
+// L'ancien calcul faisait `Math.ceil((limite 23:59:59 - maintenant)/24h)` : pour
+// une limite d'HIER ça rend **-0**, et `-0 < 0` est **faux** en JavaScript → le
+// colis annonçait « dernier jour pour le retirer » alors que le délai était
+// passé. On compare donc des JOURS, pas des instants : minuit à minuit.
+const joursAvant = (limite) => {
+  if (!limite) return null;
+  const fin = new Date(String(limite) + 'T00:00:00');
+  if (isNaN(fin)) return null;
+  const auj = new Date(); auj.setHours(0, 0, 0, 0);
+  return Math.round((fin - auj) / 86400000);
+};
 const retraitMode = (t) => {
   const c = CARRIERS[carrierKey(t && t.carrier)] || {};
   const qr = qrImage(t);
@@ -8688,7 +8700,11 @@ const isColisActive = (t, collected) => {
 };
 // Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller, ou on a
 // un code de retrait). Écarte les lignes de suivi parasites.
-const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || !!codeRetrait(t && t.code));
+// ⚠️ UN QR SUFFIT À RETIRER UN COLIS (22 août). Avant, il fallait un LIEU ou un
+// CODE : un colis Chronopost/Pickup dont le seul moyen de retrait est le Pickup
+// Pass n'apparaissait donc **nulle part** — mesuré sur « Votre colis VINTED est
+// arrivé en relais Pickup », qui n'a ni code ni adresse dans l'email.
+const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || !!codeRetrait(t && t.code) || !!qrImage(t));
 // ⚠️ UN MÊME COLIS PEUT AVOIR PLUSIEURS LIGNES. Mesuré en base : 3 n° de suivi
 // existent en double (`email_track_vinted_04103186091937` ET
 // `email_track_chronopost_04103186091937`) — le transporteur et Vinted envoient
@@ -13770,14 +13786,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     //    rendu réel, pas à la relecture. Et une consigne n'a pas de
                     //    comptoir : le geste n'est pas le même, le texte non plus.
                     const casier = !!t.consigne || !!ident;
-                    const jours = t.limite ? Math.ceil((new Date(t.limite+'T23:59:59') - Date.now())/86400000) : null;
+                    const jours = joursAvant(t.limite);
                     return (
                       <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
                         {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                           <div style={{fontSize:11,fontWeight:600,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>📍 {nom}{g.adresse?` — ${g.adresse}`:''}{g.guessed?<span style={{color:C.muted,fontWeight:600}}> (relais habituel)</span>:''}</div>
-                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{code?(casier?'Saisis ces nombres sur le casier 👉':'Donne ce code au comptoir 👉'):'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
+                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{qrImage(t)?(code?(casier?'Scanne le QR, ou saisis ces nombres 👉':'Présente le QR au comptoir 👉'):'Présente ce QR pour retirer 👉'):code?(casier?'Saisis ces nombres sur le casier 👉':'Donne ce code au comptoir 👉'):'Code pas encore reçu'}{t.suivi?` · suivi ${t.suivi}`:''}</div>
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
@@ -13786,6 +13802,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             </div>
                           )}
                         </div>
+                        {/* ⚠️⚠️ LE QR MANQUAIT SUR CETTE CARTE — c'est CELLE-CI que
+                            l'écran Achats utilise (groupée par point relais), pas
+                            celle de Ma journée. Chronopost/Pickup se retire en
+                            SCANNANT le Pickup Pass : sans lui, les nombres ne
+                            servent qu'au casier, et en relais il n'y avait
+                            littéralement rien à présenter au comptoir.
+                            Il passe EN PREMIER : c'est le geste principal. */}
+                        {qrImage(t) && (
+                          <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
+                            style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:10,padding:3,cursor:'pointer',width:64,height:64,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                            <img src={qrImage(t)} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                          </button>
+                        )}
                         {(code||ident) && (
                           <div style={{flexShrink:0,display:'flex',gap:6}}>
                             {ident && (
@@ -14033,7 +14062,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                 Captée dans l'email, jamais déduite : pas de date
                                 dans l'email ⟹ rien d'affiché (§ email-inbound). */}
                             {t.limite && (()=>{
-                              const j = Math.ceil((new Date(t.limite+'T23:59:59') - Date.now())/86400000);
+                              const j = joursAvant(t.limite);
                               const urgent = j<=2;
                               return <div style={{fontSize:11,fontWeight:urgent?700:500,color:urgent?C.danger:C.warn,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                                 {j<0?'⚠️ délai dépassé':j===0?"⏰ dernier jour pour le retirer":j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} (${j} j)`}

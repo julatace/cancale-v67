@@ -3115,3 +3115,21 @@ Le correctif ci-dessus répare l'avenir ; les **593 emails déjà mis de côté*
 ⚠️ À dire à Julien plutôt que de le laisser croire : **le retard ne contient que 2 colis à retirer**, pas « plein ». S'il en attend davantage, leurs emails sont soit arrivés avant le 16 août (donc déjà traités), soit jamais arrivés à l'app.
 
 **Vérifié au banc** (Réglages rendu, 12 lignes de quarantaine, `/api/email-rattacher` simulé) : carte affichée, bouton « ▶ Tout rejouer (12) », feuille de confirmation, **12 appels sur 12**, tous en `silencieux`, **envoyés l'un après l'autre** (écarts 6–9 ms), ids distincts, **0 erreur d'app**.
+
+### 5.43 (suite) — ⚠️ IL AVAIT RAISON : LA CARTE DES COLIS N'AFFICHAIT AUCUN QR
+
+Julien : « il n'y a rien qui a changé, tu es sûr que tu as mis les QR code Chronopost dans achat ? » — **non**, et le vérifier au rendu l'a prouvé en trois minutes.
+
+J'avais vérifié l'**extraction** (le QR sort bien de l'email) et le **filtre** (`qrImage`). Je n'avais **pas** vérifié que l'écran Achats l'affiche. Banc dédié (`achat_qr.cjs`) : on fabrique la ligne `email_track_*` que le rejeu VA produire, en passant les vrais emails encore en quarantaine dans les vraies fonctions, puis on rend l'écran Achats. Résultat : **0 vignette QR, aucune modale**.
+
+⚠️ **Il y a DEUX cartes de colis dans le fichier, et j'avais lu la mauvaise.** Celle que j'ai relue (l. ~14030) porte bien un bloc `qrImage(t)` — c'est celle de **Ma journée**. L'écran **Achats** utilise une autre carte, **groupée par point relais** (l. ~13775), qui n'affichait que le code et l'identifiant. **Chronopost se retire en SCANNANT** : sur cet écran il n'y avait donc littéralement rien à présenter au comptoir.
+
+### Trois défauts, tous trouvés au rendu réel
+1. **La carte Achats ne montrait pas le QR.** Vignette 64 px cliquable ajoutée **en premier** (avant les nombres) : c'est le geste principal. Le texte d'usage suit (« Scanne le QR, ou saisis ces nombres 👉 » / « Présente le QR au comptoir 👉 »).
+2. ⚠️ **Un colis qui n'a QU'UN QR n'apparaissait NULLE PART.** `isColisRetirable` exigeait **un lieu OU un code** — or « Votre colis VINTED est arrivé en relais Pickup » n'a ni l'un ni l'autre, seulement le Pickup Pass. Il est maintenant compté (`|| !!qrImage(t)`). Sans ça, le colis serait resté invisible jusqu'au renvoi à l'expéditeur.
+3. ⚠️ **`-0 < 0` est FAUX en JavaScript.** Le calcul `Math.ceil((limite 23:59:59 − maintenant)/24h)` rend **-0** pour une limite d'hier → le colis annonçait « ⏰ dernier jour pour le retirer » alors que **le délai était dépassé**. `joursAvant(limite)` (module-level, utilisé par les DEUX cartes — §11) compare des **jours**, minuit à minuit.
+
+**Vérifié au banc, sur les données que le rejeu produira** : « colis à retirer » affichés · **2 vignettes QR** (dont le colis qui n'apparaissait pas du tout) · modale ouverte avec le **QR en grand** · identifiant 8156 + code 9539 · lieu « Consigne Pickup Super U Cancale » · délais corrects (**« délai de retrait dépassé »** pour le 21/08, **« à retirer demain »** pour le 23/08) · **0 erreur d'app**.
+⚠️ Trois de mes assertions de banc étaient fausses avant l'app (date affichée en « demain », en « dépassé ») — **relire l'attendu avant d'accuser le code**.
+
+Smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.
