@@ -3182,3 +3182,26 @@ Julien : « je ne veux pas qu'il y ait marqué traité, je veux que ce soit auto
 **3. Le n° de suivi sur sa propre ligne**, en chiffres monospace : au comptoir c'est ce qu'on demande quand le scan ou le code ne passe pas.
 
 **Vérifié au banc** : aucun bouton « Traiter », **aucun indicateur** de traitement, rattrapage lancé tout seul (**colis en premier**, tous en `silencieux`), `n° 09843408317167` visible, 2 vignettes QR, modale plein écran, identifiant 8156 + code 9539, délais justes — puis **après le ✓** : bloc « en attente de confirmation », **le QR toujours accessible dessus**, bouton ↺ Remettre. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22 · `audit-coherence` 6/0.
+
+### 5.43 (suite) — ⚠️ LE RATTRAPAGE NE SE TERMINAIT JAMAIS + le compte exact des colis
+
+Julien : « j'ai qu'un seul QR code alors que j'ai plusieurs colis… scanne tous les mails que tu peux ».
+
+**1. ⚠️ Défaut trouvé en mesurant : la quarantaine ne se vidait pas.**
+Relevé le 22 août au soir : `email_track_` **94 → 109** (le rattrapage automatique a bien tourné), mais **593 lignes de quarantaine toujours là**. Cause : `api/email-rattacher.js` supprime la ligne traitée par `DELETE`… or **le `DELETE` sur `app_data` est sans effet avec la clé publique** (§5.22) et `SUPABASE_SERVICE_KEY` n'est pas réglée sur cette installation. Donc le rattrapage **reprenait les 593 mêmes emails à chaque ouverture de l'onglet Achats** — 593 appels serverless pour rien, à chaque fois.
+➡️ La ligne est désormais **VIDÉE** par upsert (`{supprime:true, rejoueLe, type}`) en plus du `DELETE`, et **les deux listes** (rattrapage auto + écran Réglages) **ignorent ce qui porte `supprime`**.
+
+**2. Le scan exhaustif — il n'y a bien que 2 colis à retirer.**
+Détection VOLONTAIREMENT LARGE (n'importe quelle mention de chronopost / pickup / mondial relay / relais / consigne / shop2shop / colissimo / suivi, dans l'expéditeur, le sujet, le texte OU le HTML) sur les **593** emails :
+
+| | |
+|---|---|
+| emails qui parlent de colis | **41** |
+| **« arrivé / à retirer »** | **2** — les deux avec leur **vrai QR** (17 et 19 août) |
+| « entre de bonnes mains » / « confirmation de dépôt » | 34 — **ses colis vendus qui partent**, rien à retirer |
+| « Votre colis a été retiré » | 3 (20 août) — déjà récupérés |
+| « en chemin » / espagnol | 2 |
+
+⚠️ **À dire tel quel : les autres emails Chronopost ne sont pas des colis qui l'attendent, ce sont les siens qui partent.** Chercher plus loin dans ces 593 ne donnera rien de plus — c'est mesuré, pas supposé. S'il en attend d'autres, leurs emails **ne sont jamais arrivés à l'app** (une boîte qui ne transfère pas) ou datent d'**avant le 16 août** (donc déjà traités, mais extraits par l'ancien code : le corps brut n'étant pas conservé, leur QR est définitivement perdu — §5.37).
+
+**Vérifié au banc** : les lignes déjà rejouées sont **ignorées** (elles ne repartent pas dans la boucle), aucun indicateur, colis en premier, n° de suivi visible, 2 vignettes QR, modale, 8156/9539, et après le ✓ le QR reste accessible. **0 erreur d'app** · smoke 12 écrans **0 PAGEERROR** · `audit-qr` 5/5 · `audit-identite` 22/22.

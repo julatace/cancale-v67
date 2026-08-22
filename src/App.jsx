@@ -11823,9 +11823,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     (async () => {
       let lignes = [];
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject`, { headers: sbAuth() });
+        // ⚠️ `supprime` : une ligne déjà rejouée est VIDÉE, pas effacée (le
+        //    `DELETE` sur `app_data` est sans effet avec la clé publique, §5.22).
+        //    Sans ce filtre, on reprenait les 593 mêmes emails à chaque ouverture.
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject,sup:data->>supprime`, { headers: sbAuth() });
         if (!r.ok) return;
-        lignes = (await r.json()) || [];
+        lignes = ((await r.json()) || []).filter(x => !x.sup && x.sujet != null);
       } catch (_) { return; }
       if (!lignes.length || mort) return;
       // Les colis passent devant : c'est ce qu'on attend à l'écran.
@@ -17811,8 +17814,8 @@ function EmailsSetting() {
       // ⚠️ Scalaires seulement : une ligne de quarantaine contient l'email
       // ENTIER (pièces jointes comprises) — un `select=data` ici referait le
       // trou d'égress de §34.
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject,raison:data->>raison,quand:data->>at`, { headers: sbAuth() });
-      setQuarantaine(r.ok ? await r.json() : []);
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject,raison:data->>raison,quand:data->>at,sup:data->>supprime`, { headers: sbAuth() });
+      setQuarantaine(r.ok ? ((await r.json()) || []).filter(x => !x.sup) : []);
     } catch (_) { setQuarantaine([]); }
   }, []);
   useEffect(() => { charger(); }, [charger]);
