@@ -69,8 +69,22 @@ export default async function handler(req, res) {
   // ⚠️ On ne supprime QUE si le traitement a réellement abouti : sinon on
   // détruirait le seul exemplaire de l'email.
   if (resultat && resultat.ok && !resultat.quarantaine) {
+    // ⚠️⚠️ LE `DELETE` SUR `app_data` EST SANS EFFET AVEC LA CLÉ PUBLIQUE
+    // (200 / 0 ligne supprimée — §5.22), et `SUPABASE_SERVICE_KEY` n'est pas
+    // réglée sur cette installation. Résultat mesuré le 22 août : 15 emails de
+    // suivi créés, et **593 lignes de quarantaine toujours là** — donc le
+    // rattrapage automatique les reprenait TOUTES à chaque ouverture de l'onglet
+    // Achats. On VIDE donc la ligne (un upsert, lui, passe), et les listes
+    // ignorent ce qui porte `supprime`.
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: HEADERS });
+    } catch (_) {}
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+        method: 'POST',
+        headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ id, data: { supprime: true, rejoueLe: new Date().toISOString(), type: resultat.type || 'traité' } }]),
+      });
     } catch (_) {}
   }
   res.status(200).json({ ok: !!(resultat && resultat.ok), owner: owner || null, resultat });
