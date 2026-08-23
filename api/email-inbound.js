@@ -22,6 +22,7 @@ import { stampBordereau } from './_lib/stamp.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { adressesDeLivraison, resoudreProprietaire } from './_lib/proprietaire-email.js';
+import { normaliserEntrant, formeRecue } from './_lib/lire-email.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -78,34 +79,12 @@ function texteUtile(mail) {
 // Normalise le corps de requête (selon le service de réception) vers une forme
 // unique : { from, to, subject, text, html, attachments:[{filename, contentType, contentB64}] }
 function normalizeInbound(body) {
-  const b = body || {};
-  const out = { from: '', to: '', subject: '', text: '', html: '', attachments: [] };
-
-  // Postmark inbound
-  if (b.FromFull || b.Subject != null || b.TextBody != null) {
-    out.from = (b.FromFull && b.FromFull.Email) || b.From || '';
-    out.to = (b.ToFull && b.ToFull[0] && b.ToFull[0].Email) || b.To || '';
-    out.subject = b.Subject || '';
-    out.text = b.TextBody || '';
-    out.html = b.HtmlBody || '';
-    out.attachments = (b.Attachments || []).map(a => ({ filename: a.Name, contentType: a.ContentType, contentB64: a.Content }));
-    return out;
-  }
-  // SendGrid inbound parse (champs "subject", "text", "html", "from", "to")
-  // Mailgun ("subject", "body-plain", "body-html", "sender", "recipient")
-  // + JSON générique (Cloudflare Worker) : { from, to, subject, text, html, attachments }
-  out.from = b.from || b.sender || '';
-  out.to = b.to || b.recipient || '';
-  out.subject = b.subject || '';
-  out.text = b.text || b['body-plain'] || '';
-  out.html = b.html || b['body-html'] || '';
-  const atts = b.attachments || b.Attachments || [];
-  out.attachments = (Array.isArray(atts) ? atts : []).map(a => ({
-    filename: a.filename || a.name || a.Name || '',
-    contentType: a.contentType || a.type || a.ContentType || '',
-    contentB64: a.contentB64 || a.content || a.Content || a.data || '',
-  }));
-  return out;
+  // ⚠️ Une seule règle de lecture, dans `_lib/lire-email.js` (testée par
+  // `scripts/audit-email-formes.cjs` sur 15 formes réelles). Elle sait aussi
+  // ouvrir un email BRUT (MIME) et les formes emballées — ce que cette fonction
+  // ne savait pas faire, d'où un email arrivé le 23 août avec expéditeur et
+  // sujet vides, classé « ignoré », et perdu sans laisser de trace.
+  return normaliserEntrant(body);
 }
 
 // ⚠️ LE PROPRIÉTAIRE EST PROPRE À CHAQUE REQUÊTE, PAS AU MODULE.
@@ -379,10 +358,37 @@ async function pushOnce(payload, categorie) {
   } catch (_) {}
 }
 
+// ⚠️ ON NE JETTE PLUS AUCUN EMAIL.
+// Le 23 août, un email est arrivé à 06:36 avec expéditeur et sujet vides : il a
+// été classé « ignoré » et **rien n'a été gardé** — impossible de savoir ce que
+// c'était, alors que Julien attendait des codes de retrait Chronopost.
+// Désormais tout email qu'on n'a pas su classer est CONSERVÉ tel qu'il est
+// arrivé, avec la forme reçue et la raison. Il est visible dans l'app et peut
+// être rejoué comme un email de quarantaine.
+// ⚠️ Borné à 200 Ko : ces lignes ne sont lues que sur demande, jamais au
+// chargement d'un écran (leçon d'égress §34).
+async function garderInconnu(corpsBrut, mail, raison) {
+  try {
+    let brut = '';
+    try { brut = typeof corpsBrut === 'string' ? corpsBrut : JSON.stringify(corpsBrut); } catch (_) { brut = String(corpsBrut); }
+    if (brut && brut.length > 200000) brut = brut.slice(0, 200000);
+    const cle = shortHash((mail && mail.subject ? mail.subject : '') + String(brut).slice(0, 400) + Date.now());
+    await supabaseUpsert([{ id: `email_inconnu_${cle}`, data: {
+      type: 'inconnu', raison,
+      forme: formeRecue(corpsBrut),
+      subject: (mail && mail.subject) || '', from: (mail && mail.from) || '', to: (mail && mail.to) || '',
+      receivedAt: new Date().toISOString(),
+      brut,
+    } }]);
+  } catch (_) {}
+}
+
 async function logEmail(entry) {
   try {
     const cur = (await supabaseGetRow('email_journal')) || { entries: [] };
-    const entries = [{ ...entry, at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 30);
+    // 200 et non 30 : le 23 août, une rafale d'emails « offre » avait chassé du
+    // journal la seule ligne qui expliquait un colis manquant.
+    const entries = [{ ...entry, at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 200);
     await supabaseUpsert([{ id: 'email_journal', data: { entries } }]);
   } catch (_) {}
 }
@@ -800,6 +806,64 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
 // CETTE requête, puis délègue. Tout ce qui écrit à l'intérieur (y compris les
 // écritures déclenchées plus tard dans la même chaîne d'await) lit le bon
 // vendeur, même si un autre email est traité en parallèle.
+// ── QUEL TRANSPORTEUR ? (fonction PURE, testée par scripts/audit-transporteurs.cjs)
+// Sortie : la clé du transporteur, ou null si ce n'est pas un email de colis.
+// ⚠️ Aucune devinette métier ici : on ne fait que reconnaître l'expéditeur et
+// des mots de colis. Un email de vente / offre / message n'en est jamais un.
+export function detecterTransporteur(mail) {
+  const subject = (mail && mail.subject) || '';
+  const isBordereauSubject = /Bordereau\s+d['’]envoi/i.test(subject);
+  const fromVinted = /vinted/i.test(mail.from);
+  const isVintedShipping = /shipping@|relay\.vinted/i.test(mail.from);
+  const carrierSrc = ((fromVinted && !isVintedShipping)
+    ? mail.from
+    : `${mail.from} ${subject} ${(mail.text || '').slice(0, 1200)}`).toLowerCase();
+  // Détection élargie : TOUS les transporteurs courants (pas seulement Mondial
+  // Relay / Chronopost). L'ordre n'a pas d'importance, chaque test est distinct.
+  let carrier =
+    // ⚠️ Vinted Go AVANT le reste : son nom contient « vinted », donc sans ce
+    // test il retombait sur le filet `isVintedShipping` (ou sur rien du tout
+    // quand l'expéditeur est `@vintedgo.com`). Julien : « aucune erreur du
+    // côté Chronopost, Mondial Relay, Vinted GO ».
+    /vinted\s*go|vintedgo/.test(carrierSrc) ? 'vinted'
+    : /mondial\s*relay|mondialrelay/.test(carrierSrc) ? 'mondialrelay'
+    : /chronopost/.test(carrierSrc) ? 'chronopost'
+    : /relais\s*colis|relaiscolis/.test(carrierSrc) ? 'relaiscolis'
+    : /colissimo|\bla\s*poste\b|laposte/.test(carrierSrc) ? 'colissimo'
+    : /shop\s*2\s*shop|shop2shop/.test(carrierSrc) ? 'shop2shop'
+    : /inpost/.test(carrierSrc) ? 'inpost'
+    : /\bups\b/.test(carrierSrc) ? 'ups'
+    : /\bdpd\b/.test(carrierSrc) ? 'dpd'
+    : /\bgls\b/.test(carrierSrc) ? 'gls'
+    : /\bdhl\b/.test(carrierSrc) ? 'dhl'
+    : /\bfedex\b/.test(carrierSrc) ? 'fedex'
+    : null;
+  if (!carrier && isVintedShipping) carrier = 'vinted'; // suivi Vinted (Vinted Go...)
+  // Filet générique : un email de colis d'un transporteur NON listé (point
+  // relais / à retirer / suivi) est quand même traité comme un suivi, pour
+  // capter QR / code / lieu. On exige un signal fort « colis/retrait » et que
+  // ce ne soit pas un email de vente/offre/message Vinted (fromVinted exclu).
+  if (!carrier && !fromVinted) {
+    const t = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 1200)}`.toLowerCase();
+    if (/point\s+relais|à\s*retirer|a\s*retirer|code\s+de\s+retrait|pr[êe]t.*retrait|colis.*(retrait|disponible|arriv|livr)|pickup/.test(t)) {
+    carrier = 'autre';
+    }
+  }
+  // ⚠️ Un email de COLIS envoyé par Vinted lui-même (pas via `shipping@`) était
+  // écarté par le `!fromVinted` ci-dessus : un colis annoncé « arrivé au point
+  // relais » par Vinted n'apparaissait alors nulle part. On le récupère, mais
+  // UNIQUEMENT sur un signal fort DANS LE SUJET et jamais sur un email de
+  // vente / offre / message (le sujet le dit toujours) — on ne devine pas.
+  if (!carrier && fromVinted) {
+    const sj = subject.toLowerCase();
+    const colis = /colis|point\s+relais|à\s*retirer|a\s*retirer|code\s+de\s+retrait|consigne|casier|pickup/.test(sj);
+    const pasColis = /vendu|offre|message|facture|paiement|transfert|favori|évaluation|evaluation|bordereau/.test(sj);
+    if (colis && !pasColis) carrier = 'autre';
+  }
+  if (isBordereauSubject) return null; // un bordereau n'est pas un suivi
+  return carrier;
+}
+
 export default async function handler(req, res) {
   return contexteVendeur.run({ owner: '' }, () => traiterEmail(req, res));
 }
@@ -827,7 +891,12 @@ export async function traiterEmail(req, res) {
     corpsBrut = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     mail = normalizeInbound(corpsBrut);
   }
-  catch (_) { res.status(200).json({ ok: false, error: 'corps illisible' }); return; }
+  catch (_) {
+    // Même un corps illisible est conservé : c'est la seule façon de savoir
+    // ensuite ce qui n'est pas passé.
+    await garderInconnu(req.body, null, 'corps illisible');
+    res.status(200).json({ ok: false, error: 'corps illisible' }); return;
+  }
 
   // ── À QUEL VENDEUR CET EMAIL APPARTIENT-IL ? ──────────────────────────────
   // Décidé par l'ADRESSE DE RÉCEPTION, que le vendeur a enregistrée lui-même
@@ -874,39 +943,7 @@ export async function traiterEmail(req, res) {
     // (expéditeur réécrit → on regarde aussi le sujet), et les emails
     // d'expédition de Vinted (shipping@relay.vinted.com). Jamais pour un
     // bordereau (traité au point 1, prioritaire).
-    const isBordereauSubject = /Bordereau\s+d['’]envoi/i.test(subject);
-    const fromVinted = /vinted/i.test(mail.from);
-    const isVintedShipping = /shipping@|relay\.vinted/i.test(mail.from);
-    const carrierSrc = ((fromVinted && !isVintedShipping)
-      ? mail.from
-      : `${mail.from} ${subject} ${(mail.text || '').slice(0, 1200)}`).toLowerCase();
-    // Détection élargie : TOUS les transporteurs courants (pas seulement Mondial
-    // Relay / Chronopost). L'ordre n'a pas d'importance, chaque test est distinct.
-    let carrier =
-        /mondial\s*relay|mondialrelay/.test(carrierSrc) ? 'mondialrelay'
-      : /chronopost/.test(carrierSrc) ? 'chronopost'
-      : /relais\s*colis|relaiscolis/.test(carrierSrc) ? 'relaiscolis'
-      : /colissimo|\bla\s*poste\b|laposte/.test(carrierSrc) ? 'colissimo'
-      : /shop\s*2\s*shop|shop2shop/.test(carrierSrc) ? 'shop2shop'
-      : /inpost/.test(carrierSrc) ? 'inpost'
-      : /\bups\b/.test(carrierSrc) ? 'ups'
-      : /\bdpd\b/.test(carrierSrc) ? 'dpd'
-      : /\bgls\b/.test(carrierSrc) ? 'gls'
-      : /\bdhl\b/.test(carrierSrc) ? 'dhl'
-      : /\bfedex\b/.test(carrierSrc) ? 'fedex'
-      : null;
-    if (!carrier && isVintedShipping) carrier = 'vinted'; // suivi Vinted (Vinted Go...)
-    // Filet générique : un email de colis d'un transporteur NON listé (point
-    // relais / à retirer / suivi) est quand même traité comme un suivi, pour
-    // capter QR / code / lieu. On exige un signal fort « colis/retrait » et que
-    // ce ne soit pas un email de vente/offre/message Vinted (fromVinted exclu).
-    if (!carrier && !fromVinted) {
-      const t = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 1200)}`.toLowerCase();
-      if (/point\s+relais|à\s*retirer|a\s*retirer|code\s+de\s+retrait|pr[êe]t.*retrait|colis.*(retrait|disponible|arriv|livr)|pickup/.test(t)) {
-        carrier = 'autre';
-      }
-    }
-    if (isBordereauSubject) carrier = null; // un bordereau n'est pas un suivi
+    const carrier = detecterTransporteur(mail);
     if (carrier) {
       const track = parseCarrierEmail(mail, carrier);
       // QR / code-barres de retrait : cherché dans les pièces jointes ET dans le
@@ -1171,8 +1208,15 @@ export async function traiterEmail(req, res) {
       return;
     }
 
-    await logEmail({ type: 'ignoré', subject, from: mail.from });
-    res.status(200).json({ ok: true, type: 'ignoré', subject });
+    // ⚠️ « Ignoré » ne veut pas dire « jeté ». Un email qu'aucune règle ne
+    // reconnaît est CONSERVÉ entier : c'est comme ça qu'on voit ce qui manque
+    // au lieu de le deviner. La forme reçue est notée au journal — c'est elle
+    // qui dira si un service de réception a changé de format.
+    const forme = formeRecue(corpsBrut);
+    const illisible = !subject && !mail.from && !(mail.text || mail.html);
+    await garderInconnu(corpsBrut, mail, illisible ? 'illisible (aucun champ lu)' : 'aucune règle ne le reconnaît');
+    await logEmail({ type: 'ignoré', subject, from: mail.from, forme, illisible });
+    res.status(200).json({ ok: true, type: 'ignoré', subject, forme });
   } catch (e) {
     // On répond 200 pour éviter que le service de mail ne rejoue / bounce.
     res.status(200).json({ ok: false, error: String(e) });

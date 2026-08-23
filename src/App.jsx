@@ -1059,6 +1059,20 @@ const reclassifyTrack = (d) => {
   if (d.status !== 'available' && (d.suivi || '').trim() && TRACK_AVAILABLE_RE.test(s)) return { ...d, status: 'available', statusLabel: 'Arrivé au point de retrait' };
   return d;
 };
+// ⚠️ LES EMAILS QUE L'APP N'A PAS SU LIRE (posé le 23 août 2026).
+// Le journal a montré un email arrivé à 06:36 avec expéditeur ET sujet vides,
+// classé « ignoré » — rien n'était gardé, donc impossible de savoir ce que
+// c'était pendant que Julien attendait ses codes Chronopost. Le serveur les
+// conserve désormais (`email_inconnu_*`) ; ici on lit UNIQUEMENT des scalaires
+// (le corps brut ne part jamais au chargement d'un écran — égress, §34).
+const fetchEmailsIncompris = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=id,subject:data->>subject,from:data->>from,forme:data->>forme,raison:data->>raison,at:data->>receivedAt&limit=200`, { headers: sbAuth() });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    return rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  } catch (_) { return []; }
+};
 const fetchEmailTracking = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_track_*&select=id,data`, {
@@ -1439,6 +1453,11 @@ const CARRIERS = {
   gls:          { name: 'GLS',           short: 'GLS', bg: '#0A5B9A', fg: '#FFD200', retrait: 'code' },
   dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#D40511', retrait: 'auto' },
   fedex:        { name: 'FedEx',         short: 'FX', bg: '#4D148C', fg: '#FF6600', retrait: 'auto' },
+  // ⚠️ `autre` = le filet du serveur : un email de colis d'un transporteur non
+  // listé est quand même traité (api/email-inbound.js). Sans cette entrée, sa
+  // carte s'affichait sans nom ni couleur, et `retraitMode` n'avait pas de
+  // préférence — donc aucune consigne au comptoir.
+  autre:        { name: 'Transporteur',  short: '📦', bg: '#64748B', fg: '#fff', retrait: 'auto' },
 };
 // Ce qu'il faut présenter au comptoir pour CE colis, selon son transporteur ET
 // ce qu'on a réellement reçu. Une seule règle, utilisée partout (modale de
@@ -1530,6 +1549,7 @@ const carrierKey = (raw) => {
   if (/\bdhl\b/.test(s)) return 'dhl';
   if (/\bfedex\b/.test(s)) return 'fedex';
   if (/amazon/.test(s)) return 'amazon';
+  if (/autre|generic/.test(s)) return 'autre';
   return null;
 };
 // Nom lisible d'un transporteur (repli « Transporteur » si inconnu).
@@ -3350,6 +3370,70 @@ const libellePeriode = (p) => {
   return `${f(p.from)} → ${f(p.to)}`;
 };
 
+/* ── RÉCEPTION DES EMAILS : « est-ce que ça arrive ? » ─────────────────────
+   Julien : « je veux qu'il n'y ait aucune erreur du côté Chronopost, Mondial
+   Relay, Vinted GO ». La première erreur possible n'est pas dans le code : c'est
+   un email qui n'arrive jamais. Sans cette ligne, un transporteur peut cesser
+   d'être transféré et rien ne le dit — c'est exactement ce qui s'est passé le
+   23 août (4 emails Chronopost annoncés, un seul reçu, et illisible).
+   Ne coûte AUCUNE requête pour les dates (elles viennent des suivis déjà
+   chargés) ; une seule lecture scalaire pour les emails non compris. */
+function ReceptionEmails({ tracking }) {
+  const [incompris, setIncompris] = useState(null);
+  useEffect(() => { let mort = false; fetchEmailsIncompris().then(r => { if (!mort) setIncompris(r); }); return () => { mort = true; }; }, []);
+  const lignes = useMemo(() => {
+    const m = {};
+    for (const t of (tracking || [])) {
+      const k = carrierKey(t && t.carrier) || 'autre';
+      const d = t && t.receivedAt ? Date.parse(t.receivedAt) : NaN;
+      if (isNaN(d)) continue;
+      if (!m[k] || d > m[k].ts) m[k] = { ts: d, n: (m[k] ? m[k].n : 0) + 1 };
+      else m[k].n += 1;
+    }
+    // Les trois transporteurs qu'il nomme sont TOUJOURS listés, même à zéro :
+    // « aucun email reçu » est justement l'information à voir.
+    for (const k of ['chronopost', 'mondialrelay', 'vinted']) if (!m[k]) m[k] = { ts: 0, n: 0 };
+    return Object.entries(m).sort((a, b) => b[1].ts - a[1].ts);
+  }, [tracking]);
+  const age = (ts) => {
+    if (!ts) return null;
+    const h = (Date.now() - ts) / 3600000;
+    return h < 1 ? "à l'instant" : h < 24 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`;
+  };
+  const nInc = incompris ? incompris.length : 0;
+  return (
+    <details style={{border:`1px solid ${nInc?C.warn:C.border}`,background:nInc?`${C.warn}0e`:C.card,borderRadius:12,padding:'8px 12px',marginBottom:10}}>
+      <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:nInc?C.warn:C.muted,listStyle:'none'}}>
+        📬 Réception des emails{nInc>0?` — ${nInc} non compris`:''}
+      </summary>
+      <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:5}}>
+        {lignes.map(([k, v]) => (
+          <div key={k} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+            <CarrierBadge carrier={k} size={18}/>
+            <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{carrierName(k)}</div>
+            <div style={{color:v.ts?(Date.now()-v.ts<3*86400000?C.ok||C.accent:C.warn):C.danger,fontWeight:600,flexShrink:0}}>
+              {v.ts ? `${v.n} email${v.n>1?'s':''} · dernier ${age(v.ts)}` : 'aucun email reçu'}
+            </div>
+          </div>
+        ))}
+        {nInc>0 && (
+          <div style={{marginTop:6,paddingTop:6,borderTop:`1px solid ${C.border}`}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.warn,marginBottom:4}}>⚠️ {nInc} email{nInc>1?'s':''} reçu{nInc>1?'s':''} que l'app n'a pas su lire</div>
+            {incompris.slice(0,6).map(e=>(
+              <div key={e.id} style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                {(e.at||'').slice(0,16).replace('T',' ')} · {e.subject || '(sans sujet)'} · {e.from || '(sans expéditeur)'} · forme « {e.forme||'?'} »
+              </div>
+            ))}
+            <div style={{fontSize:11,color:C.muted,marginTop:5}}>Ils sont conservés entiers : rien n'est perdu, on peut les relire pour comprendre ce qui manque.</div>
+          </div>
+        )}
+        <div style={{fontSize:11,color:C.muted,marginTop:4}}>
+          Un transporteur à « aucun email reçu » ne veut pas dire qu'il n'y a pas de colis : ça veut dire que ses emails n'arrivent pas jusqu'à l'app (boîte qui ne transfère plus).
+        </div>
+      </div>
+    </details>
+  );
+}
 function PeriodePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const now = new Date();
@@ -13878,6 +13962,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
             style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
         )}
+        <ReceptionEmails tracking={tracking}/>
         {/* À RETIRER — liste simple façon appli de colis : groupée par point relais,
             avec LE CODE de retrait en gros (c'est ça qu'on donne au comptoir) et un
             « Y aller ». Source = emails transporteur (qui portent le code), et non
@@ -13919,7 +14004,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
-                <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>📦 {pickupUnion.total} colis à retirer</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:C.text}}>📦 {pickupUnion.total} colis à retirer</div>
+                  {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
+                      reçoit » (Julien). On compte les colis dont on SAIT nommer
+                      la paire — jamais un total gonflé : quand il en manque, ça
+                      se voit, c'est justement l'information utile. */}
+                  {(()=>{ const nom = avail.filter(t=>String(t.artTitle||'').trim()).length + extra.filter(o=>String(o.title||'').trim()).length;
+                    return <div style={{fontSize:11.5,color:C.muted,fontWeight:600,marginTop:1}}>
+                      {nom} paire{nom>1?'s':''} connue{nom>1?'s':''}{nom<pickupUnion.total?` · ${pickupUnion.total-nom} colis dont l'article n'est pas encore identifié`:''}
+                    </div>; })()}
+                </div>
                 <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{border:`1px solid ${C.accent}`,background:showRelais?C.accent:'transparent',color:showRelais?'#fff':C.accent,borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🗺️ {showRelais?'Masquer la carte':'Carte'}</button>
               </div>
               {/* ⚠️ UN ENDROIT DÉDIÉ PAR TRANSPORTEUR (demande de Julien). Chaque
@@ -13928,7 +14023,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   logo de chaque ligne pour savoir quoi présenter. */}
               {(()=>{ const parTr={};
                 Object.entries(groups).forEach(([nom,g])=>{ const k=carrierName(g.carrier)||'Autre';
-                  (parTr[k]=parTr[k]||{carrier:g.carrier,relais:[],n:0}); parTr[k].relais.push([nom,g]); parTr[k].n+=g.colis.length; });
+                  (parTr[k]=parTr[k]||{carrier:g.carrier,relais:[],n:0,paires:0}); parTr[k].relais.push([nom,g]); parTr[k].n+=g.colis.length;
+                  parTr[k].paires += g.colis.filter(t=>String(t.artTitle||'').trim()).length; });
                 const ordre=Object.entries(parTr).sort((a,b)=>b[1].n-a[1].n);
                 return ordre.map(([tr,bloc])=>(
                   <div key={'tr'+tr} style={{marginBottom:14}}>
@@ -13938,7 +14034,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,paddingBottom:6,borderBottom:`1px solid ${C.border}`}}>
                         {bloc.carrier&&<CarrierBadge carrier={bloc.carrier} size={20}/>}
                         <div style={{flex:1,fontSize:13.5,fontWeight:700,color:C.text}}>{tr}</div>
-                        <div style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{bloc.n} colis</div>
+                        <div style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{bloc.n} colis{bloc.paires>0?` · ${bloc.paires} paire${bloc.paires>1?'s':''}`:''}</div>
                       </div>
                     )}
                     {bloc.relais.map(([nom,g])=>(

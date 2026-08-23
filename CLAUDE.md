@@ -3342,3 +3342,114 @@ smoke 12 écrans **0 PAGEERROR** · `audit-identite` **26 contrôles** (les 4
 nouveaux **échouent bien sur le code d'avant** : 5 champs écrivaient lettre par
 lettre, la reprise auto touchait une paire au garage) · `audit-qr` 5/5 ·
 `audit-coherence` 6 règles / 0 désaccord.
+
+---
+
+## 5.44 — ⚠️ UN EMAIL ARRIVÉ ET PERDU SANS TRACE (23 août) + lecture de TOUTES les formes
+
+Julien : « j'ai toujours que deux colis, et j'ai reçu quatre messages ce matin de
+Chronopost dont deux rappels. Je veux qu'il n'y ait aucune erreur du côté
+Chronopost, Mondial Relay, Vinted GO. À chaque fois on doit voir le nombre de
+paires que l'on reçoit. »
+
+### Ce que la base disait (mesuré avant de coder)
+| | |
+|---|---|
+| dernière ligne `email_track_` | **22 août 20:29** — donc rien ce matin |
+| emails reçus le 23 août (journal `email_journal`) | **3** : une offre à 08:01, une finalisation à 00:56, et **un « ignoré » à 06:36 avec expéditeur ET sujet VIDES** |
+| quarantaine | 593 lignes, **0 email de colis restant** (tous rejoués) |
+| suivis en base | 109 · Chronopost 32 · Mondial Relay 67 · Vinted 5 |
+
+➡️ Deux conclusions, et elles sont différentes :
+1. **Au plus UN de ses quatre emails Chronopost a atteint l'app**, et celui-là,
+   l'app **n'a même pas su en lire l'expéditeur ni le sujet** — il a été classé
+   « ignoré » et **rien n'a été gardé**. Aucun moyen de savoir ce que c'était.
+2. Les trois autres ne sont **jamais arrivés** (le pipeline fonctionne : une
+   finalisation Vinted est passée à 00:56 le même matin). C'est une question
+   d'**adresse de transfert**, pas de code.
+
+⚠️ Et **deux rappels ne sont pas deux colis** : un rappel réécrit la ligne du
+colis qu'il concerne (clé = n° de suivi). « Toujours deux colis » peut donc être
+exact — c'est le troisième point ci-dessous qui rend ça vérifiable.
+
+### 1. `api/_lib/lire-email.js` — savoir ouvrir le contenant
+`normalizeInbound` ne connaissait que **4 formes** (Postmark, SendGrid, Mailgun,
+JSON à plat). Un service qui livre l'email **BRUT (MIME)**, ou l'emballe
+(`{message:{…}}`, `{data:{email:{…}}}`), ou met les en-têtes dans un tableau,
+passait **entièrement à travers** — expéditeur et sujet vides, exactement le cas
+du 06:36.
+Nouveau module **pur** : MIME complet (multipart, `quoted-printable`, `base64`,
+en-têtes `=?UTF-8?B?…?=`, dépliage des lignes, pièces jointes), formes emballées
+(4 niveaux), en-têtes en tableau ou en objet, `envelope`, chaîne JSON, Buffer.
+Il rend aussi **`forme`** (« mime-brut », « data>email>plate »…) — donc le
+journal dit désormais CE QU'ON A REÇU quand quelque chose ne passe pas.
+⚠️ Il ne devine **jamais** le contenu : il ne fait qu'ouvrir l'enveloppe.
+**`scripts/audit-email-formes.cjs` : 15 formes, toutes lisibles** (les 4
+anciennes en non-régression).
+
+### 2. ⚠️ ON NE JETTE PLUS AUCUN EMAIL
+`garderInconnu()` : tout email qu'aucune règle ne reconnaît — et tout corps
+illisible — est **conservé entier** (`email_inconnu_*`, borné à 200 Ko) avec sa
+forme et la raison. Le journal passe de **30 à 200 entrées** : le 23 août, une
+rafale d'emails « offre » avait chassé du journal la seule ligne qui expliquait
+un colis manquant.
+➡️ **Règle : « ignoré » ne veut pas dire « jeté ».** Sans ça, on ne peut que
+deviner — c'est ce qui a coûté six jours en août.
+
+### 3. Panneau « 📬 Réception des emails » (écran Achats)
+Par transporteur : **nombre d'emails reçus et date du dernier**. Chronopost,
+Mondial Relay et Vinted Go y sont **toujours listés, même à zéro** — « aucun
+email reçu » est justement l'information à voir. Plus, en orange, les emails que
+l'app n'a pas su lire (sujet, expéditeur, forme).
+⚠️ Aucune requête pour les dates (elles viennent des suivis déjà chargés) ; une
+seule lecture **scalaire** pour les emails non compris (§34).
+Ça remplace « je crois que ça n'arrive pas » par un chiffre.
+
+### 4. Aiguillage des transporteurs : `detecterTransporteur(mail)` (fonction pure)
+Extraite du handler pour être testable. Deux trous comblés :
+- **Vinted Go** : son nom contient « vinted », donc un email de `@vintedgo.com`
+  n'était **jamais** reconnu comme un colis (l'expéditeur seul était examiné) ;
+- un **colis annoncé par Vinted lui-même** (pas via `shipping@`) était écarté par
+  un `!fromVinted` — il n'apparaissait nulle part. Récupéré **uniquement** sur un
+  signal fort dans le SUJET et jamais sur un email de vente / offre / message /
+  favori / bordereau (on ne devine pas).
+**`scripts/audit-transporteurs.cjs` : 23 contrôles**, dont les 8 « ce qui ne doit
+JAMAIS devenir un colis » et 3 bout-en-bout (la forme du contenant ne change pas
+la décision).
+
+### 5. Le nombre de paires
+La carte affiche « 📦 N colis à retirer » **et** « M paires connues · X colis
+dont l'article n'est pas encore identifié », et chaque section de transporteur
+« N colis · M paires ».
+⚠️ **Mesuré : `artTitle` est vide sur les 109 suivis** — un email de transporteur
+ne nomme pas l'article. Les paires connues viennent donc aujourd'hui des colis
+identifiés par le **statut Vinted**. Le compteur le dit au lieu de gonfler un
+total : quand il en manque, ça se voit.
+
+### 6. Le transporteur générique n'avait pas de fiche
+Le serveur peut classer un email en `carrier: 'autre'` ; `CARRIERS` n'avait pas
+cette entrée → carte sans nom ni couleur, et `retraitMode` sans préférence (donc
+aucune consigne au comptoir). Ajoutée.
+
+### Vérifié
+`npm run build` OK · `node --check api/email-inbound.js` OK ·
+`audit-email-formes` **15/15** · `audit-transporteurs` **23/23** · `audit-qr`
+5/5 · `audit-identite` 26/26 · `audit-coherence` 5 règles / 0 désaccord ·
+banc app (écran Achats rendu sur les vraies données) : panneau « Réception des
+emails » présent et déplié (Chronopost 27 emails · dernier il y a 11 h · Mondial
+Relay 58 · Vinted Go 5 …), compteur de paires rendu, QR + modale + code 9539 +
+identifiant 8156 inchangés, **0 erreur d'app**.
+
+### ⚠️ CE QUI RESTE OUVERT, ET CE QU'IL FAUT DEMANDER À JULIEN
+Le code sait maintenant lire n'importe quelle forme et ne perd plus rien — mais
+**il ne peut pas traiter un email qui ne lui est pas envoyé**. Sur ses quatre
+emails Chronopost du 23 août, un seul est arrivé. La question à poser est donc
+**l'ADRESSE** : sur quelle boîte arrivent ses emails Pickup, et cette boîte
+transfère-t-elle bien vers l'app ? (Adresses vues jusqu'ici : `shopcancale35@`,
+`lolanisse35@`, `tomjeancanc35@`, `vinted35260@icloud`, `traces_etage_3i@icloud`,
+2 `privaterelay`.) Le panneau « Réception des emails » sert exactement à ça :
+un transporteur à « aucun email reçu » désigne une boîte qui ne transfère plus.
+
+⚠️ **Le rejeu VIDE la ligne de quarantaine** (`{supprime:true}`) : le corps brut
+de ces emails est donc perdu. C'est pour ça qu'on ne peut plus en extraire
+l'article a posteriori — les `email_inconnu_*`, eux, sont conservés entiers.
