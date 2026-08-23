@@ -3080,6 +3080,68 @@
     }
   }, 800);
 
+  /* ── PROPOSITION DE BORDEREAU, SANS OUVRIR LE PANNEAU ────────────────────
+     Julien : « dès que je me connecte sur un compte Vinted, sans même avoir
+     ouvert l'extension, s'il y a une vente, propose de générer et d'envoyer le
+     bordereau dans l'app ».
+     ⚠️ C'est une PROPOSITION : générer, c'est agir sur Vinted, donc ça reste
+     son clic (§5.32). La carte s'affiche au-dessus du FAB, se referme, et ne
+     revient pas pour la même vente avant 20 h (côté service worker).
+     ⚠️ Elle ne s'affiche QUE pour le compte connecté dans cet onglet — c'est le
+     service worker qui l'a déterminé (agir au nom d'un autre compte est LE
+     signal multi-comptes que Vinted sanctionne, §48). */
+  let propo = null;
+  function fermerPropo() { if (propo) { propo.remove(); propo = null; } }
+  function afficherPropo(uid, ventes) {
+    fermerPropo();
+    if (!ventes || !ventes.length) return;
+    propo = document.createElement('div');
+    propo.id = 'vrm-propo';
+    propo.style.cssText = 'position:fixed;right:18px;bottom:82px;z-index:2147483000;width:300px;max-width:calc(100vw - 36px);'
+      + 'background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);'
+      + 'padding:12px 13px;font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+    const lignes = ventes.map(v => `
+      <div class="vrm-propo-l" data-tx="${esc(v.tx)}" style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        ${v.photo ? `<img src="${esc(v.photo)}" alt="" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex:0 0 auto">`
+                  : '<div style="width:34px;height:34px;border-radius:8px;background:#e2e8f0;flex:0 0 auto"></div>'}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title || 'Vente')}</div>
+          <div class="vrm-propo-etat" style="font-size:11.5px;color:#64748b">bordereau à générer</div>
+        </div>
+        <button class="vrm-propo-go" data-tx="${esc(v.tx)}" style="flex:0 0 auto;border:none;background:#0f172a;color:#fff;border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">📄 Générer</button>
+      </div>`).join('');
+    propo.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;font-weight:700">${ventes.length} vente${ventes.length > 1 ? 's' : ''} sans bordereau</div>
+        <button id="vrm-propo-x" aria-label="Fermer" style="border:none;background:transparent;color:#64748b;font-size:16px;cursor:pointer;line-height:1">✕</button>
+      </div>
+      <div style="font-size:11.5px;color:#64748b;margin-top:2px">Un clic : l'extension le génère et l'envoie dans l'application.</div>
+      ${lignes}`;
+    document.documentElement.appendChild(propo);
+    propo.querySelector('#vrm-propo-x').onclick = fermerPropo;
+    propo.querySelectorAll('.vrm-propo-go').forEach(b => {
+      b.onclick = () => {
+        const tx = b.getAttribute('data-tx');
+        const ligne = propo.querySelector(`.vrm-propo-l[data-tx="${tx}"]`);
+        const etat = ligne && ligne.querySelector('.vrm-propo-etat');
+        b.disabled = true; b.textContent = '⏳';
+        chrome.runtime.sendMessage({ action: 'genererBord', uid, tx }, (r) => {
+          const ok = r && r.ok;
+          if (etat) etat.textContent = ok ? (r.envoye ? '✅ dans l\'application' : '✅ généré — le PDF suit') : ('⚠️ ' + ((r && (r.error || r.raison)) || 'échec'));
+          if (etat) etat.style.color = ok ? '#15803d' : '#b45309';
+          b.textContent = ok ? '✓' : '↻';
+          b.disabled = false;
+          if (ok) { b.style.background = '#15803d'; setTimeout(() => { if (ligne) ligne.remove(); if (propo && !propo.querySelector('.vrm-propo-l')) fermerPropo(); }, 2500); }
+        });
+      };
+    });
+  }
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.__vrm === 'proposerBordereau') afficherPropo(msg.uid, msg.ventes);
+    });
+  } catch (_) {}
+
   load();   // pastille dès l'arrivée sur Vinted
   onPage(); // lit la date si on arrive directement sur une annonce
 })();
