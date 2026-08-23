@@ -3821,3 +3821,70 @@ le panneau affiche **« ⚠️ 1 email »**, pas 5 · `audit-offres` 10/10 ·
 sont les **contestations que Julien envoie lui-même à Vinted** (« réexamen
 humain », « DEMANDE URGENTE »). Sa boîte fait donc suivre aussi son courrier
 SORTANT. Ce n'est pas un défaut de l'app, mais ça explique une partie du bruit.
+
+---
+
+## 5.50 — LA DESCRIPTION QUE L'APP NE VOYAIT PAS + le coffre complété + un objectif proposé
+
+Julien : « vas-y, tout est bien à part facture et garage, parce que je n'ai pas
+encore eu l'occasion de m'en servir. » ⚠️ **Ni les Factures ni le Garage n'ont
+donc été touchés** : ils ne sont pas cassés, juste pas encore utilisés.
+
+### 1. ⚠️ `descLen` ÉTAIT TOUJOURS NUL — le même défaut que les photos (§5.11)
+`mapWardrobeItem` calcule `descLen` depuis `it.description`. Or l'allègement
+(§23) ne garde **pas** ce champ (il pèse). Donc, sur les **25 annonces en
+ligne, aucune** n'était jugée sur sa description : `scoreAnnonce` s'abstient
+quand le champ est nul (règle §31, « un champ absent ne retire jamais de
+point »), et l'atelier Republier ne conseillait **jamais** dessus.
+- **Extension** : `articleMaigre` pose désormais **`descLen`** (un entier, trois
+  octets — exactement le motif `nPhotos` de §5.11). Le TEXTE, lui, continue
+  d'aller au coffre : c'est là qu'on le recopie pour republier.
+- **App** : `mapWardrobeItem` lit `it.descLen` en premier.
+- ⚠️ **Et à la lecture, pour l'existant** (leçon §5.37) : les annonces déjà
+  captées n'ont pas l'entier et ne seront pas recaptées tout de suite. `loadListings`
+  complète depuis **`vinted_item_details`** (les fiches lues sur la page —
+  **40 sur 40 portaient leur texte** au moment de la mesure), en ne gardant que
+  la **longueur** : le texte complet ne repart jamais dans l'app (§34). Une
+  seule lecture, mise en cache, et le filtre `PUB` de §5.08 écarte le texte
+  marketing de Vinted.
+
+**Mesuré au banc, dans les deux sens** : avec une fiche de description très
+courte posée sur une annonce en ligne, l'écran Republier affiche enfin
+**« description courte »** — et **sur le code d'avant, rien n'apparaît**.
+
+### 2. Le coffre ne complétait que ce qu'il archivait
+Mesuré : **89 annonces au coffre, 8 avec leur texte**, alors que 40 fiches en
+portaient un. `archiverLot` n'enrichissait que les articles du dressing **en
+cours** d'archivage : une annonce plus en ligne, ou d'un autre compte, ne
+récupérait jamais son texte — et « Republier » annonçait « texte à capter » pour
+une paire dont le texte est en base.
+➡️ Une seconde boucle repasse sur les lignes **déjà enregistrées** à qui il
+manque la description, en n'écrivant que celles qui changent vraiment (égress).
+
+⚠️ **CORRECTION DE MA PROPRE MESURE** — ma première lecture annonçait « coffre :
+0 description ». **C'était faux** : je lisais `data->>description` alors que le
+champ s'appelle **`desc`**. Le vrai chiffre est **8 sur 89**. Troisième fois de
+la journée qu'un de mes scripts ment avant le code (§21) — **vérifier le nom du
+champ avant de conclure à un zéro**.
+
+### 3. Un objectif de CA qu'on ne peut plus « oublier de fixer »
+`vinted_goal` n'était **pas défini** : la barre d'objectif, la carte de « Ma
+journée » et le panneau de l'extension affichaient tous un objectif vide depuis
+le début. Un objectif qu'il faut inventer ne se fixe jamais.
+➡️ Tant qu'aucun objectif n'existe, l'app en **propose un**, calculé sur SON
+historique : la moyenne des **3 derniers mois complets**, arrondie à la dizaine,
+avec le chiffre affiché (« Tes 3 derniers mois complets : 1 439 € en moyenne »)
+et un bouton **« 🎯 Viser 1 440 € »**. Un clic. ⚠️ Rien n'est écrit tout seul, et
+**rien n'est proposé sous 2 mois complets d'historique** — un objectif tiré d'un
+seul mois n'est qu'un hasard.
+
+### Vérifié
+`npm run build` OK · `node --check background.js` OK · banc objectif : bloc rendu,
+proposition **1 439 € → « Viser 1 440 € »**, clic → `vinted_goal = 1440` · banc
+description : « description courte » affiché, **absent sur le code d'avant** ·
+`audit-email-formes` 16 · `audit-offres` 10/10 · `audit-transporteurs` 23/23 ·
+`audit-qr` 5/5 · `audit-identite` 30/30 · `audit-bordereau-pdf` 7/7 ·
+`audit-coherence` 0 désaccord · smoke 12 écrans **0 PAGEERROR**.
+⚠️ Piège de banc : le bloc objectif vit dans « Analyse de tes ventes »,
+**repliée par défaut** — sans l'ouvrir, on mesure un artefact et on conclut à
+tort que le bloc n'existe pas.

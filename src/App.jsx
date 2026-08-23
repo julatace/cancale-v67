@@ -1106,6 +1106,36 @@ const familleEmail = (subject, from) => {
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
   return '';
 };
+// ⚠️ LA DESCRIPTION QUE L'APP NE VOYAIT PAS (23 août).
+// La moisson est allégée : le TEXTE des annonces n'y est pas (il pèse). Donc
+// `descLen` était toujours nul et la note d'annonce ne jugeait JAMAIS la
+// description — sur les 25 annonces en ligne, aucune n'était évaluée dessus.
+// L'extension pose désormais l'entier à la capture, mais les annonces DÉJÀ
+// captées n'en ont pas et ne seront pas recaptées tout de suite. Or le texte
+// existe : `vinted_item_details` (les fiches lues sur la page par le panneau)
+// en portait **40 sur 40** au moment de la mesure.
+// ⚠️ UNE seule ligne lue, une fois par chargement de l'écran Annonces, et on ne
+// garde QUE la longueur — le texte complet ne repart jamais dans l'app (§34).
+let _descLensCache = null;
+const fetchDescLens = async () => {
+  if (_descLensCache) return _descLensCache;
+  const out = {};
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
+    if (r.ok) {
+      const rows = await r.json();
+      const d = (rows && rows[0] && rows[0].data) || {};
+      // Le texte marketing de Vinted n'est pas une description (§5.08).
+      const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+      for (const k in d) {
+        const t = String((d[k] && d[k].description) || '').trim();
+        if (t && !PUB.test(t)) out[String(k)] = t.length;
+      }
+    }
+  } catch (_) { /* réseau : on se passe du complément */ }
+  _descLensCache = out;
+  return out;
+};
 const fetchEmailsIncompris = async () => {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=id,subject:data->>subject,from:data->>from,forme:data->>forme,raison:data->>raison,famille:data->>famille,at:data->>receivedAt&limit=200`, { headers: sbAuth() });
@@ -2451,7 +2481,12 @@ const mapWardrobeItem = (it) => ({
   // ont six. L'extension pose maintenant le vrai nombre.
   photoCount: Number.isFinite(it.nPhotos) ? it.nPhotos
             : (Array.isArray(it.photos) ? it.photos.length : (it.photo ? 1 : null)),
-  descLen: typeof it.description === 'string' ? it.description.trim().length : null,
+  // ⚠️ Même règle que `photoCount` : l'extension pose l'entier (`descLen`), le
+  // texte complet n'est jamais dans la moisson (il pèse — il va au coffre).
+  // Sans ça, ce critère était TOUJOURS inconnu et la note d'annonce ne pouvait
+  // jamais juger la description.
+  descLen: Number.isFinite(it.descLen) ? it.descLen
+         : (typeof it.description === 'string' ? it.description.trim().length : null),
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
@@ -11998,6 +12033,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       else anyErr=true;
     }
     const error = out.length===0 && anyErr && !anyOk;
+    // Complète la longueur de description pour les annonces captées AVANT que
+    // l'extension ne la pose (elle ne coûte qu'une lecture, mise en cache).
+    try {
+      const lens = await fetchDescLens();
+      for (const it of out) { if (it.descLen == null) { const l = lens[String(it.id)]; if (l != null) it.descLen = l; } }
+    } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
     if (!error) putCache('listings', out);
     // Annonces que VINTED a marquées vendues (identité, jamais un titre).
     if (vendues.size) setVenduesVinted(vendues);
@@ -13841,6 +13882,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </button>
               )}
             </div>
+            {/* ⚠️ UN OBJECTIF QU'IL FAUT INVENTER NE SE FIXE JAMAIS (mesuré le
+                23 août : `vinted_goal` non défini). On le PROPOSE, calculé sur
+                SON historique — la moyenne des 3 derniers mois complets, arrondie
+                à la dizaine. Un clic suffit ; on n'écrit rien tout seul. */}
+            {goal<=0 && (()=>{
+              const parMois = {};
+              for (const o of (sales.items || [])) {
+                if (classifyOrderStatus(o.status) === 'cancelled') continue;
+                const d = new Date(o.date); if (isNaN(d)) continue;
+                const k = d.toISOString().slice(0, 7);
+                parMois[k] = (parMois[k] || 0) + ((o.price && o.price.amount != null) ? Number(o.price.amount) || 0 : 0);
+              }
+              const moisEnCours = new Date().toISOString().slice(0, 7);
+              const complets = Object.entries(parMois).filter(([k]) => k < moisEnCours).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 3);
+              if (complets.length < 2) return null;   // pas assez d'historique : on ne propose rien
+              const moy = complets.reduce((s2, [, v]) => s2 + v, 0) / complets.length;
+              const prop = Math.max(10, Math.round(moy / 10) * 10);
+              return (
+                <div style={{marginTop:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                  <div style={{flex:'1 1 150px',minWidth:0,fontSize:11,color:C.muted,lineHeight:1.4}}>
+                    Tes {complets.length} derniers mois complets : <b style={{color:C.text}}>{Math.round(moy)} €</b> en moyenne.
+                  </div>
+                  <button type="button" onClick={()=>saveGoal(prop)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    🎯 Viser {prop} €
+                  </button>
+                </div>
+              );
+            })()}
             {goal>0 && (
               <div style={{height:8,borderRadius:999,background:C.border,overflow:'hidden'}}>
                 <div style={{height:'100%',width:`${pct}%`,background:pct>=100?INV_STATUS.online.color:C.accent,borderRadius:999,transition:'width .4s'}}/>
