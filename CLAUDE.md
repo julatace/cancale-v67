@@ -3529,3 +3529,74 @@ annonces en ligne » passait AUSSI sur l'ancien code — la chaîne
 `const items = (listings.items || []);` existe ailleurs dans le fichier. Ancré
 sur le commentaire qui la précède. **Un contrôle qui ne sait pas échouer ne
 prouve rien.**
+
+---
+
+## 5.46 — LES OFFRES LISAIENT LE PRIX DE L'ARTICLE, PAS L'OFFRE + le texte se lit d'une seule façon
+
+Audit des données du jour (23 août), sans rien demander : **184 offres archivées**
+(`email_offer_*`).
+
+| constat | chiffre |
+|---|---|
+| offres avec le **pseudo de l'acheteur** | **0 / 184** |
+| offres **sans montant** | une bonne partie (`€ de ?` dans le relevé) |
+| numéros portés par deux paires **présentes** | **1 — le N°4** (« adidas spezial noir 35,5 » et « 3 manuels première ST2S ») |
+| annonces en ligne sans numéro | 1 (se règle à la prochaine ouverture de l'app) |
+
+### 1. ⚠️ LE MONTANT DE L'OFFRE ÉTAIT LE PREMIER € DU MESSAGE
+`montant` prenait `(\d+[,.]?\d*)\s*€` sur **tout** le texte — donc le **prix
+affiché de l'article** quand il apparaît avant l'offre. **Prouvé** sur un email
+type : ancienne règle → **45,00 €** (le prix), nouvelle règle → **30,00 €**
+(l'offre).
+Conséquences réelles : la notification annonçait le mauvais montant, et le
+« copilote d'offres » (`buy` / `net` / « ✅ Accepte » ou « ⚠️ Refuse ») **conseillait
+sur un chiffre faux** — sur de l'argent, avec 24 h pour décider.
+➡️ On cherche d'abord un montant **rattaché à l'offre** (`offre de X €`,
+`X € pour`, `propose X €`), le premier € du message ne servant plus que de repli.
+
+### 2. Le pseudo de l'acheteur : vide sur les 184
+Deux causes cumulées : une seule tournure reconnue, et surtout — voir ci-dessous —
+un texte d'email qui n'était parfois **que du CSS**. Quatre tournures acceptées
+maintenant (`X t'a fait une offre`, `offre de X`, `de la part de X`, `X a fait
+une offre`).
+⚠️ **Et quand l'extraction échoue, on garde un ÉCHANTILLON** du texte (300
+caractères, seulement dans ce cas) sur la ligne de l'offre : la prochaine session
+calera les motifs sur du vrai au lieu de deviner (méthode §5.24 → §5.26).
+
+### 3. ⚠️ LE TEXTE UTILE, PARTOUT — une seule règle (§11)
+`texteUtile(mail)` (posé la veille pour les colis) écarte un `text` qui n'est
+qu'une feuille de style — certains services de réception en livrent une à la
+place du message. **Seule `parseCarrierEmail` l'utilisait.** Les branches
+vente / achat / offre / message / favori lisaient encore `mail.text` brut : sur
+ces emails-là elles ne trouvaient **ni montant, ni acheteur, ni article**.
+`const corpsTexte = texteUtile(mail)` est calculé **une fois** dans le handler et
+utilisé par toutes les branches — y compris les **clés de déduplication**
+(`shortHash`), qui sinon se calculaient sur du CSS identique d'un email à l'autre.
+
+### 4. ⚠️ UN BUG QUE LE BUILD NE POUVAIT PAS VOIR
+En factorisant, `detecterTransporteur` (fonction **pure**) s'est mise à lire
+`corpsTexte`, une variable du **handler**. `npm run build` passe (le fichier
+`api/` n'est pas dans le bundle) et `node --check` aussi (la syntaxe est bonne) :
+c'est **`scripts/audit-transporteurs.cjs` qui l'a attrapé**, en l'exécutant
+vraiment. La fonction relit désormais son texte elle-même.
+➡️ **Une fonction serverless n'est vérifiée que si un banc l'EXÉCUTE.**
+
+### 5. Le numéro en double remonte dans la cloche
+Le N°4 est porté par **deux annonces en ligne** depuis des semaines. C'était
+signalé sur l'écran Annonces — encore fallait-il y aller. C'est une chose **à
+faire**, donc sa place est dans le centre de notifications :
+« 🚨 N numéros portés par deux annonces (N°4…) — la mauvaise paire peut partir »,
+qui mène à l'écran Annonces.
+⚠️ Rien n'est corrigé automatiquement (un numéro ne bouge plus tout seul, §5.45) :
+on **montre**, il tranche.
+
+### Vérifié
+`npm run build` OK · **`scripts/audit-offres.cjs`** (nouveau) : 8 formulations +
+le cas « le prix de l'article vient avant l'offre » + « du CSS ne fabrique ni
+montant ni acheteur » + « toutes les branches lisent le même texte utile » —
+**10/10** · `audit-transporteurs` 23/23 (il a trouvé le bug du point 4) ·
+`audit-email-formes` 15/15 · `audit-qr` 5/5 · `audit-identite` 30/30 ·
+`audit-coherence` 0 désaccord · banc cloche (fixture : deux annonces au même
+numéro) → **« 🚨 2 numéros portés par deux annonces (N°4, N°15) »** rendu, et le
+N°4 est le VRAI doublon de la base · smoke 12 écrans **0 PAGEERROR, 0 artefact**.

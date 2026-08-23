@@ -18881,6 +18881,13 @@ export default function App() {
       const acctLabels = load('vinted_account_labels', {}); // pour dire SUR QUEL COMPTE aller voir
       const ageDays=(it)=>{ let ts=null; if(it.createdTs!=null) ts=it.createdTs<1e12?it.createdTs*1000:it.createdTs; else { const e=nums[it.id]; if(e&&e.numberedAt){ const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } } return ts!=null?Math.floor((Date.now()-ts)/86400000):null; };
       let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
+      // ⚠️ DEUX PAIRES AVEC LE MÊME NUMÉRO = la mauvaise chaussure dans le carton
+      // (§19, le risque n°1). C'est signalé sur l'écran Annonces, mais il faut y
+      // aller pour le voir. Mesuré le 23 août : le N°4 était porté par DEUX
+      // annonces en ligne (« adidas spezial noir 35,5 » et « 3 manuels ST2S »)
+      // depuis des semaines. Ça a sa place dans la cloche : c'est une chose à
+      // faire, pas une statistique.
+      const numPorteurs={};
       const unreadByAcct={}; // nom du compte -> nb de messages non lus (pour l'indice)
       const lbcOnlineIds=new Set(); // ids d'annonces encore en ligne (pour la synchro Leboncoin)
       // MÊMES RÈGLES QUE LES ÉCRANS : un compte masqué/bloqué ne génère aucune
@@ -18925,6 +18932,8 @@ export default function App() {
             const age=ageDays(it);
             if(age!=null && age>=30) sleepCount+=1;
             if(!nums[it.id] || !nums[it.id].numero) noNumCount+=1;
+            const nn=String((nums[it.id]||{}).numero||'').trim();
+            if(nn) (numPorteurs[nn]=numPorteurs[nn]||[]).push(it.title||'');
           }
         }
       }
@@ -18962,6 +18971,8 @@ export default function App() {
         items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}${hint}`, n:unreadTotal, tab:'cat_msg'});
       }
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
+      const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
+      if(numDbl.length>0) items.push({icon:'🚨', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces'});
       if(noNumCount>0)   items.push({icon:'🔢', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
       if(sleepCount>0)   items.push({icon:'😴', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF si l'échéance de déclaration approche (≤ 14 j) ou est passée.
