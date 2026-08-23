@@ -4001,10 +4001,26 @@ que §5.39 a retiré partout ailleurs — et ils étaient restés là.
 | reçus dont le titre est « contenu » dans celui d'un autre | **22 / 48** |
 | titres en double parmi les reçus | 2, dont **« est conforme à sa » ×16** |
 
-⚠️ Le second chiffre dit autre chose au passage : **l'`article` extrait des
-emails de reçu est souvent un morceau de phrase**, pas un titre. L'extraction
-côté serveur est à revoir — mais tant qu'elle l'est, rapprocher par ce champ
-n'a aucun sens.
+### 6. ⚠️ ET LA CAUSE DU CHARABIA : les deux-points étaient FACULTATIFS
+L'extraction du titre d'article (`api/email-inbound.js`, branche achat) avait
+pour seconde alternative `(?:achet[ée]e?\s*:?\s*|article\s*:?\s*)([^…]{4,70})`
+— **les deux-points optionnels**. Donc n'importe quelle phrase contenant le mot
+« article » était capturée comme titre.
+
+**Preuve, en exécutant l'ANCIEN code sur des phrases types** — il rend
+exactement les chaînes trouvées en base :
+| texte de l'email | ancien code | nouveau |
+|---|---|---|
+| « L'**article** est conforme à sa description. » | `"est conforme à sa description."` (16 fois en base) | `""` |
+| « Les **articles** sont dans leur état d'origine. » | `"s sont dans leur état d"` (2 fois en base) | `""` |
+| « Ton **article** te plaît ? Laisse une évaluation » | `"te plaît ? Laisse une évaluation"` | `""` |
+| « **Achat :** Salomon XT-6 » | `""` (raté !) | `"Salomon XT-6"` |
+
+➡️ Deux formes acceptées, et deux seulement : le titre **entre guillemets**
+après « commande », ou une **vraie étiquette suivie de deux-points**
+(`Article :`, `Achat :`, `Articles achetés :`). Sinon **pas de titre**.
+⚠️ Ça ne répare pas les 48 lignes déjà en base (l'email ne repassera pas), mais
+combiné au point 5, un titre-charabia ne peut plus attraper de reçu.
 
 ➡️ Règle §5.39 appliquée ici aussi : **transaction unique, sinon titre
 strictement égal ET unique, sinon rien**. Le `.includes` est supprimé. La
@@ -4041,5 +4057,5 @@ vaut aucun reçu que le reçu d'une autre paire.
 en ensemble, score par ensembles, ancien test unique disparu, pagination des
 lectures > 1 000 lignes, helper `lireTout` avec l'en-tête `Range`, estampille
 `updated_at` · `audit-coherence` 5 règles / **0 désaccord** · `audit-qr` 5/5 ·
-`audit-offres` 10/10 · `audit-transporteurs` 23/23 · `audit-email-formes` 16/16 ·
+`audit-offres` 10/10 · `audit-transporteurs` 23/23 · `audit-email-formes` 17/17 ·
 `audit-bordereau-pdf` 7/7 · smoke app **12 écrans, 0 PAGEERROR, 0 artefact**.

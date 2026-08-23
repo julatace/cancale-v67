@@ -1111,7 +1111,21 @@ export async function traiterEmail(req, res) {
     const cotéVendeur = /vendu|a\s+achet[ée]\s+ton\s+article|pr[ée]pare\s+ta\s+commande|[àa]\s+exp[ée]dier|bordereau\s+d['’]envoi|ton\s+article/i.test(achText);
     if (!cotéVendeur && /(?:tu as|vous avez)\s+achet|merci pour (?:ton|votre) achat|confirmation d['']achat|(?:ton|votre)?\s*re[çc]u pour (?:la |ta |votre )?commande/i.test(achText)) {
       const prix = (achText.match(/(\d+[,.]\d{2})\s*€/) || [])[1] || '';
-      const article = ((achText.match(/commande\s*[«"“]\s*([^»"”\n]{2,70})\s*[»"”]/i) || achText.match(/(?:achet[ée]e?\s*:?\s*|article\s*:?\s*)[«"“']?([^«»"”'\n]{4,70})/i) || [])[1] || '').trim();
+      // ⚠️ LE TITRE DE L'ARTICLE N'EST PAS UN MORCEAU DE PHRASE.
+      // L'ancienne 2e alternative rendait les deux-points FACULTATIFS
+      // (`article\s*:?\s*`), donc n'importe quelle phrase contenant le mot
+      // « article » était capturée : mesuré sur les 48 reçus réels en base,
+      // « est conforme à sa » revient **16 fois** comme titre d'article
+      // (extrait de « l'article est conforme à sa description »), et 22 reçus
+      // sur 48 ont un titre « contenu » dans celui d'un autre.
+      // On n'accepte donc que deux formes SANS ambiguïté :
+      //   • le titre entre guillemets après « commande » ;
+      //   • une vraie étiquette, c'est-à-dire suivie de DEUX-POINTS.
+      // Sinon : pas de titre. Un titre faux vaut moins que pas de titre — il
+      // sert ensuite à rattacher le reçu à un achat (règle d'identité §5.39).
+      const article = ((achText.match(/commande\s*[«"“]\s*([^»"”\n]{2,70})\s*[»"”]/i)
+        || achText.match(/(?:article|articles?\s+achet[ée]e?s?|achat)\s*:\s*[«"“']?([^«»"”'\n]{4,70})/i)
+        || [])[1] || '').trim();
       const transaction = (achText.match(/transaction\s*:?\s*#?(\d{6,})/i) || [])[1] || '';
       const pdfA = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
       const key = transaction || shortHash(subject + corpsTexte.slice(0, 300));
