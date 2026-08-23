@@ -812,12 +812,16 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
 // des mots de colis. Un email de vente / offre / message n'en est jamais un.
 export function detecterTransporteur(mail) {
   const subject = (mail && mail.subject) || '';
+  // ⚠️ La fonction est PURE : elle relit le texte utile elle-même. Une première
+  // version lisait `corpsTexte`, une variable du handler — `node --check` et le
+  // build passaient, et c'est `scripts/audit-transporteurs.cjs` qui l'a attrapé.
+  const corpsTexte = texteUtile(mail);
   const isBordereauSubject = /Bordereau\s+d['’]envoi/i.test(subject);
   const fromVinted = /vinted/i.test(mail.from);
   const isVintedShipping = /shipping@|relay\.vinted/i.test(mail.from);
   const carrierSrc = ((fromVinted && !isVintedShipping)
     ? mail.from
-    : `${mail.from} ${subject} ${(mail.text || '').slice(0, 1200)}`).toLowerCase();
+    : `${mail.from} ${subject} ${corpsTexte.slice(0, 1200)}`).toLowerCase();
   // Détection élargie : TOUS les transporteurs courants (pas seulement Mondial
   // Relay / Chronopost). L'ordre n'a pas d'importance, chaque test est distinct.
   let carrier =
@@ -844,7 +848,7 @@ export function detecterTransporteur(mail) {
   // capter QR / code / lieu. On exige un signal fort « colis/retrait » et que
   // ce ne soit pas un email de vente/offre/message Vinted (fromVinted exclu).
   if (!carrier && !fromVinted) {
-    const t = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 1200)}`.toLowerCase();
+    const t = `${subject}\n${corpsTexte.slice(0, 1200)}`.toLowerCase();
     if (/point\s+relais|à\s*retirer|a\s*retirer|code\s+de\s+retrait|pr[êe]t.*retrait|colis.*(retrait|disponible|arriv|livr)|pickup/.test(t)) {
     carrier = 'autre';
     }
@@ -930,7 +934,15 @@ export async function traiterEmail(req, res) {
   }
 
   const subject = mail.subject || '';
-  const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${mail.text}`;
+  // ⚠️ LE TEXTE D'UN EMAIL SE LIT D'UNE SEULE FAÇON (§11).
+  // `texteUtile` (posé le 23 août pour les colis) écarte un `text` qui n'est
+  // qu'une feuille de style — certains services de réception en livrent une à la
+  // place du message. Les branches vente / offre / message / favori lisaient
+  // encore `mail.text` brut : sur ces emails-là, elles ne trouvaient ni montant,
+  // ni acheteur, ni article. Mesuré sur les 184 offres archivées : le pseudo de
+  // l'acheteur est vide sur TOUTES, et le montant sur une bonne partie.
+  const corpsTexte = texteUtile(mail);
+  const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${corpsTexte}`;
   const acc = await detectAccount(rawForDetect);
   // Date de RÉCEPTION de l'email : celle d'origine si on rejoue un email conservé
   // (voir api/email-rattacher.js), sinon maintenant.
@@ -1026,9 +1038,9 @@ export async function traiterEmail(req, res) {
     // 2) FINALISATION (argent reçu).
     // Formes réelles : « Transaction finalisée », « La transaction est
     // finalisée », corps « Viré sur ton compte Vinted : 41,00 € ».
-    const finText = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 1500)}`;
+    const finText = `${subject}\n${corpsTexte.slice(0, 1500)}`;
     if (/transaction\s+(?:est\s+)?finalis/i.test(finText) || /vir[ée]\s+sur\s+ton\s+compte/i.test(finText) || /ajout[ée]s?\s+(?:à|dans)\s+ton\s+porte-monnaie/i.test(finText) || /disponibles?\s+(?:dans|sur)\s+ton\s+porte-monnaie/i.test(finText)) {
-      const key = shortHash(subject + '|' + (mail.text || '').slice(0, 400));
+      const key = shortHash(subject + '|' + corpsTexte.slice(0, 400));
       const article = ((finText.match(/la vente de\s+(.+?)\s+a été réalis/i) || [])[1] || '').trim();
       // Montant crédité : on tente plusieurs formulations, puis en dernier
       // recours le plus gros montant € de l'email (le crédit) — avant ce
@@ -1059,7 +1071,7 @@ export async function traiterEmail(req, res) {
     // « tu as acheté » matcherait sinon le détecteur de ventes (« X a
     // acheté ton article »). On archive l'email comme justificatif d'achat
     // (texte + PDF joint éventuel) pour le registre d'achats.
-    const achText = `${subject}\n${(mail.text || htmlToText(mail.html) || '').slice(0, 2000)}`;
+    const achText = `${subject}\n${corpsTexte.slice(0, 2000)}`;
     // ⚠️ GARDE-FOU vente↔achat (bug signalé par Julien : une VENTE tombait en
     // achat). Les emails côté VENDEUR contiennent aussi « ta commande »
     // (« Prépare ta commande », « ta commande est à expédier ») → l'ancien motif
@@ -1074,11 +1086,11 @@ export async function traiterEmail(req, res) {
       const article = ((achText.match(/commande\s*[«"“]\s*([^»"”\n]{2,70})\s*[»"”]/i) || achText.match(/(?:achet[ée]e?\s*:?\s*|article\s*:?\s*)[«"“']?([^«»"”'\n]{4,70})/i) || [])[1] || '').trim();
       const transaction = (achText.match(/transaction\s*:?\s*#?(\d{6,})/i) || [])[1] || '';
       const pdfA = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
-      const key = transaction || shortHash(subject + (mail.text || '').slice(0, 300));
+      const key = transaction || shortHash(subject + corpsTexte.slice(0, 300));
       await supabaseUpsert([{ id: `email_achat_${key}`, data: {
         type: 'achat', subject, article, prix, transaction,
         account: acc.login || '', uid: acc.uid || '',
-        texte: (mail.text || htmlToText(mail.html) || '').slice(0, 4000),
+        texte: corpsTexte.slice(0, 4000),
         pdfB64: pdfA ? pdfA.contentB64 : null, filename: pdfA ? pdfA.filename : null,
         receivedAt: now,
       } }]);
@@ -1094,7 +1106,7 @@ export async function traiterEmail(req, res) {
     }
 
     // 3) VENTE ("Ton article s'est vendu") → facture.
-    if (/vendu/i.test(subject) || /a\s+achet/i.test(mail.text || '')) {
+    if (/vendu/i.test(subject) || /a\s+achet/i.test(corpsTexte)) {
       const data = parseSaleEmail(mail);
       if (!data) { res.status(200).json({ ok: false, type: 'vente', error: 'parse échec' }); return; }
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
@@ -1124,12 +1136,12 @@ export async function traiterEmail(req, res) {
     }
 
     // 4) OFFRE reçue → notif immédiate (les offres expirent en 24h !).
-    const textAll = `${subject}\n${mail.text || htmlToText(mail.html) || ''}`;
+    const textAll = `${subject}\n${corpsTexte}`;
     // Extrait le contenu utile qui suit une phrase d'annonce (le texte du
     // message reçu, l'éventuel mot accompagnant une offre...). On coupe au
     // premier élément d'habillage (boutons, pied de page, liens).
     const extractAfter = (announceRe, maxLen = 140) => {
-      const lines = (mail.text || htmlToText(mail.html) || '').split('\n').map(l => l.trim());
+      const lines = corpsTexte.split('\n').map(l => l.trim());
       const idx = lines.findIndex(l => announceRe.test(l));
       if (idx < 0) return '';
       const useful = [];
@@ -1143,10 +1155,28 @@ export async function traiterEmail(req, res) {
     };
 
     if (/offre/i.test(subject) || /t['']a (?:fait|envoyé) une offre|nouvelle offre/i.test(textAll)) {
-      const montant = (textAll.match(/(\d+[,.]?\d*)\s*€/) || [])[1] || '';
-      const qui = (textAll.match(/(\S+)\s+t['']a\s+(?:fait|envoyé)\s+une\s+offre/i) || [])[1] || '';
+      // ⚠️ LE MONTANT DE L'OFFRE, PAS LE PREMIER € DU MESSAGE.
+      // L'ancienne règle prenait le premier montant rencontré dans tout le texte
+      // — donc le prix affiché de l'article quand il apparaissait avant l'offre.
+      // On cherche d'abord un montant explicitement rattaché à l'offre.
+      const montant =
+          (textAll.match(/offre\s+(?:de\s+)?(\d+[,.]?\d*)\s*€/i) || [])[1]
+       || (textAll.match(/(\d+[,.]?\d*)\s*€\s*(?:pour|au lieu de)/i) || [])[1]
+       || (textAll.match(/(?:propose|propos[ée]e?)\s*(?:de\s*)?(\d+[,.]?\d*)\s*€/i) || [])[1]
+       || (textAll.match(/(\d+[,.]?\d*)\s*€/) || [])[1] || '';
+      // Le pseudo de l'acheteur : plusieurs tournures selon les emails Vinted.
+      // ⚠️ Mesuré sur les 184 offres archivées : il était vide sur TOUTES —
+      // l'unique motif ne couvrait pas la formulation réellement envoyée (et,
+      // sur les emails dont le `text` n'était que du CSS, il n'y avait rien à
+      // lire du tout : voir `corpsTexte`).
+      const qui =
+          (textAll.match(/([\w.\-]{2,30})\s+t['’]a\s+(?:fait|envoyé|propos[ée])\s+une?\s+(?:offre|proposition)/i) || [])[1]
+       || (textAll.match(/(?:offre|proposition)\s+de\s+([\w.\-]{2,30})\s*(?:\n|·|—|-|,)/i) || [])[1]
+       || (textAll.match(/de\s+la\s+part\s+de\s+([\w.\-]{2,30})/i) || [])[1]
+       || (textAll.match(/([\w.\-]{2,30})\s+(?:a|vient\s+de)\s+(?:te\s+)?(?:faire|fait|envoyer|envoyé)\s+une?\s+offre/i) || [])[1]
+       || '';
       const article = (textAll.match(/offre\s+(?:de\s+[\d,.]+\s*€\s+)?pour\s+[«"“']?([^«»"”'\n]{3,60})/i) || [])[1] || '';
-      const key = shortHash(subject + (mail.text || '').slice(0, 200));
+      const key = shortHash(subject + corpsTexte.slice(0, 200));
       // ── COPILOTE D'OFFRES : conseil chiffré instantané ─────────────────────
       // On retrouve le prix d'achat de la paire → on dit s'il faut accepter et
       // combien il reste net, ou refuser (offre sous le coût).
@@ -1167,6 +1197,11 @@ export async function traiterEmail(req, res) {
       // Archive l'offre + le conseil pour le panneau « Copilote d'offres » de l'app.
       try { await supabaseUpsert([{ id: `email_offer_${key}`, data: {
         type: 'offre', qui, article, montant, buy, net,
+        // ⚠️ Quand l'extraction échoue, on garde un ÉCHANTILLON du texte (300
+        // caractères) au lieu de deviner une nouvelle regex à l'aveugle — c'est
+        // la méthode qui a fini par expliquer la fiche article (§5.24 → §5.26).
+        // Rien n'est gardé quand tout a été lu.
+        extrait: (!montant || !qui) ? corpsTexte.replace(/\s+/g, ' ').slice(0, 300) : undefined,
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]); } catch (_) {}
       await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net });
@@ -1178,7 +1213,7 @@ export async function traiterEmail(req, res) {
     if (/nouveau message|message de|t['']a envoyé un message|vous avez re[çc]u un message/i.test(textAll)) {
       const qui = (textAll.match(/(?:message de|de la part de)\s+(\S+)/i) || textAll.match(/(\S+)\s+t['']a envoyé/i) || [])[1] || '';
       const extrait = extractAfter(/envoy[ée] un message|nouveau message|message de/i);
-      const key = shortHash(subject + (mail.text || '').slice(0, 200));
+      const key = shortHash(subject + corpsTexte.slice(0, 200));
       try { await pushOnce({
         title: `💬 ${qui || 'Message Vinted'}${acc.login ? ` → ${acc.login}` : ''}`,
         body: extrait ? `« ${extrait} »` : 'Nouveau message — ouvre Vinted pour répondre.',
@@ -1196,7 +1231,7 @@ export async function traiterEmail(req, res) {
       const qui = (m && m[1]) || '';
       const article = (m && m[2]) || '';
       const prix = (textAll.match(/(\d+[,.]\d{2})\s*€/) || [])[1] || '';
-      const key = shortHash(subject + (mail.text || '').slice(0, 200));
+      const key = shortHash(subject + corpsTexte.slice(0, 200));
       try { await pushOnce({
         title: '❤️ Nouveau favori !',
         body: `${qui || 'Quelqu\'un'} craque sur « ${(article || 'ton article').slice(0, 45)} »${prix ? ` (${prix} €)` : ''}${acc.login ? ` (${acc.login})` : ''} — fais-lui une offre !`,
