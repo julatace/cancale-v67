@@ -151,7 +151,17 @@ const sbAuth = (extra) => {
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
 // (auth.uid()) mais on l'envoie explicitement : c'est plus lisible, et la règle
 // `with check` de Postgres vérifie qu'on n'écrit pas au nom d'un autre.
-const withOwner = (row) => (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, row) : row;
+// ⚠️ `app_data` n'a AUCUN trigger : sans `updated_at` explicite, la colonne
+// garde la date de CRÉATION de la ligne et ment à tous ses lecteurs (§15).
+// Mesuré le 23 août : 9 des 10 écritures de l'app l'omettaient — `widget_stats`
+// affichait « 21 juillet » en colonne pour une donnée écrite le jour même, et
+// j'ai failli en tirer un faux diagnostic. On l'estampille ICI, une seule fois,
+// pour que ça vaille aussi pour toute écriture ajoutée plus tard (§11).
+// Une valeur déjà posée par l'appelant gagne (elle est plus précise que la nôtre).
+const withOwner = (row) => {
+  const base = Object.assign({ updated_at: new Date().toISOString() }, row);
+  return (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, base) : base;
+};
 
 const authCall = async (path, body) => {
   try {
@@ -748,6 +758,22 @@ const cloudLoad = async () => {
 // est mise en attente et rejouée juste après ; (2) refus d'un payload vide.
 let _cloudTimer = null;
 let _pushPending = false;
+// ── CE QU'ON N'ENVOIE PAS DANS LA LIGNE PARTAGÉE ──────────────────────────
+// La ligne `main` repart EN ENTIER à chaque sauvegarde (mesuré : 138 Ko), donc
+// tout ce qu'elle porte inutilement coûte à chaque frappe validée.
+// `vinted_accounts` y était copié AVEC `access_token` et `refresh_token` des
+// 8 comptes — 15,9 Ko, soit 11 % de la ligne — alors que cette copie ne sert
+// qu'à afficher les comptes AVANT que le réseau réponde. La source des jetons
+// est la table `vinted_accounts`, relue au démarrage par `fetchVintedAccounts`.
+// ⚠️ On n'allège QUE la copie qui part dans le nuage : le navigateur garde sa
+// copie complète en localStorage (voir aussi cloudLoad, qui n'écrase plus cette
+// clé — sinon un chargement du nuage effacerait les jetons de l'appareil).
+const ALLEGER_AVANT_CLOUD = {
+  vinted_accounts: (v) => Array.isArray(v)
+    ? v.map(a => ({ id: a.id, vinted_user_id: a.vinted_user_id, login: a.login, domain: a.domain }))
+    : v,
+};
+
 const cloudPush = () => {
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
   if (_cloudTimer) clearTimeout(_cloudTimer);
@@ -755,7 +781,7 @@ const cloudPush = () => {
   _cloudTimer = setTimeout(async () => {
     try {
       const payload = {};
-      SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { try { payload[k] = JSON.parse(v); } catch { payload[k] = v; } } });
+      SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { let val; try { val = JSON.parse(v); } catch { val = v; } const f = ALLEGER_AVANT_CLOUD[k]; payload[k] = f ? f(val) : val; } });
       // verrou 2 : ne JAMAIS écraser le cloud avec un état vide.
       if (Object.keys(payload).length === 0) { _emitSync('error'); _cloudTimer = null; return; }
       // UPSERT et non PATCH : un PATCH ne modifie qu'une ligne existante, donc
@@ -943,6 +969,39 @@ const _emitBusy = () => { _busySubs.forEach(f => { try { f(_busy > 0); } catch (
 const onBusy = (fn) => { _busySubs.add(fn); fn(_busy > 0); return () => _busySubs.delete(fn); };
 const busyStart = () => { _busy++; _emitBusy(); };
 const busyEnd = () => { _busy = Math.max(0, _busy - 1); _emitBusy(); };
+
+// ── LIRE TOUTES LES LIGNES, PAS LES 1 000 PREMIÈRES ───────────────────────
+// ⚠️ Supabase (PostgREST) renvoie AU PLUS 1 000 lignes par requête, et il ne le
+// dit pas : on reçoit une liste complète en apparence, tronquée en réalité.
+// Mesuré le 23 août : la base porte 2 447 lignes, dont 1 127 `harvest_*` et
+// 1 211 `email_*` — les deux dépassent donc le plafond. La coupure se fait par
+// ordre d'identifiant, donc c'est TOUJOURS la même fin de liste qui disparaît
+// (pour `harvest_*`, les comptes dont l'identifiant est le plus grand ; pour
+// `email_*`, les `email_track_*`, c'est-à-dire les colis).
+// Conséquences réelles avant ce correctif : la fraîcheur de certains comptes
+// n'était jamais lue, la réparation automatique des comptes bloqués (§5.09) les
+// ignorait, et « dernier email reçu » pouvait dater d'avant le dernier colis.
+// ⚠️ C'est le même piège qui a faussé une de MES mesures ce jour-là (§21) :
+// un plafond silencieux ressemble à une donnée absente.
+// On pagine avec l'en-tête Range, page par page, jusqu'à recevoir moins d'une
+// page pleine. Garde-fou à 20 pages (20 000 lignes) pour ne jamais boucler.
+const PAGE_SB = 1000;
+const lireTout = async (query, opts = {}) => {
+  const max = opts.maxPages || 20;
+  const out = [];
+  for (let p = 0; p < max; p++) {
+    const from = p * PAGE_SB;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${query}`, {
+      headers: sbAuth({ Range: `${from}-${from + PAGE_SB - 1}`, 'Range-Unit': 'items' }),
+    });
+    if (!r.ok) return p === 0 ? null : out;   // 1re page en erreur = échec ; sinon on rend ce qu'on a
+    const lot = await r.json();
+    if (!Array.isArray(lot)) return p === 0 ? null : out;
+    out.push(...lot);
+    if (lot.length < PAGE_SB) break;
+  }
+  return out;
+};
 
 // ── UNE LIGNE MOISSONNÉE N'EST TÉLÉCHARGÉE QU'UNE FOIS ────────────────────
 // Mesuré au chronomètre : au démarrage, l'app demandait 24 fois les lignes
@@ -2867,13 +2926,25 @@ const COULEURS = {
 };
 // Renvoie la couleur reconnue dans un titre, ou null si aucune / plusieurs
 // (deux couleurs = bicolore, on ne se prononce pas plutôt que de trancher).
-function extractColor(text){
-  if(!text) return null;
+// TOUTES les couleurs reconnues dans un libellé (« noir et violet » → 2).
+// ⚠️ Indispensable pour les paires BICOLORES : `extractColor` ne rend qu'une
+// couleur ou rien, donc un titre à deux couleurs désactivait complètement le
+// test de couleur du sélecteur d'achat — bonus ET pénalité. Mesuré le 23 août
+// sur les 212 paires : « Nike zoom fly 5 NOIR VIOLET 41 » se voyait proposer
+// « Nike zoom fly 5 maat 41 ORANJE » avec la pastille « suggéré » (score 14,
+// pile au seuil), et « Adidas Spezial NOIR ET VERT 38 » recevait
+// « Adidas Spezial BLU n. 38 ». Un prix d'achat faux ne se voit jamais.
+function extractColors(text){
+  if(!text) return [];
   const t = String(text).toLowerCase().replace(/[^a-zà-ÿ0-9]+/g,' ');
   const vues = new Set();
   for(const [nom, mots] of Object.entries(COULEURS))
     for(const m of mots) if(new RegExp('(^| )'+m+'( |$)').test(t)) { vues.add(nom); break; }
-  return vues.size === 1 ? [...vues][0] : null;
+  return [...vues];
+}
+function extractColor(text){
+  const v = extractColors(text);
+  return v.length === 1 ? v[0] : null;
 }
 const KNOWN_MODELS = [
   'zoom fly','p-6000','p6000','p 6000','air max 95','air max 97','air max 1','air max 90','air max',
@@ -8659,9 +8730,12 @@ function VintedAccounts({ accounts, setAccounts }) {
   const blockedAccts = useMemo(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)), []);
   useEffect(() => { (async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
-      if (!res.ok) return;
-      const rows = await res.json(); const by = {};
+      // ⚠️ 1 127 lignes `harvest_*` en base : au-delà de 1 000, Supabase tronque
+      // en silence et des comptes n'auraient JAMAIS de fraîcheur (§A1).
+      // On écarte aussi les lignes vidées (comptes supprimés) : elles ne disent
+      // plus rien sur la fraîcheur d'un compte vivant.
+      const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt&data->>supprime=is.null');
+      if (!rows) return; const by = {};
       rows.forEach(r => { const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
       setLastCap(by);
     } catch (_) {}
@@ -10078,9 +10152,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { (async () => {
     if (!blockedAccts.size) return;
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
-      if (!res.ok) return;
-      const rows = await res.json(); const parUid = {};
+      // ⚠️ 1 127 lignes `harvest_*` en base : au-delà de 1 000, Supabase tronque
+      // en silence et des comptes n'auraient JAMAIS de fraîcheur (§A1).
+      // On écarte aussi les lignes vidées (comptes supprimés) : elles ne disent
+      // plus rien sur la fraîcheur d'un compte vivant.
+      const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt&data->>supprime=is.null');
+      if (!rows) return; const parUid = {};
       rows.forEach(r => {
         const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return;
         const t = harvestTs(r) || 0; if (t && (!parUid[m[1]] || t > parUid[m[1]])) parUid[m[1]] = t;
@@ -10205,7 +10282,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const marqueRef = (extractBrand(item?.title) || '').toLowerCase();
     const tailleRef = String(extractSize(item?.title) || '').toLowerCase();
     const modeleRef = extractModel(item?.title);
-    const couleurRef = extractColor(item?.title);
+    // ⚠️ TOUTES les couleurs du titre, pas une seule : une paire bicolore
+    // (« noir et violet ») rendait `extractColor` nul, ce qui neutralisait le
+    // test de couleur — bonus ET pénalité — et laissait passer une paire d'une
+    // AUTRE couleur pile au seuil « suggéré » (mesuré : 2 cas sur les 10 premiers).
+    const couleursRef = extractColors(item?.title);
     const prixVente = Number(item?.price?.amount ?? item?.price ?? 0) || 0;
     const score = (o) => {
       let pts = 0;
@@ -10228,9 +10309,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // ⚠️ LA COULEUR TRANCHE AUTANT QUE LE MODÈLE. Sans elle, « spezial noir 38 »
       // et « spezial blu 38 » avaient le MÊME score : marque + taille + modèle.
       // Deux couleurs reconnues et différentes = ce n'est pas la même paire.
-      const co = extractColor(t);
-      if (couleurRef && co === couleurRef) pts += 4;
-      else if (couleurRef && co && co !== couleurRef) pts -= 8;
+      // On compare des ENSEMBLES : une couleur commune suffit à rapprocher
+      // (« bleu marine » ↔ « blu »), aucune couleur commune écarte franchement
+      // (« noir violet » ↔ « oranje »). Un côté sans couleur reconnue ne pèse
+      // ni dans un sens ni dans l'autre — on ne se prononce pas sur du vide.
+      const cs = extractColors(t);
+      if (couleursRef.length && cs.length) {
+        pts += cs.some(c => couleursRef.includes(c)) ? 4 : -8;
+      }
       const pa = Number(o.price?.amount);
       if (!isNaN(pa) && prixVente > 0 && pa > 0 && pa < prixVente) pts += 1; // un achat coûte moins cher que la revente
       if (normTitle(t) === normTitle(item?.title || '')) pts += 6;            // titre identique : quasi sûr
@@ -18429,9 +18515,12 @@ function ConnexionsSetting() {
   useEffect(() => { (async () => {
     const lire = async (motif) => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${motif}&select=id,updated_at,cap:data->>capturedAt`, { headers: sbAuth() });
-        if (!r.ok) return null;
-        const rows = await r.json();
+        // ⚠️ `email_*` = 1 211 lignes, `harvest_*` = 1 127 : sans pagination on
+        // n'en lit que 1 000, et la coupure enlève justement les `email_track_*`
+        // (les colis), donc « dernier email reçu » pouvait dater d'avant le
+        // dernier colis arrivé (§A1). Lignes vidées écartées.
+        const rows = await lireTout(`id=like.${motif}&select=id,updated_at,cap:data->>capturedAt&data->>supprime=is.null`);
+        if (!rows) return null;
         let ts = 0; rows.forEach(x => { const t = harvestTs(x) || 0; if (t > ts) ts = t; });
         return { n: rows.length, ts };
       } catch (_) { return null; }
@@ -18843,7 +18932,10 @@ export default function App() {
         //    y compris la NUMÉROTATION des paires (vinted_annonce_numeros /
         //    vinted_used_numeros) : sinon le composant qui les lit au montage
         //    repartirait de zéro et écraserait le cloud (numéros qui « changent »).
-        SYNC_KEYS.forEach(k => { if (cloud[k] !== undefined && cloud[k] !== null) { try { localStorage.setItem(k, JSON.stringify(cloud[k])); } catch (_) {} } });
+        // ⚠️ `vinted_accounts` est EXCLU : la copie du nuage est volontairement
+        // sans jetons (cf. ALLEGER_AVANT_CLOUD), l'écrire ici retirerait les
+        // jetons de cet appareil jusqu'à ce que la table réponde.
+        SYNC_KEYS.forEach(k => { if (k === 'vinted_accounts') return; if (cloud[k] !== undefined && cloud[k] !== null) { try { localStorage.setItem(k, JSON.stringify(cloud[k])); } catch (_) {} } });
         // 2) Puis on met à jour les états React des données gérées à la racine.
         const apply = (key, setter) => {
           if (cloud[key] !== undefined && cloud[key] !== null) { setter(cloud[key]); }

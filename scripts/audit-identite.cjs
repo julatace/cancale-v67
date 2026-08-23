@@ -267,5 +267,73 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('la numérotation ne peut pas être désactivée', 'un interrupteur peut encore la couper');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 9) LE SÉLECTEUR D'ACHAT ET LES PAIRES BICOLORES
+//    Mesuré le 23 août sur les 212 paires numérotées et 318 achats : une paire
+//    dont le titre porte DEUX couleurs (« noir et violet ») rendait
+//    `extractColor` nul, ce qui neutralisait le test de couleur — bonus ET
+//    pénalité. Deux paires sur les dix premières recevaient donc la pastille
+//    « suggéré » pour un achat d'une AUTRE couleur, pile au seuil de 12 :
+//      « Nike zoom fly 5 noir violet 41 » ← « Nike zoom fly 5 maat 41 ORANJE »
+//      « Adidas Spezial noir et vert 38 » ← « Adidas Spezial BLU n. 38 »
+//    Un prix d'achat faux ne se voit jamais : il produit une marge crédible.
+{
+  // a) la lecture « toutes les couleurs » existe
+  /function extractColors\(text\)\{/.test(SRC)
+    ? ok('les couleurs d\'un titre sont lues en ENSEMBLE (paires bicolores)')
+    : nok('les couleurs d\'un titre sont lues en ensemble',
+          'seule `extractColor` existe : un titre bicolore ne rend rien, donc plus aucun test de couleur');
+  // b) le score du sélecteur compare des ensembles, plus une couleur unique
+  /const couleursRef = extractColors\(item\?\.title\)/.test(SRC)
+    && /const cs = extractColors\(t\);[\s\S]{0,260}?couleursRef\.includes\(c\)/.test(SRC)
+    ? ok('le sélecteur d\'achat compare des ensembles de couleurs')
+    : nok('le sélecteur d\'achat compare des ensembles de couleurs',
+          'il compare encore une couleur unique : une paire bicolore désactive le test');
+  // c) l'ancienne comparaison une-couleur-contre-une-couleur a bien disparu du score
+  /couleurRef && co && co !== couleurRef/.test(SRC)
+    ? nok('l\'ancien test de couleur unique a disparu du score', 'il est encore là')
+    : ok('l\'ancien test de couleur unique a disparu du score');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10) L'APP LIT TOUTES LES LIGNES, PAS LES 1 000 PREMIÈRES
+//     Supabase (PostgREST) plafonne SILENCIEUSEMENT une réponse à 1 000 lignes.
+//     Mesuré le 23 août : 2 447 lignes en base, dont 1 127 `harvest_*` et
+//     1 211 `email_*`. Les lectures par préfixe qui les dépassent doivent
+//     paginer, sinon c'est toujours la même fin de liste qui manque —
+//     pour `email_*`, ce sont les `email_track_*`, donc les COLIS.
+{
+  const capables = [
+    ["id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt", 'fraîcheur des comptes'],
+    ["id=like.${motif}&select=id,updated_at,cap:data->>capturedAt", 'dernier email / dernière capture'],
+  ];
+  let mauvais = [];
+  for (const [q, nom] of capables) {
+    const i = SRC.indexOf(q);
+    if (i < 0) { mauvais.push(nom + ' (requête introuvable)'); continue; }
+    // la ligne doit passer par lireTout, pas par un fetch nu
+    const ligne = SRC.slice(Math.max(0, i - 260), i + q.length + 40);
+    if (!/lireTout\(/.test(ligne)) mauvais.push(nom);
+  }
+  mauvais.length
+    ? nok('les lectures de plus de 1 000 lignes paginent', 'sans pagination : ' + mauvais.join(', '))
+    : ok('les lectures de plus de 1 000 lignes paginent');
+  /const lireTout = async \(query, opts = \{\}\)/.test(SRC) && /Range: `\$\{from\}-\$\{from \+ PAGE_SB - 1\}`/.test(SRC)
+    ? ok('le helper de pagination existe et utilise l\'en-tête Range')
+    : nok('le helper de pagination existe', '`lireTout` absent ou ne pagine pas');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11) `updated_at` NE MENT PLUS
+//     `app_data` n'a aucun trigger : sans estampille explicite, la colonne garde
+//     la date de CRÉATION. Mesuré : 9 des 10 écritures de l'app l'omettaient,
+//     et `widget_stats` affichait « 21 juillet » pour une donnée du jour même.
+{
+  /const withOwner = \(row\) => \{[\s\S]{0,400}?updated_at: new Date\(\)\.toISOString\(\)/.test(SRC)
+    ? ok('toute ligne écrite est estampillée `updated_at`')
+    : nok('toute ligne écrite est estampillée `updated_at`',
+          '`withOwner` ne pose pas la date : la colonne gardera la date de création');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
