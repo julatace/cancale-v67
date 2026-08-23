@@ -3453,3 +3453,79 @@ un transporteur à « aucun email reçu » désigne une boîte qui ne transfère
 ⚠️ **Le rejeu VIDE la ligne de quarantaine** (`{supprime:true}`) : le corps brut
 de ces emails est donc perdu. C'est pour ça qu'on ne peut plus en extraire
 l'article a posteriori — les `email_inconnu_*`, eux, sont conservés entiers.
+
+---
+
+## 5.45 — ⚠️ UN NUMÉRO NE BOUGE PLUS JAMAIS TOUT SEUL, ET AUCUNE PAIRE N'EN MANQUE
+
+Julien : « es-tu sûr que les numéros qu'on a attribués aux chaussures ne
+changeront jamais, même si on modifie des choses dans le site ? Je veux vraiment
+que ça ne change pas. Et je veux forcément qu'elle ait un numéro : dès qu'elle
+est postée, elle doit avoir un numéro. »
+
+**Réponse honnête au moment de la question : NON, pas encore garanti.** Mesuré
+sur la vraie base le 23 août :
+
+| | |
+|---|---|
+| annonces en ligne (tous comptes) | 23 · **1 sans numéro** (`9736477763`, compte `angeled92`) |
+| paires numérotées | 209 · **194 avec `auto:true`** |
+| **numéros posés au garage** | **0** |
+| → paires que la reprise automatique pouvait encore changer | **194** |
+
+Le garde-fou « pas si elle est rangée au garage » (posé la veille) ne protégeait
+donc **rien en pratique** : le garage est vide.
+
+### 1. La reprise de numéro n'est plus AUTOMATIQUE
+C'était la seule chose qui pouvait encore changer un numéro déjà écrit. L'effet
+qui appliquait `numeroReprises` est **supprimé**. La reprise reste **proposée**
+dans le bandeau ♻️ (`applyReprise`, un tap, avec la photo, le titre, les deux
+numéros et la case du garage sous les yeux — et l'avertissement quand la paire a
+été vendue).
+⚠️ **Contrepartie assumée, à redire à Julien** : quand il republie une paire,
+elle reçoit un numéro **NEUF** (nouvel id d'annonce = nouvelle paire pour Vinted)
+et sa boîte porte l'ancien. Le bandeau ♻️ propose de remettre l'ancien — **c'est
+à lui de taper**. C'est le prix de « rien ne change tout seul », et c'est ce
+qu'il a demandé. **Ne pas remettre l'automatique sans son accord explicite.**
+
+### 2. « Renuméroter à la suite » est retiré du menu
+C'est le seul outil qui **réattribue** des numéros en masse — donc exactement ce
+qui est interdit maintenant qu'ils sont écrits sur des cartons. Le code de la
+modale reste, mais **plus rien ne l'ouvre**.
+
+### 3. La numérotation ne peut plus être désactivée
+L'interrupteur « 🔢 Auto N° » pouvait rester sur *off* : une paire mise en ligne
+pendant ce temps n'obtenait **aucun** numéro, et rien ne le disait. `autoNum` est
+désormais une **constante vraie** et le bouton a disparu.
+
+### 4. Toute annonce EN LIGNE reçoit un numéro — comptes masqués compris
+L'effet partait d'`annBase`, qui écarte les comptes masqués et les paires données
+pour vendues. Or masquer un compte cache sa **comptabilité** : ça ne sort pas le
+carton de l'étagère. Il part maintenant de **`listings.items`** (même portée que
+`porteursNum`, §5.33).
+
+### Ce qui peut encore changer un numéro (la liste complète, à jour)
+| chemin | déclenché par |
+|---|---|
+| champ N° d'une annonce | **lui**, validé à la sortie du champ (§5.44) |
+| champ N° d'une ligne de vente | **lui** |
+| bouton « → N°X » d'un doublon | **lui** |
+| bandeau ♻️ « remets son numéro » | **lui** |
+| numérotation automatique | seulement une annonce **sans** numéro |
+⚠️ **Aucun autre. Aucun effet, aucun outil, aucune synchro.**
+
+### Vérifié
+`npm run build` OK · `scripts/audit-identite.cjs` **30 contrôles**, dont 4
+nouveaux — et **les 4 échouent bien sur le code d'avant** (§21) ·
+banc dédié (`num_tous.cjs`, vraies données) : 21 annonces rendues, **0 sans
+numéro**, **0 champ N° vide**, une annonce volontairement dépouillée de son
+numéro en **reçoit un neuf (N°335)**, et **aucun numéro ne bouge** sur 4 s
+d'observation · `num_manuel.cjs` cas 2 rejoué (refus sur une paire présente) ·
+`audit-qr` 5/5 · `audit-transporteurs` 23/23 · `audit-email-formes` 15/15 ·
+`audit-coherence` 0 désaccord · smoke 12 écrans **0 PAGEERROR, 0 artefact**.
+
+⚠️ **Piège de banc rencontré** : le contrôle « la numérotation couvre toutes les
+annonces en ligne » passait AUSSI sur l'ancien code — la chaîne
+`const items = (listings.items || []);` existe ailleurs dans le fichier. Ancré
+sur le commentaire qui la précède. **Un contrôle qui ne sait pas échouer ne
+prouve rien.**

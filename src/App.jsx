@@ -9474,7 +9474,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const unmarkSold = (id) => setSoldManual(prev => { const n=new Set(prev); n.delete(String(id)); save('vinted_annonces_vendues',[...n]); return n; });
   const [emailSales, setEmailSales] = useState(null); // emails de vente (auto-retrait des annonces vendues)
   const [showEmailSold, setShowEmailSold] = useState(false); // réafficher les annonces retirées auto
-  const [autoNum, setAutoNum] = useState(() => load('vinted_autonum', true)); // numérotation automatique des annonces
+  // ⚠️ LA NUMÉROTATION N'EST PLUS DÉSACTIVABLE (23 août 2026).
+  // Julien va écrire les numéros sur les boîtes : une annonce postée DOIT avoir
+  // un numéro, sans exception. Un interrupteur qui pouvait rester sur « off »
+  // était un trou — une paire mise en ligne pendant ce temps n'en recevait
+  // aucun, et rien ne le disait. La constante reste pour les effets qui la
+  // lisent (elle vaut désormais toujours vrai).
+  const autoNum = true;
   // Le cloud est-il chargé ? Tant qu'il ne l'est pas, on NE numérote PAS (sinon on
   // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
   // le localStorage (que le cloud vient de remplir) → les numéros restent stables.
@@ -11268,39 +11274,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    ne coûte rien — le compteur monte, c'est normal ; une collision, si.
   };
 
-  // AUTO-REPRISE : quand une annonce republiée (nouvelles photos → numéro auto
-  // tout neuf) correspond SANS AMBIGUÏTÉ à une seule paire orpheline (même
-  // titre + pointure, orpheline hors ligne), on lui remet AUTOMATIQUEMENT son
-  // ancien numéro — celui écrit sur sa boîte. Zéro clic. Les cas ambigus
-  // (plusieurs paires identiques) et les numéros saisis à la main ne sont JAMAIS
-  // touchés (numeroReprises ne contient que les correspondances uniques + auto).
-  // Vérifié sur données réelles avant livraison (5 reprises justes, 2 cas
-  // piégeux laissés intacts). Garde-fou cloudReady comme toute écriture auto.
-  useEffect(() => {
-    if (!autoNum || !cloudReady) return;
-    if (!numeroReprises.length) return;
-    const u = { ...numeros };
-    const freed = [];
-    let changed = false;
-    for (const r of numeroReprises) {
-      // ⚠️ PAIRE VENDUE : jamais toute seule. Elle est partie ; si elle revient
-      //    (litige, retour), elle revient dans un autre carton → numéro NEUF par
-      //    défaut. Le bandeau propose quand même de lui rendre le sien, en un tap.
-      if (r.vendue) continue;
-      const oldNum = String(r.orphan.e.numero);
-      u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
-      if (r.orphan.key !== r.item.id) delete u[r.orphan.key]; // l'ancienne fiche devient l'annonce actuelle
-      freed.push(String(r.current.numero));
-      changed = true;
-    }
-    if (changed) {
-      setNumeros(u); save('vinted_annonce_numeros', u);
-      // ⚠️ Les numéros auto remplacés ne sont PAS rendus au pot (même raison qu'au-
-      //    dessus). C'est ce filtre qui retirait des numéros de la mémoire — mesuré
-      //    au banc : le N°134, pourtant porté par une paire, redevenait proposable.
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [numeroReprises, autoNum, cloudReady]);
+  // ⚠️⚠️ LA REPRISE DE NUMÉRO N'EST PLUS AUTOMATIQUE (23 août 2026).
+  // Julien : « sois sûr que les numéros attribués aux paires ne bougent plus
+  // JAMAIS, je vais commencer à les mettre dans les boîtes. »
+  // Un effet qui remet tout seul l'ancien numéro d'une paire republiée est utile
+  // — mais c'est aussi la SEULE chose qui pouvait encore changer un numéro déjà
+  // écrit. Mesuré le 23 août : 194 des 209 paires portaient un numéro posé
+  // automatiquement, et AUCUNE n'était rangée au garage — le garde-fou « pas si
+  // elle est au garage » ne protégeait donc rien en pratique.
+  // ➡️ Désormais RIEN ne change un numéro sans un geste de Julien. La reprise
+  //    reste proposée dans le bandeau ♻️ (`numeroReprises` + `applyReprise`,
+  //    un tap, avec le nom de la paire et les deux numéros sous les yeux).
+  // ⚠️ NE PAS LA REMETTRE EN AUTOMATIQUE sans son accord explicite.
 
   const annStats = useMemo(() => {
     // Même base que la grille (annBase) : le bandeau compte exactement ce qui
@@ -12127,8 +12112,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  • Un numéro n'est jamais réattribué à une autre paire (vinted_used_numeros).
   // Modifiable à la main ensuite (le champ N° reste éditable), et désactivable.
   useEffect(() => {
-    if (!autoNum || !cloudReady) return; // ⛔ pas de numérotation avant que le cloud soit chargé
-    const items = annBase;   // jamais de numéro consommé pour un compte masqué/bloqué
+    if (!cloudReady) return; // ⛔ pas de numérotation avant que le cloud soit chargé
+    // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO — Julien : « je veux
+    //    forcément qu'elle ait un numéro, peu importe : dès qu'elle est postée,
+    //    elle doit avoir un numéro ». Donc `listings.items` (toutes les annonces
+    //    réellement en ligne) et non `annBase` : masquer un compte cache sa
+    //    COMPTABILITÉ, ça ne sort pas le carton de l'étagère — sa paire est
+    //    physiquement là et il lui faut un numéro sur sa boîte (même règle que
+    //    `porteursNum`, §5.33). Mesuré le 23 août : 1 paire en ligne sans numéro.
+    const items = (listings.items || []);
     if (!items.length) return;
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
@@ -12182,7 +12174,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ua = [...nextUsed].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, autoNum, cloudReady]);
+  }, [listings.items, cloudReady]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
@@ -15047,7 +15039,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {annStats.sleeping>0 && <option value="sleeping">Qui dorment 😴</option>}
               <option value="nonum">Sans numéro</option>
             </select>
-            <button type="button" onClick={()=>{ const v=!autoNum; setAutoNum(v); save('vinted_autonum', v); }} title="Numéroter automatiquement chaque annonce (réutilise le numéro d'une paire renvoyée/republiée)" style={{border:`1px solid ${autoNum?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,fontWeight:600,background:autoNum?`${INV_STATUS.online.color}14`:'transparent',color:autoNum?INV_STATUS.online.color:C.text,cursor:'pointer'}}>{autoNum?'🔢 Auto N° ✓':'🔢 Auto N°'}</button>
+            {/* L'interrupteur « Auto N° » a été retiré : la numérotation est désormais
+                toujours active (voir la déclaration de `autoNum`). */}
             {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
                 ne servent pas tous les jours et encombraient la barre. */}
             <div style={{position:'relative'}}>
@@ -15059,7 +15052,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
-                    {k:'renum', icon:'🔢', lab:'Renuméroter à la suite', desc:`Remettre les numéros à plat (1 → ${renumPlan.nTotal})`, on:()=>{ setAnnToolsOpen(false); setRenumOpen(true); }},
+                    /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
+                       C'est le seul outil qui RÉATTRIBUE des numéros en masse — donc
+                       exactement ce que Julien interdit maintenant qu'il les écrit sur
+                       les boîtes. Le code de la modale reste, mais plus rien ne l'ouvre.
+                       Ne pas le remettre sans son accord explicite. */
                   ].map(t=>(
                     <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:10,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                       <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
