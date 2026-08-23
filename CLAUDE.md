@@ -3710,3 +3710,60 @@ chargés) ; deux lectures **scalaires** pour le reste (§34).
 **Vérifié au rendu réel** (banc Achats, vraies données) : les 5 transporteurs
 listés, les 8 comptes listés, **« 2 comptes ne reçoivent aucun email (tomj606,
 angeled92) »**, 2 colis à retirer et « 2 paires connues ». **0 erreur d'app.**
+
+---
+
+## 5.48 — LE BORDEREAU PROPOSÉ DÈS L'ARRIVÉE SUR VINTED + le PDF qui arrive vraiment
+
+Julien : « dès que je me connecte sur un compte Vinted, **sans même avoir ouvert
+l'extension**, s'il y a une vente, propose de générer et d'envoyer le bordereau
+dans l'app. Et je veux que la transmission du bordereau dans l'app soit
+automatique dès qu'il est généré, il ne doit pas y avoir d'erreur. »
+
+### 1. La proposition, sur la page, sans ouvrir le panneau
+`visiteVinted()` (déjà déclenchée à chaque chargement d'une page Vinted, §5.19)
+appelle désormais **`proposerBordereaux(uid)`** :
+- `ventesSansBordereau(uid)` lit la moisson (`aGenererBordereau`) et **écarte**
+  ce qui a déjà un bordereau — reçu par email (`email_bord_*`) ou déjà capté
+  (`harvest_{uid}_label_*`). **Aucun appel Vinted** : lecture seule.
+- Le service worker envoie la liste à l'onglet ; `vinted-panel.js` affiche une
+  **carte flottante au-dessus du FAB** (panneau fermé), une ligne par vente :
+  photo, titre, bouton **« 📄 Générer »**. Un clic → génération **et** envoi du
+  PDF dans l'app, avec le compte rendu sur la ligne (« ✅ dans l'application »).
+- ⚠️ **C'est une PROPOSITION, pas une génération automatique** — générer, c'est
+  agir sur Vinted, ça reste son clic (§5.32). Et **seulement pour le compte
+  connecté dans cet onglet** : agir au nom d'un autre est LE signal multi-comptes
+  que Vinted sanctionne (§48).
+- ⚠️ **Une seule proposition par vente et par 20 h** (`vrmPropose`, mémo local) :
+  sans ça, ça devient un bandeau qu'on ne voit plus.
+
+### 2. Le PDF n'existe pas à la milliseconde où Vinted accepte
+C'était la cause des « bordereaux générés mais pas dans l'app » : le service
+d'expédition **fabrique** le PDF puis le dépose sur S3. Un seul essai juste après
+la génération tombait souvent sur « pas encore d'URL », et le bordereau
+n'arrivait qu'à la visite suivante — voire par email.
+**`recupererLabelInsiste`** réessaie (1,5 s → 4 s → 9 s), et **uniquement sur les
+échecs transitoires** (« pas donné l'URL », « n'expose pas encore l'expédition ») :
+un refus dur (permissions, PDF vide, 4xx) ne s'arrangera pas en attendant, on
+n'insiste pas. Branchée aux **trois** chemins : génération automatique,
+`genererBord` et `recupBord` du panneau.
+⚠️ Ce **n'est pas** un rythme « faussement humain » (toujours refusé, §32) :
+c'est attendre qu'un fichier soit prêt, sur UNE vente, après SON action.
+
+### 3. ⚠️ Un helper appelé hors de sa portée, encore
+`ventesSansBordereau` lisait la photo via `photoDeCommande` — qui vit **dans**
+`buildPanelData`. `node --check` passe (la syntaxe est bonne) et l'erreur ne
+serait apparue **qu'au moment d'afficher la proposition**. Lecture inlinée.
+C'est la deuxième fois en deux sessions (§5.46 point 4) : **dans ce fichier, un
+helper n'est utilisable que dans la fonction où il est déclaré.**
+
+### Vérifié
+`node --check` sur les deux fichiers · **`scripts/audit-bordereau-pdf.cjs`**
+(nouveau, exécute la VRAIE fonction en `vm`) : **7 cas / 0 non conforme** — prêt
+du 1er coup, prêt au 2e, prêt au 4e (dernier), expédition pas encore exposée puis
+oui, jamais prêt → abandon après 4, refus dur → **aucun réessai**, PDF vide →
+**aucun réessai** · banc panneau : **panneau FERMÉ**, la carte s'affiche avec les
+2 ventes et leurs boutons, le clic envoie `genererBord` avec le bon `tx` et le
+bon `uid`, et la ligne affiche « ✅ dans l'application » — les 13 onglets sans
+erreur (le seul « interactions: 1 » reste l'artefact connu du harnais).
+Extension **5.32.0** — à recharger dans Chrome.

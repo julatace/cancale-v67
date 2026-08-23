@@ -684,7 +684,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (!r.ok) { sendResponse({ ...r, envoye: false }); return; }
             const accs = await getStoredAccounts();
             const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
-            const r2 = acc2 ? await recupererLabel(acc2, msg.uid, msg.tx) : { ok: false, raison: 'compte introuvable' };
+            // ⚠️ On INSISTE : Vinted fabrique le PDF après avoir accepté la
+            // génération, il n'est donc pas prêt à la milliseconde suivante.
+            const r2 = acc2 ? await recupererLabelInsiste(acc2, msg.uid, msg.tx) : { ok: false, raison: 'compte introuvable' };
             sendResponse({ ok: true, envoye: r2.ok, error: r2.ok ? '' : r2.raison });
             return;
           }
@@ -694,7 +696,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
             if (!acc2) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
             const stop = await garde(msg.uid, acc2); if (stop) { sendResponse(stop); return; }
-            const r2 = await recupererLabel(acc2, msg.uid, msg.tx);
+            const r2 = await recupererLabelInsiste(acc2, msg.uid, msg.tx);
             sendResponse({ ok: r2.ok, envoye: r2.ok, error: r2.ok ? '' : (r2.raison || 'échec') });
             return;
           }
@@ -1637,7 +1639,61 @@ async function visiteVinted() {
     // tout seul ici est en LECTURE SEULE : aller chercher le PDF des bordereaux
     // déjà émis pour le déposer dans l'app.
     await genererBordereauxEnAttente(uid, { lectureSeule: true });
+    // ⚠️ « DÈS QUE JE ME CONNECTE SUR UN COMPTE VINTED, SANS MÊME AVOIR OUVERT
+    // L'EXTENSION, S'IL Y A UNE VENTE, PROPOSE DE GÉNÉRER ET D'ENVOYER LE
+    // BORDEREAU DANS L'APP » (Julien, 23 août).
+    // On PROPOSE — on ne génère pas tout seul (§5.32 : générer, c'est agir sur
+    // Vinted, ça reste son clic). La carte s'affiche sur la page, sans ouvrir le
+    // panneau ; un clic suffit.
+    await proposerBordereaux(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
+}
+
+// Les ventes de CE compte qui attendent qu'on génère leur bordereau, telles que
+// Vinted les a rendues à la dernière moisson. Lecture seule, aucun appel Vinted.
+async function ventesSansBordereau(uid) {
+  try {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const cand = ventes.filter(o => o && o.transaction_id != null && aGenererBordereau(o.status));
+    if (!cand.length) return [];
+    // Un bordereau déjà reçu par email prouve qu'il existe : rien à proposer.
+    const deja = new Set();
+    try {
+      const mails = await sbGet('app_data?id=like.email_bord_*&select=tx:data->>transaction');
+      for (const m of (mails || [])) if (m && m.tx) deja.add(String(m.tx));
+    } catch (_) {}
+    try {
+      const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
+      for (const r of (cur || [])) if (r && r.tx) deja.add(String(r.tx));
+    } catch (_) {}
+    return cand.filter(o => !deja.has(String(o.transaction_id)))
+      // ⚠️ La photo se lit ICI, pas via un helper d'une autre portée :
+      //    `photoDeCommande` vit dans `buildPanelData` — l'appeler d'ici lèverait
+      //    une ReferenceError au moment où la proposition doit s'afficher.
+      .map(o => ({ tx: String(o.transaction_id), title: String(o.title || ''),
+        photo: (o.photo && (o.photo.url || (typeof o.photo === 'string' ? o.photo : ''))) || '' }));
+  } catch (_) { return []; }
+}
+
+// Envoie la proposition à l'onglet Vinted actif. Le panneau (déjà injecté sur
+// la page) l'affiche en carte flottante — sans avoir à l'ouvrir.
+// ⚠️ Une seule proposition par vente et par jour : elle ne doit pas devenir un
+// bandeau qu'on finit par ne plus voir.
+async function proposerBordereaux(uid) {
+  try {
+    const liste = await ventesSansBordereau(uid);
+    if (!liste.length) return;
+    const memo = (await chrome.storage.local.get('vrmPropose')).vrmPropose || {};
+    const frais = liste.filter(v => !memo[v.tx] || Date.now() - Number(memo[v.tx]) > 20 * 3600 * 1000);
+    if (!frais.length) return;
+    for (const v of frais) memo[v.tx] = Date.now();
+    await chrome.storage.local.set({ vrmPropose: memo });
+    const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
+    for (const t of tabs) {
+      try { await chrome.tabs.sendMessage(t.id, { __vrm: 'proposerBordereau', uid: String(uid), ventes: frais.slice(0, 5) }); } catch (_) {}
+    }
+  } catch (_) {}
 }
 try {
   chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
@@ -2318,6 +2374,31 @@ async function recupererLabel(acc, uid, tx) {
   } catch (e) { await noterDiag('label_erreur'); return { ok: false, raison: String(e).slice(0, 80) }; }
 }
 
+// ⚠️ « JE VEUX QUE LA TRANSMISSION DU BORDEREAU SOIT AUTOMATIQUE DÈS QU'IL EST
+// GÉNÉRÉ, IL NE DOIT PAS Y AVOIR D'ERREUR » (Julien, 23 août).
+// Le PDF n'existe pas à la milliseconde où Vinted accepte la génération : le
+// service d'expédition le fabrique, puis le dépose sur S3. Un seul essai juste
+// après la génération tombait donc souvent sur « pas encore d'URL » — et le
+// bordereau n'arrivait dans l'app qu'à la visite suivante, voire par email.
+// On réessaie, en laissant le temps à Vinted de le produire.
+// ⚠️ Ce n'est PAS un rythme « faussement humain » (toujours refusé, §32) : c'est
+// attendre qu'un fichier soit prêt, sur UNE vente, après une action de Julien.
+const LABEL_ATTENTES_MS = [1500, 4000, 9000];
+async function recupererLabelInsiste(acc, uid, tx) {
+  let dernier = { ok: false, raison: 'non tenté' };
+  for (let i = 0; i <= LABEL_ATTENTES_MS.length; i++) {
+    dernier = await recupererLabel(acc, uid, tx);
+    if (dernier.ok) { if (i) await noterDiag('label_ok_apres_' + i + '_essai'); return dernier; }
+    // On n'insiste que sur les échecs TRANSITOIRES (le PDF n'est pas encore là).
+    // Un refus dur (permissions, PDF vide, 4xx) ne s'arrangera pas en attendant.
+    const transitoire = /pas donné l'URL|n'expose pas encore/i.test(dernier.raison || '');
+    if (!transitoire || i === LABEL_ATTENTES_MS.length) break;
+    await new Promise(r => setTimeout(r, LABEL_ATTENTES_MS[i]));
+  }
+  if (!dernier.ok) await noterDiag('label_abandon_apres_essais');
+  return dernier;
+}
+
 async function genererBordereauxEnAttente(uid, opts = {}) {
   try {
     if (!uid) return 0;
@@ -2348,7 +2429,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       memo[tx] = { t: Date.now(), ok: !!r.ok };
       if (r.ok) {
         faits++;
-        const eu = (await recupererLabel(acc, uid, tx)).ok;
+        const eu = (await recupererLabelInsiste(acc, uid, tx)).ok;
         logActivity(eu ? `📄 Bordereau généré et rangé dans l'app — ${String(o.title || '').slice(0, 40)}`
                        : `📄 Bordereau généré — ${String(o.title || '').slice(0, 40)} (le PDF arrivera par email)`);
       } else {
