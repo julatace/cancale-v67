@@ -191,9 +191,14 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     ? ok('la reprise marque les paires vendues (toutes les ventes, pas que les finalisées)')
     : nok('la reprise marque les paires vendues (toutes les ventes, pas que les finalisées)',
           'elle repart de `txnLink`, qui ignore litiges et remboursements');
-  /if \(r\.vendue\) continue;/.test(SRC)
-    ? ok('la reprise AUTOMATIQUE saute les paires vendues')
-    : nok('la reprise AUTOMATIQUE saute les paires vendues');
+  // ⚠️ Ce contrôle a changé de forme le 23 août : la reprise n'est PLUS
+  // automatique du tout (§9 ci-dessous), donc « elle saute les paires vendues »
+  // n'a plus d'objet — la garantie est plus forte. Ce qui doit rester vrai,
+  // c'est que le drapeau `vendue` est toujours calculé et affiché à Julien
+  // avant qu'il ne tape (avertissement du bandeau ♻️).
+  /r\.vendue/.test(SRC) && /a été VENDUE sous le N°/.test(SRC)
+    ? ok('une paire vendue est signalée avant toute reprise de son numéro')
+    : nok('une paire vendue est signalée avant toute reprise de son numéro');
   // Saisie manuelle : un numéro déjà porté par une paire PRÉSENTE doit être refusé.
   /const poserNumero = async/.test(SRC) && /porteursNum\[n\] \|\| \[\]/.test(SRC)
     ? ok('changer un N° à la main : refus si une paire le porte encore')
@@ -229,6 +234,37 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   /if \(!autres\.length\) \{ updatePair\(item, \{ numero: n \}\); recordUsed\(n\); return; \}/.test(SRC)
     ? ok('le numéro n\'est écrit qu\'après les contrôles de collision')
     : nok('le numéro n\'est écrit qu\'après les contrôles de collision');
+}
+
+// ── 9) UN NUMÉRO NE BOUGE PLUS JAMAIS TOUT SEUL, ET AUCUNE PAIRE N'EN MANQUE ──
+//     Julien, 23 août : « es-tu sûr que les numéros attribués aux chaussures ne
+//     changeront jamais, même si on modifie des choses dans le site ? Et je veux
+//     forcément qu'elle ait un numéro : dès qu'elle est postée, elle doit en
+//     avoir un. »
+//     Mesuré ce jour-là : 194 des 209 paires portaient un numéro posé
+//     automatiquement et AUCUNE n'était rangée au garage — la reprise
+//     automatique pouvait donc encore toutes les changer.
+{
+  // a) la reprise de numéro ne s'exécute plus toute seule
+  /LA REPRISE DE NUMÉRO N'EST PLUS AUTOMATIQUE/.test(SRC) && !/for \(const r of numeroReprises\) \{/.test(SRC)
+    ? ok('aucun effet ne réécrit un numéro tout seul (la reprise est proposée, pas appliquée)')
+    : nok('aucun effet ne réécrit un numéro tout seul',
+          'un effet applique encore `numeroReprises` sans geste de l\'utilisateur');
+  // b) plus aucun bouton n'ouvre la renumérotation EN MASSE
+  /setRenumOpen\(true\)/.test(SRC)
+    ? nok('aucun bouton ne lance une renumérotation en masse', 'le menu ⋯ Outils ouvre encore la modale')
+    : ok('aucun bouton ne lance une renumérotation en masse');
+  // c) toute annonce EN LIGNE reçoit un numéro — comptes masqués compris
+  // ⚠️ On ancre sur le commentaire + la ligne : `const items = (listings.items…)`
+  // existe ailleurs dans le fichier, donc le tester seul donnait un faux vert.
+  /TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO[\s\S]{0,900}?const items = \(listings\.items \|\| \[\]\);/.test(SRC)
+    ? ok('la numérotation couvre TOUTES les annonces en ligne (comptes masqués compris)')
+    : nok('la numérotation couvre TOUTES les annonces en ligne',
+          'elle part encore d\'`annBase`, qui écarte les comptes masqués');
+  // d) elle n'est pas désactivable
+  /const autoNum = true;/.test(SRC) && !/setAutoNum\(/.test(SRC)
+    ? ok('la numérotation ne peut pas être désactivée')
+    : nok('la numérotation ne peut pas être désactivée', 'un interrupteur peut encore la couper');
 }
 
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
