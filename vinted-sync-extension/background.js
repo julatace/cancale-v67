@@ -1135,6 +1135,14 @@ function articleMaigre(it) {
   // rend le diagnostic honnête. Les URL, elles, vont au coffre (archiverLot).
   if (Array.isArray(it.photos)) o.nPhotos = it.photos.length;
   else if (o.photo) o.nPhotos = 1;
+  // ⚠️ MÊME PROBLÈME QUE LES PHOTOS, POUR LA DESCRIPTION (mesuré le 23 août).
+  // L'allègement ne garde pas `description` (elle pèse), donc `descLen` était
+  // TOUJOURS nul dans l'app : la note d'annonce ne pouvait jamais juger la
+  // description, et l'atelier « Republier » ne conseillait jamais dessus — sur
+  // les 25 annonces en ligne, aucune n'était évaluée sur ce critère.
+  // Un entier coûte trois octets et rend le diagnostic possible. Le TEXTE, lui,
+  // va au coffre (archiverLot) — c'est là qu'on le recopie pour republier.
+  if (typeof it.description === 'string') o.descLen = it.description.trim().length;
   return o;
 }
 
@@ -2097,6 +2105,31 @@ async function archiverLot(uid, items) {
           && Number(anc.nPhotos) === Number(rec.nPhotos)) continue;
     } else rec.firstSavedAt = rec.savedAt;
     out.push({ id: `coffre_${uid}_${rec.id}`, data: rec });
+  }
+  // ⚠️ LES FICHES DÉJÀ AU COFFRE N'ÉTAIENT JAMAIS COMPLÉTÉES (mesuré le 23 août :
+  // 89 annonces au coffre, **8 seulement avec leur texte**, alors que 40 fiches
+  // lues sur la page en portaient un). La boucle ci-dessus ne voit que les
+  // articles du dressing EN COURS d'archivage : une annonce plus en ligne, ou
+  // d'un autre compte, ne récupérait jamais son texte — et « Republier »
+  // annonçait « texte à capter » pour une paire dont le texte est en base.
+  // On repasse donc sur les lignes DÉJÀ enregistrées à qui il manque la
+  // description, en n'écrivant que celles qui changent vraiment.
+  const dejaEcrites = new Set(out.map(o => o.id));
+  for (const id in anciens) {
+    const anc = anciens[id];
+    const cle = `coffre_${uid}_${id}`;
+    if (!anc || dejaEcrites.has(cle)) continue;
+    const p = pages[String(id)];
+    if (!p) continue;
+    const t = String(p.description || '').trim();
+    const photos = Array.isArray(anc.photos) ? anc.photos.slice() : [];
+    let change = false;
+    if (!anc.desc && t.length > 15 && !PUB.test(t)) { anc.desc = t; change = true; }
+    for (const u of (p.photos || [])) if (u && !photos.includes(u)) { photos.push(u); change = true; }
+    if (!change) continue;
+    anc.photos = photos;
+    anc.nPhotos = Math.max(Number(anc.nPhotos) || 0, photos.length);
+    out.push({ id: cle, data: anc });
   }
   if (!out.length) return true;
   return await supabaseUpsert('app_data', out, 'id');
