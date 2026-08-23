@@ -3600,3 +3600,113 @@ montant ni acheteur » + « toutes les branches lisent le même texte utile » �
 `audit-coherence` 0 désaccord · banc cloche (fixture : deux annonces au même
 numéro) → **« 🚨 2 numéros portés par deux annonces (N°4, N°15) »** rendu, et le
 N°4 est le VRAI doublon de la base · smoke 12 écrans **0 PAGEERROR, 0 artefact**.
+
+---
+
+## 5.47 — LA SAISIE EN SÉRIE DES PRIX D'ACHAT (le défaut de données le plus coûteux)
+
+Relevé du 23 août, après tous les correctifs de la journée :
+
+| | |
+|---|---|
+| paires numérotées | **210** |
+| **avec un prix d'achat** | **0** |
+| ventes finalisées | **231** · CA **6 717,69 €** |
+| ventes du mois (hors annulées) | 83 · 2 816 € (l'app publiait 81 / 2 792 € — écart = les ventes captées depuis) |
+| factures | 0 · cases de garage occupées | 0 |
+
+➡️ **Tout le bénéfice, la marge, la « meilleure marque » et le rapport comptable
+tournent avec un COÛT DE ZÉRO**, sur 231 ventes et 6 717 € de CA. C'est le
+défaut ouvert depuis §22, et il n'a jamais bougé.
+
+### Pourquoi ça ne se remplissait pas — ce n'est pas de la paresse
+Julien a dit « je vais tout remplir manuellement ». Ce qui l'en empêche, c'est le
+**geste** : ouvrir chaque carte de l'écran Annonces, viser un petit champ, taper,
+recommencer — 210 fois, en cherchant les paires une par une. Le rapprochement
+automatique est exclu depuis §22/§5.23/§5.38 (un prix d'achat faux ne se voit
+jamais et fausse la marge pour toujours).
+
+### Ce qui est livré : `fillBuyRows` + la modale « Prix d'achat à compléter »
+**Une seule liste, un champ par ligne, Entrée passe à la suivante.**
+- **Les paires VENDUES d'abord, au CA décroissant** — ce sont elles qui faussent
+  vraiment la compta. Mesuré au banc : N°11 (84 €), N°3 (77 €), N°21 (60 €)…
+  Vingt minutes de frappe redressent l'essentiel.
+- Chaque ligne : vignette, N°, titre, et ce que la paire pèse (« vendue 84,00 € »,
+  « en ligne · 45,00 € », « plus en ligne »).
+- `ChampSaisie` (§5.44) gagne **`apresEntree`** : Entrée valide **et** donne le
+  focus au champ suivant. C'est ce qui rend une longue liste tenable au clavier.
+- Écriture par `setBuyForKey(key, val)` sur `vinted_annonce_numeros[key]`, avec la
+  règle existante : **une saisie manuelle efface le lien vers un achat**
+  (`buyFromId`/`buyFrom` à `null`), sinon la carte afficherait un achat sans
+  rapport avec le chiffre saisi.
+- L'impact de chaque paire est calculé par **IDENTITÉ** (`identiteAnnonce` : id
+  d'annonce Vinted, sinon photo) — **jamais par titre** (§5.34).
+
+⚠️ **Aucune saisie automatique** : c'est lui qui tape. La règle « mieux vaut un
+blanc qu'un faux » est intacte.
+
+### Deux portes d'entrée, là où le manque se constate
+- écran **Ventes**, sur l'alerte « X ventes finalisées sans prix d'achat » →
+  bouton **« 💶 Tout compléter d'un coup »** (l'ancien « Les compléter → », qui ne
+  faisait que filtrer la liste, devient « Voir la liste ») ;
+- écran **Annonces** → ⋯ Outils → **« Compléter les prix d'achat »**, avec le
+  compte de paires concernées.
+
+### Vérifié
+`npm run build` OK · banc dédié (`fillbuy.cjs`, vraies données) : le bouton ouvre
+la modale, **196 paires listées et 196 champs**, triées par CA décroissant
+(84 € / 77 € / 60 €), un prix tapé au clavier est **enregistré**, et **Entrée
+donne bien le focus au champ suivant** — **0 erreur d'app**.
+
+### 5.47 (suite) — LES CODES 9195 / 6121 : CHERCHÉS PARTOUT, INTROUVABLES — et POURQUOI
+
+Julien : « j'ai deux codes de rappel, 9195 et 6121, regarde si tu les trouves
+dans les mails ».
+
+**Cherchés dans les trois endroits possibles, à la chaîne brute :**
+| où | résultat |
+|---|---|
+| 109 lignes `email_track_*` (`code` et `code2`) | **absents** |
+| 444 lignes de quarantaine restantes (recherche brute dans le JSON entier) | **absents** |
+| 26 lignes `email_inconnu_*` (corps conservé) | **absents** |
+
+➡️ **Ces deux emails ne sont jamais arrivés jusqu'à l'app.** Ce n'est pas un
+défaut de lecture — le corps brut est fouillé, chiffre par chiffre.
+
+### ⚠️ ET LA CAUSE EST MAINTENANT NOMMÉE : DEUX COMPTES NE REÇOIVENT RIEN
+Croisement des 8 comptes Vinted reliés avec les emails réellement reçus :
+
+| compte | emails reçus |
+|---|---|
+| julatace35260 | 184 |
+| llloollllaa | 127 |
+| julienf765 | 112 |
+| tomj683 | 87 |
+| julatace3535 | 23 |
+| liliand653 | 2 |
+| **tomj606** | **0** ⚠️ |
+| **angeled92** | **0** ⚠️ |
+
+**`angeled92` a 4 annonces en ligne et 91 € en attente** — c'est un compte
+vivant, et **aucun** de ses emails n'atteint l'app. Ses codes de retrait ne
+peuvent donc pas y être. Adresses de réception observées : `shopcancale35@`,
+`lolanisse35@`, `tomjeancanc35@`, `vinted35260@icloud`, `traces_etage_3i@icloud`,
+un `privaterelay`.
+
+### Le panneau « 📬 Ce qui arrive dans l'app » (onglet Achats, ouvert par défaut)
+Remplace le `<details>` replié de §5.44 et répond aux trois demandes du jour :
+- **une ligne par transporteur**, Chronopost / Mondial Relay / **Vinted Go**
+  **toujours affichés même à zéro**, avec le nombre de **colis à retirer** et la
+  date du dernier email ;
+- **une ligne par compte Vinted** avec le nombre d'emails reçus et la fraîcheur —
+  et, en rouge, **la liste de ceux qui ne reçoivent rien** avec ce que ça
+  implique (« leurs codes de retrait n'arrivent jamais ici ») ;
+- le compte des emails **non classés** (26 à ce jour — évaluations, « commande
+  mise à jour », « a mis en ligne un nouvel article », newsletters : aucun colis).
+
+⚠️ Aucune requête pour les dates de colis (elles viennent des suivis déjà
+chargés) ; deux lectures **scalaires** pour le reste (§34).
+
+**Vérifié au rendu réel** (banc Achats, vraies données) : les 5 transporteurs
+listés, les 8 comptes listés, **« 2 comptes ne reçoivent aucun email (tomj606,
+angeled92) »**, 2 colis à retirer et « 2 paires connues ». **0 erreur d'app.**
