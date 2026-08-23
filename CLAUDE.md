@@ -3767,3 +3767,57 @@ oui, jamais prêt → abandon après 4, refus dur → **aucun réessai**, PDF vi
 bon `uid`, et la ligne affiche « ✅ dans l'application » — les 13 onglets sans
 erreur (le seul « interactions: 1 » reste l'artefact connu du harnais).
 Extension **5.32.0** — à recharger dans Chrome.
+
+---
+
+## 5.49 — « NON COMPRIS » DOIT VOULOIR DIRE QUELQUE CHOSE
+
+Le compteur posé la veille (§5.44) a fait son travail : **28 emails conservés**.
+Mais en les classant, aucun n'appelle la moindre action :
+
+| famille | nombre |
+|---|---|
+| **les emails que Julien ENVOIE lui-même à Vinted** (contestations de blocage) | **11** |
+| « Commande mise à jour pour … » | 8 |
+| évaluations (« Laisse une évaluation », « X t'a laissé une évaluation ») | 5 |
+| « untel a mis en ligne un nouvel article » | 3 |
+| newsletter | 1 |
+| **vraiment inconnu** | **0** |
+
+➡️ Le panneau annonçait donc « 28 emails non compris » alors qu'il n'y avait
+**rien à comprendre**. Un compteur qui crie au loup finit par ne plus être
+regardé — c'est le défaut du panneau Garage (§5.14), et il se reproduisait.
+
+### `familleConnue(subject, from)` — reconnaître, sans jeter
+Six familles étiquetées. **Rien n'est supprimé** (la règle §5.44 tient) : ces
+emails restent conservés, simplement rangés en `connu-sans-action` et **allégés
+à 2 Ko** au lieu de 200 (une newsletter n'a pas à peser en base, §34).
+⚠️ **« Commande mise à jour » est volontairement SANS ACTION** : les statuts de
+commande viennent de la moisson Vinted, **jamais des emails** (§33 — c'était la
+source des faux achats). L'étiquette est là pour ne pas le redécouvrir.
+
+### ⚠️ LA MÊME RÈGLE À LA LECTURE (leçon §5.37)
+Les 28 lignes déjà en base n'ont pas de champ `famille` et **ne seront jamais
+réécrites**. Sans une copie de la règle **côté app**, le compteur aurait continué
+d'annoncer 28. `familleEmail` (src/App.jsx) est donc la copie exacte de
+`familleConnue` (api/email-inbound.js).
+**`scripts/audit-email-formes.cjs` vérifie que les deux tranchent pareil** sur
+**12 sujets réels** — dont 5 qui ne doivent **JAMAIS** être rangés « sans
+action » : colis Chronopost, offre, vente, bordereau, transaction finalisée.
+
+### Ce que le panneau affiche maintenant
+- rien à signaler → une ligne discrète « N emails reconnus sans action à faire » ;
+- un email vraiment inconnu → l'alerte orange, avec son sujet.
+
+### Vérifié
+`npm run build` OK · `node --check api/email-inbound.js` OK ·
+`audit-email-formes` **16 contrôles** (15 formes + les familles) ·
+banc Achats avec 5 emails injectés (4 familles connues + 1 vrai inconnu) →
+le panneau affiche **« ⚠️ 1 email »**, pas 5 · `audit-offres` 10/10 ·
+`audit-transporteurs` 23/23 · `audit-qr` 5/5 · `audit-identite` 30/30 ·
+`audit-bordereau-pdf` 7/7 · `audit-coherence` 0 désaccord.
+
+⚠️ **Au passage, une information qui n'est pas technique** : 11 des emails reçus
+sont les **contestations que Julien envoie lui-même à Vinted** (« réexamen
+humain », « DEMANDE URGENTE »). Sa boîte fait donc suivre aussi son courrier
+SORTANT. Ce n'est pas un défaut de l'app, mais ça explique une partie du bruit.

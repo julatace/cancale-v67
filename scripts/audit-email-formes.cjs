@@ -79,6 +79,51 @@ for (const c of cas) {
 const v = normaliserEntrant({ inconnu: 42 });
 (!v.from && !v.subject && !v.text && !v.html) ? ok('un contenant illisible ne fabrique rien') : nok('un contenant illisible ne fabrique rien');
 
+// ── LES FAMILLES « CONNUES, SANS ACTION » ───────────────────────────────────
+// ⚠️ Mesuré le 23 août : 28 emails « non compris » dont 27 étaient des
+// évaluations, des newsletters, des « commande mise à jour » et les emails que
+// Julien envoie lui-même à Vinted. Un compteur qui crie au loup finit par ne
+// plus être regardé (le défaut du panneau Garage, §5.14).
+// La règle vit DEUX FOIS (serveur, pour ce qui arrive ; app, pour ce qui est
+// déjà en base et ne sera jamais réécrit — §5.37). Elles doivent trancher
+// pareil : deux règles qui divergent, c'est deux chiffres qui se contredisent.
+{
+  const fs2 = require('fs');
+  const srvSrc = fs2.readFileSync(path.resolve(__dirname, '../api/email-inbound.js'), 'utf8');
+  const appSrc = fs2.readFileSync(path.resolve(__dirname, '../src/App.jsx'), 'utf8');
+  const coupe = (src, deb, fin) => { const i = src.indexOf(deb); const j = src.indexOf(fin, i); return i < 0 || j < 0 ? '' : src.slice(i, j + fin.length); };
+  const srv = coupe(srvSrc, 'function familleConnue(', "\n}");
+  const app = coupe(appSrc, 'const familleEmail = (', "\n};");
+  if (!srv || !app) { nok('les deux règles de famille sont trouvables'); }
+  else {
+    const fSrv = new Function(srv + '\nreturn familleConnue;')();
+    const fApp = new Function(app + '\nreturn familleEmail;')();
+    // Sujets RÉELS relevés dans la base le 23 août.
+    const cas = [
+      ["Le membre euroscalco t'a laissé une évaluation", "L'équipe Vinted <no-reply@vinted.fr>", true],
+      ['Laisse une évaluation', "L'équipe Vinted <no-reply@vinted.fr>", true],
+      ['Commande mise à jour pour nike p-6000 blanc/jaune taille 40', "L'équipe Vinted <no-reply@vinted.fr>", true],
+      ['julatace35260 a mis en ligne un nouvel article', "L'équipe Vinted <no-reply@vinted.fr>", true],
+      ['Contestation formelle – Demande de réexamen humain', 'vinted@vinted.fr', true],
+      ['DEMANDE URGENTE – Je souhaite être mis en relation avec un conseiller', 'vinted@vinted.fr', true],
+      ["C'est déjà l'heure de la rentrée ? 😲", 'Vinted <no-reply@team.vinted.com>', true],
+      // ⚠️ Ce qui ne doit JAMAIS être rangé en « sans action » :
+      ['Votre colis Chronopost est arrivé en consigne Pickup', 'chronopost@network1.pickup.fr', false],
+      ['Nouvelle offre pour nike zoom fly 5', "L'équipe Vinted <no-reply@vinted.fr>", false],
+      ['Ton article est vendu !', "L'équipe Vinted <no-reply@vinted.fr>", false],
+      ["Bordereau d'envoi pour ta commande", "L'équipe Vinted <no-reply@vinted.fr>", false],
+      ['La transaction est finalisée', "L'équipe Vinted <no-reply@vinted.fr>", false],
+    ];
+    let mauvais = 0, divergents = 0;
+    for (const [sujet, de, attenduConnu] of cas) {
+      const a = fSrv(sujet, de), b = fApp(sujet, de);
+      if (a !== b) { divergents++; nok('serveur et app tranchent pareil', `« ${sujet.slice(0, 40)} » → serveur « ${a} » / app « ${b} »`); }
+      if (!!a !== attenduConnu) { mauvais++; nok(attenduConnu ? 'famille reconnue' : 'ne doit PAS être « sans action »', `« ${sujet.slice(0, 46)} » → « ${a || '(rien)'} »`); }
+    }
+    if (!mauvais && !divergents) ok(`familles « connu, sans action » : ${cas.length} sujets réels, serveur et app d'accord`);
+  }
+}
+
 console.log(ko ? `\n${ko} forme(s) d'email illisibles.` : "\nToutes les formes d'email connues sont lisibles.");
 process.exit(ko ? 1 : 0);
 })();

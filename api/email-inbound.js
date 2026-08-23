@@ -367,14 +367,42 @@ async function pushOnce(payload, categorie) {
 // être rejoué comme un email de quarantaine.
 // ⚠️ Borné à 200 Ko : ces lignes ne sont lues que sur demande, jamais au
 // chargement d'un écran (leçon d'égress §34).
-async function garderInconnu(corpsBrut, mail, raison) {
+// ⚠️ « NON COMPRIS » DOIT VOULOIR DIRE QUELQUE CHOSE.
+// Mesuré le 23 août sur les 28 emails conservés : 11 sont des emails que Julien
+// a lui-même ENVOYÉS à Vinted (contestations), 8 des « Commande mise à jour »,
+// 5 des évaluations, 3 des « untel a mis en ligne un nouvel article », 1 une
+// newsletter. Aucun n'appelle la moindre action — mais le compteur affichait
+// « 28 emails non compris », donc il criait au loup et on cesserait vite de le
+// regarder (le défaut du panneau Garage, §5.14).
+// ➡️ On les RECONNAÎT et on les range à part. Rien n'est jeté (règle §5.44) :
+//    ils restent conservés, juste étiquetés « connu, sans action » — et allégés,
+//    parce qu'une newsletter n'a pas à peser 200 Ko en base (§34).
+// ⚠️ « Commande mise à jour » est volontairement SANS ACTION : les statuts de
+//    commande viennent de la moisson Vinted, jamais des emails (§33 — c'était la
+//    source des faux achats). On l'étiquette pour ne pas le redécouvrir.
+function familleConnue(subject, from) {
+  const s = String(subject || '');
+  const f = String(from || '');
+  if (/laiss[ée] une [ée]valuation|^Laisse une [ée]valuation/i.test(s)) return 'évaluation';
+  if (/Commande mise [àa] jour/i.test(s)) return 'commande mise à jour (le statut vient de la moisson)';
+  if (/a mis en ligne un nouvel article/i.test(s)) return "nouvel article d'un membre suivi";
+  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain/i.test(s)) return 'ton propre email envoyé à Vinted';
+  if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
+  if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  return '';
+}
+
+async function garderInconnu(corpsBrut, mail, raison, famille) {
   try {
     let brut = '';
     try { brut = typeof corpsBrut === 'string' ? corpsBrut : JSON.stringify(corpsBrut); } catch (_) { brut = String(corpsBrut); }
-    if (brut && brut.length > 200000) brut = brut.slice(0, 200000);
+    // Une famille reconnue n'a pas besoin d'être conservée en entier : on garde
+    // de quoi l'identifier, pas de quoi peser (§34).
+    const plafond = famille ? 2000 : 200000;
+    if (brut && brut.length > plafond) brut = brut.slice(0, plafond);
     const cle = shortHash((mail && mail.subject ? mail.subject : '') + String(brut).slice(0, 400) + Date.now());
     await supabaseUpsert([{ id: `email_inconnu_${cle}`, data: {
-      type: 'inconnu', raison,
+      type: famille ? 'connu-sans-action' : 'inconnu', famille: famille || '', raison,
       forme: formeRecue(corpsBrut),
       subject: (mail && mail.subject) || '', from: (mail && mail.from) || '', to: (mail && mail.to) || '',
       receivedAt: new Date().toISOString(),
@@ -1249,9 +1277,10 @@ export async function traiterEmail(req, res) {
     // qui dira si un service de réception a changé de format.
     const forme = formeRecue(corpsBrut);
     const illisible = !subject && !mail.from && !(mail.text || mail.html);
-    await garderInconnu(corpsBrut, mail, illisible ? 'illisible (aucun champ lu)' : 'aucune règle ne le reconnaît');
-    await logEmail({ type: 'ignoré', subject, from: mail.from, forme, illisible });
-    res.status(200).json({ ok: true, type: 'ignoré', subject, forme });
+    const famille = illisible ? '' : familleConnue(subject, mail.from);
+    await garderInconnu(corpsBrut, mail, illisible ? 'illisible (aucun champ lu)' : (famille ? 'connu, sans action' : 'aucune règle ne le reconnaît'), famille);
+    await logEmail({ type: famille ? 'connu-sans-action' : 'ignoré', subject, from: mail.from, forme, illisible, famille });
+    res.status(200).json({ ok: true, type: famille ? 'connu-sans-action' : 'ignoré', famille, subject, forme });
   } catch (e) {
     // On répond 200 pour éviter que le service de mail ne rejoue / bounce.
     res.status(200).json({ ok: false, error: String(e) });

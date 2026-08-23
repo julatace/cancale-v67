@@ -1088,9 +1088,27 @@ const fetchEmailsParCompte = async () => {
   } catch (_) { /* réseau : on rend ce qu'on a */ }
   return out;
 };
+// ⚠️ LA MÊME RÈGLE À LA LECTURE (leçon §5.37).
+// Les emails déjà en base n'ont pas de champ `famille` — ils ne seront jamais
+// réécrits. Sans cette copie côté app, le compteur continuerait d'annoncer
+// « 28 emails non compris » alors que 27 sont des évaluations, des newsletters
+// et les emails que Julien envoie lui-même à Vinted.
+// ⚠️ Copie EXACTE de `familleConnue` (api/email-inbound.js), vérifiée par
+// scripts/audit-email-formes.cjs — deux règles qui divergent, c'est deux
+// chiffres qui se contredisent (§11).
+const familleEmail = (subject, from) => {
+  const s = String(subject || ''), f = String(from || '');
+  if (/laiss[ée] une [ée]valuation|^Laisse une [ée]valuation/i.test(s)) return 'évaluation';
+  if (/Commande mise [àa] jour/i.test(s)) return 'commande mise à jour (le statut vient de la moisson)';
+  if (/a mis en ligne un nouvel article/i.test(s)) return "nouvel article d'un membre suivi";
+  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain/i.test(s)) return 'ton propre email envoyé à Vinted';
+  if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
+  if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  return '';
+};
 const fetchEmailsIncompris = async () => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=id,subject:data->>subject,from:data->>from,forme:data->>forme,raison:data->>raison,at:data->>receivedAt&limit=200`, { headers: sbAuth() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=id,subject:data->>subject,from:data->>from,forme:data->>forme,raison:data->>raison,famille:data->>famille,at:data->>receivedAt&limit=200`, { headers: sbAuth() });
     if (!r.ok) return [];
     const rows = await r.json();
     return rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
@@ -3444,7 +3462,13 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
     const h = (Date.now() - ts) / 3600000;
     return h < 1 ? "à l'instant" : h < 24 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`;
   };
-  const nInc = incompris ? incompris.length : 0;
+  // ⚠️ « Non compris » doit vouloir dire quelque chose. Les familles reconnues
+  // sans action (évaluations, newsletters, « commande mise à jour », les emails
+  // que Julien envoie lui-même à Vinted) sont comptées à part : sinon le
+  // compteur crie au loup et on cesse de le regarder.
+  const vraimentInconnus = useMemo(() => (incompris || []).filter(e => !String(e.famille || '').trim() && !familleEmail(e.subject, e.from)), [incompris]);
+  const nInc = vraimentInconnus.length;
+  const nConnus = (incompris ? incompris.length : 0) - nInc;
   // Un compte sans le moindre email : sa boîte ne transfère pas vers l'app.
   const muets = useMemo(() => {
     if (!parCompte || !comptes || !comptes.length) return [];
@@ -3501,10 +3525,15 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
           )}
         </div>
       )}
+      {nInc===0 && nConnus>0 && (
+        <div style={{fontSize:10.5,color:C.muted,marginTop:8,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
+          {nConnus} email{nConnus>1?'s':''} reconnu{nConnus>1?'s':''} sans action à faire (évaluations, newsletters, mises à jour de commande) — rien à signaler.
+        </div>
+      )}
       {nInc>0 && (
         <div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
           <div style={{fontSize:11.5,fontWeight:700,color:C.warn,marginBottom:4}}>⚠️ {nInc} email{nInc>1?'s':''} reçu{nInc>1?'s':''} que l'app n'a pas su classer</div>
-          {incompris.slice(0,4).map(e=>(
+          {vraimentInconnus.slice(0,4).map(e=>(
             <div key={e.id} style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
               {(e.at||'').slice(0,16).replace('T',' ')} · {e.subject || '(sans sujet)'}
             </div>
