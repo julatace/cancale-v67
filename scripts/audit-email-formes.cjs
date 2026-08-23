@@ -124,6 +124,41 @@ const v = normaliserEntrant({ inconnu: 42 });
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 3) LE TITRE D'ARTICLE D'UN REÇU N'EST PAS UN MORCEAU DE PHRASE
+//    L'ancienne règle rendait les deux-points FACULTATIFS après « article », donc
+//    toute phrase contenant ce mot était capturée. Mesuré sur les 48 reçus réels
+//    en base : « est conforme à sa » figure **16 fois** comme titre d'article
+//    (extrait de « l'article est conforme à sa description ») et 22 reçus sur 48
+//    ont un titre « contenu » dans celui d'un autre. Ce champ sert ensuite à
+//    rattacher le reçu à un achat : un titre faux vaut moins que pas de titre.
+{
+  const SRV = require('fs').readFileSync(path.join(__dirname, '..', 'api', 'email-inbound.js'), 'utf8');
+  const m = SRV.match(/const article = \(\(achText[\s\S]*?\)\[1\] \|\| ''\)\.trim\(\);/);
+  if (!m) { nok("le titre d'article d'un reçu se lit", 'extraction introuvable dans api/email-inbound.js'); }
+  else {
+    let lire;
+    try { lire = new Function('achText', m[0] + ' return article;'); }
+    catch (e) { lire = null; nok("le titre d'article d'un reçu se lit", 'code non exécutable : ' + e.message); }
+    if (lire) {
+      const cas = [
+        ["Ton reçu pour la commande\nMerci ! L'article est conforme à sa description.", '', 'une phrase contenant « article »'],
+        ['Ton reçu pour la commande « Nike Air Max 90 taille 42 »', 'Nike Air Max 90 taille 42', 'titre entre guillemets'],
+        ['Reçu\nArticle : Adidas Spezial noir 38\nPrix : 22,00 €', 'Adidas Spezial noir 38', 'étiquette suivie de deux-points'],
+        ["Merci pour ton achat\nLes articles sont dans leur état d'origine.", '', 'une phrase contenant « articles sont »'],
+        ['Reçu\nAchat : Salomon XT-6', 'Salomon XT-6', 'étiquette « Achat : »'],
+        ['Ton article te plaît ? Laisse une évaluation', '', 'aucune étiquette : on ne rend rien'],
+      ];
+      let mauvais = 0;
+      for (const [txt, attendu, nom] of cas) {
+        let r = ''; try { r = lire(txt); } catch (_) {}
+        if (r !== attendu) { mauvais++; nok("titre d'article : " + nom, `rendu ${JSON.stringify(r)}, attendu ${JSON.stringify(attendu)}`); }
+      }
+      if (!mauvais) ok(`titre d'article d'un reçu : ${cas.length} cas, aucun morceau de phrase capturé`);
+    }
+  }
+}
+
 console.log(ko ? `\n${ko} forme(s) d'email illisibles.` : "\nToutes les formes d'email connues sont lisibles.");
 process.exit(ko ? 1 : 0);
 })();

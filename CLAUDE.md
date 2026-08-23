@@ -3888,3 +3888,174 @@ description : « description courte » affiché, **absent sur le code d'avant** 
 ⚠️ Piège de banc : le bloc objectif vit dans « Analyse de tes ventes »,
 **repliée par défaut** — sans l'ouvrir, on mesure un artefact et on conclut à
 tort que le bloc n'existe pas.
+
+---
+
+## 5.51 — LE PLAFOND DES 1 000 LIGNES, `updated_at` QUI MENT, ET LES PAIRES BICOLORES
+
+Julien : « vas-y, fais tout — et avant de faire, fais-moi une énorme liste de
+choses à améliorer que tu peux faire, prends ton temps. » ⚠️ **Factures et Garage
+exclus** (« tout est bien à part facture garage parce que j'ai pas encore eu
+l'occasion de m'en servir ») : ils ne sont pas cassés, juste pas encore utilisés.
+
+Liste établie **en mesurant la base d'abord**, puis exécutée. Trois défauts réels
+trouvés, un faux positif écarté, un chantier laissé à son arbitrage.
+
+### ⚠️⚠️ 1. SUPABASE PLAFONNE UNE RÉPONSE À 1 000 LIGNES, SANS LE DIRE
+Relevé du 23 août : **2 447 lignes** dans `app_data`, dont **1 127 `harvest_*`**
+et **1 211 `email_*`**. PostgREST renvoie **au plus 1 000 lignes** par requête et
+ne signale rien : on reçoit une liste complète en apparence, tronquée en réalité,
+**coupée par ordre d'identifiant** — c'est donc toujours la même fin de liste qui
+disparaît.
+
+⚠️ **MESURÉ, pas supposé — et l'écart d'AUJOURD'HUI est plus petit que le pire
+cas** (je le dis parce que la tentation était d'annoncer le pire cas) :
+
+| lecture | lignes lues avant → après | impact réel mesuré le 23 août |
+|---|---|---|
+| fraîcheur des comptes (`VintedAccounts`) | **1 000 → 1 115** | **aucun compte ne disparaît** (les 10 sont vus dans les deux cas) ; **2 comptes** avaient une fraîcheur légèrement en retard |
+| réparation auto des comptes bloqués (§5.09) | 1 000 → 1 115 | même lecture, même écart : une fraîcheur en retard peut faire rater la fenêtre de 7 jours |
+| « dernier email reçu » (Réglages) | **1 000 → 1 055** | **« dernier email » était en retard de 12 minutes** (12:44 au lieu de 12:56) ; aucune famille ne disparaît |
+
+Le correctif est donc **préventif autant que curatif** : l'écart d'aujourd'hui est
+mineur, mais il **grandit avec la base** (2 447 lignes et ça monte tous les
+jours), et il est **silencieux** — rien, dans la réponse, ne dit qu'elle est
+tronquée.
+
+➡️ **`lireTout(query)`** (module-level) pagine avec l'en-tête `Range`, page de
+1 000, jusqu'à recevoir moins d'une page pleine ; garde-fou à 20 pages. Les trois
+lectures y passent, et écartent au passage les lignes vidées
+(`data->>supprime=is.null` — **168 lignes** en base, dont 155 de quarantaine
+rejouée, relues pour rien à chaque ouverture).
+⚠️ **C'est le même plafond qui a faussé une de MES mesures ce jour-là** (§21) :
+j'ai d'abord annoncé « 1 000 lignes en base » avant de paginer et d'en trouver
+2 447. Un plafond silencieux ressemble exactement à une donnée absente.
+
+### ⚠️ 2. LA COLONNE `updated_at` MENTAIT SUR 9 ÉCRITURES SUR 10
+`app_data` n'a **aucun trigger** (§15) : sans estampille explicite, la colonne
+garde la date de **création** de la ligne. Sur les 10 upserts de l'app, **9**
+l'omettaient.
+- `widget_stats` : colonne **21 juillet**, `data.updatedAt` **23 août 12:44**.
+- `push_subs` : colonne **16 juillet**, `data.updatedAt` **23 août 12:44**.
+
+➡️ **Les deux figuraient dans ma liste comme « périmés ». Les deux étaient
+frais.** Ce sont deux faux diagnostics que j'ai attrapés en vérifiant AVANT de
+coder — et que j'aurais livrés en corrigeant « à l'œil ».
+➡️ Correctif à **un seul endroit** (§11) : **`withOwner`** estampille désormais
+`updated_at` sur toute ligne écrite, y compris celles ajoutées plus tard. Une
+valeur déjà posée par l'appelant gagne.
+
+### 3. LES JETONS VINTED NE PARTENT PLUS DANS LA LIGNE PARTAGÉE
+La ligne `main` fait **138,4 Ko** et repart **EN ENTIER** à chaque sauvegarde
+(`cloudPush` remplace `data`). Détail : `vinted_annonce_numeros` 78,5 Ko ·
+`vinted_sale_overrides` 16,8 Ko · **`vinted_accounts` 15,9 Ko** ·
+`vinted_stock_vinted` 11,3 Ko · `vinted_txn_link` 5,4 Ko.
+
+`vinted_accounts` y était copié **avec `access_token` et `refresh_token`** des
+8 comptes — 11 % de la ligne, renvoyés à chaque frappe validée — alors que cette
+copie ne sert qu'à **afficher** les comptes avant que le réseau réponde ; la
+source des jetons est la **table** `vinted_accounts`, relue au démarrage.
+➡️ **`ALLEGER_AVANT_CLOUD`** : la copie qui part dans le nuage ne garde que
+`id / vinted_user_id / login / domain`.
+⚠️ **Et `cloudLoad` n'écrase plus cette clé** : sans ça, un chargement du nuage
+aurait retiré les jetons du localStorage de l'appareil jusqu'à ce que la table
+réponde — donc un « Synchroniser » en échec dans les premières secondes.
+
+### ⚠️ 4. LE SÉLECTEUR D'ACHAT ÉTAIT AVEUGLE SUR LES PAIRES BICOLORES
+§5.38 avait ajouté la couleur au score (même couleur +4, couleurs différentes
+−8). Mais `extractColor` rend **une couleur ou rien**, et rend `null` dès qu'un
+titre en porte deux — « on ne se prononce pas ». Conséquence non vue à l'époque :
+une paire **bicolore désactivait complètement le test**, bonus ET pénalité.
+
+Mesuré en exécutant les VRAIES fonctions sur les **212 paires numérotées** et
+**318 achats** — 2 des 10 premières suggestions étaient fausses, pile au seuil
+de 12 :
+| paire | achat « suggéré » | pourquoi ça passait |
+|---|---|---|
+| « Nike zoom fly 5 **noir violet** 41 » | « Nike zoom fly 5 maat 41 **ORANJE** » | bicolore → aucun test de couleur (4+4+5+1 = 14) |
+| « Adidas Spezial **noir et vert** 38 » | « Adidas Spezial **BLU** n. 38 » | idem |
+
+➡️ **`extractColors(text)`** rend **toutes** les couleurs reconnues, et le score
+compare des **ensembles** : une couleur commune rapproche (+4, « bleu marine » ↔
+« blu »), **aucune couleur commune écarte** (−8). Un côté sans couleur reconnue
+ne pèse ni dans un sens ni dans l'autre. `extractColor` reste, définie à partir
+de `extractColors`.
+
+**Mesuré après correction, sur les mêmes données** : les deux fausses
+suggestions **disparaissent**, et plusieurs paires récupèrent un **meilleur**
+candidat en tête (« Spezial noir et vert » → « Spezial **schwarz** » au lieu de
+« blu » ; « Spezial bleu marine Lila » → « Spezial **bleu** »). Total : 62 → 63
+paires avec au moins un candidat suggéré — **moins de faux, pas moins d'aide**.
+
+### ⚠️ 5. LE REÇU D'ACHAT POUVAIT ÊTRE CELUI D'UN AUTRE ACHAT
+`receiptFor(o)` rattache le **vrai reçu Vinted reçu par email** à un achat —
+c'est un document comptable, pas un ornement. Il cherchait dans cet ordre :
+n° de transaction → titre exact → **titre « contenu » dans l'autre**
+(`.includes`). Les deux derniers niveaux sont des ressemblances, exactement ce
+que §5.39 a retiré partout ailleurs — et ils étaient restés là.
+
+**Mesuré sur les 48 reçus réels :**
+| | |
+|---|---|
+| reçus portant un n° de transaction | **0 / 48** — la voie certaine ne marche **jamais** |
+| reçus dont le titre est « contenu » dans celui d'un autre | **22 / 48** |
+| titres en double parmi les reçus | 2, dont **« est conforme à sa » ×16** |
+
+### 6. ⚠️ ET LA CAUSE DU CHARABIA : les deux-points étaient FACULTATIFS
+L'extraction du titre d'article (`api/email-inbound.js`, branche achat) avait
+pour seconde alternative `(?:achet[ée]e?\s*:?\s*|article\s*:?\s*)([^…]{4,70})`
+— **les deux-points optionnels**. Donc n'importe quelle phrase contenant le mot
+« article » était capturée comme titre.
+
+**Preuve, en exécutant l'ANCIEN code sur des phrases types** — il rend
+exactement les chaînes trouvées en base :
+| texte de l'email | ancien code | nouveau |
+|---|---|---|
+| « L'**article** est conforme à sa description. » | `"est conforme à sa description."` (16 fois en base) | `""` |
+| « Les **articles** sont dans leur état d'origine. » | `"s sont dans leur état d"` (2 fois en base) | `""` |
+| « Ton **article** te plaît ? Laisse une évaluation » | `"te plaît ? Laisse une évaluation"` | `""` |
+| « **Achat :** Salomon XT-6 » | `""` (raté !) | `"Salomon XT-6"` |
+
+➡️ Deux formes acceptées, et deux seulement : le titre **entre guillemets**
+après « commande », ou une **vraie étiquette suivie de deux-points**
+(`Article :`, `Achat :`, `Articles achetés :`). Sinon **pas de titre**.
+⚠️ Ça ne répare pas les 48 lignes déjà en base (l'email ne repassera pas), mais
+combiné au point 5, un titre-charabia ne peut plus attraper de reçu.
+
+➡️ Règle §5.39 appliquée ici aussi : **transaction unique, sinon titre
+strictement égal ET unique, sinon rien**. Le `.includes` est supprimé. La
+fonction rend donc `null` plus souvent — c'est le comportement voulu : mieux
+vaut aucun reçu que le reçu d'une autre paire.
+
+### Ce que je n'ai PAS fait, et pourquoi
+- **`vinted_stock_vinted` (1 815 entrées, 11,3 Ko à chaque sauvegarde)** : §22 le
+  donnait pour « un écran retiré ». **Faux** — le composant `StockVinted` existe
+  toujours, la clé est **lue ET réécrite** par deux effets de réconciliation
+  vivants. La retirer de `SYNC_KEYS` l'**effacerait du nuage** (`cloudPush`
+  remplace toute la ligne) et arrêterait le partage entre appareils. C'est une
+  décision qui lui appartient (§22 le disait déjà), pas un nettoyage.
+- **Les notifications** : rien à réparer. `push_subs` porte 2 appareils et se
+  réécrit à chaque ouverture (voir point 2) ; `push_prefs` est absent, donc les
+  défauts de §5.41 s'appliquent — 5 catégories sur 10, ce qui est le
+  comportement voulu.
+- **Le prix plancher des offres** (0 posé sur 212 offres) : le calcul du montant
+  à proposer appartient **au panneau de l'extension** (`remiseLigne`, §5.02).
+  En écrire un second dans l'app, c'est deux règles pour une même notion (§11) —
+  donc deux chiffres qui finiront par se contredire.
+
+### Ce qui reste dans SES mains (mesuré, pas corrigeable par le code)
+| | |
+|---|---|
+| **212 paires numérotées, 0 prix d'achat** | 231 ventes / **6 717,69 €** calculées avec un coût de zéro. L'outil de saisie en série existe (§5.47) ; **63 paires** ont désormais une suggestion fiable à un tap. |
+| **le N°4 porté par deux annonces en ligne** | « adidas spezial noir 35,5 » et « 3 manuels première ST2S » — signalé dans la cloche |
+| **`tomj606` et `angeled92` ne reçoivent aucun email** | `angeled92` a 4 annonces en ligne et 91 € en attente : ses codes de retrait n'arrivent jamais |
+| **`vinted_goal` toujours vide** | l'app propose 1 440 € (moyenne de ses 3 derniers mois), un tap |
+
+### Vérifié
+`npm run build` OK · **`scripts/audit-identite.cjs` passe à 38 contrôles**, dont
+**8 nouveaux qui échouent bien sur le code d'avant** (§21) : lecture des couleurs
+en ensemble, score par ensembles, ancien test unique disparu, pagination des
+lectures > 1 000 lignes, helper `lireTout` avec l'en-tête `Range`, estampille
+`updated_at` · `audit-coherence` 5 règles / **0 désaccord** · `audit-qr` 5/5 ·
+`audit-offres` 10/10 · `audit-transporteurs` 23/23 · `audit-email-formes` 17/17 ·
+`audit-bordereau-pdf` 7/7 · smoke app **12 écrans, 0 PAGEERROR, 0 artefact**.
