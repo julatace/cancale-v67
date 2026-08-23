@@ -3987,6 +3987,30 @@ candidat en tête (« Spezial noir et vert » → « Spezial **schwarz** » au l
 « blu » ; « Spezial bleu marine Lila » → « Spezial **bleu** »). Total : 62 → 63
 paires avec au moins un candidat suggéré — **moins de faux, pas moins d'aide**.
 
+### ⚠️ 5. LE REÇU D'ACHAT POUVAIT ÊTRE CELUI D'UN AUTRE ACHAT
+`receiptFor(o)` rattache le **vrai reçu Vinted reçu par email** à un achat —
+c'est un document comptable, pas un ornement. Il cherchait dans cet ordre :
+n° de transaction → titre exact → **titre « contenu » dans l'autre**
+(`.includes`). Les deux derniers niveaux sont des ressemblances, exactement ce
+que §5.39 a retiré partout ailleurs — et ils étaient restés là.
+
+**Mesuré sur les 48 reçus réels :**
+| | |
+|---|---|
+| reçus portant un n° de transaction | **0 / 48** — la voie certaine ne marche **jamais** |
+| reçus dont le titre est « contenu » dans celui d'un autre | **22 / 48** |
+| titres en double parmi les reçus | 2, dont **« est conforme à sa » ×16** |
+
+⚠️ Le second chiffre dit autre chose au passage : **l'`article` extrait des
+emails de reçu est souvent un morceau de phrase**, pas un titre. L'extraction
+côté serveur est à revoir — mais tant qu'elle l'est, rapprocher par ce champ
+n'a aucun sens.
+
+➡️ Règle §5.39 appliquée ici aussi : **transaction unique, sinon titre
+strictement égal ET unique, sinon rien**. Le `.includes` est supprimé. La
+fonction rend donc `null` plus souvent — c'est le comportement voulu : mieux
+vaut aucun reçu que le reçu d'une autre paire.
+
 ### Ce que je n'ai PAS fait, et pourquoi
 - **`vinted_stock_vinted` (1 815 entrées, 11,3 Ko à chaque sauvegarde)** : §22 le
   donnait pour « un écran retiré ». **Faux** — le composant `StockVinted` existe
@@ -4012,8 +4036,8 @@ paires avec au moins un candidat suggéré — **moins de faux, pas moins d'aide
 | **`vinted_goal` toujours vide** | l'app propose 1 440 € (moyenne de ses 3 derniers mois), un tap |
 
 ### Vérifié
-`npm run build` OK · **`scripts/audit-identite.cjs` passe à 36 contrôles**, dont
-**6 nouveaux qui échouent bien sur le code d'avant** (§21) : lecture des couleurs
+`npm run build` OK · **`scripts/audit-identite.cjs` passe à 38 contrôles**, dont
+**8 nouveaux qui échouent bien sur le code d'avant** (§21) : lecture des couleurs
 en ensemble, score par ensembles, ancien test unique disparu, pagination des
 lectures > 1 000 lignes, helper `lireTout` avec l'en-tête `Range`, estampille
 `updated_at` · `audit-coherence` 5 règles / **0 désaccord** · `audit-qr` 5/5 ·

@@ -335,5 +335,25 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
           '`withOwner` ne pose pas la date : la colonne gardera la date de création');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 12) LE REÇU D'ACHAT (facture Vinted reçue par email) NE SE DEVINE PAS
+//     Mesuré le 23 août sur les 48 reçus réels : AUCUN ne porte de n° de
+//     transaction, l'`article` extrait est souvent un morceau de phrase
+//     (« est conforme à sa » revient 16 fois), et **22 reçus sur 48** ont un
+//     titre « contenu » dans celui d'un autre. Le repli `.includes` pouvait
+//     donc coller le reçu d'un AUTRE achat — une erreur comptable.
+{
+  const i = SRC.indexOf('const receiptFor = (o) =>');
+  const bloc = i < 0 ? '' : SRC.slice(i, i + 1400);
+  /\.includes\(ot\)|ot\.includes\(at\)/.test(bloc)
+    ? nok('le reçu d\'achat ne se rapproche jamais par « titre contenu »',
+          'le repli `.includes` est encore là : il touche 22 reçus sur 48')
+    : ok('le reçu d\'achat ne se rapproche jamais par « titre contenu »');
+  /n === 1 \? seul : null/.test(bloc)
+    ? ok('le reçu d\'achat exige un candidat UNIQUE (titre comme transaction)')
+    : nok('le reçu d\'achat exige un candidat unique',
+          'il prend encore le premier titre égal sans vérifier qu\'il est seul');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);

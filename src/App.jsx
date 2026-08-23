@@ -9920,17 +9920,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Recherche par ordre de fiabilité : (1) n° de transaction, (2) titre exact,
   // (3) titre « contenu » (l'un dans l'autre) mais SEULEMENT s'il n'y a qu'un seul
   // candidat (sinon on risque d'associer le mauvais reçu → on s'abstient).
+  // ⚠️ RÈGLE D'IDENTITÉ (§5.39) — un reçu mal attribué est une erreur COMPTABLE,
+  // pas un détail d'affichage. Deux corrections mesurées le 23 août sur les
+  // 48 reçus réels :
+  //  • le repli « un titre contenu dans l'autre » (`.includes`) touchait
+  //    **22 reçus sur 48** — ce n'est pas une identité, il est supprimé ;
+  //  • le rapprochement par titre exact prenait le PREMIER match sans vérifier
+  //    qu'il est unique, exactement le défaut corrigé ailleurs en §5.39.
+  // ⚠️ Et un constat qui vaut d'être écrit : **aucun** des 48 reçus ne porte de
+  // n° de transaction, et l'`article` extrait est souvent un morceau de phrase
+  // (« est conforme à sa », 16 fois). La voie certaine ne fonctionne donc jamais
+  // aujourd'hui, et le titre ne vaut rien — d'où la sévérité assumée : on rend
+  // `null` plutôt que le reçu d'un autre achat.
   const receiptFor = (o) => {
     const list = achEmails || [];
     if (!list.length) return null;
-    const byTx = list.find(a => a.transaction && String(a.transaction) === String(o.transaction_id));
-    if (byTx) return byTx;
+    // 1) n° de transaction = identité certaine.
+    const tx = String(o.transaction_id || '');
+    if (tx) {
+      let seul = null, n = 0;
+      for (const a of list) if (a.transaction && String(a.transaction) === tx) { n++; seul = a; }
+      if (n === 1) return seul;
+      if (n > 1) return null;   // deux reçus pour une transaction : on ne tranche pas
+    }
+    // 2) titre STRICTEMENT égal, et un seul candidat DES DEUX CÔTÉS.
     const ot = normTitle(o.title);
     if (!ot) return null;
-    const exact = list.find(a => a.article && normTitle(a.article) === ot);
-    if (exact) return exact;
-    const loose = list.filter(a => { const at = normTitle(a.article); return at && (at.includes(ot) || ot.includes(at)); });
-    return loose.length === 1 ? loose[0] : null;
+    let seul = null, n = 0;
+    for (const a of list) if (a.article && normTitle(a.article) === ot) { n++; seul = a; }
+    return n === 1 ? seul : null;
   };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
