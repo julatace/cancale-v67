@@ -227,7 +227,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   frappe.length
     ? nok('aucun champ N°/prix n\'écrit à chaque frappe', frappe.length + ' champ(s) écrivent encore lettre par lettre')
     : ok('aucun champ N°/prix n\'écrit à chaque frappe');
-  /function ChampSaisie\(/.test(SRC) && /onKeyDown=\{ev => \{[\s\S]{0,120}Enter/.test(SRC)
+  /function ChampSaisie\(/.test(SRC) && /onKeyDown=\{ev => \{[\s\S]{0,400}?ev\.key === 'Enter'[\s\S]{0,120}?blur\(\)/.test(SRC)
     ? ok('la saisie se valide sur Entrée ou à la sortie du champ')
     : nok('la saisie se valide sur Entrée ou à la sortie du champ');
   // Et c'est `poserNumero` — donc après les contrôles — qui écrit le numéro.

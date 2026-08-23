@@ -1065,6 +1065,29 @@ const reclassifyTrack = (d) => {
 // c'était pendant que Julien attendait ses codes Chronopost. Le serveur les
 // conserve désormais (`email_inconnu_*`) ; ici on lit UNIQUEMENT des scalaires
 // (le corps brut ne part jamais au chargement d'un écran — égress, §34).
+// ⚠️ « JE VEUX QUE L'APP REGARDE LES COMPTES CONNECTÉS ET LES ADRESSES MAIL
+// CONNECTÉES POUR VOIR S'IL EN MANQUE » (Julien, 23 août).
+// Mesuré ce jour-là : 8 comptes Vinted reliés, mais **2 ne reçoivent AUCUN
+// email** (`tomj606`, `angeled92`) — alors qu'`angeled92` a 4 annonces en ligne
+// et 91 € en attente. Ses emails de colis (donc ses codes de retrait) n'arrivent
+// jamais jusqu'à l'app. C'est exactement le trou qui explique les codes
+// introuvables : la boîte de ce compte ne transfère pas.
+// Lecture SCALAIRE uniquement (compte + date), jamais le corps (§34).
+const fetchEmailsParCompte = async () => {
+  const out = {};
+  try {
+    for (const f of ['email_track_', 'email_sale_', 'email_bord_', 'email_achat_', 'email_final_', 'email_offer_']) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${f}*&select=acc:data->>account,at:data->>receivedAt&limit=1000`, { headers: sbAuth() });
+      if (!r.ok) continue;
+      for (const row of await r.json()) {
+        const a = String(row.acc || '').trim(); if (!a) continue;
+        const e = (out[a] = out[a] || { n: 0, last: '' });
+        e.n += 1; if (String(row.at || '') > e.last) e.last = String(row.at || '');
+      }
+    }
+  } catch (_) { /* réseau : on rend ce qu'on a */ }
+  return out;
+};
 const fetchEmailsIncompris = async () => {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=id,subject:data->>subject,from:data->>from,forme:data->>forme,raison:data->>raison,at:data->>receivedAt&limit=200`, { headers: sbAuth() });
@@ -2942,7 +2965,7 @@ function Input({label,...p}) {
    pas dedans, il suit la donnée (numéro posé automatiquement, prix repris
    d'un achat relié…). `onCommit` n'est appelé QUE si la valeur a changé —
    sinon entrer puis sortir d'un champ prix effacerait l'achat relié. */
-function ChampSaisie({ value, onCommit, style, ...p }) {
+function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
   const [txt, setTxt] = useState(value == null ? '' : String(value));
   const [actif, setActif] = useState(false);
   const avantRef = useRef(value == null ? '' : String(value));
@@ -2960,7 +2983,9 @@ function ChampSaisie({ value, onCommit, style, ...p }) {
       onChange={ev => setTxt(ev.target.value)}
       onBlur={ev => sortir(ev.target.value)}
       onKeyDown={ev => {
-        if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur(); }
+        // Entrée valide ET, en saisie en série, passe au champ suivant : c'est
+        // ce qui rend une longue liste de prix d'achat tenable au clavier.
+        if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur(); if (apresEntree) setTimeout(apresEntree, 0); }
         else if (ev.key === 'Escape') { annuleRef.current = true; ev.currentTarget.blur(); }
       }}
     />
@@ -3378,9 +3403,30 @@ const libellePeriode = (p) => {
    23 août (4 emails Chronopost annoncés, un seul reçu, et illisible).
    Ne coûte AUCUNE requête pour les dates (elles viennent des suivis déjà
    chargés) ; une seule lecture scalaire pour les emails non compris. */
-function ReceptionEmails({ tracking }) {
+/* ── RÉCEPTION : LES TRANSPORTEURS ET LES COMPTES ─────────────────────────
+   Julien, 23 août : « je veux qu'il n'y ait aucune erreur du côté Chronopost,
+   Mondial Relay, Vinted GO » puis « je veux que l'app regarde les comptes
+   connectés et les adresses mail connectées pour voir s'il en manque, et dire
+   lesquels manquent ».
+   Deux erreurs possibles, et aucune n'est dans le code :
+    · un TRANSPORTEUR dont les emails n'arrivent plus ;
+    · un COMPTE Vinted dont la boîte ne transfère pas — mesuré ce jour-là :
+      `tomj606` et `angeled92` n'ont JAMAIS reçu le moindre email, alors
+      qu'`angeled92` a 4 annonces en ligne et 91 € en attente. Ses codes de
+      retrait ne pouvaient donc pas arriver.
+   ⚠️ Ouvert par défaut, et les trois transporteurs nommés sont TOUJOURS
+   affichés même à zéro : « aucun email reçu » est l'information utile.
+   Aucune requête pour les dates des colis (elles viennent des suivis déjà
+   chargés) ; deux lectures scalaires pour le reste (§34). */
+function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   const [incompris, setIncompris] = useState(null);
-  useEffect(() => { let mort = false; fetchEmailsIncompris().then(r => { if (!mort) setIncompris(r); }); return () => { mort = true; }; }, []);
+  const [parCompte, setParCompte] = useState(null);
+  useEffect(() => {
+    let mort = false;
+    fetchEmailsIncompris().then(r => { if (!mort) setIncompris(r); });
+    fetchEmailsParCompte().then(r => { if (!mort) setParCompte(r); });
+    return () => { mort = true; };
+  }, []);
   const lignes = useMemo(() => {
     const m = {};
     for (const t of (tracking || [])) {
@@ -3390,8 +3436,6 @@ function ReceptionEmails({ tracking }) {
       if (!m[k] || d > m[k].ts) m[k] = { ts: d, n: (m[k] ? m[k].n : 0) + 1 };
       else m[k].n += 1;
     }
-    // Les trois transporteurs qu'il nomme sont TOUJOURS listés, même à zéro :
-    // « aucun email reçu » est justement l'information à voir.
     for (const k of ['chronopost', 'mondialrelay', 'vinted']) if (!m[k]) m[k] = { ts: 0, n: 0 };
     return Object.entries(m).sort((a, b) => b[1].ts - a[1].ts);
   }, [tracking]);
@@ -3401,37 +3445,74 @@ function ReceptionEmails({ tracking }) {
     return h < 1 ? "à l'instant" : h < 24 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`;
   };
   const nInc = incompris ? incompris.length : 0;
+  // Un compte sans le moindre email : sa boîte ne transfère pas vers l'app.
+  const muets = useMemo(() => {
+    if (!parCompte || !comptes || !comptes.length) return [];
+    return comptes.filter(a => { const l = String(a.login || '').trim(); return l && !parCompte[l]; });
+  }, [parCompte, comptes]);
+  const ligne = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 };
   return (
-    <details style={{border:`1px solid ${nInc?C.warn:C.border}`,background:nInc?`${C.warn}0e`:C.card,borderRadius:12,padding:'8px 12px',marginBottom:10}}>
-      <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:nInc?C.warn:C.muted,listStyle:'none'}}>
-        📬 Réception des emails{nInc>0?` — ${nInc} non compris`:''}
-      </summary>
-      <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:5}}>
-        {lignes.map(([k, v]) => (
-          <div key={k} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
-            <CarrierBadge carrier={k} size={18}/>
-            <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{carrierName(k)}</div>
-            <div style={{color:v.ts?(Date.now()-v.ts<3*86400000?C.ok||C.accent:C.warn):C.danger,fontWeight:600,flexShrink:0}}>
-              {v.ts ? `${v.n} email${v.n>1?'s':''} · dernier ${age(v.ts)}` : 'aucun email reçu'}
-            </div>
-          </div>
-        ))}
-        {nInc>0 && (
-          <div style={{marginTop:6,paddingTop:6,borderTop:`1px solid ${C.border}`}}>
-            <div style={{fontSize:12,fontWeight:700,color:C.warn,marginBottom:4}}>⚠️ {nInc} email{nInc>1?'s':''} reçu{nInc>1?'s':''} que l'app n'a pas su lire</div>
-            {incompris.slice(0,6).map(e=>(
-              <div key={e.id} style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                {(e.at||'').slice(0,16).replace('T',' ')} · {e.subject || '(sans sujet)'} · {e.from || '(sans expéditeur)'} · forme « {e.forme||'?'} »
+    <div style={{border:`1px solid ${muets.length||nInc?C.warn:C.border}`,background:muets.length||nInc?`${C.warn}0c`:C.card,borderRadius:12,padding:'10px 12px',marginBottom:10}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:7}}>📬 Ce qui arrive dans l'app</div>
+      <div style={{display:'flex',flexDirection:'column',gap:5}}>
+        {lignes.map(([k, v]) => {
+          const nColis = (colisParTransporteur && colisParTransporteur[k]) || 0;
+          return (
+            <div key={k} style={ligne}>
+              <CarrierBadge carrier={k} size={18}/>
+              <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                {carrierName(k)}
+                {nColis>0 && <b style={{color:C.accent}}> · {nColis} colis à retirer</b>}
               </div>
-            ))}
-            <div style={{fontSize:11,color:C.muted,marginTop:5}}>Ils sont conservés entiers : rien n'est perdu, on peut les relire pour comprendre ce qui manque.</div>
-          </div>
-        )}
-        <div style={{fontSize:11,color:C.muted,marginTop:4}}>
-          Un transporteur à « aucun email reçu » ne veut pas dire qu'il n'y a pas de colis : ça veut dire que ses emails n'arrivent pas jusqu'à l'app (boîte qui ne transfère plus).
-        </div>
+              <div style={{color:v.ts?(Date.now()-v.ts<3*86400000?(C.ok||C.accent):C.warn):C.danger,fontWeight:600,flexShrink:0,textAlign:'right'}}>
+                {v.ts ? `${v.n} email${v.n>1?'s':''} · ${age(v.ts)}` : 'aucun email reçu'}
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </details>
+      {/* ── LES COMPTES : lesquels ne reçoivent RIEN ─────────────────────── */}
+      {comptes && comptes.length > 0 && (
+        <div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
+          <div style={{fontSize:11.5,fontWeight:700,color:C.text,marginBottom:5}}>👤 Tes comptes Vinted et leurs emails</div>
+          {parCompte === null && <div style={{fontSize:11,color:C.muted}}>lecture en cours…</div>}
+          {parCompte !== null && (
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              {comptes.map(a => {
+                const l = String(a.login || '').trim() || String(a.vinted_user_id || '');
+                const e = parCompte[String(a.login || '').trim()] || null;
+                const ts = e && e.last ? Date.parse(e.last) : NaN;
+                return (
+                  <div key={String(a.vinted_user_id)} style={{...ligne,fontSize:11.5}}>
+                    <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
+                    <div style={{flexShrink:0,fontWeight:600,color:e?(isNaN(ts)?C.muted:(Date.now()-ts<7*86400000?(C.ok||C.accent):C.warn)):C.danger}}>
+                      {e ? `${e.n} email${e.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}` : '⚠️ aucun email'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {muets.length>0 && (
+            <div style={{fontSize:11,color:C.warn,marginTop:6,lineHeight:1.45}}>
+              <b>{muets.length} compte{muets.length>1?'s':''} ne reçoi{muets.length>1?'vent':'t'} aucun email</b> ({muets.map(a=>a.login||a.vinted_user_id).join(', ')}).
+              {muets.length>1?'Leurs':'Ses'} emails Vinted et {muets.length>1?'leurs':'ses'} <b>codes de retrait</b> n'arrivent donc jamais ici : il faut faire suivre {muets.length>1?'ces boîtes':'la boîte de ce compte'} vers l'adresse de l'app.
+            </div>
+          )}
+        </div>
+      )}
+      {nInc>0 && (
+        <div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
+          <div style={{fontSize:11.5,fontWeight:700,color:C.warn,marginBottom:4}}>⚠️ {nInc} email{nInc>1?'s':''} reçu{nInc>1?'s':''} que l'app n'a pas su classer</div>
+          {incompris.slice(0,4).map(e=>(
+            <div key={e.id} style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              {(e.at||'').slice(0,16).replace('T',' ')} · {e.subject || '(sans sujet)'}
+            </div>
+          ))}
+          <div style={{fontSize:10.5,color:C.muted,marginTop:4}}>Ils sont conservés entiers — rien n'est perdu.</div>
+        </div>
+      )}
+    </div>
   );
 }
 function PeriodePicker({ value, onChange }) {
@@ -12671,6 +12752,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const copyText = (txt, key) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(()=>setCopied(''),1500); } catch(_){} };
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
+  // ── SAISIE EN SÉRIE DES PRIX D'ACHAT ───────────────────────────────────────
+  // ⚠️ LE défaut de données le plus coûteux, mesuré encore le 23 août :
+  // **0 prix d'achat sur 210 paires**, donc le bénéfice, la marge, la « meilleure
+  // marque » et le rapport comptable tournent avec un COÛT DE ZÉRO — sur 231
+  // ventes finalisées et 6 717 € de CA. Julien a dit qu'il les remplirait à la
+  // main ; ce qui l'en empêche, c'est le geste : ouvrir chaque carte, viser un
+  // petit champ, recommencer 210 fois.
+  // Ici : une seule liste, un champ par ligne, Entrée passe au suivant. Les
+  // paires qui pèsent le plus sur la compta (celles réellement vendues, au CA le
+  // plus élevé) sont en tête — vingt minutes de frappe redressent l'essentiel.
+  // ⚠️ Aucune saisie automatique : c'est lui qui tape, ou qui tape sur une
+  // suggestion qu'il voit (règle tenue depuis §22).
+  const [fillBuyOpen, setFillBuyOpen] = useState(false);
+  const fillBuyRows = useMemo(() => {
+    // Ce que chaque paire pèse dans la compta : ses ventes, résolues par
+    // IDENTITÉ (id d'annonce Vinted, sinon photo) — jamais par titre (§5.34).
+    const impact = {};
+    for (const o of (sales.items || [])) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const k = identiteAnnonce(o); if (!k) continue;
+      const p = (o.price && o.price.amount != null) ? Number(o.price.amount) || 0 : 0;
+      const e = (impact[k] = impact[k] || { n: 0, ca: 0 });
+      e.n += 1; e.ca += p;
+    }
+    const out = [];
+    for (const k in numeros) {
+      const e = numeros[k]; if (!e) continue;
+      if (String(e.buyPrice || '').trim()) continue;          // déjà renseigné
+      const num = String(e.numero || '').trim(); if (!num) continue;
+      const im = impact[k] || { n: 0, ca: 0 };
+      out.push({ key: k, e, numero: num, enLigne: onlineAnnonceIds.has(String(k)), nVentes: im.n, ca: im.ca });
+    }
+    // Les paires VENDUES d'abord, au CA décroissant : c'est là que le coût
+    // manquant fausse vraiment les chiffres. Les annonces en ligne ensuite.
+    out.sort((a, b) => (b.ca - a.ca) || (Number(b.enLigne) - Number(a.enLigne)) || (parseInt(a.numero, 10) - parseInt(b.numero, 10)));
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numeros, sales.items, onlineAnnonceIds, txnItem, txnLink]);
+  const setBuyForKey = (key, val) => {
+    setNumeros(prev => {
+      const u = { ...prev };
+      const cur = u[key] || {};
+      const v = String(val || '').trim();
+      // Saisir un prix à la main efface le lien vers un achat (sinon la carte
+      // afficherait un achat qui n'a plus rien à voir avec le chiffre saisi).
+      u[key] = { ...cur, buyPrice: v, buyFromId: null, buyFrom: null };
+      save('vinted_annonce_numeros', u);
+      return u;
+    });
+  };
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const ymOf = (dstr) => { if(!dstr) return null; const d=new Date(dstr); if(isNaN(d)) return null; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
@@ -13763,7 +13894,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:13,fontWeight:700,color:C.warn}}>💸 {totals.sansCout} vente{totals.sansCout>1?'s':''} finalisée{totals.sansCout>1?'s':''} sans prix d'achat</div>
               <div style={{fontSize:11,color:C.text,marginTop:2,lineHeight:1.4}}>Ton bénéfice net et ton rapport comptable sont <b>sous-estimés</b> tant que tu ne renseignes pas leur coût. Saisis-le dans le champ « achat » de chaque vente.</div>
             </div>
-            <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les compléter →</button>
+            <button type="button" onClick={()=>setFillBuyOpen(true)} title="Une liste, un champ par ligne, Entrée passe à la suivante" style={{flexShrink:0,border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>💶 Tout compléter d'un coup</button>
+            <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir la liste</button>
           </div>
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
@@ -13954,7 +14086,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
             style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
         )}
-        <ReceptionEmails tracking={tracking}/>
+        {/* Compte des colis à retirer PAR TRANSPORTEUR, pour que Chronopost,
+            Mondial Relay et Vinted Go aient chacun leur ligne sur l'onglet
+            Achats — même quand ils n'ont rien (demande de Julien). */}
+        <ReceptionEmails tracking={tracking} comptes={accounts}
+          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>
         {/* À RETIRER — liste simple façon appli de colis : groupée par point relais,
             avec LE CODE de retrait en gros (c'est ça qu'on donne au comptoir) et un
             « Y aller ». Source = emails transporteur (qui portent le code), et non
@@ -15052,6 +15188,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
+                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
                        C'est le seul outil qui RÉATTRIBUE des numéros en masse — donc
                        exactement ce que Julien interdit maintenant qu'il les écrit sur
@@ -16153,6 +16290,63 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,color:C.muted}}>{treasury.nSpent} achat{treasury.nSpent>1?'s':''} (Vinted + hors Vinted){buys.items===null?' · chargement…':''}</div>
               </div>
               <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Basé sur le statut Vinted de chaque commande (fiable, se met à jour tout seul).</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── SAISIE EN SÉRIE DES PRIX D'ACHAT ────────────────────────────────
+          Une liste, un champ par ligne, Entrée passe au suivant. Les paires
+          vendues au CA le plus élevé d'abord : ce sont elles qui faussent le
+          plus la compta tant que leur coût manque. */}
+      {fillBuyOpen && (
+        <div onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1">
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter</div>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>
+                    {fillBuyRows.length} paire{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe à la suivante
+                  </div>
+                </div>
+                <button type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
+              </div>
+              {fillBuyRows.length>0 && (
+                <div style={{fontSize:11,color:C.warn,marginTop:6,lineHeight:1.4}}>
+                  Tant qu'un coût manque, la vente compte comme <b>100 % de marge</b> : ton bénéfice et ton rapport comptable sont sous-estimés.
+                </div>
+              )}
+            </div>
+            <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
+              {fillBuyRows.length===0 && (
+                <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Toutes tes paires ont un prix d'achat.</div>
+              )}
+              {fillBuyRows.slice(0,300).map((r,i)=>(
+                <div key={r.key} style={{display:'flex',gap:10,alignItems:'center',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:6}}>
+                  <div style={{width:40,height:40,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    {r.e.photo?<img src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>👟</span>}
+                  </div>
+                  <div style={{flex:'1 1 130px',minWidth:0}}>
+                    <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                      <span style={{color:C.accent,fontWeight:700}}>N°{r.numero}</span> {r.e.title||'(sans titre)'}
+                    </div>
+                    <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                      {/* Montants au format français (virgule) : `eur` ne fait que
+                          convertir en nombre, il ne met pas en forme. */}
+                      {r.nVentes>0 ? `vendue ${r.nVentes>1?r.nVentes+' fois · ':''}${r.ca.toFixed(2).replace('.',',')} €` : r.enLigne ? `en ligne${r.e.price!=null?` · ${eur(r.e.price).toFixed(2).replace('.',',')} €`:''}` : 'plus en ligne'}
+                    </div>
+                  </div>
+                  <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg,width:96}}>
+                    <ChampSaisie value="" data-fillbuy={i}
+                      onCommit={v=>setBuyForKey(r.key,v)}
+                      apresEntree={()=>{ const n=document.querySelector(`[data-fillbuy="${i+1}"]`); if(n) n.focus(); }}
+                      placeholder="achat" inputMode="decimal"
+                      style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    <span style={{fontSize:11,color:C.muted}}>€</span>
+                  </div>
+                </div>
+              ))}
+              {fillBuyRows.length>300 && <div style={{fontSize:11,color:C.muted,textAlign:'center',padding:'8px'}}>… et {fillBuyRows.length-300} autres (elles apparaîtront au fur et à mesure).</div>}
             </div>
           </div>
         </div>
