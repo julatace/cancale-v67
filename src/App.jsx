@@ -15704,15 +15704,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
           const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
           return (
-            <div style={{border:`1px solid ${aPoster.length?C.accent:C.border}`,background:aPoster.length?`${C.accent}0e`:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px 11px 15px',marginBottom:12,overflow:'hidden'}}>
+              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:aPoster.length?C.accent:C.border}}/>
+              <span aria-hidden="true" style={{flexShrink:0,color:aPoster.length?C.accent:C.muted,marginTop:1}}><Icon name={aPoster.length?'truck':'check'} size={18}/></span>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
                 <div style={{flex:1,minWidth:150}}>
-                  <div style={{fontSize:15,fontWeight:700,color:C.text}}>
-                    {aPoster.length>0 ? `📦 ${aPoster.length} colis à envoyer` : '✅ Aucun colis à envoyer'}
+                  <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
+                    {aPoster.length>0 && <span style={{fontSize:17,fontWeight:700,color:C.accent,letterSpacing:-0.3}}>{aPoster.length}</span>}
+                    <span style={{fontSize:13,fontWeight:600,color:C.text}}>{aPoster.length>0 ? 'colis à envoyer' : 'Aucun colis à envoyer'}</span>
                   </div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
                     {aPoster.length>0
-                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}`
+                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}`
                       : 'Vinted ne te demande aucun envoi en ce moment.'}
                   </div>
                 </div>
@@ -15818,7 +15821,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   compte TOUT : on lisait « 4 bordereaux à imprimer » puis
                   « 1 colis à expédier » sur le même écran. On nomme ce qu'on
                   compte au lieu de laisser croire à une contradiction. */}
-              <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} à poster en priorité {overdue?'· du retard !':''}</div>
+              <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
+                <span style={{fontSize:17,fontWeight:700,color:danger?C.danger:C.warn,letterSpacing:-0.3}}>{total}</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}>à poster en priorité{overdue?' — du retard':''}</span>
+              </div>
               <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — les plus urgents sont en haut de la liste.</div>
             </div>
           );
@@ -15869,7 +15875,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const ex = expeditions().filter(e => !e.o || matchOrd(e.o));
           if (!ex.length) return (
             <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
-              ✅ Aucun colis à envoyer.<br/>
+              Aucun colis à envoyer.<br/>
               <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
             </div>
           );
@@ -15916,7 +15922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {urgTxt && <span style={{flexShrink:0,color:urgCol,fontWeight:600}}>{urgTxt}</span>}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>
-                            : (num ? <span style={{flexShrink:0}}>🏠 pas rangée</span> : null)}
+                            : (num ? <span style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>pas rangée</span> : null)}
                           {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span>}
                           {posted && <span style={{flexShrink:0,color:INV_STATUS.online.color,fontWeight:600}}>✓ posté</span>}
                         </div>
@@ -15965,8 +15971,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             en est, au lieu de te renvoyer faire le travail. */}
                         <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
                           {aGenererBordereau(o && o.status)
-                            ? <>⏳ <b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
-                            : <>✅ <b>Bordereau déjà généré</b> chez Vinted — le PDF arrive par email.</>}
+                            ? <><b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
+                            : <><b>Bordereau déjà généré</b> chez Vinted — le PDF arrive par email.</>}
                         </div>
                         <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>

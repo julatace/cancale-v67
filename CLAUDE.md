@@ -4406,3 +4406,13 @@ affiche-t-il encore quelque chose ?*
 ⚠️ C'est la deuxième fois de la journée qu'un défaut passe le build et le smoke
 et n'apparaît qu'au rendu réel (l'autre : §5.55, le commentaire JSX rendu comme
 objet vide). **Regarder les captures fait partie du test, ce n'est pas un extra.**
+
+### 5.56 (suite) — écran Colis, même traitement
+Les trois blocs de tête (vert « N colis à envoyer », rouge « à poster en
+priorité », rouge « numéro porté par deux paires ») s'empilaient comme trois
+alertes de même force. Les deux premiers passent au gabarit `Notice` : surface
+neutre, barre de 3 px, **le chiffre porte la couleur**. Le troisième garde son
+cadre rouge — deux paires dans la même boîte est le seul risque irréversible de
+l'app (§19), il doit rester le plus fort de l'écran.
+Emojis d'état retirés des cartes (`⏳`, `✅`, `📦`, `📮`) : le mot et la couleur
+disaient déjà la même chose ; `🏠 pas rangée` passe à l'icône `home`.
