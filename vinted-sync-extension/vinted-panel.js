@@ -718,6 +718,19 @@
         <div class="vrm-st"><b style="color:#0f6b4f">${eurI(a.caEncaisse)}</b><span class="vrm-m">Encaissé</span></div>
       </div>
       <div class="vrm-m" style="text-align:center;margin:-2px 0 8px;opacity:.7">Chiffres de l'app · ${a.updatedAt ? esc(timeago(Date.parse(a.updatedAt))) : ''}</div>` : '';
+    // ── RATTRAPER LES DATES D'ENCAISSEMENT ────────────────────────────────
+    // L'app ne peut dater un encaissement que si le DÉTAIL de la transaction a
+    // été capté ; sinon elle refuse de dater (elle ne pose jamais l'encaissement
+    // au jour de la vente, l'écart réel va jusqu'à 25 jours). Le passage
+    // automatique en récupère 3 par visite : ce bouton en fait un lot, sur ton
+    // clic, pour un mois passé qu'on veut boucler tout de suite.
+    // ⚠️ Lectures seules, une par une, compte connecté uniquement, et le plafond
+    // de 20 actions/h coupe le lot de lui-même.
+    const rattrap = `
+      <div style="display:flex;align-items:center;gap:8px;border:1px solid #dde;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fbfcfe">
+        <span class="vrm-m" style="flex:1;min-width:0">Dates d'encaissement manquantes dans l'app ? Va les chercher pour ce compte.</span>
+        <button class="vrm-rattrap" style="flex-shrink:0;border:1px solid #111;background:#111;color:#fff;border-radius:999px;padding:5px 11px;font-weight:700;font-size:11px;cursor:pointer">Récupérer</button>
+      </div>`;
     if (!all.length) return `${head}<div class="vrm-m">Aucune vente captée pour l'instant.<br>Ouvre « Mes ventes » sur Vinted une fois pour les capter (0 requête ajoutée).</div>`;
     // 1) PÉRIODE (deux dates) — appliquée AVANT tout le reste, pour que les
     //    compteurs des autres filtres correspondent à ce que tu vois vraiment.
@@ -732,10 +745,11 @@
     const FILTERS = [['all', 'Toutes', parCompte.length], ['pending', '⏳ En cours', nPend], ['completed', '✅ Finalisées', nDone]];
     const filterChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${FILTERS.map(([k, l, n]) => `<button class="vrm-vfilter" data-f="${k}" style="border:1px solid ${ventesFilter === k ? '#111' : '#dde'};background:${ventesFilter === k ? '#111' : '#fff'};color:${ventesFilter === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}${n ? ` ${n}` : ''}</button>`).join('')}</div>`;
     const list = ventesFilter === 'all' ? parCompte : parCompte.filter(v => v.etat === ventesFilter);
-    if (!list.length) return `${head}${periodeBar()}${acctChips}${filterChips}<div class="vrm-m" style="padding:6px 2px">Aucune vente dans cette sélection.</div>`;
+    if (!list.length) return `${head}${rattrap}${periodeBar()}${acctChips}${filterChips}<div class="vrm-m" style="padding:6px 2px">Aucune vente dans cette sélection.</div>`;
     const rows = list.slice(0, 200).map(v => venteRow(v)).join('');
     return `
       ${head}
+      ${rattrap}
       ${periodeBar()}
       ${acctChips}
       ${filterChips}
@@ -860,6 +874,20 @@
 
   function wireVentes() {
     panel.querySelectorAll('.vrm-vfilter').forEach(b => { b.onclick = () => { ventesFilter = b.dataset.f; render(); }; });
+    panel.querySelectorAll('.vrm-rattrap').forEach(b => { b.onclick = async () => {
+      const uid = DATA && DATA.compteActif; 
+      if (!uid) { b.textContent = 'connecte-toi d\'abord'; return; }
+      b.disabled = true; b.textContent = '⏳…';
+      try {
+        const r = await new Promise(res => chrome.runtime.sendMessage(
+          { from: 'cancale-vpanel', action: 'rattraperEncaissements', uid, max: 15 }, x => res(x || {})));
+        // On rend compte du VRAI nombre récupéré : zéro veut dire quelque chose
+        // (tout est déjà là, ou le plafond horaire est atteint).
+        b.textContent = r && r.ok ? (r.n > 0 ? `✓ ${r.n} datée${r.n > 1 ? 's' : ''}` : 'rien à récupérer') : 'échec';
+        if (r && r.n > 0) setTimeout(() => load(), 600);
+      } catch (_) { b.textContent = 'échec'; }
+      setTimeout(() => { b.disabled = false; }, 1500);
+    }; });
     panel.querySelectorAll('.vrm-vacct').forEach(b => { b.onclick = () => { ventesAcct = b.dataset.a; render(); }; });
     // Calendrier de période (clic début → clic fin, façon Airbnb).
     const tog = panel.querySelector('#vrm-cal-toggle');

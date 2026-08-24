@@ -3789,8 +3789,22 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
 }
 function PeriodePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
+  // ⚠️ Julien : « je veux pouvoir sélectionner un mois — juin par exemple — et
+  // que l'app fasse la somme du 1er au dernier jour de juin ». Les raccourcis
+  // « Ce mois » / « Mois dernier » ne couvraient que les deux derniers : pour
+  // juin en août, il fallait pointer deux dates dans le calendrier. Le
+  // sélecteur s'ouvre donc sur les MOIS ; le jour-à-jour reste à un clic.
+  const [vue, setVue] = useState('mois');            // 'mois' | 'jours'
   const now = new Date();
   const [mois, setMois] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [annee, setAnnee] = useState(now.getFullYear());
+  // Un mois entier, du 1er au dernier jour — bornes calculées, jamais saisies.
+  const choisirMois = (an, m) => {
+    const from = new Date(an, m, 1);
+    const to = new Date(an, m + 1, 0);              // jour 0 du mois suivant = dernier du mois
+    onChange({ from, to, label: `${MOIS_FR[m]} ${an}` });
+    setOpen(false);
+  };
   const actif = !!(value && (value.from || value.to));
   const presets = [
     { k:'mois',   lab:'Ce mois',      f:()=>({ from:new Date(now.getFullYear(),now.getMonth(),1), to:now, label:`${MOIS_FR[now.getMonth()]} ${now.getFullYear()}` }) },
@@ -3832,6 +3846,36 @@ function PeriodePicker({ value, onChange }) {
       </div>
       {open && (
         <div style={{ marginTop:8, border:`1px solid ${C.border}`, background:C.card, borderRadius:14, padding:'10px 12px' }}>
+          <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+            {[['mois','Un mois entier'],['jours','Jour à jour']].map(([k,lab])=>(
+              <button key={k} type="button" onClick={()=>setVue(k)}
+                style={{ flex:1, border:`1px solid ${vue===k?C.accent:C.border}`, background:vue===k?`${C.accent}14`:'transparent', color:vue===k?C.accent:C.muted, borderRadius:10, padding:'7px 0', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>{lab}</button>
+            ))}
+          </div>
+          {vue==='mois' ? (<>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <button type="button" onClick={()=>setAnnee(a=>a-1)} aria-label="Année précédente" style={{ border:'none', background:'transparent', color:C.text, fontSize:16, cursor:'pointer', padding:'2px 10px' }}>‹</button>
+              <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{annee}</div>
+              <button type="button" onClick={()=>setAnnee(a=>a+1)} disabled={annee>=now.getFullYear()} aria-label="Année suivante"
+                style={{ border:'none', background:'transparent', color:annee>=now.getFullYear()?C.border:C.text, fontSize:16, cursor:annee>=now.getFullYear()?'default':'pointer', padding:'2px 10px' }}>›</button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
+              {MOIS_FR.map((nom,m)=>{
+                // Un mois à venir n'a rien à sommer : on le grise plutôt que de
+                // laisser choisir une période forcément vide.
+                const futur = annee>now.getFullYear() || (annee===now.getFullYear() && m>now.getMonth());
+                const sel = value && value.label === `${nom} ${annee}`;
+                return (
+                  <button key={m} type="button" disabled={futur} onClick={()=>choisirMois(annee,m)}
+                    style={{ border:`1px solid ${sel?C.accent:C.border}`, background:sel?C.accent:'transparent', color:futur?C.border:(sel?'#fff':C.text),
+                             borderRadius:10, padding:'10px 0', fontSize:13, fontWeight:600, cursor:futur?'default':'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>
+                    {nom}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>Un tap = tout le mois, du 1er au dernier jour.</div>
+          </>) : (<>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
             <button type="button" onClick={()=>setMois(m=>new Date(m.getFullYear(), m.getMonth()-1, 1))} style={{ border:'none', background:'transparent', color:C.text, fontSize:16, cursor:'pointer', padding:'2px 8px' }}>‹</button>
             <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{MOIS_FR[mois.getMonth()]} {mois.getFullYear()}</div>
@@ -3852,6 +3896,7 @@ function PeriodePicker({ value, onChange }) {
           <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>
             {value && value.from && !value.to ? 'Choisis la date de fin.' : 'Clique la date de début, puis celle de fin.'}
           </div>
+          </>)}
         </div>
       )}
     </div>
@@ -12612,10 +12657,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // total plutôt que d'être posées au hasard sur la date de vente. On les
     // compte pour le dire — un chiffre incomplet qui se présente comme complet
     // est pire qu'un chiffre absent.
-    let sansDate = 0;
+    // ⚠️ Sur un mois passé, la date d'encaissement peut n'être connue pour
+    // AUCUNE vente (l'extension ne capte les détails de transaction que depuis
+    // peu). Afficher « 0 € » serait exact et inutilisable. On compte donc aussi
+    // ce qu'on sait dire : les ventes finalisées CONCLUES sur la période, avec
+    // leur montant — en disant que c'est une autre question.
+    let sansDate = 0, sansDateEur = 0, sansDateNb = 0;
     if (surEncaissement) for (const o of (sales.items || [])) {
       if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
-      if (isNaN(dateEncaissement(o))) sansDate++;
+      if (!isNaN(dateEncaissement(o))) continue;
+      sansDate++;
+      if (dansPeriode(o, periode)) { sansDateNb++; sansDateEur += (o.price?.amount != null ? Number(o.price.amount) : 0); }
     }
     for (const o of items) {
       if (isHidden(o)) continue;
@@ -12631,7 +12683,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, surEncaissement, sansDate };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, surEncaissement, sansDate, sansDateEur, sansDateNb };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, vFilter, curSub, txnItem]);
 
@@ -14334,10 +14386,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             faux d'une à trois semaines) : elle sort du total, et on le dit. */}
         {totals.surEncaissement && totals.sansDate > 0 && (
           <Notice tone="warn" icon="clock"
-            value={totals.sansDate}
-            title={`vente${totals.sansDate>1?'s':''} finalisée${totals.sansDate>1?'s':''} sans date d'encaissement connue`}
-            desc="Elles ne sont pas comptées dans le total ci-dessus. Repasse une fois sur Vinted avec le compte concerné : l'extension capte le détail de la transaction, et la date arrive toute seule."
-            detail="Vinted ne donne la date d'encaissement que dans le détail d'une transaction, pas dans la liste des commandes. L'extension le capte pendant que tu navigues — c'est pour ça qu'il suffit de repasser sur le compte."/>
+            value={totals.sansDateNb > 0 ? fmtE0(totals.sansDateEur) : totals.sansDate}
+            title={totals.sansDateNb > 0
+              ? `vendus sur ${libellePeriode(periode).toLowerCase()} et finalisés, mais l'encaissement n'est pas encore daté`
+              : `vente${totals.sansDate>1?'s':''} finalisée${totals.sansDate>1?'s':''} sans date d'encaissement connue`}
+            desc={totals.sansDateNb > 0
+              ? `${totals.sansDateNb} vente${totals.sansDateNb>1?'s':''} — ce montant n'est PAS dans « Argent reçu » ci-dessus, qui ne compte que les encaissements réellement datés. Les deux répondent à deux questions différentes : ce qui a été vendu sur la période, et ce qui a été touché sur la période.`
+              : "Elles ne sont pas comptées dans le total ci-dessus."}
+            detail="Vinted ne donne la date d'encaissement que dans le détail d'une transaction, jamais dans la liste des commandes. L'extension va le chercher à chaque passage sur vinted.fr, quelques ventes à la fois — la couverture des mois passés se remplit donc au fil des visites. Tant qu'elle manque, l'app préfère le dire plutôt que de dater un encaissement au jour de la vente : l'écart réel est de 7 jours en médiane, jusqu'à 25."/>
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(

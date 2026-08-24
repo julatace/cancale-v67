@@ -685,6 +685,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           //    donc jamais un lot à lâcher d'un coup. C'est ce qui différencie
           //    une file séquentielle d'une rafale (§32/§43), et le plafond de
           //    20 actions/h par compte (`garde`) reste le vrai garde-fou.
+          // ── RATTRAPAGE DES DATES D'ENCAISSEMENT (sur clic) ────────────────
+          // Le passage automatique en récupère 3 par visite : pour rattraper un
+          // mois passé, il faudrait des semaines. Ce bouton en fait un LOT, sur
+          // SON clic.
+          // ⚠️ Ce n'est pas une rafale (§32/§43) : ce sont des LECTURES (GET) sur
+          // ses propres transactions, envoyées UNE PAR UNE en attendant chaque
+          // réponse, uniquement pour le compte connecté (`garde`), et le plafond
+          // de 20 actions/h par compte reste le vrai garde-fou — il coupe le lot
+          // de lui-même. Aucune écriture, aucune action sur Vinted.
+          if (msg.action === 'rattraperEncaissements') {
+            const n = await capterEncaissements(msg.uid, { max: Number(msg.max) || 15 });
+            sendResponse({ ok: true, n });
+            return;
+          }
           if (msg.action === 'genererBord') {
             // Un clic = un bordereau : on génère, puis on va CHERCHER le PDF et
             // on l'envoie dans l'app. Le compte rendu remonte au panneau pour
@@ -1688,8 +1702,9 @@ async function visiteVinted() {
 //   · on ne demande QUE les ventes finalisées dont le détail manque.
 const ENCAISS_MAX_PAR_VISITE = 3;
 const ENCAISS_RETRY_MS = 24 * 3600 * 1000;
-async function capterEncaissements(uid) {
+async function capterEncaissements(uid, opts = {}) {
   try {
+    const plafond = Math.max(1, Math.min(20, Number(opts.max) || ENCAISS_MAX_PAR_VISITE));
     const acc = await accountFor(uid); if (!acc) return 0;
     if (!(await garde(uid, acc)).ok) return 0;
     // Ce qu'on a déjà : inutile de redemander.
@@ -1701,7 +1716,10 @@ async function capterEncaissements(uid) {
     const maintenant = Date.now();
     let faits = 0;
     for (const o of ventes) {
-      if (faits >= ENCAISS_MAX_PAR_VISITE) break;
+      if (faits >= plafond) break;
+      // Le plafond horaire est le vrai garde-fou : dès qu'il refuse, on arrête
+      // le lot au lieu de s'acharner (les suivantes taperaient le même mur).
+      if (!(await garde(uid, acc)).ok) break;
       const tx = String(o && o.transaction_id || ''); if (!tx) continue;
       if (!/finalis/i.test(String(o.status || ''))) continue;   // seules les finalisées portent un encaissement
       if (deja.has(tx)) continue;
