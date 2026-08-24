@@ -13,36 +13,47 @@ const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
 // conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
+  // ── LES FONDATIONS VISUELLES ──────────────────────────────────────────────
+  // Julien : « change totalement le visuel, je veux qu'elle soit beaucoup plus
+  // belle ». Ce qui faisait « tableau de bord de développeur » n'était pas le
+  // détail des écrans mais ces valeurs-ci : des cartes plates de la même
+  // couleur que le fond, séparées par un trait d'1 px, et un vert unique posé
+  // partout. On change donc la BASE — tout l'écran en hérite — plutôt que six
+  // cents endroits.
+  //  · le fond n'est plus neutre : il est légèrement TEINTÉ, la carte est plus
+  //    CLAIRE que lui. C'est ce décalage qui donne le relief, pas le contour.
+  //  · l'ombre porte la profondeur ; le trait n'est plus qu'un liseré.
+  //  · l'accent devient une VRAIE couleur de marque (vert profond), et le
+  //    doré/ambre sert d'accent secondaire — deux couleurs valent mieux qu'une
+  //    déclinée à l'infini.
   light: {
-    // FOND LÉGÈREMENT TEINTÉ, CARTES BLANCHES : c'est le contraste entre les deux
-    // qui donne le relief. Avant, le fond était presque blanc et chaque carte
-    // devait se dessiner un contour gris pour exister — d'où l'impression de
-    // formulaire administratif. Maintenant la carte se détache par sa clarté et
-    // son ombre, et le trait n'est plus qu'un liseré très pâle.
-    bg:"#eef2ef", surface:"#ffffff", card:"#ffffff", border:"#e3e9e5",
-    accent:"#0f6b4f", accentSoft:"#178a66", onAccent:"#ffffff",
+    bg:"#eaf0ec", surface:"#ffffff", card:"#ffffff", card2:"#f5f8f6", border:"#dde6e0",
+    accent:"#0b6b4a", accentSoft:"#12946a", onAccent:"#ffffff",
     danger:"#c0453f", warn:"#a9760f", gold:"#B8863B",
-    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0d1512", muted:"#63736b",
-    // Élévation à DEUX niveaux, jamais de noir pur (c'est ce qui fait « cheap »).
-    // La composante large et diffuse fait la profondeur, la fine pose l'objet.
-    shadow:"0 1px 1px rgba(13,32,24,.04), 0 4px 14px -4px rgba(13,32,24,.10)",
-    shadowLg:"0 2px 4px rgba(13,32,24,.05), 0 18px 40px -12px rgba(13,32,24,.18)",
-    glass:"rgba(255,255,255,.78)",
-    // Couleurs de SÉRIE des graphiques (≠ couleurs de statut, jamais réutilisées
-    // pour un avertissement). Paire vérifiée : elle reste distinguable en vision
-    // normale ET en daltonisme (deutan/tritan) sur ce fond.
-    s1:"#14795a", s2:"#6d5cc7",
+    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0b1a14", muted:"#5f7167",
+    // Trois niveaux d'élévation, jamais de noir pur : la composante large et
+    // diffuse fait la profondeur, la fine pose l'objet sur le fond.
+    shadow:"0 1px 1px rgba(9,32,22,.04), 0 3px 10px -3px rgba(9,32,22,.09)",
+    shadowMd:"0 1px 2px rgba(9,32,22,.05), 0 10px 24px -8px rgba(9,32,22,.14)",
+    shadowLg:"0 2px 4px rgba(9,32,22,.06), 0 22px 48px -14px rgba(9,32,22,.20)",
+    ring:"rgba(11,107,74,.14)",
+    glass:"rgba(255,255,255,.82)",
+    s1:"#0b6b4a", s2:"#6d5cc7",
   },
   dark: {
-    bg:"#0b0f0d", surface:"#141b18", card:"#18211d", border:"#28322d",
-    accent:"#4aa87d", accentSoft:"#5cbb8e", onAccent:"#04150d",
-    danger:"#e87b7f", warn:"#dcae5c", gold:"#E0B972",
-    blue:"#6aabd8", purple:"#ac9dea", text:"#eef4f0", muted:"#8b9b92",
-    shadow:"0 1px 2px rgba(0,0,0,.4), 0 4px 16px -4px rgba(0,0,0,.5)",
-    shadowLg:"0 2px 6px rgba(0,0,0,.5), 0 20px 44px -12px rgba(0,0,0,.6)",
-    glass:"rgba(20,27,24,.74)",
-    // Mode sombre : teintes RECALCULÉES pour ce fond, pas un simple éclaircissement.
-    s1:"#4aa87d", s2:"#9482d8",
+    // Mode sombre RECALCULÉ pour ce fond, pas un simple éclaircissement : la
+    // carte est nettement plus claire que le fond (c'est elle qu'on regarde),
+    // et le fond garde une pointe de vert pour ne pas virer au gris d'usine.
+    bg:"#080d0b", surface:"#111a16", card:"#16211c", card2:"#1c2a23", border:"#2a3a32",
+    accent:"#3fbe86", accentSoft:"#5ad19c", onAccent:"#04150d",
+    danger:"#f08a8d", warn:"#e6b768", gold:"#E0B972",
+    blue:"#74b4de", purple:"#b3a5ef", text:"#eef6f1", muted:"#8ea79a",
+    shadow:"0 1px 2px rgba(0,0,0,.45), 0 3px 12px -3px rgba(0,0,0,.5)",
+    shadowMd:"0 2px 4px rgba(0,0,0,.5), 0 12px 28px -8px rgba(0,0,0,.6)",
+    shadowLg:"0 3px 8px rgba(0,0,0,.55), 0 26px 56px -14px rgba(0,0,0,.7)",
+    ring:"rgba(63,190,134,.20)",
+    glass:"rgba(17,26,22,.78)",
+    s1:"#3fbe86", s2:"#a394e8",
   },
 };
 let C = THEMES.light;
@@ -3150,9 +3161,12 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
        capture sur « 112 ventes sans prix d'achat »). La rangée passe à la ligne,
        le texte ne descend jamais sous 190 px. */
     <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',
-      background:C.card,border:`1px solid ${C.border}`,borderRadius:12,
-      padding:'11px 13px 11px 15px',marginBottom:10,overflow:'hidden',...style}}>
+      background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadow,
+      padding:'13px 15px 13px 17px',marginBottom:10,overflow:'hidden',...style}}>
       <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
+      {/* Un voile très pâle de la couleur : l'avertissement se teinte sans
+          devenir un bloc criard (la surface reste neutre). */}
+      <span aria-hidden="true" style={{position:'absolute',inset:0,background:`linear-gradient(100deg, ${col}0e, transparent 42%)`,pointerEvents:'none'}}/>
       {icon && <span aria-hidden="true" style={{flexShrink:0,color:col,marginTop:1}}><Icon name={icon} size={18}/></span>}
       <div style={{flex:'1 1 190px',minWidth:0}}>
         <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
@@ -3172,7 +3186,9 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
   );
 }
 function Card({children,style={}}) {
-  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,...style}}>{children}</div>;
+  // Rayon plus généreux + ombre douce : une carte doit se poser SUR le fond,
+  // pas être découpée dedans au cutter.
+  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
@@ -3186,12 +3202,15 @@ function StatBox({label,value,color=C.text,sub=null}) {
   // comme ça le nombre s'affiche toujours en entier.
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
-  const fs = !L ? 20 : L <= 5 ? 20 : L <= 7 ? 16 : L <= 9 ? 13 : L <= 11 ? 11.5 : 10.5;
+  // Le CHIFFRE est ce qu'on vient lire : il passe devant, en gros et serré.
+  // L'étiquette redevient une légende, plus une petite capitale espacée qui
+  // criait autant que la valeur.
+  const fs = !L ? 26 : L <= 5 ? 26 : L <= 7 ? 21 : L <= 9 ? 16 : L <= 11 ? 13 : 11.5;
   return (
-    <Card style={{flex:1,minWidth:110}}>
-      <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>{label}</div>
-      <div style={{fontSize:fs,fontWeight:600,color,lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
-      {sub&&<div style={{fontSize:11,color:C.muted,marginTop:3}}>{sub}</div>}
+    <Card style={{flex:1,minWidth:110,padding:'14px 15px'}}>
+      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>{label}</div>
+      <div style={{fontSize:fs,fontWeight:700,color,lineHeight:1.1,letterSpacing:-0.8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
+      {sub&&<div style={{fontSize:11.5,color:C.muted,marginTop:5,lineHeight:1.35}}>{sub}</div>}
     </Card>
   );
 }
@@ -3908,13 +3927,19 @@ function EmptyState({ icon, title, desc, action }) {
 function ScreenHead({ icon, title, desc, right }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   return (
-    <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:12}}>
+    <div style={{display:'flex',alignItems:'flex-start',gap:12,marginBottom:16}}>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          {line ? <Icon name={icon} size={19} style={{color:C.accent,flexShrink:0}}/> : <span style={{fontSize:17}}>{icon}</span>}
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4}}>{title}</h2>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {/* L'icône dans une pastille teintée : elle devient un repère d'écran
+              au lieu d'un glyphe posé devant le mot. */}
+          {line ? (
+            <span aria-hidden="true" style={{flexShrink:0,width:32,height:32,borderRadius:11,background:C.ring,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <Icon name={icon} size={18}/>
+            </span>
+          ) : <span style={{fontSize:19}}>{icon}</span>}
+          <h2 style={{margin:0,fontSize:22,fontWeight:700,color:C.text,letterSpacing:-0.7,lineHeight:1.15}}>{title}</h2>
         </div>
-        {desc && <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>{desc}</div>}
+        {desc && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{desc}</div>}
       </div>
       {right}
     </div>
