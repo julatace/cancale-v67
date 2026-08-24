@@ -3462,6 +3462,10 @@ const TABS=[
 // l'onglet actif. Un jeu d'icônes au trait donne à la barre du bas le calme
 // d'une app native (l'emoji reste ailleurs, là où il sert de repère rapide).
 const ICON_PATHS = {
+  // Repère de carte et flèche d'itinéraire : les points relais affichaient 📍
+  // et 🧭, deux emojis au milieu de logos de transporteurs au trait.
+  pin:  'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z M12 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
+  nav:  'M3 11 21 3l-8 18-2-7-8-3Z',
   // ── Icônes ajoutées pour remplacer les emojis utilisés COMME icônes ───────
   // ⚠️ Un emoji est dessiné par le système d'exploitation : il n'a ni la même
   // graisse, ni la même grille, ni la même couleur que le reste de l'interface.
@@ -3665,9 +3669,11 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
     return comptes.filter(a => { const l = String(a.login || '').trim(); return l && !parCompte[l]; });
   }, [parCompte, comptes]);
   const ligne = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 };
-  return (
-    <div style={{border:`1px solid ${muets.length||nInc?C.warn:C.border}`,background:muets.length||nInc?`${C.warn}0c`:C.card,borderRadius:12,padding:'10px 12px',marginBottom:10}}>
-      <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:7}}>📬 Ce qui arrive dans l'app</div>
+  // Le DÉTAIL (transporteurs + comptes, un par ligne) : c'est la preuve, pas
+  // l'alerte. Il vit derrière un dépliant dans les deux cas, pour que l'écran
+  // Achats commence par les colis et non par un tableau de diagnostic.
+  const detail = (
+    <>
       <div style={{display:'flex',flexDirection:'column',gap:5}}>
         {lignes.map(([k, v]) => {
           const nColis = (colisParTransporteur && colisParTransporteur[k]) || 0;
@@ -3685,10 +3691,9 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
           );
         })}
       </div>
-      {/* ── LES COMPTES : lesquels ne reçoivent RIEN ─────────────────────── */}
       {comptes && comptes.length > 0 && (
         <div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
-          <div style={{fontSize:11.5,fontWeight:700,color:C.text,marginBottom:5}}>👤 Tes comptes Vinted et leurs emails</div>
+          <div style={{fontSize:11.5,fontWeight:600,color:C.text,marginBottom:5}}>Tes comptes Vinted et leurs emails</div>
           {parCompte === null && <div style={{fontSize:11,color:C.muted}}>lecture en cours…</div>}
           {parCompte !== null && (
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
@@ -3700,29 +3705,18 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
                   <div key={String(a.vinted_user_id)} style={{...ligne,fontSize:11.5}}>
                     <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
                     <div style={{flexShrink:0,fontWeight:600,color:e?(isNaN(ts)?C.muted:(Date.now()-ts<7*86400000?(C.ok||C.accent):C.warn)):C.danger}}>
-                      {e ? `${e.n} email${e.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}` : '⚠️ aucun email'}
+                      {e ? `${e.n} email${e.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}` : 'aucun email'}
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-          {muets.length>0 && (
-            <div style={{fontSize:11,color:C.warn,marginTop:6,lineHeight:1.45}}>
-              <b>{muets.length} compte{muets.length>1?'s':''} ne reçoi{muets.length>1?'vent':'t'} aucun email</b> ({muets.map(a=>a.login||a.vinted_user_id).join(', ')}).
-              {muets.length>1?'Leurs':'Ses'} emails Vinted et {muets.length>1?'leurs':'ses'} <b>codes de retrait</b> n'arrivent donc jamais ici : il faut faire suivre {muets.length>1?'ces boîtes':'la boîte de ce compte'} vers l'adresse de l'app.
-            </div>
-          )}
-        </div>
-      )}
-      {nInc===0 && nConnus>0 && (
-        <div style={{fontSize:10.5,color:C.muted,marginTop:8,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
-          {nConnus} email{nConnus>1?'s':''} reconnu{nConnus>1?'s':''} sans action à faire (évaluations, newsletters, mises à jour de commande) — rien à signaler.
         </div>
       )}
       {nInc>0 && (
-        <div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
-          <div style={{fontSize:11.5,fontWeight:700,color:C.warn,marginBottom:4}}>⚠️ {nInc} email{nInc>1?'s':''} reçu{nInc>1?'s':''} que l'app n'a pas su classer</div>
+        <div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
+          <div style={{fontSize:11.5,fontWeight:600,color:C.text,marginBottom:4}}>{nInc} email{nInc>1?'s':''} que l'app n'a pas su classer</div>
           {vraimentInconnus.slice(0,4).map(e=>(
             <div key={e.id} style={{fontSize:10.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
               {(e.at||'').slice(0,16).replace('T',' ')} · {e.subject || '(sans sujet)'}
@@ -3731,7 +3725,41 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
           <div style={{fontSize:10.5,color:C.muted,marginTop:4}}>Ils sont conservés entiers — rien n'est perdu.</div>
         </div>
       )}
-    </div>
+      {nInc===0 && nConnus>0 && (
+        <div style={{fontSize:10.5,color:C.muted,marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
+          {nConnus} email{nConnus>1?'s':''} reconnu{nConnus>1?'s':''} sans action à faire (évaluations, newsletters, mises à jour de commande).
+        </div>
+      )}
+    </>
+  );
+  // Combien de transporteurs se taisent alors qu'on les attend.
+  const muetsTr = lignes.filter(([, v]) => !v.ts).length;
+  const probleme = muets.length > 0 || nInc > 0;
+  // ── QUAND QUELQUE CHOSE CLOCHE : on le NOMME, avec le geste à faire.
+  //    Un compte muet est le cas grave : ses codes de retrait n'arrivent jamais.
+  if (probleme) {
+    const quoi = muets.length > 0
+      ? `compte${muets.length>1?'s':''} Vinted ne reçoi${muets.length>1?'vent':'t'} aucun email`
+      : `email${nInc>1?'s':''} reçu${nInc>1?'s':''} que l'app n'a pas su classer`;
+    return (
+      <Notice tone="warn" icon="alert"
+        value={muets.length > 0 ? muets.length : nInc}
+        title={quoi}
+        desc={muets.length > 0
+          ? `${muets.map(a=>a.login||a.vinted_user_id).join(', ')} — leurs codes de retrait n'arrivent donc jamais ici. Il faut faire suivre ces boîtes vers l'adresse de l'app.`
+          : "Ils sont conservés entiers, rien n'est perdu — mais aucune action n'en a été tirée."}
+        detail={detail}/>
+    );
+  }
+  // ── QUAND TOUT VA BIEN : une ligne, pas un tableau. Le détail reste à un clic.
+  return (
+    <details style={{marginBottom:10}}>
+      <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:7,fontSize:11.5,color:C.muted,padding:'2px 0'}}>
+        <span aria-hidden="true" style={{color:muetsTr?C.warn:(C.ok||C.accent),display:'flex'}}><Icon name={muetsTr?'alert':'check'} size={14}/></span>
+        Réception des emails{muetsTr>0 ? ` · ${muetsTr} transporteur${muetsTr>1?'s':''} silencieux` : ' · tout arrive'}
+      </summary>
+      <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px'}}>{detail}</div>
+    </details>
   );
 }
 function PeriodePicker({ value, onChange }) {
@@ -12366,11 +12394,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const venteStage = (o) => {
     const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
     if (classifyOrderStatus(o.status) === 'cancelled') return { label: 'Annulée', color: C.danger, step: 0 };
-    if (/finalis/i.test(s) || tus === 'completed') return { label: '✅ Vendue', color: INV_STATUS.online.color, step: 4 };
-    if (/livr|remis|r[ée]ception/i.test(s)) return { label: '📦 Livrée', color: C.blue || C.accent, step: 3 };
-    if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: '📦 Au relais', color: C.blue || C.accent, step: 3 };
-    if (/transit|achemin|exp[eé]di|envoy|en\s+route/i.test(s)) return { label: '🚚 En transit', color: C.blue || C.accent, step: 2 };
-    if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: '📮 À expédier', color: C.warn, step: 1 };
+    if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
+    if (/livr|remis|r[ée]ception/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
+    if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
+    if (/transit|achemin|exp[eé]di|envoy|en\s+route/i.test(s)) return { label: 'En transit', color: C.blue || C.accent, step: 2 };
+    if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: 'À expédier', color: C.warn, step: 1 };
     if (/pay|valid|pr[ée]par/i.test(s)) return { label: 'Payée', color: C.muted, step: 1 };
     return { label: 'En cours', color: C.warn, step: 1 };
   };
@@ -14139,11 +14167,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ); })()}
         </>)}
-        {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
-          {/* (L'avertissement « sans prix d'achat » est rendu UNE SEULE FOIS,
-              par le bloc juste en dessous qui porte aussi les deux actions.
-              Il y en avait deux, l'un au-dessus de l'autre — §11.) */}
-        )}
         {sales.failed?.length>0 && (
           <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:10,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
             ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
@@ -14843,17 +14866,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{border:`1px solid ${C.border}`,borderRadius:12,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderBottom:`1px solid ${C.border}`}}>
                     <span style={{flex:1,fontSize:11,fontWeight:600,color:C.muted}}>Points relais{ville?` à ${ville}`:''} ({autres.length})</span>
-                    <button onClick={()=>{ const v=!carriersOnly; setCarriersOnly(v); save('vrm_relais_carriers_only',v); }} style={{border:`1px solid ${carriersOnly?C.accent:C.border}`,borderRadius:999,background:carriersOnly?`${C.accent}12`:'transparent',color:carriersOnly?C.accent:C.muted,fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>{carriersOnly?'📦 Casiers & transporteurs':'Tous les commerces'}</button>
+                    <button onClick={()=>{ const v=!carriersOnly; setCarriersOnly(v); save('vrm_relais_carriers_only',v); }} style={{border:`1px solid ${carriersOnly?C.accent:C.border}`,borderRadius:999,background:carriersOnly?`${C.accent}12`:'transparent',color:carriersOnly?C.accent:C.muted,fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>{carriersOnly?'Casiers & transporteurs':'Tous les commerces'}</button>
                   </div>
                   <div style={{maxHeight:240,overflowY:'auto'}}>
                     {autres.map(([lieu,g])=>(
                       <div key={lieu} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 12px',borderTop:`1px solid ${C.border}55`}}>
-                        {g.carrier?<CarrierBadge carrier={g.carrier} size={22}/>:<span style={{fontSize:15,flexShrink:0}}>📍</span>}
+                        {g.carrier?<CarrierBadge carrier={g.carrier} size={22}/>:<span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="pin" size={18}/></span>}
                         <span style={{flex:1,minWidth:0}}>
                           <span style={{display:'block',fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nom||lieu}</span>
                           <span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.rue,g.type].filter(Boolean).join(' · ')||' '}</span>
                         </span>
-                        {g.lat&&<a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:10,color:C.blue||C.accent,fontSize:13,padding:'4px 7px'}}>🧭</a>}
+                        {g.lat&&<a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:10,color:C.blue||C.accent,padding:'5px 7px',display:'flex'}}><Icon name="nav" size={15}/></a>}
                         <button onClick={()=>{ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); }} title="Retirer ce point de la carte" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',flexShrink:0,padding:'2px 6px'}}><Icon name="close" size={15}/></button>
                       </div>
                     ))}
@@ -14872,7 +14895,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <button type="button" onClick={()=>setOffSecOpen(v=>!v)}
               style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'11px 14px',marginBottom:offSecOpen?10:12,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-              <span style={{fontSize:15}}>🏷️</span>
+              <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="tag" size={18}/></span>
               <span style={{flex:1,textAlign:'left',minWidth:0}}>
                 <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Achats hors Vinted</span>
                 <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>
