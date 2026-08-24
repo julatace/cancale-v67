@@ -1871,12 +1871,27 @@ const fetchCapturedLabelMetas = async (uid) => {
 // dit à quelle annonce il correspond.
 // ⚠️ ÉGRESS (§34) : une ligne de transaction est grosse → on ne lit que les
 // deux entiers utiles, jamais `select=data`.
+// ⚠️ On lit ici QUATRE SCALAIRES par transaction, jamais le payload (§34) :
+//  · `item` — l'identifiant d'annonce donné par Vinted (identité certaine, §5.34) ;
+//  · `maj` + `etat` — quand le statut a changé, et vers QUOI. Le couple des deux
+//    donne la DATE D'ENCAISSEMENT : c'est le moment où Vinted a finalisé la
+//    vente, donc libéré l'argent. Mesuré sur la vraie base : la vente est
+//    finalisée 7 jours après l'achat en médiane, jusqu'à 25 — dater
+//    l'encaissement au jour de la vente serait donc faux d'une à trois semaines.
+//  ⚠️ `maj` ne vaut « encaissement » QUE si `etat` dit finalisé : sur un détail
+//    capté plus tôt, `maj` date de l'étape d'avant (« Le paiement a été validé »).
 const fetchTxnItemIds = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,item:data->payload->transaction->>item_id`, { headers: sbAuth() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,item:data->payload->transaction->>item_id,maj:data->payload->transaction->>status_updated_at,etat:data->payload->transaction->>status_title`, { headers: sbAuth() });
     if (!res.ok) return {};
     const map = {};
-    for (const r of await res.json()) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
+    for (const r of await res.json()) {
+      if (!r || !r.tx) continue;
+      const cur = map[String(r.tx)];
+      // Plusieurs captures d'une même transaction : on garde la plus récente.
+      if (cur && cur.maj && r.maj && Date.parse(r.maj) <= Date.parse(cur.maj)) continue;
+      map[String(r.tx)] = { item: r.item ? String(r.item) : '', maj: r.maj || '', etat: r.etat || '' };
+    }
     return map;
   } catch (_) { return {}; }
 };
@@ -3596,14 +3611,20 @@ const jourClef = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,
 const debutJour = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 const finJour = (d) => { const x = new Date(d); x.setHours(23,59,59,999); return x; };
 // Une commande est dans la période si sa date de vente/achat y tombe.
-const dansPeriode = (o, p) => {
+// ⚠️ DEUX DATES DIFFÉRENTES, ET IL NE FAUT PAS LES CONFONDRE.
+//  · la date de VENTE (`o.date`) = le jour où l'acheteur a payé ;
+//  · la date d'ENCAISSEMENT = le jour où Vinted a finalisé et libéré l'argent.
+// Mesuré sur la vraie base : 7 jours d'écart en médiane, jusqu'à 25. Employer
+// l'une pour l'autre fausse la compta d'une à trois semaines.
+// Julien : « en finalisé, c'est simplement la réception d'argent qui compte ».
+const dansPeriodeDate = (t, p) => {
   if (!p || (!p.from && !p.to)) return true;
-  const t = o && o.date ? Date.parse(o.date) : NaN;
   if (isNaN(t)) return false;                       // sans date, on ne devine pas
   if (p.from && t < debutJour(p.from).getTime()) return false;
   if (p.to && t > finJour(p.to).getTime()) return false;
   return true;
 };
+const dansPeriode = (o, p) => dansPeriodeDate(o && o.date ? Date.parse(o.date) : NaN, p);
 const libellePeriode = (p) => {
   if (!p || (!p.from && !p.to)) return 'Toute la période';
   if (p.label) return p.label;
@@ -9958,6 +9979,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
+  const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
   const [renumOpen, setRenumOpen] = useState(false); // modale « Renuméroter à la suite »
   const [dispOpen, setDispOpen] = useState(false);   // panneau « annonces disparues sans vente »
   const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
@@ -10974,7 +10996,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
   const identiteAnnonce = (o) => {
     if (!o) return null;
-    const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
+    const parVinted = o.transaction_id != null ? (txnItem[String(o.transaction_id)] || {}).item : null;
     if (parVinted) return String(parVinted);
     return entryKeyByPhoto(o) || null;
   };
@@ -10987,7 +11009,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // taille 34 » verrouillé sur le N°155, « …taille 38 » sur le N°27, deux paires
     // que Vinted rattache à une AUTRE annonce). Un verrou ne peut donc plus primer
     // sur ce que dit Vinted : quand les deux se contredisent, **Vinted gagne**.
-    const certain = o && o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
+    const certain = o && o.transaction_id != null ? (txnItem[String(o.transaction_id)] || {}).item : null;
     const linked = o && o.transaction_id != null ? txnLink[String(o.transaction_id)] : null;
     if (linked && numeros[linked] && !(certain && String(certain) !== String(linked))) {
       const e = numeros[linked];
@@ -11263,8 +11285,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
   // La période s'applique EN MÊME TEMPS que la recherche : les compteurs et les
   // totaux affichés correspondent donc toujours à ce qui est listé.
+  // LA date d'encaissement d'une vente, et il n'y en a qu'une (§11).
+  // Source unique : le détail de transaction capté par l'extension, et
+  // SEULEMENT quand ce détail dit lui-même « finalisé » — sinon son
+  // `status_updated_at` date de l'étape d'avant (« Le paiement a été validé »),
+  // ce qui donnerait un encaissement le jour de la vente, donc faux.
+  // Rien d'autre ne fait foi : ni la date de vente, ni une estimation.
+  const dateEncaissement = (o) => {
+    const t = o && o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
+    if (!t || !t.maj || !/finalis/i.test(t.etat || '')) return NaN;
+    const ms = Date.parse(t.maj);
+    return isNaN(ms) ? NaN : ms;
+  };
+  // Sur le filtre « Finalisées », la période porte sur l'ENCAISSEMENT — c'est
+  // la demande de Julien, et c'est la seule lecture juste pour la compta.
+  // Une vente dont on ne connaît pas encore la date d'encaissement n'est
+  // JAMAIS datée au jour de la vente : elle sort du total et se compte à part.
   const matchOrd = (o) => {
-    if (!dansPeriode(o, periode)) return false;
+    // ⚠️ `matchOrd` sert AUSSI aux Achats et aux Colis : sans ce garde-fou, un
+    // filtre laissé sur « Finalisées » daterait les achats à l'encaissement
+    // d'une vente. La règle ne vaut que sur l'écran Ventes.
+    if (curSub === 'ventes' && vFilter === 'finalisees' && periode && (periode.from || periode.to)) {
+      if (!dansPeriodeDate(dateEncaissement(o), periode)) return false;
+    } else if (!dansPeriode(o, periode)) return false;
     const q = ordSearch.trim().toLowerCase(); if (!q) return true;
     const e = effEntry(o); const num = String(e?.numero||'');
     const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
@@ -12023,7 +12066,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // verrou déjà en base, on corrige la ligne au lieu de la contourner —
       // sinon le mauvais lien resurgit partout où il est lu (bordereau, facture,
       // prix d'achat). Mesuré : 2 verrous faux sur les 35 vérifiables.
-      const certain = txnItem[tid] ? String(txnItem[tid]) : null;
+      const certain = (txnItem[tid] || {}).item ? String(txnItem[tid].item) : null;
       if (next[tid]) {
         if (certain && String(next[tid]) !== certain && !onlineAnnonceIds.has(certain)) { next[tid] = certain; changed = true; }
         continue;
@@ -12395,9 +12438,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
+  // ⚠️ « ANNULÉE » ET « REMBOURSÉE » NE SONT PAS LA MÊME CHOSE.
+  // Julien : « je crois que tu t'es trompée dans une vente, tu l'affiches
+  // annulée alors qu'elle a bien été expédiée ». Il a raison — mesuré sur la
+  // vraie base : sur 33 ventes classées annulées, **3 avaient bel et bien été
+  // expédiées** (bordereau reçu, ou Vinted dit « Commande livrée »). Ce ne sont
+  // pas des commandes annulées avant l'envoi : la paire est partie ET l'argent
+  // est revenu à l'acheteur. C'est pire qu'une annulation, et ça ne se dit pas
+  // avec le même mot.
+  // La preuve d'expédition est CERTAINE (jamais un rapprochement par titre) :
+  // un bordereau existe pour ce n° de transaction, ou le statut Vinted lui-même
+  // porte un mot d'acheminement.
+  const venteExpediee = (o) => {
+    const tx = String(o && o.transaction_id || ''); if (!tx) return false;
+    if (/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test(o.status || '')) return true;
+    if (labelsCaptes[tx]) return true;
+    return (emailBords || []).some(b => String(b.transaction || '') === tx);
+  };
   const venteStage = (o) => {
     const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
-    if (classifyOrderStatus(o.status) === 'cancelled') return { label: 'Annulée', color: C.danger, step: 0 };
+    if (classifyOrderStatus(o.status) === 'cancelled') return venteExpediee(o)
+      ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
+      : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
     if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
     if (/livr|remis|r[ée]ception/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
     if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
@@ -12537,8 +12599,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
     // quelques lignes : deux chiffres pour la même chose sur le même écran
     // (§11). C'est exactement ce qu'on veut pour une déclaration mensuelle.
-    const items = (sales.items || []).filter(o => dansPeriode(o, periode));
+    // ⚠️ SUR « FINALISÉES », LA PÉRIODE PORTE SUR L'ENCAISSEMENT (§ dateEncaissement).
+    // Le CA d'un mois, c'est l'argent reçu ce mois-là — pas les ventes conclues
+    // ce mois-là, qui seront payées jusqu'à trois semaines plus tard.
+    const surEncaissement = curSub === 'ventes' && vFilter === 'finalisees' && periode && (periode.from || periode.to);
+    const dedans = (o) => surEncaissement
+      ? (classifyOrderStatus(o.status) === 'completed' ? dansPeriodeDate(dateEncaissement(o), periode) : dansPeriode(o, periode))
+      : dansPeriode(o, periode);
+    const items = (sales.items || []).filter(dedans);
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
+    // Finalisées dont l'encaissement n'est pas encore daté : elles sortent du
+    // total plutôt que d'être posées au hasard sur la date de vente. On les
+    // compte pour le dire — un chiffre incomplet qui se présente comme complet
+    // est pire qu'un chiffre absent.
+    let sansDate = 0;
+    if (surEncaissement) for (const o of (sales.items || [])) {
+      if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
+      if (isNaN(dateEncaissement(o))) sansDate++;
+    }
     for (const o of items) {
       if (isHidden(o)) continue;
       const stt = classifyOrderStatus(o.status);
@@ -12553,9 +12631,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, surEncaissement, sansDate };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, vFilter, curSub, txnItem]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -13956,9 +14034,61 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               detail="Elles apparaîtront dans la liste (et dans la comptabilité) après ta prochaine navigation sur Vinted : c'est l'extension qui recapte les ventes."/>
           );
         })()}
+        {/* ── VENTES PAR JOUR ────────────────────────────────────────────────
+            Demande de Julien : « un endroit où on puisse voir les ventes par
+            jour, pareil un calendrier de tel jour à tel jour ; ici ce n'est pas
+            l'argent reçu, mais simplement les ventes qui ont été faites ce
+            jour-là ». Donc : DATE DE VENTE, toujours — même quand le filtre
+            « Finalisées » fait porter le reste de l'écran sur l'encaissement.
+            Les annulées sont exclues (elles ne sont pas des ventes). */}
+        {(()=>{
+          const jours = {};
+          for (const o of (sales.items || [])) {
+            if (isHidden(o)) continue;
+            if (classifyOrderStatus(o.status) === 'cancelled') continue;
+            if (!dansPeriode(o, periode)) continue;             // ← date de VENTE
+            const t = o.date ? Date.parse(o.date) : NaN; if (isNaN(t)) continue;
+            const d = new Date(t); const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const j = jours[k] || (jours[k] = { n:0, ca:0, ts:new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime() });
+            j.n += 1; j.ca += (o.price?.amount!=null ? Number(o.price.amount) : 0);
+          }
+          const liste = Object.entries(jours).sort((a,b)=>b[1].ts-a[1].ts);
+          if (!liste.length) return null;
+          const totN = liste.reduce((s,[,v])=>s+v.n,0), totCa = liste.reduce((s,[,v])=>s+v.ca,0);
+          const max = Math.max(...liste.map(([,v])=>v.ca)) || 1;
+          const fmtJ = (ts) => new Date(ts).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'});
+          return (
+            <details style={{marginBottom:10}} open={liste.length<=10}>
+              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
+                <span aria-hidden="true" style={{flexShrink:0,color:C.accent,display:'flex'}}><Icon name="calendar" size={18}/></span>
+                <span style={{flex:'1 1 150px',minWidth:0}}>
+                  <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Ventes par jour</span>
+                  <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>{liste.length} jour{liste.length>1?'s':''} · {totN} vente{totN>1?'s':''} · {fmtE0(totCa)} — sur {libellePeriode(periode).toLowerCase()}</span>
+                </span>
+              </summary>
+              <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
+                {liste.map(([k,v],i)=>(
+                  <div key={k} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderTop:i?`1px solid ${C.border}66`:'none'}}>
+                    <span style={{flexShrink:0,width:76,fontSize:12,fontWeight:600,color:C.text}}>{fmtJ(v.ts)}</span>
+                    {/* La barre rend la comparaison entre jours immédiate ; le
+                        chiffre reste à droite, c'est lui qui fait foi. */}
+                    <span aria-hidden="true" style={{flex:1,minWidth:20,height:6,borderRadius:999,background:`${C.accent}22`,overflow:'hidden'}}>
+                      <span style={{display:'block',height:'100%',width:`${Math.round(v.ca/max*100)}%`,background:C.accent}}/>
+                    </span>
+                    <span style={{flexShrink:0,fontSize:11.5,color:C.muted,width:58,textAlign:'right'}}>{v.n} vente{v.n>1?'s':''}</span>
+                    <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.text,width:66,textAlign:'right',whiteSpace:'nowrap'}}>{fmtE0(v.ca)}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          );
+        })()}
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
-            <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            {/* Sur « Finalisées » avec une période, ce chiffre est de l'ARGENT
+                REÇU sur ces dates — pas des ventes conclues sur ces dates. Le
+                libellé le dit, sinon les deux se confondent. */}
+            <StatBox label={totals.surEncaissement ? 'Argent reçu' : 'CA finalisé'} value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
                 affiche déjà ce montant, avec le détail par compte et l'avertissement
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
@@ -14198,6 +14328,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </span>
             }/>
         )}
+        {/* ⚠️ UN TOTAL INCOMPLET QUI SE PRÉSENTE COMME COMPLET EST PIRE QU'UN
+            TOTAL ABSENT. Une vente finalisée dont on ne connaît pas encore la
+            date d'encaissement n'est pas datée au jour de la vente (ce serait
+            faux d'une à trois semaines) : elle sort du total, et on le dit. */}
+        {totals.surEncaissement && totals.sansDate > 0 && (
+          <Notice tone="warn" icon="clock"
+            value={totals.sansDate}
+            title={`vente${totals.sansDate>1?'s':''} finalisée${totals.sansDate>1?'s':''} sans date d'encaissement connue`}
+            desc="Elles ne sont pas comptées dans le total ci-dessus. Repasse une fois sur Vinted avec le compte concerné : l'extension capte le détail de la transaction, et la date arrive toute seule."
+            detail="Vinted ne donne la date d'encaissement que dans le détail d'une transaction, pas dans la liste des commandes. L'extension le capte pendant que tu navigues — c'est pour ça qu'il suffit de repasser sur le compte."/>
+        )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
@@ -14282,7 +14423,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         ligne sans statut ni n° de transaction Vinted. */}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    {(()=>{ const vs=venteStage(o); return <span style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
+                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
@@ -15492,6 +15633,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{position:'absolute',left:0,top:'calc(100% + 6px)',zIndex:71,minWidth:230,background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
@@ -15917,7 +16059,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:6}}>
                           {num
-                            ? <span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{num}</span>
+                            ? <span style={{fontSize:15,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'3px 9px',flexShrink:0,letterSpacing:-0.2}}>N°{num}</span>
                             : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
                           <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{titre}</span>
                         </div>
@@ -15935,6 +16077,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* Le numéro de l'email vient d'un rapprochement par titre,
                             celui de la transaction est une identité : quand les deux
                             se contredisent on dit lequel on garde (§5.17). */}
+                        {/* ⚠️ LE CONFLIT DE NUMÉRO SE VOIT ICI, au moment où on
+                            ferme le carton — pas seulement sur l'écran Annonces.
+                            Julien : « si je me trompe entre deux colis, c'est deux
+                            ventes de perdues ». Un numéro porté par deux paires
+                            présentes est le seul défaut qui envoie la mauvaise
+                            chaussure ; il doit crier là où se fait le geste. */}
+                        {num && (()=>{
+                          const c = conflitsNum.find(x => String(x.numero) === String(num));
+                          if (!c) return null;
+                          const autres = c.porteurs.filter(x => normTitle(x.titre||'') !== normTitle(titre||''));
+                          return (
+                            <div style={{fontSize:11.5,fontWeight:600,marginTop:5,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'6px 9px',lineHeight:1.45}}>
+                              <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par une autre paire</span>
+                              <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
+                                {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
+                                {' '}— vérifie la photo ci-contre avant de fermer le carton, et corrige le numéro de l'autre paire dans Annonces.
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {b && (()=>{ const lit=numLitige(b); return lit ? (
                           <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
@@ -17097,6 +17259,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
+      {/* ── INVENTAIRE PHYSIQUE ───────────────────────────────────────────
+          Julien déménage, et veut pouvoir faire une confiance AVEUGLE aux
+          numéros. La question à laquelle il faut pouvoir répondre carton en
+          main est : « quelles paires doivent être chez moi, là, maintenant ? »
+          Réponse = `porteursNum`, LA définition unique de « ce numéro est
+          occupé par une paire réellement présente » (§5.33) — la même que celle
+          qui interdit de réattribuer un numéro. Une seule règle, deux usages
+          (§11) : on ne recalcule rien ici.
+          ⚠️ Tous les comptes, MÊME MASQUÉS : masquer un compte cache sa
+          comptabilité, ça ne sort pas le carton de l'étagère. */}
+      {inventOpen && (()=>{
+        const lignes = Object.entries(porteursNum)
+          .map(([num, p]) => ({ num, n: parseInt(num, 10), p }))
+          .sort((a, b) => (isNaN(a.n) ? 1e9 : a.n) - (isNaN(b.n) ? 1e9 : b.n));
+        const conflits = new Set(conflitsNum.map(c => String(c.numero)));
+        const photoDe = (por) => { const e = por.type === 'annonce' ? numeros[por.id] : null; return (e && e.photo) || null; };
+        const ou = (t) => t === 'annonce' ? 'en ligne' : t === 'vente' ? 'à envoyer' : 'au garage';
+        return (
+          <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:620,maxHeight:'88vh',overflowY:'auto',padding:'16px 14px calc(20px + env(safe-area-inset-bottom))'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                <span style={{flex:1,fontSize:17,fontWeight:700,color:C.text}}>Inventaire physique</span>
+                <button type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
+              </div>
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>
+                <b style={{color:C.text}}>{lignes.length} paire{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, la paire n'est pas là où l'app la croit.
+              </div>
+              {conflits.size>0 && (
+                <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
+                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'x':''} porté{conflits.size>1?'s':''} par deux paires</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux cartons portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                </div>
+              )}
+              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:14,overflow:'hidden'}}>
+                {lignes.map((l,i)=>{
+                  const dbl = conflits.has(l.num);
+                  const ph = l.p.map(photoDe).find(Boolean);
+                  return (
+                    <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.danger}0e`:'transparent'}}>
+                      <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:INV_STATUS.online.color,borderRadius:9,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
+                      <span style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
+                        {ph && <img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                      </span>
+                      <span style={{flex:1,minWidth:0}}>
+                        <span style={{display:'block',fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.p.map(x=>x.titre).filter(Boolean)[0] || '—'}</span>
+                        <span style={{display:'block',fontSize:11,color:dbl?C.danger:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux paires !':''}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={()=>{
+                const txt = lignes.map(l=>`N°${l.num}\t${(l.p.map(x=>x.titre).filter(Boolean)[0]||'').replace(/\t/g,' ')}\t${l.p.map(x=>ou(x.type)).join(' + ')}`).join('\n');
+                try { navigator.clipboard.writeText(`Inventaire physique — ${lignes.length} paires\n\n${txt}`); toast('Liste copiée'); } catch(_) { toast('Copie impossible'); }
+              }} style={{width:'100%',marginTop:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier la liste (pour l'imprimer)</button>
+            </div>
+          </div>
+        );
+      })()}
       {auditOpen && (()=>{
         const onlineNums = new Set(); annBase.forEach(it=>{ const nn=numeros[it.id]?.numero; if(nn) onlineNums.add(String(nn)); });
         const soldNums = new Set(); (sales.items||[]).forEach(o=>{ if(classifyOrderStatus(o.status)==='completed'){ const e=effEntry(o); if(e&&e.numero) soldNums.add(String(e.numero)); } });
