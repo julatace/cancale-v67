@@ -4602,3 +4602,63 @@ par deux annonces en ligne. Il est signalé en rouge sur l'écran Annonces, dans
 l'inventaire et sur la carte du colis — mais il existe. Tant qu'il n'est pas
 corrigé, la réponse honnête est « une seule erreur possible, et elle est
 nommée », pas « aucune ».
+
+---
+
+## 5.58 — RETIRER LE BRUIT, CORRIGER UN BANDEAU QUI MENTAIT, OUVRIR LA 3D
+
+### « Synchroniser » retiré (Ventes, Achats, Annonces)
+Julien : « tu peux enlever le bouton synchroniser, ça se synchronise avec
+l'extension de toute façon ». C'est vrai — et ce bouton allait chercher les
+données **en direct chez Vinted, tous comptes à la fois** : exactement
+l'empreinte multi-comptes qu'on passe notre temps à réduire (§5). Le retirer
+supprime le seul endroit d'où l'app pouvait déclencher ça.
+⚠️ `loadOrders(..., force)` et `loadListings(force)` existent toujours (le
+`force` sert au vidage de cache) — c'est seulement l'entrée manuelle qui part.
+
+### ⚠️ « 22 JOURS SANS CAPTURE » ÉTAIT FAUX — mesuré
+Le bandeau prenait le compte **le plus ancien parmi TOUS**, masqués compris.
+
+| compte | dernière capture |
+|---|---|
+| 6 comptes actifs | **0,0 à 0,1 j** (le jour même) |
+| 147827838 | 5,5 j |
+| **3175772080 (`liliand653`)** | **22,6 j — MASQUÉ par Julien** |
+| 3170790456 (sans jetons) | 48 j |
+
+Les « 22 jours » venaient donc d'un compte qu'il a **lui-même mis hors
+comptabilité**. Le bandeau ignore désormais `acctOff` et ne parle qu'au-delà
+d'**une semaine** (2 jours, c'était du bruit quotidien).
+
+### Signalements des Annonces : il n'en reste qu'un
+Le compteur générique additionnait des choses sans conséquence (compte muet,
+annonce disparue, compte bloqué) avec **la seule qui coûte de l'argent** : deux
+paires présentes sous le même numéro. Noyée au milieu, elle ne se voyait plus.
+Les autres sont retirées ; celle-ci reste, en rouge, dépliée d'office.
+
+### 3D : 14 objets de décor + une vraie palette
+« Je veux un vrai jeu vidéo, je veux pouvoir tout créer dedans. »
+chaise, bureau, canapé, lit, tapis, plante, lampadaire, miroir, cadre,
+poubelle, escabeau, radiateur, vélo, établi — assemblés avec **les mêmes
+primitives et les mêmes matières** que les meubles, chacun projetant son ombre.
+⚠️ Ils portent `deco: true` : ni case, ni numéro, ni inventaire. `isSurface()`
+les excluait déjà, donc on ne peut rien poser dessus par erreur.
+La palette passe en **deux familles nommées** (Rangement / Décor) : trente
+boutons à plat rendaient le rangement introuvable.
+
+### Refonte visuelle : les FONDATIONS, pas six cents endroits
+Ce qui faisait « tableau de bord de développeur » n'était pas le détail des
+écrans mais les valeurs de base : cartes plates de la même couleur que le fond,
+séparées par un trait d'1 px, un vert unique posé partout.
+- **Tokens** : fond légèrement teinté et carte **plus claire que lui** — c'est
+  ce décalage qui donne le relief, pas le contour ; trois niveaux d'élévation
+  (`shadow`/`shadowMd`/`shadowLg`), jamais de noir pur ; nouveaux `card2` et
+  `ring` ; mode sombre recalculé pour son fond.
+- **Primitives** (tout l'écran en hérite) : `Card` rayon 16 + ombre ;
+  `Notice` avec un voile très pâle de sa couleur (il se teinte sans crier) ;
+  `ScreenHead` titre 22 px serré, icône dans une pastille teintée ;
+  `StatBox` où **le chiffre passe devant** (26 px) et l'étiquette redevient une
+  légende.
+
+**Vérifié** : `npm run build` OK · smoke **11 écrans, 0 vide, 0 erreur** ·
+**9 audits au vert** · captures relues (Ventes, Réglages).
