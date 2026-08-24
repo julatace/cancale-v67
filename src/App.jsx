@@ -3770,7 +3770,7 @@ function PeriodePicker({ value, onChange }) {
     <div style={{ marginBottom:12 }}>
       <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
         <button type="button" onClick={()=>setOpen(o=>!o)} style={{ ...chip(null, actif), display:'inline-flex', alignItems:'center', gap:6 }}>
-          🗓️ {libellePeriode(value)}
+          <Icon name="calendar" size={14} style={{marginRight:5}}/>{libellePeriode(value)}
         </button>
         {presets.map(p=>(
           <button key={p.k} type="button" onClick={()=>{ onChange(p.f()); setOpen(false); }} style={chip(null, value && value.label===p.f().label)}>{p.lab}</button>
@@ -14140,11 +14140,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ); })()}
         </>)}
         {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
-          <Notice tone="warn" icon="alert"
-            value={totals.nb-totals.nbCout}
-            title={`vente${(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat`}
-            desc="Tant qu'il manque, le bénéfice affiché est le prix de vente entier."
-            detail="Le prix d'achat se saisit sur l'annonce (onglet Annonces), ou d'un coup avec « Tout compléter » — une liste, un champ par ligne, Entrée passe à la suivante."/>
+          {/* (L'avertissement « sans prix d'achat » est rendu UNE SEULE FOIS,
+              par le bloc juste en dessous qui porte aussi les deux actions.
+              Il y en avait deux, l'un au-dessus de l'autre — §11.) */}
         )}
         {sales.failed?.length>0 && (
           <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:10,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
@@ -14154,14 +14152,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Ventes sans prix d'achat : le bénéfice est faux tant qu'on ne le saisit
             pas (la vente compte comme 100 % de marge). Bouton → filtre dédié. */}
         {totals.sansCout>0 && (
-          <div style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:8,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.warn}}>💸 {totals.sansCout} vente{totals.sansCout>1?'s':''} finalisée{totals.sansCout>1?'s':''} sans prix d'achat</div>
-              <div style={{fontSize:11,color:C.text,marginTop:2,lineHeight:1.4}}>Ton bénéfice net et ton rapport comptable sont <b>sous-estimés</b> tant que tu ne renseignes pas leur coût. Saisis-le dans le champ « achat » de chaque vente.</div>
-            </div>
-            <button type="button" onClick={()=>setFillBuyOpen(true)} title="Une liste, un champ par ligne, Entrée passe à la suivante" style={{flexShrink:0,border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>💶 Tout compléter d'un coup</button>
-            <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir la liste</button>
-          </div>
+          <Notice tone="warn" icon="alert"
+            value={totals.sansCout}
+            title={`vente${totals.sansCout>1?'s':''} finalisée${totals.sansCout>1?'s':''} sans prix d'achat`}
+            desc="Ton bénéfice net et ton rapport comptable sont sous-estimés tant qu'il manque."
+            detail="Le prix d'achat se saisit sur l'annonce (onglet Annonces). « Tout compléter » ouvre une liste : un champ par ligne, Entrée passe à la suivante."
+            action={
+              /* ⚠️ Les deux boutons vivaient dans une rangée flex avec
+                 `flexShrink:0` : le bloc de texte s'écrasait et le titre
+                 s'écrivait un mot par ligne (vu en capture). Ils passent dans
+                 une colonne qui ne rétrécit pas, sous les 150 px de large. */
+              <span style={{display:'flex',flexDirection:'column',gap:6,flexShrink:0,alignSelf:'center'}}>
+                <button type="button" onClick={()=>setFillBuyOpen(true)} title="Une liste, un champ par ligne, Entrée passe à la suivante" style={{flexShrink:0,border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>💶 Tout compléter d'un coup</button>
+                <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir la liste</button>
+              </span>
+            }/>
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
@@ -14479,7 +14484,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
                             <div style={{fontSize:11,fontWeight:jours<=2?700:600,color:jours<=2?C.danger:C.warn,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {jours<0?'⚠️ délai de retrait dépassé':jours===0?'⏰ dernier jour pour le retirer':jours===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} · ${jours} j`}
+                              {jours<0?'délai de retrait dépassé':jours===0?'dernier jour pour le retirer':jours===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} · ${jours} j`}
                             </div>
                           )}
                         </div>
@@ -14806,7 +14811,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               const j = joursAvant(t.limite);
                               const urgent = j<=2;
                               return <div style={{fontSize:11,fontWeight:urgent?700:500,color:urgent?C.danger:C.warn,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                                {j<0?'⚠️ délai dépassé':j===0?"⏰ dernier jour pour le retirer":j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} (${j} j)`}
+                                {j<0?'délai dépassé':j===0?"dernier jour pour le retirer":j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} (${j} j)`}
                               </div>;
                             })()}
                           </div>
@@ -16775,7 +16780,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {qrView.lieu && <div style={{fontSize:12.5,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>📍 {qrView.lieu}</div>}
             {qrView.limite && (()=>{ const j=Math.ceil((new Date(qrView.limite+'T23:59:59')-Date.now())/86400000);
               return <div style={{fontSize:12,fontWeight:700,color:j<=2?'#c53030':'#9a5b16',textAlign:'center'}}>
-                {j<0?'⚠️ délai de retrait dépassé':j===0?'⏰ dernier jour pour le retirer':j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(qrView.limite).toLocaleDateString('fr-FR')} · ${j} j`}
+                {j<0?'délai de retrait dépassé':j===0?'dernier jour pour le retirer':j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(qrView.limite).toLocaleDateString('fr-FR')} · ${j} j`}
               </div>; })()}
             {qrView.suivi && (qrView.img || qrView.code) && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
             <div style={{fontSize:11,color:'#999',textAlign:'center',lineHeight:1.4}}>
