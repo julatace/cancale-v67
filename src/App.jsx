@@ -17274,7 +17274,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           .map(([num, p]) => ({ num, n: parseInt(num, 10), p }))
           .sort((a, b) => (isNaN(a.n) ? 1e9 : a.n) - (isNaN(b.n) ? 1e9 : b.n));
         const conflits = new Set(conflitsNum.map(c => String(c.numero)));
-        const photoDe = (por) => { const e = por.type === 'annonce' ? numeros[por.id] : null; return (e && e.photo) || null; };
+        // La photo est ce qui permet de VÉRIFIER un carton : on la cherche là
+        // où elle est vraiment — l'annonce en ligne, la vente, sinon la fiche
+        // numérotée. Rapprochement par IDENTIFIANT uniquement (§5.34).
+        const photoDe = (por) => {
+          if (por.type === 'annonce') {
+            const it = (listings.items || []).find(x => String(x.id) === String(por.id));
+            if (it && it.photo) return it.photo;
+            const e = numeros[por.id]; if (e && e.photo) return e.photo;
+          }
+          if (por.type === 'vente') {
+            const o = (sales.items || []).find(x => String(x.transaction_id || '') === String(por.id));
+            if (o) { const ph = orderPhoto(o); if (ph) return ph; const e = effEntry(o); if (e && e.photo) return e.photo; }
+          }
+          return null;
+        };
         const ou = (t) => t === 'annonce' ? 'en ligne' : t === 'vente' ? 'à envoyer' : 'au garage';
         return (
           <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
