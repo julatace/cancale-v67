@@ -15838,12 +15838,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             rien ne le rattrape. On le met en tête, en rouge, avec les porteurs. */}
         {conflitsNum.length > 0 && (
           <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
-            <div style={{fontSize:14,fontWeight:700,color:C.danger}}>🚨 {conflitsNum.length} numéro{conflitsNum.length>1?'x':''} porté{conflitsNum.length>1?'s':''} par deux paires</div>
+            <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
+              <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'x':''} porté{conflitsNum.length>1?'s':''} par deux paires
+            </div>
             <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux cartons portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
             {conflitsNum.slice(0,6).map(c=>(
               <div key={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
                 <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
-                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'📦 en ligne':p.type==='vente'?'📮 à expédier':'🏠 garage'} « {String(p.titre||'').slice(0,34)} »</span>
+                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'en ligne':p.type==='vente'?'à expédier':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
                 ))}
               </div>
             ))}
