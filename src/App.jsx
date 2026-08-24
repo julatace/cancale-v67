@@ -538,6 +538,19 @@ if (MULTI_USER && typeof window !== 'undefined') {
 }
 
 // Liste des cles synchronisees dans le cloud
+// ── L'IDENTITÉ DE L'ENTREPRISE N'EST PAS DANS LE CODE ─────────────────────
+// ⚠️ Le dépôt est PUBLIC, et il portait en dur la raison sociale, l'adresse
+// postale et le SIRET du vendeur comme VALEUR PAR DÉFAUT. Deux problèmes :
+//  • c'est une information personnelle publiée dans un dépôt ouvert ;
+//  • et pour un produit qu'on veut louer, un NOUVEAU vendeur ouvrait l'app en
+//    trouvant l'entreprise de quelqu'un d'autre déjà remplie sur ses factures.
+// Le défaut est donc VIDE : chacun renseigne la sienne dans
+// Réglages → Factures (elle est ensuite synchronisée comme le reste).
+const ENTREPRISE_VIDE = {
+  companyName: '', companyType: '', companyAddress: '', siret: '',
+  footer: 'Merci pour votre achat !',
+};
+
 const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
@@ -2809,7 +2822,7 @@ const generateAchatJustificatif = async (o, opts = {}) => {
     y -= o2.gap || 40;
   };
   page.drawText('Re\u00e7u d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
-  page.drawText(opts.shop || 'Shop Cancale35', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
+  page.drawText(opts.shop || 'Ma boutique', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
   page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 24;
   line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
   line('N° de transaction Vinted', o.transaction_id || '—');
@@ -3413,6 +3426,7 @@ const TABS=[
 // l'onglet actif. Un jeu d'icônes au trait donne à la barre du bas le calme
 // d'une app native (l'emoji reste ailleurs, là où il sert de repère rapide).
 const ICON_PATHS = {
+  more:  <><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></>,
   sun:   <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   chart: <><path d="M5 20V10M12 20V4M19 20v-6"/></>,
   tag:   <><path d="M3.5 11.2V4.5a1 1 0 0 1 1-1h6.7a1 1 0 0 1 .7.3l8.3 8.3a1 1 0 0 1 0 1.4l-6.7 6.7a1 1 0 0 1-1.4 0L3.8 11.9a1 1 0 0 1-.3-.7Z"/><circle cx="8" cy="8" r="1.4"/></>,
@@ -3472,17 +3486,29 @@ const Icon = ({ name, size = 24, style }) => {
       style={{verticalAlign:'middle',...(style||{})}}>{d}</svg>
   );
 };
+// ── LA BARRE DU BAS NE DÉFILE PLUS ───────────────────────────────────────────
+// ⚠️ Plainte de Julien : « je dois glisser de gauche à droite en bas pour voir
+// toutes les interfaces ». C'était exact : la barre portait NEUF onglets dans un
+// conteneur `overflow-x: auto`, donc sur un téléphone la moitié était hors
+// écran — Garage et Factures n'étaient atteignables qu'en faisant défiler une
+// barre dont rien n'indiquait qu'elle défilait.
+// Une barre d'onglets qui défile, c'est le signe qu'il y a trop d'onglets. On
+// garde donc les CINQ écrans du travail quotidien, et le reste passe derrière
+// « Plus » — c'est le motif standard des applications mobiles, et il fait
+// tenir la barre sur n'importe quel écran sans jamais rien couper.
 const BOTTOM_TABS=[
   {id:'journee',      icon:'sun',     emoji:'☀️',label:'Ma journée'},
-  {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Stats'},
   {id:'cat_annonces', icon:'tag',     emoji:'🟢',label:'Annonces'},
-  {id:'cat_repub',    icon:'spark',   emoji:'✨',label:'Republier'},
   {id:'cat_ventes',   icon:'cash',    emoji:'💸',label:'Ventes'},
   {id:'cat_achats',   icon:'bag',     emoji:'🛍️',label:'Achats'},
-  {id:'cat_bord',     icon:'doc',     emoji:'📄',label:'Bordereaux'},
-  {id:'cat_msg',      icon:'chat',    emoji:'💬',label:'Messages'},
-  {id:'garage',       icon:'home',    emoji:'🏠',label:'Garage'},
-  {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures'},
+  {id:'cat_bord',     icon:'doc',     emoji:'📄',label:'Colis'},
+];
+// Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
+const PLUS_TABS=[
+  {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
+  {id:'cat_msg',      icon:'chat',    emoji:'💬',label:'Messages',      desc:'Ce qui est arrivé de nouveau'},
+  {id:'garage',       icon:'home',    emoji:'🏠',label:'Garage',        desc:'Où est rangée chaque paire'},
+  {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures',      desc:'Documents pour tes comptes pro'},
 ];
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
@@ -3837,6 +3863,10 @@ function BottomBar({tab,setTab}) {
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
+  const [plus,setPlus]=React.useState(false);              // feuille « Plus »
+  const dansPlus = PLUS_TABS.some(t=>t.id===tab);
+  // Changer d'écran referme la feuille (sinon elle reste ouverte par-dessus).
+  React.useEffect(()=>{ setPlus(false); },[tab]);
   React.useEffect(()=>{
     const isField=el=>el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT');
     const onIn=e=>{ if(isField(e.target)) setKbOpen(true); };
@@ -3849,14 +3879,43 @@ function BottomBar({tab,setTab}) {
     // Barre en VERRE DÉPOLI (comme iOS) : le contenu défile derrière au lieu
     // d'être coupé net par un bandeau opaque. L'onglet actif porte une pastille
     // colorée — repère visuel net, plus lisible qu'un simple changement de teinte.
-    <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'auto',
+    <>
+    {plus && (
+      <div data-noswipe onClick={()=>setPlus(false)}
+        style={{position:'fixed',inset:0,zIndex:70,background:'rgba(15,23,42,.38)',
+          backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)'}}>
+        <div onClick={e=>e.stopPropagation()} role="menu" aria-label="Autres écrans"
+          style={{position:'absolute',left:0,right:0,bottom:0,background:C.surface,
+            borderTopLeftRadius:20,borderTopRightRadius:20,borderTop:`1px solid ${C.border}`,
+            boxShadow:'0 -12px 40px rgba(16,32,24,.18)',padding:'10px 10px calc(14px + env(safe-area-inset-bottom))',
+            animation:'cancaleSheet .22s cubic-bezier(.32,.72,0,1)'}}>
+          <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'2px auto 10px'}}/>
+          {PLUS_TABS.map(t=>{ const on=tab===t.id; return (
+            <button key={t.id} type="button" role="menuitem" onClick={()=>{ setTab(t.id); setPlus(false); }}
+              style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
+                padding:'12px 12px',borderRadius:12,border:'none',cursor:'pointer',fontFamily:'inherit',
+                background:on?`${C.accent}14`:'transparent',color:on?C.accent:C.text}}>
+              <span aria-hidden="true" style={{display:'flex',flexShrink:0,width:34,height:34,borderRadius:10,
+                alignItems:'center',justifyContent:'center',background:on?`${C.accent}1f`:C.bg,color:on?C.accent:C.muted}}>
+                <Icon name={t.icon} size={19}/>
+              </span>
+              <span style={{minWidth:0,flex:'1 1 auto'}}>
+                <span style={{display:'block',fontSize:15,fontWeight:on?600:500}}>{t.label}</span>
+                <span style={{display:'block',fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.desc}</span>
+              </span>
+            </button>
+          );})}
+        </div>
+      </div>
+    )}
+    <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'hidden',
       background:C.glass||C.surface,backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
       borderTop:`1px solid ${C.border}`,boxShadow:'0 -1px 0 rgba(0,0,0,.03), 0 -8px 24px rgba(16,32,24,.06)',
-      paddingBottom:'env(safe-area-inset-bottom)',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',
-      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)',pointerEvents:kbOpen?'none':'auto'}}>
+      paddingBottom:'env(safe-area-inset-bottom)',
+      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)'}}>
       {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
-          flex:'1 0 auto',minWidth:64,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'9px 6px 8px',
+          flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
           color:on?C.accent:C.muted,transition:'color .18s ease'}}>
           <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
@@ -3864,10 +3923,27 @@ function BottomBar({tab,setTab}) {
             transform:on?'translateY(-1px)':'none',opacity:on?1:0.62}}>
             <Icon name={t.icon} size={23} style={{strokeWidth:on?2:1.7}}/>
           </span>
-          <span style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1}}>{t.label}</span>
+          <span style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1,
+            overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
         </button>
       );})}
+      {/* « Plus » : même gabarit que les autres, et il s'allume quand l'écran
+          affiché vient de derrière (sinon on ne saurait plus où on est). */}
+      <button type="button" onClick={()=>setPlus(true)} aria-label="Plus d'écrans"
+        aria-expanded={plus} aria-current={dansPlus?'page':undefined} style={{
+        flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
+        background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
+        color:dansPlus?C.accent:C.muted,transition:'color .18s ease'}}>
+        <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
+          width:38,height:26,opacity:dansPlus?1:0.62}}>
+          <Icon name="more" size={23} style={{strokeWidth:dansPlus?2:1.7}}/>
+        </span>
+        <span style={{fontSize:9,fontWeight:dansPlus?600:500,whiteSpace:'nowrap',letterSpacing:0.1}}>
+          {dansPlus ? (PLUS_TABS.find(t=>t.id===tab)||{}).label : 'Plus'}
+        </span>
+      </button>
     </nav>
+    </>
   );
 }
 // Ancienne application : le catalogue et les ventes historiques restent
@@ -4069,7 +4145,15 @@ const BrandMark = ({ id }) => id === 'google' ? (
   </svg>
 );
 
+// Empreinte SHA-256 du code d'accès de secours. ⚠️ Le CODE lui-même n'est nulle
+// part dans le dépôt : une empreinte ne se remonte pas. Il a été remis au
+// propriétaire en main propre. Pour le changer : recalculer l'empreinte avec
+// `echo -n "<nouveau code>" | shasum -a 256` et remplacer la ligne ci-dessous.
+const CODE_ACCES_HASH = 'abe463733a572f979547b38c378eadd7f35c273d81acee0b7f35cca551e7e426';
+
 function AuthScreen() {
+  const [codeAcces, setCodeAcces] = React.useState('');
+  const [codeErr, setCodeErr] = React.useState('');
   const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw' : 'in'); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
   const [pw, setPw] = React.useState('');
@@ -4258,16 +4342,50 @@ function AuthScreen() {
             )}
           </div>
         </form>
-        {/* Tant que rien n'est cloisonné, on laisse une porte : personne ne doit
-            se retrouver enfermé dehors de son propre outil à cause d'un email de
-            confirmation qui n'arrive pas. Elle disparaît dès la migration. */}
+        {/* ⚠️⚠️ CETTE PORTE ÉTAIT GRANDE OUVERTE SUR INTERNET.
+            Elle existait pour une bonne raison (§12) : personne ne doit se
+            retrouver enfermé hors de son propre outil parce qu'un email de
+            confirmation n'arrive pas. Mais c'était un bouton « Entrer sans
+            compte », visible de TOUT LE MONDE, sur une adresse publique — et
+            comme la base n'est pas encore cloisonnée, un clic donnait accès à
+            l'intégralité de la boutique : ventes, achats, noms d'acheteurs,
+            codes de retrait, comptes Vinted reliés.
+            Elle demande maintenant un CODE. L'empreinte du code est dans le
+            code source, le code lui-même n'y est pas : une empreinte SHA-256
+            ne se remonte pas. Les appareils qui sont DÉJÀ entrés gardent leur
+            accès (le drapeau vit dans leur navigateur) — donc personne n'est
+            enfermé dehors, et un inconnu n'entre plus.
+            ⚠️ Ceci reste un pansement : le vrai correctif est la migration RLS
+            (SECURITE.md). Cette porte disparaît d'elle-même le jour où elle
+            passe. */}
         {!CLOISONNE && (
-          <button type="button"
-            onClick={()=>{ try{ localStorage.setItem('vrm_acces_direct','1'); }catch(_){} location.reload(); }}
-            style={{width:'100%',marginTop:12,border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,
-              borderRadius:12,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            Entrer sans compte (temporaire)
-          </button>
+          <details style={{marginTop:12}}>
+            <summary style={{listStyle:'none',cursor:'pointer',fontSize:12,color:C.muted,textAlign:'center'}}>
+              Entrer avec un code d'accès
+            </summary>
+            <form onSubmit={async (e)=>{
+              e.preventDefault();
+              const saisi = String(codeAcces||'').trim().toLowerCase();
+              if(!saisi) return;
+              try {
+                const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(saisi));
+                const hex = [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+                if (hex === CODE_ACCES_HASH) { localStorage.setItem('vrm_acces_direct','1'); location.reload(); }
+                else setCodeErr('Code incorrect.');
+              } catch(_) { setCodeErr("Ce navigateur ne sait pas vérifier le code."); }
+            }} style={{marginTop:8}}>
+              <input value={codeAcces} onChange={e=>{setCodeAcces(e.target.value);setCodeErr('');}}
+                placeholder="code d'accès" autoComplete="off" spellCheck={false}
+                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,background:C.bg,
+                  color:C.text,borderRadius:12,padding:'11px 12px',fontSize:13,fontFamily:'inherit'}}/>
+              {codeErr && <div style={{color:C.danger,fontSize:11.5,marginTop:6}}>{codeErr}</div>}
+              <button type="submit"
+                style={{width:'100%',marginTop:8,border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,
+                  borderRadius:12,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                Entrer
+              </button>
+            </form>
+          </details>
         )}
         {/* On dit la VÉRITÉ sur l'état de la base. Afficher « chacun ses
             données » alors que la migration n'est pas passée serait un mensonge
@@ -5444,7 +5562,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                       {(() => {
                         const inv=invoices&&invoices.find(i=>String(i.productId).trim()===String(v.productId||'').trim());
                         if(!inv) return <span style={{color:C.muted,fontSize:11}}>—</span>;
-                        return <button type="button" onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings||{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'}))}
+                        return <button type="button" onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings||{...ENTREPRISE_VIDE}))}
                           title={`Voir la facture ${inv.number}`}
                           style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'monospace'}}>
                           📄 {inv.number}
@@ -6012,9 +6130,9 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:500}}>Acheteur</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <Field label="Nom complet"><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder="Morel Anne-Sophie"/></Field>
-              <Field label="Email"><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder="annesomorel@yahoo.fr"/></Field>
-              <Field label="Adresse complète"><Input value={data.buyerAddress} onChange={e=>setData(d=>({...d,buyerAddress:e.target.value}))} placeholder="6 rue Gutenberg, Montreuil, 93100, FR, France"/></Field>
+              <Field label="Nom complet"><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder="Prénom Nom"/></Field>
+              <Field label="Email"><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder="prenom.nom@exemple.fr"/></Field>
+              <Field label="Adresse complète"><Input value={data.buyerAddress} onChange={e=>setData(d=>({...d,buyerAddress:e.target.value}))} placeholder="N° et rue, code postal, ville, pays"/></Field>
             </div>
           </div>
           
@@ -9743,13 +9861,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [offersDone, setOffersDone] = useState(() => new Set(load('vinted_offers_done', []) || []));
   const offerKey = (o) => `${o.receivedAt||''}|${normTitle(o.article||'')}`;
   const markOfferDone = (o) => setOffersDone(prev => { const n = new Set(prev); n.add(offerKey(o)); save('vinted_offers_done', [...n]); return n; });
-  const [drafts, setDrafts] = useState(() => load('vinted_annonce_drafts', {}));
-  const [repubEdit, setRepubEdit] = useState(null);   // { it } → modale d'édition d'une nouvelle version
-  const [repubForm, setRepubForm] = useState(null);   // { title, desc, price } en cours d'édition
+  // (brouillons de republication : état retiré avec l'atelier. La clé
+  //  `vinted_annonce_drafts` reste synchronisée — on ne supprime pas des
+  //  données du nuage au passage d'un écran.)
   const [repubAi, setRepubAi] = useState({ busy:false, why:'', reason:'' }); // état de la rédaction IA
   const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
-  const saveDrafts = (updater) => setDrafts(prev => { const next = typeof updater==='function' ? updater(prev) : updater; save('vinted_annonce_drafts', next); return next; });
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [renumOpen, setRenumOpen] = useState(false); // modale « Renuméroter à la suite »
   const [dispOpen, setDispOpen] = useState(false);   // panneau « annonces disparues sans vente »
@@ -11737,146 +11854,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros]);
 
-  // ── ATELIER DE REPUBLICATION ────────────────────────────────────────────────
-  // Prix « du marché » pour une paire : la médiane des annonces EN LIGNE de même
-  // marque + même taille (au moins 2 pour être crédible), sinon null. Sert à
-  // dire « ton prix est au-dessus/en-dessous des paires comparables ». C'est du
-  // RÉEL (tes propres annonces), pas une estimation inventée d'un marché externe.
-  const peerPrice = (it) => {
-    if (!it.brand) return null;
-    const bs = (it.brand || '').toLowerCase(), sz = (it.size || '');
-    const peers = annBase
-      .filter(o => o.id !== it.id && o.price != null && (o.brand || '').toLowerCase() === bs && (o.size || '') === sz)
-      .map(o => Number(o.price)).filter(v => v > 0).sort((a, b) => a - b);
-    if (peers.length < 2) return null;
-    return peers[Math.floor(peers.length / 2)];
-  };
+  // (`peerPrice` — la médiane des annonces comparables — vivait ici, pour
+  //  l'atelier de republication. Retiré avec lui.)
 
-  // Note d'annonce sur 100 — 100 % CALCULÉE, jamais inventée. On PART de 100 et
-  // on retire des points pour chaque défaut RÉELLEMENT constaté (champ présent) :
-  // titre pauvre, fiche incomplète, paire qui dort, engagement faible. Un champ
-  // absent (Vinted ne le donne pas) ne retire jamais de points → pas de faux
-  // procès. Renvoie aussi la liste des problèmes et des conseils concrets.
-  const scoreAnnonce = (it, override) => {
-    const title = String((override && override.title != null ? override.title : it.title) || '');
-    const price = (override && override.price != null && override.price !== '') ? Number(override.price) : (it.price != null ? Number(it.price) : null);
-    // Description : on ne connaît PAS le texte actuel de l'annonce (l'extension ne
-    // garde que sa longueur, descLen). Donc tant que Julien n'a pas TAPÉ une
-    // description dans le brouillon, on garde la longueur d'origine — sinon la
-    // « nouvelle version » démarrerait toujours pénalisée « pas de description »
-    // et paraîtrait pire que l'actuelle, ce qui est faux et décourageant.
-    const descLen = (override && override.desc != null && String(override.desc).trim().length > 0) ? String(override.desc).trim().length : it.descLen;
-    const words = title.trim().split(/\s+/).filter(Boolean);
-    const age = listedAgeDays(it);
-    const views = it.views, favs = it.favourites;
-    const problems = [], advice = [];
-    let score = 100;
-    // — Titre (jusqu'à −34) : c'est ce que l'acheteur lit en premier.
-    if (words.length < 3) { score -= 20; problems.push('titre très court'); advice.push('Titre = marque + modèle + taille + état'); }
-    else if (words.length < 5) { score -= 9; advice.push('Enrichis le titre (modèle, coloris, état)'); }
-    if (it.brand && !new RegExp('\\b' + (it.brand.split(/\s+/)[0] || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(title)) { score -= 6; advice.push(`Mets « ${it.brand} » dans le titre`); }
-    if (!/(\b3\d\b|\b4\d\b|\bt\.?\s?\d|taille|pointure)/i.test(title) && !it.size) { score -= 5; problems.push('taille absente du titre'); advice.push('Ajoute la taille dans le titre'); }
-    if (!/(neuf|comme neuf|très bon|tres bon|bon état|bon etat|excellent|tbe|bon)/i.test(title)) { score -= 3; advice.push("Précise l'état dans le titre"); }
-    // — Fiche (jusqu'à −29) : ce qui rassure et fait cliquer « acheter ».
-    if (it.photoCount != null && it.photoCount < 3) { score -= (it.photoCount <= 1 ? 15 : 8); problems.push(it.photoCount <= 1 ? '1 seule photo' : `${it.photoCount} photos`); advice.push('Ajoute des photos (semelle, étiquette, défauts)'); }
-    if (!it.brand) { score -= 5; problems.push('marque manquante'); }
-    if (!it.size) { score -= 5; problems.push('taille manquante'); }
-    if (descLen != null && descLen < 20) { score -= (descLen === 0 ? 11 : 6); problems.push(descLen === 0 ? 'pas de description' : 'description courte'); advice.push("Décris l'état, la matière, la pointure"); }
-    // — Âge / engagement (jusqu'à −37) : la seule preuve que l'annonce « marche ».
-    if (age != null) {
-      if (age >= 90) { score -= 22; problems.push(`en ligne depuis ${age} j`); advice.push('Republie : elle repart en tête de liste'); }
-      else if (age >= 60) { score -= 15; problems.push(`dort depuis ${age} j`); advice.push('Republie ou baisse le prix'); }
-      else if (age >= 30) { score -= 8; problems.push(`dort depuis ${age} j`); }
-    }
-    if (views != null) {
-      if (views >= 30 && (favs ?? 0) === 0) { score -= 11; problems.push(`${views} vues, 0 favori`); advice.push('Beaucoup vue mais 0 favori → baisse le prix ou refais la 1ʳᵉ photo'); }
-      else if (views >= 60 && favs != null && views > 0 && favs / views < 0.03) { score -= 6; problems.push(`${views} vues pour ${favs} ❤️`); }
-      else if (views < 5 && age != null && age >= 14) { score -= 6; problems.push('très peu vue'); advice.push('Republie pour lui redonner de la visibilité'); }
-    }
-    // Prix vs paires comparables (info, petit poids) :
-    const peer = peerPrice(it);
-    if (peer != null && price != null && price > peer * 1.25) { score -= 5; problems.push(`prix > paires similaires (~${peer} €)`); advice.push(`Aligne-toi vers ${peer} €`); }
-    score = Math.max(1, Math.min(100, Math.round(score)));
-    const cls = score >= 80 ? 'top' : score >= 55 ? 'mid' : 'low';
-    return { score, cls, problems, advice, peer, age };
-  };
-
-  // La liste de l'atelier : chaque annonce en ligne avec sa note, triée du plus
-  // gros POTENTIEL D'AMÉLIORATION au plus faible (les pires d'abord = le plus à
-  // gagner). C'est « voici les annonces qui ont le plus gros potentiel ».
-  const repubList = useMemo(() => {
-    const out = annBase.map(it => {
-      const sc = scoreAnnonce(it);
-      const d = drafts[it.id];
-      const draftScore = d ? scoreAnnonce(it, { title: d.title, desc: d.desc, price: d.price }).score : null;
-      return { it, ...sc, hasDraft: !!d, draftScore, gain: 100 - sc.score };
-    });
-    out.sort((a, b) => a.score - b.score || (b.it.price ?? 0) - (a.it.price ?? 0));
-    return out;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, drafts, listingDates]);
-
-  const repubStats = useMemo(() => {
-    const n = repubList.length;
-    const avg = n ? Math.round(repubList.reduce((s, r) => s + r.score, 0) / n) : 0;
-    const low = repubList.filter(r => r.cls === 'low').length;
-    const mid = repubList.filter(r => r.cls === 'mid').length;
-    const top = repubList.filter(r => r.cls === 'top').length;
-    return { n, avg, low, mid, top };
-  }, [repubList]);
-
-  // Ouvre l'éditeur de nouvelle version pour une annonce. Pré-remplit avec le
-  // brouillon existant s'il y en a un, sinon avec l'annonce actuelle.
-  const openRepub = (it) => {
-    const d = drafts[it.id];
-    // Prix propre : l'API renvoie « 73.0 » → on affiche « 73 » (Number enlève le .0).
-    const px = (v) => (v == null || v === '' || isNaN(Number(v))) ? '' : String(Number(v));
-    setRepubForm(d ? { title: d.title || '', desc: d.desc || '', price: d.price != null ? px(d.price) : px(it.price) }
-                   : { title: it.title || '', desc: '', price: px(it.price) });
-    setRepubAi({ busy: false, why: '', reason: '' });
-    setRepubEdit({ it });
-  };
-
-  // Demande à l'IA de réécrire titre + description. Sans clé branchée, l'app le
-  // dit et garde ce que tu as tapé (on ne fabrique rien). La clé perso éventuelle
-  // (Réglages) est envoyée depuis ton appareil, jamais stockée sur le serveur.
-  const aiRewrite = async () => {
-    if (!repubEdit) return;
-    const it = repubEdit.it;
-    setRepubAi({ busy: true, why: '', reason: '' });
-    try {
-      const key = load('vrm_ai_key', '') || undefined;
-      const r = await fetch('/api/ai', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: repubForm.title || it.title, brand: it.brand, size: it.size, condition: it.condition, price: repubForm.price || it.price, desc: repubForm.desc, key }),
-      });
-      const j = await r.json();
-      if (j && j.ok) {
-        setRepubForm(f => ({ ...f, title: j.title || f.title, desc: j.desc || f.desc }));
-        setRepubAi({ busy: false, why: j.why || 'Titre et description réécrits.', reason: '' });
-      } else {
-        setRepubAi({ busy: false, why: '', reason: (j && j.reason) || 'error' });
-      }
-    } catch {
-      setRepubAi({ busy: false, why: '', reason: 'network' });
-    }
-  };
-
-  // Enregistre la nouvelle version en brouillon + garde l'historique des versions.
-  const saveRepub = () => {
-    if (!repubEdit) return;
-    const it = repubEdit.it;
-    const before = scoreAnnonce(it).score;
-    const after = scoreAnnonce(it, { title: repubForm.title, desc: repubForm.desc, price: repubForm.price }).score;
-    saveDrafts(prev => {
-      const old = prev[it.id];
-      const versions = (old && old.versions) ? old.versions.slice(-9) : [];
-      versions.push({ title: repubForm.title, desc: repubForm.desc, price: repubForm.price, at: Date.now(), scoreBefore: before, scoreAfter: after });
-      return { ...prev, [it.id]: { title: repubForm.title, desc: repubForm.desc, price: repubForm.price, versions, updatedAt: Date.now() } };
-    });
-    setRepubEdit(null); setRepubForm(null);
-    toast('Nouvelle version enregistrée. Applique-la sur Vinted quand tu veux.');
-  };
+  // (L'atelier de republication vivait ici : note d'annonce sur 100, file de
+  //  travail par priorité, rédaction IA et historique des versions. Retiré avec
+  //  son onglet — voir le commentaire au niveau du rendu. Le panneau de
+  //  l'extension fait ce travail, là où le geste est possible.)
 
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
   const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; _persistAcctCache(); };
@@ -12165,8 +12149,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if ((curSub==='annonces'||curSub==='republication'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
@@ -12273,7 +12257,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
       if (curSub === 'ventes' || curSub === 'journee') loadOrders('sold', setSales);
       if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys); fetchEmailTracking().then(setTracking); }
-      if (curSub === 'annonces' || curSub === 'republication' || curSub === 'journee') loadListings();
+      if (curSub === 'annonces' || curSub === 'journee') loadListings();
       if (curSub === 'messages' || curSub === 'journee') loadConvs();
     };
     document.addEventListener('visibilitychange', onVis);
@@ -13231,7 +13215,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try { ents = load('vinted_entreprises', []) || []; } catch(_) {}
     try { active = load('vinted_entreprise_active', null); } catch(_) {}
     try { settings = load('vinted_invoice_settings', null); } catch(_) {}
-    return entForInvoice(inv, ents, active, settings || { companyName:'Shop Cancale35', companyType:'Entrepreneur individuel', companyAddress:'80 rue de la vieille rivière 35260', siret:'94135104100012', footer:'Merci pour votre achat !' });
+    return entForInvoice(inv, ents, active, settings || { ...ENTREPRISE_VIDE });
   };
   // Imprime le bordereau (tamponné) ET, pour un compte pro, la facture — dans UN
   // seul PDF (bordereau puis facture), et lance directement l'impression.
@@ -15512,526 +15496,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       </>)}
 
-      {/* ── ATELIER DE REPUBLICATION ─────────────────────────────────────────
-          « Voici les annonces qui ont le plus gros potentiel d'amélioration. »
-          Note calculée par annonce, file de travail par priorité, éditeur de
-          nouvelle version (avec rédaction IA optionnelle) et comparaison de
-          score avant/après. Tout le calcul est RÉEL ; la rédaction IA ne
-          s'allume qu'avec une clé branchée. */}
-      {curSub==='republication' && (<>
-        <ScreenHead icon="spark" title="Atelier de republication" desc="Retravaille tes annonces qui vendent mal : l'app note chacune, te dit quoi améliorer, et prépare une nouvelle version. Tu valides et tu l'appliques sur Vinted."/>
-        <NoAcc/>
-        {listings.loading && <Skeleton variant="card" count={6}/>}
-        {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
-        {listings.items && !listings.error && repubList.length===0 && (
-          <EmptyState icon="✨" title="Aucune annonce à retravailler" desc="Tes annonces en ligne apparaîtront ici avec leur note et des conseils d'amélioration."/>
-        )}
-        {listings.items && !listings.error && repubList.length>0 && (()=>{
-          const CL = { low:{c:C.danger,lbl:'À retravailler'}, mid:{c:C.warn,lbl:'Potentiel élevé'}, top:{c:INV_STATUS.online.color,lbl:'Très performante'} };
-          const shown = repubBucket==='all' ? repubList : repubList.filter(r=>r.cls===repubBucket);
-          return (<>
-            {/* Bandeau de synthèse */}
-            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
-              <div style={{flex:'1 1 120px',minWidth:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'10px 12px',boxShadow:C.shadow||'none'}}>
-                <div style={{fontSize:11,color:C.muted,fontWeight:500}}>Note moyenne</div>
-                <div style={{fontSize:22,fontWeight:700,color:repubStats.avg>=80?INV_STATUS.online.color:repubStats.avg>=55?C.warn:C.danger,whiteSpace:'nowrap'}}>{repubStats.avg}<span style={{fontSize:13,color:C.muted}}>/100</span></div>
-              </div>
-              <div style={{flex:'1 1 120px',minWidth:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'10px 12px',boxShadow:C.shadow||'none'}}>
-                <div style={{fontSize:11,color:C.muted,fontWeight:500}}>À retravailler</div>
-                <div style={{fontSize:22,fontWeight:700,color:repubStats.low?C.danger:C.muted,whiteSpace:'nowrap'}}>{repubStats.low}<span style={{fontSize:13,color:C.muted}}> / {repubStats.n}</span></div>
-              </div>
-            </div>
-            {/* File de travail par priorité */}
-            <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-              {[['all','Toutes',repubStats.n],['low','🔴 Haute',repubStats.low],['mid','🟠 Moyenne',repubStats.mid],['top','🟢 OK',repubStats.top]].map(([k,lbl,n])=>(
-                <button key={k} onClick={()=>setRepubBucket(k)} style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${repubBucket===k?C.accent:C.border}`,background:repubBucket===k?C.accent:'transparent',color:repubBucket===k?'#fff':C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{lbl} · {n}</button>
-              ))}
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {shown.map(r=>{
-                const it=r.it; const meta=CL[r.cls];
-                const num=(numeros[it.id]||{}).numero||'';
-                return (
-                  <div key={it._acc.vinted_user_id+'_'+it.id} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'11px 12px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-                    <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none'}}>
-                      <div style={{width:60,height:76,borderRadius:12,overflow:'hidden',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {it.photo?<img src={it.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:24}}>👟</span>}
-                      </div>
-                    </a>
-                    <div style={{flex:'1 1 150px',minWidth:0}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <span title="Note calculée à partir du titre, de la fiche, de l'âge et de l'engagement" style={{flexShrink:0,fontSize:13,fontWeight:700,color:'#fff',background:meta.c,borderRadius:999,padding:'2px 9px',whiteSpace:'nowrap'}}>{r.score}/100</span>
-                        <span style={{fontSize:11,fontWeight:600,color:meta.c}}>{meta.lbl}</span>
-                        {r.hasDraft && <span title="Une nouvelle version est prête" style={{fontSize:10.5,fontWeight:600,color:INV_STATUS.online.color,background:INV_STATUS.online.color+'18',borderRadius:8,padding:'1px 7px'}}>✍️ v2 prête{r.draftScore!=null?` · ${r.draftScore}/100`:''}</span>}
-                      </div>
-                      <div style={{fontSize:13,fontWeight:600,color:C.text,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'(sans titre)'}</div>
-                      <div style={{fontSize:11.5,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[prix(it.price,it.currency)||null,it.brand,it.size].filter(Boolean).join(' · ')}</div>
-                      {r.problems.length>0 && (
-                        <div style={{marginTop:6,display:'flex',flexWrap:'wrap',gap:5}}>
-                          {r.problems.slice(0,4).map((p,i)=>(<span key={i} style={{fontSize:10.5,fontWeight:500,color:C.danger,background:C.danger+'12',borderRadius:8,padding:'1px 7px'}}>{p}</span>))}
-                        </div>
-                      )}
-                      {r.problems.length===0 && <div style={{marginTop:6,fontSize:11,color:INV_STATUS.online.color,fontWeight:500}}>✓ Rien à signaler — annonce solide</div>}
-                      <div style={{marginTop:8}}>
-                        <button type="button" onClick={()=>openRepub(it)} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,padding:'7px 13px',cursor:'pointer',fontFamily:'inherit'}}>✍️ {r.hasDraft?'Revoir la version':'Nouvelle version'}</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>);
-        })()}
-      </>)}
-
-      {/* ── Messages (séparés par compte via le sélecteur) ── */}
-      {curSub==='messages' && (<>
-        <ScreenHead icon="chat" title="Messages" desc="On te dit juste s'il y a du nouveau. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
-        <NoAcc/>
-        {/* Réponses rapides : modèles copiables en 1 clic (répondre se fait sur Vinted). */}
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-            <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>⚡ Réponses rapides</span>
-            <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':'✎ Modifier'}</button>
-          </div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {quickReplies.map((t,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:999,background:C.bg,padding:'4px 4px 4px 10px'}}>
-                <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent='✓ Copié !'; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:230,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t}</button>
-                {showQR ? (
-                  <>
-                    <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
-                    <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
-                  </>
-                ) : <span style={{color:C.muted,fontSize:11,paddingRight:4}}>📋</span>}
-              </div>
-            ))}
-            {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:999,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
-          </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:6}}>Clique un message pour le <b>copier</b>, puis colle-le dans la conversation Vinted.</div>
-        </div>
-        {/* ── RÉSUMÉ, PAS LA LISTE ──────────────────────────────────────────
-            Julien : « enlève les messages, mets juste qu'il y en a de nouveaux ».
-            On ne déroule plus toutes les conversations : une seule carte dit
-            combien de messages non lus, et un bouton emmène répondre sur Vinted
-            (répondre depuis l'app n'est pas possible, cf. section 5). */}
-        {convs.loading && <Skeleton variant="row" count={2}/>}
-        {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
-        {convs.items && !convs.error && (()=>{
-          const nonLus = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
-          const total  = (convs.items||[]).filter(c=>!acctOffOf(c)).length;
-          const inboxUrl = 'https://www.vinted.fr/inbox';
-          return (
-            <div style={{border:`1px solid ${nonLus?C.accent:C.border}`,background:nonLus?`${C.accent}0e`:C.card,borderRadius:16,padding:'16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-              <span style={{fontSize:26,flexShrink:0}}>{nonLus?'✉️':'📭'}</span>
-              <div style={{flex:'1 1 165px',minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:nonLus?C.accent:C.text,lineHeight:1.2}}>
-                  {nonLus>0 ? `${nonLus} nouveau${nonLus>1?'x':''} message${nonLus>1?'s':''}` : 'Aucun nouveau message'}
-                </div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                  {total>0 ? `${total} conversation${total>1?'s':''} en tout` : 'Tes échanges apparaîtront ici'}
-                </div>
-              </div>
-              <a href={inboxUrl} target="_blank" rel="noreferrer"
-                style={{flex:'1 1 130px',textAlign:'center',textDecoration:'none',border:'none',borderRadius:12,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
-                {nonLus>0?'Répondre sur Vinted':'Ouvrir Vinted'}
-              </a>
-            </div>
-          );
-        })()}
-      </>)}
-
-      {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
-      {curSub==='bordereaux' && (<>
-        <ScreenHead icon="doc" title="Colis à envoyer" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
-        <NoAcc/>
-        {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
-            Vinted attend de toi (moisson de l'extension), pas les emails reçus :
-            un email peut manquer, une vente à expédier ne ment pas. */}
-        {(()=>{
-          if (sales.loading && emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
-          const ex = expeditions();
-          const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
-          const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
-          const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
-          return (
-            <div style={{border:`1px solid ${aPoster.length?C.accent:C.border}`,background:aPoster.length?`${C.accent}0e`:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                <div style={{flex:1,minWidth:150}}>
-                  <div style={{fontSize:15,fontWeight:700,color:C.text}}>
-                    {aPoster.length>0 ? `📦 ${aPoster.length} colis à envoyer` : '✅ Aucun colis à envoyer'}
-                  </div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {aPoster.length>0
-                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · 🧾 ${proNb} avec facture (pro)`:''}`
-                      : 'Vinted ne te demande aucun envoi en ce moment.'}
-                  </div>
-                </div>
-                {avecPdf.length>0 && (
-                  <button type="button" onClick={batchBordereaux} disabled={batchBusy}
-                    title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
-                    style={{flexShrink:0,border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
-                    {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-        {/* ── OÙ DÉPOSER TES COLIS ────────────────────────────────────────────
-            Les points relais autour de chez toi, avec adresse, distance et
-            horaires. Donnée captée par l'extension quand Vinted la charge :
-            ZÉRO appel Vinted depuis l'app.
-            ⚠️ C'est le DÉPÔT (où tu portes le carton), pas le retrait d'un
-            achat — deux choses différentes, cf. fetchDropOffPoints. */}
-        {(()=>{
-          if (!dropOffs || !dropOffs.carriers.length) return null;
-          const jours = dropOffs.capturedAt ? Math.round((Date.now()-dropOffs.capturedAt)/86400000) : null;
-          const total = dropOffs.carriers.reduce((n,c)=>n+c.points.length,0);
-          return (
-            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
-              <button type="button" onClick={()=>setDropOpen(o=>!o)} aria-expanded={dropOpen}
-                style={{width:'100%',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:18,flexShrink:0}}>📍</span>
-                <span style={{flex:'1 1 150px',minWidth:0}}>
-                  <span style={{display:'block',fontSize:15,fontWeight:700,color:C.text}}>Où déposer tes colis</span>
-                  <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    {total} point{total>1?'s':''} près de chez toi · {dropOffs.carriers.map(c=>c.carrier).join(' · ')}
-                  </span>
-                </span>
-                <span style={{flexShrink:0,fontSize:12,color:C.muted}}>{dropOpen?'▲':'▼'}</span>
-              </button>
-              {dropOpen && (
-                <div style={{marginTop:10}}>
-                  {dropOffs.carriers.map(c=>(
-                    <div key={c.carrier} style={{marginBottom:10}}>
-                      <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:6}}>{c.carrier}</div>
-                      {c.points.slice(0,6).map(p=>(
-                        <div key={p.code} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-                          <div style={{flex:'1 1 150px',minWidth:0}}>
-                            <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</div>
-                            {p.adresse && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.adresse}</div>}
-                            {p.ouverture && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🕒 {p.ouverture}</div>}
-                          </div>
-                          {p.km!=null && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text}}>{p.km} {p.unite}</span>}
-                          {p.lat && p.lon && (
-                            <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`} target="_blank" rel="noreferrer"
-                               style={{flexShrink:0,fontSize:12,color:C.accent,textDecoration:'none'}}>Itinéraire ↗</a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                  {/* On DIT l'âge : un point relais ferme, la liste n'est pas éternelle. */}
-                  <div style={{fontSize:11,color:C.muted}}>
-                    Liste captée par l'extension{jours!=null?(jours<1?" aujourd'hui":` il y a ${jours} j`):''} — elle se rafraîchit quand tu prépares un envoi sur Vinted.
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-        {/* Bordereau capté par l'extension (téléchargé sur Vinted) → tamponnage 1 clic. */}
-        {freshLabel && (()=>{
-          // Bordereau frais capté → on cherche la vente À EXPÉDIER de CE compte.
-          // S'il n'y en a qu'UNE, on la pré-associe : bouton « Tamponner N°X » en
-          // 1 tap (auto number + titre + fichier capté). Sinon on invite à cliquer
-          // 📄 sur la bonne vente.
-          const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && isAwaitingShipStatus(o.status) && !isShipDone(o));
-          const one = pending.length===1 ? pending[0] : null;
-          const e = one ? effEntry(one) : null; const num = e?.numero || '';
-          return (
-            <div style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}12`,borderRadius:12,padding:'10px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <span style={{fontSize:20}}>🆕</span>
-              <div style={{flex:1,minWidth:160}}>
-                <div style={{fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>Bordereau téléchargé il y a {freshLabel.mins} min ({freshLabel.name})</div>
-                {one
-                  ? <div style={{fontSize:11,color:C.text,marginTop:1}}>Prêt à tamponner pour <b>{num?`N°${num} · `:''}{one.title}</b> — un tap et c'est fait.</div>
-                  : <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>}
-              </div>
-              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc)} style={{flexShrink:0,border:'none',background:INV_STATUS.online.color,color:'#fff',borderRadius:10,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
-            </div>
-          );
-        })()}
-        {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
-        {(()=>{
-          let overdue=0, today=0, tomorrow=0;
-          // Même source que la liste : les colis que Vinted attend, avec leur délai.
-          for (const e of expeditions()) { if (e.o && isShipDone(e.o)) continue; if (e.dl==null) continue; if(e.dl<0) overdue++; else if(e.dl===0) today++; else if(e.dl===1) tomorrow++; }
-          const total=overdue+today+tomorrow; if(!total) return null;
-          const danger = overdue>0 || today>0;
-          const parts=[]; if(overdue) parts.push(`${overdue} en retard`); if(today) parts.push(`${today} aujourd'hui`); if(tomorrow) parts.push(`${tomorrow} demain`);
-          return (
-            <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
-              {/* ⚠️ CE BANDEAU NE COMPTE QUE L'URGENT (en retard / aujourd'hui /
-                  demain), pas tous les colis. Il disait « N colis à expédier »,
-                  exactement les mêmes mots que le compteur du haut qui, lui,
-                  compte TOUT : on lisait « 4 bordereaux à imprimer » puis
-                  « 1 colis à expédier » sur le même écran. On nomme ce qu'on
-                  compte au lieu de laisser croire à une contradiction. */}
-              <div style={{fontSize:13,fontWeight:700,color:danger?C.danger:C.warn}}>📮 {total} à poster en priorité {overdue?'· du retard !':''}</div>
-              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — les plus urgents sont en haut de la liste.</div>
-            </div>
-          );
-        })()}
-        {/* ⚠️ DEUX PAIRES, UN SEUL NUMÉRO = la mauvaise chaussure part. C'est le
-            risque le plus coûteux de l'app : une fois le mauvais carton envoyé,
-            rien ne le rattrape. On le met en tête, en rouge, avec les porteurs. */}
-        {conflitsNum.length > 0 && (
-          <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
-            <div style={{fontSize:14,fontWeight:700,color:C.danger}}>🚨 {conflitsNum.length} numéro{conflitsNum.length>1?'x':''} porté{conflitsNum.length>1?'s':''} par deux paires</div>
-            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux cartons portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
-            {conflitsNum.slice(0,6).map(c=>(
-              <div key={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
-                <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
-                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'📦 en ligne':p.type==='vente'?'📮 à expédier':'🏠 garage'} « {String(p.titre||'').slice(0,34)} »</span>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-        {/* SIGNALEMENT (pas un colis) : un bordereau reçu qu'on ne rattache à
-            aucune vente. Il ne peut pas y avoir de bordereau sans vente — donc
-            si ça arrive, c'est la MOISSON qui manque, pas un carton à préparer.
-            On le dit ici au lieu de fabriquer une fausse ligne de travail. */}
-        {(()=>{
-          const sv = bordSansVente();
-          if (!sv.length) return null;
-          const comptes = [...new Set(sv.map(b=>b.account).filter(Boolean))];
-          return (
-            <div style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.warn}}>⚠️ {sv.length} bordereau{sv.length>1?'x':''} reçu{sv.length>1?'s':''} sans vente correspondante</div>
-              <div style={{fontSize:11,color:C.text,marginTop:3,lineHeight:1.45}}>
-                Un bordereau existe toujours pour une vente : si celle-ci n'apparaît pas, c'est que la capture est en retard{comptes.length?` sur ${comptes.join(', ')}`:''} — repasse une fois sur Vinted avec ce compte. Ce n'est pas un colis à préparer, donc il n'est pas dans la liste.
-              </div>
-            </div>
-          );
-        })()}
-        {/* ── LA LISTE : UN COLIS = UNE VENTE QUI ATTEND MON ENVOI ───────────
-            Une seule liste, construite sur la moisson de l'extension. Le
-            bordereau (PDF reçu par email) n'est qu'un COMPLÉMENT de la ligne :
-            avec lui on imprime en un clic, sans lui on le génère sur Vinted.
-            Avant il y avait deux listes — les emails en haut, les vraies ventes
-            en bas — et la paire à envoyer se retrouvait sous un bordereau
-            fantôme d'un compte supprimé. */}
-        {sales.loading && <Skeleton variant="row" count={4}/>}
-        {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
-        {!sales.loading && !sales.error && (()=>{
-          const ex = expeditions().filter(e => !e.o || matchOrd(e.o));
-          if (!ex.length) return (
-            <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
-              ✅ Aucun colis à envoyer.<br/>
-              <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
-            </div>
-          );
-          const sec = { flexShrink:0, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
-          return (
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {ex.map(e=>{
-                const o=e.o, b=e.b;
-                // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
-                // l'a (le n° de transaction est une identité certaine), jamais
-                // d'un rapprochement par titre (§24).
-                const ph = o ? orderPhoto(o) : bordPhoto(b);
-                const titre = o ? o.title : (b.modele||b.article||'Bordereau');
-                const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero||'') : '');
-                const posted = o ? isShipDone(o) : isBordShippedManual(b);
-                const cell = num ? garageCellOf(garageGrid, num) : null;
-                const dl = e.dl;
-                const urgCol = dl==null ? C.muted : dl<0 ? C.danger : dl<=1 ? C.warn : C.muted;
-                const urgTxt = dl==null ? null : dl<0 ? `⚠️ ${-dl}j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl}j pour poster`;
-                const inv = b ? invForBord(b) : null;
-                // Deux sources de PDF, l'une comme l'autre certaines (le lien se
-                // fait par le n° de transaction) : l'email reçu, ou le bordereau
-                // capté par l'extension juste après l'avoir généré.
-                const capte = e.txn ? labelsCaptes[e.txn] : null;
-                const pdf = !!(b && b.hasPdf) || !!capte;
-                const acc = o ? o._acc : null;
-                return (
-                  <div key={e.key} data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:16,opacity:posted?0.55:1}}>
-                    <div style={{display:'flex',gap:12,alignItems:'center'}}>
-                      <div style={{width:58,height:58,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
-                      </div>
-                      <div style={{flex:'1 1 150px',minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6}}>
-                          {num
-                            ? <span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{num}</span>
-                            : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
-                          <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{titre}</span>
-                        </div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
-                          {o && o.date && <span style={{flexShrink:0}}>vendu le {new Date(o.date).toLocaleDateString('fr-FR')}</span>}
-                          {o && o.price && <span style={{flexShrink:0,fontWeight:600,color:C.text}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
-                          {urgTxt && <span style={{flexShrink:0,color:urgCol,fontWeight:600}}>{urgTxt}</span>}
-                          {cell
-                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>
-                            : (num ? <span style={{flexShrink:0}}>🏠 pas rangée</span> : null)}
-                          {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span>}
-                          {posted && <span style={{flexShrink:0,color:INV_STATUS.online.color,fontWeight:600}}>✓ posté</span>}
-                        </div>
-                        {/* Le numéro de l'email vient d'un rapprochement par titre,
-                            celui de la transaction est une identité : quand les deux
-                            se contredisent on dit lequel on garde (§5.17). */}
-                        {b && (()=>{ const lit=numLitige(b); return lit ? (
-                          <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                            <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
-                            <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>choisir</button>
-                          </div>
-                        ) : null; })()}
-                      </div>
-                      <button type="button" onClick={async ()=>{
-                        if (b) { if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }
-                        else if (o && o.transaction_id!=null && await askConfirm('Masquer ce colis ? (il disparaît de la liste)')) toggleHidden(o.transaction_id);
-                      }} title="Masquer" aria-label="Masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,fontSize:17,cursor:'pointer',padding:'0 2px',lineHeight:1,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
-                    </div>
-                    {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
-                        le générer sur Vinted. Le glisser-fichier reste dispo pour
-                        celui qui n'a pas branché sa boîte mail. */}
-                    <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
-                      {pdf ? (
-                        <button type="button" onClick={async ()=>{
-                          if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
-                          // Le PDF vient de l'email s'il y en a un, sinon de la
-                          // capture faite par l'extension au moment de générer.
-                          // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER.
-                          // C'est l'étiquette prise chez Vinted, rattachée à la
-                          // vente par son n° de transaction. L'email n'est qu'une
-                          // VÉRIFICATION (il arrive plus tard, et son numéro vient
-                          // d'un rapprochement par titre, §5.17) — donc un secours,
-                          // pas la source.
-                          let bytes = null;
-                          if (capte) { const l=await fetchLabelPdf(capte.row); bytes = l&&l.pdfB64?b64ToBytes(l.pdfB64):null; }
-                          if (!bytes && b && b.hasPdf) { const p=await fetchBordPdf(b._row); bytes = p&&p.pdfB64?b64ToBytes(p.pdfB64):null; }
-                          if (!bytes) { toast('PDF illisible.'); return; }
-                          processBordereau(num, titre, bytes);
-                        }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
-                        style={{flex:'1 1 160px',border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
-                      ) : (<>
-                        {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
-                            qui génère le bordereau manquant dès que tu arrives sur
-                            Vinted (aucun argent engagé, aucun choix — c'est une
-                            formalité obligatoire). L'app se contente de dire où on
-                            en est, au lieu de te renvoyer faire le travail. */}
-                        <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
-                          {aGenererBordereau(o && o.status)
-                            ? <>⏳ <b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
-                            : <>✅ <b>Bordereau déjà généré</b> chez Vinted — le PDF arrive par email.</>}
-                        </div>
-                        <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
-                          style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
-                      </>)}
-                      {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}
-                      {/* Sans bordereau, il n'y avait AUCUN moyen de poser le numéro
-                          sur cette vente — or c'est lui qu'on tamponne. Le numéro
-                          n'est pas deviné (le titre de revente diffère souvent de
-                          celui de l'annonce, §24) : c'est toi qui le donnes, et il
-                          est mémorisé sur la vente (`vinted_sale_overrides`). */}
-                      {!num && !b && o && o.transaction_id!=null && <button type="button" onClick={async ()=>{
-                        const v=(await askText({numeric:true,desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
-                        if(v) setSaleOverride(o.transaction_id,{numero:v});
-                      }} title="Poser le numéro de boîte de cette paire" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔢 Poser le N°</button>}
-                    </div>
-                    <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
-                      {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
-                        title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
-                        style={{...sec,border:`1px solid ${isBordPrinted(b)?C.accent:C.border}`,background:isBordPrinted(b)?`${C.accent}18`:'transparent',color:isBordPrinted(b)?C.accent:C.muted}}>
-                        {isBordPrinted(b)?'✓ Imprimé':'Imprimé ?'}
-                      </button>}
-                      {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
-                          deux marqueurs pour un même carton, c'était deux chiffres
-                          qui divergeaient. */}
-                      <button type="button" onClick={()=>{
-                        if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
-                        else { if(o && !isShipDone(o)) toggleShipDone(o); if(b) markBordShipped(b); }
-                      }} title={posted?'Annuler « colis fait »':'Marquer comme posté → il sort de la liste'}
-                        style={{...sec,border:`1px solid ${posted?INV_STATUS.online.color:C.border}`,background:posted?`${INV_STATUS.online.color}18`:'transparent',color:posted?INV_STATUS.online.color:C.muted}}>
-                        {posted?'↺ Pas encore':'✓ Colis fait'}
-                      </button>
-                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
-                      {capte && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · ✓ confirmé par l\'email' : ''}</span>}
-                      {!pdf && <span style={{fontSize:11,color:C.muted}}>Bordereau pas encore reçu</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-        {/* Historique : les bordereaux déjà partis restent consultables, mais ils
-            n'encombrent plus la liste de travail. */}
-        {Array.isArray(emailBords) && (()=>{
-          const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
-          if (!faits.length) return null;
-          return (
-            <div style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'9px 12px'}}>
-              <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {faits.length} colis parti{faits.length>1?'s':''}</span>
-              <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
-              <button onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
-            </div>
-          );
-        })()}
-        {showBordDone && Array.isArray(emailBords) && (
-          <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:8}}>
-            {emailBords.filter(b=>!isBordHidden(b) && isBordDone(b))
-              .sort((a,b2)=>new Date(b2.receivedAt||0)-new Date(a.receivedAt||0))
-              .map((b,i)=>(
-                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,opacity:0.7}}>
-                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {bordPhoto(b)?<img src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
-                  </div>
-                  <div style={{flex:'1 1 120px',minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
-                    <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
-                  </div>
-                  {b.hasPdf && <button type="button" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
-                </div>
-              ))}
-          </div>
-        )}
-      </>)}
-
-      {/* Modale : relier un achat (depuis Annonces) */}
-      {pickerFor && (
-        <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.text}}>Quel achat correspond à cette paire ?</div>
-              <button type="button" onClick={()=>setPickerFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:'8px 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
-              {purchasesPick.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement de tes achats…</div>}
-              {!purchasesPick.loading && (() => {
-                const curId = numeros[pickerFor.id]?.buyFromId;
-                const avail = purchasesPick.items.filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId));
-                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat disponible.</div>;
-                // Les meilleurs candidats (même marque ET même taille) sont
-                // signalés : avec ~700 achats, sans repère on ne sait pas par où
-                // commencer, et le prix d'achat finit par ne jamais être saisi.
-                return avail.map((p, iP) => (
-                  <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
-    paires sans rapport — « nike » + « 40 » désigne des centaines d'articles.
-    12 exige le MODÈLE en plus (4+4+5), ou un titre identique. Une paire dont
-    le modèle n'est pas reconnu n'est jamais « suggérée » : on ne se prononce
-    pas plutôt que d'induire un faux prix d'achat. */}
-                        {(p._score||0) >= 12 && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
-                        {p.title}
-                      </div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
-                    </div>
-                    <div style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{p.price?.amount} {cur(p.price?.currency_code)}</div>
-                  </button>
-                ));
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── ONGLET « REPUBLIER » RETIRÉ (demande de Julien, août 2026) ───────────
+          « L'onglet republier sur l'application ça sert à rien, tu peux
+          l'enlever. » L'atelier faisait doublon avec le panneau de l'extension,
+          qui lui, travaille SUR Vinted, là où se fait le geste : texte du
+          coffre, photos recadrées, formulaire pré-rempli, suppression de
+          l'ancienne (§5.07). Ici, on notait une annonce sans rien pouvoir
+          appliquer.
+          ⚠️ Retirés ensemble : l'entrée de la barre du bas, l'écran, la modale
+          d'édition, et les calculs qui n'existaient que pour eux.
+          Le panneau de l'extension n'est PAS touché. */}
 
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
@@ -17140,102 +16614,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
-      {/* ── Éditeur de nouvelle version d'annonce (atelier de republication) ── */}
-      {repubEdit && repubForm && (()=>{
-        const it = repubEdit.it;
-        const before = scoreAnnonce(it);
-        const after = scoreAnnonce(it, { title: repubForm.title, desc: repubForm.desc, price: repubForm.price });
-        const d = drafts[it.id];
-        const versions = (d && d.versions) ? d.versions : [];
-        const gain = after.score - before.score;
-        const aiKey = load('vrm_ai_key', '');
-        const reasonMsg = {
-          'no-key': "L'IA n'est pas encore branchée. Ajoute ta clé dans Réglages → Assistant IA (ou côté Vercel) et la rédaction automatique s'allumera. En attendant, tes suggestions calculées restent affichées.",
-          'api-error': "L'IA a refusé la requête (clé invalide ou quota). Vérifie ta clé dans Réglages.",
-          'parse': "L'IA a répondu, mais dans un format inattendu. Réessaie.",
-          'network': "Connexion à l'IA impossible pour l'instant. Réessaie dans un instant.",
-          'error': "Une erreur est survenue. Réessaie.",
-        };
-        // ⚠️ createPortal vers document.body : sinon la fenêtre est piégée dans
-        // le contexte d'empilement de <main> et la BARRE DU BAS passe par-dessus
-        // → le bouton « Enregistrer » (en bas) est caché et on ne peut pas
-        // « descendre » jusqu'à lui (bug signalé par Julien).
-        return createPortal(
-        <div onClick={()=>{setRepubEdit(null);setRepubForm(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'90vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{width:48,height:60,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {it.photo?<img src={it.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text}}>✍️ Nouvelle version</div>
-                <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.title||'Annonce'}</div>
-              </div>
-              <button type="button" onClick={()=>{setRepubEdit(null);setRepubForm(null);}} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
-            </div>
-            <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>
-              {/* Comparaison de score avant → après */}
-              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:'12px',marginBottom:14}}>
-                <div style={{textAlign:'center'}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500}}>Actuelle</div>
-                  <div style={{fontSize:24,fontWeight:700,color:before.score>=80?INV_STATUS.online.color:before.score>=55?C.warn:C.danger}}>{before.score}</div>
-                </div>
-                <span style={{fontSize:20,color:C.muted}}>→</span>
-                <div style={{textAlign:'center'}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500}}>Nouvelle</div>
-                  <div style={{fontSize:24,fontWeight:700,color:after.score>=80?INV_STATUS.online.color:after.score>=55?C.warn:C.danger}}>{after.score}</div>
-                </div>
-                {gain!==0 && <span style={{fontSize:13,fontWeight:700,color:gain>0?INV_STATUS.online.color:C.danger,background:(gain>0?INV_STATUS.online.color:C.danger)+'18',borderRadius:999,padding:'2px 9px'}}>{gain>0?`+${gain}`:gain}</span>}
-              </div>
-              {/* Bouton IA */}
-              <button type="button" onClick={aiRewrite} disabled={repubAi.busy} style={{width:'100%',border:`1px solid ${C.accent}`,borderRadius:12,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:700,padding:'11px',cursor:repubAi.busy?'default':'pointer',fontFamily:'inherit',opacity:repubAi.busy?0.6:1,marginBottom:8}}>{repubAi.busy?'⏳ L\'IA rédige…':'🤖 Rédiger avec l\'IA'}</button>
-              {repubAi.why && <div style={{fontSize:12,color:INV_STATUS.online.color,background:INV_STATUS.online.color+'10',borderRadius:10,padding:'8px 10px',marginBottom:10}}>✨ {repubAi.why}</div>}
-              {repubAi.reason && <div style={{fontSize:12,color:C.muted,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:10,lineHeight:1.45}}>{reasonMsg[repubAi.reason]||reasonMsg.error}</div>}
-              {/* Champs */}
-              <div style={{fontSize:11,color:C.muted,fontWeight:600,margin:'6px 0 4px'}}>TITRE</div>
-              <input value={repubForm.title} onChange={ev=>setRepubForm(f=>({...f,title:ev.target.value}))} placeholder="Marque + modèle + taille + état" style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C.text,background:C.card,fontFamily:'inherit',outline:'none'}}/>
-              <div style={{fontSize:10.5,color:repubForm.title.length>70?C.danger:C.muted,marginTop:3,textAlign:'right'}}>{repubForm.title.length}/70</div>
-              <div style={{fontSize:11,color:C.muted,fontWeight:600,margin:'8px 0 4px'}}>DESCRIPTION</div>
-              <textarea value={repubForm.desc} onChange={ev=>setRepubForm(f=>({...f,desc:ev.target.value}))} rows={5} placeholder="État, matière, pointure, défauts éventuels…" style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C.text,background:C.card,fontFamily:'inherit',outline:'none',resize:'vertical'}}/>
-              <div style={{fontSize:11,color:C.muted,fontWeight:600,margin:'8px 0 4px'}}>PRIX (€)</div>
-              <input value={repubForm.price} onChange={ev=>setRepubForm(f=>({...f,price:ev.target.value}))} inputMode="decimal" placeholder="Prix de vente" style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,color:C.text,background:C.card,fontFamily:'inherit',outline:'none'}}/>
-              {after.peer!=null && <div style={{fontSize:11.5,color:C.muted,marginTop:5}}>💡 Paires similaires (même marque·taille) autour de <b>{after.peer} €</b>.</div>}
-              {/* Retouche photo (recadrer / zoomer) — Julien édite SA photo et la
-                  téléverse lui-même sur Vinted. Aucune modif automatique. */}
-              <div style={{fontSize:11,color:C.muted,fontWeight:600,margin:'14px 0 4px'}}>PHOTO</div>
-              <button type="button" onClick={()=>setPhotoEdit({ refPhoto: it.photo||null, refTitle: it.title||'' })} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,fontSize:13,fontWeight:600,padding:'11px',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>✂️ Retoucher une photo (recadrer / zoomer)</button>
-              <div style={{fontSize:11,color:C.muted,marginTop:5,lineHeight:1.4}}>Tu choisis une photo depuis ton téléphone, tu la recadres/zoomes, puis tu l'enregistres pour la mettre toi‑même sur Vinted.</div>
-              {/* Conseils calculés */}
-              {before.advice.length>0 && (
-                <div style={{marginTop:14}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}}>CE QUI PEUT ÊTRE AMÉLIORÉ</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                    {before.advice.map((a,i)=>(<div key={i} style={{fontSize:12.5,color:C.text,display:'flex',gap:7,alignItems:'flex-start'}}><span style={{color:C.accent}}>•</span><span style={{flex:1,minWidth:0}}>{a}</span></div>))}
-                  </div>
-                </div>
-              )}
-              {/* Historique des versions */}
-              {versions.length>0 && (
-                <div style={{marginTop:16}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}}>HISTORIQUE ({versions.length})</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                    {versions.slice().reverse().map((v,i)=>(
-                      <div key={i} style={{fontSize:12,color:C.muted,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 10px'}}>
-                        <div style={{color:C.text,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.title||'(sans titre)'}</div>
-                        <div style={{marginTop:2}}>{new Date(v.at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · note {v.scoreBefore}→{v.scoreAfter} · {v.price?`${v.price} €`:'prix inchangé'}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',gap:8,alignItems:'center'}}>
-              <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour y appliquer cette version" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:12.5,fontWeight:600,padding:'11px 13px'}}>↗ Vinted</a>
-              <button type="button" onClick={saveRepub} style={{flex:1,border:'none',borderRadius:12,background:C.accent,color:'#fff',fontSize:14,fontWeight:700,padding:'11px',cursor:'pointer',fontFamily:'inherit'}}>Enregistrer la version</button>
-            </div>
-          </div>
-        </div>, document.body);
-      })()}
 
       {/* ── Éditeur de photo (recadrer / zoomer) — retouche manuelle, Julien
              téléverse lui-même sur Vinted. Aucune modif auto (refus tenu). ── */}
@@ -18144,7 +17522,7 @@ function EmailStartSetting() {
 // Notifications push : ventes / bordereaux / argent reçu en temps réel, même
 // app fermée. Nécessite l'app installée sur l'écran d'accueil (iPhone) et le
 // pipeline email branché (api/email-inbound.js). Un abonnement par appareil.
-const VAPID_PUBLIC_KEY='BBQbRWE86gwZClx3buB8J2JJrd-Kg7aYR-HJqev811KmNnTxLxOAwxFhwF8MfvzHp1-K4tnmjFfQZxVaoB7psi8';
+const VAPID_PUBLIC_KEY='BLw4VOxC3CXI_yY521zsKXiVbjbQ_YsQtNWqHBDBWsPBD6y4AdCrA_rBv-9vJ3_UgtfcKBjPLPyGFRwANjfBFSk';
 function PushSetting() {
   const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
   const [msg, setMsg] = useState(null);
@@ -18697,7 +18075,7 @@ export default function App() {
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
-    const TABS_OK=['dashboard','cat_annonces','cat_repub','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
+    const TABS_OK=['dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -18792,11 +18170,7 @@ export default function App() {
   const [notifOpen,setNotifOpen]=useState(false);
   const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
-    companyName:'Shop Cancale35',
-    companyType:'Entrepreneur individuel',
-    companyAddress:'80 rue de la vieille rivière 35260',
-    siret:'94135104100012',
-    footer:'Merci pour votre achat !',
+    ...ENTREPRISE_VIDE,
   }));
   // ── Factures PRO : plusieurs micro-entreprises ─────────────────────────────
   // On démarre TOUJOURS avec au moins une entité, amorcée depuis les réglages
@@ -18805,7 +18179,7 @@ export default function App() {
   const [entreprises,setEntreprisesRaw]=useState(()=>{
     const stored=load('vinted_entreprises',null);
     if(Array.isArray(stored)&&stored.length) return stored;
-    const s=load('vinted_invoice_settings',{companyName:'Shop Cancale35',companyType:'Entrepreneur individuel',companyAddress:'80 rue de la vieille rivière 35260',siret:'94135104100012',footer:'Merci pour votre achat !'});
+    const s=load('vinted_invoice_settings',{...ENTREPRISE_VIDE});
     return [{id:'ent_1',...s}];
   });
   const setEntreprises=(v)=>{ setEntreprisesRaw(v); save('vinted_entreprises',v); };
@@ -19786,7 +19160,7 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_repub:'republication',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
         </EcranGardeFou>

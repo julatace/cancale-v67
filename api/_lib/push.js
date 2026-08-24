@@ -34,10 +34,26 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.s
 // l'est pas : le comportement d'aujourd'hui reste identique.
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
-export const VAPID_PUBLIC = 'BBQbRWE86gwZClx3buB8J2JJrd-Kg7aYR-HJqev811KmNnTxLxOAwxFhwF8MfvzHp1-K4tnmjFfQZxVaoB7psi8';
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || 'ayc_z_oGCoQUS_zf3cAGDBxGNh0gBX6g3KchpNLgHM4';
+export const VAPID_PUBLIC = 'BLw4VOxC3CXI_yY521zsKXiVbjbQ_YsQtNWqHBDBWsPBD6y4AdCrA_rBv-9vJ3_UgtfcKBjPLPyGFRwANjfBFSk';
+// ⚠️⚠️ LA CLÉ PRIVÉE NE VIT QUE DANS L'ENVIRONNEMENT, JAMAIS DANS LE DÉPÔT.
+// Elle était écrite ici en repli — et le dépôt est PUBLIC : n'importe qui
+// pouvait donc envoyer une notification sur les téléphones du vendeur.
+// La paire a été régénérée (l'ancienne est morte) ; la nouvelle clé privée se
+// colle dans les variables d'environnement Vercel sous `VAPID_PRIVATE_KEY`.
+// ⚠️ Plus AUCUN repli en dur : sans la variable, on n'envoie rien et on le dit
+// (`pushConfigure()`), au lieu de repartir sur une clé connue de tous.
+// L'adresse de contact (exigée par la norme Web Push, transmise au service de
+// notification) vient de `PUSH_CONTACT` — ce n'est pas un secret, mais ce n'est
+// pas non plus au dépôt de porter l'email personnel de quelqu'un.
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
+const PUSH_CONTACT = process.env.PUSH_CONTACT || 'mailto:contact@vrm.center';
 
-webpush.setVapidDetails('mailto:vinted35260@icloud.com', VAPID_PUBLIC, VAPID_PRIVATE);
+export const pushConfigure = () => {
+  if (!VAPID_PRIVATE) return false;
+  try { webpush.setVapidDetails(PUSH_CONTACT, VAPID_PUBLIC, VAPID_PRIVATE); return true; }
+  catch (_) { return false; }
+};
+const PUSH_PRET = pushConfigure();
 
 const HEADERS = {
   apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -104,6 +120,11 @@ export async function saveSubs(subs) {
 // Envoie la notification à tous les appareils abonnés.
 // Les abonnements morts (appli désinstallée, permission retirée) sont purgés.
 export async function sendPushToAll(payload) {
+  // ⚠️ Sans clé privée (variable d'environnement absente), on n'envoie RIEN et
+  // on le dit clairement — plutôt que de repartir sur la clé qui traînait dans
+  // le dépôt public. Un envoi silencieusement impossible est pire qu'un refus
+  // explicite : le vendeur croirait ses notifications actives.
+  if (!PUSH_PRET) return { sent: 0, total: 0, erreur: 'VAPID_PRIVATE_KEY absente' };
   const subs = await loadSubs();
   if (!subs.length) return { sent: 0, total: 0 };
   const body = JSON.stringify(payload);
