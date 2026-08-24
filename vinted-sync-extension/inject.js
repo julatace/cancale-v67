@@ -312,7 +312,6 @@
       let pid = null;
       if (who) { sendHarvest('/api/v2/users/current', who); try { pid = JSON.parse(who).user.id; } catch (_) {} }
       // 2) annonces en ligne (dressing).
-      let wardrobeIds = [];
       if (pid) {
         await new Promise(r => setTimeout(r, jitter(600, 1500)));
         // TOUTES les pages : Vinted plafonne per_page (~96 malgre le 200
@@ -330,28 +329,30 @@
           if (!lot.length || (tp && page >= tp)) break;
           await new Promise(r => setTimeout(r, jitter(600, 1500)));
         }
-        if (tout) {
-          sendHarvest(`/api/v2/wardrobe/${pid}/items`, JSON.stringify(tout));
-          try { wardrobeIds = (tout.items || []).filter(it => !it.is_closed && !it.is_hidden).map(it => String(it.id)); } catch (_) {}
-        }
+        if (tout) sendHarvest(`/api/v2/wardrobe/${pid}/items`, JSON.stringify(tout));
       }
-      // 2b) DÉTAIL COMPLET de chaque annonce (description, catégorie, attributs…),
-      //     par PETITS LOTS tournants, à un rythme HUMAIN (jitter), pour tout
-      //     récupérer sur plusieurs passages sans marteler Vinted. Un curseur
-      //     mémorise où on en était → au fil des visites, tout finit capté.
-      if (wardrobeIds.length) {
-        const CK = '__cancale_item_cursor';
-        let cur = 0; try { cur = +(localStorage.getItem(CK) || 0) || 0; } catch (_) {}
-        if (cur >= wardrobeIds.length) cur = 0;
-        const BATCH = 6; // combien de détails par passage (doux)
-        for (let i = 0; i < BATCH && i < wardrobeIds.length; i++) {
-          const id = wardrobeIds[(cur + i) % wardrobeIds.length];
-          await new Promise(r => setTimeout(r, jitter(900, 2200)));
-          const d = await apiGet(`/api/v2/items/${id}`);
-          if (d) sendHarvest(`/api/v2/items/${id}`, d);
-        }
-        try { localStorage.setItem(CK, String((cur + BATCH) % wardrobeIds.length)); } catch (_) {}
-      }
+      // 2b) ⚠️ RETIRÉ — 6 REQUÊTES PAR VISITE POUR RIEN.
+      //     On demandait ici le détail de 6 annonces par passage
+      //     (`GET /api/v2/items/{id}`), avec une pause de 0,9–2,2 s entre
+      //     chacune, en espérant récupérer la DESCRIPTION.
+      //     Le compteur de diagnostic (`panel_diag_capture`, relevé du 24 août)
+      //     est sans appel :
+      //         recu_item = 73   ·   abandon_json_item = 73   ·   ecrit_item = 0
+      //     73 tentatives, 73 échecs, ZÉRO ligne écrite. La cause est connue
+      //     depuis §5.26 : Vinted renvoie sur cette URL une PAGE D'ERREUR HTML
+      //     avec un statut 200, donc `apiGet` la laisse passer et `JSON.parse`
+      //     casse. L'endpoint ne rend plus la fiche, point.
+      //     Ce que ça coûtait à chaque visite sur Vinted : 6 appels inutiles,
+      //     6 à 13 secondes de retard sur la vraie moisson, et 6 requêtes de
+      //     plus dans l'empreinte du compte — le signal qu'on passe justement
+      //     notre temps à réduire (§5, §48).
+      //     ⚠️ Rien n'est perdu : la DESCRIPTION arrive par la lecture de la
+      //     PAGE (`readListingDetailFromPage` → `vinted_item_details`), qui
+      //     fonctionne, et c'est elle que le coffre et « Republier » lisent
+      //     (§5.10, §5.50). Le bouton manuel « 📥 Récupérer le texte »
+      //     (`capterAnnonce`) reste disponible si Vinted rétablit un jour
+      //     l'endpoint — il le dira tout seul en écrivant une ligne.
+      //     NE PAS remettre cette boucle sans avoir vu `ecrit_item > 0`.
       // 3) ventes + achats. ⚠️ « purchased » et PAS « bought » : ?type=bought
       // renvoie chez certains comptes les ventes (verifie en base), ce qui
       // faisait afficher des ventes dans les achats.

@@ -4059,3 +4059,69 @@ lectures > 1 000 lignes, helper `lireTout` avec l'en-tête `Range`, estampille
 `updated_at` · `audit-coherence` 5 règles / **0 désaccord** · `audit-qr` 5/5 ·
 `audit-offres` 10/10 · `audit-transporteurs` 23/23 · `audit-email-formes` 17/17 ·
 `audit-bordereau-pdf` 7/7 · smoke app **12 écrans, 0 PAGEERROR, 0 artefact**.
+
+---
+
+## 5.52 — ⚠️ L'INSTRUMENTATION DÉTRUISAIT SES PROPRES PREUVES + 6 REQUÊTES PAR VISITE DANS LE VIDE
+
+Julien : « améliore d'autres choses, propose-moi des améliorations ». Méthode
+habituelle : lire la base d'abord. Le compteur `panel_diag_capture` (posé en §46,
+relevé du 24 août 08:29) répond à deux questions ouvertes depuis des semaines.
+
+```
+recu_item = 73   ·   abandon_json_item = 73   ·   ecrit_item = 0
+label_url_trouve = 1  ·  label_url_introuvable = 1
+rates = {}      ← ⚠️ vide, alors qu'il devrait expliquer les 73 échecs
+```
+
+### 1. ⚠️ `noterDiag` EFFAÇAIT `rates` — on comptait les échecs sans pouvoir les expliquer
+La ligne `panel_diag_capture` porte deux choses : `n` (les compteurs, écrits par
+`noterDiag`) et `rates` (**un échantillon de réponse ratée par type**, écrit par
+`echantillonRate`). C'est ce couple qui avait fini par expliquer la fiche article
+(§5.24 → §5.26) : le compteur dit COMBIEN, l'échantillon dit POURQUOI.
+
+Or `noterDiag` réécrivait la ligne avec **`{ n, majAt }` seulement** — donc il
+supprimait `rates`. Et comme il part **à chaque capture** (des centaines de fois
+par jour) alors qu'un échantillon n'est posé que **sur un échec**, la preuve
+était détruite dans la minute. D'où `rates: {}` en base avec 73 échecs comptés.
+
+➡️ `noterDiag` réécrit désormais **toute la ligne** (`{ ...tout, n, majAt }`).
+⚠️ **La leçon dépasse ce cas** : une instrumentation qui réécrit sa propre ligne
+doit préserver ce qu'elle n'a pas produit, sinon elle efface exactement ce qu'on
+lui demande de garder — et on passe des semaines à re-poser des sondes qui
+existaient déjà.
+
+### 2. ⚠️ 6 REQUÊTES PAR VISITE VERS UN ENDPOINT MORT (73 échecs sur 73)
+`inject.js` demandait à chaque passage sur Vinted le détail de **6 annonces**
+(`GET /api/v2/items/{id}`), avec une pause de 0,9–2,2 s entre chacune, pour
+récupérer la DESCRIPTION. Bilan mesuré : **73 tentatives, 73 échecs, 0 ligne
+écrite**. La cause est connue depuis §5.26 — Vinted renvoie sur cette URL une
+**page d'erreur HTML avec un statut 200**, donc `apiGet` la laisse passer et
+`JSON.parse` casse.
+
+Ce que ça coûtait à **chaque** visite : 6 appels inutiles, **6 à 13 secondes** de
+retard sur la vraie moisson, et 6 requêtes de plus dans l'empreinte du compte —
+le signal qu'on passe justement notre temps à réduire (§5, §48).
+
+➡️ La boucle est **retirée** (et `wardrobeIds`, devenue morte, avec elle).
+⚠️ **Rien n'est perdu** : la description arrive par la **lecture de page**
+(`readListingDetailFromPage` → `vinted_item_details`), qui fonctionne — c'est
+elle que le coffre et « Republier » lisent (§5.10, §5.50). Le bouton manuel
+« 📥 Récupérer le texte » reste là : si Vinted rétablit l'endpoint, il l'écrira
+tout seul. **Ne pas remettre la boucle sans avoir vu `ecrit_item > 0`.**
+
+### Ce que le relevé dit d'autre (pas de correctif nécessaire)
+| compteur | lecture |
+|---|---|
+| `ignore_partiel_orders_purchased = 49` · `_inbox = 48` · `_listings = 20` | le garde-fou anti-partiel (§5.19) refuse constamment des captures tronquées — **il travaille**, ce n'est pas un défaut |
+| `ignore_billing_hors_sujet = 24` | le garde-fou porte-monnaie (§5.27) écarte bien les réponses qui n'en sont pas |
+| `label_url_trouve = 1` / `introuvable = 1` | la chaîne du PDF de bordereau **a fonctionné au moins une fois** — première observation réelle depuis §5.29. L'échec restant s'expliquera tout seul maintenant que `rates` survit. |
+
+### Vérifié
+`node --check` sur `inject.js` et `background.js` · **`scripts/audit-diagnostic.cjs`**
+(nouveau) exécute le VRAI `noterDiag` avec des stubs : **5 contrôles**, dont
+**4 qui échouent bien sur le code d'avant** (§21) · banc panneau : la carte de
+proposition de bordereau rend et envoie toujours le bon message, **16 onglets,
+0 erreur d'app** (les 2 « échecs » restent les artefacts connus du harnais :
+l'onglet `reponse` n'existe que sur une page de conversation, et le clic sur un
+élément filtré `display:none`). Extension **5.34.0**.

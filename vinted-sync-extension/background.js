@@ -380,11 +380,20 @@ async function noterDiag(cle) {
     if (Date.now() - _diag.dernier < 60000) return;
     _diag.dernier = Date.now();
     const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-    const cur = (rows && rows[0] && rows[0].data && rows[0].data.n) || {};
+    const tout = (rows && rows[0] && rows[0].data) || {};
+    const cur = tout.n || {};
     const n = { ...cur };
     for (const k in _diag.n) n[k] = (n[k] || 0) + _diag.n[k];
     _diag.n = {};
-    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { n, majAt: new Date().toISOString() } }], 'id');
+    // ⚠️ ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
+    // `rates` — les échantillons de réponses ratées gardés par
+    // `echantillonRate`. Et comme `noterDiag` part à chaque capture (des
+    // centaines de fois par jour) alors qu'un échantillon n'est posé que sur un
+    // échec, la preuve était détruite dans la minute. Constaté le 24 août :
+    // `rates: {}` en base alors que `abandon_json_item` était à 73 et
+    // `label_url_introuvable` à 1 — l'instrumentation détruisait ses propres
+    // preuves, donc on ne pouvait pas expliquer les échecs qu'elle comptait.
+    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { ...tout, n, majAt: new Date().toISOString() } }], 'id');
   } catch (_) {}
 }
 
