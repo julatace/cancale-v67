@@ -4234,3 +4234,72 @@ dans les deux sens).
 | `VAPID_PRIVATE_KEY` sur Vercel (sinon plus aucune notification) | Julien |
 | ressaisir son entreprise dans Réglages → Factures | Julien |
 | `SUPABASE_SERVICE_KEY` + `VRM_OWNER_UID` avant d'activer RLS | Julien |
+
+---
+
+## 5.54 — REFONTE VISUELLE, PHASE 1 : arrêter de crier
+
+Julien : « on dirait vraiment un site fait par intelligence artificielle, fais
+quelque chose de professionnel… là ça ne me convient pas du tout ».
+
+Méthode : **regarder l'écran** (captures du banc §20) avant de toucher au code,
+puis mesurer ce qui produit l'impression.
+
+### ⚠️ 1. UN `>` S'AFFICHAIT EN HAUT DE CHAQUE ÉCRAN
+Trouvé en inspectant le DOM, pas le code : un nœud de texte `>` en tout premier
+enfant du conteneur racine. Cause — la balise ouvrante du conteneur se terminait
+par **`}}>>`** : le premier `>` ferme la balise, le second devient du texte.
+Il était là sur **tous les écrans, tous les appareils**. C'est exactement le
+genre de détail qui fait « pas fini ». Une ligne.
+
+### 2. Le diagnostic, en chiffres
+**693 emojis** dans du code non commenté (⚠️ 70 · ✓ 44 · 📦 42 · 💸 20 · ✅ 20 …).
+Mais le vrai défaut n'est pas leur nombre : c'est que **tout est un encadré
+teinté**. Sur l'écran Ventes on comptait, empilés : un bloc rouge, un vert, un
+ambre, trois gris, **un bandeau en dégradé violet/rose**, un autre ambre. Quand
+tout crie aussi fort, plus rien ne ressort — et l'œil lit « fabriqué à la
+chaîne ».
+
+### 3. La règle posée : `Notice`
+Nouveau composant (à côté de `Card`/`StatBox`) :
+- **surface NEUTRE** (`C.card`), jamais un fond teinté ;
+- la couleur ne sert qu'à une **barre de 3 px** sur le côté et à l'**icône** ;
+- le titre garde la couleur du texte — c'est le **chiffre** qui porte la couleur
+  quand il y a urgence ;
+- l'explication longue passe derrière **« Pourquoi ? »** : disponible, mais elle
+  n'occupe plus l'écran.
+
+Converti : colis à expédier, argent en attente, vente repérée via bordereau,
+ventes sans prix d'achat.
+
+### 4. Les emojis utilisés COMME icônes
+⚠️ Un emoji est dessiné par le système : ni la même graisse, ni la même grille,
+ni la même couleur que le reste. Mélanger les deux, c'est le tell.
+- **16 icônes au trait ajoutées** à `ICON_PATHS` (truck, clock, alert, check,
+  euro, eye, heart, printer, camera, calendar, filter, sleep, target, qr,
+  wallet, info) — même grille 24 et même trait que la barre du bas.
+- Les tuiles de « Ma journée » : le carré de 46 px teinté avec un emoji de 24 px
+  devient une **pastille neutre + icône au trait**.
+- Le **bandeau « Wrapped »** en dégradé violet/rose passe en ligne discrète, au
+  même gabarit que « Analyse de tes ventes » juste en dessous : deux entrées de
+  même nature ont désormais la même apparence.
+- ☀️ devant « Bonjour Julien » et 🗓️ devant « Ta semaine » : retirés (« TA
+  SEMAINE » devient une étiquette calme en capitales).
+- **9 loupes** retirées des champs de recherche : un champ se reconnaît à sa
+  forme, pas à un emoji collé devant le texte d'aide.
+
+### 5. Le numéro de version sort de l'en-tête
+Il s'affichait **tronqué** (« v83/00 · Rafraîchisse… ») sur tous les écrans :
+information de développeur, en permanence, dans le bandeau du haut. Il vit
+maintenant dans Réglages, à côté de la version de l'extension — là où on le
+cherche quand on en a besoin.
+
+### ⚠️ Ce qui reste (dit franchement)
+Il reste ~600 emojis, surtout dans des pastilles de statut et des libellés de
+boutons. Les remplacer d'un coup, c'est 600 modifications dispersées que je ne
+peux pas vérifier une par une — et le résultat serait moins bon, pas meilleur.
+La suite se fait **écran par écran, capture à l'appui**, comme cette phase.
+
+### Vérifié
+`npm run build` OK · smoke **11 écrans, 0 PAGEERROR, 0 artefact** · le nœud de
+texte parasite a disparu du DOM (mesuré avant/après) · 9 audits au vert.

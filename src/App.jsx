@@ -3128,6 +3128,42 @@ function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
     />
   );
 }
+// ── NOTICE : UN ENCADRÉ QUI INFORME SANS CRIER ───────────────────────────────
+// ⚠️ Avant, chaque information importante était un bloc ENTIÈREMENT TEINTÉ,
+// bordé de sa couleur, avec un emoji de 20 px et un paragraphe d'explication
+// dessous. Sur l'écran Ventes, ça donnait six blocs rouge / vert / ambre /
+// violet empilés : plus rien ne ressortait, puisque tout criait aussi fort.
+// C'est le défaut qui fait « assemblé par une machine » plutôt que « produit ».
+//
+// La règle ici : la surface reste NEUTRE, la couleur ne sert qu'à une barre de
+// 3 px sur le côté et à l'icône. Le titre garde la couleur du texte — c'est le
+// CHIFFRE qui porte la couleur quand il y a urgence. L'explication longue passe
+// derrière « Pourquoi ? » : elle reste disponible, elle n'occupe plus l'écran.
+function Notice({ tone='info', icon, title, value, desc, detail, action, style={} }) {
+  const col = tone==='danger' ? C.danger : tone==='warn' ? C.warn : tone==='ok' ? C.accent : C.blue;
+  return (
+    <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',
+      background:C.card,border:`1px solid ${C.border}`,borderRadius:12,
+      padding:'11px 13px 11px 15px',marginBottom:10,overflow:'hidden',...style}}>
+      <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
+      {icon && <span aria-hidden="true" style={{flexShrink:0,color:col,marginTop:1}}><Icon name={icon} size={18}/></span>}
+      <div style={{flex:'1 1 auto',minWidth:0}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
+          {value != null && <span style={{fontSize:17,fontWeight:700,color:col,letterSpacing:-0.3,whiteSpace:'nowrap'}}>{value}</span>}
+          <span style={{fontSize:13,fontWeight:600,color:C.text,minWidth:0}}>{title}</span>
+        </div>
+        {desc && <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>{desc}</div>}
+        {detail && (
+          <details style={{marginTop:5}}>
+            <summary style={{listStyle:'none',cursor:'pointer',fontSize:11,color:C.muted,opacity:.85}}>Pourquoi ?</summary>
+            <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.45}}>{detail}</div>
+          </details>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
 function Card({children,style={}}) {
   return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,...style}}>{children}</div>;
 }
@@ -3426,6 +3462,28 @@ const TABS=[
 // l'onglet actif. Un jeu d'icônes au trait donne à la barre du bas le calme
 // d'une app native (l'emoji reste ailleurs, là où il sert de repère rapide).
 const ICON_PATHS = {
+  // ── Icônes ajoutées pour remplacer les emojis utilisés COMME icônes ───────
+  // ⚠️ Un emoji est dessiné par le système d'exploitation : il n'a ni la même
+  // graisse, ni la même grille, ni la même couleur que le reste de l'interface.
+  // Mélanger les deux, c'est précisément ce qui fait « assemblé à la va-vite ».
+  // Toutes celles-ci partagent la grille 24, le trait et les coins arrondis des
+  // icônes de la barre du bas.
+  truck:   <><path d="M3 7.5h11v9H3z"/><path d="M14 11h3.6l2.4 2.6v2.9H14z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.4" cy="18" r="1.8"/></>,
+  clock:   <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></>,
+  alert:   <><path d="M12 4.2 21 19.2H3L12 4.2Z"/><path d="M12 10v4"/><path d="M12 16.6h.01"/></>,
+  check:   <><path d="M4.5 12.6 9.5 17.5 19.5 7"/></>,
+  euro:    <><path d="M17 6.6A6.6 6.6 0 0 0 8.2 12 6.6 6.6 0 0 0 17 17.4"/><path d="M4.5 10.4h7.8"/><path d="M4.5 13.6h7.8"/></>,
+  eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
+  heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
+  printer: <><path d="M7 9V4h10v5"/><path d="M7 17.5H5a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 5 10.5h14a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-2"/><path d="M7 14.5h10V20H7z"/></>,
+  camera:  <><path d="M3.5 8.6h3.1l1.3-2.1h8.2l1.3 2.1h3.1v9.4a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z"/><circle cx="12" cy="13.2" r="3.2"/></>,
+  calendar:<><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M3.5 10h17"/><path d="M8 3.5v4M16 3.5v4"/></>,
+  filter:  <><path d="M3.8 5.5h16.4l-6.4 7.4v5.6l-3.6 2v-7.6Z"/></>,
+  sleep:   <><path d="M20 14.5A8 8 0 0 1 9.5 4 8.2 8.2 0 1 0 20 14.5Z"/></>,
+  target:  <><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="0.9"/></>,
+  qr:      <><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h3v3h-3zM20.5 14v3M17.5 20.5h3M14 20.5h0.01"/></>,
+  wallet:  <><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h11a2 2 0 0 1 2 2v1"/><rect x="3.5" y="7.5" width="17" height="11" rx="2"/><circle cx="16.6" cy="13" r="1.1"/></>,
+  info:    <><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2"/><path d="M12 7.9h.01"/></>,
   more:  <><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></>,
   sun:   <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   chart: <><path d="M5 20V10M12 20V4M19 20v-6"/></>,
@@ -5232,7 +5290,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           <Input value={searchInput}
             onChange={e=>setSearchInput(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-            placeholder="🔍 Numéro... puis Entrée"
+            placeholder="Numéro... puis Entrée"
             style={{flex:1,minWidth:120}}/>
           <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
           {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
@@ -5497,7 +5555,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <Input value={searchInput}
           onChange={e=>setSearchInput(e.target.value)}
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="🔍 Article, date... puis Entrée"
+          placeholder="Article, date... puis Entrée"
           style={{maxWidth:280,flex:1,minWidth:160}}/>
         <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
         {search&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
@@ -5954,7 +6012,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           value={searchInput}
           onChange={e=>setSearchInput(e.target.value)}
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="🔍 N° de paire ou date de vente... puis Entrée"
+          placeholder="N° de paire ou date de vente... puis Entrée"
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
@@ -6625,7 +6683,7 @@ function LocalPhoto({ locate, onLocateConsumed }) {
       ) : (<>
         {/* Recherche */}
         <div style={{ display: 'flex', gap: 8 }}>
-          <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="🔎 Cherche un N° → l'app te montre où"
+          <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → l'app te montre où"
             inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
           {search && <button onClick={() => { setSearch(''); setHighlight(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px', fontFamily: 'inherit' }}><Icon name="close" size={15}/></button>}
         </div>
@@ -7870,7 +7928,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       </div>
       {/* Recherche */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="🔎 Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+        <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
         {search && <button onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
       </div>
       {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
@@ -8337,7 +8395,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           <Input value={searchInput}
             onChange={e=>setSearchInput(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-            placeholder="🔍 Numéro à chercher (puis Entrée)..."
+            placeholder="Numéro à chercher (puis Entrée)..."
           />
           <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
           {garageSearch&&<Btn small onClick={clearSearch} color={C.border}>✕</Btn>}
@@ -13473,11 +13531,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         const jobs=[];
-        if(toShip.length) jobs.push({icon:'🚚',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`⚠️ ${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_bord',prio:late>0?0:1});
+        if(toShip.length) jobs.push({icon:'truck',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_bord',prio:late>0?0:1});
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
-        if(pickupCount) jobs.push({icon:'📦',color:C.blue||C.accent,title:`Retirer ${pickupCount} colis`,sub:'Déposés en point relais — récupère-les avec ton code',tab:'cat_achats',prio:2});
-        if(unread) jobs.push({icon:'💬',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
-        if(repriceList.length) jobs.push({icon:'🏷️',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
+        if(pickupCount) jobs.push({icon:'box',color:C.blue||C.accent,title:`Retirer ${pickupCount} colis`,sub:'Déposés en point relais — récupère-les avec ton code',tab:'cat_achats',prio:2});
+        if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
+        if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -13503,7 +13561,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div>
             <div style={{marginBottom:16}}>
               <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
-              <div style={{fontSize:22,fontWeight:700,color:C.text,marginTop:2}}>☀️ {hello} Julien</div>
+              {/* Le soleil en emoji devant le bonjour : c'est joli une fois, et ça fait
+                      « thème par défaut » les mille fois suivantes. Le nom suffit. */}
+              <div style={{fontSize:24,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.5}}>{hello} Julien</div>
               {!loading && (
                 <div style={{fontSize:13,color:C.muted,marginTop:3}}>
                   {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</> : <>Rien d'urgent — ta boutique tourne. 👌</>}
@@ -13534,7 +13594,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if(!ws.length && !toShip.length) return null;
               return (
                 <div style={{marginBottom:14,border:`1px solid ${C.accent}33`,background:`${C.accent}0a`,borderRadius:16,padding:'13px 15px'}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:9}}>🗓️ Ta semaine</div>
+                  <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:9,textTransform:'uppercase',letterSpacing:0.6}}>Ta semaine</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 90px'}}>
                       <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1}}>{ws.length}</div>
@@ -13567,7 +13627,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
                 {jobs.map((j,i)=>(
                   <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:16,border:`1px solid ${j.color}44`,background:`${j.color}0e`,cursor:'pointer',textAlign:'left',width:'100%',fontFamily:'inherit'}}>
-                    <div style={{width:46,height:46,borderRadius:12,background:`${j.color}1c`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{j.icon}</div>
+                    {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
+                        avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
+                        empilés, c'est ce qui faisait « application générée ».
+                        Maintenant : une pastille neutre et l'icône au trait, du
+                        même dessin que la barre du bas. La couleur ne sert plus
+                        qu'à l'icône et au chevron — le fond reste calme. */}
+                    <div style={{width:42,height:42,borderRadius:11,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
                       <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
@@ -13637,7 +13703,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if(loading||val<=0) return null;
               return (
               <div style={{marginTop:16,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:16,border:`1px solid ${C.accent}33`,background:`${C.accent}0c`}}>
-                <div style={{fontSize:26}}>💶</div>
+                <div style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en attente{escrow?'':' (estimation)'}</div>
                   <div style={{fontSize:20,fontWeight:700,color:C.accent}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
@@ -13671,7 +13737,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.items && sales.items.length>0 && (
           <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
             <PeriodePicker value={periode} onChange={setPeriode}/>
-            <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, acheteur)…"
+            <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, acheteur)…"
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
           </div>
         )}
@@ -13685,17 +13751,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const s = toShip[0];
           const when = (t)=> t.daysLeft==null ? '' : t.daysLeft<0 ? `en retard de ${-t.daysLeft} j` : t.daysLeft===0 ? "à expédier aujourd'hui" : `avant le ${t.shipBy.toLocaleDateString('fr-FR')} (${t.daysLeft} j)`;
           return (
-            <div style={{border:`1.5px solid ${col}`,background:`${col}12`,borderRadius:12,padding:'10px 13px',marginBottom:12}}>
-              <div style={{display:'flex',alignItems:'center',gap:9}}>
-                <span style={{fontSize:20}}>⏰</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:700,color:col}}>{toShip.length} colis à expédier{late>0?` · ${late} en retard`:urgent>0?` · ${urgent} urgent${urgent>1?'s':''}`:''}</div>
-                  {s.shipBy && <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Le plus pressé : <b>{s.o.title||'vente'}</b> — {when(s)}</div>}
-                </div>
-                {onNav && <button type="button" onClick={()=>onNav('cat_bord')} style={{flexShrink:0,border:'none',background:col,color:'#fff',borderRadius:10,padding:'8px 11px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>📦 Expédier</button>}
-              </div>
-              <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.4}}>Vinted laisse ~{SHIP_DAYS} j après la vente pour expédier ; à temps = note vendeur préservée. Échéance estimée. Génère le bordereau plus bas (bouton 📄) ou dans l'onglet Bordereaux.</div>
-            </div>
+            <Notice
+              tone={late>0 ? 'danger' : urgent>0 ? 'warn' : 'ok'}
+              icon="truck"
+              value={toShip.length}
+              title={`colis à expédier${late>0?` · ${late} en retard`:urgent>0?` · ${urgent} pour demain`:''}`}
+              desc={s.shipBy ? `Le plus pressé : ${s.title||'—'}${when(s)?` · ${when(s)}`:''}` : null}
+              detail={`Vinted laisse environ ${SHIP_DAYS} jours après la vente pour expédier. À temps, ta note vendeur est préservée. L'échéance affichée est une estimation ; le bordereau se génère depuis l'onglet Colis.`}
+              action={onNav && (
+                <button type="button" onClick={()=>onNav('cat_bord')}
+                  style={{flexShrink:0,alignSelf:'center',border:`1px solid ${C.border}`,background:C.surface,color:C.text,
+                    borderRadius:9,padding:'7px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  Expédier
+                </button>
+              )}/>
           );
         })()}
         {/* 💶 Argent en route : ventes en cours (pas encore validées par
@@ -13714,14 +13783,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // anciennes gardent ce statut alors que l'argent a déjà été versé.
           const reel = (walletEscrow && walletEscrow.total > 0) ? walletEscrow : null;
           return (
-            <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}10`,borderRadius:12,padding:'11px 14px',marginBottom:12}}>
+            <div style={{position:'relative',overflow:'hidden',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px 11px 16px',marginBottom:10}}>
+              {/* Surface NEUTRE + une barre de 3 px : la couleur signale, elle
+                  n'inonde plus le bloc. Le montant, lui, garde l'accent — c'est
+                  lui l'information, pas le fond. */}
+              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:C.accent}}/>
               {/* La carte est CLIQUABLE : Julien veut voir d'où sort le total,
                   compte par compte — un chiffre agrégé qu'on ne peut pas ouvrir
                   est invérifiable, donc invendable. */}
               <button type="button" onClick={()=>setDetailAttente(v=>!v)} aria-expanded={detailAttente} disabled={!reel}
                 style={{width:'100%',border:'none',background:'transparent',padding:0,textAlign:'left',fontFamily:'inherit',cursor:reel?'pointer':'default'}}>
                 <div style={{display:'flex',alignItems:'center',gap:11}}>
-                  <span style={{fontSize:22}}>💶</span>
+                  <span style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="wallet" size={20}/></span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}{reel?<span style={{textTransform:'none',letterSpacing:0,fontWeight:600,color:C.accent}}> · {detailAttente?'masquer le détail ▲':'voir le détail ▼'}</span>:null}</div>
                     <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
@@ -13842,13 +13915,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           });
           if(!pending.length||sales.items===null) return null;
           return (
-            <div style={{border:`1.5px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:12}}>
-              <div style={{fontSize:13,fontWeight:600,color:C.warn}}>📦 {pending.length} vente{pending.length>1?'s':''} repérée{pending.length>1?'s':''} via bordereau, pas encore synchronisée{pending.length>1?'s':''}</div>
-              <div style={{fontSize:11,color:C.text,marginTop:4,lineHeight:1.5}}>
-                {pending.map(b=>(b.numero?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
-              </div>
-              <div style={{fontSize:11,color:C.muted,marginTop:4}}>Elles apparaîtront dans la liste (et la compta) après ta prochaine navigation sur Vinted (l'extension re-capte tes ventes).</div>
-            </div>
+            <Notice tone="warn" icon="box"
+              value={pending.length}
+              title={`vente${pending.length>1?'s':''} repérée${pending.length>1?'s':''} via bordereau, pas encore synchronisée${pending.length>1?'s':''}`}
+              desc={pending.map(b=>(b.numero?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
+              detail="Elles apparaîtront dans la liste (et dans la comptabilité) après ta prochaine navigation sur Vinted : c'est l'extension qui recapte les ventes."/>
           );
         })()}
         {(totals.nb>0 || totals.nbAttente>0) && (
@@ -13889,24 +13960,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ventes — l'essentiel était enterré. On les regroupe derrière un seul
             bouton, fermé par défaut : l'écran va droit au but, l'analyse reste
             à un tap. */}
-        {/* 🎉 WRAPPED — la rétrospective plein écran (existait mais n'était reliée
-            à aucun bouton, donc invisible). Entrée festive et bien visible. */}
+        {/* ⚠️ LE BANDEAU « WRAPPED » NE PREND PLUS TOUT L'ÉCRAN.
+            C'était un pavé en dégradé violet/rose, texte blanc, emoji de 26 px,
+            posé au milieu d'un outil de comptabilité — l'élément qui faisait le
+            plus « application fabriquée par une machine ». La rétrospective est
+            sympathique, elle n'a simplement pas à crier plus fort que les colis
+            à expédier. Elle devient une ligne discrète, au même gabarit que
+            « Analyse de tes ventes » juste en dessous : deux entrées de même
+            nature ont désormais la même apparence. */}
         {(totals.nb>0) && (
           <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
-            style={{width:'100%',display:'flex',alignItems:'center',gap:12,border:'none',borderRadius:16,padding:'14px 16px',marginBottom:12,cursor:'pointer',fontFamily:'inherit',color:'#fff',background:'linear-gradient(120deg,#6a3cff,#a936ff 55%,#ff4fa3)',boxShadow:'0 6px 18px rgba(140,60,255,0.35)'}}>
-            <span style={{fontSize:26}}>🎉</span>
-            <span style={{flex:1,textAlign:'left'}}>
-              <span style={{display:'block',fontSize:15,fontWeight:800,letterSpacing:-0.3}}>Ton Wrapped {new Date().getFullYear()}</span>
-              <span style={{display:'block',fontSize:12,opacity:0.9,fontWeight:500}}>Ta rétrospective animée — appuie pour la vivre</span>
+            style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,
+              background:C.card,borderRadius:12,padding:'11px 13px',marginBottom:10,cursor:'pointer',fontFamily:'inherit'}}>
+            <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="spark" size={17}/></span>
+            <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>
+              Rétrospective {new Date().getFullYear()}
             </span>
-            <span style={{fontSize:20,fontWeight:800}}>›</span>
+            <span style={{fontSize:11,color:C.muted,fontWeight:500}}>voir</span>
           </button>
         )}
         {(totals.nb>0) && (
           <div style={{marginBottom:12}}>
             <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
               style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-              <span style={{fontSize:15}}>📊</span>
+              <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="chart" size={17}/></span>
               <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Analyse de tes ventes</span>
               <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{analyseOpen?'masquer':'voir'}</span>
               <span style={{fontSize:13,color:C.muted,transform:analyseOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
@@ -14063,9 +14140,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ); })()}
         </>)}
         {totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
-          <div style={{fontSize:12,fontWeight:500,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>
-            ⚠️ {totals.nb-totals.nbCout} vente{(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat — complète le prix dans l'onglet « Annonces » (bouton 🔗).
-          </div>
+          <Notice tone="warn" icon="alert"
+            value={totals.nb-totals.nbCout}
+            title={`vente${(totals.nb-totals.nbCout)>1?'s':''} sans prix d'achat`}
+            desc="Tant qu'il manque, le bénéfice affiché est le prix de vente entier."
+            detail="Le prix d'achat se saisit sur l'annonce (onglet Annonces), ou d'un coup avec « Tout compléter » — une liste, un champ par ligne, Entrée passe à la suivante."/>
         )}
         {sales.failed?.length>0 && (
           <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:10,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
@@ -14269,7 +14348,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
         {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && (
-          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="🔎 Rechercher (titre, N°, vendeur)…"
+          <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, vendeur)…"
             style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
         )}
         {/* Compte des colis à retirer PAR TRANSPORTEUR, pour que Chronopost,
@@ -15347,7 +15426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </>)}
           {/* Recherche + tri */}
           <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
-            <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="🔎 Rechercher (titre, marque, N°)…"
+            <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
             <select value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
@@ -17958,6 +18037,10 @@ function ConnexionsSetting() {
       <Ligne t="Emails" coul={teinte(mail && mail.ts)}
         etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
         d="Bordereaux, suivi des colis et codes de retrait arrivent par email — Vinted ne les donne pas autrement."/>
+      {/* La version de l'app : ici, et plus dans l'en-tête de chaque écran. */}
+      <div style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`,fontSize:11,color:C.muted}}>
+        Version de l'application · <span style={{fontVariantNumeric:'tabular-nums'}}>{BUILD_ID}</span>
+      </div>
     </div>
   );
 }
@@ -18851,7 +18934,7 @@ export default function App() {
       // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
       slideTab(e.clientX-s.x, e.clientY-s.y, 110);
       }}
-      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>>
+      onPointerCancel={()=>{ swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -18886,7 +18969,12 @@ export default function App() {
               passait à la ligne et faisait grandir l'en-tête d'un écran à l'autre. */}
           <div style={{minWidth:0}}>
             <VrmWord height={19} color={C.text} accent={C.accent} style={{display:'block'}}/>
-            <div style={{fontSize:9,color:C.muted,fontWeight:500,letterSpacing:0.2,marginTop:2,opacity:0.75,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>{BUILD_ID}</div>
+            {/* ⚠️ Le numéro de version ne s'affiche PLUS dans l'en-tête. Il y
+                apparaissait tronqué (« v83/00 · Rafraîchisse… ») sur TOUS les
+                écrans : c'est de la information de développeur, et c'est
+                exactement ce qui fait « outil bricolé » plutôt que produit.
+                Il reste consultable dans Réglages, à côté de la version de
+                l'extension — c'est là qu'on le cherche quand on en a besoin. */}
           </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
