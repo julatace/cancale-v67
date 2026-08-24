@@ -15626,12 +15626,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           d'édition, et les calculs qui n'existaient que pour eux.
           Le panneau de l'extension n'est PAS touché. */}
 
-      /* ⚠️ RESTAURÉS. En retirant l'atelier « Republier », j'ai emporté avec lui
-         les blocs voisins : les écrans MESSAGES et COLIS, et la modale qui relie
-         une annonce à un achat. Les deux écrans s'affichaient entièrement VIDES
-         — et le smoke ne l'a pas vu, parce qu'un écran vide ne lève aucune
-         erreur. Une suppression par plage de lignes doit être vérifiée sur ce
-         qui RESTE, pas seulement sur ce qui disparaît. */
+      {/* ⚠️ RESTAURÉS. En retirant l'atelier « Republier », j'ai emporté avec lui
+          les blocs voisins : les écrans MESSAGES et COLIS, et la modale qui relie
+          une annonce à un achat. Les deux écrans s'affichaient entièrement VIDES
+          — et le smoke ne l'a pas vu, parce qu'un écran vide ne lève aucune
+          erreur. Une suppression par plage de lignes doit être vérifiée sur ce
+          qui RESTE, pas seulement sur ce qui disparaît.
+          ⚠️ Et ce commentaire-ci s'est affiché EN TEXTE au premier essai : un
+          commentaire de style C posé nu au milieu d'enfants JSX est un nœud de
+          TEXTE, pas un commentaire — il faut les accolades. Version miroir du
+          piège de §5.55. */}
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
