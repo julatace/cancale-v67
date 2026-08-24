@@ -4234,3 +4234,185 @@ dans les deux sens).
 | `VAPID_PRIVATE_KEY` sur Vercel (sinon plus aucune notification) | Julien |
 | ressaisir son entreprise dans Réglages → Factures | Julien |
 | `SUPABASE_SERVICE_KEY` + `VRM_OWNER_UID` avant d'activer RLS | Julien |
+
+---
+
+## 5.54 — REFONTE VISUELLE, PHASE 1 : arrêter de crier
+
+Julien : « on dirait vraiment un site fait par intelligence artificielle, fais
+quelque chose de professionnel… là ça ne me convient pas du tout ».
+
+Méthode : **regarder l'écran** (captures du banc §20) avant de toucher au code,
+puis mesurer ce qui produit l'impression.
+
+### ⚠️ 1. UN `>` S'AFFICHAIT EN HAUT DE CHAQUE ÉCRAN
+Trouvé en inspectant le DOM, pas le code : un nœud de texte `>` en tout premier
+enfant du conteneur racine. Cause — la balise ouvrante du conteneur se terminait
+par **`}}>>`** : le premier `>` ferme la balise, le second devient du texte.
+Il était là sur **tous les écrans, tous les appareils**. C'est exactement le
+genre de détail qui fait « pas fini ». Une ligne.
+
+### 2. Le diagnostic, en chiffres
+**693 emojis** dans du code non commenté (⚠️ 70 · ✓ 44 · 📦 42 · 💸 20 · ✅ 20 …).
+Mais le vrai défaut n'est pas leur nombre : c'est que **tout est un encadré
+teinté**. Sur l'écran Ventes on comptait, empilés : un bloc rouge, un vert, un
+ambre, trois gris, **un bandeau en dégradé violet/rose**, un autre ambre. Quand
+tout crie aussi fort, plus rien ne ressort — et l'œil lit « fabriqué à la
+chaîne ».
+
+### 3. La règle posée : `Notice`
+Nouveau composant (à côté de `Card`/`StatBox`) :
+- **surface NEUTRE** (`C.card`), jamais un fond teinté ;
+- la couleur ne sert qu'à une **barre de 3 px** sur le côté et à l'**icône** ;
+- le titre garde la couleur du texte — c'est le **chiffre** qui porte la couleur
+  quand il y a urgence ;
+- l'explication longue passe derrière **« Pourquoi ? »** : disponible, mais elle
+  n'occupe plus l'écran.
+
+Converti : colis à expédier, argent en attente, vente repérée via bordereau,
+ventes sans prix d'achat.
+
+### 4. Les emojis utilisés COMME icônes
+⚠️ Un emoji est dessiné par le système : ni la même graisse, ni la même grille,
+ni la même couleur que le reste. Mélanger les deux, c'est le tell.
+- **16 icônes au trait ajoutées** à `ICON_PATHS` (truck, clock, alert, check,
+  euro, eye, heart, printer, camera, calendar, filter, sleep, target, qr,
+  wallet, info) — même grille 24 et même trait que la barre du bas.
+- Les tuiles de « Ma journée » : le carré de 46 px teinté avec un emoji de 24 px
+  devient une **pastille neutre + icône au trait**.
+- Le **bandeau « Wrapped »** en dégradé violet/rose passe en ligne discrète, au
+  même gabarit que « Analyse de tes ventes » juste en dessous : deux entrées de
+  même nature ont désormais la même apparence.
+- ☀️ devant « Bonjour Julien » et 🗓️ devant « Ta semaine » : retirés (« TA
+  SEMAINE » devient une étiquette calme en capitales).
+- **9 loupes** retirées des champs de recherche : un champ se reconnaît à sa
+  forme, pas à un emoji collé devant le texte d'aide.
+
+### 5. Le numéro de version sort de l'en-tête
+Il s'affichait **tronqué** (« v83/00 · Rafraîchisse… ») sur tous les écrans :
+information de développeur, en permanence, dans le bandeau du haut. Il vit
+maintenant dans Réglages, à côté de la version de l'extension — là où on le
+cherche quand on en a besoin.
+
+### ⚠️ Ce qui reste (dit franchement)
+Il reste ~600 emojis, surtout dans des pastilles de statut et des libellés de
+boutons. Les remplacer d'un coup, c'est 600 modifications dispersées que je ne
+peux pas vérifier une par une — et le résultat serait moins bon, pas meilleur.
+La suite se fait **écran par écran, capture à l'appui**, comme cette phase.
+
+### Vérifié
+`npm run build` OK · smoke **11 écrans, 0 PAGEERROR, 0 artefact** · le nœud de
+texte parasite a disparu du DOM (mesuré avant/après) · 9 audits au vert.
+
+---
+
+## 5.55 — ⚠️ UN COMMENTAIRE JSX SEUL ENTRE PARENTHÈSES EST UN OBJET (écran Ventes cassé)
+
+Trouvé par le smoke, pas par la relecture ni par `npm run build` :
+
+```
+CONSOLE @cat_ventes  Minified React error #31 … object with keys {}
+CONSOLE @cat_ventes  [VRM] écran en erreur
+```
+
+En nettoyant un doublon d'avertissement, j'avais laissé la condition et remplacé
+son contenu par un commentaire :
+
+```jsx
+{totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
+  {/* … le bloc vit maintenant plus bas … */}
+)}
+```
+
+⚠️ **`( {/* … */} )` n'est PAS un commentaire : c'est un littéral d'objet `{}`.**
+React refuse de rendre un objet (#31), donc **l'écran Ventes tombait dès qu'il y
+avait une vente sans prix d'achat** — c'est-à-dire toujours (§5.47 : 0 prix
+d'achat sur 212 paires). Le build ne le voit pas (la syntaxe est valable), un
+smoke sans données non plus (la condition est fausse) : **seul un rendu réel avec
+les vraies données le montre** — la leçon de §26, à l'identique.
+
+`EcranGardeFou` (§5.14) a fait son travail : message d'erreur, barre du bas
+intacte, rien de perdu. C'est la deuxième fois qu'il rattrape une de mes
+livraisons.
+
+➡️ Le motif n'existe nulle part ailleurs (vérifié par recherche sur
+`&& (` immédiatement suivi d'une ligne `{/*`). **Un commentaire qui remplace du
+JSX doit sortir des parenthèses, ou la condition doit disparaître avec lui.**
+
+### Refonte visuelle, phase 2 — écran Achats
+- **« Ce qui arrive dans l'app »** était un tableau de diagnostic encadré, ouvert
+  en permanence, **au-dessus des colis à retirer**. Il se tait désormais quand
+  tout va bien (une ligne dépliable « Réception des emails · tout arrive ») et
+  devient un vrai `Notice` d'avertissement **quand un compte ne reçoit aucun
+  email** — le cas grave, mesuré en §5.47 : ses codes de retrait n'arrivent
+  jamais. Le tableau complet (transporteurs + comptes) reste, derrière le
+  dépliant : c'est la preuve, pas l'alerte.
+- **Pastilles de statut de vente** (`venteStage`) : elles portaient un emoji ET
+  une couleur qui disent la même chose. On garde la couleur et le mot
+  (« À expédier », « En transit », « Au relais », « Livrée », « Vendue »).
+- **Points relais** : `📍` et `🧭` deviennent des icônes au trait (`pin`, `nav`,
+  ajoutées à `ICON_PATHS`) — elles étaient à côté des logos de transporteurs.
+- **Annonces** : `🚨`/`⚠️` du bandeau de signalements → `Icon name="alert"` teinté
+  par la gravité ; `🏠` → icône `home` ; raccourcis Ventes/Achats/Annonces/
+  Bordereaux → mêmes symboles au trait que la barre du bas.
+
+⚠️ **Ce qui reste volontairement en emoji** : les emojis **dans un libellé de
+bouton** (« 📋 Copier », « ⬇️ Exporter ») — §13 : là, ils aident. La règle est
+« un emoji utilisé COMME icône devient une icône au trait », pas « plus aucun
+emoji ».
+
+---
+
+## 5.56 — ⚠️⚠️ J'AI SUPPRIMÉ DEUX ÉCRANS ENTIERS, ET LE BANC N'A RIEN DIT
+
+En retirant l'atelier « Republier » (§5.53), j'ai supprimé une **plage de lignes**
+qui contenait aussi ses voisins. Perdus, en production sur la branche :
+
+| perdu | conséquence |
+|---|---|
+| `curSub==='messages'` | **écran Messages entièrement vide** |
+| `curSub==='bordereaux'` | **écran Colis entièrement vide** — celui qui porte les colis à expédier |
+| modale `{pickerFor && …}` | **« Relier à un achat » ne s'ouvrait plus** — l'outil central du prix d'achat (§5.23) |
+
+Vu au **rendu**, pas à la relecture : la capture de l'onglet Colis était une page
+noire avec la barre du bas, alors que « Ma journée » annonçait *« Expédier 3 colis »*.
+
+### ⚠️ Pourquoi le smoke ne l'a pas vu — et le chiffre était sous mes yeux
+Le banc comptait les erreurs de page et les artefacts d'affichage. **Un écran vide
+ne lève aucune erreur** : il passait donc « 0 PAGEERROR, 11 écrans OK ». Pire, le
+banc imprimait déjà la preuve et je l'ai lue sans la voir :
+
+```
+cat_ventes 17455 · cat_annonces 4418 · cat_achats 3560 · settings 5823
+cat_bord 57   ⚠️   cat_msg 61   ⚠️
+```
+
+57 et 61 caractères, c'est l'en-tête et la barre du bas — rien d'autre.
+
+➡️ **Deux durcissements du banc** (`smoke_all.cjs`) :
+1. **moins de 120 caractères = ÉCHEC** (`ECRAN VIDE @<onglet>`), plus un nombre à
+   remarquer dans un JSON ;
+2. la liste d'onglets contenait **`stats` et `cat_repub`, qui n'existent pas dans
+   `TABS_OK`** : l'app retombait sur l'onglet par défaut et le banc mesurait
+   **trois fois Ma journée** en croyant tester le tableau de bord (les trois
+   rendaient exactement 361 caractères — le même repli). Remplacés par `journee`
+   et `dashboard`.
+
+### La leçon
+**Une suppression par plage de lignes se vérifie sur ce qui RESTE, pas sur ce qui
+disparaît.** `npm run build` passe (le JSX restant est valable), un smoke qui ne
+compte que les erreurs passe aussi. Le contrôle qui tranche est : *chaque écran
+affiche-t-il encore quelque chose ?*
+⚠️ C'est la deuxième fois de la journée qu'un défaut passe le build et le smoke
+et n'apparaît qu'au rendu réel (l'autre : §5.55, le commentaire JSX rendu comme
+objet vide). **Regarder les captures fait partie du test, ce n'est pas un extra.**
+
+### 5.56 (suite) — écran Colis, même traitement
+Les trois blocs de tête (vert « N colis à envoyer », rouge « à poster en
+priorité », rouge « numéro porté par deux paires ») s'empilaient comme trois
+alertes de même force. Les deux premiers passent au gabarit `Notice` : surface
+neutre, barre de 3 px, **le chiffre porte la couleur**. Le troisième garde son
+cadre rouge — deux paires dans la même boîte est le seul risque irréversible de
+l'app (§19), il doit rester le plus fort de l'écran.
+Emojis d'état retirés des cartes (`⏳`, `✅`, `📦`, `📮`) : le mot et la couleur
+disaient déjà la même chose ; `🏠 pas rangée` passe à l'icône `home`.
