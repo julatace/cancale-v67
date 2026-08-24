@@ -13750,8 +13750,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {!only && (
         <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-          {[['ventes','💸 Ventes'],['achats','🛍️ Achats'],['annonces','🟢 Annonces'],['bordereaux','📄 Bordereaux']].map(([id,label])=>(
-            <button key={id} onClick={()=>setSub(id)} style={{padding:'6px 14px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:500,fontSize:13,cursor:'pointer'}}>{label}</button>
+          {/* Mêmes symboles que la barre du bas : un écran et son raccourci
+              portent le même signe, au trait, pas un emoji du système. */}
+          {[['ventes','cash','Ventes'],['achats','bag','Achats'],['annonces','shop','Annonces'],['bordereaux','printer','Bordereaux']].map(([id,ic,label])=>(
+            <button key={id} onClick={()=>setSub(id)} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:500,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}><Icon name={ic} size={15}/>{label}</button>
           ))}
         </div>
       )}
@@ -15089,7 +15091,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" onClick={() => setDiagOpen(v => !v)}
               style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${teinte}${grave?'':'55'}`,background:`${teinte}12`,
                 borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
-              <span style={{fontSize:15}}>{grave ? '🚨' : '⚠️'}</span>
+              <span aria-hidden="true" style={{flexShrink:0,color:teinte,display:'flex'}}><Icon name="alert" size={17}/></span>
               <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
                 {grave
                   ? `${numDoublons.length} numéro${numDoublons.length>1?'x':''} en double${n>numDoublons.length?` · ${n-numDoublons.length} autre${n-numDoublons.length>1?'s':''}`:''}`
@@ -15183,7 +15185,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{d.numero} · {d.e.title||'—'}</div>
-                      <div style={{fontSize:10.5,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? '🏠 rangée au garage' : 'pas au garage'}</div>
+                      <div style={{fontSize:10.5,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? 'rangée au garage' : 'pas au garage'}</div>
                     </div>
                     <button type="button" title="La paire n'est plus à vendre : on libère son numéro pour une autre paire."
                       onClick={()=>{ setPairsLost(prev=>{ const u={...prev,[d.numero]:{ at:new Date().toISOString(), title:d.e.title||'' }}; save('vinted_pairs_lost',u); return u; }); toast(`N°${d.numero} retirée du stock`); }}
@@ -15315,9 +15317,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 120px',minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
                         <div style={{fontSize:11,fontWeight:500,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
-                          <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'📦 Reçue — à republier':lab.txt}</span>
+                          <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'Reçue — à republier':lab.txt}</span>
                           <AcctTag acc={r.o._acc} name={accNameOf(r.o._acc)}/>
-                          {r.cell && <span style={{color:C.blue||C.accent}}>🏠 {garageCellLabel(r.cell)}</span>}
+                          {r.cell && <span style={{color:C.blue||C.accent,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>{garageCellLabel(r.cell)}</span>}
                           {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
                         </div>
                       </div>

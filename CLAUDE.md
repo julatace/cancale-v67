@@ -4303,3 +4303,60 @@ La suite se fait **écran par écran, capture à l'appui**, comme cette phase.
 ### Vérifié
 `npm run build` OK · smoke **11 écrans, 0 PAGEERROR, 0 artefact** · le nœud de
 texte parasite a disparu du DOM (mesuré avant/après) · 9 audits au vert.
+
+---
+
+## 5.55 — ⚠️ UN COMMENTAIRE JSX SEUL ENTRE PARENTHÈSES EST UN OBJET (écran Ventes cassé)
+
+Trouvé par le smoke, pas par la relecture ni par `npm run build` :
+
+```
+CONSOLE @cat_ventes  Minified React error #31 … object with keys {}
+CONSOLE @cat_ventes  [VRM] écran en erreur
+```
+
+En nettoyant un doublon d'avertissement, j'avais laissé la condition et remplacé
+son contenu par un commentaire :
+
+```jsx
+{totals.nb>0 && (totals.nb-totals.nbCout)>0 && (
+  {/* … le bloc vit maintenant plus bas … */}
+)}
+```
+
+⚠️ **`( {/* … */} )` n'est PAS un commentaire : c'est un littéral d'objet `{}`.**
+React refuse de rendre un objet (#31), donc **l'écran Ventes tombait dès qu'il y
+avait une vente sans prix d'achat** — c'est-à-dire toujours (§5.47 : 0 prix
+d'achat sur 212 paires). Le build ne le voit pas (la syntaxe est valable), un
+smoke sans données non plus (la condition est fausse) : **seul un rendu réel avec
+les vraies données le montre** — la leçon de §26, à l'identique.
+
+`EcranGardeFou` (§5.14) a fait son travail : message d'erreur, barre du bas
+intacte, rien de perdu. C'est la deuxième fois qu'il rattrape une de mes
+livraisons.
+
+➡️ Le motif n'existe nulle part ailleurs (vérifié par recherche sur
+`&& (` immédiatement suivi d'une ligne `{/*`). **Un commentaire qui remplace du
+JSX doit sortir des parenthèses, ou la condition doit disparaître avec lui.**
+
+### Refonte visuelle, phase 2 — écran Achats
+- **« Ce qui arrive dans l'app »** était un tableau de diagnostic encadré, ouvert
+  en permanence, **au-dessus des colis à retirer**. Il se tait désormais quand
+  tout va bien (une ligne dépliable « Réception des emails · tout arrive ») et
+  devient un vrai `Notice` d'avertissement **quand un compte ne reçoit aucun
+  email** — le cas grave, mesuré en §5.47 : ses codes de retrait n'arrivent
+  jamais. Le tableau complet (transporteurs + comptes) reste, derrière le
+  dépliant : c'est la preuve, pas l'alerte.
+- **Pastilles de statut de vente** (`venteStage`) : elles portaient un emoji ET
+  une couleur qui disent la même chose. On garde la couleur et le mot
+  (« À expédier », « En transit », « Au relais », « Livrée », « Vendue »).
+- **Points relais** : `📍` et `🧭` deviennent des icônes au trait (`pin`, `nav`,
+  ajoutées à `ICON_PATHS`) — elles étaient à côté des logos de transporteurs.
+- **Annonces** : `🚨`/`⚠️` du bandeau de signalements → `Icon name="alert"` teinté
+  par la gravité ; `🏠` → icône `home` ; raccourcis Ventes/Achats/Annonces/
+  Bordereaux → mêmes symboles au trait que la barre du bas.
+
+⚠️ **Ce qui reste volontairement en emoji** : les emojis **dans un libellé de
+bouton** (« 📋 Copier », « ⬇️ Exporter ») — §13 : là, ils aident. La règle est
+« un emoji utilisé COMME icône devient une icône au trait », pas « plus aucun
+emoji ».
