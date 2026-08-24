@@ -4551,3 +4551,54 @@ prendrait des semaines. Ce bouton en fait un lot de 15, **sur son clic**.
 transactions, envoyées une par une en attendant chaque réponse, pour le seul
 compte connecté, et le plafond de 20 actions/h coupe le lot de lui-même — il est
 désormais vérifié **avant chaque requête**, plus seulement au début.
+
+
+### 5.57 (suite) — ⚠️ SIMPLIFIÉ : « FINALISÉES » PORTE SUR LA DATE DE VENTE
+
+Julien, après coup : « c'est hyper simple, il s'agit juste d'additionner toutes
+les ventes réalisées d'une date à l'autre dans les ventes finalisées. **On ne te
+parle pas de transfert d'argent**, simplement des ventes finalisées. »
+
+➡️ **La date d'encaissement est RETIRÉE de la période.** Une seule date partout :
+celle de la vente. Le filtre « Finalisées » somme les ventes finalisées dont la
+vente tombe dans la plage. C'est plus simple, **complet dès aujourd'hui** (la
+date de vente est toujours là, l'encaissement ne l'était que pour 67 ventes sur
+236), et ça ne dépend d'aucune capture supplémentaire.
+⚠️ **Ne pas réintroduire la date d'encaissement sans qu'il le redemande.**
+Retirés avec elle : `dateEncaissement`, le mode « Argent reçu », l'avertissement
+« sans date d'encaissement », la capture `capterEncaissements` de l'extension et
+son bouton dans le panneau — des requêtes Vinted pour une donnée que plus rien
+ne lit, c'est de l'empreinte pour rien. `fetchTxnItemIds` revient à deux
+scalaires (l'identité d'annonce, elle, reste essentielle).
+
+### La période descend sous les onglets
+« En haut, quand tu cliques sur finalisé, ça fait un onglet trop gros. » Six
+pastilles de période + la recherche formaient deux blocs pleins avant la
+première vente. La recherche reste en haut (elle sert quel que soit le filtre) ;
+**le sélecteur de période passe SOUS les onglets** — on choisit « Finalisées »,
+puis le mois.
+
+### ⚠️ « Est-ce que tu es sûr qu'il n'y aura jamais d'erreur sur les numéros ? »
+Réponse mesurée, et elle n'est pas « oui » sans réserve.
+
+| relevé du 24 août | |
+|---|---|
+| numéros attribués | **195, du N°1 au N°275** |
+| portés par une annonce EN LIGNE | **23** |
+| paires déjà parties (numéro brûlé à vie) | **172** |
+| jamais attribués (vrais trous) | 80 |
+| **conflits (un numéro sur deux paires présentes)** | **1 — le N°4** |
+
+**Les « sauts » ne sont pas aléatoires** : entre 100 et 160, presque tous les
+numéros SONT attribués — à des paires vendues (N°100 Samba LT, N°101 Spezial
+gris… seuls N°118 et N°134 sont encore en ligne). L'inventaire n'affiche que les
+paires présentes, d'où l'impression de trous.
+**Ce qui est garanti** : un numéro n'est jamais réattribué (§5.40) ; la saisie
+manuelle refuse un numéro porté par une paire présente (§5.42) ; l'attribution
+automatique ne pioche que dans les numéros libres ; le numéro d'un colis vient
+de l'identifiant d'annonce Vinted, jamais d'une ressemblance (§5.34).
+**Ce qui ne l'est pas** : le N°4, hérité d'avant ces garde-fous, est encore porté
+par deux annonces en ligne. Il est signalé en rouge sur l'écran Annonces, dans
+l'inventaire et sur la carte du colis — mais il existe. Tant qu'il n'est pas
+corrigé, la réponse honnête est « une seule erreur possible, et elle est
+nommée », pas « aucune ».

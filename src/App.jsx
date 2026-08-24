@@ -1871,27 +1871,15 @@ const fetchCapturedLabelMetas = async (uid) => {
 // dit à quelle annonce il correspond.
 // ⚠️ ÉGRESS (§34) : une ligne de transaction est grosse → on ne lit que les
 // deux entiers utiles, jamais `select=data`.
-// ⚠️ On lit ici QUATRE SCALAIRES par transaction, jamais le payload (§34) :
-//  · `item` — l'identifiant d'annonce donné par Vinted (identité certaine, §5.34) ;
-//  · `maj` + `etat` — quand le statut a changé, et vers QUOI. Le couple des deux
-//    donne la DATE D'ENCAISSEMENT : c'est le moment où Vinted a finalisé la
-//    vente, donc libéré l'argent. Mesuré sur la vraie base : la vente est
-//    finalisée 7 jours après l'achat en médiane, jusqu'à 25 — dater
-//    l'encaissement au jour de la vente serait donc faux d'une à trois semaines.
-//  ⚠️ `maj` ne vaut « encaissement » QUE si `etat` dit finalisé : sur un détail
-//    capté plus tôt, `maj` date de l'étape d'avant (« Le paiement a été validé »).
+// ⚠️ On lit ici DEUX SCALAIRES par transaction, jamais le payload (§34) :
+// la transaction et l'identifiant d'annonce que Vinted lui rattache — l'identité
+// certaine sur laquelle repose tout le reste (§5.34).
 const fetchTxnItemIds = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,item:data->payload->transaction->>item_id,maj:data->payload->transaction->>status_updated_at,etat:data->payload->transaction->>status_title`, { headers: sbAuth() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,item:data->payload->transaction->>item_id`, { headers: sbAuth() });
     if (!res.ok) return {};
     const map = {};
-    for (const r of await res.json()) {
-      if (!r || !r.tx) continue;
-      const cur = map[String(r.tx)];
-      // Plusieurs captures d'une même transaction : on garde la plus récente.
-      if (cur && cur.maj && r.maj && Date.parse(r.maj) <= Date.parse(cur.maj)) continue;
-      map[String(r.tx)] = { item: r.item ? String(r.item) : '', maj: r.maj || '', etat: r.etat || '' };
-    }
+    for (const r of await res.json()) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
     return map;
   } catch (_) { return {}; }
 };
@@ -11041,7 +11029,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
   const identiteAnnonce = (o) => {
     if (!o) return null;
-    const parVinted = o.transaction_id != null ? (txnItem[String(o.transaction_id)] || {}).item : null;
+    const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     if (parVinted) return String(parVinted);
     return entryKeyByPhoto(o) || null;
   };
@@ -11054,7 +11042,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // taille 34 » verrouillé sur le N°155, « …taille 38 » sur le N°27, deux paires
     // que Vinted rattache à une AUTRE annonce). Un verrou ne peut donc plus primer
     // sur ce que dit Vinted : quand les deux se contredisent, **Vinted gagne**.
-    const certain = o && o.transaction_id != null ? (txnItem[String(o.transaction_id)] || {}).item : null;
+    const certain = o && o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     const linked = o && o.transaction_id != null ? txnLink[String(o.transaction_id)] : null;
     if (linked && numeros[linked] && !(certain && String(certain) !== String(linked))) {
       const e = numeros[linked];
@@ -11330,29 +11318,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
   // La période s'applique EN MÊME TEMPS que la recherche : les compteurs et les
   // totaux affichés correspondent donc toujours à ce qui est listé.
-  // LA date d'encaissement d'une vente, et il n'y en a qu'une (§11).
-  // Source unique : le détail de transaction capté par l'extension, et
-  // SEULEMENT quand ce détail dit lui-même « finalisé » — sinon son
-  // `status_updated_at` date de l'étape d'avant (« Le paiement a été validé »),
-  // ce qui donnerait un encaissement le jour de la vente, donc faux.
-  // Rien d'autre ne fait foi : ni la date de vente, ni une estimation.
-  const dateEncaissement = (o) => {
-    const t = o && o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
-    if (!t || !t.maj || !/finalis/i.test(t.etat || '')) return NaN;
-    const ms = Date.parse(t.maj);
-    return isNaN(ms) ? NaN : ms;
-  };
-  // Sur le filtre « Finalisées », la période porte sur l'ENCAISSEMENT — c'est
-  // la demande de Julien, et c'est la seule lecture juste pour la compta.
-  // Une vente dont on ne connaît pas encore la date d'encaissement n'est
-  // JAMAIS datée au jour de la vente : elle sort du total et se compte à part.
+  // ⚠️ UNE SEULE DATE, PARTOUT : celle de la VENTE.
+  // J'avais fait porter la période de « Finalisées » sur la date d'encaissement
+  // (le jour où Vinted libère l'argent). Julien a tranché : « on ne te parle pas
+  // de transfert d'argent, mais simplement des ventes finalisées » — donc la
+  // somme des ventes FINALISÉES dont la vente tombe entre les deux dates.
+  // C'est plus simple, c'est complet dès aujourd'hui (la date de vente est
+  // toujours là), et ça ne dépend d'aucune capture supplémentaire.
+  // NE PAS réintroduire la date d'encaissement ici sans qu'il le redemande.
   const matchOrd = (o) => {
-    // ⚠️ `matchOrd` sert AUSSI aux Achats et aux Colis : sans ce garde-fou, un
-    // filtre laissé sur « Finalisées » daterait les achats à l'encaissement
-    // d'une vente. La règle ne vaut que sur l'écran Ventes.
-    if (curSub === 'ventes' && vFilter === 'finalisees' && periode && (periode.from || periode.to)) {
-      if (!dansPeriodeDate(dateEncaissement(o), periode)) return false;
-    } else if (!dansPeriode(o, periode)) return false;
+    if (!dansPeriode(o, periode)) return false;
     const q = ordSearch.trim().toLowerCase(); if (!q) return true;
     const e = effEntry(o); const num = String(e?.numero||'');
     const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
@@ -12111,7 +12086,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // verrou déjà en base, on corrige la ligne au lieu de la contourner —
       // sinon le mauvais lien resurgit partout où il est lu (bordereau, facture,
       // prix d'achat). Mesuré : 2 verrous faux sur les 35 vérifiables.
-      const certain = (txnItem[tid] || {}).item ? String(txnItem[tid].item) : null;
+      const certain = txnItem[tid] ? String(txnItem[tid]) : null;
       if (next[tid]) {
         if (certain && String(next[tid]) !== certain && !onlineAnnonceIds.has(certain)) { next[tid] = certain; changed = true; }
         continue;
@@ -12644,14 +12619,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // laissait « CA finalisé 6 068 € · 212 ventes » au-dessus d'une liste de
     // quelques lignes : deux chiffres pour la même chose sur le même écran
     // (§11). C'est exactement ce qu'on veut pour une déclaration mensuelle.
-    // ⚠️ SUR « FINALISÉES », LA PÉRIODE PORTE SUR L'ENCAISSEMENT (§ dateEncaissement).
-    // Le CA d'un mois, c'est l'argent reçu ce mois-là — pas les ventes conclues
-    // ce mois-là, qui seront payées jusqu'à trois semaines plus tard.
-    const surEncaissement = curSub === 'ventes' && vFilter === 'finalisees' && periode && (periode.from || periode.to);
-    const dedans = (o) => surEncaissement
-      ? (classifyOrderStatus(o.status) === 'completed' ? dansPeriodeDate(dateEncaissement(o), periode) : dansPeriode(o, periode))
-      : dansPeriode(o, periode);
-    const items = (sales.items || []).filter(dedans);
+    const items = (sales.items || []).filter(o => dansPeriode(o, periode));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
     // Finalisées dont l'encaissement n'est pas encore daté : elles sortent du
     // total plutôt que d'être posées au hasard sur la date de vente. On les
@@ -12674,13 +12642,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!dansPeriode(o, periode)) continue;
       masqNb++; masqEur += (o.price?.amount != null ? Number(o.price.amount) : 0);
     }
-    let sansDate = 0, sansDateEur = 0, sansDateNb = 0;
-    if (surEncaissement) for (const o of (sales.items || [])) {
-      if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
-      if (!isNaN(dateEncaissement(o))) continue;
-      sansDate++;
-      if (dansPeriode(o, periode)) { sansDateNb++; sansDateEur += (o.price?.amount != null ? Number(o.price.amount) : 0); }
-    }
     for (const o of items) {
       if (isHidden(o)) continue;
       const stt = classifyOrderStatus(o.status);
@@ -12695,9 +12656,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, surEncaissement, sansDate, sansDateEur, sansDateNb, masqNb, masqEur };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, vFilter, curSub, txnItem]);
+  }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -13911,8 +13872,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         {sales.items && sales.items.length>0 && (
-          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
-            <PeriodePicker value={periode} onChange={setPeriode}/>
+          <div style={{marginBottom:14}}>
             <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, acheteur)…"
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
           </div>
@@ -14149,10 +14109,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {(totals.nb>0 || totals.nbAttente>0) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
-            {/* Sur « Finalisées » avec une période, ce chiffre est de l'ARGENT
-                REÇU sur ces dates — pas des ventes conclues sur ces dates. Le
-                libellé le dit, sinon les deux se confondent. */}
-            <StatBox label={totals.surEncaissement ? 'Argent reçu' : 'CA finalisé'} value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
                 affiche déjà ce montant, avec le détail par compte et l'avertissement
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
@@ -14406,17 +14363,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             detail="Masquer une vente sert à écarter un doublon ou un test. La liste est conservée (clé « vinted_sales_hidden ») et se synchronise entre tes appareils — rien n'est supprimé, tout revient en un clic."
             action={<button type="button" onClick={()=>setShowHidden(true)} style={{border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les réafficher</button>}/>
         )}
-        {totals.surEncaissement && totals.sansDate > 0 && (
-          <Notice tone="warn" icon="clock"
-            value={totals.sansDateNb > 0 ? fmtE0(totals.sansDateEur) : totals.sansDate}
-            title={totals.sansDateNb > 0
-              ? `vendus sur ${libellePeriode(periode).toLowerCase()} et finalisés, mais l'encaissement n'est pas encore daté`
-              : `vente${totals.sansDate>1?'s':''} finalisée${totals.sansDate>1?'s':''} sans date d'encaissement connue`}
-            desc={totals.sansDateNb > 0
-              ? `${totals.sansDateNb} vente${totals.sansDateNb>1?'s':''} — ce montant n'est PAS dans « Argent reçu » ci-dessus, qui ne compte que les encaissements réellement datés. Les deux répondent à deux questions différentes : ce qui a été vendu sur la période, et ce qui a été touché sur la période.`
-              : "Elles ne sont pas comptées dans le total ci-dessus."}
-            detail="Vinted ne donne la date d'encaissement que dans le détail d'une transaction, jamais dans la liste des commandes. L'extension va le chercher à chaque passage sur vinted.fr, quelques ventes à la fois — la couverture des mois passés se remplit donc au fil des visites. Tant qu'elle manque, l'app préfère le dire plutôt que de dater un encaissement au jour de la vente : l'écart réel est de 7 jours en médiane, jusqu'à 25."/>
-        )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
@@ -14462,6 +14408,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })()}
         </div>
+        {/* LA PÉRIODE, SOUS LE FILTRE QU'ELLE AFFINE. Elle était tout en haut,
+            au-dessus de tout : six pastilles + la recherche formaient deux blocs
+            pleins avant la première vente. Ici, elle est là où on l'utilise —
+            on choisit « Finalisées », puis le mois. */}
+        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {sales.loading && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}

@@ -694,11 +694,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // réponse, uniquement pour le compte connecté (`garde`), et le plafond
           // de 20 actions/h par compte reste le vrai garde-fou — il coupe le lot
           // de lui-même. Aucune écriture, aucune action sur Vinted.
-          if (msg.action === 'rattraperEncaissements') {
-            const n = await capterEncaissements(msg.uid, { max: Number(msg.max) || 15 });
-            sendResponse({ ok: true, n });
-            return;
-          }
           if (msg.action === 'genererBord') {
             // Un clic = un bordereau : on génère, puis on va CHERCHER le PDF et
             // on l'envoie dans l'app. Le compte rendu remonte au panneau pour
@@ -1677,68 +1672,10 @@ async function visiteVinted() {
     // Vinted, ça reste son clic). La carte s'affiche sur la page, sans ouvrir le
     // panneau ; un clic suffit.
     await proposerBordereaux(uid);
-    // LECTURE SEULE, et c'est ce qui rend la compta juste : la DATE
-    // D'ENCAISSEMENT n'existe que dans le détail d'une transaction.
-    await capterEncaissements(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
-// ── LA DATE D'ENCAISSEMENT DES VENTES FINALISÉES ──────────────────────────
-// Julien : « en finalisé, c'est simplement la réception d'argent qui compte ».
-// Or la liste des commandes (`my_orders`) ne porte QU'UNE date : celle de la
-// vente. Le moment où Vinted finalise — donc libère l'argent — n'est écrit que
-// dans le détail de la transaction (`status_updated_at` avec un `status_title`
-// finalisé). Mesuré sur la vraie base : 7 jours d'écart en médiane, jusqu'à 25.
-// Sans ce détail, l'app ne peut pas dater un encaissement, et elle le dit
-// plutôt que de le poser au hasard sur la date de vente.
-//
-// ⚠️ CE SONT DE VRAIES REQUÊTES VINTED. Mêmes garde-fous que partout (§48) :
-//   · uniquement le compte CONNECTÉ dans cet onglet (`garde`) — agir au nom
-//     d'un autre compte est LE signal multi-comptes que Vinted sanctionne ;
-//   · plafond global de 20 actions/h par compte (`compterAction`) ;
-//   · au plus 3 par visite — une limite de volume, PAS un rythme « humain »
-//     déguisé (toujours refusé, §32) ;
-//   · une transaction déjà tentée n'est pas réessayée avant 24 h ;
-//   · on ne demande QUE les ventes finalisées dont le détail manque.
-const ENCAISS_MAX_PAR_VISITE = 3;
-const ENCAISS_RETRY_MS = 24 * 3600 * 1000;
-async function capterEncaissements(uid, opts = {}) {
-  try {
-    const plafond = Math.max(1, Math.min(20, Number(opts.max) || ENCAISS_MAX_PAR_VISITE));
-    const acc = await accountFor(uid); if (!acc) return 0;
-    if (!(await garde(uid, acc)).ok) return 0;
-    // Ce qu'on a déjà : inutile de redemander.
-    const dejaRows = (await sbGet(`app_data?id=like.harvest_${uid}_txn_*&select=id`)) || [];
-    const deja = new Set(dejaRows.map(r => String(r.id).replace(`harvest_${uid}_txn_`, '')));
-    const soldRow = (await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`)) || [];
-    const ventes = (soldRow[0] && soldRow[0].data && soldRow[0].data.payload && soldRow[0].data.payload.my_orders) || [];
-    const memo = (await chrome.storage.local.get('vrmEncaissTente')).vrmEncaissTente || {};
-    const maintenant = Date.now();
-    let faits = 0;
-    for (const o of ventes) {
-      if (faits >= plafond) break;
-      // Le plafond horaire est le vrai garde-fou : dès qu'il refuse, on arrête
-      // le lot au lieu de s'acharner (les suivantes taperaient le même mur).
-      if (!(await garde(uid, acc)).ok) break;
-      const tx = String(o && o.transaction_id || ''); if (!tx) continue;
-      if (!/finalis/i.test(String(o.status || ''))) continue;   // seules les finalisées portent un encaissement
-      if (deja.has(tx)) continue;
-      if (maintenant - Number(memo[tx] || 0) < ENCAISS_RETRY_MS) continue;
-      memo[tx] = maintenant;
-      const t = await vintedGet(acc, `/api/v2/transactions/${tx}`);
-      if (t && t.json && t.json.transaction) {
-        // ⚠️ On passe par `storeHarvest` (la voie qui sait écrire UNE ligne PAR
-        // transaction, `harvest_{uid}_txn_{id}`). `storeHarvestRow` écrit une
-        // ligne unique par type et écraserait chaque détail avec le suivant.
-        await storeHarvest(acc.domain, 'transaction', String(t.json.transaction.id || tx), JSON.stringify(t.json));
-        faits++;
-      }
-    }
-    await chrome.storage.local.set({ vrmEncaissTente: memo });
-    if (faits) logActivity(`💶 ${faits} date${faits > 1 ? 's' : ''} d'encaissement captée${faits > 1 ? 's' : ''}`);
-    return faits;
-  } catch (_) { return 0; }
-}
+
 
 // Les ventes de CE compte qui attendent qu'on génère leur bordereau, telles que
 // Vinted les a rendues à la dernière moisson. Lecture seule, aucun appel Vinted.
