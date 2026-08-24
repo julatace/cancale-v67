@@ -12662,6 +12662,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // peu). Afficher « 0 € » serait exact et inutilisable. On compte donc aussi
     // ce qu'on sait dire : les ventes finalisées CONCLUES sur la période, avec
     // leur montant — en disant que c'est une autre question.
+    // ⚠️ LES VENTES MASQUÉES NE COMPTENT DANS AUCUN TOTAL — et rien ne le
+    // disait. Mesuré sur la vraie base : **205 ventes masquées**, dont 50 des
+    // 51 de juin. Choisir « juin » affichait donc 41 € au lieu de ~1 500 €,
+    // sans un mot. Un total qui se présente comme complet alors qu'il exclut
+    // des lignes est exactement ce qu'on s'interdit (§ « Argent en attente »).
+    let masqNb = 0, masqEur = 0;
+    for (const o of (sales.items || [])) {
+      if (!isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      if (!dansPeriode(o, periode)) continue;
+      masqNb++; masqEur += (o.price?.amount != null ? Number(o.price.amount) : 0);
+    }
     let sansDate = 0, sansDateEur = 0, sansDateNb = 0;
     if (surEncaissement) for (const o of (sales.items || [])) {
       if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
@@ -12683,7 +12695,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, surEncaissement, sansDate, sansDateEur, sansDateNb };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, surEncaissement, sansDate, sansDateEur, sansDateNb, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, vFilter, curSub, txnItem]);
 
@@ -14384,6 +14396,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             TOTAL ABSENT. Une vente finalisée dont on ne connaît pas encore la
             date d'encaissement n'est pas datée au jour de la vente (ce serait
             faux d'une à trois semaines) : elle sort du total, et on le dit. */}
+        {/* Les ventes masquées sont invisibles PAR DESIGN — mais leur absence
+            d'un total mensuel doit se voir, sinon le chiffre ment par omission. */}
+        {totals.masqNb > 0 && !showHidden && (
+          <Notice tone="warn" icon="eye"
+            value={totals.masqNb}
+            title={`vente${totals.masqNb>1?'s':''} masquée${totals.masqNb>1?'s':''} sur ${libellePeriode(periode).toLowerCase()}`}
+            desc={`${fmtE0(totals.masqEur)} qui ne comptent dans aucun total de cet écran. Tu les as masquées d'un ✕ à un moment ; si ce n'était pas voulu, réaffiche-les.`}
+            detail="Masquer une vente sert à écarter un doublon ou un test. La liste est conservée (clé « vinted_sales_hidden ») et se synchronise entre tes appareils — rien n'est supprimé, tout revient en un clic."
+            action={<button type="button" onClick={()=>setShowHidden(true)} style={{border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les réafficher</button>}/>
+        )}
         {totals.surEncaissement && totals.sansDate > 0 && (
           <Notice tone="warn" icon="clock"
             value={totals.sansDateNb > 0 ? fmtE0(totals.sansDateEur) : totals.sansDate}
