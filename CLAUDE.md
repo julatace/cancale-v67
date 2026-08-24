@@ -4360,3 +4360,49 @@ JSX doit sortir des parenthèses, ou la condition doit disparaître avec lui.**
 bouton** (« 📋 Copier », « ⬇️ Exporter ») — §13 : là, ils aident. La règle est
 « un emoji utilisé COMME icône devient une icône au trait », pas « plus aucun
 emoji ».
+
+---
+
+## 5.56 — ⚠️⚠️ J'AI SUPPRIMÉ DEUX ÉCRANS ENTIERS, ET LE BANC N'A RIEN DIT
+
+En retirant l'atelier « Republier » (§5.53), j'ai supprimé une **plage de lignes**
+qui contenait aussi ses voisins. Perdus, en production sur la branche :
+
+| perdu | conséquence |
+|---|---|
+| `curSub==='messages'` | **écran Messages entièrement vide** |
+| `curSub==='bordereaux'` | **écran Colis entièrement vide** — celui qui porte les colis à expédier |
+| modale `{pickerFor && …}` | **« Relier à un achat » ne s'ouvrait plus** — l'outil central du prix d'achat (§5.23) |
+
+Vu au **rendu**, pas à la relecture : la capture de l'onglet Colis était une page
+noire avec la barre du bas, alors que « Ma journée » annonçait *« Expédier 3 colis »*.
+
+### ⚠️ Pourquoi le smoke ne l'a pas vu — et le chiffre était sous mes yeux
+Le banc comptait les erreurs de page et les artefacts d'affichage. **Un écran vide
+ne lève aucune erreur** : il passait donc « 0 PAGEERROR, 11 écrans OK ». Pire, le
+banc imprimait déjà la preuve et je l'ai lue sans la voir :
+
+```
+cat_ventes 17455 · cat_annonces 4418 · cat_achats 3560 · settings 5823
+cat_bord 57   ⚠️   cat_msg 61   ⚠️
+```
+
+57 et 61 caractères, c'est l'en-tête et la barre du bas — rien d'autre.
+
+➡️ **Deux durcissements du banc** (`smoke_all.cjs`) :
+1. **moins de 120 caractères = ÉCHEC** (`ECRAN VIDE @<onglet>`), plus un nombre à
+   remarquer dans un JSON ;
+2. la liste d'onglets contenait **`stats` et `cat_repub`, qui n'existent pas dans
+   `TABS_OK`** : l'app retombait sur l'onglet par défaut et le banc mesurait
+   **trois fois Ma journée** en croyant tester le tableau de bord (les trois
+   rendaient exactement 361 caractères — le même repli). Remplacés par `journee`
+   et `dashboard`.
+
+### La leçon
+**Une suppression par plage de lignes se vérifie sur ce qui RESTE, pas sur ce qui
+disparaît.** `npm run build` passe (le JSX restant est valable), un smoke qui ne
+compte que les erreurs passe aussi. Le contrôle qui tranche est : *chaque écran
+affiche-t-il encore quelque chose ?*
+⚠️ C'est la deuxième fois de la journée qu'un défaut passe le build et le smoke
+et n'apparaît qu'au rendu réel (l'autre : §5.55, le commentaire JSX rendu comme
+objet vide). **Regarder les captures fait partie du test, ce n'est pas un extra.**
