@@ -4125,3 +4125,112 @@ proposition de bordereau rend et envoie toujours le bon message, **16 onglets,
 0 erreur d'app** (les 2 « échecs » restent les artefacts connus du harnais :
 l'onglet `reponse` n'existe que sur une page de conversation, et le clic sur un
 élément filtré `display:none`). Extension **5.34.0**.
+
+---
+
+## 5.53 — ⚠️ SÉCURITÉ : le dépôt est PUBLIC, et il portait une vraie clé privée
+
+Julien : « ne laisse pas d'informations dans le code source et sécurise bien le
+site Internet… il faut que je puisse bientôt pouvoir louer ». Vérifié avant de
+coder — et le constat est sérieux.
+
+### 1. ⚠️⚠️ Ce qui était lisible par n'importe qui sur GitHub
+Le dépôt `julatace/cancale-v67` est **public** (`"private": false`, vérifié par
+l'API). Y étaient écrits en clair :
+
+| | pourquoi c'est grave |
+|---|---|
+| **la clé PRIVÉE VAPID** (`ayc_z_…`, en repli dans `api/_lib/push.js`) | un **vrai secret** : n'importe qui pouvait envoyer une notification sur les téléphones de Julien |
+| **nom + email + adresse postale d'une VRAIE CLIENTE** (placeholders du formulaire de facture) | donnée personnelle d'un **tiers**, publiée |
+| l'email personnel de Julien | idem |
+| raison sociale + adresse + **SIRET**, en valeur par DÉFAUT | un nouveau vendeur ouvrait l'app avec l'entreprise de quelqu'un d'autre pré-remplie sur ses factures |
+
+**Fait** : paire VAPID **régénérée** (l'ancienne est morte), la privée vit
+désormais **uniquement** en variable d'environnement, **sans aucun repli** —
+sans elle on n'envoie rien et on le dit (`pushConfigure`), plutôt que de repartir
+sur une clé connue de tous. Données personnelles remplacées par des exemples
+neutres. Identité d'entreprise → **`ENTREPRISE_VIDE`**.
+⚠️ **Conséquence à dire à Julien** : ses infos d'entreprise n'étaient sauvegardées
+**nulle part** (ni localStorage ni cloud — vérifié : `vinted_invoice_settings`
+est absent de la ligne `main`). Elles ne vivaient QUE dans le code. Il doit donc
+les ressaisir **une fois** dans Réglages → Factures.
+
+### 2. ⚠️⚠️ LA PORTE GRANDE OUVERTE SUR INTERNET
+`MULTI_USER = true` et `CLOISONNE = false` : l'écran de connexion s'affiche, et
+il portait un bouton **« Entrer sans compte (temporaire) »** — visible de tout le
+monde, sur une adresse publique. Un clic donnait accès à **toute la boutique** :
+ventes, achats, noms d'acheteurs, codes de retrait, comptes Vinted reliés.
+
+La porte existait pour une bonne raison (§12 : ne jamais enfermer Julien dehors à
+cause d'un email de confirmation qui n'arrive pas). Elle demande maintenant un
+**CODE**, dont seule l'**empreinte SHA-256** est dans le code source
+(`CODE_ACCES_HASH`) — une empreinte ne se remonte pas.
+⚠️ **Aucun risque d'enfermement** : les appareils déjà entrés gardent leur accès
+(le drapeau `vrm_acces_direct` vit dans leur navigateur). **Vérifié au banc dans
+les deux sens** : inconnu → écran de connexion, bouton libre disparu, mauvais
+code refusé, bon code accepté ; appareil déjà autorisé → entre directement.
+
+### 3. Ce qu'on ne peut PAS cacher, et pourquoi on ne fait pas semblant
+`SUPABASE_URL`, la clé « anon » et l'URL du script de factures sont **livrées au
+navigateur** : une application web ne cache rien à celui qui l'ouvre. Les mettre
+en variable d'environnement les retire du dépôt, **pas du bundle**.
+➡️ Ce qui les rend inoffensives, c'est **RLS**. Tant qu'il est désactivé, cette
+clé n'est pas une clé publique : c'est un **accès complet lecture/écriture** à
+toute la base, y compris la table `vinted_accounts` et ses **jetons de session
+Vinted**. Ce n'est pas une hypothèse — toute la mise au point de ce projet s'est
+faite en lisant la vraie base avec cette seule clé, prise dans le dépôt public.
+
+**Les deux gestes qui referment ça, et que SEUL Julien peut faire** :
+1. **passer le dépôt en privé** (un clic, gratuit, réversible, sans effet sur
+   Vercel) ;
+2. **appliquer la migration RLS** (`supabase/migrations/001-multi-utilisateurs.sql`).
+
+`SECURITE.md` (nouveau) dit tout ça noir sur blanc, pour pouvoir être montré à
+quelqu'un qui envisage de louer l'outil. `.env.example` documente chaque
+variable, sans aucune valeur.
+**`scripts/audit-secrets.cjs`** (nouveau) refuse toute réapparition : clé privée,
+email personnel, SIRET, adresse postale. Les 4 règles **échouent bien sur le code
+d'avant**.
+
+### 4. L'onglet « Republier » de l'app est RETIRÉ
+Julien : « l'onglet republier sur l'application ça sert à rien, tu peux
+l'enlever. » Il faisait doublon avec le panneau de l'extension, qui lui travaille
+**sur Vinted**, là où le geste est possible (texte du coffre, photos recadrées,
+formulaire pré-rempli, suppression de l'ancienne — §5.07). Ici, on notait une
+annonce sans rien pouvoir appliquer.
+Retirés ensemble : l'entrée de la barre, l'écran, la modale d'édition et les
+calculs qui n'existaient que pour eux (`scoreAnnonce`, `repubList`, `peerPrice`,
+`aiRewrite`, l'état des brouillons). **≈ 740 lignes.**
+⚠️ La clé `vinted_annonce_drafts` **reste dans `SYNC_KEYS`** : `cloudPush`
+remplace toute la ligne, donc la retirer **effacerait** ses brouillons du nuage.
+On ne supprime pas des données au passage d'un écran. Le panneau de l'extension
+n'est **pas** touché.
+
+### 5. ⚠️ LA BARRE DU BAS NE DÉFILE PLUS
+Julien : « je dois glisser de gauche à droite en bas pour voir toutes les
+interfaces ». C'était exact : **neuf onglets** dans un conteneur
+`overflow-x: auto` — sur un téléphone, Garage et Factures étaient hors écran, sur
+une barre dont rien n'indiquait qu'elle défilait.
+Une barre d'onglets qui défile, c'est le signe qu'il y a trop d'onglets. Elle
+porte désormais les **cinq écrans du quotidien** (Ma journée · Annonces · Ventes ·
+Achats · Colis) + **« Plus »**, une feuille qui monte du bas avec Statistiques,
+Messages, Garage et Factures. « Plus » s'allume quand l'écran affiché vient de
+derrière — sinon on ne saurait plus où on est.
+**Mesuré au banc à 320, 390 et 430 px** : `scrollWidth === clientWidth` sur les
+trois, **et la page elle-même ne défile plus horizontalement**. La feuille
+s'ouvre, liste les 4 écrans et se referme au clic.
+
+### Vérifié
+`npm run build` OK · **9 audits au vert** (`secrets` nouveau, `identite` 38,
+`coherence`, `qr`, `offres`, `transporteurs`, `email-formes`, `bordereau-pdf`,
+`diagnostic`) · banc barre du bas (3 largeurs) · banc porte d'accès (5 contrôles,
+dans les deux sens).
+
+### ⚠️ CE QUI RESTE, ET QUI N'EST PAS DU CODE
+| à faire | par qui |
+|---|---|
+| **dépôt en privé** | Julien (un clic) |
+| **migration RLS** | Julien (coller le SQL) |
+| `VAPID_PRIVATE_KEY` sur Vercel (sinon plus aucune notification) | Julien |
+| ressaisir son entreprise dans Réglages → Factures | Julien |
+| `SUPABASE_SERVICE_KEY` + `VRM_OWNER_UID` avant d'activer RLS | Julien |

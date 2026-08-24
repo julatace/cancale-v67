@@ -62,7 +62,7 @@ self.addEventListener('notificationclick', event => {
 // notifications s'arrêtent SANS erreur visible — c'est exactement le « je reçois
 // plus de notif » de Julien. Ici on se ré-abonne tout seul et on renvoie le
 // nouveau jeton au serveur.
-const VAPID_PUBLIC = 'BBQbRWE86gwZClx3buB8J2JJrd-Kg7aYR-HJqev811KmNnTxLxOAwxFhwF8MfvzHp1-K4tnmjFfQZxVaoB7psi8';
+const VAPID_PUBLIC = 'BLw4VOxC3CXI_yY521zsKXiVbjbQ_YsQtNWqHBDBWsPBD6y4AdCrA_rBv-9vJ3_UgtfcKBjPLPyGFRwANjfBFSk';
 function vapidKey(b64) {
   const pad = '='.repeat((4 - (b64.length % 4)) % 4);
   const s = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
