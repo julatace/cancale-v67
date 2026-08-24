@@ -4511,3 +4511,43 @@ Le banc ne servait **aucune ligne `harvest_*_txn_*`** : il mesurait donc « 0 da
 d'encaissement, 112 sans date » et j'aurais pu conclure que la fonction ne marche
 pas. Fixture `txn.json` ajoutée (4 champs par transaction, comme l'app).
 **Servir TOUTES les familles de lignes avant de conclure.**
+
+### 5.57 (suite) — CHOISIR N'IMPORTE QUEL MOIS, et ⚠️ 205 VENTES MASQUÉES
+
+Julien : « je veux pouvoir sélectionner un mois — juin par exemple — et que
+l'app fasse la somme du 1er au dernier jour de juin ».
+
+Les raccourcis « Ce mois » / « Mois dernier » ne couvraient que les deux
+derniers : pour juin en août, il fallait pointer deux dates dans le calendrier.
+`PeriodePicker` s'ouvre désormais sur les **MOIS** — une année navigable et
+douze boutons, un tap = tout le mois, bornes calculées jamais saisies, mois à
+venir grisés. « Jour à jour » reste à un clic.
+
+### ⚠️ LE VRAI DÉFAUT TROUVÉ EN VÉRIFIANT : 205 ventes masquées, sans un mot
+En testant juin, l'app annonçait **1 vente / 41 €** alors que la base en porte
+**51 pour 1 740 €**. Le banc a prouvé que les 90 ventes du compte arrivent bien
+jusqu'à l'app (log du mock) — la perte était ailleurs.
+
+**Cause : `vinted_sales_hidden` contient 205 ventes masquées, dont 50 des 51 de
+juin.** L'app les excluait à raison (un ✕ sur une carte les masque
+volontairement) — mais elle ne le **disait pas**. Un total qui se présente comme
+complet alors qu'il exclut des lignes est exactement ce qu'on s'interdit.
+➡️ Un avertissement compte désormais les ventes masquées **de la période**, avec
+leur montant, et propose de les réafficher en un clic. Vérifié au rendu :
+« 41 ventes masquées sur juin 2026 · 1 472 € qui ne comptent dans aucun total ».
+
+### ⚠️ Honnêteté sur les mois passés
+La date d'encaissement n'existe que dans le détail d'une transaction, et
+l'extension ne les capte que depuis peu : **mesuré, l'argent reçu daté ne couvre
+que juillet (5 ventes, 215 €) et août (56, 1 791,80 €)**. Pour juin, l'app
+afficherait 0 € — exact et inutilisable. L'avertissement dit donc les **deux**
+chiffres, nommés : « Argent reçu » (encaissements réellement datés) et « X €
+vendus sur juin et finalisés, mais l'encaissement n'est pas encore daté ».
+
+### Extension 5.36.0 — bouton « Récupérer » (onglet Ventes)
+Le passage automatique ramène 3 dates par visite : boucler un mois passé
+prendrait des semaines. Ce bouton en fait un lot de 15, **sur son clic**.
+⚠️ Ce n'est pas une rafale (§32/§43) : ce sont des **lectures** sur ses propres
+transactions, envoyées une par une en attendant chaque réponse, pour le seul
+compte connecté, et le plafond de 20 actions/h coupe le lot de lui-même — il est
+désormais vérifié **avant chaque requête**, plus seulement au début.
