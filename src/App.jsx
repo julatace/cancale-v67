@@ -6853,6 +6853,25 @@ const FURN_TYPES = {
   porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true },
   fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true },
   autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
+  // ── DÉCOR ────────────────────────────────────────────────────────────────
+  // Julien : « je veux un vrai jeu vidéo, je veux pouvoir tout créer dedans ».
+  // Ces objets ne rangent RIEN (`deco: true`) : ils ne portent pas de case, ne
+  // reçoivent pas de numéro et ne comptent dans aucun inventaire. Ils servent à
+  // ce que la pièce ressemble à sa pièce — c'est ça qui fait qu'on s'y repère.
+  chaise:  { label: 'Chaise',  emoji: '🪑', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#8a6f57', h3d: 0.95, build: 'chaise', deco: true },
+  bureau:  { label: 'Bureau',  emoji: '🖥️', w: 1.6, h: 0.8, rows: 1, cols: 1, color: '#9c7b56', h3d: 0.76, build: 'bureau', deco: true },
+  canape:  { label: 'Canapé',  emoji: '🛋️', w: 2.2, h: 1,   rows: 1, cols: 1, color: '#5f7f9b', h3d: 0.85, build: 'canape', deco: true },
+  lit:     { label: 'Lit',     emoji: '🛏️', w: 2,   h: 1.6, rows: 1, cols: 1, color: '#7e8ba3', h3d: 0.6,  build: 'lit',    deco: true },
+  tapis:   { label: 'Tapis',   emoji: '🟫', w: 2.4, h: 1.6, rows: 1, cols: 1, color: '#a8564f', h3d: 0.03, build: 'tapis',  deco: true },
+  plante:  { label: 'Plante',  emoji: '🪴', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#3f7d4f', h3d: 1.3,  build: 'plante', deco: true },
+  lampe:   { label: 'Lampadaire', emoji: '💡', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#d8c48a', h3d: 1.7, build: 'lampe', deco: true },
+  miroir:  { label: 'Miroir',  emoji: '🪞', w: 0.9, h: 0.3, rows: 1, cols: 1, color: '#cfd8e0', h3d: 1.6,  build: 'miroir', deco: true },
+  cadre:   { label: 'Cadre',   emoji: '🖼️', w: 0.8, h: 0.2, rows: 1, cols: 1, color: '#8a6f57', h3d: 0.6,  build: 'cadre',  deco: true },
+  poubelle:{ label: 'Poubelle',emoji: '🗑️', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#6b7280', h3d: 0.7,  build: 'poubelle', deco: true },
+  escabeau:{ label: 'Escabeau',emoji: '🪜', w: 0.7, h: 0.7, rows: 1, cols: 1, color: '#9aa0a6', h3d: 1.2,  build: 'escabeau', deco: true },
+  radiateur:{label: 'Radiateur',emoji:'♨️', w: 1.2, h: 0.3, rows: 1, cols: 1, color: '#e6e8ea', h3d: 0.6,  build: 'radiateur', deco: true },
+  velo:    { label: 'Vélo',    emoji: '🚲', w: 1.7, h: 0.6, rows: 1, cols: 1, color: '#3f4b5b', h3d: 1.0,  build: 'velo',   deco: true },
+  etabli:  { label: 'Établi',  emoji: '🛠️', w: 1.8, h: 0.8, rows: 1, cols: 1, color: '#8c7a63', h3d: 0.9,  build: 'etabli', deco: true },
 };
 const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
 // ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
@@ -7148,6 +7167,116 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         return g;
       };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
+      // ── OBJETS DE DÉCOR ────────────────────────────────────────────────────
+      // Assemblés à partir des mêmes primitives (box / cylindre) et des mêmes
+      // matières que les meubles : une pièce meublée doit avoir l'air d'un tout,
+      // pas d'un décor collé par-dessus. Chacun projette son ombre (`shadowize`).
+      const cyl = (r1, r2, h, mat, seg) => shadowize(new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg || 14), mat));
+      const pied = (m, x, z, h, r) => { const c = cyl(r || 0.035, r || 0.035, h, m); c.position.set(x, h / 2, z); return c; };
+      const buildChaise = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base); const assise = ht * 0.48;
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz]) => g.add(pied(m, sx*(w/2-0.06), sz*(d/2-0.06), assise)));
+        const s = box(w, 0.06, d, m); s.position.y = assise; g.add(s);
+        const dos = box(w, ht - assise, 0.06, m); dos.position.set(0, assise + (ht - assise) / 2, -d / 2 + 0.03); g.add(dos);
+        return g;
+      };
+      const buildBureau = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base);
+        const top = box(w, 0.06, d, m); top.position.y = ht; g.add(top);
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz]) => g.add(pied(m, sx*(w/2-0.07), sz*(d/2-0.07), ht, 0.045)));
+        const cais = box(w * 0.3, ht * 0.62, d * 0.8, woodMat(shade(base, -10)));
+        cais.position.set(w / 2 - w * 0.18, ht * 0.31, 0); g.add(cais);
+        return g;
+      };
+      const buildCanape = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base), assise = ht * 0.45;
+        const b = box(w, assise, d, m); b.position.y = assise / 2; g.add(b);
+        const coussin = box(w - 0.16, 0.14, d - 0.16, woodMat(shade(base, 12))); coussin.position.y = assise + 0.07; g.add(coussin);
+        const dos = box(w, ht - assise, 0.18, m); dos.position.set(0, assise + (ht - assise) / 2, -d / 2 + 0.09); g.add(dos);
+        [-1, 1].forEach(sx => { const a = box(0.18, ht * 0.72, d, m); a.position.set(sx * (w / 2 - 0.09), ht * 0.36, 0); g.add(a); });
+        return g;
+      };
+      const buildLit = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base);
+        const cadre = box(w, ht * 0.5, d, m); cadre.position.y = ht * 0.25; g.add(cadre);
+        const mat2 = box(w - 0.1, ht * 0.42, d - 0.1, woodMat('#e8e6e1')); mat2.position.y = ht * 0.5 + ht * 0.21; g.add(mat2);
+        const or = box(w * 0.42, 0.12, d * 0.26, woodMat('#f2f0ec'));
+        or.position.set(-w * 0.22, ht * 0.5 + ht * 0.42 + 0.06, -d / 2 + d * 0.2); g.add(or);
+        const tete = box(w, ht * 0.9, 0.08, m); tete.position.set(0, ht * 0.45, -d / 2 + 0.04); g.add(tete);
+        return g;
+      };
+      const buildTapis = (w, d, ht, base) => {
+        const g = new THREE.Group(); const t = box(w, 0.02, d, woodMat(base)); t.position.y = 0.011; g.add(t);
+        const b = box(w * 0.88, 0.024, d * 0.82, woodMat(shade(base, 16))); b.position.y = 0.014; g.add(b);
+        return g;
+      };
+      const buildPlante = (w, d, ht, base) => {
+        const g = new THREE.Group(); const pot = cyl(w * 0.28, w * 0.22, ht * 0.26, woodMat('#b5714f'));
+        pot.position.y = ht * 0.13; g.add(pot);
+        const tronc = cyl(0.03, 0.04, ht * 0.4, woodMat('#6b5136'), 8); tronc.position.y = ht * 0.26 + ht * 0.2; g.add(tronc);
+        const vert = woodMat(base);
+        [[0, 0, ht * 0.78, 0.32], [0.16, 0.08, ht * 0.66, 0.24], [-0.14, -0.1, ht * 0.7, 0.22]].forEach(([x, z, y, r]) => {
+          const f = shadowize(new THREE.Mesh(new THREE.SphereGeometry(w * r, 10, 8), vert));
+          f.position.set(x, y, z); f.scale.y = 0.8; g.add(f);
+        });
+        return g;
+      };
+      const buildLampe = (w, d, ht, base) => {
+        const g = new THREE.Group();
+        const socle = cyl(w * 0.3, w * 0.32, 0.04, metalMat); socle.position.y = 0.02; g.add(socle);
+        const mat_ = cyl(0.022, 0.022, ht * 0.82, metalMat, 10); mat_.position.y = ht * 0.45; g.add(mat_);
+        const abat = cyl(w * 0.34, w * 0.24, ht * 0.2, woodMat(base), 16); abat.position.y = ht * 0.9; g.add(abat);
+        return g;
+      };
+      const buildMiroir = (w, d, ht, base) => {
+        const g = new THREE.Group(); const cadre = box(w, ht, 0.05, woodMat('#6b5136'));
+        cadre.position.y = ht / 2; g.add(cadre);
+        const glace = box(w - 0.1, ht - 0.1, 0.02, new THREE.MeshStandardMaterial({ color: base, metalness: 0.85, roughness: 0.12 }));
+        glace.position.set(0, ht / 2, 0.03); g.add(glace);
+        return g;
+      };
+      const buildCadre = (w, d, ht, base) => {
+        const g = new THREE.Group(); const c = box(w, ht, 0.04, woodMat(base)); c.position.y = ht / 2 + 0.9; g.add(c);
+        const toile = box(w - 0.08, ht - 0.08, 0.02, woodMat('#e9e2d3')); toile.position.set(0, ht / 2 + 0.9, 0.025); g.add(toile);
+        return g;
+      };
+      const buildPoubelle = (w, d, ht, base) => {
+        const g = new THREE.Group(); const c = cyl(w * 0.3, w * 0.24, ht * 0.9, woodMat(base), 16);
+        c.position.y = ht * 0.45; g.add(c);
+        const cv = cyl(w * 0.32, w * 0.32, 0.04, woodMat(shade(base, -12)), 16); cv.position.y = ht * 0.92; g.add(cv);
+        return g;
+      };
+      const buildEscabeau = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = metalMat;
+        [-1, 1].forEach(sx => { const p = box(0.05, ht, 0.05, m); p.position.set(sx * (w / 2 - 0.05), ht / 2, -d / 4); p.rotation.x = 0.12; g.add(p); });
+        for (let i = 1; i <= 3; i++) { const marche = box(w - 0.12, 0.04, d * 0.42, m); marche.position.set(0, (i / 3.4) * ht, -d / 4 + i * 0.02); g.add(marche); }
+        return g;
+      };
+      const buildRadiateur = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base); const n = Math.max(4, Math.round(w / 0.11));
+        for (let i = 0; i < n; i++) { const a = box(w / n * 0.7, ht * 0.86, d, m); a.position.set(-w / 2 + (i + 0.5) * (w / n), ht * 0.5, 0); g.add(a); }
+        const bas = box(w, 0.05, d, metalMat); bas.position.y = ht * 0.06; g.add(bas);
+        return g;
+      };
+      const buildVelo = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: base, metalness: 0.6, roughness: 0.35 });
+        const pneu = new THREE.MeshStandardMaterial({ color: '#22262b', roughness: 0.9 });
+        [-1, 1].forEach(sx => { const r = shadowize(new THREE.Mesh(new THREE.TorusGeometry(ht * 0.33, 0.035, 8, 22), pneu));
+          r.position.set(sx * (w / 2 - ht * 0.34), ht * 0.33, 0); g.add(r); });
+        const cadre = box(w * 0.6, 0.05, 0.05, m); cadre.position.set(0, ht * 0.5, 0); g.add(cadre);
+        const selle = box(0.22, 0.06, 0.1, pneu); selle.position.set(-w * 0.1, ht * 0.72, 0); g.add(selle);
+        const guidon = box(0.06, 0.05, 0.42, m); guidon.position.set(w * 0.26, ht * 0.72, 0); g.add(guidon);
+        const fourche = box(0.05, ht * 0.42, 0.05, m); fourche.position.set(w * 0.26, ht * 0.5, 0); g.add(fourche);
+        return g;
+      };
+      const buildEtabli = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base);
+        const top = box(w, 0.08, d, woodMat(shade(base, -6))); top.position.y = ht; g.add(top);
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz]) => g.add(pied(metalMat, sx*(w/2-0.08), sz*(d/2-0.08), ht, 0.05)));
+        const etag = box(w - 0.16, 0.05, d - 0.16, m); etag.position.y = ht * 0.28; g.add(etag);
+        const fond = box(w, ht * 0.5, 0.05, m); fond.position.set(0, ht + ht * 0.25, -d / 2 + 0.03); g.add(fond);
+        return g;
+      };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const disposeMat = (mat) => { if (!mat) return; (Array.isArray(mat) ? mat : [mat]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); if (mm && mm.dispose) mm.dispose(); }); };
       const buildFurniture = () => {
@@ -7183,6 +7312,20 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             case 'porte': g = buildPorte(w, d, ht, base); break;
             case 'fenetre': g = buildFenetre(w, d, ht, base); break;
             case 'carton': g = buildCarton(w, d, ht, base, it.num); break;
+            case 'chaise': g = buildChaise(w, d, ht, base); break;
+            case 'bureau': g = buildBureau(w, d, ht, base); break;
+            case 'canape': g = buildCanape(w, d, ht, base); break;
+            case 'lit': g = buildLit(w, d, ht, base); break;
+            case 'tapis': g = buildTapis(w, d, ht, base); break;
+            case 'plante': g = buildPlante(w, d, ht, base); break;
+            case 'lampe': g = buildLampe(w, d, ht, base); break;
+            case 'miroir': g = buildMiroir(w, d, ht, base); break;
+            case 'cadre': g = buildCadre(w, d, ht, base); break;
+            case 'poubelle': g = buildPoubelle(w, d, ht, base); break;
+            case 'escabeau': g = buildEscabeau(w, d, ht, base); break;
+            case 'radiateur': g = buildRadiateur(w, d, ht, base); break;
+            case 'velo': g = buildVelo(w, d, ht, base); break;
+            case 'etabli': g = buildEtabli(w, d, ht, base); break;
             case 'pile': g = buildPile(pileNumsArr, nr, cellSize); break;
             default: g = buildGeneric(w, d, ht, base);
           }
@@ -8025,13 +8168,26 @@ function RoomPlan({ locate, onLocateConsumed }) {
         return <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800, lineHeight:1.4 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <><br/><span style={{fontWeight:500,color:C.text}}>{pos}</span></> : null}</div>;
       })()}
 
-      {/* Palette de meubles */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>Ajouter :</span>
-        {Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden).map(([k, t]) => (
-          <button key={k} onClick={() => addFurn(k)} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 700, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
-        ))}
-      </div>
+      {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────
+          Deux familles, et la distinction n'est pas cosmétique : un RANGEMENT
+          porte des cases, reçoit des numéros et compte dans l'inventaire ; un
+          objet de DÉCOR ne range rien. Les mélanger dans une seule rangée de
+          trente boutons rendait le rangement introuvable. */}
+      {(() => {
+        const tous = Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden);
+        const groupes = [
+          ['Rangement', tous.filter(([, t]) => !t.deco), "Ils portent des cases et des numéros."],
+          ['Décor',     tous.filter(([, t]) =>  t.deco), "Pour que la pièce ressemble à la tienne. Ne range rien."],
+        ];
+        return groupes.map(([titre, liste, aide]) => liste.length ? (
+          <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span title={aide} style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
+            {liste.map(([k, t]) => (
+              <button key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
+            ))}
+          </div>
+        ) : null);
+      })()}
       {/* Taille de la pièce */}
       <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
         <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
@@ -14367,9 +14523,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
-          {accounts.length>0 && (
-            <button onClick={()=>{ loadOrders('sold',setSales,true); loadListings&&loadListings(true); }} disabled={sales.loading} title="Va chercher tes ventes en direct sur Vinted (tous comptes), sans attendre l'extension" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:sales.loading?'default':'pointer',opacity:sales.loading?0.6:1}}>{sales.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
-          )}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
               quotidien — et Compta / Registre / Litiges / CSV passent derrière un
@@ -14547,9 +14700,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
-          {accounts.length>0 && (
-            <button onClick={()=>loadOrders('purchased',setBuys,true)} disabled={buys.loading} title="Va chercher tes achats en direct sur Vinted (tous comptes)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:buys.loading?'default':'pointer',opacity:buys.loading?0.6:1}}>{buys.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
-          )}
         </div>
         {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && (
@@ -15253,29 +15403,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             avant de voir ses annonces. Ils sont maintenant derrière une seule
             ligne, dépliable, et n'apparaissent que s'il y a vraiment quelque
             chose à signaler. */}
-        {(() => {
-          // ⚠️ Les « trous » de numérotation ne sont PLUS un signalement (§5.40) :
-          //    un numéro est pris à vie, la séquence monte, c'est normal.
-          const n = numDoublons.length + comptesMuets.length + (disparues.length ? 1 : 0) + (blockedList.length ? 1 : 0);
-          if (!n) return null;
-          // Un numéro en double fait expédier la mauvaise paire : la barre passe
-          // en rouge et le dit, au lieu de se fondre dans les avertissements.
-          const grave = numDoublons.length > 0;
-          const teinte = grave ? C.danger : C.warn;
-          return (
-            <button type="button" onClick={() => setDiagOpen(v => !v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${teinte}${grave?'':'55'}`,background:`${teinte}12`,
-                borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
-              <span aria-hidden="true" style={{flexShrink:0,color:teinte,display:'flex'}}><Icon name="alert" size={17}/></span>
-              <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
-                {grave
-                  ? `${numDoublons.length} numéro${numDoublons.length>1?'x':''} en double${n>numDoublons.length?` · ${n-numDoublons.length} autre${n-numDoublons.length>1?'s':''}`:''}`
-                  : `${n} signalement${n>1?'s':''} sur tes annonces`}
-              </span>
-              <span style={{fontSize:11.5,color:grave?C.danger:C.muted,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
-            </button>
-          );
-        })()}
+        {/* ⚠️ IL NE RESTE QU'UNE SEULE ALERTE ICI, ET C'EST VOULU.
+            Julien : « enlève le signalement sur tes annonces, et tout ce qui
+            n'est pas pertinent ». Le compteur générique mélangeait des choses
+            sans conséquence (compte muet, annonce disparue, compte bloqué) avec
+            LA seule qui coûte de l'argent : deux paires présentes sous le même
+            numéro, donc la mauvaise chaussure dans le carton. Noyée au milieu,
+            elle ne se voyait plus. Les autres sont retirées ; celle-ci reste,
+            en rouge, et se déplie toute seule. */}
+        {numDoublons.length > 0 && (
+          <button type="button" onClick={() => setDiagOpen(v => !v)}
+            style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.danger}`,background:`${C.danger}12`,
+              borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
+            <span aria-hidden="true" style={{flexShrink:0,color:C.danger,display:'flex'}}><Icon name="alert" size={17}/></span>
+            <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
+              {`${numDoublons.length} numéro${numDoublons.length>1?'x':''} porté${numDoublons.length>1?'s':''} par deux paires`}
+            </span>
+            <span style={{fontSize:11.5,color:C.danger,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
+          </button>
+        )}
         {diagOpen && (<>
         {/* NUMÉROS QUI MONTENT TROP HAUT — « pourquoi N°156 alors que j'ai à
             peine 50 paires ? ». L'outil de renumérotation existait mais était
@@ -15466,8 +15612,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               → une paire vendue restait « en ligne » indéfiniment). */}
           {(()=>{
             let oldest = null;
-            for (const a of accounts) { const ms = harvestAgeMs(a.vinted_user_id, 'listings'); if (ms != null && (oldest == null || ms > oldest)) oldest = ms; }
-            if (oldest == null || oldest < 2*86400000) return null; // < 2 j : rien à signaler
+            for (const a of accounts) {
+              if (acctOff(a.vinted_user_id)) continue;   // masqué/retiré : hors compta, hors alerte
+              const ms = harvestAgeMs(a.vinted_user_id, 'listings');
+              if (ms != null && (oldest == null || ms > oldest)) oldest = ms;
+            }
+            if (oldest == null || oldest < 7*86400000) return null; // moins d'une semaine : rien à dire
             const j = Math.floor(oldest/86400000);
             return (
               <Notice tone="warn" icon="clock"
@@ -15544,7 +15694,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.hasView && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>👁 {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:999,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
-            <button onClick={()=>loadListings(true)} disabled={listings.loading} title="Va chercher tes annonces EN DIRECT sur Vinted (tous comptes) — enlève les paires vendues qui traînent encore" style={{marginLeft:'auto',fontSize:12,fontWeight:600,color:'#fff',background:C.accent,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:listings.loading?'default':'pointer',opacity:listings.loading?0.6:1}}>{listings.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
+
             <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
