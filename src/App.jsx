@@ -7422,7 +7422,13 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           g.position.set((it.x + it.w / 2) - room.w / 2, baseY, (it.y + it.h / 2) - room.h / 2);
           g.rotation.y = it.rot || 0; // orientation (collé au mur)
           g.userData = { itemId: it.id, w: it.w, h: it.h, type: it.type };
-          if (!isBox) { // les boîtes portent déjà leur N° imprimé → pas d'étiquette flottante
+          // ⚠️ LE DÉCOR NE PORTE PAS D'ÉTIQUETTE. Vu au rendu : huit pastilles
+          // sombres flottaient au-dessus de la pièce et masquaient précisément
+          // ce qu'on vient regarder. Une chaise se reconnaît sans qu'on écrive
+          // « Chaise » dessus ; un RANGEMENT, lui, garde son nom et son compte —
+          // c'est l'information utile (où sont les paires).
+          const estDeco = !!(FURN_TYPES[it.type] || {}).deco;
+          if (!isBox && !estDeco) { // les boîtes portent déjà leur N° imprimé → pas d'étiquette flottante
             // ⚠️ UN MEUBLE SANS NOM AFFICHAIT « undefined » EN 3D, sur son
             // étiquette. Les meubles créés dans l'app en ont toujours un, mais
             // un plan importé ou restauré peut ne pas en avoir : on retombe
