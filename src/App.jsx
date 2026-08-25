@@ -14670,6 +14670,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const urgent = toShip.filter(t=>t.daysLeft!=null && t.daysLeft>=0 && t.daysLeft<=1).length;
           const col = late>0 ? C.danger : urgent>0 ? C.warn : C.accent;
           const s = toShip[0];
+          // ⚠️ `toShip` porte {o, daysLeft, shipBy} — il n'y a JAMAIS eu de champ
+          // `title` : la ligne affichait donc « Le plus pressé : — » pour tout le
+          // monde, en permanence. Le titre vit sur la commande, et le NUMÉRO est
+          // ce qu'on lit pour trouver la boîte : on le met devant. Identité
+          // certaine (effEntry → id d'annonce Vinted, sinon photo), jamais un
+          // rapprochement par titre.
           const when = (t)=> t.daysLeft==null ? '' : t.daysLeft<0 ? `en retard de ${-t.daysLeft} j` : t.daysLeft===0 ? "à expédier aujourd'hui" : `avant le ${t.shipBy.toLocaleDateString('fr-FR')} (${t.daysLeft} j)`;
           return (
             <Notice
@@ -14677,7 +14683,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               icon="truck"
               value={toShip.length}
               title={`colis à expédier${late>0?` · ${late} en retard`:urgent>0?` · ${urgent} pour demain`:''}`}
-              desc={s.shipBy ? `Le plus pressé : ${s.title||'—'}${when(s)?` · ${when(s)}`:''}` : null}
+              desc={s.shipBy ? (()=>{ const e=effEntry(s.o); const n=e&&e.numero?`N°${e.numero} · `:'';
+                const t=(s.o&&s.o.title)||''; const q=when(s);
+                return t||n ? `Le plus pressé : ${n}${t}${q?` · ${q}`:''}` : (q?`Le plus pressé : ${q}`:null); })() : null}
               detail={`Vinted laisse environ ${SHIP_DAYS} jours après la vente pour expédier. À temps, ta note vendeur est préservée. L'échéance affichée est une estimation ; le bordereau se génère depuis l'onglet Colis.`}
               action={onNav && (
                 <button type="button" onClick={()=>onNav('cat_bord')}
