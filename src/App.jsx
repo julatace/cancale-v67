@@ -8772,7 +8772,11 @@ function RoomPlan({ locate, onLocateConsumed }) {
 function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
-  const [garageView,setGarageView]=useState(()=>load('vinted_garage_view','grid')); // grid | photo
+  // ⚠️ LA 3D EST LA VUE PAR DÉFAUT (Julien : « je veux vraiment que la 3D soit
+  // une application dans l'application »). Le choix reste MÉMORISÉ par appareil :
+  // qui préfère la grille la retrouve au prochain passage — on change le point
+  // de départ, pas son habitude.
+  const [garageView,setGarageView]=useState(()=>load('vinted_garage_view','plan')); // plan | grid | photo
 
   // Localisation demandee depuis l'inventaire : amorce la recherche sur le numero.
   useEffect(()=>{
@@ -8980,8 +8984,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
       <div style={{display:'flex',gap:6,background:C.surface,borderRadius:999,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start'}}>
-        {[['grid','🗄️ Grille'],['photo','📸 Photo'],['plan','🪑 Plan']].map(([v,l])=>(
-          <button key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} style={{border:'none',borderRadius:999,padding:'6px 13px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>{l}</button>
+        {[['plan','home','Ma pièce'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
+          <button key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} className={garageView===v?'vrm-btn-primary':undefined}
+            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:999,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
+            <Icon name={ic} size={15}/>{l}
+          </button>
         ))}
       </div>
 
