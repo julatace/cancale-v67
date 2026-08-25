@@ -8214,8 +8214,36 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // Écrit le numéro dans la case (gravité + croissance de la grille) puis lance
   // l'animation de chute. Un seul chemin d'écriture, quel que soit le point
   // d'entrée : la feuille de choix, la saisie libre, ou l'effacement.
+  // Où ce numéro est-il DÉJÀ posé dans le plan ? (pièce + meuble)
+  // ⚠️ Un même numéro dans deux cases, c'est « dans quelle boîte est-elle ? » —
+  // le pendant, au garage, des deux paires sous le même numéro (§19). La
+  // feuille de choix l'empêche déjà (elle ne propose que ce qui n'est pas
+  // rangé) ; ce garde-fou couvre la SAISIE LIBRE, qui ne vérifiait rien.
+  const dejaPoseOu = (num) => {
+    const t = String(num || '').trim(); if (!t) return null;
+    for (const r of (plan.rooms || [])) for (const o of (r.items || [])) {
+      for (const [k, a] of Object.entries(o.slots || {})) if ((a || []).some(v => String(v).trim() === t)) return { piece: r.name, meuble: o.name, cell: k, id: o.id };
+      if (Array.isArray(o.nums) && o.nums.some(v => String(v).trim() === t)) return { piece: r.name, meuble: o.name, cell: null, id: o.id };
+      if (o.num != null && String(o.num).trim() === t) return { piece: r.name, meuble: o.name, cell: null, id: o.id };
+    }
+    return null;
+  };
+
   const poserDansCase = (itemId, cellKey, saisie) => {
     const it = items.find(x => x.id === itemId); if (!it) return;
+    {
+      const v0 = saisie == null ? '' : String(saisie).trim();
+      const cur0 = ((it.slots || {})[cellKey] || [])[0] || '';
+      if (v0 && v0 !== cur0) {
+        const ou = dejaPoseOu(v0);
+        if (ou && !(ou.id === itemId && ou.cell === cellKey)) {
+          // Information, pas décision : un bandeau suffit — deux boutons pour
+          // un seul résultat, c'est une fausse question.
+          toast(`N°${v0} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`);
+          return;
+        }
+      }
+    }
     const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
     const c0 = Number(String(cellKey).split('_')[1]);
     const slots = { ...(it.slots || {}) };
@@ -8543,9 +8571,14 @@ function RoomPlan({ locate, onLocateConsumed }) {
           derrière un seul dépliant, et l'écran s'ouvre sur la pièce + la
           recherche. */}
       <details style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
-        <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none' }}>
-          <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: C.text }}>Aménager la pièce</span>
-          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Ajouter des meubles, changer les dimensions, déplacer</span>
+        {/* ⚠️ `listStyle:none` retire le triangle du navigateur : sans repère
+            ajouté, plus rien ne dit que ça s'ouvre. On pose donc un chevron. */}
+        <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: C.text }}>Aménager la pièce</span>
+            <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Ajouter des meubles, changer les dimensions, déplacer</span>
+          </span>
+          <span aria-hidden="true" style={{ flexShrink: 0, color: C.muted, fontSize: 15, lineHeight: 1 }}>›</span>
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 13px 13px' }}>
         {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────

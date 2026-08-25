@@ -4799,3 +4799,132 @@ comparées à l'octet) et l'étagère se présente **de face, ses rayons lisible
   et en bas sur un écran de téléphone). Sur ordinateur — la cible qu'il a fixée
   pour l'app comme pour l'extension (§42) — le canvas est large et la pièce
   remplit le cadre.
+
+---
+
+## 5.61 — LES NOTIFICATIONS COUPÉES PAR MA PROPRE CORRECTION + une vraie typographie + on range une VRAIE paire
+
+Julien : « remets les notifications, je ne les reçois plus… améliore le
+graphisme, les couleurs, les contrastes, les logos, les boutons, qu'on n'ait
+pas l'impression que ce soit fait par une IA… et la 3D doit être une
+application dans l'application : tu sélectionnes ce que tu ranges, la taille,
+on voit les animations. »
+
+### 1. ⚠️⚠️ POURQUOI IL NE RECEVAIT PLUS RIEN — c'est §5.53 qui l'a cassé
+En sortant la clé privée VAPID du dépôt public, la **paire a été régénérée** :
+la clé **PUBLIQUE a changé elle aussi**. Or un abonnement push est **scellé à
+la clé publique avec laquelle il a été créé**. Les abonnements déjà posés sur
+ses deux appareils sont donc devenus inutilisables — le service de push refuse
+l'envoi — et `getSubscription()` les rend **quand même**. L'écran affichait
+donc « activé » pendant que plus rien n'arrivait, et le bouton « Test »
+répondait « aucun appareil n'a reçu », ce qui désignait le mauvais coupable.
+
+- **`memeCle(sub)`** compare la clé de l'abonnement à la clé courante et
+  **ré-abonne tout seul** quand elles diffèrent (désabonnement + nouvel
+  abonnement + renvoi au serveur), avec un mot dans l'écran.
+- **`GET /api/push?etat=1`** répond « le serveur peut-il envoyer ? » (booléen +
+  nombre d'appareils, **aucun secret exposé**). Réglages → Notifications
+  affiche le verdict en rouge quand la clé manque.
+- Le bouton **Test remonte la RAISON du serveur** : « aucun appareil abonné »
+  et « le serveur n'a pas sa clé » produisaient exactement le même silence.
+
+⚠️ **Ce que le code ne peut PAS faire** : poser `VAPID_PRIVATE_KEY` dans les
+variables d'environnement Vercel. Tant qu'elle manque, **zéro notification
+part**, quel que soit le nombre d'appareils abonnés. L'app le dit désormais
+noir sur blanc au lieu de laisser chercher.
+
+### 2. LE GRAPHISME — les deux tells d'une interface générée
+**Tell n°1 : une seule police neutre à toutes les tailles.** Rien ne distingue
+un titre d'un paragraphe sinon la taille. On oppose désormais une police
+d'**AFFICHAGE** (Bricolage Grotesque — titres d'écran, montants, gros
+chiffres, N° des paires) à la police de **TEXTE** (Inter), avec un contraste
+tenu : affichage resserré (**-0,03 em**) contre micro-étiquettes aérées en
+capitales (**+0,09 em**, classe `.vrm-label`). C'est ce couple qui fait lire
+« composé par quelqu'un ».
+**Tell n°2 : l'aplat parfaitement lisse.** Aucune surface réelle ne l'est. Une
+trame de bruit à **2,8 %**, non cliquable, sur toute la page (`body::after`,
+SVG `feTurbulence` en `data:`) — personne ne sait dire pourquoi, mais ça ne
+ressemble plus à du CSS pur.
+
+**Les boutons** (il les a nommés) : tous les boutons de l'app portent des
+styles **en ligne**, donc une règle CSS ne peut pas les repeindre — mais les
+**états** (`:hover`, `:active`, `:focus-visible`) n'existent pas en style en
+ligne. Ces règles-là s'appliquent donc partout **sans jamais écraser une
+intention de couleur** : légère montée en luminosité au survol, enfoncement au
+clic, anneau de focus aux couleurs de la marque.
+⚠️ `:hover` borné à `(hover:hover) and (pointer:fine)` : sur mobile le survol
+reste « collé » après un tap et le bouton paraît bloqué.
+
+⚠️ **Le fond de page gardait les ANCIENNES couleurs** (`#eef2ef` / `#0b0f0d`)
+alors que la palette était passée à `#f1f4f2` / `#0a0e11` : une bande d'une
+autre teinte derrière les cartes, visible sur tous les écrans. Resynchronisé.
+
+⚠️ **Défaut vu en capture, pas à la relecture** : les étiquettes en capitales
+sont **plus longues**. « COÛT D'ACHAT » et « BÉNÉFICE NET » passaient sur deux
+lignes et les trois `StatBox` d'une rangée ne s'alignaient plus. On réserve
+deux lignes pour tout le monde — les chiffres restent sur la même ligne d'œil.
+
+### 3. LA 3D — on range une VRAIE paire, et le carton tombe
+Avant, remplir une case demandait de **taper un numéro de mémoire** : rien ne
+vérifiait qu'il existe, ni qu'il n'est pas déjà rangé ailleurs.
+
+- **`RangerSheet`** : on choisit dans la liste de ses paires — **photo, N°,
+  titre, POINTURE**, recherche. La liste dérive de **`vinted_nums_physiques`**
+  (§5.14), la définition unique de « cette paire est chez toi » : aucune règle
+  n'est réécrite ici (§11).
+  ⚠️ **Sans cette liste** (écran Annonces jamais ouvert sur cet appareil), on
+  propose **tout plutôt que rien** — mais on trie les **plus récemment
+  numérotées en tête** et **on l'écrit dans la feuille**. On ne fait pas
+  semblant de savoir.
+- **`animerDepot`** : la boîte **tombe** dans sa case — chute accélérée, rebond
+  amorti, halo qui s'éteint. ⚠️ Déclenchée **APRÈS** la reconstruction du
+  meuble (l'effet sur `items`) : la boîte n'existe qu'à ce moment-là. React
+  exécute les effets dans l'ordre de déclaration, c'est ce qui garantit
+  l'enchaînement.
+- **`poserDansCase`** : un seul chemin d'écriture pour les trois entrées
+  (choix, saisie libre, effacement) — gravité, croissance de la grille,
+  animation.
+- **Garde-fou `dejaPoseOu(num)`** : un même numéro dans deux cases, c'est
+  « dans quelle boîte est-elle ? » — le pendant, au garage, des deux paires
+  sous le même numéro (§19). La feuille l'empêche par construction (elle ne
+  propose que ce qui n'est pas rangé) ; ce garde-fou couvre la **saisie
+  libre**, qui ne vérifiait rien, et nomme le meuble où la paire se trouve.
+
+### 4. État des données mesuré AVANT de coder (25 août)
+| | |
+|---|---|
+| paires numérotées | **225** |
+| annonces en ligne | 26 |
+| **numéros portés par deux annonces en ligne** | **0** ✅ |
+| **annonces en ligne sans numéro** | **0** ✅ |
+| **prix d'achat renseignés** | **0 / 225** ⚠️ |
+
+Les garde-fous de §5.40 (aucun numéro réattribué) et §5.45 (rien ne bouge tout
+seul) **tiennent** : le N°4 corrigé la veille n'est pas revenu, et aucune
+annonce n'est sortie sans numéro. Le seul trou reste **le prix d'achat** —
+l'outil de saisie en série existe (§5.47), c'est de la frappe.
+
+### ⚠️ Deux pièges de banc, encore (§21)
+1. **J'ai failli signaler un bug qui n'existe pas** : la capture
+   `smoke-cat_journee.png` montrait un commentaire JSX affiché EN TEXTE sur
+   l'écran d'accueil. Vérification : la capture datait de **10:49**, d'un run
+   précédent, et `cat_journee` n'était **pas** dans les onglets du banc. Le
+   bundle courant ne contient **aucune** occurrence du texte. **Regarder la
+   date du fichier avant d'accuser le code.** L'onglet a été ajouté au banc, et
+   un **détecteur permanent** cherche désormais `/*` et `*/` dans le texte
+   affiché — la famille §5.55/§5.56 ne repassera plus.
+2. **Mon banc lisait la mauvaise clé** : `vrm_room` au lieu de
+   `vrm_room_plan` → il concluait « rien n'a été rangé » alors que tout
+   marchait.
+
+### Vérifié
+`npm run build` OK · `node --check api/push.js` OK · **9 audits au vert** ·
+banc : la police d'affichage est **réellement chargée et appliquée**
+(`document.fonts.check('700 22px "Bricolage Grotesque"')` = **true**, famille
+calculée du titre = Bricolage Grotesque) · **banc de rangement dédié** : deux
+taps sur une case → la feuille s'ouvre (**175 paires**, nom de case
+« colonne 3 · 2ᵉ depuis le bas », avertissement d'honnêteté affiché) → un tap
+sur N°154 → **`Étagère:3_2=154`** en base (la gravité l'a fait tomber en bas de
+la colonne), l'étiquette du meuble passe à **« Étagère (1) »** et le panneau à
+**« 1 boîte rangée · 14 places libres »** · smoke tous écrans, **0 ECRAN
+VIDE, 0 PAGEERROR**.

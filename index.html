@@ -85,6 +85,34 @@
     }
     @media print{ body::after{display:none;} }
 
+    /* 3 ter) LES BOUTONS. Julien : « améliore les boutons ».
+       Tous les boutons de l'app portent des styles EN LIGNE (une seule
+       feuille React) : une règle CSS ne peut pas les repeindre. Mais les
+       ÉTATS (`:hover`, `:active`, `:focus-visible`) n'existent pas en style
+       en ligne — donc ces règles-ci s'appliquent partout, sans jamais écraser
+       une intention de couleur. C'est exactement ce qui manque à une
+       interface générée : elle est jolie au repos et morte sous le doigt.
+       ⚠️ `:hover` seulement sur les appareils à VRAI survol : sur mobile,
+       le survol reste « collé » après un tap et le bouton paraît bloqué. */
+    @media (hover:hover) and (pointer:fine){
+      button:not(:disabled):hover,a[role="button"]:hover{ filter:brightness(1.06) saturate(1.03); }
+    }
+    button:not(:disabled):active{ filter:brightness(.94); }
+    button:disabled{ cursor:not-allowed; }
+    /* Anneau de focus au clavier : visible, aux couleurs de la marque, jamais
+       le contour bleu du navigateur. */
+    :focus-visible{ outline:2px solid rgba(0,135,90,.55); outline-offset:2px; border-radius:10px; }
+    @media (prefers-color-scheme: dark){ :focus-visible{ outline-color:rgba(46,224,143,.6); } }
+
+    /* Bouton PRINCIPAL : un dégradé à peine perceptible + un liseré clair en
+       haut. C'est ce qui fait qu'un bouton a l'air d'un objet posé sur la page
+       plutôt que d'un rectangle colorié. Réservé aux actions qui comptent. */
+    .vrm-btn-primary{
+      position:relative;overflow:hidden;
+      background-image:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,0) 55%);
+      box-shadow:0 1px 0 rgba(255,255,255,.22) inset,0 2px 8px -2px rgba(6,26,18,.35);
+    }
+
     /* 4) DÉFILEMENT : élastique sur iOS + barres discrètes sur desktop. */
     html{-webkit-text-size-adjust:100%;}
     body{overscroll-behavior-y:none;}
