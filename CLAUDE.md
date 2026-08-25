@@ -4956,3 +4956,62 @@ le dossier est vidé, le banc plante, et on croit à une régression.
 d'affichage, 0 erreur non-réseau** · 9 audits au vert · base de production :
 225 paires numérotées, 26 annonces en ligne, **0 doublon de numéro**,
 **0 annonce sans numéro**.
+
+---
+
+## 5.62 — ⚠️ LE VRAI PROBLÈME N'ÉTAIT NI LES COULEURS NI LA POLICE : LA FORME ÉTAIT MOBILE
+
+Julien, **trois fois** : « le rendu est presque pareil, je veux quelque chose
+qui révolutionne ». Il avait raison les trois fois, et mes réponses (palette,
+typographie, grain, états de boutons) étaient **des retouches sur une structure
+qui ne changeait pas**.
+
+### Ce que la mesure a montré — et il fallait la faire au 1er message
+Rendu de l'app à **1440×900**, l'écran où il travaille (§42 : ordinateur
+d'abord). C'était une **app mobile étirée** :
+
+| constat (capture) | |
+|---|---|
+| largeur d'une carte d'action pour porter trois mots | **1170 px** |
+| navigation | **en bas**, comme sur un téléphone |
+| vide noir sous le contenu | **~350 px** |
+| écrans accessibles d'un coup | **5 sur 9** (les autres derrière « Plus ») |
+
+➡️ **Aucune retouche de teinte ne corrige ça.** Un lecteur relie mal le début
+d'une ligne de 1170 px à sa fin ; une barre d'onglets en bas d'un écran de
+bureau, personne n'en met ; et cacher la moitié de la navigation derrière un
+bouton est une contrainte de **téléphone**, sans raison d'être sur 1440 px.
+
+### Le shell d'ordinateur — `useOrdinateur()` (≥ 1024 px)
+- **`SideBar`** : les **neuf** écrans visibles d'un coup, groupés
+  « Au quotidien » / « Le reste », la marque en haut, Réglages en bas. La barre
+  du bas disparaît — **une seule navigation à la fois, jamais les deux**.
+- **Largeur de lecture bornée à 980 px**, collée à gauche sous la barre : la
+  respiration passe **à droite**, plus dans la carte.
+- **En-tête décalé** après la barre latérale, et **la marque n'y est plus** :
+  deux logos sur le même écran, c'est ce qui fait « assemblé » plutôt que
+  « conçu ».
+- **Actions de Ma journée en GRILLE** :
+  `repeat(auto-fit, minmax(340px, 1fr))` → **deux colonnes** sur grand écran,
+  **une** sur téléphone. La même règle pour les deux, **sans test de largeur
+  dans le JavaScript** — donc rien à maintenir en double.
+- **Une lueur** (deux dégradés radiaux très doux, `body::before`) sous tout le
+  contenu. Sur grand écran il reste forcément du vide une journée calme : un
+  aplat noir qui s'arrête net fait « page pas finie », une source de lumière en
+  fait de la respiration.
+
+⚠️ **En dessous de 1024 px, RIEN ne change** : `ordi` est faux, la barre du bas
+et la pleine largeur sont exactement celles d'avant. **Le téléphone est
+intact** — c'est la condition de ce changement, et elle est vérifiée au banc à
+430 px.
+
+### La leçon, et elle vaut pour la suite
+**Quand quelqu'un dit trois fois « c'est pareil », arrêter de retoucher et aller
+mesurer l'objet dans SES conditions.** Deux sessions de palette et de
+typographie n'ont pas déplacé son impression parce que le défaut n'était pas
+là ; une capture à sa vraie résolution l'a montré en trente secondes.
+
+⚠️ **Piège d'outillage rencontré cinq fois aujourd'hui** : lancer
+`npm run build` pendant qu'un banc sert `dist/` vide le dossier sous ses pieds —
+le banc plante ou se fige, et on croit à une régression. **Un seul des deux à
+la fois.**
