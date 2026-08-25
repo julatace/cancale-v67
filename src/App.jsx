@@ -20376,7 +20376,11 @@ export default function App() {
               : <VrmLogo size={40}/>}
             {/* Repère « modifiable » : une pastille discrète en coin, et non plus
                 un bandeau noir en travers du logo — il masquait le bas du V. */}
-            <div style={{position:'absolute',right:-1,bottom:-1,width:14,height:14,borderRadius:999,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:C.muted,lineHeight:1}}>✎</div>
+            {/* ⚠️ La pastille « modifiable » ne colle plus en permanence sur la
+                marque : un produit fini ne porte pas un crayon sur son logo.
+                Elle apparaît au SURVOL (ordinateur) ; le changement d'icône
+                reste accessible dans Réglages sur téléphone. */}
+            <div className="vrm-logo-edit" style={{position:'absolute',right:-1,bottom:-1,width:14,height:14,borderRadius:999,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:C.muted,lineHeight:1,opacity:0,transition:'opacity .15s ease'}}>✎</div>
           </div>
           {/* minWidth:0 + nowrap : avec la flèche « retour », le numéro de version
               passait à la ligne et faisait grandir l'en-tête d'un écran à l'autre. */}
