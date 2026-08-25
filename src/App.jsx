@@ -11489,6 +11489,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // au-dessus de la grille et obligeaient à défiler longtemps avant de voir
   // ses propres annonces.
   const [diagOpen, setDiagOpen] = useState(false);
+  // ⚠️ REPLIÉ PAR DÉFAUT. Mesuré en capture : ce panneau faisait 409 px et,
+  // avec les autres bandeaux, repoussait la PREMIÈRE ANNONCE à 1146 px du haut
+  // — il fallait défiler un écran et demi pour voir son stock. C'est une liste
+  // de travail, pas une alerte : le compte suffit tant qu'on ne l'ouvre pas.
+  const [retoursOpen, setRetoursOpen] = useState(false);
   // Section « Analyse » de l'onglet Ventes : repliée par défaut pour que l'écran
   // aille droit à la liste des ventes. Le choix est mémorisé sur l'appareil.
   const [analyseOpen, setAnalyseOpen] = useState(() => !!load('vinted_analyse_open', false));
@@ -12310,7 +12315,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Un numéro en double est trop grave pour rester derrière une barre repliée :
   // on déplie tout seul. Les autres signalements restent discrets.
-  useEffect(() => { if (numDoublons.length) setDiagOpen(true); }, [numDoublons.length]);
 
   const annShown = useMemo(() => {
     let arr = [...annBase];
@@ -12362,6 +12366,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [annBase, annSearch, annSort, numeros]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
   const blockedList = useMemo(() => accounts.filter(a => blockedAccts.has(String(a.vinted_user_id))), [accounts, blockedAccts]);
+
+  // ⚠️ APRÈS les trois listes qu'il lit (piège TDZ, §19 : un useMemo s'exécute
+  // immédiatement). Compte ce qui vit derrière le dépliant « signalements » —
+  // le numéro en double, lui, s'affiche seul et n'est pas compté ici.
+  const nAutresSignalements = useMemo(
+    () => comptesMuets.length + (disparues.length ? 1 : 0) + blockedList.length,
+    [comptesMuets, disparues, blockedList]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
   // ── LITIGES / RETOURS : que devient le NUMÉRO de la paire ? ────────────────
   // Statuts réellement renvoyés par Vinted dans ce cas : « Retour initié »,
@@ -16047,33 +16058,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             numéro, donc la mauvaise chaussure dans le carton. Noyée au milieu,
             elle ne se voyait plus. Les autres sont retirées ; celle-ci reste,
             en rouge, et se déplie toute seule. */}
-        {numDoublons.length > 0 && (
-          <button type="button" onClick={() => setDiagOpen(v => !v)}
-            style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.danger}`,background:`${C.danger}12`,
-              borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
-            <span aria-hidden="true" style={{flexShrink:0,color:C.danger,display:'flex'}}><Icon name="alert" size={17}/></span>
-            <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
-              {`${numDoublons.length} numéro${numDoublons.length>1?'x':''} porté${numDoublons.length>1?'s':''} par deux paires`}
-            </span>
-            <span style={{fontSize:11.5,color:C.danger,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
-          </button>
-        )}
-        {diagOpen && (<>
-        {/* NUMÉROS QUI MONTENT TROP HAUT — « pourquoi N°156 alors que j'ai à
-            peine 50 paires ? ». L'outil de renumérotation existait mais était
-            enfoui dans « ⋯ Outils » : personne ne le trouvait. On le propose
-            quand l'écart devient visible (plus de 15 numéros perdus). */}
-        {/* ⚠️ LE PANNEAU « TES NUMÉROS MONTENT TROP HAUT » A ÉTÉ RETIRÉ (§5.40).
-            Il annonçait « N numéros sont libres entre les deux » et poussait à
-            renuméroter — deux choses désormais FAUSSES et dangereuses :
-            un numéro donné une fois est pris à vie, et renuméroter le
-            réattribuerait à une autre paire. Or une paire peut revenir (litige,
-            retour, annulation) et doit retrouver SON numéro.
-            Que le compteur monte est NORMAL : il compte les paires passées, pas
-            le stock. « Renuméroter à la suite » reste dans ⋯ Outils pour un cas
-            exceptionnel, mais on ne le suggère plus jamais. */}
-        {/* NUMÉROS EN DOUBLE — le plus grave : deux paires dans la même boîte,
-            donc la mauvaise chaussure part à l'expédition. */}
+        {/* ⚠️ LE DOUBLON D'ALERTE (§11 : une notion, un seul endroit).
+            Le panneau des numéros en double se déplie TOUT SEUL (effet sur
+            numDoublons) : la barre de résumé qui le précédait était donc
+            TOUJOURS affichée juste au-dessus de lui, avec le même titre.
+            Mesuré en capture : deux blocs consécutifs disant la même chose.
+            La barre est supprimée — le panneau se montre seul, sans bascule :
+            c'est la seule alerte de l'app qui coûte de l'argent (§19), elle
+            n'a pas à être repliable. */}
         {numDoublons.length > 0 && (
           <div style={{border:`1.5px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
             <div style={{fontSize:13.5,fontWeight:700,color:C.danger}}>
@@ -16107,6 +16099,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </div>
         )}
+        {/* ⚠️ LES AUTRES SIGNALEMENTS ÉTAIENT PRISONNIERS DE CETTE BASCULE.
+            Ils ne s'ouvraient qu'avec le bouton de la barre de résumé, qui
+            n'apparaissait QUE s'il y avait un numéro en double. Sans conflit
+            de numéro, un compte muet ou une annonce disparue était donc
+            INATTEIGNABLE — de l'affichage mort. Ils ont désormais leur propre
+            dépliant, qui ne s'affiche que s'il y a vraiment quelque chose. */}
+        {nAutresSignalements > 0 && (
+          <button type="button" onClick={() => setDiagOpen(v => !v)}
+            style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,
+              borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
+            <span aria-hidden="true" style={{flexShrink:0,color:C.warn,display:'flex'}}><Icon name="alert" size={17}/></span>
+            <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
+              {`${nAutresSignalements} signalement${nAutresSignalements>1?'s':''}`}
+            </span>
+            <span style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
+          </button>
+        )}
+        {diagOpen && (<>
         {/* COMPTE MUET : il a des paires numérotées mais ne renvoie plus AUCUNE
             annonce. C'est la signature d'un masquage par Vinted. On le dit tout
             de suite, sinon on croit avoir perdu son stock. */}
@@ -16265,11 +16275,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           })()}
           {retoursAttendus.length > 0 && (
             <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'10px 12px'}}>
-              {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (<>
-                <div style={{fontSize:13,fontWeight:700,color:C.warn,marginBottom:2}}>{retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}{rec>0?` · ${rec} déjà reçue${rec>1?'s':''}`:''}</div>
-                <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier. <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</div>
-              </>); })()}
-              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (
+                <button type="button" onClick={()=>setRetoursOpen(v=>!v)}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                  <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:700,color:C.warn}}>{retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}{rec>0?` · ${rec} déjà reçue${rec>1?'s':''}`:''}</span>
+                  <span style={{fontSize:11.5,color:C.muted,fontWeight:600,flexShrink:0}}>{retoursOpen?'Masquer':'Voir'}</span>
+                </button>
+              ); })()}
+              {retoursOpen && (
+              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier. <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</div>)}
+              {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
                   const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
                   const col = lab.col();
@@ -16295,7 +16310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   );
                 })}
-              </div>
+              </div>)}
             </div>
           )}
           {numeroReprises.length > 0 && (
