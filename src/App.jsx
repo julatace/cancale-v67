@@ -4089,6 +4089,77 @@ function TopProgress() {
   );
 }
 
+// ── LE SHELL D'ORDINATEUR ───────────────────────────────────────────────────
+// ⚠️ Julien : « le rendu est presque pareil, je veux quelque chose qui
+// révolutionne ». Le vrai problème n'était ni les couleurs ni la police : sur
+// son écran de 1440 px, l'app était une app MOBILE ÉTIRÉE — une carte de
+// 1170 px pour porter trois mots, la navigation EN BAS comme sur un téléphone,
+// et 350 px de vide sous le contenu (constaté en capture à 1440×900).
+// Aucune retouche de teinte ne corrige ça : c'est la FORME qui est mobile.
+// ➡️ Au-dessus de 1024 px : barre latérale à gauche, largeur de lecture bornée,
+//    barre du bas retirée. En dessous : rien ne change, le mobile est intact.
+const useOrdinateur = () => {
+  const [ord, setOrd] = React.useState(() => {
+    try { return window.matchMedia('(min-width: 1024px)').matches; } catch (_) { return false; }
+  });
+  React.useEffect(() => {
+    let mq; try { mq = window.matchMedia('(min-width: 1024px)'); } catch (_) { return; }
+    const on = () => setOrd(mq.matches);
+    try { mq.addEventListener('change', on); } catch (_) { mq.addListener(on); }
+    return () => { try { mq.removeEventListener('change', on); } catch (_) { mq.removeListener(on); } };
+  }, []);
+  return ord;
+};
+
+const NAV_LARGEUR = 236;
+
+// Barre latérale : TOUS les écrans visibles d'un coup, pas quatre plus un
+// « Plus ». Sur un grand écran, cacher la moitié de la navigation derrière un
+// bouton n'a aucune raison d'être — c'est une contrainte de téléphone.
+function SideBar({ tab, setTab }) {
+  const groupes = [
+    { titre: 'Au quotidien', items: BOTTOM_TABS },
+    { titre: 'Le reste',     items: PLUS_TABS },
+  ];
+  return (
+    <nav aria-label="Navigation principale" style={{
+      position:'fixed',left:0,top:0,bottom:0,width:NAV_LARGEUR,zIndex:60,
+      display:'flex',flexDirection:'column',gap:2,
+      background:C.surface,borderRight:`1px solid ${C.border}`,
+      padding:'14px 12px 14px',overflowY:'auto'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:'2px 6px 16px'}}>
+        <VrmLogo size={34}/>
+        <VrmWord height={17} color={C.text} accent={C.accent}/>
+      </div>
+      {groupes.map(g => (
+        <div key={g.titre} style={{marginBottom:6}}>
+          <div className="vrm-label" style={{color:C.muted,opacity:.75,padding:'8px 8px 6px'}}>{g.titre}</div>
+          {g.items.map(t => {
+            const on = tab === t.id;
+            return (
+              <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={on?'page':undefined}
+                style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
+                  padding:'9px 10px',marginBottom:2,borderRadius:11,border:'none',cursor:'pointer',fontFamily:'inherit',
+                  background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.text,
+                  fontSize:13.5,fontWeight:on?600:500,transition:'background .15s ease,color .15s ease'}}>
+                <Icon name={t.icon} size={19} style={{opacity:on?1:.68,flexShrink:0}}/>
+                <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+      <div style={{flex:1}}/>
+      <button type="button" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}
+        style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
+          padding:'9px 10px',borderRadius:11,border:`1px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit',
+          background:tab==='settings'?C.card2:'transparent',color:C.muted,fontSize:13,fontWeight:500}}>
+        <Icon name="gear" size={18}/><span>Réglages</span>
+      </button>
+    </nav>
+  );
+}
+
 function BottomBar({tab,setTab}) {
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
@@ -14334,10 +14405,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
 
+            {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
+                Empilées, chacune traversait 900 px pour porter trois mots et
+                laissait 400 px de vide sous l'écran (mesuré en capture à
+                1440×900). Une grille qui se remplit toute seule
+                (`auto-fit, minmax(340px, 1fr)`) donne DEUX colonnes sur un
+                grand écran et UNE sur téléphone — la même règle, sans test de
+                largeur dans le JavaScript. */}
             {!loading && jobs.length>0 && (
-              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(340px, 1fr))',gap:10}}>
                 {jobs.map((j,i)=>(
-                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:16,border:`1px solid ${j.color}44`,background:`${j.color}0e`,cursor:'pointer',textAlign:'left',width:'100%',fontFamily:'inherit'}}>
+                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:16,border:`1px solid ${j.color}44`,background:`${j.color}0e`,cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
                     {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                         avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
                         empilés, c'est ce qui faisait « application générée ».
@@ -19526,6 +19604,8 @@ export default function App() {
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
   const [authState,setAuthState]=useState(AUTH);
+  // Ordinateur ou téléphone : décide la NAVIGATION et la largeur de lecture.
+  const ordi = useOrdinateur();
   React.useEffect(()=>{ const off=onAuthChange(setAuthState); authBoot(); return off; },[]);
   // Clé du widget iPhone : créée une seule fois, après le chargement du cloud
   // (sinon chaque appareil en générerait une différente et se voleraient la
@@ -20357,10 +20437,14 @@ export default function App() {
       <ConfirmHost/>
       {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
           derrière au défilement au lieu de buter sur un bandeau plein. */}
+      {/* Sur ordinateur l'en-tête commence APRÈS la barre latérale, et la marque
+          n'y est plus : elle est en haut de la barre. Deux logos sur le même
+          écran, c'est le genre de doublon qui fait « assemblé », pas « conçu ». */}
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',
+        marginLeft: ordi ? NAV_LARGEUR : undefined,
         background:C.glass||C.surface,backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
         borderBottom:`1px solid ${C.border}`}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto',visibility: ordi ? 'hidden' : undefined}}>
           {canBack && <button type="button" onClick={goBack} title="Retour" aria-label="Retour"
             style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:999,border:`1px solid ${C.border}`,background:C.bg,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1}}>‹</button>}
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
@@ -20584,7 +20668,18 @@ export default function App() {
           <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:6,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
-      <main style={{maxWidth:1200,margin:'0 auto',paddingBottom:'calc(84px + env(safe-area-inset-bottom))'}}>
+      {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
+          Une carte de 1170 px pour trois mots, c'est le tell n°1 d'une app
+          mobile étirée : l'œil ne relie plus le début de la ligne à sa fin.
+          On plafonne à 980 px, collé à gauche sous la barre latérale — la
+          respiration passe à droite, pas dans la carte. Sur téléphone,
+          `ordi` est faux et RIEN ne change. */}
+      <main style={{
+        maxWidth: ordi ? 980 : 1200,
+        margin: ordi ? '0' : '0 auto',
+        marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
+        paddingRight: ordi ? 28 : undefined,
+        paddingBottom: ordi ? 40 : 'calc(84px + env(safe-area-inset-bottom))'}}>
         <EcranGardeFou resetKey={tab}>
         {tab==='settings'&&<SettingsScreen setTab={setTab}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
@@ -20670,7 +20765,9 @@ export default function App() {
         {tab==='leboncoin'&&<LeboncoinScreen/>}
         </EcranGardeFou>
       </main>
-      <BottomBar tab={tab} setTab={setTab}/>
+      {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
+          téléphone. Jamais les deux — c'est la même liste d'écrans. */}
+      {ordi ? <SideBar tab={tab} setTab={setTab}/> : <BottomBar tab={tab} setTab={setTab}/>}
       {showBackup&&<BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

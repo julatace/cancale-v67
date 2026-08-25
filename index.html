@@ -74,6 +74,26 @@
       font-size:10.5px;font-family:'Inter',system-ui,sans-serif;
     }
 
+    /* 3 bis-0) UNE LUEUR, PAS UN APLAT.
+       Sur grand écran il reste forcément du vide sous le contenu (une journée
+       calme a peu à afficher). Un aplat noir qui s'arrête net fait « page pas
+       finie » ; une lueur très douce ancrée en haut à gauche donne une source
+       de lumière à la page et le vide devient de la respiration.
+       Fixe, non cliquable, sous tout le contenu. */
+    body::before{
+      content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+      background:
+        radial-gradient(120vh 90vh at 8% -10%, rgba(0,135,90,.10), transparent 60%),
+        radial-gradient(90vh 70vh at 100% 0%, rgba(184,134,59,.06), transparent 62%);
+    }
+    @media (prefers-color-scheme: dark){
+      body::before{
+        background:
+          radial-gradient(120vh 90vh at 8% -10%, rgba(46,224,143,.10), transparent 60%),
+          radial-gradient(90vh 70vh at 100% 0%, rgba(224,185,114,.05), transparent 62%);
+      }
+    }
+
     /* 3 bis) LE GRAIN. Un aplat de couleur parfaitement lisse est le second
        tell d'une interface générée : aucune surface réelle n'est lisse. Une
        trame de bruit à 2,5 % posée sur toute la page (jamais cliquable) casse
