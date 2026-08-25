@@ -7046,7 +7046,7 @@ const GARAGE_AMBIANCES = [
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
-function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, fallback }) {
+function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
@@ -7902,7 +7902,34 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           pas();
         } catch (_) {}
       };
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot };
+      // ── LA BOÎTE S'EN VA ──────────────────────────────────────────────
+      // Le pendant de `animerDepot` : quand une paire sort du garage, on la
+      // voit partir (elle monte et s'efface) au lieu de disparaître d'un coup.
+      // ⚠️ Appelée AVANT l'écriture : la boîte doit encore exister. Le rendu
+      // suivant la retire pour de bon.
+      const animerSortie = (itemId, cellKey, fini) => {
+        try {
+          const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
+          if (!g) { fini && fini(); return; }
+          let cible = null;
+          g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && o.isMesh) cible = o; });
+          if (!cible) { fini && fini(); return; }
+          const y0 = cible.position.y;
+          const mats = Array.isArray(cible.material) ? cible.material : [cible.material];
+          mats.forEach(m => { if (m) { m.transparent = true; } });
+          const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now()), dur = 380;
+          const pas = () => {
+            const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            const k = Math.min(1, (now - t0) / dur);
+            cible.position.y = y0 + k * 0.55;
+            mats.forEach(m => { if (m) m.opacity = 1 - k; });
+            if (k < 1) requestAnimationFrame(pas);
+            else fini && fini();
+          };
+          pas();
+        } catch (_) { fini && fini(); }
+      };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot, animerSortie };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
@@ -7926,6 +7953,12 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
     if (!depot || !depot.at || loading) return;
     try { st.current.animerDepot && st.current.animerDepot(depot.itemId, depot.cellKey); } catch (_) {}
   }, [depot && depot.at, loading]);
+  // La sortie : on anime, PUIS on prévient (c'est l'appelant qui écrit).
+  useEffect(() => {
+    if (!sortie || !sortie.at || loading) return;
+    try { st.current.animerSortie ? st.current.animerSortie(sortie.itemId, sortie.cellKey, sortie.fini) : (sortie.fini && sortie.fini()); }
+    catch (_) { sortie.fini && sortie.fini(); }
+  }, [sortie && sortie.at, loading]);
   // Surlignage : rouge = N° cherché, bleu = meuble sélectionné (édition).
   const flownRef = useRef(null);
   useEffect(() => {
@@ -8561,6 +8594,61 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
   const [ranger, setRanger] = useState(null);   // { itemId, cellKey } — feuille ouverte
   const [depot, setDepot] = useState(null);     // { itemId, cellKey, at } — animation 3D
+  const [sortie, setSortie] = useState(null);   // { itemId, cellKey, at, fini } — la boîte s'en va
+
+  // ── QUI EST DANS CE MEUBLE ──────────────────────────────────────────────
+  // Le garage savait RANGER, pas MONTRER. On ne pouvait ni voir ce qu'un
+  // meuble contient, ni en sortir une paire autrement qu'en effaçant un
+  // numéro dans une boîte de saisie. Ici : photo, N°, titre, et « Sortir ».
+  // ⚠️ Le rapprochement se fait par NUMÉRO — c'est ce qui est écrit sur le
+  // carton, donc l'identité de la boîte au garage. Quand plusieurs fiches
+  // portent le même numéro (héritage d'avant §5.40), on préfère celle d'une
+  // paire réellement présente, sinon la plus récemment numérotée, et on le
+  // SIGNALE au lieu de choisir en silence.
+  const ficheParNum = useMemo(() => {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const phys = load('vinted_nums_physiques', null);
+    const presents = Array.isArray(phys) && phys.length ? new Set(phys.map(String)) : null;
+    const par = {};
+    Object.values(fiches).forEach(f => {
+      const n = f && f.numero != null ? String(f.numero).trim() : ''; if (!n) return;
+      (par[n] = par[n] || []).push(f);
+    });
+    const out = {};
+    Object.entries(par).forEach(([n, arr]) => {
+      const vivantes = presents ? arr.filter(f => presents.has(n)) : arr;
+      const pool = vivantes.length ? vivantes : arr;
+      const best = pool.slice().sort((a, b) => (b.numberedAt || 0) - (a.numberedAt || 0))[0];
+      const titres = new Set(arr.map(f => normTitle(f.title || '')).filter(Boolean));
+      out[n] = { title: best.title || '', photo: best.photo || null, ambigu: titres.size > 1 };
+    });
+    return out;
+  }, [items]);
+
+  const contenuMeuble = (it) => {
+    const out = [];
+    Object.entries(it.slots || {}).forEach(([cell, arr]) => {
+      (arr || []).forEach(v => {
+        const n = String(v || '').trim(); if (!n) return;
+        out.push({ cell, numero: n, ...(ficheParNum[n] || {}) });
+      });
+    });
+    return out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  };
+
+  // Sortir une paire : on la voit PARTIR, puis on écrit.
+  const sortirDeCase = (itemId, cellKey, numero) => {
+    const ecrire = () => {
+      const it = items.find(x => x.id === itemId); if (!it) return;
+      const slots = { ...(it.slots || {}) };
+      const reste = (slots[cellKey] || []).filter(v => String(v).trim() !== String(numero).trim());
+      if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
+      updateItem(itemId, { slots: compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4)) });
+      setSortie(null);
+      toast(`N°${numero} sorti du garage.`);
+    };
+    setSortie({ itemId, cellKey, at: Date.now(), fini: ecrire });
+  };
 
   // Ajoute/retire un N° dans une case (empilable).
   const cellAdd = async (it, cell) => { const n = (await askText({ numeric: true, desc: 'Numéro à ranger dans cette case (empilable) :', value: '' }) || '').trim(); if (!n) return; const cur = (it.slots && it.slots[cell]) || []; updateItem(it.id, { slots: { ...(it.slots || {}), [cell]: [...cur, n] } }); };
@@ -8594,7 +8682,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           La vue 3D était sous quinze rangées de boutons : il fallait défiler
           tout l'écran de configuration avant de voir son garage. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
-      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {ranger && (
@@ -8731,6 +8819,38 @@ function RoomPlan({ locate, onLocateConsumed }) {
       {selItem && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '9px 11px', border: `1px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}0c` }}>
           <span style={{ fontSize: 13, fontWeight: 900, color: C.text, flex: '1 1 100%', marginBottom: 2 }}>{emojiOf(selItem)} {selItem.name}{(FURN_TYPES[selItem.type] || {}).box && selItem.num ? ` — N°${selItem.num}` : ''}</span>
+          {/* ── CE QU'IL Y A DEDANS ────────────────────────────────────────
+              Le garage savait ranger, pas MONTRER. On voit maintenant chaque
+              paire du meuble — photo, N°, titre — et on peut la SORTIR d'un
+              tap (elle monte et s'efface avant d'être retirée). */}
+          {(() => {
+            const dedans = contenuMeuble(selItem);
+            if (!dedans.length) return null;
+            return (
+              <div style={{ flex: '1 1 100%', marginBottom: 6 }}>
+                <div className="vrm-label" style={{ color: C.muted, marginBottom: 6 }}>
+                  {dedans.length} paire{dedans.length > 1 ? 's' : ''} dans ce meuble
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 6, maxHeight: 230, overflowY: 'auto' }}>
+                  {dedans.map(p => (
+                    <div key={p.cell + '_' + p.numero} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, minWidth: 0 }}>
+                      {p.photo
+                        ? <img src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
+                        : <span style={{ width: 36, height: 36, borderRadius: 9, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👟</span>}
+                      <span style={{ flex: '1 1 90px', minWidth: 0 }}>
+                        <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
+                        <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.ambigu ? '⚠️ N° porté par plusieurs paires' : (p.title || '—')}
+                        </span>
+                      </span>
+                      <button onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cette paire du garage"
+                        style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
           {(FURN_TYPES[selItem.type] || {}).box && (
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
