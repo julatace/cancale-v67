@@ -5142,3 +5142,31 @@ d'app** · `audit-identite` **40 contrôles**, dont **3 réancrés/ajoutés qui
 échouent bien sur le code d'avant** (§21) : le barème compare des ensembles de
 couleurs à son nouvel emplacement, un titre générique ne peut plus atteindre le
 seuil, le seuil est une seule constante · 8 autres audits au vert.
+
+### 5.64 (suite) — L'URGENCE DES COLIS ÉTAIT UN SECOND BLOC POUR LE MÊME ENSEMBLE
+
+Même famille que le doublon des Annonces, vue en capture sur l'écran **Colis** :
+```
+[vert]  3 colis à envoyer · 0 bordereau prêt · 3 en attente de bordereau
+[rouge] 3 à poster en priorité — du retard · 3 en retard
+```
+Deux blocs consécutifs pour **les mêmes 3 colis**. §5.17 avait déjà corrigé le
+*vocabulaire* de ce bandeau (« à poster en priorité » au lieu de « colis à
+expédier ») pour qu'on ne croie pas à une contradiction — mais quand **tous** les
+colis sont urgents, les deux ensembles sont identiques et le second bloc n'ajoute
+que le détail.
+
+Cause structurelle : le calcul d'urgence vivait **dans le bloc de rendu** du
+bandeau rouge, donc le bandeau du haut ne pouvait pas savoir si l'urgence
+couvrait tout ou une partie.
+
+➡️ **`urgenceColis()` et `nAPoster()` au niveau du composant, une seule fois.**
+Le bandeau rouge ne s'affiche plus que si l'urgence est un **sous-ensemble
+strict** ; sinon la ligne d'urgence passe dans le sous-titre du bandeau du haut,
+en rouge. Les deux conditions sont complémentaires : exactement un des deux
+s'affiche.
+
+**Vérifié au rendu** : « 3 colis à envoyer · 0 bordereau prêt à imprimer · 3 en
+attente de bordereau · **3 en retard — les plus urgents sont en haut de la
+liste** » en un seul bloc, les cartes remontent d'un cran. 9 audits au vert,
+smoke **0 PAGEERROR, 0 écran vide, 0 suspect**.

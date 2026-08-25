@@ -14004,6 +14004,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   };
 
+  // ── URGENCE DES COLIS — UNE SEULE DÉFINITION ────────────────────────────
+  // Le calcul vivait dans le bloc de rendu du bandeau rouge ; le bandeau du
+  // haut ne pouvait donc pas savoir si l'urgence couvrait TOUS les colis ou
+  // seulement une partie — d'où deux blocs consécutifs annonçant le même
+  // ensemble (« 3 colis à envoyer » puis « 3 à poster en priorité »).
+  // Même source que la liste : les colis que Vinted attend, avec leur délai.
+  const nAPoster = () => expeditions().filter(e => !(e.o && isShipDone(e.o))).length;
+  const urgenceColis = () => {
+    let overdue = 0, today = 0, tomorrow = 0;
+    for (const e of expeditions()) {
+      if (e.o && isShipDone(e.o)) continue;
+      if (e.dl == null) continue;
+      if (e.dl < 0) overdue++; else if (e.dl === 0) today++; else if (e.dl === 1) tomorrow++;
+    }
+    const parts = [];
+    if (overdue) parts.push(`${overdue} en retard`);
+    if (today) parts.push(`${today} aujourd'hui`);
+    if (tomorrow) parts.push(`${tomorrow} demain`);
+    return { overdue, today, tomorrow, total: overdue + today + tomorrow, danger: overdue > 0 || today > 0, parts };
+  };
+
   const setBuyForKey = (key, val) => {
     setNumeros(prev => {
       const u = { ...prev };
@@ -16787,6 +16808,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}`
                       : 'Vinted ne te demande aucun envoi en ce moment.'}
                   </div>
+                  {/* ⚠️ L'URGENCE EST ÉCRITE ICI QUAND ELLE CONCERNE TOUS LES
+                      COLIS. Le bandeau rouge juste en dessous ne compte que
+                      l'urgent : quand TOUS les colis sont en retard, il
+                      annonçait « 3 à poster en priorité » sous un « 3 colis à
+                      envoyer » — deux blocs, le même ensemble, à la suite
+                      (mesuré en capture). Le bandeau ne s'affiche donc plus que
+                      s'il désigne un SOUS-ENSEMBLE strict ; sinon l'urgence
+                      tient sur cette ligne. */}
+                  {(()=>{ const u=urgenceColis(); if(!u.total || u.total<aPoster.length) return null;
+                    return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — les plus urgents sont en haut de la liste.</div>; })()}
                 </div>
                 {avecPdf.length>0 && (
                   <button type="button" onClick={batchBordereaux} disabled={batchBusy}
@@ -16876,12 +16907,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
         {(()=>{
-          let overdue=0, today=0, tomorrow=0;
-          // Même source que la liste : les colis que Vinted attend, avec leur délai.
-          for (const e of expeditions()) { if (e.o && isShipDone(e.o)) continue; if (e.dl==null) continue; if(e.dl<0) overdue++; else if(e.dl===0) today++; else if(e.dl===1) tomorrow++; }
-          const total=overdue+today+tomorrow; if(!total) return null;
-          const danger = overdue>0 || today>0;
-          const parts=[]; if(overdue) parts.push(`${overdue} en retard`); if(today) parts.push(`${today} aujourd'hui`); if(tomorrow) parts.push(`${tomorrow} demain`);
+          const u = urgenceColis(); const { total, danger, parts } = u;
+          // ⚠️ Ne s'affiche que si l'urgence est un SOUS-ENSEMBLE strict : sinon
+          // c'est le même ensemble que le bandeau du haut, qui le dit déjà.
+          if (!total || total >= nAPoster()) return null;
           return (
             <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
               {/* ⚠️ CE BANDEAU NE COMPTE QUE L'URGENT (en retard / aujourd'hui /
