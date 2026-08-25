@@ -13,47 +13,42 @@ const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
 // conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
-  // ── LES FONDATIONS VISUELLES ──────────────────────────────────────────────
-  // Julien : « change totalement le visuel, je veux qu'elle soit beaucoup plus
-  // belle ». Ce qui faisait « tableau de bord de développeur » n'était pas le
-  // détail des écrans mais ces valeurs-ci : des cartes plates de la même
-  // couleur que le fond, séparées par un trait d'1 px, et un vert unique posé
-  // partout. On change donc la BASE — tout l'écran en hérite — plutôt que six
-  // cents endroits.
-  //  · le fond n'est plus neutre : il est légèrement TEINTÉ, la carte est plus
-  //    CLAIRE que lui. C'est ce décalage qui donne le relief, pas le contour.
-  //  · l'ombre porte la profondeur ; le trait n'est plus qu'un liseré.
-  //  · l'accent devient une VRAIE couleur de marque (vert profond), et le
-  //    doré/ambre sert d'accent secondaire — deux couleurs valent mieux qu'une
-  //    déclinée à l'infini.
+  // ── IDENTITÉ VISUELLE ─────────────────────────────────────────────────────
+  // Julien, trois fois : « le visuel ne me convient pas, je veux que ce soit
+  // beaucoup plus beau ». Ma première tentative déplaçait les couleurs de 2 % —
+  // invisible. On assume donc une VRAIE identité :
+  //  · un accent unique et franc (vert émeraude) qui ne sert QU'aux actions et
+  //    aux chiffres qui comptent — jamais en aplat de fond ;
+  //  · des surfaces nettement étagées : fond sombre profond, carte clairement
+  //    au-dessus, carte secondaire au-dessus encore. On voit la hiérarchie
+  //    sans avoir besoin d'un seul contour ;
+  //  · un gris légèrement froid côté sombre : le vert-olive donnait un rendu
+  //    terne, la teinte froide fait ressortir l'accent.
   light: {
-    bg:"#eaf0ec", surface:"#ffffff", card:"#ffffff", card2:"#f5f8f6", border:"#dde6e0",
-    accent:"#0b6b4a", accentSoft:"#12946a", onAccent:"#ffffff",
-    danger:"#c0453f", warn:"#a9760f", gold:"#B8863B",
-    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0b1a14", muted:"#5f7167",
-    // Trois niveaux d'élévation, jamais de noir pur : la composante large et
-    // diffuse fait la profondeur, la fine pose l'objet sur le fond.
-    shadow:"0 1px 1px rgba(9,32,22,.04), 0 3px 10px -3px rgba(9,32,22,.09)",
-    shadowMd:"0 1px 2px rgba(9,32,22,.05), 0 10px 24px -8px rgba(9,32,22,.14)",
-    shadowLg:"0 2px 4px rgba(9,32,22,.06), 0 22px 48px -14px rgba(9,32,22,.20)",
-    ring:"rgba(11,107,74,.14)",
-    glass:"rgba(255,255,255,.82)",
-    s1:"#0b6b4a", s2:"#6d5cc7",
+    bg:"#f1f4f2", surface:"#ffffff", card:"#ffffff", card2:"#f7faf8", border:"#e2e9e4",
+    accent:"#00875a", accentSoft:"#06a76f", onAccent:"#ffffff",
+    danger:"#d4443c", warn:"#b47512", gold:"#B8863B",
+    blue:"#2f6f9e", purple:"#6d5cc7", text:"#08130e", muted:"#5b6b62",
+    shadow:"0 1px 2px rgba(6,26,18,.05), 0 4px 12px -3px rgba(6,26,18,.10)",
+    shadowMd:"0 2px 4px rgba(6,26,18,.06), 0 12px 28px -8px rgba(6,26,18,.14)",
+    shadowLg:"0 4px 8px rgba(6,26,18,.07), 0 28px 56px -16px rgba(6,26,18,.22)",
+    ring:"rgba(0,135,90,.13)",
+    glass:"rgba(255,255,255,.85)",
+    s1:"#00875a", s2:"#6d5cc7",
   },
   dark: {
-    // Mode sombre RECALCULÉ pour ce fond, pas un simple éclaircissement : la
-    // carte est nettement plus claire que le fond (c'est elle qu'on regarde),
-    // et le fond garde une pointe de vert pour ne pas virer au gris d'usine.
-    bg:"#080d0b", surface:"#111a16", card:"#16211c", card2:"#1c2a23", border:"#2a3a32",
-    accent:"#3fbe86", accentSoft:"#5ad19c", onAccent:"#04150d",
-    danger:"#f08a8d", warn:"#e6b768", gold:"#E0B972",
-    blue:"#74b4de", purple:"#b3a5ef", text:"#eef6f1", muted:"#8ea79a",
-    shadow:"0 1px 2px rgba(0,0,0,.45), 0 3px 12px -3px rgba(0,0,0,.5)",
-    shadowMd:"0 2px 4px rgba(0,0,0,.5), 0 12px 28px -8px rgba(0,0,0,.6)",
-    shadowLg:"0 3px 8px rgba(0,0,0,.55), 0 26px 56px -14px rgba(0,0,0,.7)",
-    ring:"rgba(63,190,134,.20)",
-    glass:"rgba(17,26,22,.78)",
-    s1:"#3fbe86", s2:"#a394e8",
+    // Trois étages nettement séparés : #0a0e11 → #151b20 → #1d252b.
+    // C'est cet écart (et non un contour) qui fait lire la hiérarchie.
+    bg:"#0a0e11", surface:"#141a1f", card:"#151b20", card2:"#1d252b", border:"#28323a",
+    accent:"#2ee08f", accentSoft:"#54ecab", onAccent:"#04140c",
+    danger:"#ff7b7b", warn:"#f0b757", gold:"#E8C179",
+    blue:"#6fb6f0", purple:"#b49bff", text:"#f2f7f5", muted:"#8fa3ad",
+    shadow:"0 1px 2px rgba(0,0,0,.55), 0 4px 14px -3px rgba(0,0,0,.55)",
+    shadowMd:"0 3px 6px rgba(0,0,0,.55), 0 16px 32px -10px rgba(0,0,0,.65)",
+    shadowLg:"0 6px 12px rgba(0,0,0,.6), 0 32px 64px -16px rgba(0,0,0,.75)",
+    ring:"rgba(46,224,143,.16)",
+    glass:"rgba(20,26,31,.82)",
+    s1:"#2ee08f", s2:"#b49bff",
   },
 };
 let C = THEMES.light;
@@ -6923,6 +6918,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   const [err, setErr] = useState(false);
   const [loading, setLoading] = useState(true);
   const [amb, setAmb] = useState(() => load('vrm_garage_ambiance', 'clair')); // univers 3D choisi (par appareil)
+  const [ambOpen, setAmbOpen] = useState(false); // la liste d'ambiances ne s'ouvre que sur demande
   const HSCALE = 1.5;
 
   useEffect(() => {
@@ -6944,8 +6940,46 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       el.appendChild(renderer.domElement);
       const scene = new THREE.Scene(); scene.background = new THREE.Color('#eef1f6');
       const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 1000);
-      // Vue plus basse / immersive (proche de la hauteur des yeux, depuis l'entrée).
-      camera.position.set(room.w * 0.1, Math.max(2.2, Math.max(room.w, room.h) * 0.5), room.h * 1.05);
+      // ⚠️ LA VUE DOIT CADRER LA PIÈCE ENTIÈRE, pas un coin.
+      // L'ancienne position était FIXE (x=w*0.1, z=h*1.05) : sur une pièce de
+      // 7×6 la caméra se retrouvait à ~7 m du centre, donc DANS la pièce —
+      // l'étagère était coupée en haut et à moitié cachée par le canapé
+      // (constaté en capture, pas supposé). On calcule maintenant la distance
+      // qui fait entrer la boîte englobante de la pièce dans le champ, en
+      // tenant compte du FORMAT du canvas : sur un écran étroit c'est la
+      // largeur qui contraint, pas la hauteur.
+      const cadrerPiece = () => {
+        const wallH = room.wallH || 3.4;
+        const tgt = new THREE.Vector3(0, wallH * 0.28, 0);
+        // Direction fixe (trois-quarts, légèrement en hauteur) ; c'est la
+        // DISTANCE qu'on calcule.
+        const az = Math.PI * 0.21, el = Math.PI * 0.19;
+        const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize();
+        // ⚠️ ON NE CADRE PAS LA SPHÈRE ENGLOBANTE.
+        // Première version : R = demi-diagonale de la pièce → la caméra partait
+        // beaucoup trop loin et la pièce flottait au milieu d'un grand vide gris
+        // (constaté en capture). La diagonale d'une boîte est bien plus grande
+        // que ce qu'on voit réellement d'un point de vue donné.
+        // On projette donc les 8 COINS dans le repère de la caméra et on cherche
+        // la plus petite distance qui les fait tous entrer — exact, et ça
+        // s'adapte tout seul à la forme de la pièce comme au format de l'écran.
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(up, dir).normalize();
+        const vraiUp = new THREE.Vector3().crossVectors(dir, right).normalize();
+        const tanV = Math.tan((camera.fov * Math.PI / 180) / 2);
+        const tanH = tanV * camera.aspect;
+        let d = 3;
+        const hw = room.w / 2, hh = room.h / 2;
+        for (const sx of [-1, 1]) for (const sy of [0, 1]) for (const sz of [-1, 1]) {
+          const p = new THREE.Vector3(sx * hw, sy * wallH, sz * hh).sub(tgt);
+          const x = Math.abs(p.dot(right)), y = Math.abs(p.dot(vraiUp)), z = p.dot(dir);
+          d = Math.max(d, z + x / tanH, z + y / tanV);
+        }
+        d *= 1.06;                                                // un souffle de marge
+        return { pos: dir.clone().multiplyScalar(d).add(tgt), tgt, d };
+      };
+      const cadre0 = cadrerPiece();
+      camera.position.copy(cadre0.pos);
       // Éclairage d'intérieur : lumière du ciel douce + soleil chaud (ombres nettes)
       // + une lumière d'appoint froide pour déboucher les ombres → rendu réaliste.
       try { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12; } catch (_) {}
@@ -6964,6 +6998,21 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // ── Textures & matières procédurales (aucun fichier externe) ──
       const clamp255 = (v) => Math.max(0, Math.min(255, v | 0));
       const shade = (hex, amt) => { const h = String(hex).replace('#', ''); const r = clamp255(parseInt(h.slice(0, 2), 16) + amt), g = clamp255(parseInt(h.slice(2, 4), 16) + amt), b = clamp255(parseInt(h.slice(4, 6), 16) + amt); return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join(''); };
+      // ⚠️ LE VIDE AUTOUR DE LA PIÈCE N'EST PAS DÉCORATIF.
+      // Vue de loin, la pièce ne remplit pas tout le cadre : ce qui reste,
+      // c'était un APLAT gris uni — la chose qui fait le plus « rendu 3D pas
+      // fini ». Un dégradé vertical très léger (même recette que les murs)
+      // suffit à poser un horizon. Régénéré à chaque changement d'ambiance.
+      const fondDegrade = (hex) => {
+        const cv = document.createElement('canvas'); cv.width = 4; cv.height = 256;
+        const g = cv.getContext('2d').createLinearGradient(0, 0, 0, 256);
+        g.addColorStop(0, shade(hex, 16)); g.addColorStop(0.62, hex); g.addColorStop(1, shade(hex, -22));
+        const c = cv.getContext('2d'); c.fillStyle = g; c.fillRect(0, 0, 4, 256);
+        const t = new THREE.CanvasTexture(cv);
+        try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
+        return t;
+      };
+      scene.background = fondDegrade('#eef1f6');
       const makeWood = (base) => {
         const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
         x.fillStyle = base; x.fillRect(0, 0, 128, 128);
@@ -7465,10 +7514,14 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       };
       buildFurniture();
       const controls = new OrbitControls(camera, renderer.domElement);
-      controls.target.set(0, 0.6, 0); controls.enableDamping = true; controls.dampingFactor = 0.1;
-      controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 2.5; controls.maxDistance = Math.max(room.w, room.h) * 2.6; controls.update();
+      controls.target.copy(cadre0.tgt); controls.enableDamping = true; controls.dampingFactor = 0.1;
+      // ⚠️ La distance de cadrage doit tenir SOUS le plafond de zoom, sinon
+      // OrbitControls ramène la caméra plus près à la première mise à jour et
+      // la pièce ressort coupée — le calcul serait annulé en silence.
+      controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 1.6;
+      controls.maxDistance = Math.max(Math.max(room.w, room.h) * 2.6, cadre0.d * 1.35); controls.update();
       // Position de départ mémorisée → bouton « Recentrer » qui remet la vue par défaut.
-      const homePos = camera.position.clone(), homeTgt = controls.target.clone();
+      let homePos = camera.position.clone(), homeTgt = controls.target.clone();
       // Rotation/zoom de la caméra pilotés par les BOUTONS de l'overlay (fiable
       // sur mobile, indépendant du geste tactile). rotateView = tourner autour de
       // la pièce (gauche/droite) ; zoomView = avancer/reculer.
@@ -7602,7 +7655,13 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       el.addEventListener('pointerdown', pd, true); // CAPTURE : avant OrbitControls
       window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
       let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
-      const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+      const onResize = () => {
+        const w = el.clientWidth || W, h = el.clientHeight || H;
+        renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+        // Le cadrage dépend du FORMAT : après une rotation d'écran, « Recentrer »
+        // doit rendre la vue qui cadre CE format, pas l'ancien.
+        try { const c = cadrerPiece(); homePos = c.pos; homeTgt = c.tgt; } catch (_) {}
+      };
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
       // ── AMBIANCE (univers façon jeu) : mute les couleurs/lumières EN DIRECT
       //    (la boucle de rendu tourne en continu → effet immédiat), sans jamais
@@ -7611,7 +7670,8 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const applyAmbiance = (id) => {
         const a = GARAGE_AMBIANCES.find(x => x.id === id) || GARAGE_AMBIANCES[0];
         try {
-          scene.background.set(a.bg);
+          try { scene.background && scene.background.dispose && scene.background.dispose(); } catch (_) {}
+          scene.background = fondDegrade(a.bg);
           hemi.color.set(a.sky); hemi.groundColor.set(a.ground); hemi.intensity = a.hemi;
           ambient.intensity = a.ambient;
           dir.color.set(a.sun); dir.intensity = a.sunI;
@@ -7634,9 +7694,19 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           if (box.isEmpty()) return;
           const c = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
-          const dist = Math.max(size.x, size.y, size.z, 0.6) * 2.1 + 1.4;
-          const destTgt = c.clone();
-          const destPos = new THREE.Vector3(c.x + dist * 0.35, c.y + dist * 0.55, c.z + dist);
+          // ⚠️ ON SE MET DE FACE, pas en trois-quarts.
+          // Quand on cherche un N°, ce qu'on veut voir c'est la GRILLE de cases
+          // du meuble — de biais, les rangées se chevauchent et on ne compte
+          // plus rien. La direction est « du meuble vers le CENTRE de la
+          // pièce » : un rangement est contre un mur, il s'ouvre vers
+          // l'intérieur, donc c'est le côté dégagé. Aucune convention de
+          // rotation à deviner (elle diffère d'un type de meuble à l'autre).
+          let dx = -c.x, dz = -c.z;
+          const n = Math.hypot(dx, dz);
+          if (n < 0.35) { dx = 0; dz = 1; } else { dx /= n; dz /= n; }
+          const dist = Math.max(size.x, size.y, 0.6) * 1.45 + 1.5;
+          const destTgt = new THREE.Vector3(c.x, c.y, c.z);
+          const destPos = new THREE.Vector3(c.x + dx * dist, c.y + size.y * 0.30, c.z + dz * dist);
           const startPos = camera.position.clone(), startTgt = controls.target.clone();
           const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now()), dur = 720;
           const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -7688,15 +7758,25 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
 
   if (err) return fallback || <div style={{ fontSize: 12, color: C.muted, padding: 16 }}>3D indisponible sur cet appareil.</div>;
   return (
-    <div data-noswipe="1" style={{ position: 'relative', width: '100%', height: 420, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2' }}>
+    <div data-noswipe="1" style={{ position: 'relative', width: '100%', height: 'min(52vh, 460px)', minHeight: 320, borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2', boxShadow: C.shadow }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
       {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
-      {/* Univers / ambiance : change l'atmosphère de ton garage en direct. */}
+      {/* ⚠️ LA DÉCO NE MANGE PLUS LE HAUT DE LA PIÈCE.
+          Les cinq ambiances étaient une rangée de pastilles qui DÉFILAIT en
+          travers du haut de la vue : la dernière était coupée, et elles
+          couvraient précisément l'étagère qu'on vient regarder. Elles passent
+          derrière un seul bouton — on change d'ambiance une fois, on regarde sa
+          pièce tous les jours. */}
       {!loading && (
-        <div data-noswipe="1" style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
-          {GARAGE_AMBIANCES.map(a => (
-            <button key={a.id} type="button" onClick={() => { setAmb(a.id); save('vrm_garage_ambiance', a.id); try { st.current.applyAmbiance && st.current.applyAmbiance(a.id); } catch (_) {} }}
-              style={{ flexShrink: 0, border: `1px solid ${amb === a.id ? '#ffffff' : 'rgba(255,255,255,0.3)'}`, background: amb === a.id ? 'rgba(20,22,30,0.72)' : 'rgba(20,22,30,0.42)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit' }}>
+        <div data-noswipe="1" style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+          <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setAmbOpen(v => !v)} title="Changer l'ambiance"
+            style={{ border: '1px solid rgba(255,255,255,0.34)', background: 'rgba(20,22,30,0.55)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+            {(GARAGE_AMBIANCES.find(a => a.id === amb) || GARAGE_AMBIANCES[0]).emoji} Ambiance
+          </button>
+          {ambOpen && GARAGE_AMBIANCES.map(a => (
+            <button key={a.id} type="button" onPointerDown={e => e.stopPropagation()}
+              onClick={() => { setAmb(a.id); setAmbOpen(false); save('vrm_garage_ambiance', a.id); try { st.current.applyAmbiance && st.current.applyAmbiance(a.id); } catch (_) {} }}
+              style={{ border: `1px solid ${amb === a.id ? '#ffffff' : 'rgba(255,255,255,0.3)'}`, background: amb === a.id ? 'rgba(20,22,30,0.78)' : 'rgba(20,22,30,0.5)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit' }}>
               {a.emoji} {a.name}
             </button>
           ))}
@@ -7704,30 +7784,30 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       )}
       {/* Contrôles de vue : tourner à gauche/droite + zoom (fiables sur mobile) */}
       {!loading && (() => {
-        const btn = { width: 38, height: 38, borderRadius: 10, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.9)', color: '#1c1c22', fontSize: 17, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none' };
+        const btn = { width: 38, height: 38, borderRadius: 10, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.92)', color: '#1c1c22', fontSize: 17, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none', flexShrink: 0 };
         const stop = (e) => { e.stopPropagation(); };
         const call = (fn, ...a) => { const s = st.current || {}; if (s[fn]) s[fn](...a); };
         return (
-          <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <>
+            {/* ⚠️ Deux GRAPPES SÉPARÉES, jamais un seul bloc.
+                Les six boutons étaient collés dans un même coin, en trois
+                groupes qui se chevauchaient (relevé en capture). Cadrage à
+                gauche, navigation à droite : chacun garde sa place quelle que
+                soit la largeur. */}
+            <div style={{ position: 'absolute', left: 8, bottom: 8, display: 'flex', gap: 6 }}>
+              <button onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
               <button onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus">🗺️</button>
-              <button onPointerDown={stop} onClick={() => call('resetView')} title="Recentrer la vue" style={btn} aria-label="Recentrer la vue">🎯</button>
+              {sel && <button onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
+              <button onPointerDown={stop} onClick={() => call('rotateView', -22)} title="Tourner à gauche" style={btn} aria-label="Tourner la vue à gauche">◀</button>
               <button onPointerDown={stop} onClick={() => call('zoomView', 0.85)} title="Zoom avant" style={btn} aria-label="Zoom avant">＋</button>
               <button onPointerDown={stop} onClick={() => call('zoomView', 1.18)} title="Zoom arrière" style={btn} aria-label="Zoom arrière">−</button>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onPointerDown={stop} onClick={() => call('rotateView', -22)} title="Tourner à gauche" style={btn} aria-label="Tourner la vue à gauche">◀</button>
               <button onPointerDown={stop} onClick={() => call('rotateView', 22)} title="Tourner à droite" style={btn} aria-label="Tourner la vue à droite">▶</button>
             </div>
-          </div>
+          </>
         );
       })()}
-      {/* ⚠️ L'aide passait SOUS les boutons de vue (coin bas droit) : les deux
-          se chevauchaient. Elle est bornée en largeur et tient sur une ligne —
-          une aide illisible ne sert à personne. */}
-      <span style={{ position: 'absolute', left: 8, bottom: 6, maxWidth: 'calc(100% - 190px)', fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Glisse pour tourner la vue</span>
     </div>
   );
 }
@@ -8233,17 +8313,25 @@ function RoomPlan({ locate, onLocateConsumed }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
-      {/* Version + mise à jour manuelle (diagnostic « ça n'a rien changé ») */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', fontSize: 10.5, color: C.muted }}>
-        <span>Version : <b>{typeof __BUILD__ !== 'undefined' ? __BUILD__ : '—'}</b></span>
-        <button onClick={() => { if (window.__vrmForceUpdate) window.__vrmForceUpdate(); else window.location.reload(); }} title="Vide le cache et recharge la dernière version" style={{ border: `1px solid ${C.accent}`, borderRadius: 999, background: `${C.accent}14`, color: C.text, fontSize: 10.5, fontWeight: 800, padding: '4px 10px', cursor: 'pointer' }}>🔄 Forcer la mise à jour</button>
-      </div>
       {/* ⚠️ LA PIÈCE D'ABORD, LES RÉGLAGES ENSUITE.
           La vue 3D était sous quinze rangées de boutons : il fallait défiler
           tout l'écran de configuration avant de voir son garage. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
       <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
+
+      {/* Recherche */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+        {search && <button onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
+      </div>
+      {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
+      {hi && hi.itemId && (()=>{
+        const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
+        let pos=null;
+        if (hi.cell!=null){ const p=String(hi.cell).split('_'); const r=+p[0], c=+p[1]; const nr=Math.max(1,it.rows||1); if(!isNaN(r)&&!isNaN(c)) pos=`colonne ${c+1} · ${nr-r}ᵉ boîte depuis le bas`; }
+        return <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800, lineHeight:1.4 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <><br/><span style={{fontWeight:500,color:C.text}}>{pos}</span></> : null}</div>;
+      })()}
 
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -8260,65 +8348,67 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <button onClick={renameRoom} title="Renommer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.muted, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="pencil" size={15}/></button>
         {plan.rooms.length > 1 && <button onClick={removeRoom} title="Supprimer la pièce" style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: 'transparent', color: C.warn, fontSize: 12, padding: '6px 9px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>}
       </div>
-      {/* Recherche */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-        {search && <button onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
-      </div>
-      {hi && hi.notFound && <div style={{ fontSize: 12, color: C.warn, fontWeight: 700 }}>Aucune case ne contient « {search} ». Range-le dans un meuble (ouvre-le et touche une case).</div>}
-      {hi && hi.itemId && (()=>{
-        const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
-        let pos=null;
-        if (hi.cell!=null){ const p=String(hi.cell).split('_'); const r=+p[0], c=+p[1]; const nr=Math.max(1,it.rows||1); if(!isNaN(r)&&!isNaN(c)) pos=`colonne ${c+1} · ${nr-r}ᵉ boîte depuis le bas`; }
-        return <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800, lineHeight:1.4 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <><br/><span style={{fontWeight:500,color:C.text}}>{pos}</span></> : null}</div>;
-      })()}
+      {/* ⚠️ UTILISER AVANT AMÉNAGER. Julien : « mets-toi à la place d'un
+          revendeur pour son rangement, ça doit être plus facile à prendre en
+          main ». Un revendeur ouvre son garage pour DEUX choses : retrouver une
+          paire, ou en ranger une — pas pour ajouter un canapé. Tout l'outillage
+          de construction (meubles, dimensions, murs, déplacement) part donc
+          derrière un seul dépliant, et l'écran s'ouvre sur la pièce + la
+          recherche. */}
+      <details style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow }}>
+        <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '11px 13px', userSelect: 'none' }}>
+          <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: C.text }}>Aménager la pièce</span>
+          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Ajouter des meubles, changer les dimensions, déplacer</span>
+        </summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 13px 13px' }}>
+        {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────
+            Deux familles, et la distinction n'est pas cosmétique : un RANGEMENT
+            porte des cases, reçoit des numéros et compte dans l'inventaire ; un
+            objet de DÉCOR ne range rien. Les mélanger dans une seule rangée de
+            trente boutons rendait le rangement introuvable. */}
+        {(() => {
+          const tous = Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden);
+          const groupes = [
+            ['Rangement', tous.filter(([, t]) => !t.deco), "Ils portent des cases et des numéros."],
+            ['Décor',     tous.filter(([, t]) =>  t.deco), "Pour que la pièce ressemble à la tienne. Ne range rien."],
+          ];
+          return groupes.map(([titre, liste, aide]) => liste.length ? (
+            <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span title={aide} style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
+              {liste.map(([k, t]) => (
+                <button key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
+              ))}
+            </div>
+          ) : null);
+        })()}
+        {/* Taille de la pièce */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
+          <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
+          <button onClick={() => setRoom(1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>largeur +</button>
+          <button onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <button onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
+          <button onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
+          <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
+          <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
+          <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
+          {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
+            <button key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
+          ))}
+          <label title="Couleur libre des murs" style={{ width: 20, height: 20, borderRadius: 4, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
+            <input type="color" value={room.wallColor || '#e4e8ee'} onChange={e => patchRoom(r => ({ room: { ...r.room, wallColor: e.target.value } }))} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
+          </label>
+        </div>
 
-      {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────
-          Deux familles, et la distinction n'est pas cosmétique : un RANGEMENT
-          porte des cases, reçoit des numéros et compte dans l'inventaire ; un
-          objet de DÉCOR ne range rien. Les mélanger dans une seule rangée de
-          trente boutons rendait le rangement introuvable. */}
-      {(() => {
-        const tous = Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden);
-        const groupes = [
-          ['Rangement', tous.filter(([, t]) => !t.deco), "Ils portent des cases et des numéros."],
-          ['Décor',     tous.filter(([, t]) =>  t.deco), "Pour que la pièce ressemble à la tienne. Ne range rien."],
-        ];
-        return groupes.map(([titre, liste, aide]) => liste.length ? (
-          <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span title={aide} style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
-            {liste.map(([k, t]) => (
-              <button key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
-            ))}
-          </div>
-        ) : null);
-      })()}
-      {/* Taille de la pièce */}
-      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
-        <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
-        <button onClick={() => setRoom(1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>largeur +</button>
-        <button onClick={() => setRoom(-1, 0)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
-        <button onClick={() => setRoom(0, 1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>profondeur +</button>
-        <button onClick={() => setRoom(0, -1)} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
-        <span style={{ fontWeight: 800, marginLeft: 8 }}>Plafond :</span>
-        <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>+</button>
-        <button onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))} style={{ border: `1px solid ${C.border}`, borderRadius: 6, background: 'transparent', color: C.text, fontWeight: 700, padding: '3px 8px', cursor: 'pointer' }}>−</button>
-        <span style={{ fontWeight: 800, marginLeft: 8 }}>Murs :</span>
-        {['#e4e8ee', '#dfe7d8', '#efe4d6', '#e2dced', '#d6e6ec', '#f0dede', '#d8dde3', '#2b2f36'].map(c => (
-          <button key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 4, background: c, border: (room.wallColor || '#e4e8ee') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
-        ))}
-        <label title="Couleur libre des murs" style={{ width: 20, height: 20, borderRadius: 4, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
-          <input type="color" value={room.wallColor || '#e4e8ee'} onChange={e => patchRoom(r => ({ room: { ...r.room, wallColor: e.target.value } }))} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
-        </label>
-      </div>
-
-      {/* Mode déplacement — les meubles ne bougent QUE si ce mode est activé */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
-          {moveMode ? '✋ Mode déplacement ACTIVÉ' : '🔒 Déplacer les meubles'}
-        </button>
-        <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
-      </div>
+        {/* Mode déplacement — les meubles ne bougent QUE si ce mode est activé */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => setMoveMode(m => !m)} style={{ border: `1.5px solid ${moveMode ? C.accent : C.border}`, borderRadius: 999, background: moveMode ? C.accent : C.card, color: moveMode ? '#fff' : C.text, fontSize: 12.5, fontWeight: 800, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            {moveMode ? '✋ Mode déplacement ACTIVÉ' : '🔒 Déplacer les meubles'}
+          </button>
+          <span style={{ fontSize: 11.5, color: C.muted }}>{moveMode ? 'Glisse un meuble pour le déplacer. Re-clique pour verrouiller.' : 'Les meubles sont verrouillés — glisse pour tourner la vue.'}</span>
+        </div>
+        </div>
+      </details>
 
       {/* Bandeau « poser une pile sur un meuble » actif */}
       {putOnSrc && (
@@ -19064,8 +19154,15 @@ function ConnexionsSetting() {
         etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
         d="Bordereaux, suivi des colis et codes de retrait arrivent par email — Vinted ne les donne pas autrement."/>
       {/* La version de l'app : ici, et plus dans l'en-tête de chaque écran. */}
-      <div style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`,fontSize:11,color:C.muted}}>
-        Version de l'application · <span style={{fontVariantNumeric:'tabular-nums'}}>{BUILD_ID}</span>
+      <div style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',fontSize:11,color:C.muted}}>
+        <span style={{flex:'1 1 160px'}}>Version de l'application · <span style={{fontVariantNumeric:'tabular-nums'}}>{BUILD_ID}</span></span>
+        {/* ⚠️ Ce bouton vivait AU MILIEU DE L'ÉCRAN GARAGE (« Version : … ·
+            🔄 Forcer la mise à jour »), juste au-dessus de la pièce en 3D :
+            de l'outillage de développeur posé dans un écran de travail. Il ne
+            disparaît pas — il rejoint la version, là où on le cherche. */}
+        <button onClick={() => { if (window.__vrmForceUpdate) window.__vrmForceUpdate(); else window.location.reload(); }}
+          title="Vide le cache et recharge la dernière version"
+          style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card2, color: C.text, fontSize: 11, fontWeight: 600, padding: '5px 11px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Forcer la mise à jour</button>
       </div>
     </div>
   );
