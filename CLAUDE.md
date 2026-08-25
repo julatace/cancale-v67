@@ -5015,3 +5015,59 @@ là ; une capture à sa vraie résolution l'a montré en trente secondes.
 `npm run build` pendant qu'un banc sert `dist/` vide le dossier sous ses pieds —
 le banc plante ou se fige, et on croit à une régression. **Un seul des deux à
 la fois.**
+
+---
+
+## 5.63 — LE GARAGE MONTRE ET SORT · LES LISTES EN DEUX COLONNES
+
+Deux briques livrées avec le shell d'ordinateur (§5.62) et pas encore écrites
+ici.
+
+### 1. ⚠️ LE GARAGE NE SAVAIT QUE RANGER
+`RangerSheet` (§5.61) permettait de poser une paire dans une case. Rien, ensuite,
+ne disait **ce qu'un meuble contient**, et **rien ne permettait d'en sortir une
+paire** — sauf le vieux ✕ de la vue Grille, sur un numéro nu, sans photo. Un
+rangement où l'on ne peut que faire entrer se remplit et ne sert plus.
+
+- **`contenuMeuble(it)`** : le contenu réel d'un meuble, **trié par numéro**,
+  chaque ligne enrichie par `ficheParNum` — photo, titre, et le drapeau
+  `ambigu`. Panneau sous la 3D dès qu'un meuble est sélectionné.
+- **`ficheParNum`** = la résolution numéro → paire. ⚠️ **Deux fiches peuvent
+  porter le même numéro** (héritage d'avant §5.40, la réattribution). Dans ce
+  cas on préfère celle d'une paire **réellement présente** (`vinted_nums_physiques`,
+  §5.14 — la définition unique, on ne la refait pas), sinon la plus récemment
+  numérotée, **et on le SIGNALE** (`ambigu`) au lieu de choisir en silence.
+  Montrer la mauvaise chaussure à côté d'un numéro est exactement le risque n°1
+  (§19).
+- **`sortirDeCase(itemId, cellKey, numero)`** : la boîte **monte et s'efface**
+  (`animerSortie`, 380 ms) **PUIS** on écrit — `fini()` est rappelé par la scène
+  quand l'animation est finie. Écrire d'abord ferait disparaître la boîte avant
+  qu'on la voie partir : le geste n'aurait aucun retour.
+- **`dejaPoseOu(num)`** couvre la **saisie libre** (le champ « numéro à ranger »,
+  qui ne vérifiait rien) : un même numéro dans deux cases, c'est « dans quelle
+  boîte est-elle ? ». Le message nomme le meuble où la paire se trouve déjà.
+
+⚠️ Le garage **n'écrit jamais de numéro** : il déplace une paire déjà numérotée
+d'un endroit à l'autre. Aucun des chemins de §5.45 n'est touché.
+
+### 2. Les listes Ventes et Achats en deux colonnes (ordinateur)
+Une ligne de vente sur **1170 px** pour une photo, un titre et un prix, c'est le
+même défaut que les cartes d'action de Ma journée (§5.62). Les deux listes
+passent en `repeat(auto-fit, minmax(430px, 1fr))` + `alignItems:'start'` :
+**deux colonnes** au-delà de ~900 px, **une seule** en dessous — la même règle
+pour les deux, **sans test de largeur en JavaScript**. Le téléphone est
+strictement inchangé.
+
+⚠️ **Largeur de lecture portée de 980 à 1180 px** : sur un écran de 1512, 980 px
+laissait 230 px de vide à droite — ni rempli ni centré, ça se lisait comme un
+décalage. À 1180 px, avec les listes en deux colonnes, la ligne ne redevient pas
+trop longue.
+
+### Vérifié
+Banc de rangement dédié : deux taps sur une case → feuille → N°154 posé
+(`Étagère:3_2=154`, la gravité le fait tomber en bas de colonne) → le panneau
+affiche **« Étagère (1) · 1 boîte rangée »** avec photo et titre → « sortir » →
+la case revient à **`[]`**. Rendu ordinateur (1512×950) : barre latérale, les
+9 écrans groupés, listes Achats **en deux colonnes**. Rendu final à 1180 px :
+**0 écran vide, 0 artefact**. Mobile 430 px rejoué : **0 écran vide** — le shell
+n'a rien changé au téléphone. 9 audits au vert.
