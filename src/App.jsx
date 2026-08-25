@@ -7423,7 +7423,12 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           g.rotation.y = it.rot || 0; // orientation (collé au mur)
           g.userData = { itemId: it.id, w: it.w, h: it.h, type: it.type };
           if (!isBox) { // les boîtes portent déjà leur N° imprimé → pas d'étiquette flottante
-            const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + it.name + (cnt ? ` (${cnt})` : ''));
+            // ⚠️ UN MEUBLE SANS NOM AFFICHAIT « undefined » EN 3D, sur son
+            // étiquette. Les meubles créés dans l'app en ont toujours un, mais
+            // un plan importé ou restauré peut ne pas en avoir : on retombe
+            // alors sur le libellé de son type, jamais sur le mot « undefined ».
+            const nom = String(it.name || (FURN_TYPES[it.type] || {}).label || 'Meuble');
+            const cnt = storedCount(it); const lab = makeLabel(emojiOf(it) + ' ' + nom + (cnt ? ` (${cnt})` : ''));
             lab.position.set(0, ht + 0.55, 0); lab.userData.itemId = it.id; g.add(lab);
           }
           // La grille peint elle-même ses cartons. Les AUTRES meubles de rangement
