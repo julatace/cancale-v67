@@ -6974,13 +6974,72 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       const flatMat = (base, rough) => new THREE.MeshStandardMaterial({ color: base, roughness: rough == null ? 0.7 : rough, metalness: 0.02 });
       const metalMat = new THREE.MeshStandardMaterial({ color: '#33343a', metalness: 0.75, roughness: 0.35 });
       const shadowize = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
-      // sol : parquet clair
-      const floorTex = makeWood('#cbb089'); floorTex.repeat.set(Math.max(2, room.w / 1.4), Math.max(2, room.h / 1.4));
-      const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 });
+      // ── SOL : UN VRAI PARQUET À LAMES ────────────────────────────────────
+      // Le sol est la plus grande surface de l'image : c'est lui qui décide si
+      // on voit une pièce ou un plan. Une texture de bois « bruitée » étirée sur
+      // 6 mètres n'a aucune échelle — l'œil n'a rien pour mesurer la profondeur.
+      // Des LAMES avec leurs joints, décalées d'une rangée à l'autre, donnent
+      // cette échelle et la perspective avec.
+      const makeParquet = (base) => {
+        const S = 512, LAMES = 4, RANGS = 8;             // 4 lames × 8 rangs par tuile
+        const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
+        const lw = S / LAMES, lh = S / RANGS;
+        x.fillStyle = base; x.fillRect(0, 0, S, S);
+        for (let r = 0; r < RANGS; r++) {
+          const dec = (r % 2) * (lw / 2);               // pose à coupe perdue
+          for (let i = -1; i <= LAMES; i++) {
+            const px = i * lw + dec, py = r * lh;
+            // Chaque lame a sa propre teinte : un parquet n'est jamais uni.
+            const v = (Math.random() * 22 - 11) | 0;
+            x.fillStyle = shade(base, v); x.fillRect(px, py, lw, lh);
+            // veinage
+            for (let k = 0; k < 5; k++) {
+              x.strokeStyle = `rgba(60,38,18,${0.03 + Math.random() * 0.05})`;
+              x.lineWidth = 0.6 + Math.random();
+              const yy = py + Math.random() * lh;
+              x.beginPath(); x.moveTo(px, yy);
+              x.bezierCurveTo(px + lw * 0.35, yy + (Math.random() * 4 - 2), px + lw * 0.7, yy + (Math.random() * 4 - 2), px + lw, yy + (Math.random() * 3 - 1.5));
+              x.stroke();
+            }
+            // joints : un trait sombre en bas et à droite, un liseré clair en
+            // haut — c'est ce contraste qui donne le relief de la lame.
+            x.strokeStyle = 'rgba(35,22,10,.30)'; x.lineWidth = 1.4;
+            x.beginPath(); x.moveTo(px, py + lh); x.lineTo(px + lw, py + lh); x.moveTo(px + lw, py); x.lineTo(px + lw, py + lh); x.stroke();
+            x.strokeStyle = 'rgba(255,244,225,.16)'; x.lineWidth = 1;
+            x.beginPath(); x.moveTo(px, py + 0.6); x.lineTo(px + lw, py + 0.6); x.stroke();
+          }
+        }
+        const t = new THREE.CanvasTexture(c);
+        try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        try { t.anisotropy = renderer.capabilities.getMaxAnisotropy(); } catch (_) {}
+        return t;
+      };
+      // Une tuile = ~1,6 m de côté : les lames gardent une taille crédible quelle
+      // que soit la taille de la pièce (avant, elles s'étiraient avec).
+      const floorTex = makeParquet(room.floorColor || '#c9ab84');
+      floorTex.repeat.set(Math.max(1, room.w / 1.6), Math.max(1, room.h / 1.6));
+      const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.74, metalness: 0.03 });
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(room.w, room.h), floorMat);
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
       // murs (orientés vers l'intérieur → les murs proches ne bouchent pas la vue)
-      const wallH = Math.max(2.4, room.wallH || 3.4), wallMat = new THREE.MeshStandardMaterial({ color: room.wallColor || '#e4e8ee', roughness: 0.95, side: THREE.FrontSide });
+      const wallH = Math.max(2.4, room.wallH || 3.4);
+      // ── MURS : LA LUMIÈRE TOMBE ──────────────────────────────────────────
+      // Un mur d'une seule teinte du sol au plafond est le signe le plus sûr
+      // d'une image de synthèse : dans une vraie pièce, la lumière décroît vers
+      // le bas et le haut prend celle du plafond. Un dégradé vertical très
+      // léger (plus une trame fine) suffit à faire basculer l'impression.
+      const makeWall = (base) => {
+        const c = document.createElement('canvas'); c.width = 8; c.height = 256; const x = c.getContext('2d');
+        const g = x.createLinearGradient(0, 0, 0, 256);      // 0 = plafond, 256 = sol
+        g.addColorStop(0, shade(base, 10)); g.addColorStop(0.55, base); g.addColorStop(1, shade(base, -16));
+        x.fillStyle = g; x.fillRect(0, 0, 8, 256);
+        for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(0,0,0,${Math.random() * 0.02})`; x.fillRect(Math.random() * 8, Math.random() * 256, 1, 1); }
+        const t = new THREE.CanvasTexture(c);
+        try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
+        return t;                                            // pas de répétition : le dégradé couvre la hauteur
+      };
+      const wallMat = new THREE.MeshStandardMaterial({ map: makeWall(room.wallColor || '#e4e8ee'), roughness: 0.95, side: THREE.FrontSide });
       const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, wallH), wallMat); m.position.set(x, wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); };
       mkWall(room.w, 0, -room.h / 2, 0); mkWall(room.w, 0, room.h / 2, Math.PI);
       mkWall(room.h, -room.w / 2, 0, Math.PI / 2); mkWall(room.h, room.w / 2, 0, -Math.PI / 2);
