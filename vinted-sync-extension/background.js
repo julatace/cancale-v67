@@ -685,6 +685,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           //    donc jamais un lot à lâcher d'un coup. C'est ce qui différencie
           //    une file séquentielle d'une rafale (§32/§43), et le plafond de
           //    20 actions/h par compte (`garde`) reste le vrai garde-fou.
+          // ── RATTRAPAGE DES DATES D'ENCAISSEMENT (sur clic) ────────────────
+          // Le passage automatique en récupère 3 par visite : pour rattraper un
+          // mois passé, il faudrait des semaines. Ce bouton en fait un LOT, sur
+          // SON clic.
+          // ⚠️ Ce n'est pas une rafale (§32/§43) : ce sont des LECTURES (GET) sur
+          // ses propres transactions, envoyées UNE PAR UNE en attendant chaque
+          // réponse, uniquement pour le compte connecté (`garde`), et le plafond
+          // de 20 actions/h par compte reste le vrai garde-fou — il coupe le lot
+          // de lui-même. Aucune écriture, aucune action sur Vinted.
           if (msg.action === 'genererBord') {
             // Un clic = un bordereau : on génère, puis on va CHERCHER le PDF et
             // on l'envoie dans l'app. Le compte rendu remonte au panneau pour
@@ -1665,6 +1674,8 @@ async function visiteVinted() {
     await proposerBordereaux(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
+
+
 
 // Les ventes de CE compte qui attendent qu'on génère leur bordereau, telles que
 // Vinted les a rendues à la dernière moisson. Lecture seule, aucun appel Vinted.

@@ -718,6 +718,7 @@
         <div class="vrm-st"><b style="color:#0f6b4f">${eurI(a.caEncaisse)}</b><span class="vrm-m">Encaissé</span></div>
       </div>
       <div class="vrm-m" style="text-align:center;margin:-2px 0 8px;opacity:.7">Chiffres de l'app · ${a.updatedAt ? esc(timeago(Date.parse(a.updatedAt))) : ''}</div>` : '';
+
     if (!all.length) return `${head}<div class="vrm-m">Aucune vente captée pour l'instant.<br>Ouvre « Mes ventes » sur Vinted une fois pour les capter (0 requête ajoutée).</div>`;
     // 1) PÉRIODE (deux dates) — appliquée AVANT tout le reste, pour que les
     //    compteurs des autres filtres correspondent à ce que tu vois vraiment.

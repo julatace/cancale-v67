@@ -13,36 +13,47 @@ const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
 // conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
+  // ── LES FONDATIONS VISUELLES ──────────────────────────────────────────────
+  // Julien : « change totalement le visuel, je veux qu'elle soit beaucoup plus
+  // belle ». Ce qui faisait « tableau de bord de développeur » n'était pas le
+  // détail des écrans mais ces valeurs-ci : des cartes plates de la même
+  // couleur que le fond, séparées par un trait d'1 px, et un vert unique posé
+  // partout. On change donc la BASE — tout l'écran en hérite — plutôt que six
+  // cents endroits.
+  //  · le fond n'est plus neutre : il est légèrement TEINTÉ, la carte est plus
+  //    CLAIRE que lui. C'est ce décalage qui donne le relief, pas le contour.
+  //  · l'ombre porte la profondeur ; le trait n'est plus qu'un liseré.
+  //  · l'accent devient une VRAIE couleur de marque (vert profond), et le
+  //    doré/ambre sert d'accent secondaire — deux couleurs valent mieux qu'une
+  //    déclinée à l'infini.
   light: {
-    // FOND LÉGÈREMENT TEINTÉ, CARTES BLANCHES : c'est le contraste entre les deux
-    // qui donne le relief. Avant, le fond était presque blanc et chaque carte
-    // devait se dessiner un contour gris pour exister — d'où l'impression de
-    // formulaire administratif. Maintenant la carte se détache par sa clarté et
-    // son ombre, et le trait n'est plus qu'un liseré très pâle.
-    bg:"#eef2ef", surface:"#ffffff", card:"#ffffff", border:"#e3e9e5",
-    accent:"#0f6b4f", accentSoft:"#178a66", onAccent:"#ffffff",
+    bg:"#eaf0ec", surface:"#ffffff", card:"#ffffff", card2:"#f5f8f6", border:"#dde6e0",
+    accent:"#0b6b4a", accentSoft:"#12946a", onAccent:"#ffffff",
     danger:"#c0453f", warn:"#a9760f", gold:"#B8863B",
-    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0d1512", muted:"#63736b",
-    // Élévation à DEUX niveaux, jamais de noir pur (c'est ce qui fait « cheap »).
-    // La composante large et diffuse fait la profondeur, la fine pose l'objet.
-    shadow:"0 1px 1px rgba(13,32,24,.04), 0 4px 14px -4px rgba(13,32,24,.10)",
-    shadowLg:"0 2px 4px rgba(13,32,24,.05), 0 18px 40px -12px rgba(13,32,24,.18)",
-    glass:"rgba(255,255,255,.78)",
-    // Couleurs de SÉRIE des graphiques (≠ couleurs de statut, jamais réutilisées
-    // pour un avertissement). Paire vérifiée : elle reste distinguable en vision
-    // normale ET en daltonisme (deutan/tritan) sur ce fond.
-    s1:"#14795a", s2:"#6d5cc7",
+    blue:"#2f6f9e", purple:"#6d5cc7", text:"#0b1a14", muted:"#5f7167",
+    // Trois niveaux d'élévation, jamais de noir pur : la composante large et
+    // diffuse fait la profondeur, la fine pose l'objet sur le fond.
+    shadow:"0 1px 1px rgba(9,32,22,.04), 0 3px 10px -3px rgba(9,32,22,.09)",
+    shadowMd:"0 1px 2px rgba(9,32,22,.05), 0 10px 24px -8px rgba(9,32,22,.14)",
+    shadowLg:"0 2px 4px rgba(9,32,22,.06), 0 22px 48px -14px rgba(9,32,22,.20)",
+    ring:"rgba(11,107,74,.14)",
+    glass:"rgba(255,255,255,.82)",
+    s1:"#0b6b4a", s2:"#6d5cc7",
   },
   dark: {
-    bg:"#0b0f0d", surface:"#141b18", card:"#18211d", border:"#28322d",
-    accent:"#4aa87d", accentSoft:"#5cbb8e", onAccent:"#04150d",
-    danger:"#e87b7f", warn:"#dcae5c", gold:"#E0B972",
-    blue:"#6aabd8", purple:"#ac9dea", text:"#eef4f0", muted:"#8b9b92",
-    shadow:"0 1px 2px rgba(0,0,0,.4), 0 4px 16px -4px rgba(0,0,0,.5)",
-    shadowLg:"0 2px 6px rgba(0,0,0,.5), 0 20px 44px -12px rgba(0,0,0,.6)",
-    glass:"rgba(20,27,24,.74)",
-    // Mode sombre : teintes RECALCULÉES pour ce fond, pas un simple éclaircissement.
-    s1:"#4aa87d", s2:"#9482d8",
+    // Mode sombre RECALCULÉ pour ce fond, pas un simple éclaircissement : la
+    // carte est nettement plus claire que le fond (c'est elle qu'on regarde),
+    // et le fond garde une pointe de vert pour ne pas virer au gris d'usine.
+    bg:"#080d0b", surface:"#111a16", card:"#16211c", card2:"#1c2a23", border:"#2a3a32",
+    accent:"#3fbe86", accentSoft:"#5ad19c", onAccent:"#04150d",
+    danger:"#f08a8d", warn:"#e6b768", gold:"#E0B972",
+    blue:"#74b4de", purple:"#b3a5ef", text:"#eef6f1", muted:"#8ea79a",
+    shadow:"0 1px 2px rgba(0,0,0,.45), 0 3px 12px -3px rgba(0,0,0,.5)",
+    shadowMd:"0 2px 4px rgba(0,0,0,.5), 0 12px 28px -8px rgba(0,0,0,.6)",
+    shadowLg:"0 3px 8px rgba(0,0,0,.55), 0 26px 56px -14px rgba(0,0,0,.7)",
+    ring:"rgba(63,190,134,.20)",
+    glass:"rgba(17,26,22,.78)",
+    s1:"#3fbe86", s2:"#a394e8",
   },
 };
 let C = THEMES.light;
@@ -1871,6 +1882,9 @@ const fetchCapturedLabelMetas = async (uid) => {
 // dit à quelle annonce il correspond.
 // ⚠️ ÉGRESS (§34) : une ligne de transaction est grosse → on ne lit que les
 // deux entiers utiles, jamais `select=data`.
+// ⚠️ On lit ici DEUX SCALAIRES par transaction, jamais le payload (§34) :
+// la transaction et l'identifiant d'annonce que Vinted lui rattache — l'identité
+// certaine sur laquelle repose tout le reste (§5.34).
 const fetchTxnItemIds = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,item:data->payload->transaction->>item_id`, { headers: sbAuth() });
@@ -3147,9 +3161,12 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
        capture sur « 112 ventes sans prix d'achat »). La rangée passe à la ligne,
        le texte ne descend jamais sous 190 px. */
     <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',
-      background:C.card,border:`1px solid ${C.border}`,borderRadius:12,
-      padding:'11px 13px 11px 15px',marginBottom:10,overflow:'hidden',...style}}>
+      background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadow,
+      padding:'13px 15px 13px 17px',marginBottom:10,overflow:'hidden',...style}}>
       <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
+      {/* Un voile très pâle de la couleur : l'avertissement se teinte sans
+          devenir un bloc criard (la surface reste neutre). */}
+      <span aria-hidden="true" style={{position:'absolute',inset:0,background:`linear-gradient(100deg, ${col}0e, transparent 42%)`,pointerEvents:'none'}}/>
       {icon && <span aria-hidden="true" style={{flexShrink:0,color:col,marginTop:1}}><Icon name={icon} size={18}/></span>}
       <div style={{flex:'1 1 190px',minWidth:0}}>
         <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
@@ -3169,7 +3186,9 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
   );
 }
 function Card({children,style={}}) {
-  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,...style}}>{children}</div>;
+  // Rayon plus généreux + ombre douce : une carte doit se poser SUR le fond,
+  // pas être découpée dedans au cutter.
+  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
@@ -3183,12 +3202,15 @@ function StatBox({label,value,color=C.text,sub=null}) {
   // comme ça le nombre s'affiche toujours en entier.
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
-  const fs = !L ? 20 : L <= 5 ? 20 : L <= 7 ? 16 : L <= 9 ? 13 : L <= 11 ? 11.5 : 10.5;
+  // Le CHIFFRE est ce qu'on vient lire : il passe devant, en gros et serré.
+  // L'étiquette redevient une légende, plus une petite capitale espacée qui
+  // criait autant que la valeur.
+  const fs = !L ? 26 : L <= 5 ? 26 : L <= 7 ? 21 : L <= 9 ? 16 : L <= 11 ? 13 : 11.5;
   return (
-    <Card style={{flex:1,minWidth:110}}>
-      <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>{label}</div>
-      <div style={{fontSize:fs,fontWeight:600,color,lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
-      {sub&&<div style={{fontSize:11,color:C.muted,marginTop:3}}>{sub}</div>}
+    <Card style={{flex:1,minWidth:110,padding:'14px 15px'}}>
+      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>{label}</div>
+      <div style={{fontSize:fs,fontWeight:700,color,lineHeight:1.1,letterSpacing:-0.8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
+      {sub&&<div style={{fontSize:11.5,color:C.muted,marginTop:5,lineHeight:1.35}}>{sub}</div>}
     </Card>
   );
 }
@@ -3596,14 +3618,20 @@ const jourClef = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,
 const debutJour = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 const finJour = (d) => { const x = new Date(d); x.setHours(23,59,59,999); return x; };
 // Une commande est dans la période si sa date de vente/achat y tombe.
-const dansPeriode = (o, p) => {
+// ⚠️ DEUX DATES DIFFÉRENTES, ET IL NE FAUT PAS LES CONFONDRE.
+//  · la date de VENTE (`o.date`) = le jour où l'acheteur a payé ;
+//  · la date d'ENCAISSEMENT = le jour où Vinted a finalisé et libéré l'argent.
+// Mesuré sur la vraie base : 7 jours d'écart en médiane, jusqu'à 25. Employer
+// l'une pour l'autre fausse la compta d'une à trois semaines.
+// Julien : « en finalisé, c'est simplement la réception d'argent qui compte ».
+const dansPeriodeDate = (t, p) => {
   if (!p || (!p.from && !p.to)) return true;
-  const t = o && o.date ? Date.parse(o.date) : NaN;
   if (isNaN(t)) return false;                       // sans date, on ne devine pas
   if (p.from && t < debutJour(p.from).getTime()) return false;
   if (p.to && t > finJour(p.to).getTime()) return false;
   return true;
 };
+const dansPeriode = (o, p) => dansPeriodeDate(o && o.date ? Date.parse(o.date) : NaN, p);
 const libellePeriode = (p) => {
   if (!p || (!p.from && !p.to)) return 'Toute la période';
   if (p.label) return p.label;
@@ -3768,8 +3796,22 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
 }
 function PeriodePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
+  // ⚠️ Julien : « je veux pouvoir sélectionner un mois — juin par exemple — et
+  // que l'app fasse la somme du 1er au dernier jour de juin ». Les raccourcis
+  // « Ce mois » / « Mois dernier » ne couvraient que les deux derniers : pour
+  // juin en août, il fallait pointer deux dates dans le calendrier. Le
+  // sélecteur s'ouvre donc sur les MOIS ; le jour-à-jour reste à un clic.
+  const [vue, setVue] = useState('mois');            // 'mois' | 'jours'
   const now = new Date();
   const [mois, setMois] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [annee, setAnnee] = useState(now.getFullYear());
+  // Un mois entier, du 1er au dernier jour — bornes calculées, jamais saisies.
+  const choisirMois = (an, m) => {
+    const from = new Date(an, m, 1);
+    const to = new Date(an, m + 1, 0);              // jour 0 du mois suivant = dernier du mois
+    onChange({ from, to, label: `${MOIS_FR[m]} ${an}` });
+    setOpen(false);
+  };
   const actif = !!(value && (value.from || value.to));
   const presets = [
     { k:'mois',   lab:'Ce mois',      f:()=>({ from:new Date(now.getFullYear(),now.getMonth(),1), to:now, label:`${MOIS_FR[now.getMonth()]} ${now.getFullYear()}` }) },
@@ -3811,6 +3853,36 @@ function PeriodePicker({ value, onChange }) {
       </div>
       {open && (
         <div style={{ marginTop:8, border:`1px solid ${C.border}`, background:C.card, borderRadius:14, padding:'10px 12px' }}>
+          <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+            {[['mois','Un mois entier'],['jours','Jour à jour']].map(([k,lab])=>(
+              <button key={k} type="button" onClick={()=>setVue(k)}
+                style={{ flex:1, border:`1px solid ${vue===k?C.accent:C.border}`, background:vue===k?`${C.accent}14`:'transparent', color:vue===k?C.accent:C.muted, borderRadius:10, padding:'7px 0', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>{lab}</button>
+            ))}
+          </div>
+          {vue==='mois' ? (<>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <button type="button" onClick={()=>setAnnee(a=>a-1)} aria-label="Année précédente" style={{ border:'none', background:'transparent', color:C.text, fontSize:16, cursor:'pointer', padding:'2px 10px' }}>‹</button>
+              <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{annee}</div>
+              <button type="button" onClick={()=>setAnnee(a=>a+1)} disabled={annee>=now.getFullYear()} aria-label="Année suivante"
+                style={{ border:'none', background:'transparent', color:annee>=now.getFullYear()?C.border:C.text, fontSize:16, cursor:annee>=now.getFullYear()?'default':'pointer', padding:'2px 10px' }}>›</button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
+              {MOIS_FR.map((nom,m)=>{
+                // Un mois à venir n'a rien à sommer : on le grise plutôt que de
+                // laisser choisir une période forcément vide.
+                const futur = annee>now.getFullYear() || (annee===now.getFullYear() && m>now.getMonth());
+                const sel = value && value.label === `${nom} ${annee}`;
+                return (
+                  <button key={m} type="button" disabled={futur} onClick={()=>choisirMois(annee,m)}
+                    style={{ border:`1px solid ${sel?C.accent:C.border}`, background:sel?C.accent:'transparent', color:futur?C.border:(sel?'#fff':C.text),
+                             borderRadius:10, padding:'10px 0', fontSize:13, fontWeight:600, cursor:futur?'default':'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>
+                    {nom}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>Un tap = tout le mois, du 1er au dernier jour.</div>
+          </>) : (<>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
             <button type="button" onClick={()=>setMois(m=>new Date(m.getFullYear(), m.getMonth()-1, 1))} style={{ border:'none', background:'transparent', color:C.text, fontSize:16, cursor:'pointer', padding:'2px 8px' }}>‹</button>
             <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{MOIS_FR[mois.getMonth()]} {mois.getFullYear()}</div>
@@ -3831,6 +3903,7 @@ function PeriodePicker({ value, onChange }) {
           <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>
             {value && value.from && !value.to ? 'Choisis la date de fin.' : 'Clique la date de début, puis celle de fin.'}
           </div>
+          </>)}
         </div>
       )}
     </div>
@@ -3854,13 +3927,19 @@ function EmptyState({ icon, title, desc, action }) {
 function ScreenHead({ icon, title, desc, right }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   return (
-    <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:12}}>
+    <div style={{display:'flex',alignItems:'flex-start',gap:12,marginBottom:16}}>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          {line ? <Icon name={icon} size={19} style={{color:C.accent,flexShrink:0}}/> : <span style={{fontSize:17}}>{icon}</span>}
-          <h2 style={{margin:0,fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4}}>{title}</h2>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {/* L'icône dans une pastille teintée : elle devient un repère d'écran
+              au lieu d'un glyphe posé devant le mot. */}
+          {line ? (
+            <span aria-hidden="true" style={{flexShrink:0,width:32,height:32,borderRadius:11,background:C.ring,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <Icon name={icon} size={18}/>
+            </span>
+          ) : <span style={{fontSize:19}}>{icon}</span>}
+          <h2 style={{margin:0,fontSize:22,fontWeight:700,color:C.text,letterSpacing:-0.7,lineHeight:1.15}}>{title}</h2>
         </div>
-        {desc && <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>{desc}</div>}
+        {desc && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{desc}</div>}
       </div>
       {right}
     </div>
@@ -6799,6 +6878,25 @@ const FURN_TYPES = {
   porte:   { label: 'Porte',   emoji: '🚪', w: 1, h: 0.35, rows: 1, cols: 1, color: '#b0916f', h3d: 1.4, build: 'porte', deco: true },
   fenetre: { label: 'Fenêtre', emoji: '🪟', w: 1.6, h: 0.35, rows: 1, cols: 1, color: '#dfe7ee', h3d: 1.0, build: 'fenetre', deco: true },
   autre:   { label: 'Autre',   emoji: '🪑', w: 1, h: 1, rows: 2, cols: 2, color: '#9b8ec0', h3d: 1.0, build: 'generic' },
+  // ── DÉCOR ────────────────────────────────────────────────────────────────
+  // Julien : « je veux un vrai jeu vidéo, je veux pouvoir tout créer dedans ».
+  // Ces objets ne rangent RIEN (`deco: true`) : ils ne portent pas de case, ne
+  // reçoivent pas de numéro et ne comptent dans aucun inventaire. Ils servent à
+  // ce que la pièce ressemble à sa pièce — c'est ça qui fait qu'on s'y repère.
+  chaise:  { label: 'Chaise',  emoji: '🪑', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#8a6f57', h3d: 0.95, build: 'chaise', deco: true },
+  bureau:  { label: 'Bureau',  emoji: '🖥️', w: 1.6, h: 0.8, rows: 1, cols: 1, color: '#9c7b56', h3d: 0.76, build: 'bureau', deco: true },
+  canape:  { label: 'Canapé',  emoji: '🛋️', w: 2.2, h: 1,   rows: 1, cols: 1, color: '#5f7f9b', h3d: 0.85, build: 'canape', deco: true },
+  lit:     { label: 'Lit',     emoji: '🛏️', w: 2,   h: 1.6, rows: 1, cols: 1, color: '#7e8ba3', h3d: 0.6,  build: 'lit',    deco: true },
+  tapis:   { label: 'Tapis',   emoji: '🟫', w: 2.4, h: 1.6, rows: 1, cols: 1, color: '#a8564f', h3d: 0.03, build: 'tapis',  deco: true },
+  plante:  { label: 'Plante',  emoji: '🪴', w: 0.6, h: 0.6, rows: 1, cols: 1, color: '#3f7d4f', h3d: 1.3,  build: 'plante', deco: true },
+  lampe:   { label: 'Lampadaire', emoji: '💡', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#d8c48a', h3d: 1.7, build: 'lampe', deco: true },
+  miroir:  { label: 'Miroir',  emoji: '🪞', w: 0.9, h: 0.3, rows: 1, cols: 1, color: '#cfd8e0', h3d: 1.6,  build: 'miroir', deco: true },
+  cadre:   { label: 'Cadre',   emoji: '🖼️', w: 0.8, h: 0.2, rows: 1, cols: 1, color: '#8a6f57', h3d: 0.6,  build: 'cadre',  deco: true },
+  poubelle:{ label: 'Poubelle',emoji: '🗑️', w: 0.5, h: 0.5, rows: 1, cols: 1, color: '#6b7280', h3d: 0.7,  build: 'poubelle', deco: true },
+  escabeau:{ label: 'Escabeau',emoji: '🪜', w: 0.7, h: 0.7, rows: 1, cols: 1, color: '#9aa0a6', h3d: 1.2,  build: 'escabeau', deco: true },
+  radiateur:{label: 'Radiateur',emoji:'♨️', w: 1.2, h: 0.3, rows: 1, cols: 1, color: '#e6e8ea', h3d: 0.6,  build: 'radiateur', deco: true },
+  velo:    { label: 'Vélo',    emoji: '🚲', w: 1.7, h: 0.6, rows: 1, cols: 1, color: '#3f4b5b', h3d: 1.0,  build: 'velo',   deco: true },
+  etabli:  { label: 'Établi',  emoji: '🛠️', w: 1.8, h: 0.8, rows: 1, cols: 1, color: '#8c7a63', h3d: 0.9,  build: 'etabli', deco: true },
 };
 const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
 // ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
@@ -7094,6 +7192,116 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         return g;
       };
       const buildGeneric = (w, d, ht, base) => { const g = new THREE.Group(); const b = box(w, ht, d, woodMat(base)); b.position.y = ht / 2; g.add(b); return g; };
+      // ── OBJETS DE DÉCOR ────────────────────────────────────────────────────
+      // Assemblés à partir des mêmes primitives (box / cylindre) et des mêmes
+      // matières que les meubles : une pièce meublée doit avoir l'air d'un tout,
+      // pas d'un décor collé par-dessus. Chacun projette son ombre (`shadowize`).
+      const cyl = (r1, r2, h, mat, seg) => shadowize(new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg || 14), mat));
+      const pied = (m, x, z, h, r) => { const c = cyl(r || 0.035, r || 0.035, h, m); c.position.set(x, h / 2, z); return c; };
+      const buildChaise = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base); const assise = ht * 0.48;
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz]) => g.add(pied(m, sx*(w/2-0.06), sz*(d/2-0.06), assise)));
+        const s = box(w, 0.06, d, m); s.position.y = assise; g.add(s);
+        const dos = box(w, ht - assise, 0.06, m); dos.position.set(0, assise + (ht - assise) / 2, -d / 2 + 0.03); g.add(dos);
+        return g;
+      };
+      const buildBureau = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base);
+        const top = box(w, 0.06, d, m); top.position.y = ht; g.add(top);
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz]) => g.add(pied(m, sx*(w/2-0.07), sz*(d/2-0.07), ht, 0.045)));
+        const cais = box(w * 0.3, ht * 0.62, d * 0.8, woodMat(shade(base, -10)));
+        cais.position.set(w / 2 - w * 0.18, ht * 0.31, 0); g.add(cais);
+        return g;
+      };
+      const buildCanape = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base), assise = ht * 0.45;
+        const b = box(w, assise, d, m); b.position.y = assise / 2; g.add(b);
+        const coussin = box(w - 0.16, 0.14, d - 0.16, woodMat(shade(base, 12))); coussin.position.y = assise + 0.07; g.add(coussin);
+        const dos = box(w, ht - assise, 0.18, m); dos.position.set(0, assise + (ht - assise) / 2, -d / 2 + 0.09); g.add(dos);
+        [-1, 1].forEach(sx => { const a = box(0.18, ht * 0.72, d, m); a.position.set(sx * (w / 2 - 0.09), ht * 0.36, 0); g.add(a); });
+        return g;
+      };
+      const buildLit = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base);
+        const cadre = box(w, ht * 0.5, d, m); cadre.position.y = ht * 0.25; g.add(cadre);
+        const mat2 = box(w - 0.1, ht * 0.42, d - 0.1, woodMat('#e8e6e1')); mat2.position.y = ht * 0.5 + ht * 0.21; g.add(mat2);
+        const or = box(w * 0.42, 0.12, d * 0.26, woodMat('#f2f0ec'));
+        or.position.set(-w * 0.22, ht * 0.5 + ht * 0.42 + 0.06, -d / 2 + d * 0.2); g.add(or);
+        const tete = box(w, ht * 0.9, 0.08, m); tete.position.set(0, ht * 0.45, -d / 2 + 0.04); g.add(tete);
+        return g;
+      };
+      const buildTapis = (w, d, ht, base) => {
+        const g = new THREE.Group(); const t = box(w, 0.02, d, woodMat(base)); t.position.y = 0.011; g.add(t);
+        const b = box(w * 0.88, 0.024, d * 0.82, woodMat(shade(base, 16))); b.position.y = 0.014; g.add(b);
+        return g;
+      };
+      const buildPlante = (w, d, ht, base) => {
+        const g = new THREE.Group(); const pot = cyl(w * 0.28, w * 0.22, ht * 0.26, woodMat('#b5714f'));
+        pot.position.y = ht * 0.13; g.add(pot);
+        const tronc = cyl(0.03, 0.04, ht * 0.4, woodMat('#6b5136'), 8); tronc.position.y = ht * 0.26 + ht * 0.2; g.add(tronc);
+        const vert = woodMat(base);
+        [[0, 0, ht * 0.78, 0.32], [0.16, 0.08, ht * 0.66, 0.24], [-0.14, -0.1, ht * 0.7, 0.22]].forEach(([x, z, y, r]) => {
+          const f = shadowize(new THREE.Mesh(new THREE.SphereGeometry(w * r, 10, 8), vert));
+          f.position.set(x, y, z); f.scale.y = 0.8; g.add(f);
+        });
+        return g;
+      };
+      const buildLampe = (w, d, ht, base) => {
+        const g = new THREE.Group();
+        const socle = cyl(w * 0.3, w * 0.32, 0.04, metalMat); socle.position.y = 0.02; g.add(socle);
+        const mat_ = cyl(0.022, 0.022, ht * 0.82, metalMat, 10); mat_.position.y = ht * 0.45; g.add(mat_);
+        const abat = cyl(w * 0.34, w * 0.24, ht * 0.2, woodMat(base), 16); abat.position.y = ht * 0.9; g.add(abat);
+        return g;
+      };
+      const buildMiroir = (w, d, ht, base) => {
+        const g = new THREE.Group(); const cadre = box(w, ht, 0.05, woodMat('#6b5136'));
+        cadre.position.y = ht / 2; g.add(cadre);
+        const glace = box(w - 0.1, ht - 0.1, 0.02, new THREE.MeshStandardMaterial({ color: base, metalness: 0.85, roughness: 0.12 }));
+        glace.position.set(0, ht / 2, 0.03); g.add(glace);
+        return g;
+      };
+      const buildCadre = (w, d, ht, base) => {
+        const g = new THREE.Group(); const c = box(w, ht, 0.04, woodMat(base)); c.position.y = ht / 2 + 0.9; g.add(c);
+        const toile = box(w - 0.08, ht - 0.08, 0.02, woodMat('#e9e2d3')); toile.position.set(0, ht / 2 + 0.9, 0.025); g.add(toile);
+        return g;
+      };
+      const buildPoubelle = (w, d, ht, base) => {
+        const g = new THREE.Group(); const c = cyl(w * 0.3, w * 0.24, ht * 0.9, woodMat(base), 16);
+        c.position.y = ht * 0.45; g.add(c);
+        const cv = cyl(w * 0.32, w * 0.32, 0.04, woodMat(shade(base, -12)), 16); cv.position.y = ht * 0.92; g.add(cv);
+        return g;
+      };
+      const buildEscabeau = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = metalMat;
+        [-1, 1].forEach(sx => { const p = box(0.05, ht, 0.05, m); p.position.set(sx * (w / 2 - 0.05), ht / 2, -d / 4); p.rotation.x = 0.12; g.add(p); });
+        for (let i = 1; i <= 3; i++) { const marche = box(w - 0.12, 0.04, d * 0.42, m); marche.position.set(0, (i / 3.4) * ht, -d / 4 + i * 0.02); g.add(marche); }
+        return g;
+      };
+      const buildRadiateur = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base); const n = Math.max(4, Math.round(w / 0.11));
+        for (let i = 0; i < n; i++) { const a = box(w / n * 0.7, ht * 0.86, d, m); a.position.set(-w / 2 + (i + 0.5) * (w / n), ht * 0.5, 0); g.add(a); }
+        const bas = box(w, 0.05, d, metalMat); bas.position.y = ht * 0.06; g.add(bas);
+        return g;
+      };
+      const buildVelo = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: base, metalness: 0.6, roughness: 0.35 });
+        const pneu = new THREE.MeshStandardMaterial({ color: '#22262b', roughness: 0.9 });
+        [-1, 1].forEach(sx => { const r = shadowize(new THREE.Mesh(new THREE.TorusGeometry(ht * 0.33, 0.035, 8, 22), pneu));
+          r.position.set(sx * (w / 2 - ht * 0.34), ht * 0.33, 0); g.add(r); });
+        const cadre = box(w * 0.6, 0.05, 0.05, m); cadre.position.set(0, ht * 0.5, 0); g.add(cadre);
+        const selle = box(0.22, 0.06, 0.1, pneu); selle.position.set(-w * 0.1, ht * 0.72, 0); g.add(selle);
+        const guidon = box(0.06, 0.05, 0.42, m); guidon.position.set(w * 0.26, ht * 0.72, 0); g.add(guidon);
+        const fourche = box(0.05, ht * 0.42, 0.05, m); fourche.position.set(w * 0.26, ht * 0.5, 0); g.add(fourche);
+        return g;
+      };
+      const buildEtabli = (w, d, ht, base) => {
+        const g = new THREE.Group(); const m = woodMat(base);
+        const top = box(w, 0.08, d, woodMat(shade(base, -6))); top.position.y = ht; g.add(top);
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz]) => g.add(pied(metalMat, sx*(w/2-0.08), sz*(d/2-0.08), ht, 0.05)));
+        const etag = box(w - 0.16, 0.05, d - 0.16, m); etag.position.y = ht * 0.28; g.add(etag);
+        const fond = box(w, ht * 0.5, 0.05, m); fond.position.set(0, ht + ht * 0.25, -d / 2 + 0.03); g.add(fond);
+        return g;
+      };
       const furnGroup = new THREE.Group(); scene.add(furnGroup);
       const disposeMat = (mat) => { if (!mat) return; (Array.isArray(mat) ? mat : [mat]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); if (mm && mm.dispose) mm.dispose(); }); };
       const buildFurniture = () => {
@@ -7129,6 +7337,20 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
             case 'porte': g = buildPorte(w, d, ht, base); break;
             case 'fenetre': g = buildFenetre(w, d, ht, base); break;
             case 'carton': g = buildCarton(w, d, ht, base, it.num); break;
+            case 'chaise': g = buildChaise(w, d, ht, base); break;
+            case 'bureau': g = buildBureau(w, d, ht, base); break;
+            case 'canape': g = buildCanape(w, d, ht, base); break;
+            case 'lit': g = buildLit(w, d, ht, base); break;
+            case 'tapis': g = buildTapis(w, d, ht, base); break;
+            case 'plante': g = buildPlante(w, d, ht, base); break;
+            case 'lampe': g = buildLampe(w, d, ht, base); break;
+            case 'miroir': g = buildMiroir(w, d, ht, base); break;
+            case 'cadre': g = buildCadre(w, d, ht, base); break;
+            case 'poubelle': g = buildPoubelle(w, d, ht, base); break;
+            case 'escabeau': g = buildEscabeau(w, d, ht, base); break;
+            case 'radiateur': g = buildRadiateur(w, d, ht, base); break;
+            case 'velo': g = buildVelo(w, d, ht, base); break;
+            case 'etabli': g = buildEtabli(w, d, ht, base); break;
             case 'pile': g = buildPile(pileNumsArr, nr, cellSize); break;
             default: g = buildGeneric(w, d, ht, base);
           }
@@ -7971,13 +8193,26 @@ function RoomPlan({ locate, onLocateConsumed }) {
         return <div style={{ fontSize: 12.5, color: INV_STATUS.online.color, fontWeight: 800, lineHeight:1.4 }}>✅ N°{search} → <b>{it.name}</b>{hi.roomName ? <> · pièce <b>{hi.roomName}</b></> : null}{pos ? <><br/><span style={{fontWeight:500,color:C.text}}>{pos}</span></> : null}</div>;
       })()}
 
-      {/* Palette de meubles */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>Ajouter :</span>
-        {Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden).map(([k, t]) => (
-          <button key={k} onClick={() => addFurn(k)} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 700, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
-        ))}
-      </div>
+      {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────
+          Deux familles, et la distinction n'est pas cosmétique : un RANGEMENT
+          porte des cases, reçoit des numéros et compte dans l'inventaire ; un
+          objet de DÉCOR ne range rien. Les mélanger dans une seule rangée de
+          trente boutons rendait le rangement introuvable. */}
+      {(() => {
+        const tous = Object.entries(FURN_TYPES).filter(([, t]) => !t.hidden);
+        const groupes = [
+          ['Rangement', tous.filter(([, t]) => !t.deco), "Ils portent des cases et des numéros."],
+          ['Décor',     tous.filter(([, t]) =>  t.deco), "Pour que la pièce ressemble à la tienne. Ne range rien."],
+        ];
+        return groupes.map(([titre, liste, aide]) => liste.length ? (
+          <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span title={aide} style={{ fontSize: 11.5, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
+            {liste.map(([k, t]) => (
+              <button key={k} onClick={() => addFurn(k)} title={aide} style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card, color: C.text, fontSize: 12, fontWeight: 600, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit' }}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
+            ))}
+          </div>
+        ) : null);
+      })()}
       {/* Taille de la pièce */}
       <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
         <span style={{ fontWeight: 800 }}>Pièce {room.w}×{room.h} :</span>
@@ -9958,6 +10193,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
+  const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
   const [renumOpen, setRenumOpen] = useState(false); // modale « Renuméroter à la suite »
   const [dispOpen, setDispOpen] = useState(false);   // panneau « annonces disparues sans vente »
   const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
@@ -11263,6 +11499,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Recherche sur une commande (vente/achat) : titre, numéro, ou pseudo acheteur.
   // La période s'applique EN MÊME TEMPS que la recherche : les compteurs et les
   // totaux affichés correspondent donc toujours à ce qui est listé.
+  // ⚠️ UNE SEULE DATE, PARTOUT : celle de la VENTE.
+  // J'avais fait porter la période de « Finalisées » sur la date d'encaissement
+  // (le jour où Vinted libère l'argent). Julien a tranché : « on ne te parle pas
+  // de transfert d'argent, mais simplement des ventes finalisées » — donc la
+  // somme des ventes FINALISÉES dont la vente tombe entre les deux dates.
+  // C'est plus simple, c'est complet dès aujourd'hui (la date de vente est
+  // toujours là), et ça ne dépend d'aucune capture supplémentaire.
+  // NE PAS réintroduire la date d'encaissement ici sans qu'il le redemande.
   const matchOrd = (o) => {
     if (!dansPeriode(o, periode)) return false;
     const q = ordSearch.trim().toLowerCase(); if (!q) return true;
@@ -12395,9 +12639,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
+  // ⚠️ « ANNULÉE » ET « REMBOURSÉE » NE SONT PAS LA MÊME CHOSE.
+  // Julien : « je crois que tu t'es trompée dans une vente, tu l'affiches
+  // annulée alors qu'elle a bien été expédiée ». Il a raison — mesuré sur la
+  // vraie base : sur 33 ventes classées annulées, **3 avaient bel et bien été
+  // expédiées** (bordereau reçu, ou Vinted dit « Commande livrée »). Ce ne sont
+  // pas des commandes annulées avant l'envoi : la paire est partie ET l'argent
+  // est revenu à l'acheteur. C'est pire qu'une annulation, et ça ne se dit pas
+  // avec le même mot.
+  // La preuve d'expédition est CERTAINE (jamais un rapprochement par titre) :
+  // un bordereau existe pour ce n° de transaction, ou le statut Vinted lui-même
+  // porte un mot d'acheminement.
+  const venteExpediee = (o) => {
+    const tx = String(o && o.transaction_id || ''); if (!tx) return false;
+    if (/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test(o.status || '')) return true;
+    if (labelsCaptes[tx]) return true;
+    return (emailBords || []).some(b => String(b.transaction || '') === tx);
+  };
   const venteStage = (o) => {
     const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
-    if (classifyOrderStatus(o.status) === 'cancelled') return { label: 'Annulée', color: C.danger, step: 0 };
+    if (classifyOrderStatus(o.status) === 'cancelled') return venteExpediee(o)
+      ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
+      : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
     if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
     if (/livr|remis|r[ée]ception/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
     if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
@@ -12539,6 +12802,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (§11). C'est exactement ce qu'on veut pour une déclaration mensuelle.
     const items = (sales.items || []).filter(o => dansPeriode(o, periode));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
+    // Finalisées dont l'encaissement n'est pas encore daté : elles sortent du
+    // total plutôt que d'être posées au hasard sur la date de vente. On les
+    // compte pour le dire — un chiffre incomplet qui se présente comme complet
+    // est pire qu'un chiffre absent.
+    // ⚠️ Sur un mois passé, la date d'encaissement peut n'être connue pour
+    // AUCUNE vente (l'extension ne capte les détails de transaction que depuis
+    // peu). Afficher « 0 € » serait exact et inutilisable. On compte donc aussi
+    // ce qu'on sait dire : les ventes finalisées CONCLUES sur la période, avec
+    // leur montant — en disant que c'est une autre question.
+    // ⚠️ LES VENTES MASQUÉES NE COMPTENT DANS AUCUN TOTAL — et rien ne le
+    // disait. Mesuré sur la vraie base : **205 ventes masquées**, dont 50 des
+    // 51 de juin. Choisir « juin » affichait donc 41 € au lieu de ~1 500 €,
+    // sans un mot. Un total qui se présente comme complet alors qu'il exclut
+    // des lignes est exactement ce qu'on s'interdit (§ « Argent en attente »).
+    let masqNb = 0, masqEur = 0;
+    for (const o of (sales.items || [])) {
+      if (!isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      if (!dansPeriode(o, periode)) continue;
+      masqNb++; masqEur += (o.price?.amount != null ? Number(o.price.amount) : 0);
+    }
     for (const o of items) {
       if (isHidden(o)) continue;
       const stt = classifyOrderStatus(o.status);
@@ -12553,7 +12837,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente };
+    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
 
@@ -13769,8 +14053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         {sales.items && sales.items.length>0 && (
-          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
-            <PeriodePicker value={periode} onChange={setPeriode}/>
+          <div style={{marginBottom:14}}>
             <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, acheteur)…"
               style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
           </div>
@@ -13954,6 +14237,55 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               title={`vente${pending.length>1?'s':''} repérée${pending.length>1?'s':''} via bordereau, pas encore synchronisée${pending.length>1?'s':''}`}
               desc={pending.map(b=>(b.numero?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
               detail="Elles apparaîtront dans la liste (et dans la comptabilité) après ta prochaine navigation sur Vinted : c'est l'extension qui recapte les ventes."/>
+          );
+        })()}
+        {/* ── VENTES PAR JOUR ────────────────────────────────────────────────
+            Demande de Julien : « un endroit où on puisse voir les ventes par
+            jour, pareil un calendrier de tel jour à tel jour ; ici ce n'est pas
+            l'argent reçu, mais simplement les ventes qui ont été faites ce
+            jour-là ». Donc : DATE DE VENTE, toujours — même quand le filtre
+            « Finalisées » fait porter le reste de l'écran sur l'encaissement.
+            Les annulées sont exclues (elles ne sont pas des ventes). */}
+        {(()=>{
+          const jours = {};
+          for (const o of (sales.items || [])) {
+            if (isHidden(o)) continue;
+            if (classifyOrderStatus(o.status) === 'cancelled') continue;
+            if (!dansPeriode(o, periode)) continue;             // ← date de VENTE
+            const t = o.date ? Date.parse(o.date) : NaN; if (isNaN(t)) continue;
+            const d = new Date(t); const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            const j = jours[k] || (jours[k] = { n:0, ca:0, ts:new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime() });
+            j.n += 1; j.ca += (o.price?.amount!=null ? Number(o.price.amount) : 0);
+          }
+          const liste = Object.entries(jours).sort((a,b)=>b[1].ts-a[1].ts);
+          if (!liste.length) return null;
+          const totN = liste.reduce((s,[,v])=>s+v.n,0), totCa = liste.reduce((s,[,v])=>s+v.ca,0);
+          const max = Math.max(...liste.map(([,v])=>v.ca)) || 1;
+          const fmtJ = (ts) => new Date(ts).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'});
+          return (
+            <details style={{marginBottom:10}} open={liste.length<=10}>
+              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
+                <span aria-hidden="true" style={{flexShrink:0,color:C.accent,display:'flex'}}><Icon name="calendar" size={18}/></span>
+                <span style={{flex:'1 1 150px',minWidth:0}}>
+                  <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Ventes par jour</span>
+                  <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>{liste.length} jour{liste.length>1?'s':''} · {totN} vente{totN>1?'s':''} · {fmtE0(totCa)} — sur {libellePeriode(periode).toLowerCase()}</span>
+                </span>
+              </summary>
+              <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
+                {liste.map(([k,v],i)=>(
+                  <div key={k} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderTop:i?`1px solid ${C.border}66`:'none'}}>
+                    <span style={{flexShrink:0,width:76,fontSize:12,fontWeight:600,color:C.text}}>{fmtJ(v.ts)}</span>
+                    {/* La barre rend la comparaison entre jours immédiate ; le
+                        chiffre reste à droite, c'est lui qui fait foi. */}
+                    <span aria-hidden="true" style={{flex:1,minWidth:20,height:6,borderRadius:999,background:`${C.accent}22`,overflow:'hidden'}}>
+                      <span style={{display:'block',height:'100%',width:`${Math.round(v.ca/max*100)}%`,background:C.accent}}/>
+                    </span>
+                    <span style={{flexShrink:0,fontSize:11.5,color:C.muted,width:58,textAlign:'right'}}>{v.n} vente{v.n>1?'s':''}</span>
+                    <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.text,width:66,textAlign:'right',whiteSpace:'nowrap'}}>{fmtE0(v.ca)}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
           );
         })()}
         {(totals.nb>0 || totals.nbAttente>0) && (
@@ -14198,13 +14530,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </span>
             }/>
         )}
+        {/* ⚠️ UN TOTAL INCOMPLET QUI SE PRÉSENTE COMME COMPLET EST PIRE QU'UN
+            TOTAL ABSENT. Une vente finalisée dont on ne connaît pas encore la
+            date d'encaissement n'est pas datée au jour de la vente (ce serait
+            faux d'une à trois semaines) : elle sort du total, et on le dit. */}
+        {/* Les ventes masquées sont invisibles PAR DESIGN — mais leur absence
+            d'un total mensuel doit se voir, sinon le chiffre ment par omission. */}
+        {totals.masqNb > 0 && !showHidden && (
+          <Notice tone="warn" icon="eye"
+            value={totals.masqNb}
+            title={`vente${totals.masqNb>1?'s':''} masquée${totals.masqNb>1?'s':''} sur ${libellePeriode(periode).toLowerCase()}`}
+            desc={`${fmtE0(totals.masqEur)} qui ne comptent dans aucun total de cet écran. Tu les as masquées d'un ✕ à un moment ; si ce n'était pas voulu, réaffiche-les.`}
+            detail="Masquer une vente sert à écarter un doublon ou un test. La liste est conservée (clé « vinted_sales_hidden ») et se synchronise entre tes appareils — rien n'est supprimé, tout revient en un clic."
+            action={<button type="button" onClick={()=>setShowHidden(true)} style={{border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les réafficher</button>}/>
+        )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
-          {accounts.length>0 && (
-            <button onClick={()=>{ loadOrders('sold',setSales,true); loadListings&&loadListings(true); }} disabled={sales.loading} title="Va chercher tes ventes en direct sur Vinted (tous comptes), sans attendre l'extension" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:sales.loading?'default':'pointer',opacity:sales.loading?0.6:1}}>{sales.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
-          )}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
               quotidien — et Compta / Registre / Litiges / CSV passent derrière un
@@ -14243,6 +14586,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })()}
         </div>
+        {/* LA PÉRIODE, SOUS LE FILTRE QU'ELLE AFFINE. Elle était tout en haut,
+            au-dessus de tout : six pastilles + la recherche formaient deux blocs
+            pleins avant la première vente. Ici, elle est là où on l'utilise —
+            on choisit « Finalisées », puis le mois. */}
+        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {sales.loading && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
@@ -14282,7 +14630,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         ligne sans statut ni n° de transaction Vinted. */}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    {(()=>{ const vs=venteStage(o); return <span style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
+                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
@@ -14377,9 +14725,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
             <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
-          {accounts.length>0 && (
-            <button onClick={()=>loadOrders('purchased',setBuys,true)} disabled={buys.loading} title="Va chercher tes achats en direct sur Vinted (tous comptes)" style={{marginLeft:'auto',padding:'5px 12px',borderRadius:999,border:`1px solid ${C.accent}`,background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:buys.loading?'default':'pointer',opacity:buys.loading?0.6:1}}>{buys.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
-          )}
         </div>
         {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && (
@@ -15083,29 +15428,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             avant de voir ses annonces. Ils sont maintenant derrière une seule
             ligne, dépliable, et n'apparaissent que s'il y a vraiment quelque
             chose à signaler. */}
-        {(() => {
-          // ⚠️ Les « trous » de numérotation ne sont PLUS un signalement (§5.40) :
-          //    un numéro est pris à vie, la séquence monte, c'est normal.
-          const n = numDoublons.length + comptesMuets.length + (disparues.length ? 1 : 0) + (blockedList.length ? 1 : 0);
-          if (!n) return null;
-          // Un numéro en double fait expédier la mauvaise paire : la barre passe
-          // en rouge et le dit, au lieu de se fondre dans les avertissements.
-          const grave = numDoublons.length > 0;
-          const teinte = grave ? C.danger : C.warn;
-          return (
-            <button type="button" onClick={() => setDiagOpen(v => !v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${teinte}${grave?'':'55'}`,background:`${teinte}12`,
-                borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
-              <span aria-hidden="true" style={{flexShrink:0,color:teinte,display:'flex'}}><Icon name="alert" size={17}/></span>
-              <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
-                {grave
-                  ? `${numDoublons.length} numéro${numDoublons.length>1?'x':''} en double${n>numDoublons.length?` · ${n-numDoublons.length} autre${n-numDoublons.length>1?'s':''}`:''}`
-                  : `${n} signalement${n>1?'s':''} sur tes annonces`}
-              </span>
-              <span style={{fontSize:11.5,color:grave?C.danger:C.muted,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
-            </button>
-          );
-        })()}
+        {/* ⚠️ IL NE RESTE QU'UNE SEULE ALERTE ICI, ET C'EST VOULU.
+            Julien : « enlève le signalement sur tes annonces, et tout ce qui
+            n'est pas pertinent ». Le compteur générique mélangeait des choses
+            sans conséquence (compte muet, annonce disparue, compte bloqué) avec
+            LA seule qui coûte de l'argent : deux paires présentes sous le même
+            numéro, donc la mauvaise chaussure dans le carton. Noyée au milieu,
+            elle ne se voyait plus. Les autres sont retirées ; celle-ci reste,
+            en rouge, et se déplie toute seule. */}
+        {numDoublons.length > 0 && (
+          <button type="button" onClick={() => setDiagOpen(v => !v)}
+            style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.danger}`,background:`${C.danger}12`,
+              borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
+            <span aria-hidden="true" style={{flexShrink:0,color:C.danger,display:'flex'}}><Icon name="alert" size={17}/></span>
+            <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
+              {`${numDoublons.length} numéro${numDoublons.length>1?'x':''} porté${numDoublons.length>1?'s':''} par deux paires`}
+            </span>
+            <span style={{fontSize:11.5,color:C.danger,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
+          </button>
+        )}
         {diagOpen && (<>
         {/* NUMÉROS QUI MONTENT TROP HAUT — « pourquoi N°156 alors que j'ai à
             peine 50 paires ? ». L'outil de renumérotation existait mais était
@@ -15296,8 +15637,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               → une paire vendue restait « en ligne » indéfiniment). */}
           {(()=>{
             let oldest = null;
-            for (const a of accounts) { const ms = harvestAgeMs(a.vinted_user_id, 'listings'); if (ms != null && (oldest == null || ms > oldest)) oldest = ms; }
-            if (oldest == null || oldest < 2*86400000) return null; // < 2 j : rien à signaler
+            for (const a of accounts) {
+              if (acctOff(a.vinted_user_id)) continue;   // masqué/retiré : hors compta, hors alerte
+              const ms = harvestAgeMs(a.vinted_user_id, 'listings');
+              if (ms != null && (oldest == null || ms > oldest)) oldest = ms;
+            }
+            if (oldest == null || oldest < 7*86400000) return null; // moins d'une semaine : rien à dire
             const j = Math.floor(oldest/86400000);
             return (
               <Notice tone="warn" icon="clock"
@@ -15374,7 +15719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.hasView && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>👁 {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:999,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
-            <button onClick={()=>loadListings(true)} disabled={listings.loading} title="Va chercher tes annonces EN DIRECT sur Vinted (tous comptes) — enlève les paires vendues qui traînent encore" style={{marginLeft:'auto',fontSize:12,fontWeight:600,color:'#fff',background:C.accent,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:listings.loading?'default':'pointer',opacity:listings.loading?0.6:1}}>{listings.loading?'⏳ Sync…':'↻ Synchroniser'}</button>
+
             <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
@@ -15492,6 +15837,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{position:'absolute',left:0,top:'calc(100% + 6px)',zIndex:71,minWidth:230,background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
+                    {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
@@ -15917,7 +16263,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:6}}>
                           {num
-                            ? <span style={{fontSize:12,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'2px 7px',flexShrink:0}}>N°{num}</span>
+                            ? <span style={{fontSize:15,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'3px 9px',flexShrink:0,letterSpacing:-0.2}}>N°{num}</span>
                             : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
                           <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{titre}</span>
                         </div>
@@ -15935,6 +16281,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* Le numéro de l'email vient d'un rapprochement par titre,
                             celui de la transaction est une identité : quand les deux
                             se contredisent on dit lequel on garde (§5.17). */}
+                        {/* ⚠️ LE CONFLIT DE NUMÉRO SE VOIT ICI, au moment où on
+                            ferme le carton — pas seulement sur l'écran Annonces.
+                            Julien : « si je me trompe entre deux colis, c'est deux
+                            ventes de perdues ». Un numéro porté par deux paires
+                            présentes est le seul défaut qui envoie la mauvaise
+                            chaussure ; il doit crier là où se fait le geste. */}
+                        {num && (()=>{
+                          const c = conflitsNum.find(x => String(x.numero) === String(num));
+                          if (!c) return null;
+                          const autres = c.porteurs.filter(x => normTitle(x.titre||'') !== normTitle(titre||''));
+                          return (
+                            <div style={{fontSize:11.5,fontWeight:600,marginTop:5,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'6px 9px',lineHeight:1.45}}>
+                              <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par une autre paire</span>
+                              <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
+                                {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
+                                {' '}— vérifie la photo ci-contre avant de fermer le carton, et corrige le numéro de l'autre paire dans Annonces.
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {b && (()=>{ const lit=numLitige(b); return lit ? (
                           <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
@@ -17097,6 +17463,79 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
+      {/* ── INVENTAIRE PHYSIQUE ───────────────────────────────────────────
+          Julien déménage, et veut pouvoir faire une confiance AVEUGLE aux
+          numéros. La question à laquelle il faut pouvoir répondre carton en
+          main est : « quelles paires doivent être chez moi, là, maintenant ? »
+          Réponse = `porteursNum`, LA définition unique de « ce numéro est
+          occupé par une paire réellement présente » (§5.33) — la même que celle
+          qui interdit de réattribuer un numéro. Une seule règle, deux usages
+          (§11) : on ne recalcule rien ici.
+          ⚠️ Tous les comptes, MÊME MASQUÉS : masquer un compte cache sa
+          comptabilité, ça ne sort pas le carton de l'étagère. */}
+      {inventOpen && (()=>{
+        const lignes = Object.entries(porteursNum)
+          .map(([num, p]) => ({ num, n: parseInt(num, 10), p }))
+          .sort((a, b) => (isNaN(a.n) ? 1e9 : a.n) - (isNaN(b.n) ? 1e9 : b.n));
+        const conflits = new Set(conflitsNum.map(c => String(c.numero)));
+        // La photo est ce qui permet de VÉRIFIER un carton : on la cherche là
+        // où elle est vraiment — l'annonce en ligne, la vente, sinon la fiche
+        // numérotée. Rapprochement par IDENTIFIANT uniquement (§5.34).
+        const photoDe = (por) => {
+          if (por.type === 'annonce') {
+            const it = (listings.items || []).find(x => String(x.id) === String(por.id));
+            if (it && it.photo) return it.photo;
+            const e = numeros[por.id]; if (e && e.photo) return e.photo;
+          }
+          if (por.type === 'vente') {
+            const o = (sales.items || []).find(x => String(x.transaction_id || '') === String(por.id));
+            if (o) { const ph = orderPhoto(o); if (ph) return ph; const e = effEntry(o); if (e && e.photo) return e.photo; }
+          }
+          return null;
+        };
+        const ou = (t) => t === 'annonce' ? 'en ligne' : t === 'vente' ? 'à envoyer' : 'au garage';
+        return (
+          <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:620,maxHeight:'88vh',overflowY:'auto',padding:'16px 14px calc(20px + env(safe-area-inset-bottom))'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                <span style={{flex:1,fontSize:17,fontWeight:700,color:C.text}}>Inventaire physique</span>
+                <button type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
+              </div>
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>
+                <b style={{color:C.text}}>{lignes.length} paire{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, la paire n'est pas là où l'app la croit.
+              </div>
+              {conflits.size>0 && (
+                <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
+                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'x':''} porté{conflits.size>1?'s':''} par deux paires</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux cartons portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                </div>
+              )}
+              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:14,overflow:'hidden'}}>
+                {lignes.map((l,i)=>{
+                  const dbl = conflits.has(l.num);
+                  const ph = l.p.map(photoDe).find(Boolean);
+                  return (
+                    <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.danger}0e`:'transparent'}}>
+                      <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:INV_STATUS.online.color,borderRadius:9,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
+                      <span style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
+                        {ph && <img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                      </span>
+                      <span style={{flex:1,minWidth:0}}>
+                        <span style={{display:'block',fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.p.map(x=>x.titre).filter(Boolean)[0] || '—'}</span>
+                        <span style={{display:'block',fontSize:11,color:dbl?C.danger:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux paires !':''}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={()=>{
+                const txt = lignes.map(l=>`N°${l.num}\t${(l.p.map(x=>x.titre).filter(Boolean)[0]||'').replace(/\t/g,' ')}\t${l.p.map(x=>ou(x.type)).join(' + ')}`).join('\n');
+                try { navigator.clipboard.writeText(`Inventaire physique — ${lignes.length} paires\n\n${txt}`); toast('Liste copiée'); } catch(_) { toast('Copie impossible'); }
+              }} style={{width:'100%',marginTop:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier la liste (pour l'imprimer)</button>
+            </div>
+          </div>
+        );
+      })()}
       {auditOpen && (()=>{
         const onlineNums = new Set(); annBase.forEach(it=>{ const nn=numeros[it.id]?.numero; if(nn) onlineNums.add(String(nn)); });
         const soldNums = new Set(); (sales.items||[]).forEach(o=>{ if(classifyOrderStatus(o.status)==='completed'){ const e=effEntry(o); if(e&&e.numero) soldNums.add(String(e.numero)); } });

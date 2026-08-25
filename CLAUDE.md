@@ -4416,3 +4416,249 @@ cadre rouge — deux paires dans la même boîte est le seul risque irréversibl
 l'app (§19), il doit rester le plus fort de l'écran.
 Emojis d'état retirés des cartes (`⏳`, `✅`, `📦`, `📮`) : le mot et la couleur
 disaient déjà la même chose ; `🏠 pas rangée` passe à l'icône `home`.
+
+---
+
+## 5.57 — LE NUMÉRO NE PEUT PLUS TROMPER · « FINALISÉE » = ENCAISSÉE · VENTES PAR JOUR
+
+Julien déménage : « je veux pouvoir faire une confiance aveugle et totale envers
+ces numéros… si je me trompe entre deux colis, c'est deux ventes de perdues ».
+
+### État mesuré AVANT de coder (24 août)
+| | |
+|---|---|
+| annonces en ligne | **24 · toutes numérotées** |
+| colis à envoyer | **10 · tous avec un numéro CERTAIN** |
+| cases posées au garage | 0 |
+| **numéros portés par deux paires présentes** | **1** — le N°4 (« 3 manuels première ST2S » et « adidas spezial noir 35,5 ») |
+
+La chaîne est donc déjà saine ; ce qui manquait, c'est que le défaut se voie **au
+moment du geste**, pas seulement sur un écran qu'il faut penser à ouvrir.
+
+- Le conflit s'affiche **sur la carte du colis**, en rouge, en nommant l'autre
+  porteuse et en renvoyant à la photo.
+- Le numéro passe de 12 à **15 px** sur cette carte : c'est ce qu'on recopie sur
+  la boîte.
+- **Nouvel « Inventaire physique »** (Annonces → ⋯ Outils) : la liste des paires
+  qui doivent être chez lui **maintenant**, triée par numéro, avec photo, et
+  copiable pour l'imprimer. ⚠️ Il dérive de **`porteursNum`**, la définition
+  unique de « ce numéro est occupé par une paire présente » (§5.33) — celle-là
+  même qui interdit la réattribution. Une règle, deux usages (§11) : on ne
+  recalcule rien. Tous les comptes, **même masqués** : masquer un compte cache
+  sa comptabilité, ça ne sort pas le carton de l'étagère.
+
+### ⚠️ « ANNULÉE » vs « REMBOURSÉE » — Julien avait raison
+« Je crois que tu t'es trompée dans une vente, tu l'affiches annulée alors
+qu'elle a bien été expédiée. »
+
+**Mesuré : sur 33 ventes classées annulées, 3 avaient bel et bien été
+EXPÉDIÉES** — « new balance fuelcell propem v5 blanc » (30 €, bordereau reçu),
+« adidas samba argenté 40,5 » (26 €, bordereau reçu), « adidas spezial cuir blanc
+37,5 » (29 €, Vinted dit « Commande livrée ! »). Les 33 portent toutes le statut
+« Remboursement effectué ».
+
+Ce ne sont pas des commandes annulées avant l'envoi : **la paire est partie ET
+l'argent est revenu**. C'est pire qu'une annulation, et ça ne se dit pas avec le
+même mot. `venteExpediee(o)` tranche sur une preuve **certaine** (bordereau
+rattaché au n° de transaction, ou mot d'acheminement dans le statut Vinted) —
+jamais un rapprochement par titre (§24).
+
+### ⚠️ « FINALISÉE » VEUT DIRE ENCAISSÉE — et ce n'est PAS la date de vente
+« En finalisé, c'est simplement la réception d'argent qui compte. »
+
+`my_orders` ne porte **qu'une** date : celle de la vente. Le moment où Vinted
+finalise — donc libère l'argent — n'existe que dans le **détail de transaction**
+(`status_updated_at`). **Mesuré : 7 jours d'écart en médiane, jusqu'à 25.** Dater
+un encaissement au jour de la vente serait donc faux d'une à trois semaines.
+
+- **`dateEncaissement(o)`** = ce `status_updated_at`, **et seulement quand le
+  détail dit lui-même « finalisé »**. ⚠️ Sur un détail capté plus tôt, ce champ
+  date de l'étape d'avant (« Le paiement a été validé ») : mesuré, deux cas
+  donnaient un encaissement le jour même de la vente. Sans ce garde-fou, on
+  fabriquerait une date fausse.
+- Sur le filtre **Finalisées**, la période ET les totaux portent sur cette date ;
+  la carte se renomme **« Argent reçu »**.
+- ⚠️ Une finalisée **sans** date connue n'est **jamais** datée au jour de la
+  vente : elle sort du total, et un avertissement dit combien il y en a. Un total
+  incomplet qui se présente comme complet est pire qu'un total absent.
+- **En cours** et **Annulées** : inchangés (période sur la date de vente).
+- ⚠️ `matchOrd` sert AUSSI aux Achats et aux Colis : la règle est bornée à
+  `curSub === 'ventes'`, sinon un filtre laissé sur « Finalisées » daterait les
+  achats à l'encaissement d'une vente.
+- `fetchTxnItemIds` lit désormais **quatre scalaires** par transaction
+  (`item`, `maj`, `etat`) — jamais le payload (§34). Sa valeur est devenue un
+  **objet** : les 3 sites qui la lisaient ont été mis à jour.
+
+### VENTES PAR JOUR
+Bloc dépliable sur l'écran Ventes : chaque jour de la période, nombre de ventes +
+total, avec une barre de comparaison. **Toujours sur la DATE DE VENTE**, même
+quand le filtre Finalisées fait porter le reste de l'écran sur l'encaissement —
+ce sont deux questions différentes et elles ne doivent pas se mélanger.
+
+### Extension 5.35.0 — `capterEncaissements`
+À chaque visite sur Vinted, va chercher le détail des ventes **finalisées qui
+n'en ont pas** : c'est ce qui remplit la date d'encaissement (couverture mesurée
+au départ : **67 sur 236**). Mêmes garde-fous que partout (§48) : **compte
+connecté uniquement** (`garde`), plafond de 20 actions/h, **3 par visite max**
+(une limite de volume, pas un rythme « humain » déguisé — §32), pas de nouvel
+essai avant 24 h, et uniquement les finalisées sans détail.
+⚠️ Écrit via **`storeHarvest`** (une ligne PAR transaction) et non
+`storeHarvestRow`, qui n'écrit qu'une ligne par type et écraserait chaque détail
+avec le suivant.
+
+### ⚠️ Piège de banc (§21, encore)
+Le banc ne servait **aucune ligne `harvest_*_txn_*`** : il mesurait donc « 0 date
+d'encaissement, 112 sans date » et j'aurais pu conclure que la fonction ne marche
+pas. Fixture `txn.json` ajoutée (4 champs par transaction, comme l'app).
+**Servir TOUTES les familles de lignes avant de conclure.**
+
+### 5.57 (suite) — CHOISIR N'IMPORTE QUEL MOIS, et ⚠️ 205 VENTES MASQUÉES
+
+Julien : « je veux pouvoir sélectionner un mois — juin par exemple — et que
+l'app fasse la somme du 1er au dernier jour de juin ».
+
+Les raccourcis « Ce mois » / « Mois dernier » ne couvraient que les deux
+derniers : pour juin en août, il fallait pointer deux dates dans le calendrier.
+`PeriodePicker` s'ouvre désormais sur les **MOIS** — une année navigable et
+douze boutons, un tap = tout le mois, bornes calculées jamais saisies, mois à
+venir grisés. « Jour à jour » reste à un clic.
+
+### ⚠️ LE VRAI DÉFAUT TROUVÉ EN VÉRIFIANT : 205 ventes masquées, sans un mot
+En testant juin, l'app annonçait **1 vente / 41 €** alors que la base en porte
+**51 pour 1 740 €**. Le banc a prouvé que les 90 ventes du compte arrivent bien
+jusqu'à l'app (log du mock) — la perte était ailleurs.
+
+**Cause : `vinted_sales_hidden` contient 205 ventes masquées, dont 50 des 51 de
+juin.** L'app les excluait à raison (un ✕ sur une carte les masque
+volontairement) — mais elle ne le **disait pas**. Un total qui se présente comme
+complet alors qu'il exclut des lignes est exactement ce qu'on s'interdit.
+➡️ Un avertissement compte désormais les ventes masquées **de la période**, avec
+leur montant, et propose de les réafficher en un clic. Vérifié au rendu :
+« 41 ventes masquées sur juin 2026 · 1 472 € qui ne comptent dans aucun total ».
+
+### ⚠️ Honnêteté sur les mois passés
+La date d'encaissement n'existe que dans le détail d'une transaction, et
+l'extension ne les capte que depuis peu : **mesuré, l'argent reçu daté ne couvre
+que juillet (5 ventes, 215 €) et août (56, 1 791,80 €)**. Pour juin, l'app
+afficherait 0 € — exact et inutilisable. L'avertissement dit donc les **deux**
+chiffres, nommés : « Argent reçu » (encaissements réellement datés) et « X €
+vendus sur juin et finalisés, mais l'encaissement n'est pas encore daté ».
+
+### Extension 5.36.0 — bouton « Récupérer » (onglet Ventes)
+Le passage automatique ramène 3 dates par visite : boucler un mois passé
+prendrait des semaines. Ce bouton en fait un lot de 15, **sur son clic**.
+⚠️ Ce n'est pas une rafale (§32/§43) : ce sont des **lectures** sur ses propres
+transactions, envoyées une par une en attendant chaque réponse, pour le seul
+compte connecté, et le plafond de 20 actions/h coupe le lot de lui-même — il est
+désormais vérifié **avant chaque requête**, plus seulement au début.
+
+
+### 5.57 (suite) — ⚠️ SIMPLIFIÉ : « FINALISÉES » PORTE SUR LA DATE DE VENTE
+
+Julien, après coup : « c'est hyper simple, il s'agit juste d'additionner toutes
+les ventes réalisées d'une date à l'autre dans les ventes finalisées. **On ne te
+parle pas de transfert d'argent**, simplement des ventes finalisées. »
+
+➡️ **La date d'encaissement est RETIRÉE de la période.** Une seule date partout :
+celle de la vente. Le filtre « Finalisées » somme les ventes finalisées dont la
+vente tombe dans la plage. C'est plus simple, **complet dès aujourd'hui** (la
+date de vente est toujours là, l'encaissement ne l'était que pour 67 ventes sur
+236), et ça ne dépend d'aucune capture supplémentaire.
+⚠️ **Ne pas réintroduire la date d'encaissement sans qu'il le redemande.**
+Retirés avec elle : `dateEncaissement`, le mode « Argent reçu », l'avertissement
+« sans date d'encaissement », la capture `capterEncaissements` de l'extension et
+son bouton dans le panneau — des requêtes Vinted pour une donnée que plus rien
+ne lit, c'est de l'empreinte pour rien. `fetchTxnItemIds` revient à deux
+scalaires (l'identité d'annonce, elle, reste essentielle).
+
+### La période descend sous les onglets
+« En haut, quand tu cliques sur finalisé, ça fait un onglet trop gros. » Six
+pastilles de période + la recherche formaient deux blocs pleins avant la
+première vente. La recherche reste en haut (elle sert quel que soit le filtre) ;
+**le sélecteur de période passe SOUS les onglets** — on choisit « Finalisées »,
+puis le mois.
+
+### ⚠️ « Est-ce que tu es sûr qu'il n'y aura jamais d'erreur sur les numéros ? »
+Réponse mesurée, et elle n'est pas « oui » sans réserve.
+
+| relevé du 24 août | |
+|---|---|
+| numéros attribués | **195, du N°1 au N°275** |
+| portés par une annonce EN LIGNE | **23** |
+| paires déjà parties (numéro brûlé à vie) | **172** |
+| jamais attribués (vrais trous) | 80 |
+| **conflits (un numéro sur deux paires présentes)** | **1 — le N°4** |
+
+**Les « sauts » ne sont pas aléatoires** : entre 100 et 160, presque tous les
+numéros SONT attribués — à des paires vendues (N°100 Samba LT, N°101 Spezial
+gris… seuls N°118 et N°134 sont encore en ligne). L'inventaire n'affiche que les
+paires présentes, d'où l'impression de trous.
+**Ce qui est garanti** : un numéro n'est jamais réattribué (§5.40) ; la saisie
+manuelle refuse un numéro porté par une paire présente (§5.42) ; l'attribution
+automatique ne pioche que dans les numéros libres ; le numéro d'un colis vient
+de l'identifiant d'annonce Vinted, jamais d'une ressemblance (§5.34).
+**Ce qui ne l'est pas** : le N°4, hérité d'avant ces garde-fous, est encore porté
+par deux annonces en ligne. Il est signalé en rouge sur l'écran Annonces, dans
+l'inventaire et sur la carte du colis — mais il existe. Tant qu'il n'est pas
+corrigé, la réponse honnête est « une seule erreur possible, et elle est
+nommée », pas « aucune ».
+
+---
+
+## 5.58 — RETIRER LE BRUIT, CORRIGER UN BANDEAU QUI MENTAIT, OUVRIR LA 3D
+
+### « Synchroniser » retiré (Ventes, Achats, Annonces)
+Julien : « tu peux enlever le bouton synchroniser, ça se synchronise avec
+l'extension de toute façon ». C'est vrai — et ce bouton allait chercher les
+données **en direct chez Vinted, tous comptes à la fois** : exactement
+l'empreinte multi-comptes qu'on passe notre temps à réduire (§5). Le retirer
+supprime le seul endroit d'où l'app pouvait déclencher ça.
+⚠️ `loadOrders(..., force)` et `loadListings(force)` existent toujours (le
+`force` sert au vidage de cache) — c'est seulement l'entrée manuelle qui part.
+
+### ⚠️ « 22 JOURS SANS CAPTURE » ÉTAIT FAUX — mesuré
+Le bandeau prenait le compte **le plus ancien parmi TOUS**, masqués compris.
+
+| compte | dernière capture |
+|---|---|
+| 6 comptes actifs | **0,0 à 0,1 j** (le jour même) |
+| 147827838 | 5,5 j |
+| **3175772080 (`liliand653`)** | **22,6 j — MASQUÉ par Julien** |
+| 3170790456 (sans jetons) | 48 j |
+
+Les « 22 jours » venaient donc d'un compte qu'il a **lui-même mis hors
+comptabilité**. Le bandeau ignore désormais `acctOff` et ne parle qu'au-delà
+d'**une semaine** (2 jours, c'était du bruit quotidien).
+
+### Signalements des Annonces : il n'en reste qu'un
+Le compteur générique additionnait des choses sans conséquence (compte muet,
+annonce disparue, compte bloqué) avec **la seule qui coûte de l'argent** : deux
+paires présentes sous le même numéro. Noyée au milieu, elle ne se voyait plus.
+Les autres sont retirées ; celle-ci reste, en rouge, dépliée d'office.
+
+### 3D : 14 objets de décor + une vraie palette
+« Je veux un vrai jeu vidéo, je veux pouvoir tout créer dedans. »
+chaise, bureau, canapé, lit, tapis, plante, lampadaire, miroir, cadre,
+poubelle, escabeau, radiateur, vélo, établi — assemblés avec **les mêmes
+primitives et les mêmes matières** que les meubles, chacun projetant son ombre.
+⚠️ Ils portent `deco: true` : ni case, ni numéro, ni inventaire. `isSurface()`
+les excluait déjà, donc on ne peut rien poser dessus par erreur.
+La palette passe en **deux familles nommées** (Rangement / Décor) : trente
+boutons à plat rendaient le rangement introuvable.
+
+### Refonte visuelle : les FONDATIONS, pas six cents endroits
+Ce qui faisait « tableau de bord de développeur » n'était pas le détail des
+écrans mais les valeurs de base : cartes plates de la même couleur que le fond,
+séparées par un trait d'1 px, un vert unique posé partout.
+- **Tokens** : fond légèrement teinté et carte **plus claire que lui** — c'est
+  ce décalage qui donne le relief, pas le contour ; trois niveaux d'élévation
+  (`shadow`/`shadowMd`/`shadowLg`), jamais de noir pur ; nouveaux `card2` et
+  `ring` ; mode sombre recalculé pour son fond.
+- **Primitives** (tout l'écran en hérite) : `Card` rayon 16 + ombre ;
+  `Notice` avec un voile très pâle de sa couleur (il se teinte sans crier) ;
+  `ScreenHead` titre 22 px serré, icône dans une pastille teintée ;
+  `StatBox` où **le chiffre passe devant** (26 px) et l'étiquette redevient une
+  légende.
+
+**Vérifié** : `npm run build` OK · smoke **11 écrans, 0 vide, 0 erreur** ·
+**9 audits au vert** · captures relues (Ventes, Réglages).
