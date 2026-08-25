@@ -4928,3 +4928,31 @@ sur N°154 → **`Étagère:3_2=154`** en base (la gravité l'a fait tomber en b
 la colonne), l'étiquette du meuble passe à **« Étagère (1) »** et le panneau à
 **« 1 boîte rangée · 14 places libres »** · smoke tous écrans, **0 ECRAN
 VIDE, 0 PAGEERROR**.
+
+### 5.61 (suite) — le garage s'ouvre sur la 3D + le banc ne ment plus
+
+- **`vinted_garage_view` passe par défaut à `plan`.** Julien : « je veux
+  vraiment que la 3D soit une application dans l'application ». Le choix reste
+  **mémorisé par appareil** : qui préfère la grille la retrouve au prochain
+  passage — on change le point de départ, pas son habitude. Les trois onglets
+  passent des emojis (🗄️ 📸 🪑) aux **icônes au trait** (§5.55) et s'appellent
+  **Ma pièce / Grille / Photos**.
+- **La pastille ✎ quitte le logo** : elle n'apparaît qu'au survol (ordinateur).
+  Un produit fini ne porte pas un crayon sur sa marque ; le changement d'icône
+  reste dans Réglages.
+
+⚠️ **TROIS FOIS dans la même session j'ai lu une capture PÉRIMÉE** et failli
+signaler un bug qui n'existait pas — dont un commentaire JSX prétendument
+affiché en clair sur l'écran d'accueil (le bundle n'en contenait aucune trace ;
+la capture datait d'un run précédent). Deux durcissements du banc :
+1. **il efface toutes ses captures au démarrage** — une capture qui survit à un
+   run planté est un piège ;
+2. **détecteur permanent** de `/*` et `*/` dans le texte affiché, pour que la
+   famille §5.55/§5.56 (commentaire JSX rendu comme texte) ne repasse plus.
+⚠️ Et : **ne jamais lancer `npm run build` pendant qu'un banc sert `dist/`** —
+le dossier est vidé, le banc plante, et on croit à une régression.
+
+**État final vérifié** : smoke **11 écrans, 0 ECRAN VIDE, 0 suspect
+d'affichage, 0 erreur non-réseau** · 9 audits au vert · base de production :
+225 paires numérotées, 26 annonces en ligne, **0 doublon de numéro**,
+**0 annonce sans numéro**.
