@@ -7724,7 +7724,10 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           </div>
         );
       })()}
-      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none' }}>◀▶ tourne la vue · glisse le vide pour pivoter{' '}· en mode déplacement, glisse un meuble</span>
+      {/* ⚠️ L'aide passait SOUS les boutons de vue (coin bas droit) : les deux
+          se chevauchaient. Elle est bornée en largeur et tient sur une ligne —
+          une aide illisible ne sert à personne. */}
+      <span style={{ position: 'absolute', left: 8, bottom: 6, maxWidth: 'calc(100% - 190px)', fontSize: 9.5, color: 'rgba(0,0,0,0.45)', fontWeight: 700, pointerEvents: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Glisse pour tourner la vue</span>
     </div>
   );
 }
