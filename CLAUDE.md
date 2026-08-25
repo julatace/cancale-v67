@@ -4662,3 +4662,40 @@ séparées par un trait d'1 px, un vert unique posé partout.
 
 **Vérifié** : `npm run build` OK · smoke **11 écrans, 0 vide, 0 erreur** ·
 **9 audits au vert** · captures relues (Ventes, Réglages).
+
+---
+
+## 5.59 — LA 3D SUR LE FOND : parquet, lumière, et ce qu'on regarde en premier
+
+### Le sol décide de tout
+C'est la plus grande surface de l'image : une texture de bois « bruitée » étirée
+sur six mètres n'a **aucune échelle**, l'œil n'a rien pour mesurer la profondeur.
+`makeParquet` pose de vraies **lames** avec leurs joints, à coupe perdue
+(décalage d'un rang à l'autre), chacune avec sa teinte et son veinage — un joint
+sombre en bas/droite, un liseré clair en haut, c'est ce contraste qui donne le
+relief. **Une tuile = ~1,6 m** : les lames gardent une taille crédible quelle
+que soit la pièce (avant, elles s'étiraient avec elle).
+
+### Les murs : la lumière tombe
+Un mur d'une seule teinte du sol au plafond est le signe le plus sûr d'une image
+de synthèse. `makeWall` pose un dégradé vertical très léger (le haut prend la
+lumière du plafond, le bas s'assombrit) plus une trame fine.
+
+### La pièce d'abord, les réglages ensuite
+La vue 3D était **sous quinze rangées de boutons** : il fallait défiler tout
+l'écran de configuration avant de voir son garage. Elle passe en premier.
+
+### ⚠️ « undefined » sur chaque meuble — et pourquoi le DOM ne le voyait pas
+Vu au **rendu** : chaque étiquette de meuble portait le mot « undefined ». Mon
+scan du DOM ne trouvait rien — normal, **ce sont des sprites WebGL, pas du
+HTML**. C'était mon banc qui servait des meubles sans `name`, mais l'app ne s'en
+protégeait pas (un plan importé ferait pareil) : on retombe désormais sur le
+libellé du TYPE. Le banc sert maintenant des meubles complets.
+➡️ **Un défaut dans un canvas ne se cherche pas dans le DOM. Il faut regarder
+l'image.**
+
+### Le décor ne porte pas d'étiquette
+Huit pastilles sombres flottaient au-dessus de la pièce et masquaient
+précisément ce qu'on vient regarder. Une chaise se reconnaît sans qu'on écrive
+« Chaise » dessus ; un **rangement** garde son nom et son compte — c'est
+l'information utile (où sont les paires).
