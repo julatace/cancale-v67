@@ -15193,7 +15193,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button onClick={()=>setShowHidden(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontWeight:500,fontSize:12,padding:0}}>{showHidden?'cacher':'afficher'}</button>
           </div>
         ) : null; })()}
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
+            Une ligne de vente de 980 px pour une photo, un titre et un
+            prix, c'est le meme defaut que les cartes d'action de Ma
+            journee : on defile deux fois plus pour voir la meme chose.
+            `auto-fit, minmax(430px, 1fr)` donne DEUX colonnes sur grand
+            ecran et UNE sur telephone — la meme regle, sans test de
+            largeur dans le JavaScript, donc rien a maintenir en double.
+            Les lignes portent deja `flexWrap` et une largeur plancher
+            (§26), elles supportent la colonne plus etroite. */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(430px, 1fr))',gap:8,alignItems:'start'}}>
           {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; if(vFilter==='sanscout')return isSaleNoBuy(o); return true; }).filter(o=>matchOrd(o)).sort(parDateDesc).map(o=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
@@ -15935,7 +15944,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <EmptyState icon="🛍️" title="Aucun achat pour l'instant"
             desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/>
         )}
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
+            Une ligne de vente de 980 px pour une photo, un titre et un
+            prix, c'est le meme defaut que les cartes d'action de Ma
+            journee : on defile deux fois plus pour voir la meme chose.
+            `auto-fit, minmax(430px, 1fr)` donne DEUX colonnes sur grand
+            ecran et UNE sur telephone — la meme regle, sans test de
+            largeur dans le JavaScript, donc rien a maintenir en double.
+            Les lignes portent deja `flexWrap` et une largeur plancher
+            (§26), elles supportent la colonne plus etroite. */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(430px, 1fr))',gap:8,alignItems:'start'}}>
           {buysBase.filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
             .sort(parDateDesc)
             .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
@@ -20791,11 +20809,14 @@ export default function App() {
       {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
           Une carte de 1170 px pour trois mots, c'est le tell n°1 d'une app
           mobile étirée : l'œil ne relie plus le début de la ligne à sa fin.
-          On plafonne à 980 px, collé à gauche sous la barre latérale — la
-          respiration passe à droite, pas dans la carte. Sur téléphone,
+          On plafonne à 1180 px, collé à gauche sous la barre latérale — la
+          respiration passe à droite, pas dans la carte. ⚠️ 980 px laissait
+          230 px de vide sur un écran de 1512 : ni rempli ni centré, ça se
+          voyait comme un décalage. 1180 occupe l'espace disponible sans que la
+          ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
           `ordi` est faux et RIEN ne change. */}
       <main style={{
-        maxWidth: ordi ? 980 : 1200,
+        maxWidth: ordi ? 1180 : 1200,
         margin: ordi ? '0' : '0 auto',
         marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
         paddingRight: ordi ? 28 : undefined,
