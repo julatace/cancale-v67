@@ -4699,3 +4699,103 @@ Huit pastilles sombres flottaient au-dessus de la pièce et masquaient
 précisément ce qu'on vient regarder. Une chaise se reconnaît sans qu'on écrive
 « Chaise » dessus ; un **rangement** garde son nom et son compte — c'est
 l'information utile (où sont les paires).
+
+---
+
+## 5.60 — LE GARAGE SERT À RANGER, PAS À MEUBLER (3D cadrée + écran remis dans l'ordre)
+
+Julien : « améliore la 3D, c'est pas ouf comme ça ; **mets-toi à la place d'un
+revendeur pour son rangement**, vraiment ça doit être mieux, plus facile à
+prendre en main ». Méthode : **regarder la capture** avant de toucher au code
+(§5.56 — un défaut dans un canvas ne se cherche pas dans le DOM).
+
+### 1. ⚠️ LA CAMÉRA ÉTAIT DANS LA PIÈCE, PAS DEVANT
+La position de départ était **fixe** : `x = w*0.1, y = max(2.2, max(w,h)*0.5),
+z = h*1.05`. Sur une pièce de 7×6 ça met la caméra à **~7 m du centre**, donc à
+l'intérieur : sur la capture, l'étagère était **coupée en haut** et à moitié
+cachée par le canapé. On ne voyait pas son rangement — c'est très exactement le
+« pas ouf ».
+
+➡️ `cadrerPiece()` calcule la **distance qui fait entrer les 8 COINS** de la
+pièce dans le champ, en tenant compte du **format du canvas** (sur un écran
+étroit c'est la largeur qui contraint, pas la hauteur). `maxDistance` est relevé
+en conséquence — sinon OrbitControls ramenait la caméra plus près à la première
+mise à jour et **annulait le calcul en silence**.
+
+⚠️ **Ma première version cadrait la SPHÈRE englobante** (demi-diagonale de la
+pièce) : la caméra partait beaucoup trop loin et la pièce **flottait au milieu
+d'un grand vide gris**. La diagonale d'une boîte est bien plus grande que ce
+qu'on voit réellement d'un point de vue donné. Vu en capture, corrigé en
+projetant les coins — exact, et ça s'adapte tout seul à la forme de la pièce.
+
+### 2. Chercher un N° amène DE FACE, plus en trois-quarts
+Ce qu'on veut voir quand on cherche une paire, c'est la **grille de cases** du
+meuble : de biais, les rangées se chevauchent et on ne compte plus rien.
+`flyTo` vise désormais le meuble **de face**, depuis le côté dégagé —
+direction « meuble → centre de la pièce » : un rangement est contre un mur, il
+s'ouvre vers l'intérieur. ⚠️ **Aucune convention de rotation à deviner** (elle
+diffère d'un type de meuble à l'autre). Un meuble au centre (< 0,35 m) retombe
+sur une direction par défaut.
+Bouton **« 👁 De face »** dans la vue, visible dès qu'un meuble est sélectionné.
+
+### 3. L'écran s'ouvre sur la PIÈCE + la RECHERCHE
+Tout l'outillage de **construction** (palette de meubles, dimensions, plafond,
+couleur des murs, mode déplacement) part derrière un dépliant **« Aménager la
+pièce »**. Un revendeur ouvre son garage pour **retrouver une paire ou en ranger
+une**, pas pour ajouter un canapé. Le sélecteur de pièces reste visible : c'est
+de la navigation, pas de la construction.
+
+### 4. Trois défauts d'affichage relevés en capture
+- **Les 5 ambiances** étaient une rangée de pastilles qui **défilait en travers
+  du haut de la vue** — la dernière coupée, et elles couvraient précisément
+  l'étagère qu'on vient regarder. Un seul bouton « Ambiance » les déplie.
+- **Les 6 boutons de vue** étaient collés dans le même coin, en trois groupes qui
+  se chevauchaient. Deux grappes séparées : **cadrage à gauche, navigation à
+  droite**.
+- **Le vide autour de la pièce** était un **aplat gris uni** — la chose qui fait
+  le plus « rendu 3D pas fini ». Dégradé vertical léger (même recette que les
+  murs, §5.59), **régénéré à chaque changement d'ambiance** (`fondDegrade`).
+
+### 5. ⚠️ « Version : … · 🔄 Forcer la mise à jour » trônait au milieu du Garage
+De l'outillage de développeur posé dans un écran de travail, **juste au-dessus
+de la 3D**. §5.54 avait sorti la version de l'en-tête ; ce bloc-là était resté.
+Il **ne disparaît pas** (c'est le seul bouton de forçage de l'app) : il rejoint
+la version dans **Réglages**, là où on le cherche.
+
+### ⚠️ CE QUE J'AI CASSÉ EN CHEMIN (et comment ça a été rattrapé)
+Ma première tentative de réorganisation découpait des **plages de lignes** et les
+réinsérait ailleurs. Elle a attrapé le bloc « Recherche » du **mauvais
+composant** (celui du garage-photo, qui lit `photos`/`cur`/`pins`) et produit un
+JSX déséquilibré — `npm run build` refusait de compiler.
+➡️ Réparé en **isolant les seuls morceaux voulus** dans le diff (`git apply` de
+la palette seule sur un fichier propre) puis en refaisant le déplacement avec
+des **assertions sur la première et la dernière ligne de chaque bloc**.
+**Une découpe par numéros de ligne se vérifie sur ce qui RESTE** (§5.56) — et
+chaque bloc extrait doit être reconnu par son contenu, jamais par sa position.
+
+### Palette : identité assumée
+Ma tentative précédente déplaçait les couleurs de ~2 % : Julien a dit deux fois
+« rien n'a changé », et **il avait raison**. Nouvelle base : accent vert franc
+(`#00875a` / `#2ee08f`) réservé aux actions et aux chiffres qui comptent,
+surfaces **nettement étagées** en sombre (`#0a0e11` → `#151b20` → `#1d252b`), gris
+légèrement froid (le vert-olive rendait terne).
+
+### Vérifié
+`npm run build` OK · **9 audits au vert** (secrets, identité, cohérence 0
+désaccord sur 12 statuts, qr, offres, transporteurs, formes d'email, bordereau,
+diagnostic) · smoke **11 écrans, 0 ECRAN VIDE, 0 PAGEERROR, 0 texte
+« undefined »** (les lignes console restantes sont le 400 volontaire de
+`select=owner` et les resets de fin de test) · **captures relues** : la pièce
+entière tient dans le cadre, les boutons ne se chevauchent plus, le fond est
+dégradé · banc dédié **« De face »** : un tap dans le canvas sélectionne le
+meuble, le bouton apparaît, le clic **change réellement la vue** (images
+comparées à l'octet) et l'étagère se présente **de face, ses rayons lisibles**.
+
+### ⚠️ Reste ouvert (pas fait, dit franchement)
+- L'onglet **par défaut du Garage reste « Grille »** (25 cases grises vides). La
+  3D est derrière « Plan ». Changer le défaut est un changement de comportement :
+  **à trancher avec Julien**, pas à décider seul.
+- Le cadre reste un peu haut par rapport à une pièce large (bandes vides en haut
+  et en bas sur un écran de téléphone). Sur ordinateur — la cible qu'il a fixée
+  pour l'app comme pour l'extension (§42) — le canvas est large et la pièce
+  remplit le cadre.
