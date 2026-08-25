@@ -8224,6 +8224,13 @@ function RoomPlan({ locate, onLocateConsumed }) {
         <span>Version : <b>{typeof __BUILD__ !== 'undefined' ? __BUILD__ : '—'}</b></span>
         <button onClick={() => { if (window.__vrmForceUpdate) window.__vrmForceUpdate(); else window.location.reload(); }} title="Vide le cache et recharge la dernière version" style={{ border: `1px solid ${C.accent}`, borderRadius: 999, background: `${C.accent}14`, color: C.text, fontSize: 10.5, fontWeight: 800, padding: '4px 10px', cursor: 'pointer' }}>🔄 Forcer la mise à jour</button>
       </div>
+      {/* ⚠️ LA PIÈCE D'ABORD, LES RÉGLAGES ENSUITE.
+          La vue 3D était sous quinze rangées de boutons : il fallait défiler
+          tout l'écran de configuration avant de voir son garage. On regarde la
+          pièce, on la modifie ensuite — pas l'inverse. */}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+        fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
+
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>🏠 Pièces :</span>
@@ -8324,8 +8331,6 @@ function RoomPlan({ locate, onLocateConsumed }) {
         </div>
       )}
       {/* 👣 LA pièce en 3D — glisser tourne la vue ; en mode déplacement, glisser un meuble le bouge */}
-      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
-        fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
       {/* Barre du meuble sélectionné */}
       {selItem && (
