@@ -25,18 +25,26 @@
   <!-- Police chargée SANS bloquer l'affichage : la page s'affiche tout de suite
        avec la police système, puis bascule sur Inter une fois prête (display=swap).
        Le média « print » rend le lien non-bloquant, l'onload le réactive. -->
+  <!-- ⚠️ DEUX POLICES, ET C'EST VOULU. Julien : « on dirait fait par une IA ».
+       Le tell n°1 d'une interface générée, c'est UNE SEULE police neutre
+       (Inter) à toutes les tailles : rien ne distingue un titre d'un
+       paragraphe autre que la taille. Un vrai produit oppose une police
+       d'AFFICHAGE (titres, montants) à une police de TEXTE (le reste).
+       Bricolage Grotesque a du caractère (terminaisons coupées, chiffres
+       larges) sans être fantaisiste — et elle est superbe en gros chiffre,
+       ce que cette app affiche partout. -->
   <link rel="stylesheet" media="print" onload="this.media='all'"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&display=swap" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&display=swap" /></noscript>
   <title>VRM</title>
   <style>
-    body{margin:0;padding:0;background:#eef2ef;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+    body{margin:0;padding:0;background:#f1f4f2;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,
        mais c'est ce qui fait la différence entre « feuille de papier » et
        « écran d'application ». */
-    body{background-image:linear-gradient(180deg,#f4f7f5 0%,#eef2ef 420px);background-repeat:no-repeat;background-attachment:fixed;}
-    @media (prefers-color-scheme: dark){ body{background:#0b0f0d;background-image:linear-gradient(180deg,#111815 0%,#0b0f0d 420px);} }
+    body{background-image:linear-gradient(180deg,#f7faf8 0%,#f1f4f2 460px);background-repeat:no-repeat;background-attachment:fixed;}
+    @media (prefers-color-scheme: dark){ body{background:#0a0e11;background-image:linear-gradient(180deg,#121a1f 0%,#0a0e11 460px);} }
     *{-webkit-tap-highlight-color:transparent;}
     @keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}
 
@@ -52,8 +60,30 @@
     button,a[role="button"]{transition:transform .12s cubic-bezier(.32,.72,0,1),box-shadow .2s ease,background-color .2s ease,border-color .2s ease,opacity .2s ease;}
     button:active:not(:disabled),a[role="button"]:active{transform:scale(.975);}
 
-    /* 3) TITRES : un poil resserrés, ça pose la hiérarchie. */
-    h1,h2,h3{letter-spacing:-.02em;}
+    /* 3) TITRES ET MONTANTS : police d'AFFICHAGE, resserrée.
+          Le contraste tenu entre un affichage serré (-0.03em) et des
+          micro-étiquettes aérées en capitales (+0.09em) est ce qui fait lire
+          « composé par quelqu'un » plutôt que « sorti d'un générateur ». */
+    h1,h2,h3,.vrm-display{
+      font-family:'Bricolage Grotesque','Inter','SF Pro Display',system-ui,sans-serif;
+      letter-spacing:-.03em;
+      font-optical-sizing:auto;
+    }
+    .vrm-label{
+      text-transform:uppercase;letter-spacing:.09em;font-weight:600;
+      font-size:10.5px;font-family:'Inter',system-ui,sans-serif;
+    }
+
+    /* 3 bis) LE GRAIN. Un aplat de couleur parfaitement lisse est le second
+       tell d'une interface générée : aucune surface réelle n'est lisse. Une
+       trame de bruit à 2,5 % posée sur toute la page (jamais cliquable) casse
+       le rendu « CSS pur » sans que personne ne sache dire pourquoi. */
+    body::after{
+      content:'';position:fixed;inset:0;z-index:2147483000;pointer-events:none;
+      opacity:.028;mix-blend-mode:overlay;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    @media print{ body::after{display:none;} }
 
     /* 4) DÉFILEMENT : élastique sur iOS + barres discrètes sur desktop. */
     html{-webkit-text-size-adjust:100%;}

@@ -651,6 +651,68 @@ function SheetShell({ onClose, children }) {
   );
 }
 
+// ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
+// Julien : « tu peux sélectionner lesquels tu ranges ici, la taille… vraiment
+// tu peux tout faire avec l'application ». Avant, ranger une paire demandait de
+// TAPER son numéro de mémoire : rien ne vérifiait qu'elle existe, ni qu'elle
+// n'est pas déjà rangée ailleurs. On choisit désormais dans la liste de ses
+// paires réellement présentes — photo, N°, titre, pointure.
+// ⚠️ La saisie libre reste possible (une paire hors app, un carton de matériel),
+// mais elle n'est plus le chemin par défaut.
+function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
+  const [q, setQ] = React.useState('');
+  const f = q.trim().toLowerCase();
+  const liste = !f ? paires : paires.filter(p =>
+    String(p.numero).includes(f) || (p.title || '').toLowerCase().includes(f) || String(p.taille || '').toLowerCase().includes(f));
+  return (
+    <SheetShell onClose={onClose}>
+      <div className="vrm-display" style={{fontSize:19,fontWeight:700,color:C.text,marginBottom:2}}>Ranger une paire</div>
+      <div style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.45}}>
+        {cellNom ? <>Case <b style={{color:C.text}}>{cellNom}</b> · </> : null}
+        {paires.length} paire{paires.length>1?'s':''} pas encore rangée{paires.length>1?'s':''}
+        {/* ⚠️ On ne fait pas semblant de savoir : quand l'écran Annonces n'a
+            pas encore publié la liste des paires présentes, cette liste
+            contient tout l'historique. On l'écrit, et on met les plus
+            récentes en tête plutôt que de trier par numéro. */}
+        {paires.length > 0 && !paires[0].sur && (
+          <><br/><span style={{color:C.warn}}>Les plus récentes en tête — ouvre une fois l'écran Annonces pour n'avoir que tes paires en stock.</span></>
+        )}
+      </div>
+      {paires.length > 6 && (
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="N°, marque, pointure…" inputMode="search"
+          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:14,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',marginBottom:10}}/>
+      )}
+      {liste.length === 0 && (
+        <div style={{fontSize:12.5,color:C.muted,padding:'14px 2px',lineHeight:1.5}}>
+          {paires.length === 0
+            ? "Aucune paire en attente de rangement : tout ce que tu as en stock est déjà posé dans une case."
+            : "Rien ne correspond à cette recherche."}
+        </div>
+      )}
+      <div style={{display:'flex',flexDirection:'column',gap:7,maxHeight:'46vh',overflowY:'auto'}}>
+        {liste.slice(0, 200).map(p => (
+          <button key={p.numero} onClick={()=>onPick(p)}
+            style={{display:'flex',alignItems:'center',gap:11,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:14,background:C.card,padding:'9px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow}}>
+            {p.photo
+              ? <img src={p.photo} alt="" style={{width:44,height:44,borderRadius:10,objectFit:'cover',flexShrink:0,background:C.card2}}/>
+              : <span style={{width:44,height:44,borderRadius:10,background:C.card2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,flexShrink:0}}>👟</span>}
+            <span style={{flex:'1 1 120px',minWidth:0}}>
+              <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accent}}>N°{p.numero}</span>
+              <span style={{display:'block',fontSize:12,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || '—'}</span>
+              {p.taille ? <span className="vrm-label" style={{color:C.muted}}>Pointure {p.taille}</span> : null}
+            </span>
+            <span style={{flexShrink:0,color:C.muted}}><Icon name="home" size={17}/></span>
+          </button>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:12}}>
+        <button onClick={onLibre} style={{flex:1,padding:'10px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Autre numéro…</button>
+        <button onClick={onClose} style={{flex:1,padding:'10px 12px',borderRadius:12,border:'none',background:C.card2,color:C.muted,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+      </div>
+    </SheetShell>
+  );
+}
+
 // Feuille de SAISIE (remplace window.prompt).
 function AskTextSheet({ q, close }) {
   const [v, setV] = React.useState(q.value == null ? '' : String(q.value));
@@ -3165,7 +3227,7 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
       {icon && <span aria-hidden="true" style={{flexShrink:0,color:col,marginTop:1}}><Icon name={icon} size={18}/></span>}
       <div style={{flex:'1 1 190px',minWidth:0}}>
         <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
-          {value != null && <span style={{fontSize:17,fontWeight:700,color:col,letterSpacing:-0.3,whiteSpace:'nowrap'}}>{value}</span>}
+          {value != null && <span className="vrm-display" style={{fontSize:19,fontWeight:700,color:col,whiteSpace:'nowrap'}}>{value}</span>}
           <span style={{fontSize:13,fontWeight:600,color:C.text,minWidth:0}}>{title}</span>
         </div>
         {desc && <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>{desc}</div>}
@@ -3203,8 +3265,12 @@ function StatBox({label,value,color=C.text,sub=null}) {
   const fs = !L ? 26 : L <= 5 ? 26 : L <= 7 ? 21 : L <= 9 ? 16 : L <= 11 ? 13 : 11.5;
   return (
     <Card style={{flex:1,minWidth:110,padding:'14px 15px'}}>
-      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>{label}</div>
-      <div style={{fontSize:fs,fontWeight:700,color,lineHeight:1.1,letterSpacing:-0.8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
+      {/* ⚠️ Les étiquettes en capitales sont PLUS LONGUES : « COÛT D'ACHAT » et
+          « BÉNÉFICE NET » passaient sur deux lignes et les trois cases d'une
+          rangée ne s'alignaient plus (vu en capture). On réserve deux lignes
+          pour tout le monde : les chiffres restent sur la même ligne d'œil. */}
+      <div className="vrm-label" style={{color:C.muted,marginBottom:6,lineHeight:1.22,minHeight:'2.44em',display:'flex',alignItems:'flex-start'}}>{label}</div>
+      <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
       {sub&&<div style={{fontSize:11.5,color:C.muted,marginTop:5,lineHeight:1.35}}>{sub}</div>}
     </Card>
   );
@@ -3932,7 +3998,7 @@ function ScreenHead({ icon, title, desc, right }) {
               <Icon name={icon} size={18}/>
             </span>
           ) : <span style={{fontSize:19}}>{icon}</span>}
-          <h2 style={{margin:0,fontSize:22,fontWeight:700,color:C.text,letterSpacing:-0.7,lineHeight:1.15}}>{title}</h2>
+          <h2 className="vrm-display" style={{margin:0,fontSize:23,fontWeight:700,color:C.text,lineHeight:1.12}}>{title}</h2>
         </div>
         {desc && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{desc}</div>}
       </div>
@@ -4870,7 +4936,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         <span style={{fontSize:17,opacity:0.9}}>{icon}</span>
         <span style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.4,fontWeight:500}}>{label}</span>
       </div>
-      <div style={{fontSize:26,fontWeight:700,color,lineHeight:1.05,letterSpacing:-0.8}}>{value}</div>
+      <div className="vrm-display" style={{fontSize:28,fontWeight:700,color,lineHeight:1.02}}>{value}</div>
       {sub&&<div style={{fontSize:11,color:C.muted,marginTop:5,lineHeight:1.35}}>{sub}</div>}
     </div>
   );
@@ -4914,7 +4980,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:3}}>Aujourd'hui</div>
           {liveStats.ventesJour>0 ? (
             <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-              <span style={{fontSize:26,fontWeight:700,color:C.accent,letterSpacing:-0.5}}>{liveStats.ventesJour}</span>
+              <span className="vrm-display" style={{fontSize:28,fontWeight:700,color:C.accent}}>{liveStats.ventesJour}</span>
               <span style={{fontSize:15,fontWeight:600,color:C.text}}>vente{liveStats.ventesJour>1?'s':''}</span>
               <span style={{fontSize:15,fontWeight:600,color:C.muted}}>· {liveStats.caJour.toFixed(0)} €</span>
             </div>
@@ -4994,11 +5060,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Somme à payer ce mois</div>
-            <div style={{fontSize:26,fontWeight:600,color:C.warn,letterSpacing:-0.5}}>{fmt(urssafEstime)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.warn}}>{fmt(urssafEstime)}</div>
           </div>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net estimé après paiement</div>
-            <div style={{fontSize:26,fontWeight:600,color:C.accent,letterSpacing:-0.5}}>{fmt(netApresUrssaf)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.accent}}>{fmt(netApresUrssaf)}</div>
           </div>
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
@@ -6909,7 +6975,7 @@ const GARAGE_AMBIANCES = [
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
-function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, fallback }) {
+function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
@@ -7722,7 +7788,50 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           step();
         } catch (_) {}
       };
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo };
+      // ── LA BOÎTE TOMBE DANS SA CASE ────────────────────────────────────
+      // Julien : « ça doit être comme un jeu vidéo, on voit les animations ».
+      // Ranger une paire ne doit pas se contenter d'un chiffre qui apparaît :
+      // le carton ARRIVE. On anime la case fraîchement remplie — chute depuis
+      // le haut, léger rebond à l'atterrissage, puis un halo qui s'éteint.
+      // ⚠️ Appelé APRÈS la reconstruction du meuble (l'effet sur `items`) :
+      // la boîte n'existe qu'à ce moment-là. Pure animation → un échec ne
+      // casse rien, le rangement est déjà enregistré.
+      let depotRAF = 0;
+      const animerDepot = (itemId, cellKey) => {
+        try {
+          const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
+          if (!g) return;
+          let cible = null;
+          g.traverse(o => { if (!cible && o.userData && o.userData.cell === cellKey && o.isMesh) cible = o; });
+          if (!cible) return;
+          const yFin = cible.position.y;
+          const haut = yFin + 1.15;
+          const halo = new THREE.Mesh(
+            new THREE.RingGeometry(0.16, 0.30, 24),
+            new THREE.MeshBasicMaterial({ color: 0x2ee08f, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false })
+          );
+          halo.rotation.x = -Math.PI / 2;
+          halo.position.set(cible.position.x, yFin - 0.02, cible.position.z);
+          halo.renderOrder = 999; g.add(halo);
+          const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now()), dur = 620;
+          // chute accélérée puis rebond amorti — un objet qui se pose, pas qui glisse
+          const chute = t => { if (t < 0.72) { const k = t / 0.72; return k * k; }
+                               const k = (t - 0.72) / 0.28; return 1 - Math.sin(k * Math.PI) * 0.14 * (1 - k); };
+          if (depotRAF) cancelAnimationFrame(depotRAF);
+          const pas = () => {
+            const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            const k = Math.min(1, (now - t0) / dur);
+            cible.position.y = haut + (yFin - haut) * chute(k);
+            const e = 1 - k;
+            halo.scale.setScalar(1 + k * 2.4);
+            halo.material.opacity = 0.9 * e * e;
+            if (k < 1) depotRAF = requestAnimationFrame(pas);
+            else { depotRAF = 0; cible.position.y = yFin; try { g.remove(halo); halo.geometry.dispose(); halo.material.dispose(); } catch (_) {} }
+          };
+          pas();
+        } catch (_) {}
+      };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot };
       setLoading(false);
       cleanup = () => {
         cancelAnimationFrame(raf);
@@ -7739,6 +7848,13 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
   // Reconstruit les meubles quand les données changent (couleur, taille, hauteur,
   // ajout/suppression, N° rangés…) — SANS bouger la caméra (rebuild du groupe seul).
   useEffect(() => { dataRef.current.items = items; if (st.current.buildFurniture) { try { st.current.buildFurniture(); } catch (_) {} } }, [items]);
+  // ⚠️ APRÈS l'effet ci-dessus, jamais avant : la boîte à animer n'existe qu'une
+  // fois le meuble reconstruit. React exécute les effets dans l'ordre de
+  // déclaration — c'est ce qui garantit l'enchaînement.
+  useEffect(() => {
+    if (!depot || !depot.at || loading) return;
+    try { st.current.animerDepot && st.current.animerDepot(depot.itemId, depot.cellKey); } catch (_) {}
+  }, [depot && depot.at, loading]);
   // Surlignage : rouge = N° cherché, bleu = meuble sélectionné (édition).
   const flownRef = useRef(null);
   useEffect(() => {
@@ -8086,11 +8202,25 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const fillCell = async (itemId, cellKey) => {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne, on ne remplit pas
     const it = items.find(x => x.id === itemId); if (!it) return;
+    const cur = ((it.slots || {})[cellKey] || [])[0] || '';
+    // ⚠️ CASE VIDE → on CHOISIT une paire, on ne tape plus un numéro de mémoire.
+    // Taper un numéro n'était vérifié par rien : une paire inexistante, ou déjà
+    // rangée ailleurs, passait sans un mot. La feuille ne propose que des paires
+    // réellement chez lui et pas encore posées.
+    if (!cur && aRanger.length) { setRanger({ itemId, cellKey }); return; }
+    poserDansCase(itemId, cellKey, await askText({ numeric: true, desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur }));
+  };
+
+  // Écrit le numéro dans la case (gravité + croissance de la grille) puis lance
+  // l'animation de chute. Un seul chemin d'écriture, quel que soit le point
+  // d'entrée : la feuille de choix, la saisie libre, ou l'effacement.
+  const poserDansCase = (itemId, cellKey, saisie) => {
+    const it = items.find(x => x.id === itemId); if (!it) return;
     const nr = Math.max(1, it.rows || 3), nc = Math.max(1, it.cols || 4);
     const c0 = Number(String(cellKey).split('_')[1]);
     const slots = { ...(it.slots || {}) };
     const cur = (slots[cellKey] || [])[0] || '';
-    const n = await askText({ numeric: true, desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur });
+    const n = saisie;
     if (n == null) return; // annulé
     const v = String(n).trim();
     if (cur) { // boîte existante → on modifie / efface EN PLACE
@@ -8111,6 +8241,11 @@ function RoomPlan({ locate, onLocateConsumed }) {
       if (full && nr < maxRows) grow = { rows: nr + 1 };
     }
     updateItem(itemId, { slots: compacted, ...grow });
+    // La boîte ARRIVE (chute + halo) au lieu d'apparaître d'un coup.
+    if (v && !cur) {
+      const pose = Object.keys(compacted).find(k => (compacted[k] || [])[0] === v) || cellKey;
+      setDepot({ itemId, cellKey: pose, at: Date.now() });
+    }
   };
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
@@ -8285,6 +8420,49 @@ function RoomPlan({ locate, onLocateConsumed }) {
   const opened = items.find(it => it.id === openItem);
   const storedCount = (it) => Object.values(it.slots || {}).reduce((s, a) => s + (a ? a.length : 0), 0);
 
+  // ── LES PAIRES QU'ON PEUT RANGER ────────────────────────────────────────
+  // Source : `vinted_annonce_numeros` (photo + titre par numéro) restreint aux
+  // numéros PHYSIQUEMENT présents — la liste `vinted_nums_physiques` publiée
+  // par l'écran Annonces (§5.14), qui est LA définition de « cette paire est
+  // chez toi » (en ligne, ou vendue pas encore expédiée).
+  // ⚠️ On ne recalcule pas cette règle ici : une seule règle par notion (§11).
+  //    Sans la liste (écran Annonces jamais ouvert sur cet appareil), on
+  //    propose tout plutôt que rien — on ne cache jamais une paire à tort.
+  const dejaRangees = useMemo(() => {
+    const set = new Set();
+    (plan.rooms || []).forEach(r => (r.items || []).forEach(it => {
+      Object.values(it.slots || {}).forEach(a => (a || []).forEach(v => { const t = String(v || '').trim(); if (t) set.add(t); }));
+      if (Array.isArray(it.nums)) it.nums.forEach(v => { const t = String(v || '').trim(); if (t) set.add(t); });
+      if (it.num != null) { const t = String(it.num).trim(); if (t) set.add(t); }
+    }));
+    return set;
+  }, [plan]);
+
+  const aRanger = useMemo(() => {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const phys = load('vinted_nums_physiques', null);
+    const presents = Array.isArray(phys) && phys.length ? new Set(phys.map(String)) : null;
+    const vues = new Set(), out = [];
+    Object.values(fiches).forEach(f => {
+      const n = f && f.numero != null ? String(f.numero).trim() : '';
+      if (!n || vues.has(n) || dejaRangees.has(n)) return;
+      if (presents && !presents.has(n)) return;
+      vues.add(n);
+      out.push({ numero: n, title: f.title || '', photo: f.photo || null, taille: extractSize(f.title || ''), at: f.numberedAt || 0, sur: !!presents });
+    });
+    // ⚠️ L'ORDRE CHANGE SELON CE QU'ON SAIT, et on le dit dans la feuille.
+    // Avec la liste des paires présentes : par numéro, c'est un inventaire.
+    // SANS elle (écran Annonces jamais ouvert sur cet appareil), la liste
+    // contient tout l'historique — des paires parties depuis des mois. On
+    // remonte alors les plus RÉCEMMENT numérotées : ce sont celles en stock.
+    return presents
+      ? out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0))
+      : out.sort((a, b) => (b.at || 0) - (a.at || 0));
+  }, [dejaRangees]);
+
+  const [ranger, setRanger] = useState(null);   // { itemId, cellKey } — feuille ouverte
+  const [depot, setDepot] = useState(null);     // { itemId, cellKey, at } — animation 3D
+
   // Ajoute/retire un N° dans une case (empilable).
   const cellAdd = async (it, cell) => { const n = (await askText({ numeric: true, desc: 'Numéro à ranger dans cette case (empilable) :', value: '' }) || '').trim(); if (!n) return; const cur = (it.slots && it.slots[cell]) || []; updateItem(it.id, { slots: { ...(it.slots || {}), [cell]: [...cur, n] } }); };
   const cellRemove = (it, cell, n) => { const cur = ((it.slots && it.slots[cell]) || []).filter(x => x !== n); const slots = { ...(it.slots || {}) }; if (cur.length) slots[cell] = cur; else delete slots[cell]; updateItem(it.id, { slots }); };
@@ -8317,9 +8495,18 @@ function RoomPlan({ locate, onLocateConsumed }) {
           La vue 3D était sous quinze rangées de boutons : il fallait défiler
           tout l'écran de configuration avant de voir son garage. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
-      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount}
+      <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
 
+      {ranger && (
+        <RangerSheet
+          paires={aRanger}
+          cellNom={(() => { const p = String(ranger.cellKey).split('_'); const it = items.find(x => x.id === ranger.itemId); const nr = it ? Math.max(1, it.rows || 1) : 1; return `colonne ${(+p[1]) + 1} · ${nr - (+p[0])}ᵉ depuis le bas`; })()}
+          onPick={(p) => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, p.numero); }}
+          onLibre={async () => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, await askText({ numeric: true, desc: 'Numéro à ranger dans cette case :', value: '' })); }}
+          onClose={() => setRanger(null)}
+        />
+      )}
       {/* Recherche */}
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
@@ -18721,13 +18908,43 @@ const VAPID_PUBLIC_KEY='BLw4VOxC3CXI_yY521zsKXiVbjbQ_YsQtNWqHBDBWsPBD6y4AdCrA_rB
 function PushSetting() {
   const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
   const [msg, setMsg] = useState(null);
+  const [srv, setSrv] = useState(null);   // ce que le SERVEUR dit de lui-même
   const b64ToU8 = (s) => { const p='='.repeat((4-s.length%4)%4); const b=(s+p).replace(/-/g,'+').replace(/_/g,'/'); const r=atob(b); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); };
+
+  // ⚠️ LE PIÈGE QUI A COUPÉ SES NOTIFICATIONS (et qui vient de MOI).
+  // En sortant la clé privée VAPID du dépôt public (§5.53), la paire a été
+  // RÉGÉNÉRÉE — donc la clé PUBLIQUE a changé elle aussi. Or un abonnement push
+  // est scellé à la clé publique avec laquelle il a été créé : les abonnements
+  // déjà posés sur ses appareils sont devenus inutilisables, le service de push
+  // refuse l'envoi, et `getSubscription()` les rend quand même. L'écran
+  // affichait donc « activé » pendant que plus rien n'arrivait.
+  // ➡️ On COMPARE la clé de l'abonnement à la clé courante et on ré-abonne.
+  const memeCle = (sub) => {
+    try {
+      const a = new Uint8Array(sub.options.applicationServerKey);
+      const b = b64ToU8(VAPID_PUBLIC_KEY);
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+      return true;
+    } catch (_) { return true; }  // clé illisible : on ne casse rien
+  };
 
   useEffect(() => { (async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') { setState('unsupported'); return; }
     try {
       const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
+      let sub = await reg.pushManager.getSubscription();
+      if (sub && !memeCle(sub)) {
+        // Abonnement périmé : on le remplace tout seul, sans rien demander.
+        try {
+          await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unsubscribe', endpoint: sub.endpoint }) }).catch(()=>{});
+          await sub.unsubscribe();
+          sub = Notification.permission === 'granted'
+            ? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC_KEY) })
+            : null;
+          if (sub) setMsg('Abonnement renouvelé sur cet appareil (la clé du serveur avait changé).');
+        } catch (_) { sub = null; }
+      }
       const on = sub && Notification.permission === 'granted';
       setState(on ? 'on' : 'off');
       // Auto-réparation : si l'appareil se croit abonné, on renvoie son
@@ -18737,6 +18954,15 @@ function PushSetting() {
         fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: sub.toJSON() }) }).catch(()=>{});
       }
     } catch (_) { setState('off'); }
+  })(); }, []);
+
+  // Le serveur peut-il seulement envoyer ? (clé privée présente ou non)
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch('/api/push?etat=1');
+      const j = await r.json().catch(() => ({}));
+      if (j && typeof j.pret === 'boolean') setSrv(j);
+    } catch (_) {}
   })(); }, []);
 
   const enable = async () => {
@@ -18770,7 +18996,15 @@ function PushSetting() {
     try {
       const r = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test' }) });
       const j = await r.json().catch(()=>({}));
-      setMsg(j.sent > 0 ? `✅ Test envoyé à ${j.sent} appareil${j.sent>1?'s':''} — la notif doit apparaître.` : '⚠ Aucun appareil abonné n\'a reçu le test.');
+      // ⚠️ On affiche la RAISON donnée par le serveur. « Aucun appareil n'a
+      // reçu le test » ne dit pas si c'est l'appareil ou la clé du serveur qui
+      // manque — et c'est justement la question quand plus rien n'arrive.
+      setMsg(j.sent > 0
+        ? `✅ Test envoyé à ${j.sent} appareil${j.sent>1?'s':''} — la notif doit apparaître.`
+        : (j.erreur === 'VAPID_PRIVATE_KEY absente'
+            ? '⚠ Le serveur ne peut RIEN envoyer : la clé VAPID_PRIVATE_KEY n\'est pas configurée sur Vercel. Tant qu\'elle manque, aucune notification ne partira.'
+            : (j.total === 0 ? '⚠ Aucun appareil abonné. Active les notifications sur cet appareil d\'abord.'
+                             : `⚠ ${j.total} appareil(s) abonné(s), 0 joint. Réactive les notifications sur cet appareil.`)));
     } catch (e) { setMsg('Erreur test : ' + (e?.message || e)); }
   };
 
@@ -18781,6 +19015,22 @@ function PushSetting() {
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
         {state==='unsupported' && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
       </div>
+      {/* ⚠️ « Je ne reçois plus rien » a DEUX causes qui font le même silence :
+          aucun appareil abonné, ou le serveur sans sa clé. On les sépare ici,
+          au lieu de laisser deviner. */}
+      {srv && !srv.pret && (
+        <div style={{display:'flex',gap:8,alignItems:'flex-start',padding:'9px 11px',borderRadius:10,border:`1px solid ${C.danger}55`,background:`${C.danger}12`,marginBottom:10}}>
+          <Icon name="alert" size={16} style={{color:C.danger,flexShrink:0,marginTop:1}}/>
+          <div style={{fontSize:11.5,color:C.text,lineHeight:1.45,minWidth:0}}>
+            <b style={{color:C.danger}}>Le serveur ne peut envoyer aucune notification.</b> La clé <code style={{fontSize:10.5}}>VAPID_PRIVATE_KEY</code> n'est pas configurée sur Vercel — elle a été sortie du code source pour raison de sécurité et doit y être remise une fois. Tant qu'elle manque, activer les notifications ici ne changera rien.
+          </div>
+        </div>
+      )}
+      {srv && srv.pret && (
+        <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>
+          Serveur prêt à envoyer · <b style={{color:C.text}}>{srv.devices}</b> appareil{srv.devices>1?'s':''} abonné{srv.devices>1?'s':''}.
+        </div>
+      )}
       {state!=='unsupported' && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           {state!=='on' ? (

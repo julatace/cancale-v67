@@ -6,9 +6,19 @@
 //   POST { action:'test' }                   → envoie une notification d'essai
 // ────────────────────────────────────────────────────────────────────────────
 
-import { loadSubs, saveSubs, sendPushToAll } from './_lib/push.js';
+import { loadSubs, saveSubs, sendPushToAll, pushConfigure } from './_lib/push.js';
 
 export default async function handler(req, res) {
+  // GET ?etat=1 → « le serveur peut-il envoyer ? ». Aucun secret exposé : on
+  // répond oui/non. C'est la seule façon, depuis l'app, de distinguer « aucun
+  // appareil abonné » de « le serveur n'a pas sa clé » — deux causes qui
+  // produisent exactement le même silence côté téléphone.
+  if (req.method === 'GET') {
+    let devices = 0;
+    try { devices = (await loadSubs()).length; } catch (_) {}
+    res.status(200).json({ pret: pushConfigure(), devices });
+    return;
+  }
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
   let body;
