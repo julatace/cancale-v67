@@ -284,11 +284,28 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('les couleurs d\'un titre sont lues en ensemble',
           'seule `extractColor` existe : un titre bicolore ne rend rien, donc plus aucun test de couleur');
   // b) le score du sélecteur compare des ensembles, plus une couleur unique
-  /const couleursRef = extractColors\(item\?\.title\)/.test(SRC)
-    && /const cs = extractColors\(t\);[\s\S]{0,260}?couleursRef\.includes\(c\)/.test(SRC)
+  // ⚠️ Le barème a DÉMÉNAGÉ au niveau module (`refAchat` / `scoreAchat`) : il
+  // vivait dans `openPicker`, donc la modale de saisie en série ne pouvait pas
+  // s'en servir et le banc devait en recopier les poids. Le contrôle suit la
+  // définition unique, pas l'ancien emplacement.
+  /couleurs:\s*extractColors\(item\?\.title\)/.test(SRC)
+    && /const cs = extractColors\(t\);[\s\S]{0,200}?ref\.couleurs\.includes\(c\)/.test(SRC)
     ? ok('le sélecteur d\'achat compare des ensembles de couleurs')
     : nok('le sélecteur d\'achat compare des ensembles de couleurs',
           'il compare encore une couleur unique : une paire bicolore désactive le test');
+  // ⚠️ MARQUE + POINTURE + COULEUR font EXACTEMENT le seuil (4+4+4 = 12). Sans
+  // malus, « Baskets Nike blanche et grise pointure 45 » — un titre qui désigne
+  // des centaines de paires — était donné comme « suggéré ». Il faut le modèle
+  // des DEUX côtés, sinon la preuve est insuffisante. Mesuré : 19 → 17
+  // suggestions, les 2 perdues sont les 2 génériques.
+  /else pts -= 3;/.test(SRC)
+    ? ok('un achat au titre générique ne peut pas atteindre le seuil « suggéré »')
+    : nok('un achat au titre générique ne peut pas atteindre le seuil « suggéré »',
+          'marque + pointure + couleur = 12 = le seuil : un titre sans modèle passe');
+  // le seuil est une CONSTANTE partagée, pas un 12 recopié dans le rendu
+  /const SEUIL_SUGGERE = 12;/.test(SRC) && !/_score\|\|0\) >= 12/.test(SRC)
+    ? ok('le seuil « suggéré » est une seule constante')
+    : nok('le seuil « suggéré » est une seule constante', 'un 12 est recopié ailleurs');
   // c) l'ancienne comparaison une-couleur-contre-une-couleur a bien disparu du score
   /couleurRef && co && co !== couleurRef/.test(SRC)
     ? nok('l\'ancien test de couleur unique a disparu du score', 'il est encore là')

@@ -3030,6 +3030,63 @@ function extractColor(text){
   const v = extractColors(text);
   return v.length === 1 ? v[0] : null;
 }
+
+// ── PERTINENCE D'UN ACHAT POUR UNE PAIRE — UNE SEULE DÉFINITION ──────────────
+// ⚠️ Ce score vivait DANS `openPicker`, donc à l'intérieur d'un composant : la
+// modale de saisie en série ne pouvait pas s'en servir, et le banc devait en
+// RECOPIER les poids (donc deux barèmes qui finissent par diverger — c'est très
+// exactement ce que §11 interdit). Il est ici, au niveau module, et les deux
+// écrans + le banc lisent la même chose.
+//
+// Le barème est le résultat de trois corrections successives, toutes mesurées :
+//   marque +4 · taille identique +4 / DIFFÉRENTE −10 (le signal le plus
+//   discriminant, il ne pénalisait rien) · modèle identique +5 / différent −6
+//   (c'est lui qui écartait « Nike speakers » d'un p-6000) · une couleur
+//   commune +4 / aucune couleur commune −8, sur des ENSEMBLES (une paire
+//   bicolore neutralisait tout le test) · payé moins cher que revendu +1 ·
+//   titre strictement identique +6.
+const SEUIL_SUGGERE = 12;   // en dessous, on ne se prononce pas
+const refAchat = (item) => ({
+  marque:   (extractBrand(item?.title) || '').toLowerCase(),
+  taille:   String(extractSize(item?.title) || '').toLowerCase(),
+  modele:   extractModel(item?.title),
+  couleurs: extractColors(item?.title),
+  titre:    normTitle(item?.title || ''),
+  prix:     Number(item?.price?.amount ?? item?.price ?? 0) || 0,
+});
+const scoreAchat = (ref, o) => {
+  let pts = 0;
+  const t = o?.title || '';
+  if (ref.marque && (extractBrand(t) || '').toLowerCase() === ref.marque) pts += 4;
+  const ta = String(extractSize(t) || '').toLowerCase();
+  if (ref.taille && ta === ref.taille) pts += 4;
+  else if (ref.taille && ta && ta !== ref.taille) pts -= 10;
+  const mo = extractModel(t);
+  if (ref.modele && mo === ref.modele) pts += 5;
+  else if (ref.modele && mo && mo !== ref.modele) pts -= 6;
+  // ⚠️ MODÈLE CONNU D'UN CÔTÉ, INCONNU DE L'AUTRE = PREUVE INSUFFISANTE.
+  // Sans ce malus, marque + pointure + couleur font exactement 12, donc le
+  // seuil : mesuré sur les vraies données, « nike zoom fly 5 bleu et blanc 45 »
+  // se voyait proposer « Baskets Nike blanche et grise pointure 45 » — un titre
+  // générique qui désigne des centaines de paires (§5.23). Ce n'est pas une
+  // contradiction (on ne descend pas à −6), c'est un manque : −3 suffit à faire
+  // passer ce cas sous le seuil sans écarter un achat au titre court qui porte
+  // bien le modèle.
+  // ⚠️ ET DANS LES DEUX SENS : au premier essai je n'avais pénalisé que
+  // « paire avec modèle / achat sans modèle ». Le même achat générique est
+  // aussitôt reparti sur une AUTRE paire dont le modèle n'est pas reconnu non
+  // plus (« Nike zoom vapor pro Carlos Alcaraz blanc 45 ») — marque + pointure
+  // + couleur refont 12. Dès qu'il manque le modèle d'un côté OU de l'autre,
+  // la preuve est insuffisante. Mesuré : 19 → 17 suggestions, les 2 perdues
+  // sont les 2 génériques, aucune bonne suggestion écartée.
+  else pts -= 3;
+  const cs = extractColors(t);
+  if (ref.couleurs.length && cs.length) pts += cs.some(c => ref.couleurs.includes(c)) ? 4 : -8;
+  const pa = Number(o?.price?.amount);
+  if (!isNaN(pa) && ref.prix > 0 && pa > 0 && pa < ref.prix) pts += 1;
+  if (normTitle(t) === ref.titre && ref.titre) pts += 6;
+  return pts;
+};
 const KNOWN_MODELS = [
   'zoom fly','p-6000','p6000','p 6000','air max 95','air max 97','air max 1','air max 90','air max',
   'air force','pegasus','vaporfly','alphafly','dunk','blazer','cortez',
@@ -11326,50 +11383,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // paires, donc tous les bénéfices calculés avec un coût nul).
     // On remonte les achats de la MÊME MARQUE et de la MÊME TAILLE, dont le
     // prix payé est inférieur au prix de vente. À défaut, on garde la date.
-    const marqueRef = (extractBrand(item?.title) || '').toLowerCase();
-    const tailleRef = String(extractSize(item?.title) || '').toLowerCase();
-    const modeleRef = extractModel(item?.title);
-    // ⚠️ TOUTES les couleurs du titre, pas une seule : une paire bicolore
-    // (« noir et violet ») rendait `extractColor` nul, ce qui neutralisait le
-    // test de couleur — bonus ET pénalité — et laissait passer une paire d'une
-    // AUTRE couleur pile au seuil « suggéré » (mesuré : 2 cas sur les 10 premiers).
-    const couleursRef = extractColors(item?.title);
-    const prixVente = Number(item?.price?.amount ?? item?.price ?? 0) || 0;
-    const score = (o) => {
-      let pts = 0;
-      const t = o.title || '';
-      if (marqueRef && (extractBrand(t) || '').toLowerCase() === marqueRef) pts += 4;
-      // ⚠️ UNE POINTURE DIFFÉRENTE = CE N'EST PAS LA MÊME PAIRE. C'est le signal le
-      // plus discriminant de tous, et il ne pénalisait RIEN : « adidas spezial gris
-      // taille 38 » se voyait proposer « Adidas spezial maat 41 grijs » avec le badge
-      // « suggéré » (marque + modèle + couleur suffisaient à atteindre le seuil).
-      // Trois paires en ligne étaient dans ce cas, mesuré sur les vraies données.
-      const ta = String(extractSize(t) || '').toLowerCase();
-      if (tailleRef && ta === tailleRef) pts += 4;
-      else if (tailleRef && ta && ta !== tailleRef) pts -= 10;
-      // ⚠️ LE MODÈLE TRANCHE. Même modèle = le signal le plus fort après le
-      // titre exact ; modèles reconnus mais DIFFÉRENTS = on écarte franchement
-      // (c'est ce qui reliait un p-6000 à des « Nike speakers »).
-      const mo = extractModel(t);
-      if (modeleRef && mo === modeleRef) pts += 5;
-      else if (modeleRef && mo && mo !== modeleRef) pts -= 6;
-      // ⚠️ LA COULEUR TRANCHE AUTANT QUE LE MODÈLE. Sans elle, « spezial noir 38 »
-      // et « spezial blu 38 » avaient le MÊME score : marque + taille + modèle.
-      // Deux couleurs reconnues et différentes = ce n'est pas la même paire.
-      // On compare des ENSEMBLES : une couleur commune suffit à rapprocher
-      // (« bleu marine » ↔ « blu »), aucune couleur commune écarte franchement
-      // (« noir violet » ↔ « oranje »). Un côté sans couleur reconnue ne pèse
-      // ni dans un sens ni dans l'autre — on ne se prononce pas sur du vide.
-      const cs = extractColors(t);
-      if (couleursRef.length && cs.length) {
-        pts += cs.some(c => couleursRef.includes(c)) ? 4 : -8;
-      }
-      const pa = Number(o.price?.amount);
-      if (!isNaN(pa) && prixVente > 0 && pa > 0 && pa < prixVente) pts += 1; // un achat coûte moins cher que la revente
-      if (normTitle(t) === normTitle(item?.title || '')) pts += 6;            // titre identique : quasi sûr
-      return pts;
-    };
-    out.forEach(o => { o._score = score(o); });
+    // ⚠️ Le barème vit au niveau module (`refAchat` / `scoreAchat`) : la modale
+    // de saisie en série s'en sert aussi. Deux copies, ce serait deux listes de
+    // suggestions différentes selon l'écran ouvert (§11).
+    const ref = refAchat(item);
+    out.forEach(o => { o._score = scoreAchat(ref, o); });
     out.sort((a,b) => (b._score - a._score) || (new Date(b.date||0) - new Date(a.date||0)));
     setPurchasesPick({loading:false,items:out});
   };
@@ -13894,6 +13912,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Aucune saisie automatique : c'est lui qui tape, ou qui tape sur une
   // suggestion qu'il voit (règle tenue depuis §22).
   const [fillBuyOpen, setFillBuyOpen] = useState(false);
+  // ⚠️ LES ACHATS SONT CHARGÉS UNE SEULE FOIS pour toute la modale, pas une fois
+  // par paire : la lecture est la même que celle du sélecteur (moisson en
+  // cache), la refaire 225 fois serait le trou d'égress de §34.
+  const [fillBuyAchats, setFillBuyAchats] = useState({ loading:false, items:null });
+  useEffect(() => {
+    if (!fillBuyOpen || fillBuyAchats.items || fillBuyAchats.loading) return;
+    let mort = false;
+    setFillBuyAchats({ loading:true, items:null });
+    (async () => {
+      const vus = new Set(); const out = [];
+      for (const acc of accounts) {
+        const r = await fetchVintedOrders(acc, 'purchased', 1, 'all');
+        if (r.ok) for (const o of r.items) { const id = String(o.transaction_id); if (!vus.has(id)) { vus.add(id); out.push({ ...o, _acc: acc }); } }
+      }
+      if (!mort) setFillBuyAchats({ loading:false, items: out });
+    })();
+    return () => { mort = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fillBuyOpen]);
   const fillBuyRows = useMemo(() => {
     // Ce que chaque paire pèse dans la compta : ses ventes, résolues par
     // IDENTITÉ (id d'annonce Vinted, sinon photo) — jamais par titre (§5.34).
@@ -13919,6 +13956,54 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numeros, sales.items, onlineAnnonceIds, txnItem, txnLink]);
+  // ── UNE SUGGESTION PAR PAIRE, ET UNE SEULE FOIS ─────────────────────────
+  // Le sélecteur d'achat existait déjà, mais il fallait l'ouvrir paire par
+  // paire. Ici on propose directement le meilleur candidat — même barème que
+  // le sélecteur (`scoreAchat`, module-level), même seuil (`SEUIL_SUGGERE`).
+  // ⚠️ RIEN N'EST ÉCRIT TOUT SEUL : la suggestion s'affiche, c'est lui qui tape
+  // dessus. Un prix d'achat faux ne se voit jamais et fausse la marge pour
+  // toujours (§22/§5.23/§5.38) — mieux vaut un blanc qu'un faux.
+  // ⚠️ ET UN ACHAT NE PEUT ÊTRE PROPOSÉ QU'À UNE SEULE PAIRE : sans ça, deux
+  // paires au même titre se voyaient proposer le MÊME achat, donc le même coût
+  // compté deux fois. On sert les lignes dans l'ordre de la liste (les ventes
+  // au plus gros CA d'abord), et un achat retenu ne ressort plus.
+  const fillBuySugg = useMemo(() => {
+    const achats = fillBuyAchats.items;
+    if (!achats || !achats.length) return {};
+    const pris = new Set(linkedBuyIds);
+    const out = {};
+    for (const r of fillBuyRows.slice(0, 300)) {
+      const ref = refAchat({ title: r.e.title, price: r.e.price });
+      let best = null, bestS = 0;
+      for (const o of achats) {
+        const id = String(o.transaction_id);
+        if (pris.has(id)) continue;
+        if (classifyOrderStatus(o.status) === 'cancelled') continue;
+        const sc = scoreAchat(ref, o);
+        if (sc > bestS) { bestS = sc; best = o; }
+      }
+      if (best && bestS >= SEUIL_SUGGERE) { out[r.key] = best; pris.add(String(best.transaction_id)); }
+    }
+    return out;
+  }, [fillBuyAchats.items, fillBuyRows, linkedBuyIds]);
+
+  // Relier un achat à une paire depuis la liste (pas depuis le sélecteur) :
+  // même écriture que `choosePick`, instantané compris (§5.36) — sinon le reçu
+  // et la photo de l'achat ne seraient plus affichables sans tout recharger.
+  const linkBuyForKey = (key, p) => {
+    const prix = p.price?.amount != null ? Number(p.price.amount) : null;
+    setNumeros(prev => {
+      const u = { ...prev }; const c = u[key] || {};
+      u[key] = { ...c,
+        buyPrice: prix != null ? String(prix) : '',
+        buyFromId: p.transaction_id ? String(p.transaction_id) : null,
+        buyFrom: { title:p.title||'', date:p.date||'', photo:orderPhoto(p)||'', price:prix,
+                   devise:p.price?.currency_code||'EUR', seller:p.seller||p.user_login||'',
+                   status:p.status||'', account:accNameOf(p._acc)||'' } };
+      save('vinted_annonce_numeros', u); return u;
+    });
+  };
+
   const setBuyForKey = (key, val) => {
     setNumeros(prev => {
       const u = { ...prev };
@@ -17081,7 +17166,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     12 exige le MODÈLE en plus (4+4+5), ou un titre identique. Une paire dont
     le modèle n'est pas reconnu n'est jamais « suggérée » : on ne se prononce
     pas plutôt que d'induire un faux prix d'achat. */}
-                        {(p._score||0) >= 12 && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
+                        {(p._score||0) >= SEUIL_SUGGERE && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
                         {p.title}
                       </div>
                       <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
@@ -17571,6 +17656,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter</div>
                   <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>
                     {fillBuyRows.length} paire{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe à la suivante
+                    {fillBuyAchats.loading && <> · <span style={{color:C.accent}}>recherche de tes achats…</span></>}
+                    {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} achat{Object.keys(fillBuySugg).length>1?'s':''} retrouvé{Object.keys(fillBuySugg).length>1?'s':''}</b>, tape dessus pour relier</>}
                   </div>
                 </div>
                 <button type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
@@ -17586,7 +17673,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Toutes tes paires ont un prix d'achat.</div>
               )}
               {fillBuyRows.slice(0,300).map((r,i)=>(
-                <div key={r.key} style={{display:'flex',gap:10,alignItems:'center',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:6}}>
+                <div key={r.key} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:6}}>
+                 <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <div style={{width:40,height:40,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {r.e.photo?<img src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>👟</span>}
                   </div>
@@ -17608,6 +17696,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
+                 </div>
+                 {(()=>{ const p=fillBuySugg[r.key]; if(!p) return null;
+                   const pr=p.price?.amount!=null?Number(p.price.amount):null;
+                   const d=p.date?new Date(p.date):null;
+                   return (
+                     <button type="button" onClick={()=>linkBuyForKey(r.key,p)}
+                       style={{marginTop:6,width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}55`,background:`${C.accent}10`,borderRadius:10,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                       {orderPhoto(p)
+                         ? <img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:7,objectFit:'cover',flexShrink:0}}/>
+                         : <span style={{width:26,height:26,borderRadius:7,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}>👟</span>}
+                       <span style={{flex:1,minWidth:0}}>
+                         <span style={{display:'block',fontSize:11.5,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
+                         <span style={{display:'block',fontSize:10.5,color:C.muted}}>
+                           {pr!=null?`payé ${pr.toFixed(2).replace('.',',')} €`:'prix inconnu'}{d&&!isNaN(d)?` · ${d.toLocaleDateString('fr-FR')}`:''}{p._acc?` · ${accNameOf(p._acc)}`:''}
+                         </span>
+                       </span>
+                       <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:999,padding:'3px 9px'}}>C'est ça</span>
+                     </button>
+                   ); })()}
                 </div>
               ))}
               {fillBuyRows.length>300 && <div style={{fontSize:11,color:C.muted,textAlign:'center',padding:'8px'}}>… et {fillBuyRows.length-300} autres (elles apparaîtront au fur et à mesure).</div>}

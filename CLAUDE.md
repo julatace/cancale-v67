@@ -5071,3 +5071,74 @@ la case revient à **`[]`**. Rendu ordinateur (1512×950) : barre latérale, les
 9 écrans groupés, listes Achats **en deux colonnes**. Rendu final à 1180 px :
 **0 écran vide, 0 artefact**. Mobile 430 px rejoué : **0 écran vide** — le shell
 n'a rien changé au téléphone. 9 audits au vert.
+
+---
+
+## 5.64 — LE PRIX D'ACHAT SE RELIE EN UN TAP (et le barème n'existe plus en deux exemplaires)
+
+État inchangé depuis §22 : **0 prix d'achat sur 225 paires**, donc tout le
+bénéfice, la marge, la « meilleure marque » et le rapport comptable tournent
+avec un **coût de zéro**. La saisie en série existait (§5.47) mais il fallait
+**taper** 225 fois ; le sélecteur d'achat classait bien les candidats (§5.23,
+§5.38, §5.51) mais il fallait l'ouvrir **paire par paire**.
+
+### 1. ⚠️ LE BARÈME VIVAIT DANS UN COMPOSANT
+Le score de pertinence était écrit **à l'intérieur de `openPicker`**. Deux
+conséquences : la modale de saisie en série ne pouvait pas s'en servir, et le
+banc `prix.mjs` devait en **RECOPIER les poids** — deux barèmes qui finissent
+par diverger, exactement ce que §11 interdit (c'était même écrit dans la note de
+§5.38 : « si les poids changent d'un côté, les remettre des deux »).
+
+➡️ **`refAchat(item)` / `scoreAchat(ref, o)` / `SEUIL_SUGGERE`** vivent au niveau
+module. `openPicker`, la modale de saisie et le badge « suggéré » lisent la même
+chose. Le `12` recopié dans le rendu devient la constante.
+
+### 2. La suggestion s'affiche dans la liste, un tap la relie
+- Les achats sont chargés **UNE SEULE FOIS** pour toute la modale
+  (`fillBuyAchats`), pas une fois par paire — la même lecture que le sélecteur,
+  refaite 225 fois ce serait le trou d'égress de §34.
+- `fillBuySugg` retient le meilleur candidat **≥ `SEUIL_SUGGERE`** par paire, et
+  sert les lignes **dans l'ordre de la liste** (ventes au plus gros CA d'abord).
+- ⚠️ **Un achat ne peut être proposé qu'à UNE SEULE paire.** Sans ça, deux paires
+  au même titre se voyaient proposer le même achat, donc **le même coût compté
+  deux fois**. Un achat retenu sort du pot (`pris`), et `linkedBuyIds` exclut
+  d'entrée ceux déjà reliés.
+- `linkBuyForKey` écrit comme `choosePick`, **instantané compris** (`buyFrom`,
+  §5.36) : sans lui, réafficher la photo et le reçu de l'achat obligerait à
+  recharger les ~700 achats.
+- ⚠️ **Rien n'est écrit tout seul** : la suggestion s'affiche, c'est lui qui tape
+  dessus. La règle de §22/§5.23/§5.38 tient — mieux vaut un blanc qu'un faux.
+
+### 3. ⚠️ MARQUE + POINTURE + COULEUR FONT EXACTEMENT LE SEUIL
+En regardant les 19 premières suggestions produites sur les vraies données, 18
+étaient justes et **une ne l'était pas** :
+`« nike zoom fly 5 bleu et blanc 45 » ← « Baskets Nike blanche et grise
+pointure 45 » (payé 30,23 €, revendu 24 €)`.
+4 + 4 + 4 = **12**, soit le seuil pile, alors que l'achat ne porte **aucun
+modèle** — c'est le piège nommé en §5.23 : « nike » + « 45 » désigne des
+centaines de paires.
+
+⚠️ **Ma première correction n'a pénalisé qu'un sens** (paire avec modèle / achat
+sans modèle). Re-mesuré : **le même achat générique est aussitôt reparti sur une
+AUTRE paire** dont le modèle n'est pas reconnu non plus (« Nike zoom vapor pro
+Carlos Alcaraz blanc 45 »). Dès qu'il manque le modèle **d'un côté OU de
+l'autre**, la preuve est insuffisante → **−3** (un manque, pas une
+contradiction : on ne descend pas à −6).
+
+**Mesuré : 19 → 17 suggestions.** Les 2 perdues sont les 2 génériques. Une
+troisième, correcte, disparaît aussi (« salomon XT-6 noir 38 » ← « Salomon
+schwarz 38 ») : l'achat n'a pas de modèle reconnu. **Rien n'est perdu pour
+autant** — la paire reste dans la liste avec son champ, et le sélecteur la
+classe toujours en tête ; c'est seulement le badge qui ne s'allume plus.
+
+Les **17 restantes** ont toutes la même marque, le même modèle et la même
+pointure des deux côtés, couleur compatible.
+
+### Vérifié
+`npm run build` OK · banc `fillbuy.cjs` (vraies données) : 196 paires listées,
+**17 achats retrouvés**, le tap relie (`N°9 → 22,05 € · Adidas spezial 39.5`),
+**0 achat relié deux fois**, Entrée passe toujours au champ suivant, **0 erreur
+d'app** · `audit-identite` **40 contrôles**, dont **3 réancrés/ajoutés qui
+échouent bien sur le code d'avant** (§21) : le barème compare des ensembles de
+couleurs à son nouvel emplacement, un titre générique ne peut plus atteindre le
+seuil, le seuil est une seule constante · 8 autres audits au vert.
