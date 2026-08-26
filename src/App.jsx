@@ -2263,6 +2263,18 @@ const venteRecente = (o) => {
 // l'ordre n'avait plus de sens. Une date illisible part en bas plutôt que de
 // remonter en tête.
 const tsCommande = (o) => Date.parse((o && o.date) || '') || 0;
+// ⚠️ LE MONTANT D'UNE COMMANDE VINTED EST UN OBJET `{amount, currency_code}`,
+// pas un nombre. Une lecture naïve (`Number(o.price)`) rend NaN et une somme
+// tombe à 0 — c'est déjà arrivé deux fois (§5.27 : « aucune vente en cours »
+// mesuré à tort, parce que `String(price)` donnait « [object Object] »).
+// Une seule lecture, partout (§11), qui accepte aussi le nombre brut.
+const montantCommande = (o) => {
+  const p = o && o.price;
+  if (p == null) return 0;
+  const v = (typeof p === 'object') ? (p.amount ?? p.value) : p;
+  const n = Number(String(v ?? '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+};
 const parDateDesc = (a, b) => tsCommande(b) - tsCommande(a);
 // Heure locale d'une vente (« 14:07 »), affichée à côté de la date.
 const heureCommande = (o) => {
@@ -11606,6 +11618,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
+  // ── BILAN DES VENTES SUR UNE PÉRIODE — LA règle, une seule fois (§11) ──────
+  // ⚠️ CORRECTION (26 août) : « Vendu aujourd'hui » et « Ta semaine » de Ma
+  // journée se calculaient sur les EMAILS de vente (`email_sale_*`), avec en
+  // commentaire « même source que le tableau de bord ». C'était FAUX depuis
+  // §33 : le tableau de bord est passé à la moisson Vinted, précisément parce
+  // que les emails en voient moins (12 ventes / 308 € là où la moisson en voit
+  // 17 / 437 €). Mesuré le 26 août : la tuile annonçait **45 € / 9 paires**
+  // quand la base portait **152 € / 13 ventes** — la plainte de Julien, à
+  // l'euro près. Un email de vente n'arrive pas pour tout (offres acceptées,
+  // lots, comptes dont la boîte ne transfère pas — 2 comptes sur 8, §5.47).
+  //
+  // Règle unique : les VENTES MOISSONNÉES, par DATE DE VENTE, hors annulées,
+  // hors ventes masquées et hors comptes masqués (`isHidden` = la définition
+  // déjà partagée par tout l'écran Ventes). Même source que `liveStats`, donc
+  // les deux écrans ne peuvent plus se contredire.
+  const bilanVentes = React.useCallback((depuisTs, jusquaTs) => {
+    let n = 0, eur = 0;
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const t = tsCommande(o);
+      if (!t || t < depuisTs || (jusquaTs != null && t > jusquaTs)) continue;
+      n += 1; eur += montantCommande(o);
+    }
+    return { n, eur };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
+
   const soldByTxn = useMemo(() => { const m = {}; (sales.items || []).forEach(o => { if (o.transaction_id != null) m[String(o.transaction_id)] = o; }); return m; }, [sales.items]);
   // Un bordereau est « expédié » (donc à retirer de la liste à imprimer) dès que
   // Vinted a fait avancer la vente au-delà de « bordereau envoyé » (pris en charge,
@@ -14581,21 +14621,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // même que le tableau de bord → les deux écrans affichent le même chiffre.
         // Les comptes retirés/masqués sont exclus, et un lot compte son nombre
         // d'articles.
-        let jourN=0, jourEur=0;
-        if (Array.isArray(emailSales)) {
-          const today = new Date(); const dStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-          const live = new Set(); (accounts||[]).forEach(a=>{ if(hiddenAccts.has(String(a.vinted_user_id))||blockedAccts.has(String(a.vinted_user_id))) return; const l=String(a.login||'').trim().toLowerCase(); if(l) live.add(l); });
-          for (const d of emailSales) {
-            if (String(d.receivedAt||'').slice(0,10) !== dStr) continue;
-            const acct = String(d.account||'').toLowerCase();
-            if (acct && live.size && !live.has(acct)) continue;
-            const desig = String(d.designation||d.article||'');
-            const lm = /(\d+)\s*articles?/i.exec(desig);
-            jourN += (/lot/i.test(desig)&&lm) ? Math.max(1,parseInt(lm[1],10)) : 1;
-            const p = parseFloat(String(d.prix||'').replace(',','.'));
-            if (!isNaN(p) && p>0) jourEur += p;
-          }
-        }
+        // ⚠️ SOURCE = LES VENTES MOISSONNÉES, plus les emails (§33 et le bloc
+        // `bilanVentes` plus haut). Les emails ratent une vente sur trois.
+        const minuit = new Date(); minuit.setHours(0,0,0,0);
+        const { n: jourN, eur: jourEur } = bilanVentes(minuit.getTime());
         return (
           <div>
             <div style={{marginBottom:16}}>
@@ -14627,17 +14656,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 🗓️ Bilan de la semaine (7 derniers jours) — depuis les emails de
                 vente (fiable), + ce qu'il reste à expédier. */}
             {(()=>{
+              // Même règle que la tuile du jour : la moisson, pas les emails.
               const weekAgo = Date.now() - 7*86400000;
-              const ws = (emailSales||[]).filter(s=>{ const d=s.receivedAt?new Date(s.receivedAt).getTime():0; return d>=weekAgo; });
-              let wca=0; for(const s of ws){ const p=parseFloat(String(s.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) wca+=p; }
-              if(!ws.length && !toShip.length) return null;
+              const sem = bilanVentes(weekAgo);
+              const wca = sem.eur;
+              if(!sem.n && !toShip.length) return null;
               return (
                 <div style={{marginBottom:14,border:`1px solid ${C.accent}33`,background:`${C.accent}0a`,borderRadius:4,padding:'13px 15px'}}>
                   <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:9,textTransform:'uppercase',letterSpacing:0.6}}>Ta semaine</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 90px'}}>
-                      <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1}}>{ws.length}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vente{ws.length>1?'s':''} · 7 j</div>
+                      <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1}}>{sem.n}</div>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vente{sem.n>1?'s':''} · 7 j</div>
                     </div>
                     <div style={{flex:'1 1 90px'}}>
                       <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{wca.toFixed(0)} €</div>
