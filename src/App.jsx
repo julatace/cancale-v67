@@ -10822,9 +10822,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
   // le localStorage (que le cloud vient de remplir) → les numéros restent stables.
   const [cloudReady, setCloudReady] = useState(() => isCloudReady());
+  // ⚠️⚠️ CET EFFET RELIT CE QUE LE CLOUD VIENT D'ÉCRIRE DANS LE LOCALSTORAGE.
+  // Tout état initialisé par `load(...)` et RÉÉCRIT ENSUITE PAR UN EFFET
+  // AUTOMATIQUE doit être ici — sinon, sur un appareil neuf (localStorage vide
+  // au premier rendu), l'app travaille sur du vide puis SAUVEGARDE ce vide.
+  //
+  // `vinted_sale_overrides` MANQUAIT, et c'est la pire omission possible : il
+  // porte les 361 numéros posés sur des ventes. Sans ce rechargement, la
+  // numérotation automatique voyait toutes les ventes « sans numéro », leur en
+  // attribuait de nouveaux, et `setSaleOv({ ...saleOv })` repartait d'un objet
+  // VIDE — donc les numéros existants disparaissaient. Le commentaire de cet
+  // effet-là annonçait justement cette protection ; elle n'existait pas.
+  // Reproduit au banc : une vente portant le N°777 ressortait à N°319.
   useEffect(() => onCloudReady(() => {
     setNumeros(load('vinted_annonce_numeros', {}));
     setUsedNumeros(load('vinted_used_numeros', []));
+    setSaleOv(load('vinted_sale_overrides', {}));
+    setHiddenSales(new Set((load('vinted_sales_hidden', []) || []).map(String)));
     setCloudReady(true);
   }), []);
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
@@ -13188,7 +13202,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   // Identité certaine des ventes (transaction → annonce). Une seule lecture, en
   // scalaires : elle sert au N°, au bordereau, au prix d'achat et à la photo.
-  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (!mort && m && Object.keys(m).length) setTxnItem(m); }); return () => { mort = true; }; }, []);
+  // `txnPret` = la lecture des identités « transaction → annonce » a répondu
+  // (même vide). La numérotation automatique l'attend avant de graver un numéro
+  // NEUF : sans ça elle grave d'abord et découvre l'identité ensuite, et comme
+  // un numéro n'est jamais repris (§5.40) l'erreur est définitive.
+  const [txnPret, setTxnPret] = useState(false);
+  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, []);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
   // RATTRAPAGE AUTOMATIQUE (voir le commentaire au-dessus de `SUJET_COLIS`).
   // Aucun bouton : on répare, on montre l'avancement, et les colis apparaissent
@@ -13369,6 +13388,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── LE NUMÉRO DÉJÀ POSÉ SUR UNE VENTE (§5.69) ─────────────────────────────
+  // ⚠️ LE TROU SIGNALÉ PAR JULIEN : « si je poste une annonce depuis ma tablette
+  // et que je la vends en direct, l'extension n'a pas eu le temps de capter
+  // l'annonce en ligne, elle n'a que la vente — donc l'app écrit un numéro pour
+  // la vente ». C'est exact, et c'est prévu (`autoShip`, 98 cas en base). Mais
+  // la suite ne l'était pas : quand l'extension capte enfin le dressing et que
+  // Vinted a LAISSÉ L'ANNONCE OUVERTE (ça arrive, §5.39), cette annonce arrive
+  // sans numéro. La numérotation automatique ne réutilisait QUE `numeros` (les
+  // annonces déjà numérotées) — jamais `saleOv` — donc elle lui aurait donné un
+  // numéro NEUF. Résultat : le carton porte N°A, l'app affiche N°B pour la même
+  // paire. C'est le risque n°1 (§19), la mauvaise chaussure dans le colis.
+  //
+  // Mesuré le 26 août : 0 conflit AUJOURD'HUI (les annonces vendues sont
+  // presque toujours fermées par Vinted) — donc on ferme un trou latent, pas un
+  // incendie. C'est justement le bon moment.
+  //
+  // Deux voies d'identité, toutes deux certaines (§5.34), et RIEN d'autre :
+  //   1. l'identifiant d'annonce que Vinted attache à la transaction ;
+  //   2. la photo de la commande (une image appartient à une paire et une seule).
+  // Une photo portée par deux ventes de numéros différents est écartée : on ne
+  // tranche jamais sur une ambiguïté (§24).
+  const numVentesParIdentite = useMemo(() => {
+    const parItem = {}, parPhoto = {}, litige = new Set();
+    for (const o of (sales.items || [])) {
+      const tid = o && o.transaction_id != null ? String(o.transaction_id) : null;
+      if (!tid) continue;
+      const n = String(((saleOv[tid] || {}).numero) || '').trim();
+      if (!n) continue;
+      const item = txnItem[tid];
+      if (item) parItem[String(item)] = n;
+      const pk = photoKey(orderPhoto(o));
+      if (pk) { if (parPhoto[pk] && parPhoto[pk] !== n) litige.add(pk); else parPhoto[pk] = n; }
+    }
+    litige.forEach(k => delete parPhoto[k]);
+    return { parItem, parPhoto };
+  }, [sales.items, saleOv, txnItem]);
+
   // ── Numérotation AUTOMATIQUE des annonces en ligne ─────────────────────────
   // Chaque annonce sans N° reçoit automatiquement le prochain numéro libre. Deux
   // règles clés :
@@ -13389,6 +13445,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    `porteursNum`, §5.33). Mesuré le 23 août : 1 paire en ligne sans numéro.
     const items = (listings.items || []);
     if (!items.length) return;
+    // ⚠️ ON N'ATTRIBUE RIEN TANT QU'ON NE SAIT PAS SI UNE VENTE PORTE DÉJÀ LE
+    // NUMÉRO DE CETTE PAIRE. Les ventes et les identités « transaction →
+    // annonce » arrivent par un autre aller-retour : au premier rendu, l'effet
+    // voyait une annonce sans numéro, en gravait un neuf, et le second passage
+    // ne pouvait plus rien corriger (une annonce déjà numérotée est sautée, et
+    // un numéro ne se reprend jamais §5.40). Mesuré au banc : la paire vendue
+    // depuis le téléphone recevait N°319 alors que son carton portait N°777.
+    // Attendre deux secondes coûte moins cher qu'un numéro faux à vie.
+    if (sales.items === null || !txnPret) return;
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
     // et le garage (numéros hérités) — seule compte la numérotation de la nouvelle
@@ -13419,7 +13484,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (pk && !cur.photoK) { nextNum[it.id] = { ...cur, photoK: pk }; changed = true; }
         continue;
       }
-      let num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
+      // ⚠️ D'ABORD le numéro déjà écrit sur le carton par une VENTE de cette même
+      // paire (voir `numVentesParIdentite` juste au-dessus) : sans ça, une
+      // annonce postée depuis le téléphone puis vendue avant d'être captée
+      // repartirait sur un numéro neuf alors que sa boîte en porte déjà un.
+      let num = numVentesParIdentite.parItem[String(it.id)]
+             || (pk && numVentesParIdentite.parPhoto[pk])
+             || null;
+      if (!num) num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
       // Prochain numéro = le premier JAMAIS UTILISÉ. `taken` contient tous les
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
@@ -13440,8 +13512,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setNumeros(nextNum); save('vinted_annonce_numeros', nextNum);
       const ua = [...nextUsed].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
     }
+  // ⚠️ `numVentesParIdentite` DOIT être dans les dépendances : les ventes
+  // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
+  // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);

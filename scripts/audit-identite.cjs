@@ -372,5 +372,41 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
           'il prend encore le premier titre égal sans vérifier qu\'il est seul');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 13) UNE ANNONCE CAPTÉE APRÈS SA VENTE REPREND LE NUMÉRO DU CARTON
+//     Julien : « si je poste une annonce depuis ma tablette et que je la vends
+//     en direct, l'extension n'a que la vente ». L'app numérote alors la vente
+//     (autoShip, 98 cas en base). Si Vinted laisse l'annonce ouverte, elle
+//     arrive ensuite SANS numéro : sans ces trois règles elle en reçoit un
+//     NEUF, et la même paire porte deux numéros — le risque n°1 (§19), avec un
+//     numéro qui ne se reprend jamais (§5.40), donc une erreur définitive.
+{
+  /const numVentesParIdentite = useMemo/.test(SRC)
+    ? ok('les numéros déjà posés sur des ventes sont indexés par identité')
+    : nok('les numéros déjà posés sur des ventes sont indexés par identité',
+          '`numVentesParIdentite` absent : une annonce captée après sa vente prendra un numéro neuf');
+
+  const i = SRC.indexOf('let num = numVentesParIdentite');
+  i >= 0
+    ? ok('la numérotation réutilise ce numéro AVANT d\'en créer un neuf')
+    : nok('la numérotation réutilise ce numéro avant d\'en créer un neuf',
+          'la réutilisation par vente ne passe pas avant l\'attribution');
+
+  /if \(sales\.items === null \|\| !txnPret\) return;/.test(SRC)
+    ? ok('aucun numéro n\'est gravé avant que ventes et identités aient répondu')
+    : nok('aucun numéro n\'est gravé avant que ventes et identités aient répondu',
+          'la course est ouverte : le numéro neuf est écrit puis plus rien ne le corrige');
+
+  // Le rechargement au cloud : sans lui, `saleOv` est vide au premier rendu sur
+  // un appareil neuf et `setSaleOv({ ...saleOv })` REMPLACE les 361 numéros de
+  // vente par du vide. Reproduit au banc (N°777 ressorti en N°319).
+  const j = SRC.indexOf('setCloudReady(true)');
+  const bloc = j < 0 ? '' : SRC.slice(Math.max(0, j - 700), j);
+  /setSaleOv\(load\('vinted_sale_overrides'/.test(bloc)
+    ? ok('les numéros de vente sont relus quand le cloud arrive')
+    : nok('les numéros de vente sont relus quand le cloud arrive',
+          '`vinted_sale_overrides` absent du rechargement : ils peuvent être écrasés par du vide');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
