@@ -3629,6 +3629,9 @@ const ICON_PATHS = {
   // le cas de `pin` et `nav` juste en dessous depuis leur ajout — les deux
   // repères des points relais ne se dessinaient pas.
   menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
+  // Masquer une ligne : l'œil barré. C'était un « 🚫 » nu — un emoji dessiné par
+  // le système, au milieu de boutons au trait (§5.55).
+  eyeOff: <><path d="M3 3l18 18"/><path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c5 0 9 4.5 9 7a12 12 0 0 1-2.4 3.3"/><path d="M6.5 6.8C4.2 8.2 3 10.3 3 12c0 2.5 4 7 9 7 1.6 0 3-.4 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></>,
   // Repère de carte et flèche d'itinéraire : les points relais affichaient 📍
   // et 🧭, deux emojis au milieu de logos de transporteurs au trait.
   pin:  <><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="9.5" r="2.2"/></>,
@@ -15495,7 +15498,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
         {(()=>{ const nbH=(sales.items||[]).filter(o=>isHidden(o)).length; return nbH>0 ? (
           <div style={{fontSize:12,color:C.muted,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
-            🚫 {nbH} vente{nbH>1?'s':''} masquée{nbH>1?'s':''} de la compta
+            <Icon name="eyeOff" size={14} style={{marginRight:6}}/>{nbH} vente{nbH>1?'s':''} masquée{nbH>1?'s':''} de la compta
             <button onClick={()=>setShowHidden(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontWeight:500,fontSize:12,padding:0}}>{showHidden?'cacher':'afficher'}</button>
           </div>
         ) : null; })()}
@@ -15577,7 +15580,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ) : st==='cancelled' ? (
                   <button type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:3,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
                 ) : (
-                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>🚫</button>
+                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
                 )}
                </div>
                {/* Barre de progression de la vente : À expédier · Expédiée · Livrée · Encaissée */}
@@ -15585,16 +15588,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    AVANCE. Sur une vente encaissée (étape finale), elle est toute
                    verte, n'apprend rien et double la hauteur de la ligne. */}
                {!hidden && (()=>{ const vs=venteStage(o); if(vs.step<=0 || vs.step>=4) return null; return (
-                 <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}>
-                   {[['À expédier',1],['Expédiée',2],['Livrée',3],['Encaissée',4]].map(([lbl,idx])=>{
-                     const done=vs.step>=idx, cur2=vs.step===idx;
-                     return (
-                       <div key={idx} style={{flex:1,textAlign:'center'}}>
-                         <div style={{height:4,borderRadius:3,background:done?vs.color:C.border}}/>
-                         <div style={{fontSize:9,marginTop:3,fontWeight:cur2?700:500,color:done?vs.color:C.muted,whiteSpace:'nowrap'}}>{lbl}</div>
-                       </div>
-                     );
-                   })}
+                 /* ⚠️ LES QUATRE LIBELLÉS SONT RETIRÉS. La pastille de statut,
+                    trois lignes plus haut, dit DÉJÀ où en est la vente (« À
+                    expédier »). Les répéter sous la barre, c'est la même
+                    information deux fois — et une ligne de texte de plus par
+                    vente sur un écran qui en porte des dizaines. Les quatre
+                    segments suffisent à montrer l'avancement. */
+                 <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}
+                      title={[1,2,3,4].map(i=>['À expédier','Expédiée','Livrée','Encaissée'][i-1]).join(' → ')}>
+                   {[1,2,3,4].map(idx=>(
+                     <div key={idx} style={{flex:1,height:4,borderRadius:3,background:vs.step>=idx?vs.color:C.border}}/>
+                   ))}
                  </div>
                ); })()}
                {/* Saisie manuelle par vente : N° et prix d'achat, même pour une paire jamais numérotée. */}
@@ -16440,7 +16444,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
                           : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
                     style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
-                    {off?'🚫 ':''}{name} · {counts[uid]}
+                    {off && <Icon name="eyeOff" size={13} style={{marginRight:4}}/>}{name} · {counts[uid]}
                     {!off && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
                   </button>
                 );
@@ -17130,12 +17134,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!sv.length) return null;
           const comptes = [...new Set(sv.map(b=>b.account).filter(Boolean))];
           return (
-            <div style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:4,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.warn}}>⚠️ {sv.length} bordereau{sv.length>1?'x':''} reçu{sv.length>1?'s':''} sans vente correspondante</div>
-              <div style={{fontSize:11,color:C.text,marginTop:3,lineHeight:1.45}}>
-                Un bordereau existe toujours pour une vente : si celle-ci n'apparaît pas, c'est que la capture est en retard{comptes.length?` sur ${comptes.join(', ')}`:''} — repasse une fois sur Vinted avec ce compte. Ce n'est pas un colis à préparer, donc il n'est pas dans la liste.
-              </div>
-            </div>
+            /* ⚠️ L'EXPLICATION PASSE DERRIÈRE « Pourquoi ? » (gabarit `Notice`,
+               §5.54). Elle faisait cinq lignes de texte en permanence, au-dessus
+               des colis — pour un cas qui ne demande aucun geste immédiat. Le
+               titre dit quoi faire ; le reste attend qu'on le demande. */
+            <Notice tone="warn" icon="alert"
+              title={`${sv.length} bordereau${sv.length>1?'x':''} sans vente correspondante — repasse sur Vinted${comptes.length?` (${comptes.join(', ')})`:''}`}
+              detail={`Un bordereau existe toujours pour une vente : si celle-ci n'apparaît pas, c'est que la capture est en retard${comptes.length?` sur ${comptes.join(', ')}`:''}. Ce n'est pas un colis à préparer, donc il n'est pas dans la liste.`}
+            />
           );
         })()}
         {/* ── LA LISTE : UN COLIS = UNE VENTE QUI ATTEND MON ENVOI ───────────
