@@ -1072,8 +1072,31 @@
     };
     return `<div style="margin-bottom:10px">
       <div class="vrm-m" style="font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:6px">${svgi('dollar-sign', 14)} ${list.length} offre${list.length > 1 ? 's' : ''} à trancher</div>
+      ${autoOffresBloc()}
       ${list.slice(0, 20).map(ligne).join('')}
       <div class="vrm-m" style="font-size:10.5px;opacity:.8">Un bouton = une réponse envoyée depuis ton navigateur, sur ton clic. Rien ne part tout seul : une offre acceptée est une vente ferme.</div>
+    </div>`;
+  }
+  // ── ACCEPTER TOUT SEUL AU-DESSUS DU PRIX PLANCHER ───────────────────────────
+  // Julien : « pour chaque annonce que je poste je mets un prix minimum que
+  // l'app accepte dès que je reçois une offre ».
+  // ⚠️ ÉTEINT PAR DÉFAUT, et il faut un plancher POSÉ SUR L'ANNONCE (dans l'app,
+  //    champ « Min. accepté ») : sans plancher, aucune offre n'est touchée.
+  //    Accepter engage une vente ferme — le seuil est SA décision, prise à
+  //    l'avance, pas celle de la machine.
+  let autoOffres = null;                       // null = pas encore lu
+  function autoOffresBloc() {
+    const on = autoOffres === true;
+    const nMin = ((DATA && DATA.online) || []).filter(o => o.minPrice != null).length;
+    return `<div class="vrm-card" style="margin-bottom:8px;padding:9px">
+      <label style="display:flex;align-items:center;gap:9px;cursor:pointer">
+        <input type="checkbox" id="vrm-auto-offres" ${on ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;accent-color:#0f6b4f">
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-weight:700;font-size:12.5px">Accepter automatiquement au-dessus de mon prix minimum</span>
+          <span class="vrm-m" style="display:block;font-size:11px">${nMin} annonce${nMin > 1 ? 's ont' : ' a'} un prix minimum. Une offre en dessous n'est jamais touchée, et une paire sans minimum non plus.</span>
+        </span>
+      </label>
+      ${on ? '<div class="vrm-m" style="margin-top:6px;font-size:10.5px;opacity:.85">Au plus 3 offres par visite, uniquement sur le compte connecté ici. Une offre acceptée est une VENTE FERME : le minimum se pose annonce par annonce dans l\'app.</div>' : ''}
     </div>`;
   }
   // Les trois réponses possibles, en un clic, sans quitter le panneau.
@@ -1533,6 +1556,22 @@
   }
 
   function wireMessages() {
+    // L'interrupteur d'acceptation automatique. On lit l'état une fois (il vit
+    // dans le service worker, par navigateur) puis on redessine ; sans ce
+    // premier appel la case afficherait « éteint » même quand c'est allumé.
+    const ao = panel.querySelector('#vrm-auto-offres');
+    if (ao) {
+      if (autoOffres === null) {
+        chrome.runtime.sendMessage({ action: 'autoOffresEtat' }, (r) => {
+          const v = !!(r && r.actif);
+          if (autoOffres !== v) { autoOffres = v; render(); } else { autoOffres = v; }
+        });
+      }
+      ao.onchange = () => {
+        const v = !!ao.checked;
+        chrome.runtime.sendMessage({ action: 'autoOffresSet', actif: v }, () => { autoOffres = v; render(); });
+      };
+    }
     const mt = panel.querySelector('#vrm-msg-modele');
     if (mt) mt.oninput = () => { msgModele = mt.value; writeLS('vrm_msg_modele', msgModele); }; // pas de re-render : on garde le focus
     panel.querySelectorAll('.vrm-msg-modele-qr').forEach(b => {
@@ -3047,8 +3086,37 @@
         const n = (st.toPrint || 0) + (st.toShip || 0) + (st.toPickup || 0) + (st.unread || 0) || (DATA.relance || []).length;
         const old = fab.querySelector('.vrm-badge'); if (old) old.remove();
         if (n > 0) { const b = document.createElement('span'); b.className = 'vrm-badge'; b.textContent = n > 99 ? '99+' : String(n); fab.appendChild(b); }
+        ouvrirSiNouveau();
       });
     } catch (_) { dataBusy = false; /* extension rechargée */ }
+  }
+
+  // ── LE PANNEAU S'OUVRE QUAND IL Y A UNE VENTE À TRAITER ─────────────────────
+  // Julien : « je veux que l'extension s'ouvre dès que je reçois… et qu'elle me
+  // dise quand j'ai vendu, si je veux générer les bordereaux ».
+  // ⚠️ SEULEMENT SUR DU NOUVEAU, ET UNE FOIS PAR VENTE. Un panneau qui se rouvre
+  //    à chaque page devient un panneau qu'on ferme sans regarder — c'est le
+  //    défaut qu'on a corrigé partout ailleurs (§5.66). On mémorise donc les
+  //    transactions déjà signalées : une même vente n'ouvre le panneau qu'une
+  //    fois, et rien ne s'ouvre s'il n'y a rien à faire.
+  function ouvrirSiNouveau() {
+    try {
+      if (open) return;                                  // déjà ouvert : on ne touche à rien
+      const aFaire = [
+        ...((DATA && DATA.toShip) || []).map(v => 'v' + (v.tx || v.transaction || '')),
+        ...((DATA && DATA.offers) || []).map(o => 'o' + (o.oid || o.conv || '')),
+      ].filter(k => k.length > 1);
+      if (!aFaire.length) return;
+      let vus = [];
+      try { vus = JSON.parse(readLS('vrm_panel_vus', '[]')) || []; } catch (_) { vus = []; }
+      const dejaVu = new Set(vus);
+      const neufs = aFaire.filter(k => !dejaVu.has(k));
+      if (!neufs.length) return;                         // rien de neuf : on n'ouvre pas
+      // On borne la mémoire : au-delà, ce sont des ventes parties depuis longtemps.
+      writeLS('vrm_panel_vus', JSON.stringify([...aFaire].slice(-200)));
+      tab = ((DATA && DATA.toShip) || []).length ? 'expedier' : 'messages';
+      toggle(true);
+    } catch (_) { /* jamais bloquer la navigation pour ça */ }
   }
 
   function toggle(v) {

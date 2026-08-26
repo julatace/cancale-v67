@@ -678,6 +678,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'setMinPrice' && msg.id) { const ok = await setMinPrice(msg.id, msg.amount); sendResponse({ ok }); return; }
           // Une offre, sur TON clic uniquement (jamais en arrière-plan).
           if (msg.action === 'offre') { const r = await repondreOffre(msg); sendResponse(r); return; }
+          // Acceptation automatique au-dessus du prix plancher : l'interrupteur
+          // vit dans `chrome.storage.local` (par navigateur, comme les autres
+          // réglages d'extension), et il est ÉTEINT par défaut.
+          if (msg.action === 'autoOffresEtat') {
+            const cfg = (await chrome.storage.local.get('vrmAutoOffres')).vrmAutoOffres || {};
+            sendResponse({ ok: true, actif: !!cfg.actif }); return;
+          }
+          if (msg.action === 'autoOffresSet') {
+            await chrome.storage.local.set({ vrmAutoOffres: { actif: !!msg.actif, majAt: Date.now() } });
+            logActivity(msg.actif
+              ? '🏷 Acceptation automatique des offres ACTIVÉE (au-dessus de ton prix plancher)'
+              : '🏷 Acceptation automatique des offres désactivée');
+            sendResponse({ ok: true, actif: !!msg.actif }); return;
+          }
           // Générer un bordereau (formalité obligatoire, aucun argent engagé).
           // ⚠️ UN MESSAGE = UN BORDEREAU, volontairement. Le panneau sait
           //    traiter une SÉLECTION, mais il envoie un message par vente et
@@ -1672,6 +1686,10 @@ async function visiteVinted() {
     // Vinted, ça reste son clic). La carte s'affiche sur la page, sans ouvrir le
     // panneau ; un clic suffit.
     await proposerBordereaux(uid);
+    // ⚠️ APRÈS la moisson : les offres viennent des conversations captées, donc
+    //    travailler avant la capture reviendrait à décider sur des données
+    //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
+    await autoAccepterOffres(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
@@ -1952,6 +1970,140 @@ async function empreinte() {
 //   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/accept   (corps vide)
 //   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/reject   (corps vide)
 //   POST /api/v2/transactions/{tx}/offers  {"offer":{"price":"32","currency":"EUR"}}
+// ══════════════════════════════════════════════════════════════════════════════
+// ACCEPTER AUTOMATIQUEMENT UNE OFFRE ≥ TON PRIX PLANCHER
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, plusieurs fois : « pour chaque annonce que je poste je mets un prix
+// minimum que l'app accepte dès que je reçois une offre ».
+//
+// ⚠️ CE QUI BLOQUAIT AVANT, ET QUI EST LEVÉ (26 août). Le refus précédent
+// n'était pas de principe : accepter engage une VENTE FERME qu'on n'annule pas,
+// et le champ qui dit « cette offre est ENCORE EN ATTENTE » n'avait jamais été
+// observé — les 21 offres captées étaient toutes en 20 (acceptée) ou 30
+// (refusée). Un moteur aurait tranché sur un code inconnu, avec de l'argent au
+// bout. Relevé du 26 août sur **326 offres** dans 557 conversations captées :
+//   10 = En attente (4)   ·   20 = Offre acceptée (118)
+//   30 = Refusée (195)    ·   40 = Annulée (9)
+// Le code « en attente » EXISTE et vaut **10**. On sait donc lire l'état, et le
+// moteur peut être écrit sans deviner.
+//
+// ⚠️ CE QUI DÉCIDE, C'EST TOI, À L'AVANCE. Le plancher est posé annonce par
+// annonce : accepter au-dessus n'est pas une décision de la machine, c'est
+// l'exécution d'un ordre déjà donné — comme un ordre à cours limité. Sans
+// plancher sur CETTE annonce, on ne touche à rien.
+const OFFRE_EN_ATTENTE = 10;                 // relevé en base, pas deviné
+const OFFRES_MAX_PAR_VISITE = 3;             // limite de VOLUME, pas un rythme déguisé
+
+// Le prix plancher d'une annonce. ⚠️ UN SEUL PROPRIÉTAIRE : l'app l'écrit dans
+// `vinted_annonce_numeros[itemId].minPrice` (elle est déjà propriétaire de cette
+// structure — numéro, prix d'achat, boost). L'extension le LIT, et garde sa
+// propre ligne `panel_min_prices` en repli pour ce qui a été saisi ici avant.
+// Deux écrivains sur la même donnée finissent toujours par diverger (§5.15).
+async function planchers() {
+  const out = {};
+  try {
+    const rows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
+    const d = (rows && rows[0] && rows[0].data) || {};
+    for (const k in d) { const n = Number(d[k]); if (isFinite(n) && n > 0) out[String(k)] = n; }
+  } catch (_) {}
+  try {
+    const rows = await sbGet('app_data?id=eq.main&select=nums:data->vinted_annonce_numeros');
+    const nums = (rows && rows[0] && rows[0].nums) || {};
+    for (const k in nums) {
+      const n = Number(nums[k] && nums[k].minPrice);
+      if (isFinite(n) && n > 0) out[String(k)] = n;      // l'app prime
+    }
+  } catch (_) {}
+  return out;
+}
+
+// Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
+// conversations déjà captées (aucun appel Vinted ajouté).
+async function offresEnAttente(uid) {
+  const out = [];
+  try {
+    const rows = await sbGet(`app_data?id=like.harvest_${uid}_conv_*&select=id,data`) || [];
+    // ⚠️ TRI INLINÉ, PAS `parFraicheur` : ce helper vit DANS `buildPanelData`.
+    //    L'appeler d'ici lève une ReferenceError avalée par le try/catch — la
+    //    fonction rendait donc toujours une liste vide, en silence. Troisième
+    //    fois que ce piège se présente (§5.46, §5.48) : dans ce fichier, un
+    //    helper n'existe que dans la fonction où il est déclaré.
+    rows.sort((a, b) => (Date.parse((b.data && b.data.capturedAt) || '') || 0) - (Date.parse((a.data && a.data.capturedAt) || '') || 0));
+    const vus = new Set();
+    for (const r of rows) {
+      const p = (r.data && r.data.payload) || {};
+      const c = p.conversation || p;
+      const cid = String(c.id || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
+      const opp = (c.opposite_user && c.opposite_user.id) != null ? c.opposite_user.id : null;
+      let derniere = null;
+      for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+        if (!m || m.entity_type !== 'offer_request_message') continue;
+        const e = m.entity || {};
+        // Quatre conditions, toutes nécessaires :
+        //  • c'est l'ACHETEUR qui propose (sinon c'est ma propre contre-offre) ;
+        //  • l'offre est la COURANTE (une plus récente l'a peut-être remplacée) ;
+        //  • Vinted la dit EN ATTENTE (10), pas acceptée/refusée/annulée ;
+        //  • le libellé ne dit rien de tranché non plus (ceinture + bretelles).
+        if (opp != null && e.user_id !== opp) continue;
+        if (e.current === false) continue;
+        if (e.status !== OFFRE_EN_ATTENTE) continue;
+        if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
+        const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
+        const prix = Number(String(px == null ? '' : px).replace(',', '.'));
+        if (!isFinite(prix) || prix <= 0) continue;      // sans montant, on ne décide rien
+        if (e.transaction_id == null || e.offer_request_id == null) continue;
+        derniere = { conv: cid, prix,
+          tx: String(e.transaction_id), oid: String(e.offer_request_id),
+          item: String((c.transaction && c.transaction.item_id) || ''),
+          titre: String(c.description || '') };
+      }
+      if (derniere) out.push(derniere);
+    }
+  } catch (_) { /* forme inattendue → aucune offre plutôt qu'une fausse */ }
+  return out;
+}
+
+// Le moteur. Appelé à chaque visite sur Vinted, APRÈS la moisson (sinon on
+// travaillerait sur des offres périmées).
+async function autoAccepterOffres(uid) {
+  try {
+    const cfg = (await chrome.storage.local.get('vrmAutoOffres')).vrmAutoOffres || {};
+    if (!cfg.actif) return 0;                            // ÉTEINT PAR DÉFAUT
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    // ⚠️ Jamais au nom d'un compte qui n'est pas celui connecté dans cet onglet :
+    //    c'est LE signal multi-comptes que Vinted sanctionne (§48).
+    if (await garde(uid, acc)) return 0;
+
+    const [offres, mins] = await Promise.all([offresEnAttente(uid), planchers()]);
+    if (!offres.length) return 0;
+    const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
+    const limite = Date.now() - 7 * 86400000;
+    for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
+
+    let faites = 0;
+    for (const o of offres) {
+      if (faites >= OFFRES_MAX_PAR_VISITE) break;        // limite de volume
+      if (st[o.oid]) continue;                           // déjà traitée : jamais deux fois
+      const min = o.item ? mins[o.item] : null;
+      if (!(isFinite(min) && min > 0)) continue;         // pas de plancher → on ne touche à rien
+      if (o.prix < min) continue;                        // en dessous : c'est à toi de contrer
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi: 'accept' });
+      st[o.oid] = Date.now();
+      await chrome.storage.local.set({ vrmOffresFaites: st });
+      if (r && r.ok) {
+        faites += 1;
+        logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton minimum : ${min} €) — ${o.titre.slice(0, 40)}`);
+      } else {
+        logActivity(`⚠️ Offre de ${o.prix.toFixed(2)} € : Vinted a refusé (${(r && r.error) || '?'})`);
+        if (r && r.code) break;                          // garde-fou atteint : on arrête le lot
+      }
+    }
+    return faites;
+  } catch (_) { return 0; }
+}
+
 async function repondreOffre({ uid, tx, oid, quoi, prix }) {
   if (!uid || !tx) return { ok: false, error: 'offre incomplète' };
   if (quoi !== 'contre' && !oid) return { ok: false, error: 'offre incomplète' };
@@ -3315,8 +3467,12 @@ async function buildPanelData() {
     }
   } catch (_) { /* aucune suggestion plutôt qu'une fausse */ }
 
-  const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
-  const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
+  // ⚠️ MÊME SOURCE QUE LE MOTEUR D'ACCEPTATION (`planchers()`) : l'app est
+  //    propriétaire du prix minimum (`vinted_annonce_numeros[id].minPrice`),
+  //    la ligne `panel_min_prices` n'est qu'un repli pour ce qui a été saisi ici
+  //    avant. Si le panneau affichait un plancher différent de celui qu'applique
+  //    le moteur, on aurait deux vérités sur de l'argent (§5.15).
+  const minPrices = await planchers();
   for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }
   // Prix d'achat posés depuis le panneau (ligne dédiée) → visibles tout de suite,
   // sans attendre que l'app les reporte sur la paire.

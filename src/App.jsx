@@ -16854,6 +16854,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     « quand l'annonce est en ligne, pouvoir relier un achat avec la
                     photo de l'achat ainsi que sa facture d'achat ». */}
                 <div style={{padding:'0 10px'}}><AchatRelie entry={e} numero={num}/></div>
+                {/* ⚠️ LE PRIX MINIMUM ACCEPTÉ — demande de Julien : « pour chaque
+                    annonce que je poste je mets un prix minimum que l'app accepte
+                    dès que je reçois une offre ».
+                    L'app en est PROPRIÉTAIRE (`vinted_annonce_numeros[id].minPrice`,
+                    là où vivent déjà le numéro, le prix d'achat et le boost) ;
+                    l'extension le LIT et l'applique quand l'acceptation
+                    automatique est activée dans son panneau. Deux écrivains sur la
+                    même donnée finiraient par diverger (§5.15).
+                    ⚠️ Il ne se remplit JAMAIS tout seul : sans plancher sur cette
+                    annonce, l'extension ne touche à aucune offre. */}
+                <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${e.minPrice?C.accent:C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}}
+                     title="Offre acceptée automatiquement à partir de ce montant (si tu as activé l'acceptation auto dans l'extension). Vide = aucune offre n'est acceptée toute seule.">
+                  <span style={{fontSize:11,color:e.minPrice?C.accent:C.muted,fontWeight:600}}>Min. accepté</span>
+                  <ChampSaisie value={e.minPrice ?? ''} onCommit={v=>updatePair(item,{minPrice:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                  <span style={{fontSize:11,color:C.muted}}>€</span>
+                </div>
                 {num && (
                   <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>💡 boost</span>
