@@ -3621,10 +3621,18 @@ const TABS=[
 // l'onglet actif. Un jeu d'icônes au trait donne à la barre du bas le calme
 // d'une app native (l'emoji reste ailleurs, là où il sert de repère rapide).
 const ICON_PATHS = {
+  // Menu des écrans (téléphone) : trois traits, le signe universel — et surtout
+  // le MÊME dessin au trait que le reste de la barre, pas un « ☰ » typographique
+  // qui serait rendu par la police du système.
+  // ⚠️ CHAQUE ENTRÉE DOIT ÊTRE DU JSX, PAS UNE CHAÎNE. `Icon` fait `{d}` dans
+  // la <svg> : une chaîne y devient du TEXTE, donc l'icône est INVISIBLE. C'est
+  // le cas de `pin` et `nav` juste en dessous depuis leur ajout — les deux
+  // repères des points relais ne se dessinaient pas.
+  menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
   // Repère de carte et flèche d'itinéraire : les points relais affichaient 📍
   // et 🧭, deux emojis au milieu de logos de transporteurs au trait.
-  pin:  'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z M12 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
-  nav:  'M3 11 21 3l-8 18-2-7-8-3Z',
+  pin:  <><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="9.5" r="2.2"/></>,
+  nav:  <><path d="M3 11 21 3l-8 18-2-7-8-3Z"/></>,
   // ── Icônes ajoutées pour remplacer les emojis utilisés COMME icônes ───────
   // ⚠️ Un emoji est dessiné par le système d'exploitation : il n'a ni la même
   // graisse, ni la même grille, ni la même couleur que le reste de l'interface.
@@ -4243,14 +4251,88 @@ function SideBar({ tab, setTab }) {
   );
 }
 
+// ── MENU DES ÉCRANS, EN HAUT À GAUCHE (téléphone) ──────────────────────────
+// Julien : « je peux peut-être mettre un menu déroulant à gauche, en haut,
+// plutôt que de faire en bas avec le plus ».
+// Il a raison sur le fond : « Plus » était un SIXIÈME bouton dans une barre de
+// cinq, d'un genre différent des autres (il n'ouvre pas un écran, il ouvre une
+// liste) — et il changeait de libellé selon l'écran affiché, donc la barre du
+// bas n'avait pas toujours la même tête. Ici : la barre du bas porte les cinq
+// écrans du quotidien, un point c'est tout, et LE menu donne accès à tout.
+// ⚠️ Sur ordinateur il n'existe pas : la barre latérale montre déjà les neuf
+//    écrans d'un coup, un bouton de plus ne ferait que dupliquer.
+function MenuEcrans({ tab, setTab }) {
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => { setOpen(false); }, [tab]);
+  React.useEffect(() => {
+    if (!open) return;
+    const esc = e => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [open]);
+  const groupes = [
+    { titre: 'Au quotidien', items: BOTTOM_TABS },
+    { titre: 'Le reste',     items: PLUS_TABS },
+  ];
+  return (
+    <>
+      <button type="button" onClick={()=>setOpen(o=>!o)} aria-label="Tous les écrans" aria-expanded={open}
+        style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,
+          borderRadius:3,border:`1px solid ${open?C.accent:C.border}`,background:open?`${C.accent}14`:C.bg,
+          color:open?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+        <Icon name={open?'close':'menu'} size={19}/>
+      </button>
+      {open && (
+        <div data-noswipe onClick={()=>setOpen(false)}
+          style={{position:'fixed',inset:0,zIndex:80,background:'rgba(21,17,16,.42)',
+            backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)'}}>
+          {/* Le panneau descend DU HAUT, sous le bouton qui l'a ouvert : une
+              feuille qui monte du bas pour un bouton du haut, le geste et le
+              mouvement se contredisent. */}
+          <div onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans"
+            style={{position:'absolute',left:0,right:0,top:0,background:C.chrome,color:C.onChrome,
+              borderBottom:`1px solid ${C.chromeLine}`,boxShadow:'0 14px 40px rgba(21,17,16,.28)',
+              padding:'calc(8px + env(safe-area-inset-top)) 10px 12px',
+              animation:'cancaleSheet .2s cubic-bezier(.32,.72,0,1)',maxHeight:'86vh',overflowY:'auto'}}>
+            {groupes.map(g => (
+              <div key={g.titre} style={{marginBottom:4}}>
+                <div className="vrm-label" style={{color:C.chromeMuted,padding:'9px 8px 5px'}}>{g.titre}</div>
+                {g.items.map(t => { const on = tab === t.id; return (
+                  <button key={t.id} type="button" role="menuitem" onClick={()=>{ setTab(t.id); setOpen(false); }}
+                    aria-current={on?'page':undefined}
+                    style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
+                      padding:'11px 10px',marginBottom:2,borderRadius:3,border:'none',cursor:'pointer',fontFamily:'inherit',
+                      background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.onChrome,
+                      fontSize:15,fontWeight:on?600:500}}>
+                    <Icon name={t.icon} size={20} style={{opacity:on?1:.7,flexShrink:0}}/>
+                    <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
+                  </button>
+                );})}
+              </div>
+            ))}
+            <button type="button" role="menuitem" onClick={()=>{ setTab('settings'); setOpen(false); }}
+              aria-current={tab==='settings'?'page':undefined}
+              style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',marginTop:6,
+                padding:'11px 10px',borderRadius:3,border:`1px solid ${C.chromeLine}`,cursor:'pointer',fontFamily:'inherit',
+                background:tab==='settings'?C.chromeLine:'transparent',color:C.chromeMuted,fontSize:14,fontWeight:500}}>
+              <Icon name="gear" size={19}/><span>Réglages</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function BottomBar({tab,setTab}) {
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
-  const [plus,setPlus]=React.useState(false);              // feuille « Plus »
-  const dansPlus = PLUS_TABS.some(t=>t.id===tab);
-  // Changer d'écran referme la feuille (sinon elle reste ouverte par-dessus).
-  React.useEffect(()=>{ setPlus(false); },[tab]);
+  // ⚠️ LE BOUTON « PLUS » A DÉMÉNAGÉ EN HAUT À GAUCHE (`MenuEcrans`). Il était
+  // un sixième bouton d'un genre différent des cinq autres — il n'ouvrait pas
+  // un écran mais une liste — et son libellé changeait selon l'écran affiché,
+  // donc la barre n'avait jamais tout à fait la même tête. Elle porte
+  // maintenant les CINQ écrans du quotidien, et rien d'autre.
   React.useEffect(()=>{
     const isField=el=>el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT');
     const onIn=e=>{ if(isField(e.target)) setKbOpen(true); };
@@ -4264,34 +4346,6 @@ function BottomBar({tab,setTab}) {
     // d'être coupé net par un bandeau opaque. L'onglet actif porte une pastille
     // colorée — repère visuel net, plus lisible qu'un simple changement de teinte.
     <>
-    {plus && (
-      <div data-noswipe onClick={()=>setPlus(false)}
-        style={{position:'fixed',inset:0,zIndex:70,background:'rgba(15,23,42,.38)',
-          backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)'}}>
-        <div onClick={e=>e.stopPropagation()} role="menu" aria-label="Autres écrans"
-          style={{position:'absolute',left:0,right:0,bottom:0,background:C.surface,
-            borderTopLeftRadius:20,borderTopRightRadius:20,borderTop:`1px solid ${C.border}`,
-            boxShadow:'0 -12px 40px rgba(16,32,24,.18)',padding:'10px 10px calc(14px + env(safe-area-inset-bottom))',
-            animation:'cancaleSheet .22s cubic-bezier(.32,.72,0,1)'}}>
-          <div style={{width:36,height:4,borderRadius:3,background:C.border,margin:'2px auto 10px'}}/>
-          {PLUS_TABS.map(t=>{ const on=tab===t.id; return (
-            <button key={t.id} type="button" role="menuitem" onClick={()=>{ setTab(t.id); setPlus(false); }}
-              style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
-                padding:'12px 12px',borderRadius:4,border:'none',cursor:'pointer',fontFamily:'inherit',
-                background:on?`${C.accent}14`:'transparent',color:on?C.accent:C.text}}>
-              <span aria-hidden="true" style={{display:'flex',flexShrink:0,width:34,height:34,borderRadius:3,
-                alignItems:'center',justifyContent:'center',background:on?`${C.accent}1f`:C.bg,color:on?C.accent:C.muted}}>
-                <Icon name={t.icon} size={19}/>
-              </span>
-              <span style={{minWidth:0,flex:'1 1 auto'}}>
-                <span style={{display:'block',fontSize:15,fontWeight:on?600:500}}>{t.label}</span>
-                <span style={{display:'block',fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.desc}</span>
-              </span>
-            </button>
-          );})}
-        </div>
-      </div>
-    )}
     <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'hidden',
       /* LA NAVIGATION EST À L'ENCRE — sur téléphone c'est elle qui porte la
          signature, comme la barre latérale sur ordinateur. */
@@ -4312,21 +4366,6 @@ function BottomBar({tab,setTab}) {
             overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
         </button>
       );})}
-      {/* « Plus » : même gabarit que les autres, et il s'allume quand l'écran
-          affiché vient de derrière (sinon on ne saurait plus où on est). */}
-      <button type="button" onClick={()=>setPlus(true)} aria-label="Plus d'écrans"
-        aria-expanded={plus} aria-current={dansPlus?'page':undefined} style={{
-        flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
-        background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
-        color:dansPlus?C.accent:C.chromeMuted,transition:'color .18s ease'}}>
-        <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
-          width:38,height:26,opacity:dansPlus?1:0.62}}>
-          <Icon name="more" size={23} style={{strokeWidth:dansPlus?2:1.7}}/>
-        </span>
-        <span style={{fontSize:9,fontWeight:dansPlus?600:500,whiteSpace:'nowrap',letterSpacing:0.1}}>
-          {dansPlus ? (PLUS_TABS.find(t=>t.id===tab)||{}).label : 'Plus'}
-        </span>
-      </button>
     </nav>
     </>
   );
@@ -14737,8 +14776,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const wca = sem.eur;
               if(!sem.n && !toShip.length) return null;
               return (
-                <div style={{marginBottom:14,border:`1px solid ${C.accent}33`,background:`${C.accent}0a`,borderRadius:4,padding:'13px 15px'}}>
-                  <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:9,textTransform:'uppercase',letterSpacing:0.6}}>Ta semaine</div>
+                /* ⚠️ SURFACE NEUTRE. Juste au-dessus, « Vendu aujourd'hui » est
+                   déjà un bloc teinté à l'accent : deux encadrés de la même
+                   couleur qui se suivent, plus rien ne ressort et l'écran a
+                   l'air « décoré » (§5.54). Ici la couleur ne sert qu'aux
+                   chiffres. */
+                <div style={{marginBottom:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'13px 15px',boxShadow:C.shadow||'none'}}>
+                  <div className="vrm-label" style={{color:C.muted,marginBottom:9}}>Ta semaine</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 90px'}}>
                       <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1}}>{sem.n}</div>
@@ -14777,7 +14821,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!loading && jobs.length>0 && (
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
                 {jobs.map((j,i)=>(
-                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:4,border:`1px solid ${j.color}44`,background:`${j.color}0e`,cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+                  /* ⚠️ SURFACE NEUTRE ICI AUSSI. Quatre cartes, quatre teintes
+                     différentes, empilées : c'est exactement ce qui faisait
+                     « brouillon ». La couleur reste sur l'icône et le chevron —
+                     elle sert à reconnaître la nature de l'action, pas à
+                     repeindre un quart de l'écran. */
+                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
                     {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                         avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
                         empilés, c'est ce qui faisait « application générée ».
@@ -14795,50 +14844,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
 
-            {/* 🏷️ OFFRES REÇUES (demande de Julien) — une offre = presque une
-                vente, plus utile qu'un simple « réponds aux messages ». L'email
-                d'offre ne porte pas de photo, alors on la retrouve en associant
-                le titre de l'offre à une de tes annonces en ligne. Répondre se
-                fait sur Vinted (l'app n'envoie pas de message, cf. §5). */}
+            {/* 🏷️ OFFRES REÇUES — JUSTE LE NOMBRE (demande de Julien : « pour
+                les offres reçues, tu peux juste mettre le nombre »). Avant :
+                six cartes avec photo, titre, date et deux boutons chacune, soit
+                un pavé de 300 px sur l'écran d'accueil. Une offre se répond sur
+                Vinted de toute façon (l'app n'envoie pas de message, §5) — ce
+                qu'on veut savoir ici, c'est COMBIEN, et y aller. */}
             {!loading && (offers||[]).length>0 && (()=>{
-              // OFFRE ACCEPTÉE = l'article est désormais VENDU (elle sort d'elle-même
-              // dès que la vente est moissonnée). + offres marquées « répondu » à la
-              // main. + on ne garde que les 14 derniers jours (une offre expire vite).
+              // Une offre ACCEPTÉE sort d'elle-même dès que la vente est
+              // moissonnée. + celles marquées « traité ». + 14 jours max (une
+              // offre Vinted expire vite).
               const soldTitles = new Set((sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled').map(o=>normTitle(o.title)).filter(Boolean));
               const recent=(offers||[]).filter(o=>{
                 const d=o.receivedAt?new Date(o.receivedAt).getTime():0;
                 if(d < Date.now()-14*86400000) return false;
-                if(offersDone.has(offerKey(o))) return false;                 // « ✓ Répondu » à la main
-                if(soldTitles.has(normTitle(o.article||''))) return false;    // acceptée → vendue
+                if(offersDone.has(offerKey(o))) return false;
+                if(soldTitles.has(normTitle(o.article||''))) return false;
                 return true;
-              }).sort((a,b)=>new Date(b.receivedAt||0)-new Date(a.receivedAt||0)).slice(0,6);
+              });
               if(!recent.length) return null;
-              // Photo : l'offre n'en porte pas → on la retrouve sur une annonce en
-              // ligne du même titre, sinon sur une vente moissonnée (vraie photo
-              // Vinted). Sinon rien (placeholder honnête).
-              const photoFor=(t)=>{const n=normTitle(t||''); if(!n) return null;
-                const inList=(listings.items||[]).find(it=>normTitle(it.title)===n); if(inList&&inList.photo) return inList.photo;
-                const inSold=(sales.items||[]).find(o=>normTitle(o.title)===n); if(inSold) return orderPhoto(inSold);
-                return null;};
               return (
-                <div style={{marginTop:16}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.6,marginBottom:8}}>🏷️ Offres reçues ({recent.length})</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                    {recent.map((o,i)=>{
-                      const ph=photoFor(o.article);
-                      return (
-                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 11px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',flexWrap:'wrap'}}>
-                          <div style={{width:44,height:44,borderRadius:3,overflow:'hidden',background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{ph?<img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>🏷️</span>}</div>
-                          <div style={{flex:'1 1 130px',minWidth:0}}>
-                            <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.article||'Article'}</div>
-                            <div style={{fontSize:11,color:C.muted,marginTop:1}}>{o.montant?`Offre : ${o.montant}`:'Offre reçue'}{o.receivedAt?` · ${new Date(o.receivedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`:''}</div>
-                          </div>
-                          <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',fontSize:11.5,fontWeight:700,color:'#fff',background:C.accent,borderRadius:3,padding:'7px 11px'}}>Répondre</a>
-                          <button type="button" onClick={()=>markOfferDone(o)} title="J'ai répondu / traité cette offre" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>✓ Répondu</button>
-                        </div>
-                      );
-                    })}
+                <div style={{marginTop:10,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                  <div style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="tag" size={20}/></div>
+                  <div style={{flex:'1 1 120px',minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.text}}>{recent.length} offre{recent.length>1?'s':''} reçue{recent.length>1?'s':''}</div>
+                    <div style={{fontSize:12,color:C.muted,marginTop:2}}>Une offre acceptée, c'est presque une vente.</div>
                   </div>
+                  <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer"
+                     style={{flexShrink:0,textDecoration:'none',fontSize:12.5,fontWeight:700,color:C.onAccent,background:C.accent,borderRadius:3,padding:'8px 12px'}}>Répondre</a>
+                  {/* Sans ce bouton le compteur ne redescendrait qu'au bout de
+                      14 jours : les offres traitées sur Vinted n'ont aucun signal
+                      qui revienne jusqu'ici. */}
+                  <button type="button" onClick={()=>recent.forEach(markOfferDone)} title="Tout marquer comme traité"
+                     style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>✓</button>
                 </div>
               );
             })()}
@@ -20880,6 +20918,9 @@ export default function App() {
         background:C.glass||C.surface,backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
         borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto',visibility: ordi ? 'hidden' : undefined}}>
+          {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
+              les montre déjà tous : ce bouton n'y existe pas. */}
+          {!ordi && <MenuEcrans tab={tab} setTab={setTab}/>}
           {canBack && <button type="button" onClick={goBack} title="Retour" aria-label="Retour"
             style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:3,border:`1px solid ${C.border}`,background:C.bg,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1}}>‹</button>}
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
