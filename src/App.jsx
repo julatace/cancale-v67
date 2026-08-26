@@ -4065,7 +4065,12 @@ function ScreenHead({ icon, title, desc, right }) {
             <span aria-hidden="true" style={{display:'block',width:26,height:2,background:C.accent}}/>
           </div>
           <h2 className="vrm-display" style={{margin:0,fontSize:'clamp(27px, 4.6vw, 38px)',fontWeight:700,color:C.text,lineHeight:1.02}}>{title}</h2>
-          {desc && <div style={{fontSize:12.5,color:C.muted,marginTop:8,lineHeight:1.5,maxWidth:640}}>{desc}</div>}
+          {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
+              d'informations partout, c'est horrible ». Ce paragraphe explique ce
+              que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
+              jours, en haut de chaque page, avant le moindre contenu utile.
+              Le texte reste passé par les appelants (rien à défaire si on veut
+              le remettre, par exemple pour un nouvel utilisateur). */}
         </div>
         {right && <div style={{flexShrink:0}}>{right}</div>}
       </div>
@@ -10120,11 +10125,16 @@ function VintedAccounts({ accounts, setAccounts }) {
      memes numeros) ;
    - marquer En ligne / Vendu / Stock.
    Stocke dans la cle localStorage synchronisee "vinted_inventory". */
+// ⚠️ COULEURS ALIGNÉES SUR L'IDENTITÉ (§5.65). Ces quatre teintes étaient
+// codées en dur depuis l'origine (vert menthe, bleu, rouge, orange vif) : elles
+// survivaient à tous les changements de palette et faisaient réapparaître
+// l'ancienne identité au milieu de la nouvelle — les badges N° restaient VERTS
+// sur une app vermillon. Elles suivent maintenant la famille papier/encre.
 const INV_STATUS = {
-  online:       { label: 'En ligne',      color: '#22a06b', icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#2f80ed', icon: '⏳' },
-  sold:         { label: 'Vendu',         color: '#c0392b', icon: '💸' },
-  stock:        { label: 'Stock',         color: '#f39c12', icon: '📦' },
+  online:       { label: 'En ligne',      color: '#1F7A5C', icon: '🟢' },
+  pending_sale: { label: 'Vente en cours', color: '#1F5A78', icon: '⏳' },
+  sold:         { label: 'Vendu',         color: '#D2401E', icon: '💸' },
+  stock:        { label: 'Stock',         color: '#96650B', icon: '📦' },
 };
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
@@ -16229,18 +16239,193 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             de numéro, un compte muet ou une annonce disparue était donc
             INATTEIGNABLE — de l'affichage mort. Ils ont désormais leur propre
             dépliant, qui ne s'affiche que s'il y a vraiment quelque chose. */}
-        {nAutresSignalements > 0 && (
-          <button type="button" onClick={() => setDiagOpen(v => !v)}
-            style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,
-              borderRadius:4,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
-            <span aria-hidden="true" style={{flexShrink:0,color:C.warn,display:'flex'}}><Icon name="alert" size={17}/></span>
-            <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
-              {`${nAutresSignalements} signalement${nAutresSignalements>1?'s':''}`}
-            </span>
-            <span style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{diagOpen ? 'Masquer' : 'Voir'}</span>
-          </button>
+        {/* ⚠️ TROIS DÉPLIANTS DE CONSEILS EMPILÉS, C'ÉTAIT DEUX DE TROP.
+            « N signalements », « N paires qui te reviennent » et « Conseils &
+            signalements » posaient trois lignes à ouvrir l'une sous l'autre,
+            avant la moindre annonce. Les signalements (compte muet, annonces
+            disparues, comptes refusés) rejoignent le panneau « Conseils &
+            signalements », qui existait déjà et compte déjà ce genre de
+            choses. Un seul endroit où regarder. */}
+        {/* Visibilité par compte : une puce par compte qui a des annonces, avec
+            son nb en ligne. Tape pour MASQUER (compte bloqué/fermé → ses annonces
+            disparaissent partout) ou réafficher. Réglé le souci « 2 comptes
+            bloqués dont les annonces restaient affichées ». */}
+        {listings.items && listings.items.length>0 && (()=>{
+          const counts = {};
+          for (const it of listings.items) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; counts[uid] = (counts[uid]||0)+1; }
+          const uids = Object.keys(counts);
+          if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // 1 seul compte visible : inutile
+          const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
+          const anyHidden = uids.some(u=>hiddenAccts.has(u));
+          return (
+            <div style={{marginBottom:12,display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontSize:11,fontWeight:600,color:C.muted}}>Comptes :</span>
+              {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
+                const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
+                const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
+                // ÂGE DES DONNÉES DE CE COMPTE. L'extension ne rafraîchit en
+                // direct que le compte connecté dans le navigateur : les autres
+                // peuvent dater de plusieurs semaines. Sans cette pastille, le
+                // compteur « 96 annonces » d'un compte figé depuis 26 jours
+                // passait pour du direct.
+                const ms = harvestAgeMs(uid, 'listings');
+                const j = ms != null ? Math.floor(ms/86400000) : null;
+                const vieux = j != null && j >= 2;
+                const col = off ? C.border : vieux ? (j >= 7 ? C.danger : C.warn) : C.accent;
+                return (
+                  <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)}
+                    title={off ? 'Masqué — tape pour réafficher ses annonces'
+                          : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
+                          : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
+                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
+                    {off?'🚫 ':''}{name} · {counts[uid]}
+                    {!off && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
+                  </button>
+                );
+              })}
+              {/* Une seule phrase, sous les puces, quand au moins un compte traîne. */}
+              {(()=>{
+                const vieux = uids.filter(u => { const ms = harvestAgeMs(u, 'listings'); return ms != null && ms >= 2*86400000 && !hiddenAccts.has(u) && !blockedAccts.has(u); });
+                if (!vieux.length) return null;
+                const n = vieux.reduce((t,u)=>t+(counts[u]||0), 0);
+                return (
+                  <details style={{flex:'1 1 100%',marginTop:2}}>
+                    <summary style={{listStyle:'none',cursor:'pointer',fontSize:11,color:C.muted}}>
+                      <b style={{color:C.warn}}>{n} annonce{n>1?'s':''}</b> {vieux.length>1?'viennent de comptes':'vient d\u2019un compte'} dont les données datent
+                    </summary>
+                    <span style={{display:'block',fontSize:11,color:C.muted,lineHeight:1.5,marginTop:4}}>
+                      L'extension ne rafraîchit en direct que le compte <b style={{color:C.text}}>connecté dans ton navigateur</b> — connecte-toi sur {vieux.length>1?'ces comptes':'ce compte'} et ouvre ton dressing pour les remettre à jour.
+                    </span>
+                  </details>
+                );
+              })()}
+              {/* ⚠️ Phrase d'explication permanente retirée : elle apprend une
+                  règle qu'on comprend au premier tap, puis reste là tous les
+                  jours au-dessus du stock. */}
+            </div>
+          );
+        })()}
+        {listings.loading && <Skeleton variant="card" count={6}/>}
+        {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
+        {listings.items && !listings.error && listings.items.length===0 && (
+          <EmptyState icon="🟢" title="Aucune annonce en ligne"
+            desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
+            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:4}}>Ouvrir Vinted ↗</a>}/>
         )}
-        {diagOpen && (<>
+        {listings.items && listings.items.length>0 && (<>
+          {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
+              Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
+              affichait un instantané périmé en le faisant passer pour du direct
+              → une paire vendue restait « en ligne » indéfiniment). */}
+          {/* ⚠️ LE BANDEAU « N j SANS CAPTURE » EST SUPPRIMÉ — DOUBLON.
+              Il disait exactement ce que dit déjà la ligne « X annonces
+              viennent d'un compte dont les données datent », posée juste sous
+              les puces de comptes (donc à côté de l'information qu'elle
+              qualifie, et repliée). Deux blocs pour la même notion (§11), dont
+              un plein écran au-dessus de la grille. */}
+          {numeroReprises.length > 0 && (
+            <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:4,padding:'10px 12px'}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} paire{numeroReprises.length>1?'s':''} déjà connue{numeroReprises.length>1?'s':''} ?</div>
+              {/* ⚠️ Une paire VENDUE n'est jamais remise à son ancien numéro toute
+                  seule : elle est partie, et si elle revient (litige, retour) elle
+                  revient dans un autre carton. On le PROPOSE, il tranche. */}
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Ces annonces ont reçu un numéro NEUF. Si c'est bien la même paire et qu'elle est toujours dans SA boîte, remets son numéro d'origine.</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {numeroReprises.slice(0,8).map((r,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'7px 9px'}}>
+                    <div style={{width:34,height:34,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      {r.item.photo?<img src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · 🏠 ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                      {r.vendue && <div style={{fontSize:10,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cette paire a été VENDUE sous le N°{r.orphan.e.numero} — ne le remets que si elle t'est revenue et qu'elle est dans sa boîte</div>}
+                    </div>
+                    <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:3,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Bandeau de stats façon outil pro */}
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.n} en ligne</span>
+            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
+            {annStats.hasFav && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
+            {annStats.hasView && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>👁 {annStats.views}</span>}
+            {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
+            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
+
+            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:3,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
+          </div>
+          {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
+              Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
+              auto, marquées vendues, qui dorment, dates inconnues, repricing).
+              Ils sont regroupés derrière un seul bouton avec un compteur : on voit
+              qu'il y a quelque chose à regarder, sans que ça mange l'écran. */}
+          {(()=>{
+            const n = (emailSoldIds.size>0?1:0) + (soldManual.size>0?1:0)
+              + ((annStats.sleeping>0 && annSort!=='sleeping')?1:0)
+              + ((annStats.n>0 && annStats.datesKnown===0)?1:0)
+              + (repriceList.length>0?1:0)
+              + nAutresSignalements
+              + (retoursAttendus.length>0?1:0);
+            if (!n) return null;
+            return (
+              <button type="button" onClick={()=>setTipsOpen(v=>!v)}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+                <span style={{fontSize:15}}>💡</span>
+                <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Conseils & signalements</span>
+                <span style={{fontSize:11,fontWeight:700,color:'#fff',background:C.accent,borderRadius:3,padding:'1px 8px'}}>{n}</span>
+                <span style={{fontSize:13,color:C.muted,transform:tipsOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
+              </button>
+            );
+          })()}
+          {tipsOpen && (<>
+          {/* Les paires qui reviennent (retour, litige) : une liste de
+              travail, donc ici et pas au-dessus du stock. */}
+          {retoursAttendus.length > 0 && (
+            <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:4,padding:'10px 12px'}}>
+              {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (
+                <button type="button" onClick={()=>setRetoursOpen(v=>!v)}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                  <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:700,color:C.warn}}>{retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}{rec>0?` · ${rec} déjà reçue${rec>1?'s':''}`:''}</span>
+                  <span style={{fontSize:11.5,color:C.muted,fontWeight:600,flexShrink:0}}>{retoursOpen?'Masquer':'Voir'}</span>
+                </button>
+              ); })()}
+              {retoursOpen && (
+              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier. <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</div>)}
+              {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
+                  const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
+                  const col = lab.col();
+                  const recu = isRetourRecu(r.o);
+                  return (
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:3,padding:'7px 9px'}}>
+                      <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:3,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
+                      <div style={{width:34,height:34,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {orderPhoto(r.o)?<img src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
+                      </div>
+                      <div style={{flex:'1 1 120px',minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
+                        <div style={{fontSize:11,fontWeight:500,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
+                          <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'Reçue — à republier':lab.txt}</span>
+                          <AcctTag acc={r.o._acc} name={accNameOf(r.o._acc)}/>
+                          {r.cell && <span style={{color:C.blue||C.accent,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>{garageCellLabel(r.cell)}</span>}
+                          {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
+                        </div>
+                      </div>
+                      {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
+                      <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:3,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
+                      <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
+                    </div>
+                  );
+                })}
+              </div>)}
+            </div>
+          )}
+          {/* Les signalements (compte muet, annonces disparues, comptes
+              refusés) vivent ici : un seul panneau à ouvrir. */}
         {/* COMPTE MUET : il a des paires numérotées mais ne renvoie plus AUCUNE
             annonce. C'est la signature d'un masquage par Vinted. On le dit tout
             de suite, sinon on croit avoir perdu son stock. */}
@@ -16310,190 +16495,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </div>
         )}
-        </>)}
-        {/* Visibilité par compte : une puce par compte qui a des annonces, avec
-            son nb en ligne. Tape pour MASQUER (compte bloqué/fermé → ses annonces
-            disparaissent partout) ou réafficher. Réglé le souci « 2 comptes
-            bloqués dont les annonces restaient affichées ». */}
-        {listings.items && listings.items.length>0 && (()=>{
-          const counts = {};
-          for (const it of listings.items) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; counts[uid] = (counts[uid]||0)+1; }
-          const uids = Object.keys(counts);
-          if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // 1 seul compte visible : inutile
-          const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
-          const anyHidden = uids.some(u=>hiddenAccts.has(u));
-          return (
-            <div style={{marginBottom:12,display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
-              <span style={{fontSize:11,fontWeight:600,color:C.muted}}>Comptes :</span>
-              {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
-                const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
-                const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
-                // ÂGE DES DONNÉES DE CE COMPTE. L'extension ne rafraîchit en
-                // direct que le compte connecté dans le navigateur : les autres
-                // peuvent dater de plusieurs semaines. Sans cette pastille, le
-                // compteur « 96 annonces » d'un compte figé depuis 26 jours
-                // passait pour du direct.
-                const ms = harvestAgeMs(uid, 'listings');
-                const j = ms != null ? Math.floor(ms/86400000) : null;
-                const vieux = j != null && j >= 2;
-                const col = off ? C.border : vieux ? (j >= 7 ? C.danger : C.warn) : C.accent;
-                return (
-                  <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)}
-                    title={off ? 'Masqué — tape pour réafficher ses annonces'
-                          : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
-                          : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
-                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
-                    {off?'🚫 ':''}{name} · {counts[uid]}
-                    {!off && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
-                  </button>
-                );
-              })}
-              {/* Une seule phrase, sous les puces, quand au moins un compte traîne. */}
-              {(()=>{
-                const vieux = uids.filter(u => { const ms = harvestAgeMs(u, 'listings'); return ms != null && ms >= 2*86400000 && !hiddenAccts.has(u) && !blockedAccts.has(u); });
-                if (!vieux.length) return null;
-                const n = vieux.reduce((t,u)=>t+(counts[u]||0), 0);
-                return (
-                  <details style={{flex:'1 1 100%',marginTop:2}}>
-                    <summary style={{listStyle:'none',cursor:'pointer',fontSize:11,color:C.muted}}>
-                      <b style={{color:C.warn}}>{n} annonce{n>1?'s':''}</b> {vieux.length>1?'viennent de comptes':'vient d\u2019un compte'} dont les données datent
-                    </summary>
-                    <span style={{display:'block',fontSize:11,color:C.muted,lineHeight:1.5,marginTop:4}}>
-                      L'extension ne rafraîchit en direct que le compte <b style={{color:C.text}}>connecté dans ton navigateur</b> — connecte-toi sur {vieux.length>1?'ces comptes':'ce compte'} et ouvre ton dressing pour les remettre à jour.
-                    </span>
-                  </details>
-                );
-              })()}
-              {anyHidden && <span style={{fontSize:11,color:C.muted,flex:'1 1 100%'}}>Un compte masqué n'apparaît ni dans les annonces ni dans la compta. Retape-le pour le réafficher.</span>}
-            </div>
-          );
-        })()}
-        {listings.loading && <Skeleton variant="card" count={6}/>}
-        {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
-        {listings.items && !listings.error && listings.items.length===0 && (
-          <EmptyState icon="🟢" title="Aucune annonce en ligne"
-            desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
-            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:4}}>Ouvrir Vinted ↗</a>}/>
-        )}
-        {listings.items && listings.items.length>0 && (<>
-          {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
-              Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
-              affichait un instantané périmé en le faisant passer pour du direct
-              → une paire vendue restait « en ligne » indéfiniment). */}
-          {(()=>{
-            let oldest = null;
-            for (const a of accounts) {
-              if (acctOff(a.vinted_user_id)) continue;   // masqué/retiré : hors compta, hors alerte
-              const ms = harvestAgeMs(a.vinted_user_id, 'listings');
-              if (ms != null && (oldest == null || ms > oldest)) oldest = ms;
-            }
-            if (oldest == null || oldest < 7*86400000) return null; // moins d'une semaine : rien à dire
-            const j = Math.floor(oldest/86400000);
-            return (
-              <Notice tone="warn" icon="clock"
-                value={`${j} j`}
-                title="sans capture de l'extension"
-                desc="L'app interroge donc Vinted en direct, pour ne pas t'afficher de vieilles annonces."
-                detail="L'extension capte pendant que tu navigues sur vinted.fr. Tu n'y es pas repassé depuis, alors l'app va chercher elle-même — c'est plus lent et moins discret. Un passage sur vinted.fr suffit à revenir à la lecture normale."/>
-            );
-          })()}
-          {retoursAttendus.length > 0 && (
-            <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:4,padding:'10px 12px'}}>
-              {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (
-                <button type="button" onClick={()=>setRetoursOpen(v=>!v)}
-                  style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                  <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:700,color:C.warn}}>{retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}{rec>0?` · ${rec} déjà reçue${rec>1?'s':''}`:''}</span>
-                  <span style={{fontSize:11.5,color:C.muted,fontWeight:600,flexShrink:0}}>{retoursOpen?'Masquer':'Voir'}</span>
-                </button>
-              ); })()}
-              {retoursOpen && (
-              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier. <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</div>)}
-              {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
-                  const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
-                  const col = lab.col();
-                  const recu = isRetourRecu(r.o);
-                  return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:3,padding:'7px 9px'}}>
-                      <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:3,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
-                      <div style={{width:34,height:34,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {orderPhoto(r.o)?<img src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
-                      </div>
-                      <div style={{flex:'1 1 120px',minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
-                        <div style={{fontSize:11,fontWeight:500,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
-                          <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'Reçue — à republier':lab.txt}</span>
-                          <AcctTag acc={r.o._acc} name={accNameOf(r.o._acc)}/>
-                          {r.cell && <span style={{color:C.blue||C.accent,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>{garageCellLabel(r.cell)}</span>}
-                          {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
-                        </div>
-                      </div>
-                      {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
-                      <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:3,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
-                      <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
-                    </div>
-                  );
-                })}
-              </div>)}
-            </div>
-          )}
-          {numeroReprises.length > 0 && (
-            <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:4,padding:'10px 12px'}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} paire{numeroReprises.length>1?'s':''} déjà connue{numeroReprises.length>1?'s':''} ?</div>
-              {/* ⚠️ Une paire VENDUE n'est jamais remise à son ancien numéro toute
-                  seule : elle est partie, et si elle revient (litige, retour) elle
-                  revient dans un autre carton. On le PROPOSE, il tranche. */}
-              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Ces annonces ont reçu un numéro NEUF. Si c'est bien la même paire et qu'elle est toujours dans SA boîte, remets son numéro d'origine.</div>
-              <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {numeroReprises.slice(0,8).map((r,i)=>(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'7px 9px'}}>
-                    <div style={{width:34,height:34,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      {r.item.photo?<img src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
-                    </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · 🏠 ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
-                      {r.vendue && <div style={{fontSize:10,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cette paire a été VENDUE sous le N°{r.orphan.e.numero} — ne le remets que si elle t'est revenue et qu'elle est dans sa boîte</div>}
-                    </div>
-                    <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:3,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {/* Bandeau de stats façon outil pro */}
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.n} en ligne</span>
-            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
-            {annStats.hasFav && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
-            {annStats.hasView && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>👁 {annStats.views}</span>}
-            {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
-            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
-
-            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:3,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
-          </div>
-          {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
-              Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
-              auto, marquées vendues, qui dorment, dates inconnues, repricing).
-              Ils sont regroupés derrière un seul bouton avec un compteur : on voit
-              qu'il y a quelque chose à regarder, sans que ça mange l'écran. */}
-          {(()=>{
-            const n = (emailSoldIds.size>0?1:0) + (soldManual.size>0?1:0)
-              + ((annStats.sleeping>0 && annSort!=='sleeping')?1:0)
-              + ((annStats.n>0 && annStats.datesKnown===0)?1:0)
-              + (repriceList.length>0?1:0);
-            if (!n) return null;
-            return (
-              <button type="button" onClick={()=>setTipsOpen(v=>!v)}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-                <span style={{fontSize:15}}>💡</span>
-                <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Conseils & signalements</span>
-                <span style={{fontSize:11,fontWeight:700,color:'#fff',background:C.accent,borderRadius:3,padding:'1px 8px'}}>{n}</span>
-                <span style={{fontSize:13,color:C.muted,transform:tipsOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
-              </button>
-            );
-          })()}
-          {tipsOpen && (<>
           {emailSoldIds.size>0 && (
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:3,padding:'7px 11px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:600}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
@@ -16608,7 +16609,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </>)}
             </div>
           </div>
-          <div style={{fontSize:12,color:C.muted,marginBottom:10}}>{autoNum?<>Les numéros se mettent <b>automatiquement</b> (modifiables à la main). Une paire renvoyée puis republiée <b>garde son numéro</b>. Prochain libre : <b>{nextNumero}</b>.</>:<>Mets le <b>numéro</b> et le <b>prix d'achat</b> sur chaque paire. Prochain numéro libre : <b>{nextNumero}</b>.</>}</div>
+          {/* ⚠️ Mode d'emploi permanent retiré : « les numéros se mettent
+              automatiquement… » s'apprend une fois. Le prochain numéro libre
+              reste visible là où on en a besoin — dans le champ N° d'une paire
+              qui n'en a pas. */}
         </>)}
         {listings.items && listings.items.length>0 && annShown.length===0 && (
           <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px'}}>Aucune annonce ne correspond.</div>
@@ -17021,7 +17025,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:6}}>
                           {num
-                            ? <span style={{fontSize:15,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:3,padding:'3px 9px',flexShrink:0,letterSpacing:-0.2}}>N°{num}</span>
+                            ? <span style={{fontSize:15,fontWeight:700,color:C.onAccent||'#fff',background:C.accent,borderRadius:3,padding:'3px 9px',flexShrink:0,letterSpacing:-0.2}}>N°{num}</span>
                             : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
                           <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{titre}</span>
                         </div>

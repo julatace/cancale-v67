@@ -5229,3 +5229,57 @@ N px** : sur un écran de 430 px, une fois les marges enlevées, la grille débo
 et le prix se coupe au bord droit. Vu en capture, invisible pour le smoke (il ne
 lit que le texte). Correctif standard : **`minmax(min(430px, 100%), 1fr)`** —
 6 grilles corrigées, y compris les cartes d'action de Ma journée.
+
+---
+
+## 5.66 — « IL Y A TROP D'INFORMATIONS PARTOUT » : la passe MOINS
+
+Julien, photos à l'appui : avant de voir **un seul colis** ou **une seule
+annonce**, il fallait passer cinq à sept blocs de conseils, de diagnostics et
+d'explications. Il a raison, et c'est mesurable.
+
+### Ce qui a été SUPPRIMÉ (pas replié — supprimé)
+| bloc | pourquoi |
+|---|---|
+| **la description sous chaque titre d'écran** | elle explique ce que fait l'écran : on la lit UNE fois, puis c'est du bruit tous les jours, en haut de chaque page. Le texte reste passé par les appelants — rien à réécrire si on veut le remettre pour un nouveau venu. |
+| **« N j sans capture de l'extension »** | doublon : la ligne « X annonces viennent d'un compte dont les données datent » dit déjà la même chose, juste sous les puces de comptes — donc à côté de ce qu'elle qualifie, et repliée. |
+| **« Un compte masqué n'apparaît ni dans les annonces ni dans la compta… »** | règle qu'on comprend au premier tap, affichée en permanence. |
+| **« Les numéros se mettent automatiquement (modifiables à la main)… »** | mode d'emploi permanent. Le prochain numéro libre reste visible là où il sert : dans le champ N° d'une paire qui n'en a pas. |
+
+### ⚠️ TROIS DÉPLIANTS DE CONSEILS EMPILÉS → UN SEUL
+« N signalements », « N paires qui te reviennent » et « Conseils &
+signalements » posaient **trois lignes à ouvrir, l'une sous l'autre**, avant la
+moindre annonce. Les deux premières rejoignent la troisième, qui existait déjà
+et comptait déjà ce genre de choses. **Un seul endroit où regarder**, avec un
+compteur unique.
+
+### Ce qui RESTE au-dessus de la grille, et pourquoi
+1. le titre ;
+2. **le numéro porté par deux annonces** — le seul défaut irréversible de l'app
+   (§19), il ne se replie pas ;
+3. les **puces de comptes** — une commande, pas un conseil ;
+4. le bandeau de stats — une ligne, un chiffre par métrique ;
+5. **un** dépliant « Conseils & signalements ».
+
+### Mesuré
+| | ce matin | maintenant |
+|---|---|---|
+| première annonce | **1146 px** du haut | **490 px** |
+| hauteur de la page Annonces | 3262 px | 2606 px |
+| blocs avant la grille | 9 | **5** |
+
+### Vérifié
+`npm run build` OK · 9 audits au vert · smoke 11 écrans, 0 écran vide,
+0 PAGEERROR · rendu ordinateur : la grille d'annonces est visible sans défiler.
+
+### 5.66 (suite) — DES COULEURS DE L'ANCIENNE IDENTITÉ SURVIVAIENT EN DUR
+Les badges N° des colis s'affichaient encore en **vert menthe** au milieu d'une
+app vermillon. Cause : `INV_STATUS` portait quatre teintes **codées en dur**
+depuis l'origine (`#22a06b`, `#2f80ed`, `#c0392b`, `#f39c12`) — elles ne lisent
+pas `C.*`, donc elles survivaient à tous les changements de palette et
+réimportaient l'ancienne identité par petits morceaux.
+Alignées sur la famille papier/encre. Et le **N° d'un colis** passe à l'accent :
+c'est L'information de cette carte (on le recopie sur le carton), pas une
+couleur d'état.
+⚠️ **À vérifier après tout changement de palette** : `grep -oE '#[0-9a-fA-F]{6}'`
+sur `src/App.jsx` — ce qui n'est pas dans `THEMES` ne suivra pas.
