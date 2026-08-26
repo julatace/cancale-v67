@@ -5326,3 +5326,65 @@ build ne dit rien d'une propriété absente.
 `npm run build` OK · 9 audits au vert · smoke 11 écrans, 0 écran vide,
 0 PAGEERROR · rendu ordinateur relu : les ventes commencent juste sous les
 filtres.
+
+---
+
+## 5.68 — LE TÉLÉPHONE : mesuré à 390 px, pas à l'œil
+
+Julien : « ça ne me va toujours pas surtout sur mon téléphone, le rendu ne me
+va pas ». Les deux passes précédentes (§5.65 identité, §5.66/§5.67 densité)
+avaient été **vérifiées sur grand écran**. Rendu à **390×844** (iPhone), le
+défaut saute : ce n'est pas le style, c'est que **tout ce qui était sur une
+ligne passait sur trois ou quatre**.
+
+### Ce que la mesure montrait
+| écran | rangées empilées |
+|---|---|
+| en-tête | **8 éléments** : retour, icône VRM, mot « VRM », nuage, heure de synchro, loupe, cloche, rouage |
+| Ventes | filtres sur **2 rangées**, période sur **3** |
+| Annonces | puces de compte sur **4 rangées**, stats sur **3** |
+| lignes de vente | titre coupé à ~15 caractères (« adidas spezial n… ») |
+
+### La règle : `flexWrap:'wrap'` → une seule rangée QUI DÉFILE
+`flexWrap:'nowrap'` + `overflowX:'auto'` + `WebkitOverflowScrolling:'touch'` +
+`scrollbarWidth:'none'`/`msOverflowStyle:'none'` sur le conteneur, et
+**`flexShrink:0` + `whiteSpace:'nowrap'` sur CHAQUE enfant**.
+⚠️ **Les deux moitiés sont obligatoires** : sans `flexShrink:0`, les enfants se
+compriment jusqu'à l'illisible **au lieu de défiler** — le conteneur ne déborde
+jamais, donc rien ne défile. C'est le piège de §26 (une pastille écrasée à 0 px
+plutôt que renvoyée à la ligne), dans l'autre sens.
+⚠️ `alignItems:'center'` sur le conteneur, sinon chaque pastille s'étire à la
+hauteur de la plus grande.
+
+Appliqué aux 5 rangées : période (`PeriodePicker`), filtres Ventes, filtres
+Achats, puces de compte (Annonces), bandeau de stats (Annonces).
+
+### L'en-tête : 8 éléments → 6
+- **Le mot « VRM » était écrit deux fois** — l'icône carrée porte déjà les
+  lettres. Le mot seul reste dans la **barre latérale**, sur ordinateur.
+- **L'heure de synchro est retirée** : l'icône de nuage dit déjà si c'est
+  synchronisé, l'heure exacte est dans Réglages (comme le numéro de version,
+  §5.54).
+
+### Deux corrections de fond
+- **`StatBox`** : les tailles étaient des **pixels fixes** (34 / 28 / 21 …),
+  calibrées sur un écran large. Elles passent en `clamp(min, vw, max)` — le
+  chiffre rétrécit avec l'écran au lieu de déborder de sa colonne.
+- **Titre d'une ligne de vente** : `nowrap + ellipsis` coupait à ~15 caractères
+  sur 390 px, donc deux paires de la même marque étaient indiscernables. Passe
+  en **deux lignes** (`-webkit-box` + `WebkitLineClamp:2`).
+
+### ⚠️ Le contrôle qui manquait au banc : le DÉBORDEMENT HORIZONTAL
+Un écran trop large **ne lève aucune erreur** et ne compte pas comme vide — le
+smoke passait au vert pendant que la page débordait. `telall.cjs` compare
+`documentElement.scrollWidth` à `clientWidth` sur **les 11 écrans à 390 px** et
+**nomme l'élément coupable** quand ça dépasse. C'est le pendant du contrôle
+« écran vide » de §5.56 : *un défaut de mise en page ne se voit ni au build, ni
+au compte d'erreurs — il faut le mesurer.*
+
+### Vérifié
+`npm run build` OK · banc **telall.cjs à 390×844 : 11 écrans, 0 DÉBORDEMENT,
+0 ÉCRAN VIDE, 0 PAGEERROR, 0 artefact** (les lignes console restantes sont le
+400 volontaire de `select=owner` et les resets de fin de test) · captures
+relues (Ma journée, Achats, Ventes, Annonces, Colis) · **9 audits au vert** ·
+smoke complet inchangé.

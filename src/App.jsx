@@ -3327,7 +3327,7 @@ function StatBox({label,value,color=C.text,sub=null}) {
   // ne doit jamais se couper (§5.26).
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
-  const fs = !L ? 34 : L <= 5 ? 34 : L <= 7 ? 28 : L <= 9 ? 21 : L <= 11 ? 17 : 14;
+  const fs = !L ? 'clamp(22px,7.4vw,34px)' : L <= 5 ? 'clamp(22px,7.4vw,34px)' : L <= 7 ? 'clamp(19px,6.2vw,28px)' : L <= 9 ? 'clamp(16px,4.8vw,21px)' : L <= 11 ? 'clamp(14px,3.9vw,17px)' : 'clamp(12px,3.2vw,14px)';
   return (
     <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.accent:color}`}}>
       <div className="vrm-label" style={{color:C.muted,minHeight:'2.44em'}}>{label}</div>
@@ -3960,10 +3960,10 @@ function PeriodePicker({ value, onChange }) {
   };
   const dans = (d) => value && value.from && value.to && d >= debutJour(value.from) && d <= finJour(value.to);
   const bord = (d) => value && ((value.from && jourClef(d)===jourClef(value.from)) || (value.to && jourClef(d)===jourClef(value.to)));
-  const chip = (on, actifC) => ({ border:`1px solid ${actifC?C.accent:C.border}`, background:actifC?`${C.accent}14`:'transparent', color:actifC?C.accent:C.text, borderRadius:3, padding:'6px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
+  const chip = (on, actifC) => ({ flexShrink:0, border:`1px solid ${actifC?C.accent:C.border}`, background:actifC?`${C.accent}14`:'transparent', color:actifC?C.accent:C.text, borderRadius:3, padding:'6px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
   return (
     <div style={{ marginBottom:12 }}>
-      <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+      <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2 }}>
         <button type="button" onClick={()=>setOpen(o=>!o)} style={{ ...chip(null, actif), display:'inline-flex', alignItems:'center', gap:6 }}>
           <Icon name="calendar" size={14} style={{marginRight:5}}/>{libellePeriode(value)}
         </button>
@@ -15300,9 +15300,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
-        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+        <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
-            <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:3,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+            <button key={id} onClick={()=>setVFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:3,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
@@ -15387,7 +15387,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:'1 1 140px',minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,letterSpacing:-0.2,
+                    display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     {/* Ligne reconstituée depuis l'email (filet quand la moisson
@@ -15486,9 +15487,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+        <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
-            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:3,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+            <button key={id} onClick={()=>setAFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:3,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
         </div>
         {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
@@ -16276,8 +16277,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
           const anyHidden = uids.some(u=>hiddenAccts.has(u));
           return (
-            <div style={{marginBottom:12,display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
-              <span style={{fontSize:11,fontWeight:600,color:C.muted}}>Comptes :</span>
+            <div style={{marginBottom:12,display:'flex',gap:7,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+              <span style={{fontSize:11,fontWeight:600,color:C.muted,flexShrink:0}}>Comptes :</span>
               {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
                 const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
                 const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
@@ -16295,7 +16296,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     title={off ? 'Masqué — tape pour réafficher ses annonces'
                           : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
                           : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
-                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
+                    style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
                     {off?'🚫 ':''}{name} · {counts[uid]}
                     {!off && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
                   </button>
@@ -16366,11 +16367,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           )}
           {/* Bandeau de stats façon outil pro */}
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.n} en ligne</span>
-            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
-            {annStats.hasFav && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
-            {annStats.hasView && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>👁 {annStats.views}</span>}
+          <div style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+            <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.n} en ligne</span>
+            <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
+            {annStats.hasFav && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
+            {annStats.hasView && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>👁 {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
 
@@ -20797,7 +20798,11 @@ export default function App() {
           </div>
           {/* minWidth:0 + nowrap : avec la flèche « retour », le numéro de version
               passait à la ligne et faisait grandir l'en-tête d'un écran à l'autre. */}
-          <div style={{minWidth:0}}>
+          {/* ⚠️ LE LOGO ÉTAIT ÉCRIT DEUX FOIS : l'icône carrée porte déjà les
+              lettres « VRM », et le mot était posé juste à côté. Sur téléphone
+              ça mangeait un tiers de la barre pour ne rien dire de plus. Le mot
+              seul reste dans la barre latérale, sur ordinateur. */}
+          <div style={{minWidth:0,display:'none'}}>
             <VrmWord height={19} color={C.text} accent={C.accent} style={{display:'block'}}/>
             {/* ⚠️ Le numéro de version ne s'affiche PLUS dans l'en-tête. Il y
                 apparaissait tronqué (« v83/00 · Rafraîchisse… ») sur TOUS les
@@ -20823,11 +20828,10 @@ export default function App() {
               <span style={{display:'flex',color:syncStatus==='error'?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
                 <Icon name={syncStatus==='error'?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
               </span>
-              {lastSync&&syncStatus==='synced'&&(
-                <span style={{fontSize:9,color:C.muted,fontWeight:600}}>
-                  {String(lastSync.getHours()).padStart(2,'0')}:{String(lastSync.getMinutes()).padStart(2,'0')}
-                </span>
-              )}
+              {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
+                  portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
+                  cloche, rouage — huit éléments. L'icône de nuage dit déjà si
+                  c'est synchronisé ; l'heure exacte est dans Réglages. */}
             </span>
           </div>
           {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
