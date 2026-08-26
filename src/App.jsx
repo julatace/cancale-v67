@@ -15496,12 +15496,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.loading && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
-        {(()=>{ const nbH=(sales.items||[]).filter(o=>isHidden(o)).length; return nbH>0 ? (
-          <div style={{fontSize:12,color:C.muted,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
-            <Icon name="eyeOff" size={14} style={{marginRight:6}}/>{nbH} vente{nbH>1?'s':''} masquée{nbH>1?'s':''} de la compta
-            <button onClick={()=>setShowHidden(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontWeight:500,fontSize:12,padding:0}}>{showHidden?'cacher':'afficher'}</button>
-          </div>
-        ) : null; })()}
+        {/* ⚠️ LE COMPTE SEUL NE DIT PAS L'ENJEU. Mesuré le 26 août :
+            **208 ventes masquées**, dont 131 retrouvées dans la moisson pour
+            **2 927,60 €** — de l'argent réellement gagné qui ne compte dans
+            AUCUN total, sur tous les mois. Un chiffre sans son montant ne fait
+            pas regarder ; avec, on sait s'il faut trancher.
+            On sépare les deux causes : masquée À LA MAIN (un ✕, réversible ici)
+            et masquée parce que son COMPTE l'est (§5.10 — ça se règle dans
+            Réglages → Comptes, pas ici). Les mélanger ferait promettre un
+            « tout réafficher » qui n'en réaffiche qu'une partie. */}
+        {(()=>{
+          const items = sales.items || [];
+          const main = items.filter(o => hiddenSales.has(String(o.transaction_id)));
+          const cpt  = items.filter(o => !hiddenSales.has(String(o.transaction_id)) && acctOffOf(o));
+          const nbH = main.length + cpt.length;
+          if (!nbH) return null;
+          const eur = main.reduce((t,o)=>t+montantCommande(o),0) + cpt.reduce((t,o)=>t+montantCommande(o),0);
+          const toutReafficher = async () => {
+            const ok = await askConfirm({
+              title: `Réafficher les ${main.length} ventes masquées à la main ?`,
+              desc: `Elles reviennent dans la liste ET dans tous les totaux (${fmtE0(main.reduce((t,o)=>t+montantCommande(o),0))}). Tu les avais masquées d'un ✕ — si certaines l'étaient à raison (doublon, test), tu pourras les remasquer une par une.`,
+              ok: 'Tout réafficher',
+            });
+            if (!ok) return;
+            setHiddenSales(new Set());
+            save('vinted_sales_hidden', []);
+            toast(`${main.length} ventes réaffichées`);
+          };
+          return (
+            <div style={{fontSize:12,color:C.muted,marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <span style={{display:'inline-flex',alignItems:'center'}}><Icon name="eyeOff" size={14} style={{marginRight:6}}/>{nbH} vente{nbH>1?'s':''} hors de la compta · <strong style={{color:C.text,marginLeft:4}}>{fmtE0(eur)}</strong></span>
+              <button onClick={()=>setShowHidden(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontWeight:500,fontSize:12,padding:0,fontFamily:'inherit'}}>{showHidden?'cacher':'les voir'}</button>
+              {main.length>0 && <button onClick={toutReafficher} style={{border:'none',background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontWeight:500,fontSize:12,padding:0,fontFamily:'inherit'}}>tout réafficher ({main.length})</button>}
+              {cpt.length>0 && <span style={{fontSize:11}}>dont {cpt.length} d'un compte masqué (Réglages → Comptes)</span>}
+            </div>
+          );
+        })()}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma

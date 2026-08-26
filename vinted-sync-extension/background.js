@@ -522,7 +522,7 @@ async function storeHarvest(domain, type, id, body) {
   // lectures + 200 écritures à chaque chargement du dressing. C'est la faute
   // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
   if (type === 'listings') {
-    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+    try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
   }
 
   // Le profil contient le vrai id de profil (different de l'account_id, utile
@@ -1290,7 +1290,7 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
   if (type === 'listings') {
-    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+    try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
   }
 }
 
@@ -2230,8 +2230,12 @@ async function archiverAnnonce(uid, it, fiche) {
 // Archivage EN LOT (tout le dressing d'un compte) : une lecture, une écriture.
 // Ne dégrade jamais un enregistrement déjà riche (la description vient de la
 // fiche, le dressing ne l'a pas — on complète, on n'écrase pas).
-async function archiverLot(uid, items) {
-  if (!items || !items.length) return false;
+async function archiverLot(uid, items, tous) {
+  items = items || [];
+  // ⚠️ ON NE SORT PLUS QUAND IL N'Y A AUCUNE ANNONCE EN LIGNE : la passe de
+  // complétion ci-dessous (le texte lu sur la page) doit tourner même pour un
+  // compte dont tout le stock est vendu — c'est justement là qu'on republie.
+  if (!items.length && !(tous && tous.length)) return false;
   const rows = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id,data`) || [];
   const anciens = {};
   for (const r of rows) { const d = r && r.data; if (d && d.id) anciens[String(d.id)] = d; }
@@ -2249,8 +2253,25 @@ async function archiverLot(uid, items) {
     pages = (dr && dr[0] && dr[0].data) || {};
   } catch (_) { pages = {}; }
   const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+
+  // ⚠️ MESURÉ LE 26 AOÛT : 45 fiches lues sur la page, **28 ne correspondaient à
+  // AUCUNE ligne du coffre**. Cause : on n'archivait que les annonces EN LIGNE,
+  // alors qu'une fiche est lue dès que Julien ouvre l'annonce — y compris une
+  // paire déjà vendue ou retirée. Or c'est exactement celle-là qu'on veut au
+  // coffre : le coffre sert à RECRÉER une annonce disparue (§47).
+  // On ajoute donc les articles fermés **dont la page a été lue** : la preuve
+  // qu'il s'y est intéressé, et l'identité vient de l'id d'annonce Vinted
+  // (jamais du titre, §5.34). Borné aux fiches existantes → pas d'inflation.
+  const enLigne = new Set(items.map(it => String(it && it.id)));
+  const extras = [];
+  for (const it of (tous || [])) {
+    const id = String(it && it.id || '');
+    if (!id || enLigne.has(id) || !pages[id]) continue;
+    extras.push(it);
+  }
+
   const out = [];
-  for (const it of items.slice(0, 300)) {
+  for (const it of items.slice(0, 300).concat(extras.slice(0, 200))) {
     const rec = coffreRecord(uid, it, null);
     if (!rec.id) continue;
     // Ce que la page de l'annonce a livré : le vrai texte du vendeur + les
