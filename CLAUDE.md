@@ -5283,3 +5283,46 @@ c'est L'information de cette carte (on le recopie sur le carton), pas une
 couleur d'état.
 ⚠️ **À vérifier après tout changement de palette** : `grep -oE '#[0-9a-fA-F]{6}'`
 sur `src/App.jsx` — ce qui n'est pas dans `THEMES` ne suivra pas.
+
+---
+
+## 5.67 — PLUS MINIMALISTE : l'écran Ventes passe de 11 blocs à 7
+
+Julien : « ça ne me convient toujours pas, je veux que ce soit **plus
+minimaliste** ». La passe §5.66 avait traité Annonces ; **Ventes était le pire
+écran** et n'avait pas été touché — mesuré, **onze blocs** avant la première
+vente.
+
+### La règle, tenue jusqu'au bout
+**Au-dessus de la liste, uniquement : un réglage, un chiffre, ou une vente.**
+Tout le reste descend dans « Analyse de tes ventes », qui existait déjà.
+
+| bloc | où il va |
+|---|---|
+| « 3 colis à expédier · 3 en retard » | **dans Analyse** — il a son propre écran (Colis) ET sa tuile sur Ma journée. Trois endroits pour la même action. |
+| la grande carte « Argent en attente » + son détail par compte | **dans Analyse** — mais le **montant reste un chiffre visible** : il prend sa place dans la rangée (`EN ATTENTE · 807 € · 25 en cours`). C'est ce que Julien vient regarder ; c'est le pavé explicatif qui partait. |
+| « 1 vente repérée via bordereau » | dans Analyse |
+| « Ventes par jour » | dans Analyse |
+| **« Rétrospective 2026 »** | dans Analyse — deux lignes « regarder des chiffres » l'une sous l'autre, c'était une de trop |
+| « 112 ventes finalisées sans prix d'achat » | dans Analyse — **le chiffre est déjà dans la rangée** (`COÛT D'ACHAT · 0/112 renseigné`) |
+| « 100 ventes masquées sur la période » | dans Analyse |
+
+### Ce qui reste, dans l'ordre
+titre · recherche · **quatre chiffres** · une ligne « Analyse » · filtres ·
+période · la ligne des ventes masquées · la liste.
+
+### ⚠️ Un champ qui n'existait pas
+La nouvelle case affichait `EN ATTENTE —` : j'avais écrit `totals.attente`, le
+champ s'appelle **`totals.enAttente`**. Vu au rendu, pas à la relecture — le
+build ne dit rien d'une propriété absente.
+
+### Mesuré
+| écran | blocs avant le contenu |
+|---|---|
+| Ventes | **11 → 7** |
+| Annonces | 9 → 5 (§5.66) |
+
+### Vérifié
+`npm run build` OK · 9 audits au vert · smoke 11 écrans, 0 écran vide,
+0 PAGEERROR · rendu ordinateur relu : les ventes commencent juste sous les
+filtres.

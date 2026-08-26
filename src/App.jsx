@@ -14791,6 +14791,127 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <NoAcc/>
         {/* Rappel d'expédition : alerte les ventes à expédier, les plus urgentes
             d'abord (échéance estimée à +5 j). Protège la note vendeur. */}
+         {/* ⚠️ AU-DESSUS DE LA LISTE, ON NE GARDE QUE CE QU'ON VIENT FAIRE.
+             Julien : « je veux que ce soit plus minimaliste ». Il y avait ONZE
+             blocs avant la première vente : colis à expédier (qui a son propre
+             écran), argent en attente, vente repérée, ventes par jour, quatre
+             chiffres, rétrospective, analyse, deux avertissements, et encore
+             une ligne sur les ventes masquées. Tout ce qui n'est ni un filtre
+             ni un chiffre ni une vente est descendu dans « Analyse ». */}
+        {(totals.nb>0 || totals.nbAttente>0) && (
+          <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
+            <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+            {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
+                (avec le détail par compte et l'avertissement d'incomplétude) est
+                descendue dans « Analyse » — mais le montant lui-même est ce que
+                Julien vient regarder : il prend sa place dans la rangée. */}
+            {totals.nbAttente>0 && <StatBox label="En attente" value={fmtE0(totals.enAttente)} color={C.warn} sub={`${totals.nbAttente} en cours`}/>}
+            {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
+                affiche déjà ce montant, avec le détail par compte et l'avertissement
+                d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
+                dix lignes plus bas, « 807 € · 25 en cours » — la même chose deux fois
+                sur le même écran (§11 : une seule règle, et un seul endroit). */}
+            <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
+            {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
+            {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
+                « bénéfice » vaut mécaniquement le CA (coût = 0) — c'est FAUX, et
+                l'afficher en gros trompe (plainte de Julien : « les données ne
+                sont plus fiables »). Donc : 0 prix d'achat → on n'affiche pas un
+                faux bénéfice, on dit qu'il manque les prix d'achat. Prix connus
+                en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
+            {totals.nbCout===0
+              ? <StatBox label="Bénéfice net" value="n/d" color={C.muted} sub="saisis tes prix d'achat"/>
+              : <StatBox label="Bénéfice net" value={fmtE0(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.nbCout<totals.nb?`sur ${totals.nbCout}/${totals.nb} avec prix d'achat`:(totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût'))}/>}
+          </div>
+        )}
+        {/* Boosts détectés automatiquement (facturation Vinted captée par
+            l'extension). LECTURE SEULE : n'écrase jamais tes saisies « 💡 boost »
+            par annonce — c'est un repère pour vérifier/compléter à la main. */}
+        {Array.isArray(boostsDetected) && boostsDetected.length>0 && (()=>{
+          const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
+          return (
+            <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:4,padding:'10px 13px',marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text}}>💡 {tot.toFixed(2)} € de boosts détectés sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span></div>
+              <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>Capté automatiquement depuis ta facturation Vinted (via l'extension). Reporte ces montants dans le champ « 💡 boost » de chaque annonce concernée pour un bénéfice net exact — l'app ne les inscrit pas toute seule pour ne pas écraser tes saisies.</div>
+            </div>
+          );
+        })()}
+        {/* ── ANALYSE : tout ce qui n'est pas l'action du jour est REPLIÉ ────
+            L'onglet Ventes montrait 6 panneaux d'analyse AVANT la liste des
+            ventes — l'essentiel était enterré. On les regroupe derrière un seul
+            bouton, fermé par défaut : l'écran va droit au but, l'analyse reste
+            à un tap. */}
+        {/* ⚠️ LE BANDEAU « WRAPPED » NE PREND PLUS TOUT L'ÉCRAN.
+            C'était un pavé en dégradé violet/rose, texte blanc, emoji de 26 px,
+            posé au milieu d'un outil de comptabilité — l'élément qui faisait le
+            plus « application fabriquée par une machine ». La rétrospective est
+            sympathique, elle n'a simplement pas à crier plus fort que les colis
+            à expédier. Elle devient une ligne discrète, au même gabarit que
+            « Analyse de tes ventes » juste en dessous : deux entrées de même
+            nature ont désormais la même apparence. */}
+        {(totals.nb>0) && (
+          <div style={{marginBottom:12}}>
+            <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+              <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="chart" size={17}/></span>
+              <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Analyse de tes ventes</span>
+              <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{analyseOpen?'masquer':'voir'}</span>
+              <span style={{fontSize:13,color:C.muted,transform:analyseOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
+            </button>
+          </div>
+        )}
+        {analyseOpen && (<>
+        {(totals.nb>0) && (
+          <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
+            style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,
+              background:C.card,borderRadius:4,padding:'11px 13px',marginBottom:10,cursor:'pointer',fontFamily:'inherit'}}>
+            <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="spark" size={17}/></span>
+            <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>
+              Rétrospective {new Date().getFullYear()}
+            </span>
+            <span style={{fontSize:11,color:C.muted,fontWeight:500}}>voir</span>
+          </button>
+        )}
+        {/* Les deux avertissements (ventes sans prix d'achat, ventes
+            masquées) : le chiffre est déjà dans la rangée du haut
+            (« COÛT D'ACHAT 0/112 renseigné »), le détail est ici. */}
+        {/* Ventes sans prix d'achat : le bénéfice est faux tant qu'on ne le saisit
+            pas (la vente compte comme 100 % de marge). Bouton → filtre dédié. */}
+        {totals.sansCout>0 && (
+          <Notice tone="warn" icon="alert"
+            value={totals.sansCout}
+            title={`vente${totals.sansCout>1?'s':''} finalisée${totals.sansCout>1?'s':''} sans prix d'achat`}
+            desc="Ton bénéfice net et ton rapport comptable sont sous-estimés tant qu'il manque."
+            detail="Le prix d'achat se saisit sur l'annonce (onglet Annonces). « Tout compléter » ouvre une liste : un champ par ligne, Entrée passe à la suivante."
+            action={
+              /* ⚠️ Une colonne « qui ne rétrécit pas » ne suffisait PAS : elle
+                 volait sa largeur au texte, qui s'écrivait deux mots par ligne
+                 (vu en capture, 430 px). C'est `Notice` qui passe la rangée à
+                 la ligne maintenant ; ici on met juste les deux boutons l'un
+                 sous l'autre. */
+              <span style={{display:'flex',flexDirection:'column',gap:6}}>
+                <button type="button" onClick={()=>setFillBuyOpen(true)} title="Une liste, un champ par ligne, Entrée passe à la suivante" style={{flexShrink:0,border:'none',background:C.warn,color:'#fff',borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>💶 Tout compléter d'un coup</button>
+                <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir la liste</button>
+              </span>
+            }/>
+        )}
+        {/* ⚠️ UN TOTAL INCOMPLET QUI SE PRÉSENTE COMME COMPLET EST PIRE QU'UN
+            TOTAL ABSENT. Une vente finalisée dont on ne connaît pas encore la
+            date d'encaissement n'est pas datée au jour de la vente (ce serait
+            faux d'une à trois semaines) : elle sort du total, et on le dit. */}
+        {/* Les ventes masquées sont invisibles PAR DESIGN — mais leur absence
+            d'un total mensuel doit se voir, sinon le chiffre ment par omission. */}
+        {totals.masqNb > 0 && !showHidden && (
+          <Notice tone="warn" icon="eye"
+            value={totals.masqNb}
+            title={`vente${totals.masqNb>1?'s':''} masquée${totals.masqNb>1?'s':''} sur ${libellePeriode(periode).toLowerCase()}`}
+            desc={`${fmtE0(totals.masqEur)} qui ne comptent dans aucun total de cet écran. Tu les as masquées d'un ✕ à un moment ; si ce n'était pas voulu, réaffiche-les.`}
+            detail="Masquer une vente sert à écarter un doublon ou un test. La liste est conservée (clé « vinted_sales_hidden ») et se synchronise entre tes appareils — rien n'est supprimé, tout revient en un clic."
+            action={<button type="button" onClick={()=>setShowHidden(true)} style={{border:'none',background:C.warn,color:'#fff',borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les réafficher</button>}/>
+        )}
+        {/* Ce qui n'est ni un filtre, ni un chiffre, ni une vente vit ici :
+            colis à expédier (il a son écran), argent en attente et son détail,
+            vente repérée via bordereau, ventes par jour. */}
         {toShip.length>0 && (()=>{
           const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
           const urgent = toShip.filter(t=>t.daysLeft!=null && t.daysLeft>=0 && t.daysLeft<=1).length;
@@ -15026,75 +15147,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </details>
           );
         })()}
-        {(totals.nb>0 || totals.nbAttente>0) && (
-          <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
-            <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
-            {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
-                affiche déjà ce montant, avec le détail par compte et l'avertissement
-                d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
-                dix lignes plus bas, « 807 € · 25 en cours » — la même chose deux fois
-                sur le même écran (§11 : une seule règle, et un seul endroit). */}
-            <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
-            {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
-            {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
-                « bénéfice » vaut mécaniquement le CA (coût = 0) — c'est FAUX, et
-                l'afficher en gros trompe (plainte de Julien : « les données ne
-                sont plus fiables »). Donc : 0 prix d'achat → on n'affiche pas un
-                faux bénéfice, on dit qu'il manque les prix d'achat. Prix connus
-                en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
-            {totals.nbCout===0
-              ? <StatBox label="Bénéfice net" value="n/d" color={C.muted} sub="saisis tes prix d'achat"/>
-              : <StatBox label="Bénéfice net" value={fmtE0(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.nbCout<totals.nb?`sur ${totals.nbCout}/${totals.nb} avec prix d'achat`:(totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût'))}/>}
-          </div>
-        )}
-        {/* Boosts détectés automatiquement (facturation Vinted captée par
-            l'extension). LECTURE SEULE : n'écrase jamais tes saisies « 💡 boost »
-            par annonce — c'est un repère pour vérifier/compléter à la main. */}
-        {Array.isArray(boostsDetected) && boostsDetected.length>0 && (()=>{
-          const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
-          return (
-            <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:4,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>💡 {tot.toFixed(2)} € de boosts détectés sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span></div>
-              <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>Capté automatiquement depuis ta facturation Vinted (via l'extension). Reporte ces montants dans le champ « 💡 boost » de chaque annonce concernée pour un bénéfice net exact — l'app ne les inscrit pas toute seule pour ne pas écraser tes saisies.</div>
-            </div>
-          );
-        })()}
-        {/* ── ANALYSE : tout ce qui n'est pas l'action du jour est REPLIÉ ────
-            L'onglet Ventes montrait 6 panneaux d'analyse AVANT la liste des
-            ventes — l'essentiel était enterré. On les regroupe derrière un seul
-            bouton, fermé par défaut : l'écran va droit au but, l'analyse reste
-            à un tap. */}
-        {/* ⚠️ LE BANDEAU « WRAPPED » NE PREND PLUS TOUT L'ÉCRAN.
-            C'était un pavé en dégradé violet/rose, texte blanc, emoji de 26 px,
-            posé au milieu d'un outil de comptabilité — l'élément qui faisait le
-            plus « application fabriquée par une machine ». La rétrospective est
-            sympathique, elle n'a simplement pas à crier plus fort que les colis
-            à expédier. Elle devient une ligne discrète, au même gabarit que
-            « Analyse de tes ventes » juste en dessous : deux entrées de même
-            nature ont désormais la même apparence. */}
-        {(totals.nb>0) && (
-          <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
-            style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,
-              background:C.card,borderRadius:4,padding:'11px 13px',marginBottom:10,cursor:'pointer',fontFamily:'inherit'}}>
-            <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="spark" size={17}/></span>
-            <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>
-              Rétrospective {new Date().getFullYear()}
-            </span>
-            <span style={{fontSize:11,color:C.muted,fontWeight:500}}>voir</span>
-          </button>
-        )}
-        {(totals.nb>0) && (
-          <div style={{marginBottom:12}}>
-            <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-              <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="chart" size={17}/></span>
-              <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Analyse de tes ventes</span>
-              <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{analyseOpen?'masquer':'voir'}</span>
-              <span style={{fontSize:13,color:C.muted,transform:analyseOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
-            </button>
-          </div>
-        )}
-        {analyseOpen && (<>
         {/* Analyse de perf : temps de vente, écoulement, meilleure marque */}
         {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
@@ -15247,40 +15299,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
             ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
-        )}
-        {/* Ventes sans prix d'achat : le bénéfice est faux tant qu'on ne le saisit
-            pas (la vente compte comme 100 % de marge). Bouton → filtre dédié. */}
-        {totals.sansCout>0 && (
-          <Notice tone="warn" icon="alert"
-            value={totals.sansCout}
-            title={`vente${totals.sansCout>1?'s':''} finalisée${totals.sansCout>1?'s':''} sans prix d'achat`}
-            desc="Ton bénéfice net et ton rapport comptable sont sous-estimés tant qu'il manque."
-            detail="Le prix d'achat se saisit sur l'annonce (onglet Annonces). « Tout compléter » ouvre une liste : un champ par ligne, Entrée passe à la suivante."
-            action={
-              /* ⚠️ Une colonne « qui ne rétrécit pas » ne suffisait PAS : elle
-                 volait sa largeur au texte, qui s'écrivait deux mots par ligne
-                 (vu en capture, 430 px). C'est `Notice` qui passe la rangée à
-                 la ligne maintenant ; ici on met juste les deux boutons l'un
-                 sous l'autre. */
-              <span style={{display:'flex',flexDirection:'column',gap:6}}>
-                <button type="button" onClick={()=>setFillBuyOpen(true)} title="Une liste, un champ par ligne, Entrée passe à la suivante" style={{flexShrink:0,border:'none',background:C.warn,color:'#fff',borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>💶 Tout compléter d'un coup</button>
-                <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir la liste</button>
-              </span>
-            }/>
-        )}
-        {/* ⚠️ UN TOTAL INCOMPLET QUI SE PRÉSENTE COMME COMPLET EST PIRE QU'UN
-            TOTAL ABSENT. Une vente finalisée dont on ne connaît pas encore la
-            date d'encaissement n'est pas datée au jour de la vente (ce serait
-            faux d'une à trois semaines) : elle sort du total, et on le dit. */}
-        {/* Les ventes masquées sont invisibles PAR DESIGN — mais leur absence
-            d'un total mensuel doit se voir, sinon le chiffre ment par omission. */}
-        {totals.masqNb > 0 && !showHidden && (
-          <Notice tone="warn" icon="eye"
-            value={totals.masqNb}
-            title={`vente${totals.masqNb>1?'s':''} masquée${totals.masqNb>1?'s':''} sur ${libellePeriode(periode).toLowerCase()}`}
-            desc={`${fmtE0(totals.masqEur)} qui ne comptent dans aucun total de cet écran. Tu les as masquées d'un ✕ à un moment ; si ce n'était pas voulu, réaffiche-les.`}
-            detail="Masquer une vente sert à écarter un doublon ou un test. La liste est conservée (clé « vinted_sales_hidden ») et se synchronise entre tes appareils — rien n'est supprimé, tout revient en un clic."
-            action={<button type="button" onClick={()=>setShowHidden(true)} style={{border:'none',background:C.warn,color:'#fff',borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les réafficher</button>}/>
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
