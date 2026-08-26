@@ -5388,3 +5388,126 @@ au compte d'erreurs — il faut le mesurer.*
 400 volontaire de `select=owner` et les resets de fin de test) · captures
 relues (Ma journée, Achats, Ventes, Annonces, Colis) · **9 audits au vert** ·
 smoke complet inchangé.
+
+---
+
+## 5.69 — ⚠️ LE CA DU JOUR VENAIT DES EMAILS · le numéro d'une paire vendue avant d'être captée · menu en haut
+
+### 1. ⚠️ « Les ventes d'aujourd'hui, ça ne représente pas 45 € » — il avait raison
+Mesuré avant de coder : la base porte **13 ventes / 152 €** pour le 26 août,
+l'app affichait **45 € / 9 paires**.
+
+**Cause** : la tuile « Vendu aujourd'hui » et le bloc « Ta semaine » de Ma
+journée se calculaient sur les **emails de vente** (`email_sale_*`), avec en
+commentaire « même source que le tableau de bord ». **Faux depuis §33** : le
+tableau de bord est passé à la moisson Vinted, précisément parce que les emails
+en voient moins (12 ventes / 308 € là où la moisson en voit 17 / 437 €). Un
+email n'arrive pas pour tout : offres acceptées, lots, et **2 comptes sur 8**
+dont la boîte ne transfère rien (§5.47).
+
+- **`montantCommande(o)`** (module-level) = LA lecture du prix. Vinted rend un
+  **objet** `{amount, currency_code}` : `Number(o.price)` donne NaN et la somme
+  tombe à 0 — deux faux diagnostics déjà causés par ça (§5.27).
+- **`bilanVentes(depuis, jusqua)`** = LA règle (§11) : ventes moissonnées, par
+  date de vente, hors annulées, hors ventes masquées et comptes masqués
+  (`isHidden`, déjà partagé par tout l'écran Ventes). Les deux tuiles la
+  consomment ; elles ne peuvent plus contredire le tableau de bord.
+
+**Mesuré après, au rendu réel** : jour **45 € / 9 → 152 € / 13** · semaine
+**24 ventes / 409 € → 56 / 1 129 €**. Les deux correspondent à l'euro près au
+recomptage direct dans la base.
+
+### 2. Le trou qu'il a vu venir : poster du téléphone et vendre en direct
+Julien : « si je poste une annonce sur ma tablette et que je la vends en direct,
+l'extension n'a pas eu le temps de capter l'annonce en ligne, elle a juste la
+vente — donc elle va devoir écrire un numéro pour la vente ».
+
+C'est exact, et c'est prévu (`autoShip`, **98 cas en base**). **La suite ne
+l'était pas** : quand l'extension capte enfin le dressing et que Vinted a
+**laissé l'annonce ouverte** (ça arrive, §5.39), cette annonce arrive sans
+numéro. La numérotation automatique ne réutilisait que `numeros` (les annonces
+déjà numérotées) — **jamais `saleOv`** — donc elle lui donnait un numéro NEUF.
+Le carton porte N°A, l'app affiche N°B pour la même paire : c'est le risque n°1
+(§19), avec un numéro qui ne se reprend jamais (§5.40), donc **définitif**.
+
+Mesuré le 26 août : **0 conflit aujourd'hui** (les annonces vendues sont presque
+toujours fermées par Vinted). On ferme un trou latent — le bon moment.
+
+- **`numVentesParIdentite`** : les numéros déjà posés sur des ventes, indexés par
+  identité **certaine** (item_id Vinted, sinon photo ; une photo portée par deux
+  ventes de numéros différents est écartée). Jamais par titre (§5.34).
+- La numérotation des annonces le consulte **avant** de créer un numéro.
+- **Elle n'écrit plus rien tant que les ventes et les identités n'ont pas
+  répondu** (`sales.items === null || !txnPret`). Sinon elle grave d'abord et
+  découvre l'identité ensuite : au banc, la paire recevait N°319 alors que son
+  carton portait N°777, et le second passage ne pouvait plus rien corriger.
+
+### ⚠️ 3. LE DÉFAUT PLUS GRAVE TROUVÉ EN CHERCHANT CELUI-LÀ
+L'effet « le cloud est arrivé » relisait `vinted_annonce_numeros` et
+`vinted_used_numeros` depuis le localStorage… **mais pas
+`vinted_sale_overrides`**. Sur un appareil neuf (localStorage vide au premier
+rendu), la numérotation voyait donc **toutes les ventes sans numéro**, leur en
+attribuait, et `setSaleOv({ ...saleOv })` repartait d'un objet **VIDE** — les
+**361 numéros de vente** pouvaient être remplacés par du vide.
+Le commentaire de l'effet de numérotation annonçait justement cette protection
+(« sans ça, au démarrage `saleOv` est vide → l'app écrase les numéros saisis à
+la main ») ; **elle n'existait pas**.
+➡️ **Règle : tout état initialisé par `load(...)` ET réécrit ensuite par un
+effet automatique doit être rechargé dans `onCloudReady`.** `hiddenSales` a été
+ajouté au passage (le CA du jour en dépend maintenant).
+
+### 4. Ergonomie — ce qu'il a demandé, mot pour mot
+- **« Pour les offres reçues, tu peux juste mettre le nombre »** : six cartes
+  avec photo, titre, date et deux boutons chacune (~300 px sur l'accueil) → une
+  ligne « N offres reçues » + Répondre + tout marquer traité. Une offre se
+  répond sur Vinted de toute façon (§5).
+- **« Un menu déroulant à gauche, en haut, plutôt qu'en bas avec le plus »** :
+  `MenuEcrans`. Le bouton « Plus » disparaît de la barre du bas — c'était un
+  **sixième bouton d'un genre différent des cinq autres** (il n'ouvrait pas un
+  écran mais une liste) et **son libellé changeait selon l'écran affiché**, donc
+  la barre n'avait jamais tout à fait la même tête. Elle porte maintenant les
+  cinq écrans du quotidien, un point c'est tout. ⚠️ Absent sur ordinateur : la
+  barre latérale montre déjà les neuf écrans.
+- **« On dirait quelque chose de brouillon »** : « Ta semaine » et les quatre
+  cartes d'action étaient des encadrés teintés empilés, **quatre couleurs à la
+  suite**. Surface neutre ; la couleur reste sur l'icône et les chiffres. Il ne
+  reste qu'**une** zone teintée sur l'accueil : le chiffre du jour.
+- **Ventes** : les quatre libellés sous la barre de progression sont retirés (la
+  pastille de statut, trois lignes plus haut, dit déjà l'étape — la même
+  information deux fois, une ligne de texte par vente).
+- **Colis** : « N bordereaux sans vente correspondante » était un pavé de cinq
+  lignes d'explication en permanence, au-dessus des colis, pour un cas qui ne
+  demande aucun geste. Gabarit `Notice` : une ligne + « Pourquoi ? ». La
+  première carte remonte d'environ 90 px.
+
+### ⚠️ 5. `ICON_PATHS` ATTEND DU JSX — deux icônes ne se dessinaient pas
+Trouvé en ajoutant l'icône du menu : `Icon` fait `{d}` dans la `<svg>`, donc une
+**chaîne** y devient du **texte** — invisible. `pin` et `nav` étaient des chaînes
+depuis leur ajout (§5.26) : **les deux repères des points relais n'ont jamais
+été dessinés**. Corrigées, et le commentaire le dit à côté de la table.
+
+### Vérifié
+`npm run build` OK · **9 audits au vert**, dont **4 contrôles permanents
+ajoutés** à `audit-identite.cjs` qui **échouent bien sur le code d'avant** (§21 :
+la première tentative de preuve lançait le script depuis `/tmp`, où il plantait
+sur un chemin absent — **un test qui ne s'exécute pas ressemble à un test qui
+passe**) · banc dédié du scénario (vente au N°777, annonce captée ensuite) :
+avant **N°319**, après **N°777** · banc de numérotation : 28 annonces, **0 sans
+numéro, 0 numéro qui bouge** · **11 écrans à 390 px** sans débordement, écran
+vide, erreur ni artefact · captures relues (Ma journée, Ventes, Colis, menu
+ouvert).
+
+### ⚠️ Piège de banc rencontré (§21, encore)
+`num_tous.cjs` choisissait sa fixture parmi **toutes** les annonces des lignes
+moissonnées — y compris celles d'un compte **sans jetons** (3170782324), que
+l'app ne charge jamais (§5.20/§5.21). Il concluait « l'annonce dépouillée n'a
+rien reçu » pour une annonce invisible. Le banc filtre désormais sur les comptes
+vivants.
+
+### ⚠️ RIEN DE CETTE SESSION N'EST EN PRODUCTION
+`origin/main` est au **25 août** (PR #55). La branche `claude/new-session-gzdgur`
+a **29 commits d'avance** et **aucune pull request n'est ouverte** pour elle.
+C'est l'explication complète du « on dirait que tu n'as rien fait » : tout est
+poussé sur la branche, rien n'est déployé. Le déploiement se fait en ouvrant une
+PR depuis cette branche et en la fusionnant — c'est **la décision de Julien**,
+l'agent n'ouvre pas de PR de lui-même.
