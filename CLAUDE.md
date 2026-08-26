@@ -5170,3 +5170,62 @@ s'affiche.
 attente de bordereau · **3 en retard — les plus urgents sont en haut de la
 liste** » en un seul bloc, les cartes remontent d'un cran. 9 audits au vert,
 smoke **0 PAGEERROR, 0 écran vide, 0 suspect**.
+
+---
+
+## 5.65 — ⚠️ REFONTE TOTALE : PAPIER, ENCRE, VERMILLON (on ne reconnaît plus l'app)
+
+Julien, **quatre fois**, la dernière avec de l'agacement légitime : « je veux
+que ça soit choquant tellement c'est bien que limite on ne reconnaisse pas
+l'application — les couleurs, les formes, tout ». Les passes précédentes
+(§5.54, §5.58, §5.61, §5.62) retouchaient une identité qu'elles gardaient. Ici
+on **change de famille**, pas de nuance.
+
+### La direction
+| | avant | maintenant |
+|---|---|---|
+| fond | ardoise froide `#f1f4f2` / `#0a0e11` | **papier chaud** `#EFE8DC` / encre `#151110` |
+| accent | vert émeraude `#00875a` | **vermillon** `#D2401E` / `#FF6B3D` |
+| formes | arrondis 10-16 px | **carré, 3-4 px** (582 rayons convertis, pastilles 999 → 3) |
+| profondeur | ombres douces empilées | **filets nets** — une carte est imprimée, pas posée |
+| titre d'écran | 23 px + pastille ronde teintée | **manchette** : trait d'accent, titre 27-38 px, filet d'encre 2 px |
+| chiffres | trois cartes grises « KPI » | **hors de la boîte** : filet d'accent en haut, nombre en 34 px |
+| police d'affichage | Bricolage Grotesque | **Space Grotesk** |
+| fond de page | lueur radiale verte | **trame de papier** (la page a une matière, pas une source de lumière) |
+
+### ⚠️ LE CHROME EST À L'ENCRE, MÊME EN CLAIR
+Nouveaux jetons **`chrome` / `onChrome` / `chromeMuted` / `chromeLine`** : la
+**navigation** (barre latérale sur ordinateur, barre du bas sur téléphone) est
+un bloc d'encre contre la page papier. C'est la signature qui rend l'app
+reconnaissable en une seconde.
+Ça règle aussi un vrai défaut vu en capture : `C` est une **variable de module
+mutable** (§4), donc un composant qui ne se redessine pas garde les couleurs de
+l'ancien thème — la barre latérale restait sombre sur une page claire. Avec un
+jeton dédié, ce n'est plus une incohérence, c'est le dessin voulu.
+
+### Ce qui n'a PAS changé, volontairement
+- **Aucune donnée, aucune règle métier touchée.** Uniquement les jetons, les
+  rayons et quatre primitives (`ScreenHead`, `StatBox`, `SideBar`, `BottomBar`).
+- Le mode sombre reste disponible et suit la même identité (encre chaude, même
+  vermillon éclairci pour tenir le contraste sur le brun).
+- Le grain de §5.61 est conservé (passé à 4,5 % en `multiply` : sur du papier il
+  doit se voir), les états de boutons aussi.
+
+### ⚠️ Le surtitre a failli répéter la marque
+Première version : un surtitre « VRM » sur **chaque** écran — la marque est déjà
+dans la barre de navigation, juste à côté. Remplacé par un simple trait
+d'accent : la manchette garde son rythme sans rien répéter.
+
+### Vérifié
+`npm run build` OK · **9 audits au vert** · rendu ordinateur 1512 px en mode
+**papier** ET en mode **encre** : manchette, filets, chiffres hors boîte, rail
+d'encre, badges N° vermillon carrés · rendu mobile 430 px : barre du bas à
+l'encre, cartes d'action carrées.
+
+### ⚠️ ET UNE RÉGRESSION À MOI, ATTRAPÉE EN CAPTURE MOBILE
+Les listes Ventes/Achats passées en deux colonnes (§5.63) utilisaient
+`repeat(auto-fit, minmax(430px, 1fr))`. **`minmax(Npx, 1fr)` force une piste de
+N px** : sur un écran de 430 px, une fois les marges enlevées, la grille déborde
+et le prix se coupe au bord droit. Vu en capture, invisible pour le smoke (il ne
+lit que le texte). Correctif standard : **`minmax(min(430px, 100%), 1fr)`** —
+6 grilles corrigées, y compris les cartes d'action de Ma journée.

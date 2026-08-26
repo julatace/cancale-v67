@@ -34,17 +34,17 @@
        larges) sans être fantaisiste — et elle est superbe en gros chiffre,
        ce que cette app affiche partout. -->
   <link rel="stylesheet" media="print" onload="this.media='all'"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&display=swap" />
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&display=swap" /></noscript>
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
   <title>VRM</title>
   <style>
-    body{margin:0;padding:0;background:#f1f4f2;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+    body{margin:0;padding:0;background:#EFE8DC;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,
        mais c'est ce qui fait la différence entre « feuille de papier » et
        « écran d'application ». */
-    body{background-image:linear-gradient(180deg,#f7faf8 0%,#f1f4f2 460px);background-repeat:no-repeat;background-attachment:fixed;}
-    @media (prefers-color-scheme: dark){ body{background:#0a0e11;background-image:linear-gradient(180deg,#121a1f 0%,#0a0e11 460px);} }
+    body{background-image:none;}
+    @media (prefers-color-scheme: dark){ body{background:#151110;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
     @keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}
 
@@ -65,9 +65,9 @@
           micro-étiquettes aérées en capitales (+0.09em) est ce qui fait lire
           « composé par quelqu'un » plutôt que « sorti d'un générateur ». */
     h1,h2,h3,.vrm-display{
-      font-family:'Bricolage Grotesque','Inter','SF Pro Display',system-ui,sans-serif;
-      letter-spacing:-.03em;
-      font-optical-sizing:auto;
+      font-family:'Space Grotesk','Inter','SF Pro Display',system-ui,sans-serif;
+      letter-spacing:-.02em;
+      font-weight:700;
     }
     .vrm-label{
       text-transform:uppercase;letter-spacing:.09em;font-weight:600;
@@ -80,18 +80,18 @@
        finie » ; une lueur très douce ancrée en haut à gauche donne une source
        de lumière à la page et le vide devient de la respiration.
        Fixe, non cliquable, sous tout le contenu. */
+    /* 3 bis-0) PAS DE HALO — LA PAGE EST IMPRIMÉE, PAS ÉCLAIRÉE.
+       La lueur radiale d'avant était le tell « dashboard SaaS ». Ici, une
+       trame de papier très légère : la page a une matière, pas une source de
+       lumière. */
     body::before{
       content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
-      background:
-        radial-gradient(120vh 90vh at 8% -10%, rgba(0,135,90,.10), transparent 60%),
-        radial-gradient(90vh 70vh at 100% 0%, rgba(184,134,59,.06), transparent 62%);
+      background-image:
+        repeating-linear-gradient(90deg, rgba(26,21,18,.028) 0 1px, transparent 1px 3px);
+      opacity:.5;
     }
     @media (prefers-color-scheme: dark){
-      body::before{
-        background:
-          radial-gradient(120vh 90vh at 8% -10%, rgba(46,224,143,.10), transparent 60%),
-          radial-gradient(90vh 70vh at 100% 0%, rgba(224,185,114,.05), transparent 62%);
-      }
+      body::before{ background-image:repeating-linear-gradient(90deg, rgba(246,239,230,.02) 0 1px, transparent 1px 3px); opacity:.4; }
     }
 
     /* 3 bis) LE GRAIN. Un aplat de couleur parfaitement lisse est le second
@@ -100,7 +100,7 @@
        le rendu « CSS pur » sans que personne ne sache dire pourquoi. */
     body::after{
       content:'';position:fixed;inset:0;z-index:2147483000;pointer-events:none;
-      opacity:.028;mix-blend-mode:overlay;
+      opacity:.045;mix-blend-mode:multiply;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
     }
     @media print{ body::after{display:none;} }

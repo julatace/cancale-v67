@@ -13,42 +13,52 @@ const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
 // conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
-  // ── IDENTITÉ VISUELLE ─────────────────────────────────────────────────────
-  // Julien, trois fois : « le visuel ne me convient pas, je veux que ce soit
-  // beaucoup plus beau ». Ma première tentative déplaçait les couleurs de 2 % —
-  // invisible. On assume donc une VRAIE identité :
-  //  · un accent unique et franc (vert émeraude) qui ne sert QU'aux actions et
-  //    aux chiffres qui comptent — jamais en aplat de fond ;
-  //  · des surfaces nettement étagées : fond sombre profond, carte clairement
-  //    au-dessus, carte secondaire au-dessus encore. On voit la hiérarchie
-  //    sans avoir besoin d'un seul contour ;
-  //  · un gris légèrement froid côté sombre : le vert-olive donnait un rendu
-  //    terne, la teinte froide fait ressortir l'accent.
+  // ── IDENTITÉ : PAPIER, ENCRE, VERMILLON ───────────────────────────────────
+  // Julien, quatre fois : « je veux que ce soit choquant, qu'on ne reconnaisse
+  // presque plus l'application ». Les passes précédentes déplaçaient les
+  // couleurs de quelques pour cent — invisible, et il avait raison de le dire.
+  // On change donc de FAMILLE, pas de nuance :
+  //  · on quitte le tableau de bord sombre vert/teal (celui de tous les
+  //    outils SaaS) pour un fond PAPIER chaud et une ENCRE brune ;
+  //  · l'accent devient un VERMILLON franc — la couleur de la sneaker, pas
+  //    celle d'un graphique ;
+  //  · plus d'ombres portées en clair : des FILETS nets à la place. Une carte
+  //    ne flotte pas, elle est imprimée sur la page ;
+  //  · les formes passent de l'arrondi générique au CARRÉ (rayon 3-4 px).
+  // Les clés existantes sont conservées : tout le fichier lit toujours C.xxx.
   light: {
-    bg:"#f1f4f2", surface:"#ffffff", card:"#ffffff", card2:"#f7faf8", border:"#e2e9e4",
-    accent:"#00875a", accentSoft:"#06a76f", onAccent:"#ffffff",
-    danger:"#d4443c", warn:"#b47512", gold:"#B8863B",
-    blue:"#2f6f9e", purple:"#6d5cc7", text:"#08130e", muted:"#5b6b62",
-    shadow:"0 1px 2px rgba(6,26,18,.05), 0 4px 12px -3px rgba(6,26,18,.10)",
-    shadowMd:"0 2px 4px rgba(6,26,18,.06), 0 12px 28px -8px rgba(6,26,18,.14)",
-    shadowLg:"0 4px 8px rgba(6,26,18,.07), 0 28px 56px -16px rgba(6,26,18,.22)",
-    ring:"rgba(0,135,90,.13)",
-    glass:"rgba(255,255,255,.85)",
-    s1:"#00875a", s2:"#6d5cc7",
+    bg:"#EFE8DC", surface:"#FFFCF6", card:"#FFFCF6", card2:"#F6EFE2", border:"#D9CDB8",
+    accent:"#D2401E", accentSoft:"#E85B33", onAccent:"#FFFFFF",
+    danger:"#A8231A", warn:"#96650B", gold:"#8A6A2F",
+    blue:"#1F5A78", purple:"#584a86", text:"#1A1512", muted:"#6B6055",
+    // Pas d'ombre douce : un filet net sous la carte, comme une impression.
+    shadow:"0 1px 0 rgba(26,21,18,.07)",
+    shadowMd:"0 2px 0 rgba(26,21,18,.10)",
+    shadowLg:"0 3px 0 rgba(26,21,18,.13)",
+    ring:"rgba(210,64,30,.13)",
+    glass:"rgba(255,252,246,.90)",
+    // LE CHROME EST À L'ENCRE, MÊME EN CLAIR. Barre latérale, en-tête et barre
+    // du bas sont un bloc d'encre contre la page papier : c'est la signature
+    // qui rend l'app reconnaissable en une seconde, et ça règle au passage
+    // l'incohérence du thème sur les composants qui ne se redessinent pas
+    // (`C` est une variable de module mutable, cf. §4).
+    chrome:"#1A1512", onChrome:"#F5EEE3", chromeMuted:"#9C8D7E", chromeLine:"#332A23",
+    s1:"#D2401E", s2:"#1F5A78",
   },
   dark: {
-    // Trois étages nettement séparés : #0a0e11 → #151b20 → #1d252b.
-    // C'est cet écart (et non un contour) qui fait lire la hiérarchie.
-    bg:"#0a0e11", surface:"#141a1f", card:"#151b20", card2:"#1d252b", border:"#28323a",
-    accent:"#2ee08f", accentSoft:"#54ecab", onAccent:"#04140c",
-    danger:"#ff7b7b", warn:"#f0b757", gold:"#E8C179",
-    blue:"#6fb6f0", purple:"#b49bff", text:"#f2f7f5", muted:"#8fa3ad",
-    shadow:"0 1px 2px rgba(0,0,0,.55), 0 4px 14px -3px rgba(0,0,0,.55)",
-    shadowMd:"0 3px 6px rgba(0,0,0,.55), 0 16px 32px -10px rgba(0,0,0,.65)",
-    shadowLg:"0 6px 12px rgba(0,0,0,.6), 0 32px 64px -16px rgba(0,0,0,.75)",
-    ring:"rgba(46,224,143,.16)",
-    glass:"rgba(20,26,31,.82)",
-    s1:"#2ee08f", s2:"#b49bff",
+    // Le sombre reste CHAUD (encre, pas ardoise) : c'est la même identité, la
+    // nuit. Le vermillon s'éclaircit pour tenir le contraste sur le brun.
+    bg:"#151110", surface:"#1E1917", card:"#1E1917", card2:"#292320", border:"#3D342E",
+    accent:"#FF6B3D", accentSoft:"#FF8A63", onAccent:"#1B0C05",
+    danger:"#FF7F6B", warn:"#E0A945", gold:"#D8B071",
+    blue:"#69B4D6", purple:"#a795e0", text:"#F6EFE6", muted:"#A2948A",
+    shadow:"0 1px 0 rgba(0,0,0,.55)",
+    shadowMd:"0 2px 0 rgba(0,0,0,.6)",
+    shadowLg:"0 3px 0 rgba(0,0,0,.7)",
+    ring:"rgba(255,107,61,.16)",
+    glass:"rgba(30,25,23,.90)",
+    chrome:"#0F0C0B", onChrome:"#F6EFE6", chromeMuted:"#9C8D7E", chromeLine:"#2C2521",
+    s1:"#FF6B3D", s2:"#69B4D6",
   },
 };
 let C = THEMES.light;
@@ -644,7 +654,7 @@ function SheetShell({ onClose, children }) {
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
       <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
-        <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'0 auto 14px'}}/>
+        <div style={{width:36,height:4,borderRadius:3,background:C.border,margin:'0 auto 14px'}}/>
         {children}
       </div>
     </div>
@@ -680,7 +690,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
       </div>
       {paires.length > 6 && (
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="N°, marque, pointure…" inputMode="search"
-          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:14,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',marginBottom:10}}/>
+          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',fontSize:14,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',marginBottom:10}}/>
       )}
       {liste.length === 0 && (
         <div style={{fontSize:12.5,color:C.muted,padding:'14px 2px',lineHeight:1.5}}>
@@ -692,10 +702,10 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
       <div style={{display:'flex',flexDirection:'column',gap:7,maxHeight:'46vh',overflowY:'auto'}}>
         {liste.slice(0, 200).map(p => (
           <button key={p.numero} onClick={()=>onPick(p)}
-            style={{display:'flex',alignItems:'center',gap:11,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:14,background:C.card,padding:'9px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow}}>
+            style={{display:'flex',alignItems:'center',gap:11,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:4,background:C.card,padding:'9px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow}}>
             {p.photo
-              ? <img src={p.photo} alt="" style={{width:44,height:44,borderRadius:10,objectFit:'cover',flexShrink:0,background:C.card2}}/>
-              : <span style={{width:44,height:44,borderRadius:10,background:C.card2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,flexShrink:0}}>👟</span>}
+              ? <img src={p.photo} alt="" style={{width:44,height:44,borderRadius:3,objectFit:'cover',flexShrink:0,background:C.card2}}/>
+              : <span style={{width:44,height:44,borderRadius:3,background:C.card2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,flexShrink:0}}>👟</span>}
             <span style={{flex:'1 1 120px',minWidth:0}}>
               <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accent}}>N°{p.numero}</span>
               <span style={{display:'block',fontSize:12,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || '—'}</span>
@@ -706,8 +716,8 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
         ))}
       </div>
       <div style={{display:'flex',gap:8,marginTop:12}}>
-        <button onClick={onLibre} style={{flex:1,padding:'10px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Autre numéro…</button>
-        <button onClick={onClose} style={{flex:1,padding:'10px 12px',borderRadius:12,border:'none',background:C.card2,color:C.muted,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+        <button onClick={onLibre} style={{flex:1,padding:'10px 12px',borderRadius:4,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Autre numéro…</button>
+        <button onClick={onClose} style={{flex:1,padding:'10px 12px',borderRadius:4,border:'none',background:C.card2,color:C.muted,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
       </div>
     </SheetShell>
   );
@@ -731,14 +741,14 @@ function AskTextSheet({ q, close }) {
         <input ref={ref} value={v} onChange={e => setV(e.target.value)}
           placeholder={q.placeholder || ''}
           inputMode={q.numeric ? 'numeric' : undefined}
-          style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.surface,color:C.text,fontSize:16,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
+          style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:4,background:C.surface,color:C.text,fontSize:16,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
         <div style={{display:'flex',gap:9,marginTop:12}}>
           <button type="button" onClick={() => close(null)}
-            style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:4,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             {q.cancel || 'Annuler'}
           </button>
           <button type="submit"
-            style={{flex:2,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            style={{flex:2,border:'none',background:C.accent,color:'#fff',borderRadius:4,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             {q.ok || 'Valider'}
           </button>
         </div>
@@ -764,11 +774,11 @@ function ConfirmHost() {
       )}
       <div style={{display:'flex',gap:9,marginTop:16}}>
         <button type="button" onClick={() => close(false)}
-          style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:4,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
           {q.cancel || 'Annuler'}
         </button>
         <button type="button" autoFocus onClick={() => close(true)}
-          style={{flex:2,border:'none',background:q.danger?C.danger:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          style={{flex:2,border:'none',background:q.danger?C.danger:C.accent,color:'#fff',borderRadius:4,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
           {q.ok || 'Confirmer'}
         </button>
       </div>
@@ -3176,14 +3186,14 @@ function Cell({value, onChange, align="left", mono=false}) {
       onChange={e=>setVal(e.target.value)}
       onBlur={commit}
       onKeyDown={e=>{if(e.key==='Enter')commit();if(e.key==='Escape'){setVal(value);setEditing(false);}}}
-      style={{background:C.surface,border:`1px solid ${C.accent}`,borderRadius:10,
+      style={{background:C.surface,border:`1px solid ${C.accent}`,borderRadius:3,
         color:C.text,padding:'3px 6px',fontSize:12,fontFamily:'inherit',
         width:'100%',boxSizing:'border-box',textAlign:align,outline:'none'}}
     />
   );
   return (
     <span onClick={()=>{setVal(value);setEditing(true);}} title="Cliquer pour modifier"
-      style={{cursor:'text',display:'block',padding:'3px 6px',borderRadius:10,minHeight:22,
+      style={{cursor:'text',display:'block',padding:'3px 6px',borderRadius:3,minHeight:22,
         textAlign:align,fontFamily:mono?'monospace':'inherit'}}
       onMouseEnter={e=>e.currentTarget.style.background=C.bg}
       onMouseLeave={e=>e.currentTarget.style.background='transparent'}
@@ -3199,7 +3209,7 @@ function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
     <button type="button" onClick={onClick} disabled={!!disabled} style={{
       background:bg,color:col,
       border:outline?`1.5px solid ${color||C.accent}`:'none',
-      borderRadius:6,padding:small?'6px 14px':'10px 22px',
+      borderRadius:2,padding:small?'6px 14px':'10px 22px',
       fontSize:small?12:15,fontWeight:500,
       cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,
       fontFamily:'inherit',...style,
@@ -3210,7 +3220,7 @@ function Input({label,...p}) {
   return (
     <label style={{display:'flex',flexDirection:'column',gap:4}}>
       {label&&<span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
-      <input {...p} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,
+      <input {...p} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:2,
         color:C.text,padding:'8px 12px',fontSize:13,outline:'none',fontFamily:'inherit',...(p.style||{})}}
         onFocus={e=>e.target.style.borderColor=C.accent}
         onBlur={e=>e.target.style.borderColor=C.border}
@@ -3275,7 +3285,7 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
        capture sur « 112 ventes sans prix d'achat »). La rangée passe à la ligne,
        le texte ne descend jamais sous 190 px. */
     <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',
-      background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadow,
+      background:C.card,border:`1px solid ${C.border}`,borderRadius:4,boxShadow:C.shadow,
       padding:'13px 15px 13px 17px',marginBottom:10,overflow:'hidden',...style}}>
       <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
       {/* Un voile très pâle de la couleur : l'avertissement se teinte sans
@@ -3302,38 +3312,31 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
 function Card({children,style={}}) {
   // Rayon plus généreux + ombre douce : une carte doit se poser SUR le fond,
   // pas être découpée dedans au cutter.
-  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
+  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
-  return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:999,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
+  return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:3,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
 }
 function StatBox({label,value,color=C.text,sub=null}) {
-  // ⚠️ Un montant ne doit JAMAIS se couper (« 150… » au lieu de « 15037,88 € »,
-  // constaté sur Ventes : trois cases par ligne + un montant à 5 chiffres ne
-  // rentraient pas et l'ellipse mangeait le nombre). L'ancienne taille fixe
-  // (clamp 15-20 px) tronquait. On adapte donc la taille à la LONGUEUR de la
-  // valeur : plus c'est long, plus ça rétrécit, jusqu'à un plancher lisible —
-  // comme ça le nombre s'affiche toujours en entier.
+  // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
+  // c'est le gabarit « KPI » de n'importe quel tableau de bord. Ici : un FILET
+  // d'accent en haut, l'étiquette en capitales dessous, puis le nombre en très
+  // gros. Pas de fond, pas de contour — c'est la composition qui tient, comme
+  // dans une page imprimée.
+  // La taille suit toujours la LONGUEUR de la valeur : un montant à 5 chiffres
+  // ne doit jamais se couper (§5.26).
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
-  // Le CHIFFRE est ce qu'on vient lire : il passe devant, en gros et serré.
-  // L'étiquette redevient une légende, plus une petite capitale espacée qui
-  // criait autant que la valeur.
-  const fs = !L ? 26 : L <= 5 ? 26 : L <= 7 ? 21 : L <= 9 ? 16 : L <= 11 ? 13 : 11.5;
+  const fs = !L ? 34 : L <= 5 ? 34 : L <= 7 ? 28 : L <= 9 ? 21 : L <= 11 ? 17 : 14;
   return (
-    <Card style={{flex:1,minWidth:110,padding:'14px 15px'}}>
-      {/* ⚠️ Les étiquettes en capitales sont PLUS LONGUES : « COÛT D'ACHAT » et
-          « BÉNÉFICE NET » passaient sur deux lignes et les trois cases d'une
-          rangée ne s'alignaient plus (vu en capture). On réserve deux lignes
-          pour tout le monde : les chiffres restent sur la même ligne d'œil. */}
-      <div className="vrm-label" style={{color:C.muted,marginBottom:6,lineHeight:1.22,minHeight:'2.44em',display:'flex',alignItems:'flex-start'}}>{label}</div>
-      <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{value}</div>
-      {sub&&<div style={{fontSize:11.5,color:C.muted,marginTop:5,lineHeight:1.35}}>{sub}</div>}
-    </Card>
+    <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.accent:color}`}}>
+      <div className="vrm-label" style={{color:C.muted,minHeight:'2.44em'}}>{label}</div>
+      <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,marginTop:2,whiteSpace:'nowrap'}}>{value}</div>
+      {sub && <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.35}}>{sub}</div>}
+    </div>
   );
 }
-// Nombre qui « compte » de 0 à sa valeur, façon Wrapped. Se relance à chaque
-// changement de `value` (donc à chaque carte de l'histoire). rAF + easing cubic.
+
 function CountUp({ value, format, duration = 950, style }) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -3437,7 +3440,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
   };
 
   const chip = (v, label) => (
-    <button type="button" onClick={()=>setRatio(v)} style={{border:`1px solid ${ratio===v?C.accent:C.border}`,background:ratio===v?C.accent+'14':C.card,color:ratio===v?C.accent:C.text,borderRadius:999,fontSize:12,fontWeight:600,padding:'6px 12px',cursor:'pointer',fontFamily:'inherit'}}>{label}</button>
+    <button type="button" onClick={()=>setRatio(v)} style={{border:`1px solid ${ratio===v?C.accent:C.border}`,background:ratio===v?C.accent+'14':C.card,color:ratio===v?C.accent:C.text,borderRadius:3,fontSize:12,fontWeight:600,padding:'6px 12px',cursor:'pointer',fontFamily:'inherit'}}>{label}</button>
   );
   const sliderRow = (label, val, min, max, step, setter) => (
     <div style={{marginTop:10}}>
@@ -3463,10 +3466,10 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
               {refPhoto && (
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}}>ANNONCE ACTUELLE (repère)</div>
-                  <img src={refPhoto} alt="" style={{width:110,height:'auto',borderRadius:12,border:`1px solid ${C.border}`}}/>
+                  <img src={refPhoto} alt="" style={{width:110,height:'auto',borderRadius:4,border:`1px solid ${C.border}`}}/>
                 </div>
               )}
-              <label style={{display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}`,background:C.accent+'12',color:C.accent,borderRadius:12,fontSize:14,fontWeight:700,padding:'13px 18px',cursor:'pointer'}}>
+              <label style={{display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}`,background:C.accent+'12',color:C.accent,borderRadius:4,fontSize:14,fontWeight:700,padding:'13px 18px',cursor:'pointer'}}>
                 📷 Choisir une photo
                 <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
               </label>
@@ -3478,7 +3481,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
                 <canvas ref={canvasRef}
                   onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
                   onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
-                  style={{width:'100%',maxWidth:DW,height:'auto',borderRadius:12,border:`1px solid ${C.border}`,background:'#fff',touchAction:'none',cursor:'grab'}}/>
+                  style={{width:'100%',maxWidth:DW,height:'auto',borderRadius:4,border:`1px solid ${C.border}`,background:'#fff',touchAction:'none',cursor:'grab'}}/>
               </div>
               <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:6}}>Glisse la photo pour la recadrer.</div>
 
@@ -3488,8 +3491,8 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
 
               {sliderRow('ZOOM', zoom, 1, 3, 0.01, setZoom)}
               <div style={{display:'flex',gap:8,marginTop:10}}>
-                <button type="button" onClick={()=>{ setRot(r=>(r+270)%360); setOff({x:0,y:0}); }} style={{flex:1,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontSize:12.5,fontWeight:600,padding:'9px',cursor:'pointer',fontFamily:'inherit'}}>↺ Tourner</button>
-                <button type="button" onClick={()=>{ setRot(r=>(r+90)%360); setOff({x:0,y:0}); }} style={{flex:1,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontSize:12.5,fontWeight:600,padding:'9px',cursor:'pointer',fontFamily:'inherit'}}>↻ Tourner</button>
+                <button type="button" onClick={()=>{ setRot(r=>(r+270)%360); setOff({x:0,y:0}); }} style={{flex:1,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:3,fontSize:12.5,fontWeight:600,padding:'9px',cursor:'pointer',fontFamily:'inherit'}}>↺ Tourner</button>
+                <button type="button" onClick={()=>{ setRot(r=>(r+90)%360); setOff({x:0,y:0}); }} style={{flex:1,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:3,fontSize:12.5,fontWeight:600,padding:'9px',cursor:'pointer',fontFamily:'inherit'}}>↻ Tourner</button>
               </div>
               {sliderRow('LUMINOSITÉ', bright, 0.6, 1.5, 0.01, setBright)}
               {sliderRow('CONTRASTE', contrast, 0.6, 1.5, 0.01, setContrast)}
@@ -3499,12 +3502,12 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
 
         {img && (
           <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',gap:8,alignItems:'center'}}>
-            <label style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:12.5,fontWeight:600,padding:'11px 13px',cursor:'pointer'}}>
+            <label style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:4,color:C.text,fontSize:12.5,fontWeight:600,padding:'11px 13px',cursor:'pointer'}}>
               Changer
               <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
             </label>
-            <button type="button" onClick={()=>{ setZoom(1); setRot(0); setOff({x:0,y:0}); setBright(1); setContrast(1); }} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.muted,fontSize:12.5,fontWeight:600,padding:'11px 13px',cursor:'pointer',fontFamily:'inherit'}}>Réinit.</button>
-            <button type="button" onClick={exportPhoto} disabled={busy} style={{flex:1,border:'none',borderRadius:12,background:C.accent,color:'#fff',fontSize:14,fontWeight:700,padding:'11px',cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy?0.6:1}}>{busy?'…':'Enregistrer / Partager'}</button>
+            <button type="button" onClick={()=>{ setZoom(1); setRot(0); setOff({x:0,y:0}); setBright(1); setContrast(1); }} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:4,background:C.card,color:C.muted,fontSize:12.5,fontWeight:600,padding:'11px 13px',cursor:'pointer',fontFamily:'inherit'}}>Réinit.</button>
+            <button type="button" onClick={exportPhoto} disabled={busy} style={{flex:1,border:'none',borderRadius:4,background:C.accent,color:'#fff',fontSize:14,fontWeight:700,padding:'11px',cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy?0.6:1}}>{busy?'…':'Enregistrer / Partager'}</button>
           </div>
         )}
       </div>
@@ -3676,7 +3679,7 @@ const ICON_PATHS = {
 function IconTile({ name, color, size = 30 }) {
   const c = color || C.accent;
   return (
-    <span style={{width:size,height:size,borderRadius:9,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
+    <span style={{width:size,height:size,borderRadius:3,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
       background:`${c}16`, color:c}}>
       <Icon name={name} size={Math.round(size*0.6)}/>
     </span>
@@ -3908,7 +3911,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
         <span aria-hidden="true" style={{color:muetsTr?C.warn:(C.ok||C.accent),display:'flex'}}><Icon name={muetsTr?'alert':'check'} size={14}/></span>
         Réception des emails{muetsTr>0 ? ` · ${muetsTr} transporteur${muetsTr>1?'s':''} silencieux` : ' · tout arrive'}
       </summary>
-      <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px'}}>{detail}</div>
+      <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'10px 12px'}}>{detail}</div>
     </details>
   );
 }
@@ -3957,7 +3960,7 @@ function PeriodePicker({ value, onChange }) {
   };
   const dans = (d) => value && value.from && value.to && d >= debutJour(value.from) && d <= finJour(value.to);
   const bord = (d) => value && ((value.from && jourClef(d)===jourClef(value.from)) || (value.to && jourClef(d)===jourClef(value.to)));
-  const chip = (on, actifC) => ({ border:`1px solid ${actifC?C.accent:C.border}`, background:actifC?`${C.accent}14`:'transparent', color:actifC?C.accent:C.text, borderRadius:999, padding:'6px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
+  const chip = (on, actifC) => ({ border:`1px solid ${actifC?C.accent:C.border}`, background:actifC?`${C.accent}14`:'transparent', color:actifC?C.accent:C.text, borderRadius:3, padding:'6px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
   return (
     <div style={{ marginBottom:12 }}>
       <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
@@ -3970,11 +3973,11 @@ function PeriodePicker({ value, onChange }) {
         {actif && <button type="button" onClick={()=>{ onChange(null); setOpen(false); }} style={{ ...chip(null,false), color:C.muted }}>✕</button>}
       </div>
       {open && (
-        <div style={{ marginTop:8, border:`1px solid ${C.border}`, background:C.card, borderRadius:14, padding:'10px 12px' }}>
+        <div style={{ marginTop:8, border:`1px solid ${C.border}`, background:C.card, borderRadius:4, padding:'10px 12px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:10 }}>
             {[['mois','Un mois entier'],['jours','Jour à jour']].map(([k,lab])=>(
               <button key={k} type="button" onClick={()=>setVue(k)}
-                style={{ flex:1, border:`1px solid ${vue===k?C.accent:C.border}`, background:vue===k?`${C.accent}14`:'transparent', color:vue===k?C.accent:C.muted, borderRadius:10, padding:'7px 0', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>{lab}</button>
+                style={{ flex:1, border:`1px solid ${vue===k?C.accent:C.border}`, background:vue===k?`${C.accent}14`:'transparent', color:vue===k?C.accent:C.muted, borderRadius:3, padding:'7px 0', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>{lab}</button>
             ))}
           </div>
           {vue==='mois' ? (<>
@@ -3993,7 +3996,7 @@ function PeriodePicker({ value, onChange }) {
                 return (
                   <button key={m} type="button" disabled={futur} onClick={()=>choisirMois(annee,m)}
                     style={{ border:`1px solid ${sel?C.accent:C.border}`, background:sel?C.accent:'transparent', color:futur?C.border:(sel?'#fff':C.text),
-                             borderRadius:10, padding:'10px 0', fontSize:13, fontWeight:600, cursor:futur?'default':'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>
+                             borderRadius:3, padding:'10px 0', fontSize:13, fontWeight:600, cursor:futur?'default':'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>
                     {nom}
                   </button>
                 );
@@ -4013,7 +4016,7 @@ function PeriodePicker({ value, onChange }) {
               : (
                 <button key={jourClef(d)} type="button" onClick={()=>clic(d)}
                   style={{ border:bord(d)?`1px solid ${C.accent}`:'1px solid transparent', background:bord(d)?C.accent:(dans(d)?`${C.accent}1c`:'transparent'),
-                           color:bord(d)?'#fff':C.text, borderRadius:8, padding:'6px 0', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                           color:bord(d)?'#fff':C.text, borderRadius:3, padding:'6px 0', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
                   {d.getDate()}
                 </button>
               ))}
@@ -4030,8 +4033,8 @@ function PeriodePicker({ value, onChange }) {
 
 function EmptyState({ icon, title, desc, action }) {
   return (
-    <div style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:20,boxShadow:C.shadow||'none'}}>
-      <div style={{width:56,height:56,margin:'0 auto 12px',borderRadius:999,background:`${C.accent}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{icon}</div>
+    <div style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:5,boxShadow:C.shadow||'none'}}>
+      <div style={{width:56,height:56,margin:'0 auto 12px',borderRadius:3,background:`${C.accent}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{icon}</div>
       <div style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{title}</div>
       {desc && <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.5,maxWidth:340,marginLeft:'auto',marginRight:'auto'}}>{desc}</div>}
       {action && <div style={{marginTop:14}}>{action}</div>}
@@ -4044,22 +4047,28 @@ function EmptyState({ icon, title, desc, action }) {
 // emoji pour les écrans qui n'ont pas d'onglet dédié.
 function ScreenHead({ icon, title, desc, right }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
+  // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
+  // ligne de 23 px avec une pastille ronde teintée devant — le gabarit de tous
+  // les outils SaaS. Ici : un surtitre en capitales espacées, un titre large et
+  // serré, et un FILET D'ENCRE qui ferme le bloc. C'est ce filet, plus que la
+  // taille, qui fait lire « page composée » au lieu de « widget ».
   return (
-    <div style={{display:'flex',alignItems:'flex-start',gap:12,marginBottom:16}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          {/* L'icône dans une pastille teintée : elle devient un repère d'écran
-              au lieu d'un glyphe posé devant le mot. */}
-          {line ? (
-            <span aria-hidden="true" style={{flexShrink:0,width:32,height:32,borderRadius:11,background:C.ring,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <Icon name={icon} size={18}/>
-            </span>
-          ) : <span style={{fontSize:19}}>{icon}</span>}
-          <h2 className="vrm-display" style={{margin:0,fontSize:23,fontWeight:700,color:C.text,lineHeight:1.12}}>{title}</h2>
+    <div style={{marginBottom:18,paddingBottom:12,borderBottom:`2px solid ${C.text}`}}>
+      <div style={{display:'flex',alignItems:'flex-end',gap:14,flexWrap:'wrap'}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div className="vrm-label" style={{color:C.accent,marginBottom:6,display:'flex',alignItems:'center',gap:7}}>
+            {line
+              ? <span aria-hidden="true" style={{display:'flex',color:C.accent}}><Icon name={icon} size={14}/></span>
+              : (icon ? <span aria-hidden="true" style={{fontSize:13}}>{icon}</span> : null)}
+            {/* Un trait d'accent tient lieu de surtitre : écrire « VRM » sur
+                chaque écran répétait la marque déjà présente dans la barre. */}
+            <span aria-hidden="true" style={{display:'block',width:26,height:2,background:C.accent}}/>
+          </div>
+          <h2 className="vrm-display" style={{margin:0,fontSize:'clamp(27px, 4.6vw, 38px)',fontWeight:700,color:C.text,lineHeight:1.02}}>{title}</h2>
+          {desc && <div style={{fontSize:12.5,color:C.muted,marginTop:8,lineHeight:1.5,maxWidth:640}}>{desc}</div>}
         </div>
-        {desc && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{desc}</div>}
+        {right && <div style={{flexShrink:0}}>{right}</div>}
       </div>
-      {right}
     </div>
   );
 }
@@ -4101,7 +4110,7 @@ function Toaster() {
         return (
           <button key={t.id} type="button" onClick={()=>dismissToast(t.id)}
             style={{pointerEvents:'auto',maxWidth:520,width:'100%',textAlign:'left',cursor:'pointer',fontFamily:'inherit',
-              display:'flex',alignItems:'flex-start',gap:9,padding:'11px 14px',borderRadius:16,
+              display:'flex',alignItems:'flex-start',gap:9,padding:'11px 14px',borderRadius:4,
               background:C.card,border:`1px solid ${t.type==='info'?C.border:col+'66'}`,
               boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',
               animation:'cancaleToast .26s cubic-bezier(.32,.72,0,1) both'}}>
@@ -4182,22 +4191,22 @@ function SideBar({ tab, setTab }) {
     <nav aria-label="Navigation principale" style={{
       position:'fixed',left:0,top:0,bottom:0,width:NAV_LARGEUR,zIndex:60,
       display:'flex',flexDirection:'column',gap:2,
-      background:C.surface,borderRight:`1px solid ${C.border}`,
+      background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,
       padding:'14px 12px 14px',overflowY:'auto'}}>
       <div style={{display:'flex',alignItems:'center',gap:10,padding:'2px 6px 16px'}}>
         <VrmLogo size={34}/>
-        <VrmWord height={17} color={C.text} accent={C.accent}/>
+        <VrmWord height={17} color={C.onChrome} accent={C.accent}/>
       </div>
       {groupes.map(g => (
         <div key={g.titre} style={{marginBottom:6}}>
-          <div className="vrm-label" style={{color:C.muted,opacity:.75,padding:'8px 8px 6px'}}>{g.titre}</div>
+          <div className="vrm-label" style={{color:C.chromeMuted,padding:'8px 8px 6px'}}>{g.titre}</div>
           {g.items.map(t => {
             const on = tab === t.id;
             return (
               <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={on?'page':undefined}
                 style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
-                  padding:'9px 10px',marginBottom:2,borderRadius:11,border:'none',cursor:'pointer',fontFamily:'inherit',
-                  background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.text,
+                  padding:'9px 10px',marginBottom:2,borderRadius:3,border:'none',cursor:'pointer',fontFamily:'inherit',
+                  background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.onChrome,
                   fontSize:13.5,fontWeight:on?600:500,transition:'background .15s ease,color .15s ease'}}>
                 <Icon name={t.icon} size={19} style={{opacity:on?1:.68,flexShrink:0}}/>
                 <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
@@ -4209,8 +4218,8 @@ function SideBar({ tab, setTab }) {
       <div style={{flex:1}}/>
       <button type="button" onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}
         style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
-          padding:'9px 10px',borderRadius:11,border:`1px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit',
-          background:tab==='settings'?C.card2:'transparent',color:C.muted,fontSize:13,fontWeight:500}}>
+          padding:'9px 10px',borderRadius:3,border:`1px solid ${C.chromeLine}`,cursor:'pointer',fontFamily:'inherit',
+          background:tab==='settings'?C.chromeLine:'transparent',color:C.chromeMuted,fontSize:13,fontWeight:500}}>
         <Icon name="gear" size={18}/><span>Réglages</span>
       </button>
     </nav>
@@ -4247,13 +4256,13 @@ function BottomBar({tab,setTab}) {
             borderTopLeftRadius:20,borderTopRightRadius:20,borderTop:`1px solid ${C.border}`,
             boxShadow:'0 -12px 40px rgba(16,32,24,.18)',padding:'10px 10px calc(14px + env(safe-area-inset-bottom))',
             animation:'cancaleSheet .22s cubic-bezier(.32,.72,0,1)'}}>
-          <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'2px auto 10px'}}/>
+          <div style={{width:36,height:4,borderRadius:3,background:C.border,margin:'2px auto 10px'}}/>
           {PLUS_TABS.map(t=>{ const on=tab===t.id; return (
             <button key={t.id} type="button" role="menuitem" onClick={()=>{ setTab(t.id); setPlus(false); }}
               style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
-                padding:'12px 12px',borderRadius:12,border:'none',cursor:'pointer',fontFamily:'inherit',
+                padding:'12px 12px',borderRadius:4,border:'none',cursor:'pointer',fontFamily:'inherit',
                 background:on?`${C.accent}14`:'transparent',color:on?C.accent:C.text}}>
-              <span aria-hidden="true" style={{display:'flex',flexShrink:0,width:34,height:34,borderRadius:10,
+              <span aria-hidden="true" style={{display:'flex',flexShrink:0,width:34,height:34,borderRadius:3,
                 alignItems:'center',justifyContent:'center',background:on?`${C.accent}1f`:C.bg,color:on?C.accent:C.muted}}>
                 <Icon name={t.icon} size={19}/>
               </span>
@@ -4267,15 +4276,16 @@ function BottomBar({tab,setTab}) {
       </div>
     )}
     <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'hidden',
-      background:C.glass||C.surface,backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
-      borderTop:`1px solid ${C.border}`,boxShadow:'0 -1px 0 rgba(0,0,0,.03), 0 -8px 24px rgba(16,32,24,.06)',
+      /* LA NAVIGATION EST À L'ENCRE — sur téléphone c'est elle qui porte la
+         signature, comme la barre latérale sur ordinateur. */
+      background:C.chrome,borderTop:`1px solid ${C.chromeLine}`,boxShadow:'none',
       paddingBottom:'env(safe-area-inset-bottom)',
       transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)'}}>
       {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
-          color:on?C.accent:C.muted,transition:'color .18s ease'}}>
+          color:on?C.accent:C.chromeMuted,transition:'color .18s ease'}}>
           <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
             width:38,height:26,transition:'transform .2s cubic-bezier(.32,.72,0,1), opacity .2s ease',
             transform:on?'translateY(-1px)':'none',opacity:on?1:0.62}}>
@@ -4291,7 +4301,7 @@ function BottomBar({tab,setTab}) {
         aria-expanded={plus} aria-current={dansPlus?'page':undefined} style={{
         flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
         background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
-        color:dansPlus?C.accent:C.muted,transition:'color .18s ease'}}>
+        color:dansPlus?C.accent:C.chromeMuted,transition:'color .18s ease'}}>
         <span aria-hidden="true" style={{display:'flex',alignItems:'center',justifyContent:'center',
           width:38,height:26,opacity:dansPlus?1:0.62}}>
           <Icon name="more" size={23} style={{strokeWidth:dansPlus?2:1.7}}/>
@@ -4333,7 +4343,7 @@ function Nav({tab,setTab,open,setOpen}) {
               padding:'12px 14px',cursor:'pointer',
               background:on?C.accent:'transparent',
               color:on?C.onAccent:C.text,
-              border:'none',borderRadius:6,fontFamily:'inherit',
+              border:'none',borderRadius:2,fontFamily:'inherit',
               fontSize:15,fontWeight:on?600:500,transition:'background .12s',
             }}>
               <span style={{fontSize:17,lineHeight:1}}>{t.icon}</span>
@@ -4351,7 +4361,7 @@ function Nav({tab,setTab,open,setOpen}) {
               padding:'10px 14px',cursor:'pointer',
               background:on?C.accent:'transparent',
               color:on?C.onAccent:C.muted,
-              border:'none',borderRadius:6,fontFamily:'inherit',
+              border:'none',borderRadius:2,fontFamily:'inherit',
               fontSize:13,fontWeight:on?600:500,
             }}>
               <span style={{fontSize:15,lineHeight:1}}>{t.icon}</span>
@@ -4431,8 +4441,8 @@ function MonthChart({sales}) {
           (un libellé coloré se lit mal et la couleur ne doit pas être le seul
           indice — le trait plein / pointillé distingue déjà les deux séries). */}
       <div style={{display:'flex',gap:16,fontSize:11,marginTop:6,color:C.muted,fontWeight:500}}>
-        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:6,background:C.s1||C.accent,display:'inline-block'}}/>CA</span>
-        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:6,background:`repeating-linear-gradient(90deg, ${C.s2||C.purple} 0 5px, transparent 5px 9px)`,display:'inline-block'}}/>Bénéfice</span>
+        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:2,background:C.s1||C.accent,display:'inline-block'}}/>CA</span>
+        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:2,background:`repeating-linear-gradient(90deg, ${C.s2||C.purple} 0 5px, transparent 5px 9px)`,display:'inline-block'}}/>Bénéfice</span>
       </div>
     </div>
   );
@@ -4453,7 +4463,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
   const totalCA=ventes.reduce((s,v)=>s+(+v.sellPrice||0),0);
   const totalProfit=ventes.reduce((s,v)=>s+((+v.sellPrice||0)-(+v.buyPrice||0)),0);
   return (
-    <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:10,border:`1px solid ${C.border}`}}>
+    <div style={{marginTop:16,padding:14,background:C.bg,borderRadius:3,border:`1px solid ${C.border}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
         <span style={{fontSize:13,fontWeight:600,color:C.text}}>{mois.nomComplet} — {ventes.length} vente{ventes.length>1?'s':''}</span>
         <span onClick={onClose} style={{cursor:'pointer',color:C.muted,fontSize:20,fontWeight:500,lineHeight:1}}>×</span>
@@ -4561,7 +4571,7 @@ function AuthScreen() {
     } finally { setBusy(false); }
   };
 
-  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:12,
+  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:4,
     padding:'13px 14px', fontSize:15, background:C.card, color:C.text, outline:'none', fontFamily:'inherit' };
 
   return (
@@ -4570,7 +4580,7 @@ function AuthScreen() {
         <div style={{textAlign:'center',marginBottom:26}}>
           <VrmLogo size={76} style={{filter:'drop-shadow(0 8px 22px rgba(10,10,12,.22))'}}/>
         </div>
-        <form onSubmit={submit} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
+        <form onSubmit={submit} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
           <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:3}}>
             {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
           </div>
@@ -4599,7 +4609,7 @@ function AuthScreen() {
               {dispo.map(p => (
                 <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
-                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'12px',
+                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:4,padding:'12px',
                     fontSize:14,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
                   <BrandMark id={p.id}/> Continuer avec {p.label}
                 </button>
@@ -4615,7 +4625,7 @@ function AuthScreen() {
           {/* Création de compte alors que la confirmation par email est active :
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
           {mode==='up' && confirmRequired() && (
-            <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.45}}>
+            <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:3,padding:'9px 11px',marginBottom:10,lineHeight:1.45}}>
               La confirmation par email est active côté Supabase, et son serveur d'envoi de test est limité. Décoche <b>« Confirm email »</b> (Authentication → Providers → Email) pour que la création soit immédiate.
             </div>
           )}
@@ -4630,22 +4640,22 @@ function AuthScreen() {
               value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
           )}
 
-          {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
+          {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:3,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {needConfirm && (
-            <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
+            <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:3,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
               <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
                 Si le lien du mail affiche « <i>impossible d'accéder au site</i> », c'est normal : il renvoie vers une adresse de test.
                 <b style={{color:C.text}}> Copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
               </div>
               <input value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
-                style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:10,
+                style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:3,
                   padding:'10px 11px',fontSize:12,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
               <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
                 <button type="button" disabled={busy||!confirmLink.trim()}
                   onClick={async()=>{ setBusy(true); setErr(''); const r=await authConfirmFromLink(confirmLink, email); setBusy(false);
                     if(r.ok){ setNeedConfirm(false); setInfo('Compte confirmé !'); setTimeout(()=>location.reload(), 800); } else setErr(r.error); }}
-                  style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 13px',
+                  style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:3,padding:'9px 13px',
                     fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
                   Confirmer avec ce lien
                 </button>
@@ -4653,23 +4663,23 @@ function AuthScreen() {
                   onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
                     if(r.ok){ setErr(''); setInfo('Nouvel email envoyé — utilise le plus récent.'); } else setErr(r.error); }}
                   style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
-                    borderRadius:10,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    borderRadius:3,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                   Renvoyer l'email
                 </button>
                 <button type="button" disabled={busy}
                   onClick={async()=>{ setBusy(true); const r=await authMagicLink(email); setBusy(false);
                     if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le mail, copie le lien, colle-le ci-dessus : ça confirme ton compte ET te connecte."); } else setErr(r.error); }}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
-                    borderRadius:10,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    borderRadius:3,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                   Recevoir un lien de connexion
                 </button>
               </div>
             </div>
           )}
-          {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
+          {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:3,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
           <button type="submit" disabled={busy} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
-            borderRadius:12,padding:'13px',fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',opacity:busy?0.6:1,fontFamily:'inherit'}}>
+            borderRadius:4,padding:'13px',fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',opacity:busy?0.6:1,fontFamily:'inherit'}}>
             {busy ? '…' : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>
 
@@ -4735,11 +4745,11 @@ function AuthScreen() {
               <input value={codeAcces} onChange={e=>{setCodeAcces(e.target.value);setCodeErr('');}}
                 placeholder="code d'accès" autoComplete="off" spellCheck={false}
                 style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,background:C.bg,
-                  color:C.text,borderRadius:12,padding:'11px 12px',fontSize:13,fontFamily:'inherit'}}/>
+                  color:C.text,borderRadius:4,padding:'11px 12px',fontSize:13,fontFamily:'inherit'}}/>
               {codeErr && <div style={{color:C.danger,fontSize:11.5,marginTop:6}}>{codeErr}</div>}
               <button type="submit"
                 style={{width:'100%',marginTop:8,border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,
-                  borderRadius:12,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  borderRadius:4,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                 Entrer
               </button>
             </form>
@@ -4775,7 +4785,7 @@ function Onboarding({ setTab }) {
   ];
   return (
     <div style={{padding:'20px 16px 8px'}}>
-      <div style={{borderRadius:20,border:`1px solid ${C.border}`,background:C.card,padding:'22px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.04)'}}>
+      <div style={{borderRadius:5,border:`1px solid ${C.border}`,background:C.card,padding:'22px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.04)'}}>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
           <VrmLogo size={44}/>
           <div style={{fontSize:22,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue 👋</div>
@@ -4786,7 +4796,7 @@ function Onboarding({ setTab }) {
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           {steps.map(s=>(
             <div key={s.n} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
-              <div style={{flexShrink:0,width:32,height:32,borderRadius:999,background:s.ok?INV_STATUS.online.color:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>{s.ok?'✓':s.n}</div>
+              <div style={{flexShrink:0,width:32,height:32,borderRadius:3,background:s.ok?INV_STATUS.online.color:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>{s.ok?'✓':s.n}</div>
               <div style={{minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text}}>{s.t}</div>
                 <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>{s.d}</div>
@@ -4795,7 +4805,7 @@ function Onboarding({ setTab }) {
           ))}
         </div>
         <button onClick={()=>setTab('vintedaccounts')}
-          style={{marginTop:22,width:'100%',background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'13px 16px',cursor:'pointer',fontSize:15,fontWeight:600}}>
+          style={{marginTop:22,width:'100%',background:C.accent,color:C.onAccent,border:'none',borderRadius:4,padding:'13px 16px',cursor:'pointer',fontSize:15,fontWeight:600}}>
           Voir mes comptes connectés
         </button>
         <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
@@ -5057,7 +5067,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
     <div style={{
       flex:1,minWidth:140,
       background:gradient||C.card,
-      border:`1px solid ${C.border}`,borderRadius:16,padding:'16px 18px',
+      border:`1px solid ${C.border}`,borderRadius:4,padding:'16px 18px',
       boxShadow:C.shadow||'none',
     }}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:9}}>
@@ -5084,7 +5094,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>À faire</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {actions.map((a,i)=>(
-                <button key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px',cursor:'pointer'}}>
+                <button key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px',cursor:'pointer'}}>
                   <span style={{fontSize:22,flexShrink:0}}>{a.icon}</span>
                   <span style={{flex:1,fontSize:15,fontWeight:600,color:C.text}}>{a.text}</span>
                   <span style={{fontSize:20,color:C.muted}}>›</span>
@@ -5093,7 +5103,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             </div>
           </div>
         ) : (
-          <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
             <span style={{fontSize:20}}>✅</span>
             <span style={{fontSize:13,fontWeight:500,color:C.text}}>Tout est à jour — rien qui presse ✨</span>
           </div>
@@ -5104,7 +5114,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           qui arrive plusieurs jours après — deux choses différentes). */}
       {liveStats && liveStats.ventesJour!=null && (
         <button type="button" onClick={()=>onGo&&onGo('cat_ventes')}
-          style={{width:'100%',textAlign:'left',border:`1px solid ${liveStats.ventesJour>0?C.accent:C.border}`,background:liveStats.ventesJour>0?`${C.accent}0e`:C.card,borderRadius:16,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit'}}>
+          style={{width:'100%',textAlign:'left',border:`1px solid ${liveStats.ventesJour>0?C.accent:C.border}`,background:liveStats.ventesJour>0?`${C.accent}0e`:C.card,borderRadius:4,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit'}}>
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:3}}>Aujourd'hui</div>
           {liveStats.ventesJour>0 ? (
             <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
@@ -5130,7 +5140,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
               {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.blue||C.accent},
               {k:'unread', icon:'💬', label:'Messages non lus', val:liveStats.unread, go:'cat_msg', color:liveStats.unread>0?C.danger:C.muted},
             ].map(s=>(
-              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'13px 15px',cursor:'pointer',display:'flex',flexDirection:'column',gap:3,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'13px 15px',cursor:'pointer',display:'flex',flexDirection:'column',gap:3,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
                 <span style={{fontSize:17}}>{s.icon}</span>
                 <span style={{fontSize:22,fontWeight:700,color:s.color,letterSpacing:-0.7,lineHeight:1.05}}>{s.val}</span>
                 <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{s.label}</span>
@@ -5202,9 +5212,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
             <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>📅 Prochaine déclaration URSSAF</span>
-            <div style={{display:'flex',gap:4,background:C.surface,borderRadius:999,padding:2,border:`1px solid ${C.border}`}}>
+            <div style={{display:'flex',gap:4,background:C.surface,borderRadius:3,padding:2,border:`1px solid ${C.border}`}}>
               {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
-                <button key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:999,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
+                <button key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:3,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
               ))}
             </div>
           </div>
@@ -5212,7 +5222,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             const late=urssafDue.daysLeft<0, soon=urssafDue.daysLeft>=0&&urssafDue.daysLeft<=14;
             const col=late?C.danger:soon?C.warn:C.accent;
             return (
-              <div style={{border:`1px solid ${col}55`,background:`${col}0e`,borderRadius:12,padding:'11px 13px'}}>
+              <div style={{border:`1px solid ${col}55`,background:`${col}0e`,borderRadius:4,padding:'11px 13px'}}>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
                   <span style={{fontSize:15,fontWeight:700,color:col}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                   <span style={{fontSize:12,fontWeight:600,color:col}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
@@ -5231,12 +5241,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>🏠 Remplissage garage</span>
           <span style={{fontSize:13,fontWeight:600,color:C.accent}}>{fillRate}%</span>
         </div>
-        <div style={{height:10,background:C.surface,borderRadius:999,overflow:'hidden',border:`1px solid ${C.border}`}}>
+        <div style={{height:10,background:C.surface,borderRadius:3,overflow:'hidden',border:`1px solid ${C.border}`}}>
           <div style={{
             height:'100%',
             width:`${fillRate}%`,
             background:C.accent,
-            borderRadius:999,
+            borderRadius:3,
             transition:'width 0.4s ease',
           }}/>
         </div>
@@ -5456,7 +5466,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
                 <div style={{flex:1,minWidth:120}}>
                   {brandStats.map((b,i)=>(
                     <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
-                      <div style={{width:10,height:10,borderRadius:6,background:b.color,flexShrink:0}}/>
+                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
                       <span style={{color:C.text,fontWeight:500,flex:1}}>{b.label}</span>
                       <span style={{color:C.muted}}>{b.v}</span>
                     </div>
@@ -5473,7 +5483,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
                 <div style={{flex:1,minWidth:120}}>
                   {countryStats.map((b,i)=>(
                     <div key={i} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,fontSize:11}}>
-                      <div style={{width:10,height:10,borderRadius:6,background:b.color,flexShrink:0}}/>
+                      <div style={{width:10,height:10,borderRadius:2,background:b.color,flexShrink:0}}/>
                       <span style={{color:C.text,fontWeight:500,flex:1}}>{b.label}</span>
                       <span style={{color:C.muted}}>{b.v}</span>
                     </div>
@@ -5602,7 +5612,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         ))}
       </div>
       {oldStockCount>0&&(
-        <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:10,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:500}}>
+        <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:3,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:500}}>
           ⚠️ {oldStockCount} paire{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
@@ -5643,11 +5653,11 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                 <div style={{display:'flex',gap:4,alignItems:'center'}}>
                   <input value={newRow.id} onChange={e=>setNewRow(n=>({...n,id:e.target.value}))}
                     placeholder="N°" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:60,fontFamily:'monospace',outline:'none'}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:2,color:C.text,padding:'4px 8px',fontSize:12,width:60,fontFamily:'monospace',outline:'none'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                   <button type="button" onClick={fillNextId} title="Numéro suivant (dernier ajouté +1)"
-                    style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:15,fontWeight:600,cursor:'pointer',lineHeight:1}}>
+                    style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:2,color:C.accent,padding:'4px 6px',fontSize:15,fontWeight:600,cursor:'pointer',lineHeight:1}}>
                     +1
                   </button>
                 </div>
@@ -5655,7 +5665,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
               <td style={{padding:'6px 8px'}}>
                 <input ref={priceInputRef} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
                   type="number" placeholder="Prix achat €" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
-                  style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:100,outline:'none',fontFamily:'inherit'}}
+                  style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:2,color:C.text,padding:'4px 8px',fontSize:12,width:100,outline:'none',fontFamily:'inherit'}}
                   onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                 />
               </td>
@@ -5818,7 +5828,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       {/* Bandeau mois en cours */}
       <div style={{display:'flex',flexWrap:'wrap',gap:14,background:C.card,
-        border:`1px solid ${C.blue}44`,borderRadius:10,padding:'12px 16px'}}>
+        border:`1px solid ${C.blue}44`,borderRadius:3,padding:'12px 16px'}}>
         <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:500,width:'100%'}}>
           📅 {moisVentes.nom} — mois en cours
         </div>
@@ -5922,7 +5932,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                         if(!inv) return <span style={{color:C.muted,fontSize:11}}>—</span>;
                         return <button type="button" onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings||{...ENTREPRISE_VIDE}))}
                           title={`Voir la facture ${inv.number}`}
-                          style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:6,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'monospace'}}>
+                          style={{background:`${C.blue}22`,border:`1px solid ${C.blue}66`,borderRadius:2,color:C.blue,padding:'2px 8px',fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'monospace'}}>
                           📄 {inv.number}
                         </button>;
                       })()}
@@ -5947,21 +5957,21 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     }));
                   }}
                     placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:500}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:2,color:C.accent,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:500}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.saleDate} onChange={e=>setNewRow(n=>({...n,saleDate:e.target.value}))}
                     placeholder="jj/mm/aaaa"
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:2,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.receiveDate} onChange={e=>setNewRow(n=>({...n,receiveDate:e.target.value}))}
                     placeholder="jj/mm/aaaa"
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:2,color:C.text,padding:'4px 6px',fontSize:12,width:90,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
@@ -5969,14 +5979,14 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                   {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
                   <input value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
                     type="number" placeholder="Achat €"
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:2,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />}
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.sellPrice} onChange={e=>setNewRow(n=>({...n,sellPrice:e.target.value}))}
                     type="number" placeholder="Vente €"
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:2,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
@@ -6313,7 +6323,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           onChange={e=>setSearchInput(e.target.value)}
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
           placeholder="N° de paire ou date de vente... puis Entrée"
-          style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,
+          style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:3,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
         <Btn small onClick={triggerSearch} color={C.accent}>Chercher</Btn>
@@ -6332,7 +6342,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               const col=inv.status==='sent'?'#27a85d':inv.status==='queued'?C.warn:C.muted;
               const lbl=inv.status==='sent'?'📧 envoyée':inv.status==='queued'?'⏳ envoi en cours':'brouillon';
               return (
-                <div key={inv._id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:12,flexWrap:'wrap'}}>
+                <div key={inv._id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${col}55`,background:`${col}0d`,borderRadius:4,flexWrap:'wrap'}}>
                   <div style={{flex:1,minWidth:140}}>
                     <div style={{fontSize:13,fontWeight:600,color:C.text}}>
                       {inv.number} <span style={{fontSize:11,fontWeight:600,color:col,marginLeft:4}}>{lbl}</span>
@@ -6343,13 +6353,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                   </div>
                   <div style={{display:'flex',gap:6,flexShrink:0}}>
                     <button type="button" onClick={()=>{ const w=window.open('','_blank'); if(w){ w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${inv.number}</title></head><body>${(inv.html||'').replace('cid:logoFacture','')}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`); w.document.close(); } }}
-                      style={{padding:'6px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
+                      style={{padding:'6px 12px',borderRadius:3,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
                     {inv.status==='draft'&&inv.buyerEmail&&(
                       <button type="button" onClick={async()=>{
                         if(!await askConfirm(`Envoyer la facture ${inv.number} à ${inv.buyerEmail} ?\n(part dans les 5 minutes via Gmail)`)) return;
                         const ok=await setProInvoiceStatus(inv,'queued');
                         if(ok) setProInvs(await fetchProInvoices()); else toast('Échec — réessaie.');
-                      }} style={{padding:'6px 12px',borderRadius:10,border:'none',background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
+                      }} style={{padding:'6px 12px',borderRadius:3,border:'none',background:C.accent,color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Envoyer</button>
                     )}
                   </div>
                 </div>
@@ -6458,7 +6468,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
       onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>Nouvelle facture</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
@@ -6529,7 +6539,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
   const makeActive=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next,sel); };
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
           <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
@@ -6540,11 +6550,11 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
           <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
             {list.map(e=>(
               <button key={e.id} type="button" onClick={()=>pick(e.id)}
-                style={{border:`1px solid ${e.id===sel?C.accent:C.border}`,background:e.id===sel?`${C.accent}18`:'transparent',color:e.id===sel?C.accent:C.text,borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                style={{border:`1px solid ${e.id===sel?C.accent:C.border}`,background:e.id===sel?`${C.accent}18`:'transparent',color:e.id===sel?C.accent:C.text,borderRadius:3,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                 {e.id===activeEnt?'⭐ ':''}{e.companyName||'(sans nom)'}
               </button>
             ))}
-            <button type="button" onClick={addEnt} style={{border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
+            <button type="button" onClick={addEnt} style={{border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
           </div>
           <div style={{fontSize:10.5,color:C.muted,marginTop:5}}>⭐ = entité utilisée pour les nouvelles factures. Chaque entité a sa propre numérotation.</div>
         </div>
@@ -9231,10 +9241,10 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       <ScreenHead icon="home" title="Garage" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
-      <div style={{display:'flex',gap:6,background:C.surface,borderRadius:999,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start'}}>
+      <div style={{display:'flex',gap:6,background:C.surface,borderRadius:3,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start'}}>
         {[['plan','home','Ma pièce'],['grid','grid','Grille'],['photo','camera','Photos']].map(([v,ic,l])=>(
           <button key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} className={garageView===v?'vrm-btn-primary':undefined}
-            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:999,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
+            style={{display:'flex',alignItems:'center',gap:6,border:'none',borderRadius:3,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:garageView===v?C.accent:'transparent',color:garageView===v?(C.onAccent||'#fff'):C.muted}}>
             <Icon name={ic} size={15}/>{l}
           </button>
         ))}
@@ -9245,9 +9255,9 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
 
       {garageView==='grid' && (<>
       {placing && (
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:12,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:4,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
           <span>📦 Range la paire <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
-          <button onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:10,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
+          <button onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:3,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
         </div>
       )}
 
@@ -9265,7 +9275,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
           {duplicates.map(d=>(
             <span key={d.num} onClick={()=>{setSearchInput(d.num);setGarageSearch(d.num);}}
-              style={{background:C.bg,padding:'4px 10px',borderRadius:6,cursor:'pointer',color:C.text,border:`1px solid ${C.danger}66`}}>
+              style={{background:C.bg,padding:'4px 10px',borderRadius:2,cursor:'pointer',color:C.text,border:`1px solid ${C.danger}66`}}>
               <b style={{color:C.danger}}>#{d.num}</b> <span style={{color:C.muted}}>×{d.count}</span>
             </span>
           ))}
@@ -9282,7 +9292,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
                 {numberedNotStored.map(n=>(
                   <button key={n} type="button" onClick={()=>{ setLocalPlace(n); try{window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}catch(_){} }}
-                    style={{background:placing===n?C.warn:C.bg,color:placing===n?'#fff':C.text,padding:'5px 11px',borderRadius:10,border:`1px solid ${C.warn}66`,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📦 N°{n}</button>
+                    style={{background:placing===n?C.warn:C.bg,color:placing===n?'#fff':C.text,padding:'5px 11px',borderRadius:3,border:`1px solid ${C.warn}66`,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📦 N°{n}</button>
                 ))}
               </div>
             </Card>
@@ -9292,7 +9302,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
               <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au garage mais numéro inconnu ({storedUnknown.length})</div>
               <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au garage sans paire numérotée correspondante (ancien numéro, faute de frappe, ou vendue).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
-                {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:6,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:500}}>#{n}</span>))}
+                {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:2,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:500}}>#{n}</span>))}
               </div>
             </Card>
           )}
@@ -9321,7 +9331,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           « À ranger » + recherche + les boîtes. Le reste (blocage, couleurs,
           colonnes) est là pour qui veut, mais ne pollue plus l'écran. */}
       <button type="button" onClick={()=>{ const v=!advanced; setAdvanced(v); if(!v){setAddMode(false);setBlockMode(false);setColorMode(false);} }}
-        style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:999,padding:'5px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'5px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
         ⚙️ {advanced?'Masquer les réglages':'Réglages (couleurs, blocage, colonnes)'}
       </button>
       {advanced && (<>
@@ -9347,7 +9357,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
             title="Effacer"><Icon name="close" size={15}/></button>
         </div>}
       </div>
-      {allValsSet.size===0&&!addMode&&<div style={{fontSize:12,color:C.text,background:`${C.accent}0e`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'10px 13px',marginBottom:10,lineHeight:1.45}}>
+      {allValsSet.size===0&&!addMode&&<div style={{fontSize:12,color:C.text,background:`${C.accent}0e`,border:`1px solid ${C.accent}44`,borderRadius:4,padding:'10px 13px',marginBottom:10,lineHeight:1.45}}>
         🗄️ <b>Ton garage est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « 🏠 Ranger » pour la placer d'un tap.
       </div>}
       {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
@@ -9360,11 +9370,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6,fontWeight:500}}>Colonnes</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           {LAYOUT.map(z=>(
-            <div key={z.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,background:C.bg,padding:'4px 8px',borderRadius:6}}>
+            <div key={z.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,background:C.bg,padding:'4px 8px',borderRadius:2}}>
               <span style={{color:C.muted}}>Colonnes :</span>
-              <button onClick={()=>removeColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.danger,borderRadius:6,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>−</button>
+              <button onClick={()=>removeColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.danger,borderRadius:2,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>−</button>
               <span style={{color:C.accent,fontWeight:500,minWidth:24,textAlign:'center'}}>{z.cols.length+(extraCols[z.id]||0)}</span>
-              <button onClick={()=>addColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:6,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>+</button>
+              <button onClick={()=>addColumn(z.id)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:2,padding:'2px 8px',cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>+</button>
             </div>
           ))}
         </div>
@@ -9432,7 +9442,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
                       }}
                         style={{position:'relative',width:CW,height:CH,
                           cursor:(blockMode&&!t)||colorMode?'pointer':'auto'}}>
-                        {cellColor&&<div style={{position:'absolute',inset:0,top:TH,background:cellColor,opacity:0.35,borderRadius:6,zIndex:1,pointerEvents:'none'}}/>}
+                        {cellColor&&<div style={{position:'absolute',inset:0,top:TH,background:cellColor,opacity:0.35,borderRadius:2,zIndex:1,pointerEvents:'none'}}/>}
                         <Box val={val} isSold={isSold} highlight={highlight}/>
                         {!blockMode&&!colorMode&&<input value={val}
                           data-cell={`${z.id}_${ci}_${si}`}
@@ -9515,7 +9525,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
       animation:'fadeIn 0.2s',
     }}>
       <div onClick={e=>e.stopPropagation()} style={{
-        background:C.card,border:`1px solid ${C.border}`,borderRadius:10,
+        background:C.card,border:`1px solid ${C.border}`,borderRadius:3,
         padding:24,maxWidth:480,width:'100%',
       }}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
@@ -9528,7 +9538,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
         </div>
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:14}}>
+          <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:3,padding:14}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📤 Exporter</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               <b>{catalog.length}</b> paires · <b>{sales.length}</b> ventes
@@ -9536,7 +9546,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
             <Btn small onClick={exportData} color={C.accent}>💾 Télécharger sauvegarde</Btn>
           </div>
           
-          <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:14}}>
+          <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:3,padding:14}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📥 Restaurer</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               ⚠️ Cela remplacera toutes tes données actuelles
@@ -9545,7 +9555,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
               <input type="file" accept=".json" onChange={importData} style={{display:'none'}}/>
               <span style={{
                 display:'inline-block',background:C.warn,color:'#000',
-                border:'none',borderRadius:10,padding:'5px 12px',
+                border:'none',borderRadius:3,padding:'5px 12px',
                 fontSize:12,fontWeight:500,fontFamily:'inherit',
               }}>📁 Choisir un fichier JSON</span>
             </label>
@@ -9638,7 +9648,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
     <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
         <h2 style={{margin:0,fontSize:17,fontWeight:600}}>🟢 Stock Vinted ({stockVinted.length})</h2>
-        <button onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:10,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
+        <button onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:3,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
           {showBulk?'Fermer':'Coller en masse'}
         </button>
       </div>
@@ -9656,25 +9666,25 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           onKeyDown={e=>{ if(e.key==='Enter') addOne(); }}
           placeholder="N° de l'annonce (ex : 1908)"
           inputMode="numeric"
-          style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:10,fontSize:15}}
+          style={{flex:1,padding:'10px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:3,fontSize:15}}
         />
-        <button onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:10,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
+        <button onClick={addOne} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:3,padding:'10px 16px',fontWeight:500,fontSize:15,cursor:'pointer'}}>
           Ajouter
         </button>
       </div>
 
       {/* Collage en masse (optionnel) */}
       {showBulk&&(
-        <div style={{marginBottom:14,padding:12,background:C.card2||'rgba(0,0,0,0.04)',borderRadius:10}}>
+        <div style={{marginBottom:14,padding:12,background:C.card2||'rgba(0,0,0,0.04)',borderRadius:3}}>
           <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Colle plusieurs numéros (séparés par espace, virgule ou retour à la ligne) :</div>
           <textarea
             value={bulk}
             onChange={e=>setBulk(e.target.value)}
             rows={4}
             placeholder="1908 1925 898 ..."
-            style={{width:'100%',padding:10,border:`1px solid ${C.border||'#ccc'}`,borderRadius:10,fontSize:13,boxSizing:'border-box',resize:'vertical'}}
+            style={{width:'100%',padding:10,border:`1px solid ${C.border||'#ccc'}`,borderRadius:3,fontSize:13,boxSizing:'border-box',resize:'vertical'}}
           />
-          <button onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:10,padding:'9px 16px',fontWeight:500,fontSize:13,cursor:'pointer'}}>
+          <button onClick={addBulk} style={{marginTop:8,background:C.accent,color:C.onAccent,border:'none',borderRadius:3,padding:'9px 16px',fontWeight:500,fontSize:13,cursor:'pointer'}}>
             Ajouter tout
           </button>
         </div>
@@ -9686,24 +9696,24 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn}}>⚠️ Incohérences avec le garage</h3>
 
           {enLignePasGarage.length>0&&(
-            <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:10}}>
+            <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:3}}>
               <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>En ligne mais absent du garage ({enLignePasGarage.length})</div>
               <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le garage.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {enLignePasGarage.map(n=>(
-                  <span key={n} style={{background:C.warn,color:'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
+                  <span key={n} style={{background:C.warn,color:'#fff',borderRadius:2,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
                 ))}
               </div>
             </div>
           )}
 
           {garagePasEnLigne.length>0&&(
-            <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:10}}>
+            <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:3}}>
               <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>Au garage mais pas en ligne ({garagePasEnLigne.length})</div>
               <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces paires sont dans le garage mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {garagePasEnLigne.map(n=>(
-                  <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
+                  <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:2,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
                 ))}
               </div>
             </div>
@@ -9717,7 +9727,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           value={search}
           onChange={e=>setSearch(e.target.value)}
           placeholder="Rechercher un numéro…"
-          style={{width:'100%',padding:'9px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:10,fontSize:13,boxSizing:'border-box',marginBottom:12}}
+          style={{width:'100%',padding:'9px 12px',border:`1px solid ${C.border||'#ccc'}`,borderRadius:3,fontSize:13,boxSizing:'border-box',marginBottom:12}}
         />
       )}
 
@@ -9735,7 +9745,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
                 display:'inline-flex',alignItems:'center',gap:6,
                 background:absentGarage?'rgba(156,106,31,0.12)':(C.card2||'rgba(0,0,0,0.05)'),
                 border:absentGarage?`1px solid ${C.warn}`:'1px solid transparent',
-                borderRadius:10,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:500
+                borderRadius:3,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:500
               }}>
                 {n}
                 <button onClick={()=>removeOne(n)} title="Retirer" style={{background:'none',border:'none',color:C.danger,cursor:'pointer',fontSize:15,lineHeight:1,padding:0,fontWeight:700}}>×</button>
@@ -9973,7 +9983,7 @@ function VintedAccounts({ accounts, setAccounts }) {
   return (
     <div style={{padding:'16px 14px 40px'}}>
       {nbExclus > 0 && (
-        <div style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:14,padding:'12px 13px',marginBottom:14}}>
+        <div style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:4,padding:'12px 13px',marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
             {nbExclus} compte{nbExclus>1?'s':''} {nbExclus>1?'sont exclus':'est exclu'} de l'application
           </div>
@@ -9983,14 +9993,14 @@ function VintedAccounts({ accounts, setAccounts }) {
               ? ` Retiré${retires.logins.length>1?'s':''} : ${retires.logins.join(', ')}.` : ''}
           </div>
           <button type="button" onClick={toutAfficher} disabled={remise}
-            style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'11px',fontSize:13,fontWeight:600,cursor:remise?'default':'pointer',fontFamily:'inherit'}}>
+            style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:4,padding:'11px',fontSize:13,fontWeight:600,cursor:remise?'default':'pointer',fontFamily:'inherit'}}>
             {remise ? '…' : 'Tout réafficher'}
           </button>
         </div>
       )}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <h2 style={{fontSize:20,fontWeight:600,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
-        <button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
+        <button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
           {loading ? '…' : '↻ Actualiser'}
         </button>
       </div>
@@ -10001,7 +10011,7 @@ function VintedAccounts({ accounts, setAccounts }) {
       </div>
 
       {accounts.length === 0 && (
-        <div style={{padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
+        <div style={{padding:16,borderRadius:4,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
           Aucun compte détecté pour l'instant. Installe l'extension « Shop Cancale35 – Vinted Sync »,
           connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
         </div>
@@ -10014,7 +10024,7 @@ function VintedAccounts({ accounts, setAccounts }) {
         const warn = st.filter(s=>s.icon==='🟡'||s.icon==='⚪'||s.icon==='🔑').length;
         const bad = st.filter(s=>s.icon==='🔴'||s.icon==='🚫').length;
         return (
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:4,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
             <span style={{color:C.text}}>🩺 État des comptes :</span>
             <span style={{color:INV_STATUS.online.color}}>🟢 {ok} à jour</span>
             {warn>0 && <span style={{color:C.warn}}>🟡 {warn} à rafraîchir</span>}
@@ -10029,9 +10039,9 @@ function VintedAccounts({ accounts, setAccounts }) {
           {accounts.map(acc => {
             const tr = testResult[acc.vinted_user_id];
             return (
-              <div key={acc.vinted_user_id} style={{borderRadius:16,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+              <div key={acc.vinted_user_id} style={{borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
                 <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
-                  <span style={{width:36,height:36,flexShrink:0,borderRadius:999,background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
+                  <span style={{width:36,height:36,flexShrink:0,borderRadius:3,background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
                     {accountName(acc).slice(0,1).toUpperCase()}
                   </span>
                   <div style={{minWidth:0}}>
@@ -10040,8 +10050,8 @@ function VintedAccounts({ accounts, setAccounts }) {
                         <input autoFocus value={labelDraft} onChange={e=>setLabelDraft(e.target.value)}
                           onKeyDown={e=>{ if(e.key==='Enter') commitLabel(acc); if(e.key==='Escape') setEditingLabel(null); }}
                           placeholder={acc.login || `Compte #${acc.vinted_user_id}`}
-                          style={{fontSize:15,fontWeight:600,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:10,padding:'3px 8px',width:170}}/>
-                        <button onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:10,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:500}}>OK</button>
+                          style={{fontSize:15,fontWeight:600,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:3,padding:'3px 8px',width:170}}/>
+                        <button onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:3,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:500}}>OK</button>
                       </div>
                     ) : (
                       <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
@@ -10054,7 +10064,7 @@ function VintedAccounts({ accounts, setAccounts }) {
                       maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}
                     </div>
                     {(()=>{ const h=acctHealth(acc); return (
-                      <div title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:999,padding:'2px 9px'}}>{h.icon} {h.label}</div>
+                      <div title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:3,padding:'2px 9px'}}>{h.icon} {h.label}</div>
                     ); })()}
                     {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
                       <div style={{fontSize:12,marginTop:3,fontWeight:600,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
@@ -10069,7 +10079,7 @@ function VintedAccounts({ accounts, setAccounts }) {
                       onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
                       placeholder="📧 Email du compte (auto dès que l'extension capte le profil)"
                       title="L'adresse à laquelle Vinted écrit pour ce compte. Permet d'attribuer automatiquement les emails (ventes, bordereaux) au bon compte."
-                      style={{marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
+                      style={{marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:3,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
                       onFocus={e=>e.target.style.borderColor=C.accent}
                       onBlur={e=>e.target.style.borderColor=C.border}
                     />
@@ -10079,15 +10089,15 @@ function VintedAccounts({ accounts, setAccounts }) {
                   {tr && !tr.loading && <span style={{fontSize:11,fontWeight:500,color:tr.ok?C.accent:C.danger}}>{tr.label}</span>}
                   {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
                     <button onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
-                      style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:off?C.muted:C.accent}}>
+                      style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:3,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:off?C.muted:C.accent}}>
                       {off ? '🚫 Masqué (annonces + compta)' : '✅ Actif'}
                     </button>
                   ); })()}
-                  <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
+                  <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
                   <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Supprimer ce compte : jetons + annonces + ventes captées effacés, et l'extension ne le recaptera plus"
-                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger,opacity:removing===acc.vinted_user_id?0.5:1}}>
+                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:3,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger,opacity:removing===acc.vinted_user_id?0.5:1}}>
                     {removing===acc.vinted_user_id ? '…' : '🗑 Supprimer ce compte'}
                   </button>
                 </div>
@@ -10442,8 +10452,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
     stock: inventory.filter(p=>p.status==='stock').length,
   }), [inventory]);
 
-  const inputStyle = { padding:'8px 10px', borderRadius:10, border:`1px solid ${C.border}`, background:C.bg, color:C.text, fontSize:13 };
-  const btn = (bg, fg='#fff') => ({ padding:'8px 12px', borderRadius:10, border:'none', background:bg, color:fg, fontWeight:500, fontSize:13, cursor:'pointer' });
+  const inputStyle = { padding:'8px 10px', borderRadius:3, border:`1px solid ${C.border}`, background:C.bg, color:C.text, fontSize:13 };
+  const btn = (bg, fg='#fff') => ({ padding:'8px 12px', borderRadius:3, border:'none', background:bg, color:fg, fontWeight:500, fontSize:13, cursor:'pointer' });
 
   return (
     <div style={{padding:'0 4px'}}>
@@ -10467,7 +10477,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
       </div>
 
       {syncResult && (
-        <div style={{fontSize:12,marginBottom:12,padding:'8px 12px',borderRadius:10,background:C.surface,border:`1px solid ${C.border}`,color:C.text}}>
+        <div style={{fontSize:12,marginBottom:12,padding:'8px 12px',borderRadius:3,background:C.surface,border:`1px solid ${C.border}`,color:C.text}}>
           {syncResult.msg
             ? syncResult.msg
             : ((syncResult.sold + syncResult.pending) > 0
@@ -10479,7 +10489,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
       <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
         {[['all','Toutes'],['online','En ligne'],['pending_sale','En cours'],['sold','Vendues'],['stock','Stock']].map(([id,label]) => (
           <button key={id} type="button" onClick={()=>setFilter(id)}
-            style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${filter===id?C.accent:C.border}`,
+            style={{padding:'7px 14px',borderRadius:3,border:`1px solid ${filter===id?C.accent:C.border}`,
               background:filter===id?C.accent:'transparent',color:filter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
               boxShadow:filter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>
             {label} <span style={{opacity:0.7}}>({counts[id]})</span>
@@ -10528,7 +10538,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                     {st.items.map(listing => {
                       const linked = isListingLinked(listing.id);
                       return (
-                        <div key={listing.id} style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',background:C.bg,opacity:linked?0.6:1}}>
+                        <div key={listing.id} style={{border:`1px solid ${C.border}`,borderRadius:3,overflow:'hidden',background:C.bg,opacity:linked?0.6:1}}>
                           <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
                             {listing.photo ? <img src={listing.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}>👟</span>}
                           </div>
@@ -10566,8 +10576,8 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           const stt = INV_STATUS[p.status] || INV_STATUS.stock;
           const garage = inGarage(p.numero);
           return (
-            <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:11,borderRadius:16,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-              <div style={{width:52,height:52,borderRadius:10,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+            <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:11,borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+              <div style={{width:52,height:52,borderRadius:3,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                 {p.photo ? <img src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}>👟</span>}
               </div>
               <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
@@ -10599,7 +10609,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 
       {editing && editDraft && (
         <div onClick={()=>{setEditing(null);setEditDraft(null);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:16,padding:20,width:'100%',maxWidth:420}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:4,padding:20,width:'100%',maxWidth:420}}>
             <div style={{fontWeight:600,fontSize:15,color:C.text,marginBottom:14}}>Modifier la paire</div>
             <label style={{display:'block',fontSize:11,color:C.muted,marginBottom:4}}>Numéro</label>
             <input value={editDraft.numero} onChange={e=>setEditDraft(d=>({...d,numero:e.target.value}))} style={{...inputStyle,width:'100%',marginBottom:12}}/>
@@ -10629,8 +10639,8 @@ const ACCT_COLORS = ['#2f80ed','#9b51e0','#eb5757','#27ae60','#f2994a','#00b8a9'
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 function AcctTag({ acc, name }) {
   const col = acctColor(acc?.vinted_user_id);
-  return <span style={{display:'inline-flex',alignItems:'center',gap:4,background:col+'22',color:col,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>
-    <span style={{width:6,height:6,borderRadius:999,background:col}}/>{name}
+  return <span style={{display:'inline-flex',alignItems:'center',gap:4,background:col+'22',color:col,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:3,whiteSpace:'nowrap'}}>
+    <span style={{width:6,height:6,borderRadius:3,background:col}}/>{name}
   </span>;
 }
 
@@ -10638,11 +10648,11 @@ function AcctTag({ acc, name }) {
 // « Chargement… » figé. `variant` = 'card' (grille d'annonces) ou 'row' (listes).
 function Skeleton({ variant='row', count=6 }) {
   const bg = C.border;
-  const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:10 };
+  const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:3 };
   if (variant==='card') {
     return <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
       {Array.from({length:count}).map((_,i)=>(
-        <div key={i} style={{borderRadius:16,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,boxShadow:C.shadow||'none'}}>
+        <div key={i} style={{borderRadius:4,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,boxShadow:C.shadow||'none'}}>
           <div style={{...shimmer,width:'100%',aspectRatio:'3/4',borderRadius:0}}/>
           <div style={{padding:'8px 10px 10px',display:'flex',flexDirection:'column',gap:6}}>
             <div style={{...shimmer,height:14,width:'55%'}}/>
@@ -10654,8 +10664,8 @@ function Skeleton({ variant='row', count=6 }) {
   }
   return <div style={{display:'flex',flexDirection:'column',gap:10}}>
     {Array.from({length:count}).map((_,i)=>(
-      <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 13px',border:`1px solid ${C.border}`,borderRadius:16,background:C.surface,boxShadow:C.shadow||'none'}}>
-        <div style={{...shimmer,width:48,height:48,borderRadius:10,flexShrink:0}}/>
+      <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 13px',border:`1px solid ${C.border}`,borderRadius:4,background:C.surface,boxShadow:C.shadow||'none'}}>
+        <div style={{...shimmer,width:48,height:48,borderRadius:3,flexShrink:0}}/>
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
           <div style={{...shimmer,height:13,width:'45%'}}/>
           <div style={{...shimmer,height:11,width:'70%'}}/>
@@ -10671,7 +10681,7 @@ function LoadError({ onRetry }) {
     <div style={{fontSize:32,marginBottom:8}}>😕</div>
     <div style={{fontSize:15,fontWeight:500,color:C.text,marginBottom:4}}>Impossible de charger ces données</div>
     <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.4}}>Vérifie ta connexion, ou que ton compte Vinted est toujours actif.</div>
-    <button onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:999,padding:'8px 20px',cursor:'pointer',fontSize:13,fontWeight:500}}>Réessayer</button>
+    <button onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:3,padding:'8px 20px',cursor:'pointer',fontSize:13,fontWeight:500}}>Réessayer</button>
   </div>;
 }
 
@@ -10701,7 +10711,7 @@ function BordPlacer({ place, onConfirm, onCancel }) {
   const onUp = ()=>{ dragging.current=false; };
   return (
     <div onClick={onCancel} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:420,width:'100%',maxHeight:'92vh',overflow:'auto',padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:4,maxWidth:420,width:'100%',maxHeight:'92vh',overflow:'auto',padding:16}}>
         <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>📄 Nouveau format de bordereau</div>
         <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginBottom:12}}>
           Fais glisser l'étiquette <b>N° + titre</b> là où il y a de la place sur ton bordereau. L'app <b>retiendra</b> cet emplacement pour ce format.
@@ -10710,19 +10720,19 @@ function BordPlacer({ place, onConfirm, onCancel }) {
         <div ref={padRef}
           onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
           onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
-          style={{position:'relative',aspectRatio:`${w} / ${h}`,maxWidth:'100%',maxHeight:'56vh',margin:'0 auto',background:C.surface,border:`1px dashed ${C.border}`,borderRadius:10,touchAction:'none',cursor:'grab',overflow:'hidden'}}>
+          style={{position:'relative',aspectRatio:`${w} / ${h}`,maxWidth:'100%',maxHeight:'56vh',margin:'0 auto',background:C.surface,border:`1px dashed ${C.border}`,borderRadius:3,touchAction:'none',cursor:'grab',overflow:'hidden'}}>
           {/* Repères de zones (indicatif) */}
           <div style={{position:'absolute',top:0,left:0,right:0,height:'34%',background:`${C.muted}0d`,borderBottom:`1px dashed ${C.border}`}}/>
           <div style={{position:'absolute',top:'4%',left:0,right:0,textAlign:'center',fontSize:9,color:C.muted}}>haut (souvent code-barres / adresse)</div>
           {/* Le tampon déplaçable */}
-          <div style={{position:'absolute',left:`${xr*100}%`,top:`${yr*100}%`,width:`${wr*100}%`,height:`${hr*100}%`,background:'#fff',border:'1.5px solid #000',borderRadius:6,display:'flex',flexDirection:'column',justifyContent:'center',padding:'2px 5px',boxSizing:'border-box',boxShadow:'0 1px 6px rgba(0,0,0,.25)',cursor:'grab'}}>
+          <div style={{position:'absolute',left:`${xr*100}%`,top:`${yr*100}%`,width:`${wr*100}%`,height:`${hr*100}%`,background:'#fff',border:'1.5px solid #000',borderRadius:2,display:'flex',flexDirection:'column',justifyContent:'center',padding:'2px 5px',boxSizing:'border-box',boxShadow:'0 1px 6px rgba(0,0,0,.25)',cursor:'grab'}}>
             <div style={{fontSize:'min(3.4vw,15px)',fontWeight:700,color:'#000',lineHeight:1}}>N° {numero}</div>
             <div style={{fontSize:'min(2.4vw,9px)',color:'#222',lineHeight:1.1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{title}</div>
           </div>
         </div>
         <div style={{display:'flex',gap:8,marginTop:14}}>
-          <button onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>Annuler</button>
-          <button onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:10,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
+          <button onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>Annuler</button>
+          <button onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:3,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
         </div>
       </div>
     </div>
@@ -11434,8 +11444,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!a) return null;
     const ph = orderPhoto(a);
     return (
-      <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:10,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
-        <div style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:3,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
+        <div style={{width:30,height:30,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
           {ph ? <img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
         </div>
         <div style={{flex:'1 1 90px',minWidth:0}}>
@@ -11446,7 +11456,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
         <button type="button" onClick={()=>generateAchatJustificatif(a,{ account:a._accName||accNameOf(a._acc), regime:load('vinted_regime','micro'), numero:numero||'' })}
           title="Reçu d'achat PDF (avec le N° de la paire)" aria-label="Reçu d'achat"
-          style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:9,background:C.bg,color:C.text,cursor:'pointer',fontSize:11,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}><Icon name="doc" size={14}/> Reçu</button>
+          style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:C.bg,color:C.text,cursor:'pointer',fontSize:11,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}><Icon name="doc" size={14}/> Reçu</button>
       </div>
     );
   };
@@ -14525,7 +14535,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const NoAcc = () => !noAcc ? null : (
     <EmptyState icon="🔌" title="Aucun compte Vinted lié"
       desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
-      action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
+      action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:4,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
   );
   return (
     <div style={{padding:'16px 14px 40px'}}>
@@ -14595,7 +14605,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ouvrant l'app le soir. */}
             {jourN>0 && (
               <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:16,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+                style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:4,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
                 <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:600}}>Vendu aujourd'hui</div>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginTop:4}}>
                   <span style={{fontSize:32,fontWeight:700,color:C.accent,letterSpacing:-1,lineHeight:1}}>{jourEur.toFixed(0)} €</span>
@@ -14612,7 +14622,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               let wca=0; for(const s of ws){ const p=parseFloat(String(s.prix||'').replace(',','.')); if(!isNaN(p)&&p>0) wca+=p; }
               if(!ws.length && !toShip.length) return null;
               return (
-                <div style={{marginBottom:14,border:`1px solid ${C.accent}33`,background:`${C.accent}0a`,borderRadius:16,padding:'13px 15px'}}>
+                <div style={{marginBottom:14,border:`1px solid ${C.accent}33`,background:`${C.accent}0a`,borderRadius:4,padding:'13px 15px'}}>
                   <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:9,textTransform:'uppercase',letterSpacing:0.6}}>Ta semaine</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 90px'}}>
@@ -14635,7 +14645,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {loading && <Skeleton variant="card" count={4}/>}
 
             {!loading && jobs.length===0 && (
-              <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:16,background:C.card}}>
+              <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:4,background:C.card}}>
                 <div style={{fontSize:44,lineHeight:1}}>🎉</div>
                 <div style={{fontSize:17,fontWeight:700,color:C.text,marginTop:10}}>Tout est à jour !</div>
                 <div style={{fontSize:13,color:C.muted,marginTop:5,lineHeight:1.5}}>Rien à expédier, rien à retirer, aucun message en attente.<br/>Profite — ou va sourcer de nouvelles paires. 👟</div>
@@ -14646,20 +14656,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Empilées, chacune traversait 900 px pour porter trois mots et
                 laissait 400 px de vide sous l'écran (mesuré en capture à
                 1440×900). Une grille qui se remplit toute seule
-                (`auto-fit, minmax(340px, 1fr)`) donne DEUX colonnes sur un
+                (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
                 grand écran et UNE sur téléphone — la même règle, sans test de
                 largeur dans le JavaScript. */}
             {!loading && jobs.length>0 && (
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(340px, 1fr))',gap:10}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
                 {jobs.map((j,i)=>(
-                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:16,border:`1px solid ${j.color}44`,background:`${j.color}0e`,cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:4,border:`1px solid ${j.color}44`,background:`${j.color}0e`,cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
                     {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                         avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
                         empilés, c'est ce qui faisait « application générée ».
                         Maintenant : une pastille neutre et l'icône au trait, du
                         même dessin que la barre du bas. La couleur ne sert plus
                         qu'à l'icône et au chevron — le fond reste calme. */}
-                    <div style={{width:42,height:42,borderRadius:11,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
+                    <div style={{width:42,height:42,borderRadius:3,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
                       <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
@@ -14702,14 +14712,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {recent.map((o,i)=>{
                       const ph=photoFor(o.article);
                       return (
-                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 11px',borderRadius:14,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',flexWrap:'wrap'}}>
-                          <div style={{width:44,height:44,borderRadius:10,overflow:'hidden',background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{ph?<img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>🏷️</span>}</div>
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 11px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',flexWrap:'wrap'}}>
+                          <div style={{width:44,height:44,borderRadius:3,overflow:'hidden',background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{ph?<img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:18}}>🏷️</span>}</div>
                           <div style={{flex:'1 1 130px',minWidth:0}}>
                             <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.article||'Article'}</div>
                             <div style={{fontSize:11,color:C.muted,marginTop:1}}>{o.montant?`Offre : ${o.montant}`:'Offre reçue'}{o.receivedAt?` · ${new Date(o.receivedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`:''}</div>
                           </div>
-                          <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',fontSize:11.5,fontWeight:700,color:'#fff',background:C.accent,borderRadius:10,padding:'7px 11px'}}>Répondre</a>
-                          <button type="button" onClick={()=>markOfferDone(o)} title="J'ai répondu / traité cette offre" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>✓ Répondu</button>
+                          <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',fontSize:11.5,fontWeight:700,color:'#fff',background:C.accent,borderRadius:3,padding:'7px 11px'}}>Répondre</a>
+                          <button type="button" onClick={()=>markOfferDone(o)} title="J'ai répondu / traité cette offre" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>✓ Répondu</button>
                         </div>
                       );
                     })}
@@ -14728,7 +14738,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const val=escrow?escrow.total:inRouteSum;
               if(loading||val<=0) return null;
               return (
-              <div style={{marginTop:16,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:16,border:`1px solid ${C.accent}33`,background:`${C.accent}0c`}}>
+              <div style={{marginTop:16,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:4,border:`1px solid ${C.accent}33`,background:`${C.accent}0c`}}>
                 <div style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en attente{escrow?'':' (estimation)'}</div>
@@ -14751,7 +14761,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {/* Mêmes symboles que la barre du bas : un écran et son raccourci
               portent le même signe, au trait, pas un emoji du système. */}
           {[['ventes','cash','Ventes'],['achats','bag','Achats'],['annonces','shop','Annonces'],['bordereaux','printer','Bordereaux']].map(([id,ic,label])=>(
-            <button key={id} onClick={()=>setSub(id)} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:999,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:500,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}><Icon name={ic} size={15}/>{label}</button>
+            <button key={id} onClick={()=>setSub(id)} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:3,border:`1px solid ${sub===id?C.accent:C.border}`,background:sub===id?C.accent:'transparent',color:sub===id?'#fff':C.text,fontWeight:500,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}><Icon name={ic} size={15}/>{label}</button>
           ))}
         </div>
       )}
@@ -14765,7 +14775,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.items && sales.items.length>0 && (
           <div style={{marginBottom:14}}>
             <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, acheteur)…"
-              style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
+              style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 13px',fontSize:13.5,background:C.card,color:C.text,outline:'none'}}/>
           </div>
         )}
         <NoAcc/>
@@ -14796,7 +14806,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               action={onNav && (
                 <button type="button" onClick={()=>onNav('cat_bord')}
                   style={{flexShrink:0,alignSelf:'center',border:`1px solid ${C.border}`,background:C.surface,color:C.text,
-                    borderRadius:9,padding:'7px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    borderRadius:3,padding:'7px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                   Expédier
                 </button>
               )}/>
@@ -14818,7 +14828,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // anciennes gardent ce statut alors que l'argent a déjà été versé.
           const reel = (walletEscrow && walletEscrow.total > 0) ? walletEscrow : null;
           return (
-            <div style={{position:'relative',overflow:'hidden',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px 11px 16px',marginBottom:10}}>
+            <div style={{position:'relative',overflow:'hidden',border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px 11px 16px',marginBottom:10}}>
               {/* Surface NEUTRE + une barre de 3 px : la couleur signale, elle
                   n'inonde plus le bloc. Le montant, lui, garde l'accent — c'est
                   lui l'information, pas le fond. */}
@@ -14928,7 +14938,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const manquants = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
                 if (!manquants.length) return null;
                 return (
-                  <div style={{marginTop:8,padding:'8px 10px',border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:10,fontSize:11,color:C.text,lineHeight:1.45}}>
+                  <div style={{marginTop:8,padding:'8px 10px',border:`1px solid ${C.warn}`,background:`${C.warn}12`,borderRadius:3,fontSize:11,color:C.text,lineHeight:1.45}}>
                     ⚠️ <b>Total incomplet</b> — {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} n'{manquants.length>1?'ont':'a'} pas encore de porte-monnaie lu, donc leur argent en attente n'est <b>pas</b> dans ce chiffre :{' '}
                     <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
                     {/* ⚠️ NE PAS redire « ouvre ton porte-monnaie » : depuis la 5.20 la
@@ -14982,20 +14992,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const fmtJ = (ts) => new Date(ts).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'});
           return (
             <details style={{marginBottom:10}} open={liste.length<=10}>
-              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
+              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'11px 13px'}}>
                 <span aria-hidden="true" style={{flexShrink:0,color:C.accent,display:'flex'}}><Icon name="calendar" size={18}/></span>
                 <span style={{flex:'1 1 150px',minWidth:0}}>
                   <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Ventes par jour</span>
                   <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>{liste.length} jour{liste.length>1?'s':''} · {totN} vente{totN>1?'s':''} · {fmtE0(totCa)} — sur {libellePeriode(periode).toLowerCase()}</span>
                 </span>
               </summary>
-              <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
+              <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,overflow:'hidden'}}>
                 {liste.map(([k,v],i)=>(
                   <div key={k} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderTop:i?`1px solid ${C.border}66`:'none'}}>
                     <span style={{flexShrink:0,width:76,fontSize:12,fontWeight:600,color:C.text}}>{fmtJ(v.ts)}</span>
                     {/* La barre rend la comparaison entre jours immédiate ; le
                         chiffre reste à droite, c'est lui qui fait foi. */}
-                    <span aria-hidden="true" style={{flex:1,minWidth:20,height:6,borderRadius:999,background:`${C.accent}22`,overflow:'hidden'}}>
+                    <span aria-hidden="true" style={{flex:1,minWidth:20,height:6,borderRadius:3,background:`${C.accent}22`,overflow:'hidden'}}>
                       <span style={{display:'block',height:'100%',width:`${Math.round(v.ca/max*100)}%`,background:C.accent}}/>
                     </span>
                     <span style={{flexShrink:0,fontSize:11.5,color:C.muted,width:58,textAlign:'right'}}>{v.n} vente{v.n>1?'s':''}</span>
@@ -15033,7 +15043,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {Array.isArray(boostsDetected) && boostsDetected.length>0 && (()=>{
           const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
           return (
-            <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
+            <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:4,padding:'10px 13px',marginBottom:10}}>
               <div style={{fontSize:13,fontWeight:700,color:C.text}}>💡 {tot.toFixed(2)} € de boosts détectés sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span></div>
               <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>Capté automatiquement depuis ta facturation Vinted (via l'extension). Reporte ces montants dans le champ « 💡 boost » de chaque annonce concernée pour un bénéfice net exact — l'app ne les inscrit pas toute seule pour ne pas écraser tes saisies.</div>
             </div>
@@ -15055,7 +15065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0) && (
           <button type="button" onClick={()=>{ setWrapStep(0); setShowWrapped(true); }}
             style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,
-              background:C.card,borderRadius:12,padding:'11px 13px',marginBottom:10,cursor:'pointer',fontFamily:'inherit'}}>
+              background:C.card,borderRadius:4,padding:'11px 13px',marginBottom:10,cursor:'pointer',fontFamily:'inherit'}}>
             <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="spark" size={17}/></span>
             <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>
               Rétrospective {new Date().getFullYear()}
@@ -15066,7 +15076,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(totals.nb>0) && (
           <div style={{marginBottom:12}}>
             <button type="button" onClick={()=>setAnalyseOpen(v=>!v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
               <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="chart" size={17}/></span>
               <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Analyse de tes ventes</span>
               <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{analyseOpen?'masquer':'voir'}</span>
@@ -15085,7 +15095,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {/* Saisonnalité : meilleurs mois de vente → acheter avant les pics */}
         {seasonality && seasonality.top.length>0 && (
-          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'9px 13px',marginBottom:8}}>
+          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'9px 13px',marginBottom:8}}>
             <span style={{fontSize:12,fontWeight:600,color:C.text}}>📈 Tes meilleurs mois de vente : </span>
             <span style={{fontSize:12,fontWeight:700,color:C.accent}}>{seasonality.top.map(t=>t.m).join(' · ')}</span>
             <span style={{fontSize:11,color:C.muted,display:'block',marginTop:3}}>Sur {seasonality.total} ventes. Achète un peu avant ces mois pour avoir le stock au bon moment.</span>
@@ -15093,7 +15103,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {/* Ventes à perte : alerte + détail (erreur de saisie ou prix cassé) */}
         {pertes.length>0 && (
-          <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:12,padding:'10px 13px',marginBottom:8}}>
+          <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:4,padding:'10px 13px',marginBottom:8}}>
             <div style={{fontSize:13,fontWeight:700,color:C.danger}}>🔻 {pertes.length} vente{pertes.length>1?'s':''} à perte · {fmtE(pertes.reduce((s,p)=>s+p.net,0))}</div>
             <div style={{fontSize:11,color:C.text,marginTop:4,lineHeight:1.5}}>
               {pertes.slice(0,4).map((p,i)=>(<div key={i}>{p.num?`N°${p.num} · `:''}{p.title} — vendu {fmtE(p.sell)}, achat {fmtE(p.buy)} → <b style={{color:C.danger}}>{fmtE(p.net)}</b></div>))}
@@ -15104,7 +15114,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )}
         {/* Litiges / annulations : manque à gagner */}
         {litiges.nb>0 && (
-          <div style={{border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:12,padding:'9px 13px',marginBottom:8}}>
+          <div style={{border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:4,padding:'9px 13px',marginBottom:8}}>
             <span style={{fontSize:12,fontWeight:600,color:C.danger}}>⚖️ {litiges.nb} vente{litiges.nb>1?'s':''} annulée{litiges.nb>1?'s':''}</span>
             <span style={{fontSize:12,color:C.text,fontWeight:500}}> · {fmtE(litiges.montant)} de manque à gagner</span>
             <span style={{fontSize:11,color:C.muted,display:'block',marginTop:3}}>Filtre « Annulées » ci-dessous pour le détail. Un taux d'annulation élevé peut venir de prix/photos à revoir.</span>
@@ -15116,17 +15126,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             les ventes moissonnées → l'objectif affichait un CA différent de la
             tuile « CA du mois » de l'accueil. Une seule source, un seul nombre. */}
         {accounts.length>0 && (()=>{ const caM = (liveStats && liveStats.caMois!=null) ? liveStats.caMois : perf.caMois; const pct = goal>0 ? Math.min(100, (caM/goal)*100) : 0; return (
-          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',marginBottom:12}}>
+          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 13px',marginBottom:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:goal>0?8:0,flexWrap:'wrap',gap:6}}>
               <div style={{fontSize:12,fontWeight:600,color:C.text}}>🎯 Objectif du mois</div>
               {goalEdit ? (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   <input autoFocus type="number" defaultValue={goal||''} placeholder="0" onKeyDown={e=>{ if(e.key==='Enter'){ saveGoal(e.target.value); setGoalEdit(false);} if(e.key==='Escape') setGoalEdit(false); }}
-                    onBlur={e=>{ saveGoal(e.target.value); setGoalEdit(false); }} style={{width:90,border:`1px solid ${C.accent}`,borderRadius:10,padding:'3px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
+                    onBlur={e=>{ saveGoal(e.target.value); setGoalEdit(false); }} style={{width:90,border:`1px solid ${C.accent}`,borderRadius:3,padding:'3px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
                   <span style={{fontSize:12,color:C.muted}}>€</span>
                 </div>
               ) : (
-                <button onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
+                <button onClick={()=>setGoalEdit(true)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
                   {goal>0 ? `${caM.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
                 </button>
               )}
@@ -15153,15 +15163,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{flex:'1 1 150px',minWidth:0,fontSize:11,color:C.muted,lineHeight:1.4}}>
                     Tes {complets.length} derniers mois complets : <b style={{color:C.text}}>{Math.round(moy)} €</b> en moyenne.
                   </div>
-                  <button type="button" onClick={()=>saveGoal(prop)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  <button type="button" onClick={()=>saveGoal(prop)} style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:3,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                     🎯 Viser {prop} €
                   </button>
                 </div>
               );
             })()}
             {goal>0 && (
-              <div style={{height:8,borderRadius:999,background:C.border,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:pct>=100?INV_STATUS.online.color:C.accent,borderRadius:999,transition:'width .4s'}}/>
+              <div style={{height:8,borderRadius:3,background:C.border,overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${pct}%`,background:pct>=100?INV_STATUS.online.color:C.accent,borderRadius:3,transition:'width .4s'}}/>
               </div>
             )}
             {goal>0 && (()=>{
@@ -15189,12 +15199,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const top=nice(monthlyChart.max||1);
           const eur=(v)=> v>=1000 ? `${(v/1000).toFixed(1).replace('.',',')}k` : Math.round(v);
           return (
-          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'14px 15px',marginBottom:12,boxShadow:C.shadow||'none'}}>
+          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'14px 15px',marginBottom:12,boxShadow:C.shadow||'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:6}}>
               <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tendance — 6 mois</div>
               <div style={{display:'flex',gap:12,fontSize:11,fontWeight:500,color:C.muted}}>
-                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:6,background:s1,display:'inline-block'}}/>CA</span>
-                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:6,background:s2,display:'inline-block'}}/>Bénéfice net</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:2,background:s1,display:'inline-block'}}/>CA</span>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:9,height:9,borderRadius:2,background:s2,display:'inline-block'}}/>Bénéfice net</span>
               </div>
             </div>
             <div style={{width:'100%',overflowX:'auto'}}>
@@ -15224,7 +15234,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ); })()}
         </>)}
         {sales.failed?.length>0 && (
-          <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:10,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
+          <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
             ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
@@ -15243,8 +15253,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  la ligne maintenant ; ici on met juste les deux boutons l'un
                  sous l'autre. */
               <span style={{display:'flex',flexDirection:'column',gap:6}}>
-                <button type="button" onClick={()=>setFillBuyOpen(true)} title="Une liste, un champ par ligne, Entrée passe à la suivante" style={{flexShrink:0,border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>💶 Tout compléter d'un coup</button>
-                <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir la liste</button>
+                <button type="button" onClick={()=>setFillBuyOpen(true)} title="Une liste, un champ par ligne, Entrée passe à la suivante" style={{flexShrink:0,border:'none',background:C.warn,color:'#fff',borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>💶 Tout compléter d'un coup</button>
+                <button type="button" onClick={()=>setVFilter('sanscout')} style={{flexShrink:0,border:`1px solid ${C.warn}`,background:vFilter==='sanscout'?C.warn:'transparent',color:vFilter==='sanscout'?'#fff':C.warn,borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir la liste</button>
               </span>
             }/>
         )}
@@ -15260,11 +15270,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             title={`vente${totals.masqNb>1?'s':''} masquée${totals.masqNb>1?'s':''} sur ${libellePeriode(periode).toLowerCase()}`}
             desc={`${fmtE0(totals.masqEur)} qui ne comptent dans aucun total de cet écran. Tu les as masquées d'un ✕ à un moment ; si ce n'était pas voulu, réaffiche-les.`}
             detail="Masquer une vente sert à écarter un doublon ou un test. La liste est conservée (clé « vinted_sales_hidden ») et se synchronise entre tes appareils — rien n'est supprimé, tout revient en un clic."
-            action={<button type="button" onClick={()=>setShowHidden(true)} style={{border:'none',background:C.warn,color:'#fff',borderRadius:999,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les réafficher</button>}/>
+            action={<button type="button" onClick={()=>setShowHidden(true)} style={{border:'none',background:C.warn,color:'#fff',borderRadius:3,padding:'6px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Les réafficher</button>}/>
         )}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
-            <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+            <button key={id} onClick={()=>setVFilter(id)} style={{padding:'7px 14px',borderRadius:3,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
@@ -15276,20 +15286,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               <div style={{position:'relative'}}>
                 <button onClick={()=>setToolsOpen(v=>!v)} title="Outils : compta, registre annuel, litiges, export"
-                  style={{padding:'5px 12px',borderRadius:999,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
-                  ⋯ Outils {alert && <span style={{width:7,height:7,borderRadius:999,background:C.danger,display:'inline-block'}}/>}
+                  style={{padding:'5px 12px',borderRadius:3,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
+                  ⋯ Outils {alert && <span style={{width:7,height:7,borderRadius:3,background:C.danger,display:'inline-block'}}/>}
                 </button>
                 {toolsOpen && (
                   <>
                     <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-                    <div style={{position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:71,minWidth:220,background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                    <div style={{position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:71,minWidth:220,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                       {[
                         {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
                         {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
                         ...(alert?[{k:'lit', icon:'⚖️', lab:`Litiges${disputes.totalLost>0?` · −${Math.round(disputes.totalLost)} €`:''}`, desc:'Annulations et remboursements', danger:true, on:()=>{ setToolsOpen(false); setShowDisputes(true); }}]:[]),
                         ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter en CSV', desc:'Toutes tes ventes', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
                       ].map(t=>(
-                        <button key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:10,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                        <button key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:3,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                           <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
                           <span style={{minWidth:0}}>
                             <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
@@ -15322,12 +15332,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma
             journee : on defile deux fois plus pour voir la meme chose.
-            `auto-fit, minmax(430px, 1fr)` donne DEUX colonnes sur grand
+            `auto-fit, minmax(min(430px, 100%), 1fr)` donne DEUX colonnes sur grand
             ecran et UNE sur telephone — la meme regle, sans test de
             largeur dans le JavaScript, donc rien a maintenir en double.
             Les lignes portent deja `flexWrap` et une largeur plancher
             (§26), elles supportent la colonne plus etroite. */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(430px, 1fr))',gap:8,alignItems:'start'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px, 100%), 1fr))',gap:8,alignItems:'start'}}>
           {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; if(vFilter==='sanscout')return isSaleNoBuy(o); return true; }).filter(o=>matchOrd(o)).sort(parDateDesc).map(o=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
@@ -15343,9 +15353,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Carte de vente : même vocabulaire visuel que les achats et le
               // reste de l'app (rayon 16, ombre, photo 56, titre plus lisible).
-              <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'11px 12px'}}>
+              <div key={o.transaction_id} style={{borderRadius:4,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'11px 12px'}}>
                <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-                <div style={{width:56,height:56,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{width:56,height:56,borderRadius:4,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:'1 1 140px',minWidth:0}}>
@@ -15355,16 +15365,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* Ligne reconstituée depuis l'email (filet quand la moisson
                         Vinted manque). On le DIT : sinon on cherche d'où sort une
                         ligne sans statut ni n° de transaction Vinted. */}
-                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
+                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:3,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
+                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:3,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
-                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:999,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
-                      if (out === 'retour') return <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:999,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
-                      if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:999,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
-                      return <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
+                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
+                      if (out === 'retour') return <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:3,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
+                      if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:3,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
+                      return <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
                     })()}
                     {!num && st!=='cancelled' && <span style={{color:C.warn,fontWeight:600}} title="Paire pas encore identifiée automatiquement (photo non reconnue). Ajoute son N° et son prix d'achat dans les champs ci-dessous.">⚠️ à identifier</span>}
                   </div>
@@ -15376,26 +15386,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {benef==null && buy==null && <div style={{fontSize:11,color:C.muted}}>achat ?</div>}
                 </div>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
-                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}>📍</button>
+                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}>📍</button>
                 )}
                 {needsBordereau(o.status) && !hidden && (
-                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
+                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:3,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
-                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:10,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
+                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:3,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
                 )}
                 {num && isPairLost(num) && (
-                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
+                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
                 )}
                 {isLotTitle(o.title) && (
-                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:10,padding:'8px 10px',cursor:'pointer',fontSize:15}}>📦</button>
+                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:3,padding:'8px 10px',cursor:'pointer',fontSize:15}}>📦</button>
                 )}
                 {hidden ? (
-                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
+                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
                 ) : st==='cancelled' ? (
-                  <button type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:10,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
+                  <button type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:3,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
                 ) : (
-                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>🚫</button>
+                  <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>🚫</button>
                 )}
                </div>
                {/* Barre de progression de la vente : À expédier · Expédiée · Livrée · Encaissée */}
@@ -15408,7 +15418,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      const done=vs.step>=idx, cur2=vs.step===idx;
                      return (
                        <div key={idx} style={{flex:1,textAlign:'center'}}>
-                         <div style={{height:4,borderRadius:999,background:done?vs.color:C.border}}/>
+                         <div style={{height:4,borderRadius:3,background:done?vs.color:C.border}}/>
                          <div style={{fontSize:9,marginTop:3,fontWeight:cur2?700:500,color:done?vs.color:C.muted,whiteSpace:'nowrap'}}>{lbl}</div>
                        </div>
                      );
@@ -15418,11 +15428,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* Saisie manuelle par vente : N° et prix d'achat, même pour une paire jamais numérotée. */}
                {!hidden && (
                  <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center'}}>
-                   <div style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.numero!=null?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'3px 6px',background:C.bg,width:78,flexShrink:0}}>
+                   <div style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.numero!=null?INV_STATUS.online.color:C.border}`,borderRadius:3,padding:'3px 6px',background:C.bg,width:78,flexShrink:0}}>
                      <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'—'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                    </div>
-                   <div style={{flex:1,display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.buyPrice!=null?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'3px 8px',background:C.bg}}>
+                   <div style={{flex:1,display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.buyPrice!=null?INV_STATUS.online.color:C.border}`,borderRadius:3,padding:'3px 8px',background:C.bg}}>
                      <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"ajouter le prix d'achat €"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                      <span style={{fontSize:11,color:C.muted}}>€</span>
                    </div>
@@ -15450,13 +15460,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
           {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
-            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:999,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
+            <button key={id} onClick={()=>setAFilter(id)} style={{padding:'7px 14px',borderRadius:3,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
         </div>
         {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && (
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, vendeur)…"
-            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
+            style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
         )}
         {/* Compte des colis à retirer PAR TRANSPORTEUR, pour que Chronopost,
             Mondial Relay et Vinted Go aient chacun leur ligne sur l'onglet
@@ -15479,7 +15489,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const photoByTitle = {};
           buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=orderPhoto(o); if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
           const thumb = (src) => src
-            ? <img src={src} alt="" loading="lazy" style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
+            ? <img src={src} alt="" loading="lazy" style={{width:38,height:38,borderRadius:3,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
             : <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="bag" size={22}/></span>;
           // Point relais HABITUEL par transporteur : certains emails ne contiennent
           // pas l'adresse du relais (juste un lien « juste ici »). On déduit alors
@@ -15502,7 +15512,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const groups = {};
           avail.forEach(t=>{ let cl=cleanLieu(t.lieu); if(!cl.nom){ const u=usualRelay(t.carrier); if(u) cl={...u,guessed:true}; } const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; const pc=pointsConnus[normNom(nom)]||null; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,guessed:cl.guessed}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
-            <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
+            <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:4,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:700,color:C.text}}>{pickupUnion.total} colis à retirer</div>
@@ -15515,7 +15525,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {nom} paire{nom>1?'s':''} connue{nom>1?'s':''}{nom<pickupUnion.total?` · ${pickupUnion.total-nom} colis dont l'article n'est pas encore identifié`:''}
                     </div>; })()}
                 </div>
-                <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{border:`1px solid ${C.accent}`,background:showRelais?C.accent:'transparent',color:showRelais?'#fff':C.accent,borderRadius:999,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🗺️ {showRelais?'Masquer la carte':'Carte'}</button>
+                <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{border:`1px solid ${C.accent}`,background:showRelais?C.accent:'transparent',color:showRelais?'#fff':C.accent,borderRadius:3,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🗺️ {showRelais?'Masquer la carte':'Carte'}</button>
               </div>
               {/* ⚠️ UN ENDROIT DÉDIÉ PAR TRANSPORTEUR (demande de Julien). Chaque
                   transporteur a sa façon de remettre le colis (§28) : Chronopost
@@ -15547,7 +15557,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {/* Ouverture du jour, quand Vinted l'a donnée pour CE point. */}
                       {g.horaires && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.horaires}</div>}
                     </div>
-                    <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
+                    <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:3,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
                   </div>
                   {g.colis.map((t,i)=>{
                     const code=codeRetrait(t.code);
@@ -15559,7 +15569,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const casier = !!t.consigne || !!ident;
                     const jours = joursAvant(t.limite);
                     return (
-                      <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                      <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',marginBottom:7}}>
                         {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
@@ -15599,27 +15609,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             Il passe EN PREMIER : c'est le geste principal. */}
                         {qrImage(t) && (
                           <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
-                            style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:10,padding:3,cursor:'pointer',width:64,height:64,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                            style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:3,padding:3,cursor:'pointer',width:64,height:64,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                             <img src={qrImage(t)} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                           </button>
                         )}
                         {(code||ident) && (
                           <div style={{flexShrink:0,display:'flex',gap:6}}>
                             {ident && (
-                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 11px'}}>
+                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:3,padding:'4px 11px'}}>
                                 <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div>
                                 <div style={{fontSize:22,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{ident}</div>
                               </div>
                             )}
                             {code && (
-                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:10,padding:'4px 11px'}}>
+                              <div style={{textAlign:'center',background:`${C.accent}12`,border:`1.5px solid ${C.accent}`,borderRadius:3,padding:'4px 11px'}}>
                                 <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{ident?"Code d'ouverture":'Code'}</div>
                                 <div style={{fontSize:22,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:2}}>{code}</div>
                               </div>
                             )}
                           </div>
                         )}
-                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'8px 11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:3,padding:'8px 11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
                     );
                   })}
@@ -15634,13 +15644,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{marginBottom:12}}>
                   {avail.length>0 && <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:8}}>📍 En point relais — code à venir</div>}
                   {extra.map((o,i)=>(
-                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',marginBottom:7}}>
                       {thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Déposé en point relais (Vinted) · le code arrive par email</div>
                       </div>
-                      <button type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'8px 11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                      <button type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:3,padding:'8px 11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                     </div>
                   ))}
                 </div>
@@ -15656,7 +15666,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {pickupUnion.attenteMail.map((t,i)=>{
                     const qi = qrImage(t), cd = codeRetrait(t.code), id2 = codeRetrait(t.code2);
                     return (
-                    <div key={'m'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                    <div key={'m'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',marginBottom:7}}>
                       <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
@@ -15665,17 +15675,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                       {qi && (
                         <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
-                          style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:10,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                          style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:3,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                           <img src={qi} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                         </button>
                       )}
                       {!qi && (cd||id2) && (
                         <div style={{flexShrink:0,display:'flex',gap:5}}>
-                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
-                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?'Ouverture':'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:3,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:3,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?'Ouverture':'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
                         </div>
                       )}
-                      <button type="button" onClick={()=>unmarkCollected(t)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
+                      <button type="button" onClick={()=>unmarkCollected(t)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
                     </div>
                     );
                   })}
@@ -15697,7 +15707,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const tk = trackForBuy(o);
                     const qi = qrImage(tk), cd = codeRetrait(tk&&tk.code), id2 = codeRetrait(tk&&tk.code2);
                     return (
-                    <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:7}}>
+                    <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',marginBottom:7}}>
                       <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
@@ -15706,17 +15716,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                       {qi && (
                         <button type="button" onClick={()=>openQrView(tk)} title="QR de retrait — encore disponible en cas de problème" aria-label="Afficher le QR de retrait en grand"
-                          style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:10,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                          style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:3,padding:3,cursor:'pointer',width:52,height:52,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                           <img src={qi} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                         </button>
                       )}
                       {!qi && (cd||id2) && (
                         <div style={{flexShrink:0,display:'flex',gap:5}}>
-                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
-                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:9,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?"Ouverture":'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:3,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>Identifiant</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:3,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?"Ouverture":'Code'}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
                         </div>
                       )}
-                      <button type="button" onClick={()=>unmarkPickupDone(o)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
+                      <button type="button" onClick={()=>unmarkPickupDone(o)} title="Annuler : je ne l'ai pas encore récupéré" aria-label="Annuler" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'7px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Remettre</button>
                     </div>
                     );
                   })}
@@ -15730,7 +15740,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Repliée par défaut quand il n'y a AUCUN colis à retirer (elle prenait
             tout l'écran avant les achats). */}
         {(()=>{ const hasPickup=(tracking||[]).some(isPickupActive)||vintedToPickup.length>0; return !hasPickup ? (
-          <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',marginBottom:12}}><Icon name="pin" size={16}/>Points relais {ville?`de ${ville}`:''} <span style={{color:C.muted}}>{showRelais?'▲ masquer':'▼ voir la carte'}</span></button>
+          <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:4,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',marginBottom:12}}><Icon name="pin" size={16}/>Points relais {ville?`de ${ville}`:''} <span style={{color:C.muted}}>{showRelais?'▲ masquer':'▼ voir la carte'}</span></button>
         ) : null; })()}
         {/* Carte des relais : masquée par défaut (la liste ci-dessus suffit pour
             retirer). On l'affiche seulement si tu tapes « 🗺️ Carte ». */}
@@ -15799,8 +15809,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <input value={villeInput} onChange={e=>setVilleInput(e.target.value)}
                   onKeyDown={e=>{ if(e.key==='Enter'&&(villeInput||'').trim()) fetchVillePoints(villeInput.trim()); }}
                   placeholder="Ta ville → tous les points relais"
-                  style={{flex:'1 1 150px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button onClick={()=>{ const v=(villeInput||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'9px 16px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
+                  style={{flex:'1 1 150px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:3,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                <button onClick={()=>{ const v=(villeInput||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:3,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'9px 16px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
                 <button onClick={()=>{
                   if(!navigator.geolocation){ toast('Position non disponible sur cet appareil.'); return; }
                   setVilleLoading(true);
@@ -15814,14 +15824,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     }catch(_){ toast('Recherche indisponible, réessaie.'); }
                     setVilleLoading(false);
                   }, ()=>{ setVilleLoading(false); toast('Autorise la localisation pour utiliser ta position.'); }, {timeout:8000});
-                }} disabled={villeLoading} title="Utiliser ma position" style={{border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,fontSize:13,fontWeight:600,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit'}}>📍</button>
+                }} disabled={villeLoading} title="Utiliser ma position" style={{border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,fontSize:13,fontWeight:600,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit'}}>📍</button>
               </div>
               {/* Accès direct aux CODES/QR de retrait — un tap = QR plein écran à scanner. */}
               {avail.length>0 && (
                 <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:2,WebkitOverflowScrolling:'touch'}}>
                   {avail.map((t,i)=>(
-                    <button key={i} type="button" onClick={()=>openQrView(t)} title="Afficher le QR/code en grand" style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:3,border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'7px 9px',cursor:'pointer',fontFamily:'inherit',minWidth:70}}>
-                      <div style={{width:44,height:44,borderRadius:6,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{qrImage(t)?<img src={qrImage(t)} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:20}}>🎫</span>}</div>
+                    <button key={i} type="button" onClick={()=>openQrView(t)} title="Afficher le QR/code en grand" style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:3,border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:3,padding:'7px 9px',cursor:'pointer',fontFamily:'inherit',minWidth:70}}>
+                      <div style={{width:44,height:44,borderRadius:2,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{qrImage(t)?<img src={qrImage(t)} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:20}}>🎫</span>}</div>
                       <span style={{fontSize:9,color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{codeRetrait(t.code)||(t.suivi?'n°'+String(t.suivi).slice(-5):'Retrait')}</span>
                     </button>
                   ))}
@@ -15829,28 +15839,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
               {/* LA carte : toutes les épingles de la ville, badges = colis en attente */}
               {pins.length>0&&(
-                <div style={{border:`1px solid ${C.border}`,borderRadius:16,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.07)'}}>
+                <div style={{border:`1px solid ${C.border}`,borderRadius:4,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.07)'}}>
                   <OsmMap points={pins} selected={openPoint} onSelect={k=>setOpenPoint(openPoint===k?null:k)}/>
                   <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderTop:`1px solid ${C.border}`,background:C.card}}>
                     <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:500}}>
                       {avail.length>0?`🎫 ${avail.length} code${avail.length>1?'s':''} de retrait`:`${pins.length} point${pins.length>1?'s':''} relais${ville?' à '+ville:''}`}
                     </span>
                     {hiddenPts.size>0&&<button onClick={unhideAll} title="Réafficher les points masqués" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>↺ {hiddenPts.size} masqué{hiddenPts.size>1?'s':''}</button>}
-                    <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:999,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:600,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter</button>
+                    <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:3,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:600,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter</button>
                   </div>
                 </div>
               )}
               {pins.length===0&&(
-                <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:16,background:`${C.accent}08`,padding:'14px 16px',fontSize:13,color:C.text,fontWeight:500,lineHeight:1.5}}>
+                <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:4,background:`${C.accent}08`,padding:'14px 16px',fontSize:13,color:C.text,fontWeight:500,lineHeight:1.5}}>
                   🗺 Les points relais que <b>Vinted</b> utilise apparaissent ici tout seuls : sur Vinted (extension active), fais un achat et ouvre <b>une fois</b> la carte de choix du point relais → l'app importe la liste officielle complète. Tu peux aussi taper ta ville ci-dessus. Les points où tu as un colis afficheront le nombre.
                 </div>
               )}
               {/* Point sélectionné sans colis en attente */}
               {selGroup&&selGroup.colis.length===0&&(
-                <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:4,background:C.card}}>
                   <span style={{color:C.muted,display:'flex'}}><Icon name="pin" size={19}/></span>
                   <span style={{flex:1,fontSize:12,color:C.text,fontWeight:500}}>{openPoint} <span style={{color:C.muted,fontWeight:600}}>— aucun colis ici{selGroup.type?' · '+selGroup.type:''}</span></span>
-                  <button onClick={()=>{ if(selGroup.saved) removeSavedPoint(openPoint); else hidePoint(openPoint); }} style={{border:`1px solid ${C.danger}66`,borderRadius:10,background:'transparent',color:C.danger,fontSize:11,fontWeight:600,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>✕ Retirer</button>
+                  <button onClick={()=>{ if(selGroup.saved) removeSavedPoint(openPoint); else hidePoint(openPoint); }} style={{border:`1px solid ${C.danger}66`,borderRadius:3,background:'transparent',color:C.danger,fontSize:11,fontWeight:600,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>✕ Retirer</button>
                 </div>
               )}
               {withColis.map(([lieu,g])=>{
@@ -15859,12 +15869,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // code + le QR de chaque colis, sans avoir à cliquer.
                 const isOpen=colis.length>0||singlePoint||openPoint===lieu;
                 return (
-                <div key={lieu} style={{border:`1.5px solid ${openPoint===lieu?C.accent:C.border}`,background:C.card,borderRadius:16,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
+                <div key={lieu} style={{border:`1.5px solid ${openPoint===lieu?C.accent:C.border}`,background:C.card,borderRadius:4,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
                   {/* En-tête du point : nom + badge + renommer */}
                   <button onClick={()=>setOpenPoint(isOpen&&!singlePoint?null:lieu)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                     <span style={{position:'relative',flexShrink:0,fontSize:26}}>
                       📍
-                      <span style={{position:'absolute',top:-6,right:-10,minWidth:20,height:20,borderRadius:999,background:C.danger,color:'#fff',fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 1px 4px rgba(0,0,0,0.25)'}}>{colis.length}</span>
+                      <span style={{position:'absolute',top:-6,right:-10,minWidth:20,height:20,borderRadius:3,background:C.danger,color:'#fff',fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 1px 4px rgba(0,0,0,0.25)'}}>{colis.length}</span>
                     </span>
                     <span style={{flex:1,minWidth:0}}>
                       <span style={{display:'flex',alignItems:'center',gap:6}}>
@@ -15874,7 +15884,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {g.rue&&<span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.rue}</span>}
                       <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:500,marginTop:1}}>{colis.length} code{colis.length>1?'s':''} de retrait{singlePoint?'':(isOpen?' · replier':' · voir')}</span>
                     </span>
-                    {g.lat && <a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" onClick={(ev)=>ev.stopPropagation()} title="Itinéraire vers ce point relais" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'5px 9px',fontSize:11,fontWeight:600}}>🧭 Y aller</a>}
+                    {g.lat && <a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" onClick={(ev)=>ev.stopPropagation()} title="Itinéraire vers ce point relais" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:3,padding:'5px 9px',fontSize:11,fontWeight:600}}>🧭 Y aller</a>}
                     {!g.saved&&<span onClick={async(ev)=>{
                       ev.stopPropagation();
                       const nom=await askText({ desc: 'Nom du point relais (ex : Maison de la Presse, Cancale) :', value: colis[0].lieu||'' });
@@ -15899,7 +15909,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       const buy=buyForTrack(t);
                       return (
                         <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 13px',borderTop:i>0?`1px solid ${C.accent}22`:'none'}}>
-                          <div style={{width:40,height:40,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <div style={{width:40,height:40,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             {buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>📦</span>}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
@@ -15918,7 +15928,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             })()}
                           </div>
                           {codeRetrait(t.code)&&(
-                            <button type="button" onClick={()=>openQrView(t)} title="Afficher en grand pour scanner" style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:10,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                            <button type="button" onClick={()=>openQrView(t)} title="Afficher en grand pour scanner" style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:3,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                               <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Code</div>
                               <div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1.5}}>{codeRetrait(t.code)}</div>
                             </button>
@@ -15928,11 +15938,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               pas de faux QR, le code ci-dessus suffit au comptoir. */}
                           {qrImage(t)&&(
                             <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
-                              style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:10,padding:0,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                              style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:3,padding:0,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                               {qrImage(t)?<img src={qrImage(t)} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
                             </button>
                           )}
-                          <button onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'6px 9px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Retiré</button>
+                          <button onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:3,padding:'6px 9px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Retiré</button>
                         </div>
                       );
                     })}
@@ -15942,10 +15952,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               })}
               {/* Autres points relais de la ville (sans colis en attente) */}
               {autres.length>0&&(
-                <div style={{border:`1px solid ${C.border}`,borderRadius:12,background:C.card,overflow:'hidden'}}>
+                <div style={{border:`1px solid ${C.border}`,borderRadius:4,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderBottom:`1px solid ${C.border}`}}>
                     <span style={{flex:1,fontSize:11,fontWeight:600,color:C.muted}}>Points relais{ville?` à ${ville}`:''} ({autres.length})</span>
-                    <button onClick={()=>{ const v=!carriersOnly; setCarriersOnly(v); save('vrm_relais_carriers_only',v); }} style={{border:`1px solid ${carriersOnly?C.accent:C.border}`,borderRadius:999,background:carriersOnly?`${C.accent}12`:'transparent',color:carriersOnly?C.accent:C.muted,fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>{carriersOnly?'Casiers & transporteurs':'Tous les commerces'}</button>
+                    <button onClick={()=>{ const v=!carriersOnly; setCarriersOnly(v); save('vrm_relais_carriers_only',v); }} style={{border:`1px solid ${carriersOnly?C.accent:C.border}`,borderRadius:3,background:carriersOnly?`${C.accent}12`:'transparent',color:carriersOnly?C.accent:C.muted,fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>{carriersOnly?'Casiers & transporteurs':'Tous les commerces'}</button>
                   </div>
                   <div style={{maxHeight:240,overflowY:'auto'}}>
                     {autres.map(([lieu,g])=>(
@@ -15955,7 +15965,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span style={{display:'block',fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nom||lieu}</span>
                           <span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.rue,g.type].filter(Boolean).join(' · ')||' '}</span>
                         </span>
-                        {g.lat&&<a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:10,color:C.blue||C.accent,padding:'5px 7px',display:'flex'}}><Icon name="nav" size={15}/></a>}
+                        {g.lat&&<a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:3,color:C.blue||C.accent,padding:'5px 7px',display:'flex'}}><Icon name="nav" size={15}/></a>}
                         <button onClick={()=>{ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); }} title="Retirer ce point de la carte" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',flexShrink:0,padding:'2px 6px'}}><Icon name="close" size={15}/></button>
                       </div>
                     ))}
@@ -15973,7 +15983,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const tot = offBuys.reduce((s,b)=>{const p=parseFloat(String(b.price).replace(',','.'));return s+(isNaN(p)?0:p);},0);
           return (
             <button type="button" onClick={()=>setOffSecOpen(v=>!v)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'11px 14px',marginBottom:offSecOpen?10:12,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+              style={{width:'100%',display:'flex',alignItems:'center',gap:9,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px',marginBottom:offSecOpen?10:12,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
               <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="tag" size={18}/></span>
               <span style={{flex:1,textAlign:'left',minWidth:0}}>
                 <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Achats hors Vinted</span>
@@ -16001,19 +16011,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             setOffDraft(OFF_DRAFT0); setOffEditId(null); setOffOpen(false);
           };
           const Field = ({label,children}) => (<label style={{display:'flex',flexDirection:'column',gap:3,flex:1,minWidth:0}}><span style={{fontSize:9,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>{label}</span>{children}</label>);
-          const inp = {border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
+          const inp = {border:`1px solid ${C.border}`,borderRadius:3,padding:'9px 11px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',width:'100%',boxSizing:'border-box'};
           return (
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 13px',marginBottom:12}}>
+        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 13px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <div style={{width:38,height:38,borderRadius:12,background:`${C.accent}14`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🏷️</div>
+            <div style={{width:38,height:38,borderRadius:4,background:`${C.accent}14`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>🏷️</div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:700,color:C.text}}>Achats hors Vinted</div>
               <div style={{fontSize:11,color:C.muted}}>{offBuys.length>0 ? `${offBuys.length} paire${offBuys.length>1?'s':''} · ${Math.round(offTotal)} € dépensés` : 'Brocante, fournisseur, particulier…'}</div>
             </div>
-            <button type="button" onClick={()=>{ setOffEditId(null); setOffDraft(OFF_DRAFT0); setOffOpen(o=>!o); }} style={{border:`1px solid ${C.accent}`,background:offOpen?C.accent:`${C.accent}12`,color:offOpen?'#fff':C.accent,borderRadius:999,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>{offOpen?'✕ Fermer':'➕ Ajouter'}</button>
+            <button type="button" onClick={()=>{ setOffEditId(null); setOffDraft(OFF_DRAFT0); setOffOpen(o=>!o); }} style={{border:`1px solid ${C.accent}`,background:offOpen?C.accent:`${C.accent}12`,color:offOpen?'#fff':C.accent,borderRadius:3,padding:'7px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>{offOpen?'✕ Fermer':'➕ Ajouter'}</button>
           </div>
           {offOpen && (
-            <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:9,background:C.bg,borderRadius:12,padding:'12px',border:`1px solid ${C.border}`}}>
+            <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:9,background:C.bg,borderRadius:4,padding:'12px',border:`1px solid ${C.border}`}}>
               <Field label="Désignation"><input value={offDraft.title} onChange={e=>setOffDraft(d=>({...d,title:e.target.value}))} placeholder="ex : Nike P-6000 argenté 38" style={inp} autoFocus/></Field>
               {/* Relier directement à une annonce EN LIGNE : remplit son N° tout
                   seul → plus besoin de le retenir, et le prix payé arrive au bon
@@ -16035,20 +16045,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <Field label="Provenance"><select value={offDraft.source} onChange={e=>setOffDraft(d=>({...d,source:e.target.value}))} style={inp}>{Object.entries(SRC).map(([k,v])=><option key={k} value={k}>{v.e} {v.l}</option>)}</select></Field>
                 <Field label="Date"><input type="date" value={offDraft.date} onChange={e=>setOffDraft(d=>({...d,date:e.target.value}))} style={inp}/></Field>
               </div>
-              <button type="button" disabled={!offDraft.title.trim()} onClick={saveOff} style={{border:'none',background:offDraft.title.trim()?C.accent:C.border,color:'#fff',borderRadius:10,padding:'11px',fontSize:13,fontWeight:600,cursor:offDraft.title.trim()?'pointer':'default',fontFamily:'inherit',marginTop:2}}>{offEditId?'💾 Enregistrer':'➕ Ajouter cet achat'}</button>
+              <button type="button" disabled={!offDraft.title.trim()} onClick={saveOff} style={{border:'none',background:offDraft.title.trim()?C.accent:C.border,color:'#fff',borderRadius:3,padding:'11px',fontSize:13,fontWeight:600,cursor:offDraft.title.trim()?'pointer':'default',fontFamily:'inherit',marginTop:2}}>{offEditId?'💾 Enregistrer':'➕ Ajouter cet achat'}</button>
               <div style={{fontSize:11,color:C.muted,textAlign:'center',lineHeight:1.4}}>💡 Le N° relie l'achat à la vente : quand la paire se vend, son bénéfice utilise ce prix tout seul.</div>
             </div>
           )}
           {offBuys.length>0 && (
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:11}}>
               {offBuys.map(b=>{ const sc=srcOf(b.source); return (
-                <div key={b.id} style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 10px',background:C.bg}}>
-                  <div style={{width:32,height:32,borderRadius:10,background:`${C.accent}0e`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,flexShrink:0}} title={sc.l}>{sc.e}</div>
+                <div key={b.id} style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,borderRadius:4,padding:'9px 10px',background:C.bg}}>
+                  <div style={{width:32,height:32,borderRadius:3,background:`${C.accent}0e`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,flexShrink:0}} title={sc.l}>{sc.e}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title}</div>
                     <div style={{fontSize:11,color:C.muted,marginTop:1}}>{[sc.l,b.date?new Date(b.date).toLocaleDateString('fr-FR'):''].filter(Boolean).join(' · ')}</div>
                   </div>
-                  {b.numero && <span title="Numéro de la paire (lien avec la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'2px 7px'}}>N°{b.numero}</span>}
+                  {b.numero && <span title="Numéro de la paire (lien avec la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:2,padding:'2px 7px'}}>N°{b.numero}</span>}
                   <span style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{b.price?`${b.price} €`:'—'}</span>
                   <button type="button" onClick={()=>{ setOffEditId(b.id); setOffDraft({ title:b.title||'', price:b.price||'', numero:b.numero||'', source:b.source||'brocante', date:b.date||new Date().toISOString().slice(0,10) }); setOffOpen(true); }} aria-label="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="pencil" size={15}/></button>
                   <button type="button" onClick={async ()=>{ if(await askConfirm('Supprimer cet achat hors Vinted ?')) delOffBuy(b.id); }} aria-label="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:15,cursor:'pointer',padding:'2px 4px',flexShrink:0}}><Icon name="trash" size={16}/></button>
@@ -16073,12 +16083,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma
             journee : on defile deux fois plus pour voir la meme chose.
-            `auto-fit, minmax(430px, 1fr)` donne DEUX colonnes sur grand
+            `auto-fit, minmax(min(430px, 100%), 1fr)` donne DEUX colonnes sur grand
             ecran et UNE sur telephone — la meme regle, sans test de
             largeur dans le JavaScript, donc rien a maintenir en double.
             Les lignes portent deja `flexWrap` et une largeur plancher
             (§26), elles supportent la colonne plus etroite. */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(430px, 1fr))',gap:8,alignItems:'start'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px, 100%), 1fr))',gap:8,alignItems:'start'}}>
           {buysBase.filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
             .sort(parDateDesc)
             .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
@@ -16091,9 +16101,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // plus grande (on achète des articles, l'image compte) et hiérarchie
             // typographique plus nette. Une bordure colorée uniquement quand il y
             // a une action à faire (colis au relais).
-            <div key={o.transaction_id} style={{borderRadius:16,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'11px 12px'}}>
+            <div key={o.transaction_id} style={{borderRadius:4,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'11px 12px'}}>
               <div style={{display:'flex',gap:12,alignItems:'center'}}>
-                <div style={{width:56,height:56,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{width:56,height:56,borderRadius:4,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
@@ -16103,15 +16113,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* Ligne reconstituée depuis l'email (filet quand la moisson
                         Vinted manque). On le DIT : sinon on cherche d'où sort une
                         ligne sans statut ni n° de transaction Vinted. */}
-                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:999,padding:'1px 6px'}}>email</span>}
+                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:3,padding:'1px 6px'}}>email</span>}
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    <span style={{fontWeight:700,color:st.color,background:`${st.color}18`,borderRadius:999,padding:'1px 8px'}}>{st.label}</span>
+                    <span style={{fontWeight:700,color:st.color,background:`${st.color}18`,borderRadius:3,padding:'1px 8px'}}>{st.label}</span>
                     {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
                   </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
                   <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
-                  {buyNumByTxn[String(o.transaction_id)]!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:6,padding:'1px 7px'}}>N°{buyNumByTxn[String(o.transaction_id)]}</span>}
+                  {buyNumByTxn[String(o.transaction_id)]!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:2,padding:'1px 7px'}}>N°{buyNumByTxn[String(o.transaction_id)]}</span>}
                 </div>
               </div>
               {/* Barre de suivi : affichée UNIQUEMENT tant que le colis est en
@@ -16124,7 +16134,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const done=st.step>=idx; const cur2=st.step===idx;
                     return (
                       <div key={idx} style={{flex:1,textAlign:'center'}}>
-                        <div style={{height:4,borderRadius:999,background:done?st.color:C.border}}/>
+                        <div style={{height:4,borderRadius:3,background:done?st.color:C.border}}/>
                         <div style={{fontSize:9,marginTop:3,fontWeight:cur2?700:500,color:done?st.color:C.muted,whiteSpace:'nowrap'}}>{lbl}</div>
                       </div>
                     );
@@ -16134,18 +16144,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* Actions : Suivre le colis + reçu/justif */}
               <div style={{display:'flex',gap:6,alignItems:'center',marginTop:9,flexWrap:'wrap'}}>
                 {suivi && (st.step===2||st.step===3) && (
-                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:10,padding:'6px 11px',fontSize:12,fontWeight:600}}>🔍 Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
+                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:3,padding:'6px 11px',fontSize:12,fontWeight:600}}>🔍 Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
                 )}
                 {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
-                  <button type="button" onClick={()=>openQrView(tk)} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:10,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Code de retrait</button>
+                  <button type="button" onClick={()=>openQrView(tk)} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:3,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Code de retrait</button>
                 )}
                 <div style={{marginLeft:'auto'}}>
                   {(()=>{ const rc=receiptFor(o); return rc ? (
                     <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
-                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:10,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}>📄 Reçu</button>
+                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:3,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}>📄 Reçu</button>
                   ) : (
                     <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:buyNumByTxn[String(o.transaction_id)]||'' })}
-                      title="Télécharger le reçu d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}>📄 Reçu</button>
+                      title="Télécharger le reçu d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}>📄 Reçu</button>
                   ); })()}
                 </div>
               </div>
@@ -16181,7 +16191,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             c'est la seule alerte de l'app qui coûte de l'argent (§19), elle
             n'a pas à être repliable. */}
         {numDoublons.length > 0 && (
-          <div style={{border:`1.5px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:16,padding:'12px 14px',marginBottom:10}}>
+          <div style={{border:`1.5px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:4,padding:'12px 14px',marginBottom:10}}>
             <div style={{fontSize:13.5,fontWeight:700,color:C.danger}}>
               {numDoublons.length} numéro{numDoublons.length>1?'x':''} porté{numDoublons.length>1?'s':''} par deux annonces
             </div>
@@ -16193,7 +16203,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:6}}>N°{g.numero}</div>
                 {g.items.map(it => (
                   <div key={it.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
-                    {it.photo && <img src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
+                    {it.photo && <img src={it.photo} alt="" style={{width:34,height:34,borderRadius:3,objectFit:'cover',flexShrink:0}}/>}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
                       <div style={{fontSize:10,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/></div>
@@ -16204,7 +16214,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre}; save('vinted_annonce_numeros',u); return u; });
                       recordUsed(libre);   // le numéro est pris à vie (§5.40)
                       toast(`✓ Cette paire est maintenant le N°${libre}.`);
-                    }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:10,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:3,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       → N°{nextNumero}
                     </button>
                   </div>
@@ -16222,7 +16232,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {nAutresSignalements > 0 && (
           <button type="button" onClick={() => setDiagOpen(v => !v)}
             style={{width:'100%',display:'flex',alignItems:'center',gap:9,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,
-              borderRadius:12,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
+              borderRadius:4,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text}}>
             <span aria-hidden="true" style={{flexShrink:0,color:C.warn,display:'flex'}}><Icon name="alert" size={17}/></span>
             <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600}}>
               {`${nAutresSignalements} signalement${nAutresSignalements>1?'s':''}`}
@@ -16235,7 +16245,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             annonce. C'est la signature d'un masquage par Vinted. On le dit tout
             de suite, sinon on croit avoir perdu son stock. */}
         {comptesMuets.map(m=>(
-          <div key={m.uid} style={{marginBottom:12,border:`1px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:12,padding:'11px 13px'}}>
+          <div key={m.uid} style={{marginBottom:12,border:`1px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:4,padding:'11px 13px'}}>
             <div style={{fontSize:13,fontWeight:600,color:C.text}}>🙈 {accNameOf(m.acc)} ne renvoie plus aucune annonce</div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
               {m.nb} paire{m.nb>1?'s':''} numérotée{m.nb>1?'s':''} sur ce compte, et zéro annonce en ligne. C'est ce qui arrive quand <b>Vinted masque un compte</b> quelques jours. Tes numéros et tes prix d'achat sont conservés — ils reviendront tels quels. Rien à faire, sauf si le compte est fermé pour de bon : dans ce cas masque-le (puce du compte plus bas) ou déconnecte-le dans Paramètres.
@@ -16248,7 +16258,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {disparues.length>0 && (()=>{
           const [ouvert, setOuvert] = [dispOpen, setDispOpen];
           return (
-          <div style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'11px 13px'}}>
+          <div style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 13px'}}>
             <button type="button" onClick={()=>setOuvert(v=>!v)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit'}}>
               <span aria-hidden="true" style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="eye" size={17}/></span>
               <span style={{flex:1,minWidth:0}}>
@@ -16261,7 +16271,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
                 {disparues.slice(0,40).map(d=>(
                   <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
-                    <div style={{width:34,height:34,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden'}}>
+                    <div style={{width:34,height:34,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden'}}>
                       {d.e.photo && <img src={d.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
@@ -16270,7 +16280,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <button type="button" title="La paire n'est plus à vendre : on libère son numéro pour une autre paire."
                       onClick={()=>{ setPairsLost(prev=>{ const u={...prev,[d.numero]:{ at:new Date().toISOString(), title:d.e.title||'' }}; save('vinted_pairs_lost',u); return u; }); toast(`N°${d.numero} retirée du stock`); }}
-                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:3,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       Retirer
                     </button>
                   </div>
@@ -16287,7 +16297,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Compte bloqué par Vinted : détecté à la synchro (401/403). Ses annonces
             sont retirées automatiquement — on te dit lequel et tu peux le retirer. */}
         {blockedList.length>0 && (
-          <div style={{marginBottom:12,border:`1px solid ${C.danger}`,background:`${C.danger}10`,borderRadius:12,padding:'11px 13px'}}>
+          <div style={{marginBottom:12,border:`1px solid ${C.danger}`,background:`${C.danger}10`,borderRadius:4,padding:'11px 13px'}}>
             {blockedList.map(a=>(
               <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                 <span style={{fontSize:20}}>🚫</span>
@@ -16295,7 +16305,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,fontWeight:700,color:C.danger}}>Compte « {accNameOf(a)} » bloqué par Vinted</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1}}>Ses annonces ont été retirées automatiquement (le compte ne répond plus). Tu peux le déconnecter définitivement.</div>
                 </div>
-                <button type="button" onClick={async ()=>{ if(await askConfirm({title:`Déconnecter « ${accNameOf(a)} » ?`, desc:"Ses jetons, ses annonces et ses ventes captées sont supprimés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). À faire pour un compte banni ou fermé. Réversible depuis « Comptes retirés ».", ok:'Déconnecter', cancel:'Annuler', danger:true})){ const ok=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(ok?`« ${accNameOf(a)} » déconnecté — recharge l'app pour le voir disparaître`:'Échec de la déconnexion — réessaie'); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:10,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
+                <button type="button" onClick={async ()=>{ if(await askConfirm({title:`Déconnecter « ${accNameOf(a)} » ?`, desc:"Ses jetons, ses annonces et ses ventes captées sont supprimés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). À faire pour un compte banni ou fermé. Réversible depuis « Comptes retirés ».", ok:'Déconnecter', cancel:'Annuler', danger:true})){ const ok=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(ok?`« ${accNameOf(a)} » déconnecté — recharge l'app pour le voir disparaître`:'Échec de la déconnexion — réessaie'); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:3,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
               </div>
             ))}
           </div>
@@ -16332,7 +16342,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     title={off ? 'Masqué — tape pour réafficher ses annonces'
                           : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
                           : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
-                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:999,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
+                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
                     {off?'🚫 ':''}{name} · {counts[uid]}
                     {!off && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
                   </button>
@@ -16363,7 +16373,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items && !listings.error && listings.items.length===0 && (
           <EmptyState icon="🟢" title="Aucune annonce en ligne"
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
-            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:12}}>Ouvrir Vinted ↗</a>}/>
+            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:4}}>Ouvrir Vinted ↗</a>}/>
         )}
         {listings.items && listings.items.length>0 && (<>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
@@ -16388,7 +16398,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })()}
           {retoursAttendus.length > 0 && (
-            <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'10px 12px'}}>
+            <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:4,padding:'10px 12px'}}>
               {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (
                 <button type="button" onClick={()=>setRetoursOpen(v=>!v)}
                   style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
@@ -16404,9 +16414,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const col = lab.col();
                   const recu = isRetourRecu(r.o);
                   return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'7px 9px'}}>
-                      <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:10,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
-                      <div style={{width:34,height:34,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:3,padding:'7px 9px'}}>
+                      <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:3,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
+                      <div style={{width:34,height:34,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {orderPhoto(r.o)?<img src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                       </div>
                       <div style={{flex:'1 1 120px',minWidth:0}}>
@@ -16418,9 +16428,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
                         </div>
                       </div>
-                      {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
-                      <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:10,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
-                      <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
+                      {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
+                      <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:3,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
+                      <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
                     </div>
                   );
                 })}
@@ -16428,7 +16438,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           )}
           {numeroReprises.length > 0 && (
-            <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:12,padding:'10px 12px'}}>
+            <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:4,padding:'10px 12px'}}>
               <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} paire{numeroReprises.length>1?'s':''} déjà connue{numeroReprises.length>1?'s':''} ?</div>
               {/* ⚠️ Une paire VENDUE n'est jamais remise à son ancien numéro toute
                   seule : elle est partie, et si elle revient (litige, retour) elle
@@ -16436,8 +16446,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Ces annonces ont reçu un numéro NEUF. Si c'est bien la même paire et qu'elle est toujours dans SA boîte, remets son numéro d'origine.</div>
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {numeroReprises.slice(0,8).map((r,i)=>(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 9px'}}>
-                    <div style={{width:34,height:34,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'7px 9px'}}>
+                    <div style={{width:34,height:34,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                       {r.item.photo?<img src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
@@ -16445,7 +16455,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · 🏠 ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
                       {r.vendue && <div style={{fontSize:10,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cette paire a été VENDUE sous le N°{r.orphan.e.numero} — ne le remets que si elle t'est revenue et qu'elle est dans sa boîte</div>}
                     </div>
-                    <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:10,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
+                    <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:3,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
                   </div>
                 ))}
               </div>
@@ -16453,14 +16463,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           )}
           {/* Bandeau de stats façon outil pro */}
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
-            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>{annStats.n} en ligne</span>
-            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
-            {annStats.hasFav && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
-            {annStats.hasView && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 11px'}}>👁 {annStats.views}</span>}
-            {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:999,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
-            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:999,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
+            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.n} en ligne</span>
+            <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
+            {annStats.hasFav && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
+            {annStats.hasView && <span style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>👁 {annStats.views}</span>}
+            {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
+            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
 
-            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:999,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
+            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:3,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
               Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
@@ -16475,31 +16485,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (!n) return null;
             return (
               <button type="button" onClick={()=>setTipsOpen(v=>!v)}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+                style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
                 <span style={{fontSize:15}}>💡</span>
                 <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Conseils & signalements</span>
-                <span style={{fontSize:11,fontWeight:700,color:'#fff',background:C.accent,borderRadius:999,padding:'1px 8px'}}>{n}</span>
+                <span style={{fontSize:11,fontWeight:700,color:'#fff',background:C.accent,borderRadius:3,padding:'1px 8px'}}>{n}</span>
                 <span style={{fontSize:13,color:C.muted,transform:tipsOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
               </button>
             );
           })()}
           {tipsOpen && (<>
           {emailSoldIds.size>0 && (
-            <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'7px 11px'}}>
+            <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:3,padding:'7px 11px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:600}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
               <span style={{flex:1,minWidth:0}}>email de vente ou bordereau reçu — plus besoin d'attendre la synchro.</span>
               <button onClick={()=>setShowEmailSold(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showEmailSold?'masquer':'voir'}</button>
             </div>
           )}
           {soldManual.size>0 && (()=>{ const hidden=(listings.items||[]).filter(it=>soldManual.has(String(it.id))); if(!hidden.length) return null; return (
-            <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:10,padding:'7px 11px'}}>
+            <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${C.warn}0c`,border:`1px solid ${C.warn}33`,borderRadius:3,padding:'7px 11px'}}>
               <span style={{color:C.warn,fontWeight:600}}>✓ {hidden.length} annonce{hidden.length>1?'s':''} marquée{hidden.length>1?'s':''} vendue{hidden.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hidden.map(it=>it.title).join(' · ')}</span>
               <button onClick={async ()=>{ if(await askConfirm('Réafficher toutes les annonces marquées vendues ?')) hidden.forEach(it=>unmarkSold(it.id)); }} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>↺ annuler</button>
             </div>
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
-            <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
+            <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:3,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
               😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
               {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
             </div>
@@ -16507,13 +16517,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {/* Aucune date connue : on le DIT (avant, l'app déduisait l'ancienneté
               de la date de numérotation → chiffres faux, « qui dort » à 0). */}
           {annStats.n>0 && annStats.datesKnown===0 && (
-            <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.45}}>
+            <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:3,padding:'8px 12px',marginBottom:10,lineHeight:1.45}}>
               ⏳ <b>Ancienneté des annonces inconnue.</b> Vinted ne la donne que sur la page de l'annonce : ouvre quelques-unes de tes annonces sur vinted.fr avec l'extension — elle lit « Ajouté il y a… » au passage et le retient. Le « qui dort » se remplira tout seul.
             </div>
           )}
           {/* ── Assistant de repricing : liste consolidée à baisser ── */}
           {repriceList.length>0 && (
-            <div style={{marginBottom:12,border:`1px solid ${C.warn}66`,background:`${C.warn}0e`,borderRadius:16,overflow:'hidden'}}>
+            <div style={{marginBottom:12,border:`1px solid ${C.warn}66`,background:`${C.warn}0e`,borderRadius:4,overflow:'hidden'}}>
               <button onClick={()=>setShowReprice(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>🏷️</span>
                 <span style={{flex:1,minWidth:0}}>
@@ -16528,7 +16538,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const num = numeros[it.id]?.numero;
                     return (
                       <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.warn}22`}}>
-                        <div style={{width:40,height:40,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <div style={{width:40,height:40,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                           {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
@@ -16539,7 +16549,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
                           {atFloor && <div style={{fontSize:9,color:C.muted}}>= prix d'achat (plancher)</div>}
                         </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'6px 11px',borderRadius:10}}>🏷️ Baisser</a>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'6px 11px',borderRadius:3}}>🏷️ Baisser</a>
                       </div>
                     );
                   })}
@@ -16552,9 +16562,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {/* Recherche + tri */}
           <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
-              style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
+              style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
             <select value={annSort} onChange={e=>setAnnSort(e.target.value)}
-              style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
+              style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Date d'ajout (ancienne → récente)</option>
               <option value="recent">Ordre Vinted</option>
               <option value="price_desc">Prix ↓</option>
@@ -16571,10 +16581,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ne servent pas tous les jours et encombraient la barre. */}
             <div style={{position:'relative'}}>
               <button type="button" onClick={()=>setAnnToolsOpen(v=>!v)} title="Outils : répartir un lot, audit du stock"
-                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
+                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:3,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
               {annToolsOpen && (<>
                 <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-                <div style={{position:'absolute',left:0,top:'calc(100% + 6px)',zIndex:71,minWidth:230,background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                <div style={{position:'absolute',left:0,top:'calc(100% + 6px)',zIndex:71,minWidth:230,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
@@ -16586,7 +16596,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        les boîtes. Le code de la modale reste, mais plus rien ne l'ouvre.
                        Ne pas le remettre sans son accord explicite. */
                   ].map(t=>(
-                    <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:10,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+                    <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:3,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                       <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
                       <span style={{minWidth:0}}>
                         <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{t.lab}</span>
@@ -16619,14 +16629,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // colorée d'1,5 px pour signaler « numérotée » était lourde sur une
               // grille entière — on garde une bordure fine et c'est la PASTILLE
               // du numéro qui porte la couleur.
-              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:16,overflow:'hidden',background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',...(soldBord?{opacity:0.85}:{}),display:'flex',flexDirection:'column'}}>
+              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:4,overflow:'hidden',background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',...(soldBord?{opacity:0.85}:{}),display:'flex',flexDirection:'column'}}>
                 <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
                   <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:32}}>👟</span>}
                   </div>
-                  {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:700,padding:'4px 8px',borderRadius:10,textAlign:'center'}}>📦 VENDUE — bordereau reçu</div>}
-                  {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:700,padding:'4px 10px',borderRadius:999,boxShadow:'0 2px 8px rgba(0,0,0,.28)',letterSpacing:-0.2}}>N°{num}</div>}
-                  {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:999}}>😴 {age}j</div>}
+                  {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:700,padding:'4px 8px',borderRadius:3,textAlign:'center'}}>📦 VENDUE — bordereau reçu</div>}
+                  {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:700,padding:'4px 10px',borderRadius:3,boxShadow:'0 2px 8px rgba(0,0,0,.28)',letterSpacing:-0.2}}>N°{num}</div>}
+                  {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:3}}>😴 {age}j</div>}
                 </a>
                 <div style={{padding:'8px 10px 6px'}}>
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}>
@@ -16639,7 +16649,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       if(it.price==null || effBuy==='' || isNaN(b)) return null;
                       const m = Math.round(Number(it.price) - b - feesOf(e));
                       const pos = m>=0;
-                      return <span title="Marge potentielle si vendue à ce prix (prix en ligne − prix d'achat − boost)" style={{fontSize:12,fontWeight:700,color:pos?INV_STATUS.online.color:C.danger,background:(pos?INV_STATUS.online.color:C.danger)+'18',borderRadius:10,padding:'1px 6px'}}>{pos?`+${m}`:m} € {pos?'💰':'⚠️'}</span>;
+                      return <span title="Marge potentielle si vendue à ce prix (prix en ligne − prix d'achat − boost)" style={{fontSize:12,fontWeight:700,color:pos?INV_STATUS.online.color:C.danger,background:(pos?INV_STATUS.online.color:C.danger)+'18',borderRadius:3,padding:'1px 6px'}}>{pos?`+${m}`:m} € {pos?'💰':'⚠️'}</span>;
                     })()}
                   </div>
                   <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.brand||it.title}</div>
@@ -16654,28 +16664,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
                     {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
-                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:10,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
+                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:3,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
                     <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire (toute sa vie)" aria-label="Passeport de la paire" style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:15}}>📖</button>
                     {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
                 </div>
                 <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
-                  <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
+                  <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg}}>
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                     <ChampSaisie value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode="numeric" placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                   </div>
-                  <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg}}>
+                  <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg}}>
                     <ChampSaisie value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
-                  <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',padding:'3px 8px',display:'flex',alignItems:'center'}}><Icon name="link" size={14}/></button>
+                  <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',padding:'3px 8px',display:'flex',alignItems:'center'}}><Icon name="link" size={14}/></button>
                 </div>
                 {/* L'achat relié, avec SA photo et SON reçu — demande de Julien :
                     « quand l'annonce est en ligne, pouvoir relier un achat avec la
                     photo de l'achat ainsi que sa facture d'achat ». */}
                 <div style={{padding:'0 10px'}}><AchatRelie entry={e} numero={num}/></div>
                 {num && (
-                  <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
+                  <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>💡 boost</span>
                     <ChampSaisie value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} placeholder="0" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
@@ -16689,9 +16699,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const sugg = Math.max(1, Math.round(Number(it.price)*0.85));
                   if (!(sugg < Number(it.price))) return null;
                   return (
-                    <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 10px 10px',padding:'6px 8px',borderRadius:10,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 10px 10px',padding:'6px 8px',borderRadius:3,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
                       <span style={{fontSize:11,color:C.text,fontWeight:500,flex:1,minWidth:0,lineHeight:1.3}}>💸 Prix conseillé <b>{sugg} {cur(it.currency)}</b> <span style={{color:C.muted}}>(−15 %{sleeps?` · dort ${age}j`:''})</span></span>
-                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:10}}>🏷️ Baisser</a>
+                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:3}}>🏷️ Baisser</a>
                     </div>
                   );
                 })()}
@@ -16728,14 +16738,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <ScreenHead icon="chat" title="Messages" desc="On te dit juste s'il y a du nouveau. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
         <NoAcc/>
         {/* Réponses rapides : modèles copiables en 1 clic (répondre se fait sur Vinted). */}
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
+        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
             <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>⚡ Réponses rapides</span>
             <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':'✎ Modifier'}</button>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {quickReplies.map((t,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:999,background:C.bg,padding:'4px 4px 4px 10px'}}>
+              <div key={i} style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:3,background:C.bg,padding:'4px 4px 4px 10px'}}>
                 <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent='✓ Copié !'; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:230,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t}</button>
                 {showQR ? (
                   <>
@@ -16745,7 +16755,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ) : <span style={{color:C.muted,fontSize:11,paddingRight:4}}>📋</span>}
               </div>
             ))}
-            {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:999,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
+            {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:3,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6}}>Clique un message pour le <b>copier</b>, puis colle-le dans la conversation Vinted.</div>
         </div>
@@ -16761,7 +16771,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const total  = (convs.items||[]).filter(c=>!acctOffOf(c)).length;
           const inboxUrl = 'https://www.vinted.fr/inbox';
           return (
-            <div style={{border:`1px solid ${nonLus?C.accent:C.border}`,background:nonLus?`${C.accent}0e`:C.card,borderRadius:16,padding:'16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <div style={{border:`1px solid ${nonLus?C.accent:C.border}`,background:nonLus?`${C.accent}0e`:C.card,borderRadius:4,padding:'16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
               <span style={{fontSize:26,flexShrink:0}}>{nonLus?'✉️':'📭'}</span>
               <div style={{flex:'1 1 165px',minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:nonLus?C.accent:C.text,lineHeight:1.2}}>
@@ -16772,7 +16782,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               </div>
               <a href={inboxUrl} target="_blank" rel="noreferrer"
-                style={{flex:'1 1 130px',textAlign:'center',textDecoration:'none',border:'none',borderRadius:12,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
+                style={{flex:'1 1 130px',textAlign:'center',textDecoration:'none',border:'none',borderRadius:4,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
                 {nonLus>0?'Répondre sur Vinted':'Ouvrir Vinted'}
               </a>
             </div>
@@ -16794,7 +16804,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
           const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
           return (
-            <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px 11px 15px',marginBottom:12,overflow:'hidden'}}>
+            <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'11px 13px 11px 15px',marginBottom:12,overflow:'hidden'}}>
               <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:aPoster.length?C.accent:C.border}}/>
               <span aria-hidden="true" style={{flexShrink:0,color:aPoster.length?C.accent:C.muted,marginTop:1}}><Icon name={aPoster.length?'truck':'check'} size={18}/></span>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',flex:'1 1 190px',minWidth:0}}>
@@ -16822,7 +16832,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {avecPdf.length>0 && (
                   <button type="button" onClick={batchBordereaux} disabled={batchBusy}
                     title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
-                    style={{flexShrink:0,border:'none',borderRadius:12,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
+                    style={{flexShrink:0,border:'none',borderRadius:4,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
                     {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
@@ -16841,7 +16851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const jours = dropOffs.capturedAt ? Math.round((Date.now()-dropOffs.capturedAt)/86400000) : null;
           const total = dropOffs.carriers.reduce((n,c)=>n+c.points.length,0);
           return (
-            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'12px 14px',marginBottom:12}}>
+            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px',marginBottom:12}}>
               <button type="button" onClick={()=>setDropOpen(o=>!o)} aria-expanded={dropOpen}
                 style={{width:'100%',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:18,flexShrink:0}}>📍</span>
@@ -16893,7 +16903,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const one = pending.length===1 ? pending[0] : null;
           const e = one ? effEntry(one) : null; const num = e?.numero || '';
           return (
-            <div style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}12`,borderRadius:12,padding:'10px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}12`,borderRadius:4,padding:'10px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <span style={{fontSize:20}}>🆕</span>
               <div style={{flex:1,minWidth:160}}>
                 <div style={{fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>Bordereau téléchargé il y a {freshLabel.mins} min ({freshLabel.name})</div>
@@ -16901,7 +16911,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ? <div style={{fontSize:11,color:C.text,marginTop:1}}>Prêt à tamponner pour <b>{num?`N°${num} · `:''}{one.title}</b> — un tap et c'est fait.</div>
                   : <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>}
               </div>
-              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc)} style={{flexShrink:0,border:'none',background:INV_STATUS.online.color,color:'#fff',borderRadius:10,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
+              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc)} style={{flexShrink:0,border:'none',background:INV_STATUS.online.color,color:'#fff',borderRadius:3,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
             </div>
           );
         })()}
@@ -16912,7 +16922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // c'est le même ensemble que le bandeau du haut, qui le dit déjà.
           if (!total || total >= nAPoster()) return null;
           return (
-            <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
+            <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:4,padding:'10px 13px',marginBottom:10}}>
               {/* ⚠️ CE BANDEAU NE COMPTE QUE L'URGENT (en retard / aujourd'hui /
                   demain), pas tous les colis. Il disait « N colis à expédier »,
                   exactement les mêmes mots que le compteur du haut qui, lui,
@@ -16931,7 +16941,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             risque le plus coûteux de l'app : une fois le mauvais carton envoyé,
             rien ne le rattrape. On le met en tête, en rouge, avec les porteurs. */}
         {conflitsNum.length > 0 && (
-          <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:14,padding:'12px 14px',marginBottom:12}}>
+          <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:4,padding:'12px 14px',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'x':''} porté{conflitsNum.length>1?'s':''} par deux paires
             </div>
@@ -16954,7 +16964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!sv.length) return null;
           const comptes = [...new Set(sv.map(b=>b.account).filter(Boolean))];
           return (
-            <div style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
+            <div style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:4,padding:'10px 13px',marginBottom:10}}>
               <div style={{fontSize:13,fontWeight:700,color:C.warn}}>⚠️ {sv.length} bordereau{sv.length>1?'x':''} reçu{sv.length>1?'s':''} sans vente correspondante</div>
               <div style={{fontSize:11,color:C.text,marginTop:3,lineHeight:1.45}}>
                 Un bordereau existe toujours pour une vente : si celle-ci n'apparaît pas, c'est que la capture est en retard{comptes.length?` sur ${comptes.join(', ')}`:''} — repasse une fois sur Vinted avec ce compte. Ce n'est pas un colis à préparer, donc il n'est pas dans la liste.
@@ -16979,7 +16989,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
             </div>
           );
-          const sec = { flexShrink:0, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
+          const sec = { flexShrink:0, borderRadius:3, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {ex.map(e=>{
@@ -17003,27 +17013,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const pdf = !!(b && b.hasPdf) || !!capte;
                 const acc = o ? o._acc : null;
                 return (
-                  <div key={e.key} data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:16,opacity:posted?0.55:1}}>
+                  <div key={e.key} data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:4,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'center'}}>
-                      <div style={{width:58,height:58,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <div style={{width:58,height:58,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:6}}>
                           {num
-                            ? <span style={{fontSize:15,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:10,padding:'3px 9px',flexShrink:0,letterSpacing:-0.2}}>N°{num}</span>
-                            : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
+                            ? <span style={{fontSize:15,fontWeight:700,color:'#fff',background:INV_STATUS.online.color,borderRadius:3,padding:'3px 9px',flexShrink:0,letterSpacing:-0.2}}>N°{num}</span>
+                            : <span title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'2px 8px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
                           <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{titre}</span>
                         </div>
                         <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
+                          {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:3,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
                           {o && o.date && <span style={{flexShrink:0}}>vendu le {new Date(o.date).toLocaleDateString('fr-FR')}</span>}
                           {o && o.price && <span style={{flexShrink:0,fontWeight:600,color:C.text}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
                           {urgTxt && <span style={{flexShrink:0,color:urgCol,fontWeight:600}}>{urgTxt}</span>}
                           {cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>
                             : (num ? <span style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>pas rangée</span> : null)}
-                          {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span>}
+                          {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,background:`${C.blue||C.accent}18`,color:C.blue||C.accent,fontSize:10.5,fontWeight:700,padding:'2px 7px',borderRadius:3,whiteSpace:'nowrap'}}>🧾 Facture {inv.number||''}</span>}
                           {posted && <span style={{flexShrink:0,color:INV_STATUS.online.color,fontWeight:600}}>✓ posté</span>}
                         </div>
                         {/* Le numéro de l'email vient d'un rapprochement par titre,
@@ -17040,7 +17050,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!c) return null;
                           const autres = c.porteurs.filter(x => normTitle(x.titre||'') !== normTitle(titre||''));
                           return (
-                            <div style={{fontSize:11.5,fontWeight:600,marginTop:5,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'6px 9px',lineHeight:1.45}}>
+                            <div style={{fontSize:11.5,fontWeight:600,marginTop:5,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}`,borderRadius:3,padding:'6px 9px',lineHeight:1.45}}>
                               <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par une autre paire</span>
                               <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
@@ -17050,7 +17060,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           );
                         })()}
                         {b && (()=>{ const lit=numLitige(b); return lit ? (
-                          <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <div style={{fontSize:11,fontWeight:600,marginTop:5,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:3,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <span style={{flex:'1 1 150px',minWidth:0}}>⚠️ L'email disait N°{lit.mail}, la vente dit N°{lit.txn} — on garde celui de la vente.</span>
                             <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.warn,fontWeight:700,cursor:'pointer',fontSize:11,padding:0,fontFamily:'inherit',textDecoration:'underline'}}>choisir</button>
                           </div>
@@ -17082,14 +17092,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!bytes) { toast('PDF illisible.'); return; }
                           processBordereau(num, titre, bytes);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
-                        style={{flex:'1 1 160px',border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
+                        style={{flex:'1 1 160px',border:'none',background:C.accent,color:'#fff',borderRadius:4,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
                             qui génère le bordereau manquant dès que tu arrives sur
                             Vinted (aucun argent engagé, aucun choix — c'est une
                             formalité obligatoire). L'app se contente de dire où on
                             en est, au lieu de te renvoyer faire le travail. */}
-                        <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
+                        <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
                           {aGenererBordereau(o && o.status)
                             ? <><b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
                             : <><b>Bordereau déjà généré</b> chez Vinted — le PDF arrive par email.</>}
@@ -17140,7 +17150,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
           if (!faits.length) return null;
           return (
-            <div style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:10,padding:'9px 12px'}}>
+            <div style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:3,padding:'9px 12px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:600}}>✅ {faits.length} colis parti{faits.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
               <button onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showBordDone?'masquer':'voir'}</button>
@@ -17152,15 +17162,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {emailBords.filter(b=>!isBordHidden(b) && isBordDone(b))
               .sort((a,b2)=>new Date(b2.receivedAt||0)-new Date(a.receivedAt||0))
               .map((b,i)=>(
-                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,opacity:0.7}}>
-                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:4,opacity:0.7}}>
+                  <div style={{width:38,height:38,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {bordPhoto(b)?<img src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
                   </div>
                   <div style={{flex:'1 1 120px',minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
                   </div>
-                  {b.hasPdf && <button type="button" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
+                  {b.hasPdf && <button type="button" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
                 </div>
               ))}
           </div>
@@ -17171,7 +17181,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && (
         <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <div style={{fontSize:15,fontWeight:600,color:C.text}}>Quel achat correspond à cette paire ?</div>
               <button type="button" onClick={()=>setPickerFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
@@ -17186,8 +17196,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // signalés : avec ~700 achats, sans repère on ne sait pas par où
                 // commencer, et le prix d'achat finit par ne jamais être saisi.
                 return avail.map((p, iP) => (
-                  <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
+                  <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:3,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
+                    <div style={{width:44,height:44,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
@@ -17195,7 +17205,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     12 exige le MODÈLE en plus (4+4+5), ou un titre identique. Une paire dont
     le modèle n'est pas reconnu n'est jamais « suggérée » : on ne se prononce
     pas plutôt que d'induire un faux prix d'achat. */}
-                        {(p._score||0) >= SEUIL_SUGGERE && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:999,padding:'1px 6px'}}>suggéré</span>}
+                        {(p._score||0) >= SEUIL_SUGGERE && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:3,padding:'1px 6px'}}>suggéré</span>}
                         {p.title}
                       </div>
                       <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
@@ -17215,7 +17225,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* Recherche d'un point relais par son nom → carte → confirmer */}
       {relayPicker && (
         <div onClick={()=>setRelayPicker(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1200,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'88vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📍 Ajouter un point relais</div>
@@ -17228,14 +17238,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <input autoFocus value={relayPicker.query} onChange={e=>setRelayPicker(p=>({...p,query:e.target.value}))}
                   onKeyDown={e=>{ if(e.key==='Enter') searchPlaces(relayPicker.query); }}
                   placeholder="ex : Super U Cancale, Tabac de la Place Saint-Malo…"
-                  style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:10,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
+                  style={{flex:1,border:`1px solid ${C.border}`,borderRadius:3,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                <button onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:3,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
               </div>
               <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
                 <span style={{fontSize:11,color:C.muted}}>Transporteur :</span>
                 {Object.entries(CARRIERS).map(([k,c])=>{ const on=relayPicker.carrier===c.name; return (
-                  <button key={k} onClick={()=>setRelayPicker(p=>({...p,carrier:on?'':c.name}))} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px 3px 4px',borderRadius:999,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?`${c.bg}18`:'transparent',color:on?c.bg:C.muted,border:`1.5px solid ${on?c.bg:C.border}`}}>
-                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:18,height:18,padding:'0 4px',borderRadius:6,background:c.bg,color:c.fg,fontSize:9,fontWeight:700}}>{c.short}</span>
+                  <button key={k} onClick={()=>setRelayPicker(p=>({...p,carrier:on?'':c.name}))} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px 3px 4px',borderRadius:3,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?`${c.bg}18`:'transparent',color:on?c.bg:C.muted,border:`1.5px solid ${on?c.bg:C.border}`}}>
+                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:18,height:18,padding:'0 4px',borderRadius:2,background:c.bg,color:c.fg,fontSize:9,fontWeight:700}}>{c.short}</span>
                     {c.name}
                   </button>
                 ); })}
@@ -17247,7 +17257,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <OsmMap points={relayPicker.results.map(f=>({key:f.id,lat:f.lat,lon:f.lon}))} selected={null} onSelect={id=>{ const f=relayPicker.results.find(x=>x.id===id); if(f) addFoundPlace(f); }}/>
               <div style={{flex:1,overflow:'auto',padding:'8px 12px'}}>
                 {relayPicker.results.map(f=>(
-                  <button key={f.id} onClick={()=>addFoundPlace(f)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                  <button key={f.id} onClick={()=>addFoundPlace(f)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:3,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                     <span style={{fontSize:20,flexShrink:0}}>📍</span>
                     <span style={{flex:1,minWidth:0}}>
                       <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.nom}</span>
@@ -17269,13 +17279,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {bordResult && (
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:16,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:4,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
             <div style={{fontSize:32,marginBottom:6}}>✅</div>
             <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
             <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>L'impression est <b>lancée</b> ; si la fenêtre ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>L'impression est <b>lancée</b>{bordResult.withInvoice?<> (bordereau <b>+ facture</b>)</>:null}. Si la fenêtre d'impression ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
-              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:4,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
+            {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:4,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             {bordResult.batch && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
             <button onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
           </div>
@@ -17284,7 +17294,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {showAnnual && (
         <div onClick={()=>setShowAnnual(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📚 Registre comptable {annual.year}</div>
@@ -17295,7 +17305,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{flex:1,overflow:'auto',padding:16}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
                 <span style={{fontSize:12,fontWeight:500,color:C.text}}>Année</span>
-                <select value={reportYear} onChange={e=>setReportYear(Number(e.target.value))} style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'6px 10px',fontSize:13,fontWeight:500,background:C.card,color:C.text,cursor:'pointer'}}>
+                <select value={reportYear} onChange={e=>setReportYear(Number(e.target.value))} style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 10px',fontSize:13,fontWeight:500,background:C.card,color:C.text,cursor:'pointer'}}>
                   {reportYears.map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
@@ -17311,7 +17321,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub="13,5% du CA"/>
                 </>)}
               </div>
-              {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
+              {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
               {/* Tableau mensuel */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Détail par mois</div>
               <div style={{overflowX:'auto',marginBottom:12}}>
@@ -17348,18 +17358,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {buys.items!==null && annual.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat cette année.</div>}
               <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:12,maxHeight:260,overflowY:'auto'}}>
                 {annual.buyLines.map((b,i)=>(
-                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card}}>
+                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:3,background:C.card}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
               </div>
               {/* Reçus officiels Vinted captés par l'extension (compta pro). */}
-              <div style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px',marginBottom:12}}>
+              <div style={{border:`1px solid ${C.border}`,borderRadius:3,background:C.card,padding:'10px 12px',marginBottom:12}}>
                 <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>📄 Reçus officiels Vinted</div>
                 {capturedReceipts.length>0 ? (
                   <>
@@ -17367,7 +17377,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {capturedReceipts.map((rec,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text}}>{rec.name}</div><div style={{fontSize:11,color:C.muted}}>capté le {rec.capturedAt?new Date(rec.capturedAt).toLocaleDateString('fr-FR'):'—'}</div></div>
-                        <button type="button" onClick={()=>downloadReceipt(rec)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:10,padding:'5px 11px',cursor:'pointer',fontSize:12,fontWeight:600}}>⬇️ Télécharger</button>
+                        <button type="button" onClick={()=>downloadReceipt(rec)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:3,padding:'5px 11px',cursor:'pointer',fontSize:12,fontWeight:600}}>⬇️ Télécharger</button>
                       </div>
                     ))}
                   </>
@@ -17376,8 +17386,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
-                <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
+                <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:3,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
+                <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:3,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
               </div>
               <div style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
             </div>
@@ -17386,7 +17396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {showLister && (
         <div onClick={()=>setShowLister(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>🪄 Aide à la vente</div>
@@ -17397,17 +17407,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{flex:1,overflow:'auto',padding:16}}>
               <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
                 <input value={listQ} onChange={e=>setListQ(e.target.value)} placeholder="Modèle (ex : Nike Air Max 90, gel-lyte…)" autoFocus
-                  style={{flex:'2 1 200px',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                  style={{flex:'2 1 200px',border:`1px solid ${C.border}`,borderRadius:3,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <input value={listSize} onChange={e=>setListSize(e.target.value)} placeholder="Pointure" inputMode="decimal"
-                  style={{flex:'1 1 80px',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                  style={{flex:'1 1 80px',border:`1px solid ${C.border}`,borderRadius:3,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <input value={listBuy} onChange={e=>setListBuy(e.target.value)} placeholder="Prix d'achat €" inputMode="decimal"
-                  style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                  style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:3,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
               </div>
               {!lister ? (
                 <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de la paire que tu mets en vente.<br/><span style={{fontSize:12}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
               ) : (<>
                 {/* Prix conseillé */}
-                <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:16,padding:'13px 15px',marginBottom:14}}>
+                <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:4,padding:'13px 15px',marginBottom:14}}>
                   {lister.reco!=null ? (<>
                     <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Prix conseillé</div>
                     <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
@@ -17436,15 +17446,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>TITRE OPTIMISÉ</div>
                   <div style={{display:'flex',gap:8,alignItems:'stretch'}}>
-                    <div style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'9px 12px',fontSize:13,fontWeight:500,color:C.text}}>{lister.title}</div>
-                    <button onClick={()=>copyText(lister.title,'title')} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:copied==='title'?C.accent:`${C.accent}12`,color:copied==='title'?'#fff':C.accent,borderRadius:10,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='title'?'✓ Copié':'Copier'}</button>
+                    <div style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:3,padding:'9px 12px',fontSize:13,fontWeight:500,color:C.text}}>{lister.title}</div>
+                    <button onClick={()=>copyText(lister.title,'title')} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:copied==='title'?C.accent:`${C.accent}12`,color:copied==='title'?'#fff':C.accent,borderRadius:3,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='title'?'✓ Copié':'Copier'}</button>
                   </div>
                 </div>
                 {/* Description prête */}
                 <div style={{marginBottom:6}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:5}}>DESCRIPTION PRÊTE À COLLER</div>
-                  <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{lister.desc}</div>
-                  <button onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:10,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
+                  <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:3,padding:'11px 13px',fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{lister.desc}</div>
+                  <button onClick={()=>copyText(lister.desc,'desc')} style={{marginTop:8,width:'100%',border:`1px solid ${C.accent}`,background:copied==='desc'?C.accent:`${C.accent}12`,color:copied==='desc'?'#fff':C.accent,borderRadius:3,padding:'10px',fontSize:13,fontWeight:600,cursor:'pointer'}}>{copied==='desc'?'✓ Description copiée':'📋 Copier la description'}</button>
                 </div>
                 <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:12}}>Le prix vient de tes ventes finalisées du même modèle (recherche par mots). Colle le titre et la description sur Vinted, ajoute tes photos, et fixe le prix conseillé.</div>
               </>)}
@@ -17459,7 +17469,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px 28px'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
               <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 Paires du lot</div>
-              <button type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:999,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
+              <button type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:3,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
             </div>
             <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{lotView.order?.title||''}{lotView.order?.price?.amount!=null?` · ${Number(lotView.order.price.amount).toFixed(0)} ${cur(lotView.order.price?.currency_code)}`:''}{classifyOrderStatus(lotView.order?.status)==='cancelled'?' · ❌ remboursé (hors CA)':''}</div>
             {lotView.loading ? (
@@ -17475,11 +17485,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const e=(it.id&&numeros[String(it.id)])||(it.photo?numeros[entryKeyByPhoto({photo:it.photo})]:null)||null;
                   const num=e&&e.numero!=null?String(e.numero):null;
                   return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px'}}>
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'9px 11px'}}>
                       {it.photo
-                        ? <img src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:10,objectFit:'cover',background:C.border}}/>
-                        : <span style={{flexShrink:0,width:34,height:34,borderRadius:10,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}>👟</span>}
-                      <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:10,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
+                        ? <img src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:3,objectFit:'cover',background:C.border}}/>
+                        : <span style={{flexShrink:0,width:34,height:34,borderRadius:3,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}>👟</span>}
+                      <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:3,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
                       <span style={{flex:'1 1 120px',minWidth:0,fontSize:13,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis'}}>{it.title}{it.size?<span style={{color:C.muted,fontWeight:400}}> · {it.size}</span>:''}</span>
                       {it.price!=null && <span style={{fontSize:12,fontWeight:600,color:C.muted}}>{Number(it.price).toFixed(0)} €</span>}
                     </div>
@@ -17500,12 +17510,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setReceiptView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <button type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:999,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
+              <button type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:3,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
               <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>Reçu d'achat</div>
-              <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'7px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🖨 PDF</button>
+              <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:3,padding:'7px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🖨 PDF</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
-              <div style={{background:C.card,borderRadius:16,overflow:'hidden',border:`1px solid ${C.border}`}}>
+              <div style={{background:C.card,borderRadius:4,overflow:'hidden',border:`1px solid ${C.border}`}}>
                 <div style={{background:'#007782',color:'#fff',padding:'16px 18px'}}>
                   <div style={{fontSize:11,opacity:0.85,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>
                   <div style={{fontSize:20,fontWeight:600,marginTop:3}}>{r.article}</div>
@@ -17538,7 +17548,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>); })()}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>🎯 Sourcing — quoi racheter</div>
@@ -17548,14 +17558,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
               {/* Vérificateur d'achat : en friperie, tape le modèle + le prix demandé */}
-              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 13px',marginBottom:16}}>
+              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 13px',marginBottom:16}}>
                 <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:2}}>🔍 Vérificateur d'achat</div>
                 <div style={{fontSize:11,color:C.muted,marginBottom:8}}>En friperie : tape le modèle et le prix demandé → tes propres ventes te disent si ça vaut le coup.</div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:checker?10:0}}>
                   <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder="Modèle (ex : gel-lyte, spezial…)"
-                    style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
+                    style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
                   <input value={srcPrice} onChange={e=>setSrcPrice(e.target.value)} placeholder="Prix demandé €" inputMode="decimal"
-                    style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
+                    style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
                 </div>
                 {checker && (checker.nb===0 ? (
                   <div style={{fontSize:12,color:C.muted}}>Aucune vente finalisée ne correspond à « {srcQuery.trim()} ». Essaie un mot plus court (ex : juste la marque).</div>
@@ -17571,7 +17581,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {checker.online>0 && <StatBox label="Déjà en ligne" value={checker.online} color={C.warn} sub="chez toi"/>}
                     </div>
                     {checker.estBenef!=null && (
-                      <div style={{border:`1.5px solid ${okCol}`,background:`${okCol}14`,borderRadius:10,padding:'9px 12px'}}>
+                      <div style={{border:`1.5px solid ${okCol}`,background:`${okCol}14`,borderRadius:3,padding:'9px 12px'}}>
                         <div style={{fontSize:13,fontWeight:700,color:okCol}}>
                           {ok==='go'?'🟢 Fonce':ok==='mid'?'🟡 Négocie':'🔴 Laisse'} — bénéfice estimé {checker.estBenef>=0?'+':''}{checker.estBenef.toFixed(0)} €
                         </div>
@@ -17594,7 +17604,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{display:'flex',flexDirection:'column',gap:6}}>
                         {rows.map((r,i)=>{ const top = r.benefMoy!=null && bm!=null && r.benefMoy===bm && r.benefNb>0;
                           return (
-                          <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${top?(INV_STATUS.online.color+'88'):C.border}`,borderRadius:10,background:top?`${INV_STATUS.online.color}10`:C.card}}>
+                          <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${top?(INV_STATUS.online.color+'88'):C.border}`,borderRadius:3,background:top?`${INV_STATUS.online.color}10`:C.card}}>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.key==='—'?'Marque inconnue':(r.key==='?'?'Taille inconnue':r.key)} {top && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:500}}>★ top marge</span>}</div>
                               <div style={{fontSize:11,color:C.muted}}>{r.nb} vendue{r.nb>1?'s':''} · CA {fmtE(r.ca)}{r.joursMoy!=null?` · ${r.joursMoy.toFixed(0)} j en moy.`:''}</div>
@@ -17621,7 +17631,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {showTreasury && (
         <div onClick={()=>setShowTreasury(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'88vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>💰 Trésorerie</div>
@@ -17631,7 +17641,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{padding:'14px 16px',overflowY:'auto'}}>
               {/* ARGENT RÉELLEMENT REÇU */}
-              <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:16,padding:'13px 15px',marginBottom:11}}>
+              <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:4,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:'#16a34a',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>✅ Reçu dans le porte-monnaie</div>
                 <div style={{fontSize:32,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)} €</div>
                 <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — argent crédité sur ton solde Vinted. <b>Ne compte pas</b> tes virements vers ta banque.</div>
@@ -17639,7 +17649,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* EN ATTENTE = somme des porte-monnaie Vinted (escrow réel si capté,
                   sinon somme des ventes en cours = argent que Vinted te retient). */}
               {(()=>{ const useEscrow = walletEscrow && walletEscrow.total>0; const val = useEscrow ? walletEscrow.total : treasury.attente; return (
-              <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:16,padding:'13px 15px',marginBottom:11}}>
+              <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:4,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.warn,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
                 <div style={{fontSize:32,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)} €</div>
                 <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
@@ -17647,13 +17657,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ); })()}
               {/* LITIGES EN COURS (paires qui reviennent : retour / remboursement / suspension) */}
               {retoursAttendus.length>0 && (
-                <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:16,padding:'13px 15px',marginBottom:11}}>
+                <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:4,padding:'13px 15px',marginBottom:11}}>
                   <div style={{fontSize:12,color:C.danger,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⚖️ {retoursAttendus.length} litige{retoursAttendus.length>1?'s':''} en cours</div>
                   <div style={{fontSize:12,color:C.muted,margin:'3px 0 7px'}}>Des paires qui te reviennent (retour / remboursement / suspension) — à republier.</div>
                   <div style={{display:'flex',flexDirection:'column',gap:5}}>
                     {retoursAttendus.slice(0,6).map((r,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}>
-                        <span style={{fontWeight:700,color:C.danger,background:`${C.danger}18`,borderRadius:6,padding:'1px 7px',flexShrink:0}}>{RETOUR_LABEL[r.kind]?.txt||'↩️'}</span>
+                        <span style={{fontWeight:700,color:C.danger,background:`${C.danger}18`,borderRadius:2,padding:'1px 7px',flexShrink:0}}>{RETOUR_LABEL[r.kind]?.txt||'↩️'}</span>
                         <span style={{color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.num?`N°${r.num} · `:''}{r.title}</span>
                       </div>
                     ))}
@@ -17662,7 +17672,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               )}
               {/* DÉPENSÉ */}
-              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,padding:'13px 15px',marginBottom:11}}>
+              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>🛒 Argent dépensé (tous comptes)</div>
                 <div style={{fontSize:26,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{buys.items===null && offBuys.length===0 ? '…' : `${Math.round(treasury.spent)} €`}</div>
                 <div style={{fontSize:12,color:C.muted}}>{treasury.nSpent} achat{treasury.nSpent>1?'s':''} (Vinted + hors Vinted){buys.items===null?' · chargement…':''}</div>
@@ -17678,7 +17688,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           plus la compta tant que leur coût manque. */}
       {fillBuyOpen && (
         <div onClick={()=>setFillBuyOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1">
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <div style={{flex:1,minWidth:0}}>
@@ -17702,9 +17712,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Toutes tes paires ont un prix d'achat.</div>
               )}
               {fillBuyRows.slice(0,300).map((r,i)=>(
-                <div key={r.key} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:6}}>
+                <div key={r.key} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'8px 10px',marginBottom:6}}>
                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                  <div style={{width:40,height:40,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{width:40,height:40,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {r.e.photo?<img src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>👟</span>}
                   </div>
                   <div style={{flex:'1 1 130px',minWidth:0}}>
@@ -17717,7 +17727,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {r.nVentes>0 ? `vendue ${r.nVentes>1?r.nVentes+' fois · ':''}${r.ca.toFixed(2).replace('.',',')} €` : r.enLigne ? `en ligne${r.e.price!=null?` · ${eur(r.e.price).toFixed(2).replace('.',',')} €`:''}` : 'plus en ligne'}
                     </div>
                   </div>
-                  <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:10,padding:'2px 6px',background:C.bg,width:96}}>
+                  <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,width:96}}>
                     <ChampSaisie value="" data-fillbuy={i}
                       onCommit={v=>setBuyForKey(r.key,v)}
                       apresEntree={()=>{ const n=document.querySelector(`[data-fillbuy="${i+1}"]`); if(n) n.focus(); }}
@@ -17731,17 +17741,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    const d=p.date?new Date(p.date):null;
                    return (
                      <button type="button" onClick={()=>linkBuyForKey(r.key,p)}
-                       style={{marginTop:6,width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}55`,background:`${C.accent}10`,borderRadius:10,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                       style={{marginTop:6,width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}55`,background:`${C.accent}10`,borderRadius:3,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                        {orderPhoto(p)
-                         ? <img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:7,objectFit:'cover',flexShrink:0}}/>
-                         : <span style={{width:26,height:26,borderRadius:7,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}>👟</span>}
+                         ? <img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:2,objectFit:'cover',flexShrink:0}}/>
+                         : <span style={{width:26,height:26,borderRadius:2,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}>👟</span>}
                        <span style={{flex:1,minWidth:0}}>
                          <span style={{display:'block',fontSize:11.5,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
                          <span style={{display:'block',fontSize:10.5,color:C.muted}}>
                            {pr!=null?`payé ${pr.toFixed(2).replace('.',',')} €`:'prix inconnu'}{d&&!isNaN(d)?` · ${d.toLocaleDateString('fr-FR')}`:''}{p._acc?` · ${accNameOf(p._acc)}`:''}
                          </span>
                        </span>
-                       <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:999,padding:'3px 9px'}}>C'est ça</span>
+                       <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:3,padding:'3px 9px'}}>C'est ça</span>
                      </button>
                    ); })()}
                 </div>
@@ -17753,7 +17763,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {showReport && (
         <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📊 Rapport comptable</div>
@@ -17764,7 +17774,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{flex:1,overflow:'auto',padding:16}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
                 <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
-                <select value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'6px 10px',fontSize:13,fontWeight:500,background:C.card,color:C.text,cursor:'pointer'}}>
+                <select value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 10px',fontSize:13,fontWeight:500,background:C.card,color:C.text,cursor:'pointer'}}>
                   {reportMonths.map(m=>{ const [y,mo]=m.split('-'); const lbl=new Date(Number(y),Number(mo)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); return <option key={m} value={m}>{lbl}</option>; })}
                 </select>
               </div>
@@ -17781,26 +17791,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Cotisations est." value={fmtE(report.urssaf)} color={C.warn} sub="13,5% du CA"/>
                 </>)}
               </div>
-              {report.nb>report.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'8px 12px',marginBottom:12}}>⚠️ {report.nb-report.nbCout} vente(s) sans prix d'achat — le calcul de marge est incomplet.</div>}
+              {report.nb>report.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>⚠️ {report.nb-report.nbCout} vente(s) sans prix d'achat — le calcul de marge est incomplet.</div>}
               {/* Registre d'achats */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(report.achatsTotal)} ({report.buyLines.length})</div>
               {report.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat ce mois-ci{buys.items===null?' (registre en cours de chargement)':''}.</div>}
               <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8}}>
                 {report.buyLines.map((b,i)=>(
-                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card}}>
+                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:3,background:C.card}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
-                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
+                    <button type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
               </div>
             </div>
             <div style={{display:'flex',gap:8,padding:'12px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0}}>
-              <button onClick={exportReportCsv} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>⬇️ CSV</button>
-              <button onClick={exportReportPdf} style={{flex:1,border:'none',borderRadius:10,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>📄 PDF</button>
+              <button onClick={exportReportCsv} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>⬇️ CSV</button>
+              <button onClick={exportReportPdf} style={{flex:1,border:'none',borderRadius:3,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>📄 PDF</button>
             </div>
           </div>
         </div>
@@ -17808,9 +17818,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {openConv && (
         <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo?<img src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:10,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:10,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
+              {openConv.header?.photo?<img src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:3,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:3,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
                 <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div>
@@ -17822,24 +17832,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
               {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
               {!openConv.loading && !openConv.error && (()=>{ const bl=[...new Set(openConv.messages.flatMap(m=>(m.links||[]).filter(l=>l.bordereau).map(l=>l.url)))]; return bl.length>0 ? (
-                <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:12,padding:'10px 12px',marginBottom:4}}>
+                <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:4,padding:'10px 12px',marginBottom:4}}>
                   <div style={{fontSize:11,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:6}}>📄 Bordereau détecté dans la conversation</div>
                   {bl.map((u,i)=>(
-                    <a key={i} href={u} target="_blank" rel="noreferrer" style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'10px 12px',fontSize:13,fontWeight:600,textDecoration:'none',textAlign:'center',marginBottom:i<bl.length-1?6:0}}>Ouvrir le bordereau {bl.length>1?`(${i+1})`:''}</a>
+                    <a key={i} href={u} target="_blank" rel="noreferrer" style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:3,padding:'10px 12px',fontSize:13,fontWeight:600,textDecoration:'none',textAlign:'center',marginBottom:i<bl.length-1?6:0}}>Ouvrir le bordereau {bl.length>1?`(${i+1})`:''}</a>
                   ))}
                 </div>
               ) : null; })()}
               {!openConv.loading && !openConv.error && openConv.messages.map((m,i)=>(
                 m.kind==='event'
                   ? (/code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
-                      ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:12,padding:'8px 12px',textAlign:'center'}}>
+                      ? <div key={i} style={{alignSelf:'center',maxWidth:'92%',background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:4,padding:'8px 12px',textAlign:'center'}}>
                           <div style={{fontSize:9,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:2}}>📦 Info colis / retrait</div>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body}</div>
                           {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:12,fontWeight:500,color:C.blue||C.accent}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
                         </div>
-                      : <div key={i} style={{alignSelf:'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
+                      : <div key={i} style={{alignSelf:'center',fontSize:11,color:C.muted,background:C.surface,border:`1px solid ${C.border}`,borderRadius:3,padding:'3px 10px',maxWidth:'90%',textAlign:'center'}}>{m.body}{(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{marginLeft:6,color:C.blue||C.accent,fontWeight:500}}>{l.bordereau?'📄':'🔗'}</a>)}</div>)
                   : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
-                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:16,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
+                      <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:4,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
                       {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
                     </div>
               ))}
@@ -17853,14 +17863,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
                   {QUICK_REPLIES.map((q,i)=>(
                     <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
-                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:999,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:3,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>
                 <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
-                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()} style={{flexShrink:0,border:'none',borderRadius:12,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
+                  <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={vmrExtPresent()?'Écrire une réponse…':'Réponse (extension VRM requise)…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{flex:1,resize:'none',maxHeight:120,minHeight:20,border:`1px solid ${C.border}`,borderRadius:4,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',lineHeight:1.4}}/>
+                  <button type="button" onClick={sendReply} disabled={replyBusy||!replyText.trim()} style={{flexShrink:0,border:'none',borderRadius:4,padding:'9px 14px',background:(replyBusy||!replyText.trim())?C.border:C.accent,color:'#fff',fontSize:13,fontWeight:600,cursor:(replyBusy||!replyText.trim())?'default':'pointer'}}>{replyBusy?'…':'Envoyer'}</button>
                 </div>
                 {!vmrExtPresent() && <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,fontSize:11,fontWeight:500,color:C.blue||C.accent}}>↗ Répondre sur Vinted (sans extension)</a>}
               </div>
@@ -17881,7 +17891,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const already = bordLinks[bordKey(linkPickFor)];
         return (
         <div onClick={()=>setLinkPickFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'82vh',borderRadius:'16px 16px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'82vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{flex:1,minWidth:0}}>
@@ -17890,15 +17900,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <button type="button" onClick={()=>setLinkPickFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
               </div>
-              <input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="Chercher par N°, titre ou taille…" style={{marginTop:10,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              <input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="Chercher par N°, titre ou taille…" style={{marginTop:10,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:3,padding:'9px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
-              {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:10,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
+              {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:3,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
               {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire numérotée{q?' pour cette recherche':''}.</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
-                  style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:10,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
-                  <div style={{width:42,height:42,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:3,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                  <div style={{width:42,height:42,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>👟</span>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
@@ -17931,7 +17941,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowBrandCurves(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{padding:'12px 16px',flexShrink:0}}>
-              <select value={effBrand} onChange={e=>setCurveBrand(e.target.value)} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,fontWeight:500,cursor:'pointer'}}>
+              <select value={effBrand} onChange={e=>setCurveBrand(e.target.value)} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,fontWeight:500,cursor:'pointer'}}>
                 <option value="__ALL__">Toutes marques confondues</option>
                 {brandCurves.brandList.map(b=><option key={b} value={b}>{b}</option>)}
               </select>
@@ -18002,7 +18012,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Paire de l'année</div>
-            <div style={{width:130,height:130,borderRadius:20,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
+            <div style={{width:130,height:130,borderRadius:5,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
           </div>
@@ -18028,10 +18038,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:52,marginBottom:10}}>🚀</div>
             <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{w.mode==='month'?'Quel mois, Julien !':'Quelle année, Julien !'}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
-              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>paires vendues</div></div>
-              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
-              {w.topBrand && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.topBrand[0]}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>marque star</div></div>}
-              {w.bestMonth && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:14,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.bestMonth.nom}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>mois record</div></div>}
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:4,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>paires vendues</div></div>
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:4,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
+              {w.topBrand && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:4,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.topBrand[0]}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>marque star</div></div>}
+              {w.bestMonth && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:4,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.bestMonth.nom}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>mois record</div></div>}
             </div>
             <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:18,fontWeight:500}}>On remet ça l'année prochaine ? 👊</div>
           </div>
@@ -18053,30 +18063,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div style={{position:"fixed",inset:0,zIndex:5000,background:cur.bg,transition:'background .5s ease',display:'flex',flexDirection:'column',overflow:'hidden'}}>
           {/* Barres de progression façon story */}
           <div style={{display:'flex',gap:4,padding:'calc(12px + env(safe-area-inset-top)) 12px 8px'}}>
-            {cards.map((c,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:999,background:'rgba(255,255,255,0.3)',overflow:'hidden'}}><div style={{height:'100%',width:i<step?'100%':i===step?'100%':'0%',background:'#fff',transformOrigin:'left',animation:i===step?'wrapBar 0.5s ease both':'none'}}/></div>))}
+            {cards.map((c,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:3,background:'rgba(255,255,255,0.3)',overflow:'hidden'}}><div style={{height:'100%',width:i<step?'100%':i===step?'100%':'0%',background:'#fff',transformOrigin:'left',animation:i===step?'wrapBar 0.5s ease both':'none'}}/></div>))}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'2px 16px 0'}}>
             <div style={{flex:1,fontSize:12,color:'rgba(255,255,255,0.9)',fontWeight:600}}>🎉 Wrapped · {w.periodLabel}</div>
             {step===0 && (<>
               {/* Bascule Mois / Année (sur la carte d'intro). stopPropagation
                   pour ne pas déclencher le « touche pour continuer ». */}
-              <div onClick={e=>e.stopPropagation()} style={{display:'flex',background:'rgba(255,255,255,0.2)',borderRadius:999,padding:2}}>
+              <div onClick={e=>e.stopPropagation()} style={{display:'flex',background:'rgba(255,255,255,0.2)',borderRadius:3,padding:2}}>
                 {[['month','Mois'],['year','Année']].map(([m,lbl])=>(
-                  <button key={m} type="button" onClick={()=>setWrappedMode(m)} style={{border:'none',borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:700,cursor:'pointer',background:w.mode===m?'#fff':'transparent',color:w.mode===m?'#7a3cff':'#fff'}}>{lbl}</button>
+                  <button key={m} type="button" onClick={()=>setWrappedMode(m)} style={{border:'none',borderRadius:3,padding:'5px 11px',fontSize:12,fontWeight:700,cursor:'pointer',background:w.mode===m?'#fff':'transparent',color:w.mode===m?'#7a3cff':'#fff'}}>{lbl}</button>
                 ))}
               </div>
               {w.mode==='month' && (
-                <select value={w.mo} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedMonth(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'5px 8px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
+                <select value={w.mo} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedMonth(Number(e.target.value))} style={{border:'none',borderRadius:3,padding:'5px 8px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
                   {w.moisNoms.map((nm,i)=><option key={i} value={i} style={{color:'#111'}}>{nm}</option>)}
                 </select>
               )}
               {w.mode==='year' && w.years.length>1 && (
-                <select value={w.yr} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedYear(Number(e.target.value))} style={{border:'none',borderRadius:999,padding:'5px 10px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
+                <select value={w.yr} onClick={e=>e.stopPropagation()} onChange={e=>setWrappedYear(Number(e.target.value))} style={{border:'none',borderRadius:3,padding:'5px 10px',fontSize:12,fontWeight:700,background:'rgba(255,255,255,0.25)',color:'#fff',cursor:'pointer'}}>
                   {w.years.map(y=><option key={y} value={y} style={{color:'#111'}}>{y}</option>)}
                 </select>
               )}
             </>)}
-            <button type="button" onClick={()=>setShowWrapped(false)} aria-label="Fermer" style={{border:'none',background:'rgba(255,255,255,0.22)',color:'#fff',width:32,height:32,borderRadius:999,fontSize:20,cursor:'pointer',lineHeight:1,flexShrink:0}}>×</button>
+            <button type="button" onClick={()=>setShowWrapped(false)} aria-label="Fermer" style={{border:'none',background:'rgba(255,255,255,0.22)',color:'#fff',width:32,height:32,borderRadius:3,fontSize:20,cursor:'pointer',lineHeight:1,flexShrink:0}}>×</button>
           </div>
           {/* Contenu de la carte + zones tactiles (gauche = précédent, droite = suivant) */}
           <div style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 22px'}}>
@@ -18100,28 +18110,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🗺️ Ma tournée</div><div style={{fontSize:12,color:C.muted}}>{avail.length} colis · {points.length} point{points.length>1?'s':''} relais — le plus chargé en premier.</div></div>
-              {avail.length>0 && <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer TOUS ces colis comme récupérés ?')){ markAllCollected(avail); setTourneeOpen(false); } }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:999,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
+              {avail.length>0 && <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer TOUS ces colis comme récupérés ?')){ markAllCollected(avail); setTourneeOpen(false); } }} style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:3,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Tout retiré</button>}
               <button type="button" onClick={()=>setTourneeOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
               {points.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px'}}>Aucun colis à retirer. 👌</div>}
               {points.map((p,i)=>(
-                <div key={p.nom} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:16,overflow:'hidden'}}>
+                <div key={p.nom} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,overflow:'hidden'}}>
                   <div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{width:26,height:26,borderRadius:999,background:C.accent,color:'#fff',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{i+1}</div>
+                    <div style={{width:26,height:26,borderRadius:3,background:C.accent,color:'#fff',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{i+1}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.carrier&&<CarrierBadge carrier={p.carrier} size={18}/>}<span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nom}</span></div>
                       {p.adresse && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.adresse}</div>}
                     </div>
-                    <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.danger,background:`${C.danger}14`,borderRadius:999,padding:'3px 9px'}}>{p.colis.length}</span>
-                    <a href={mapsUrl(p)} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',fontSize:12,fontWeight:600,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:10,padding:'5px 8px'}}>🧭</a>
+                    <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.danger,background:`${C.danger}14`,borderRadius:3,padding:'3px 9px'}}>{p.colis.length}</span>
+                    <a href={mapsUrl(p)} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',fontSize:12,fontWeight:600,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:3,padding:'5px 8px'}}>🧭</a>
                   </div>
                   <div style={{display:'flex',flexDirection:'column'}}>
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
-                        <div style={{width:32,height:32,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
+                        <div style={{width:32,height:32,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{codeRetrait(t.code)&&<div style={{fontSize:11,color:C.muted}}>code {codeRetrait(t.code)}</div>}</div>
-                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:10,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
+                        <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:3,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
                     ); })}
                   </div>
@@ -18142,12 +18152,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowDisputes(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{display:'flex',gap:10,padding:'12px 16px',flexShrink:0}}>
-              <div style={{flex:1,border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:12,padding:'10px 12px'}}>
+              <div style={{flex:1,border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:4,padding:'10px 12px'}}>
                 <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Manque à gagner</div>
                 <div style={{fontSize:22,fontWeight:700,color:C.danger}}>−{Math.round(disputes.totalLost)} €</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.salesLost.length} vente{disputes.salesLost.length>1?'s':''} perdue{disputes.salesLost.length>1?'s':''}</div>
               </div>
-              <div style={{flex:1,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`,borderRadius:12,padding:'10px 12px'}}>
+              <div style={{flex:1,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`,borderRadius:4,padding:'10px 12px'}}>
                 <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Récupéré (achats)</div>
                 <div style={{fontSize:22,fontWeight:700,color:INV_STATUS.online.color}}>+{Math.round(disputes.totalBack)} €</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.buysBack.length} achat{disputes.buysBack.length>1?'s':''} remboursé{disputes.buysBack.length>1?'s':''}</div>
@@ -18183,7 +18193,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setRenumOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'86vh',borderRadius:'20px 20px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'16px 18px 12px',flexShrink:0}}>
-              <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'0 auto 14px'}}/>
+              <div style={{width:36,height:4,borderRadius:3,background:C.border,margin:'0 auto 14px'}}/>
               <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Renuméroter à la suite</div>
               <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.45}}>
                 Tes numéros vont de 1 à <b style={{color:C.text}}>{maxBefore||'—'}</b> pour <b style={{color:C.text}}>{nTotal}</b> paire{nTotal>1?'s':''} en ligne.
@@ -18193,11 +18203,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {moves.length>0 && (
               <div style={{padding:'0 18px 12px',flexShrink:0}}>
                 <div style={{display:'flex',gap:8}}>
-                  <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:'11px 13px'}}>
+                  <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'11px 13px'}}>
                     <div style={{fontSize:22,fontWeight:600,color:C.accent,lineHeight:1,letterSpacing:'-0.02em'}}>{moves.length}</div>
                     <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>paire{moves.length>1?'s':''} à renuméroter</div>
                   </div>
-                  <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:'11px 13px'}}>
+                  <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'11px 13px'}}>
                     <div style={{fontSize:22,fontWeight:600,color:C.text,lineHeight:1,letterSpacing:'-0.02em'}}>{nLocked}</div>
                     <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>gardent leur numéro</div>
                   </div>
@@ -18212,7 +18222,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{textAlign:'center',padding:'26px 10px',fontSize:13,color:C.muted}}>✅ Rien à faire, ta numérotation est déjà propre.</div>
               ) : moves.map(m=>(
                 <div key={m.id} style={{display:'flex',alignItems:'center',gap:11,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-                  <div style={{width:38,height:38,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden'}}>
+                  <div style={{width:38,height:38,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden'}}>
                     {m.photo && <img src={m.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                   </div>
                   <div style={{flex:1,minWidth:0,fontSize:12,color:C.text,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m.title}</div>
@@ -18225,8 +18235,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ))}
             </div>
             <div style={{padding:'12px 18px calc(16px + env(safe-area-inset-bottom))',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,flexShrink:0,background:C.bg}}>
-              <button type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-              {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} paire{moves.length>1?'s':''}</button>}
+              <button type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:4,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:4,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} paire{moves.length>1?'s':''}</button>}
             </div>
           </div>
         </div>
@@ -18275,19 +18285,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <b style={{color:C.text}}>{lignes.length} paire{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, la paire n'est pas là où l'app la croit.
               </div>
               {conflits.size>0 && (
-                <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
+                <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:4,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
                   <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'x':''} porté{conflits.size>1?'s':''} par deux paires</span>
                   <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux cartons portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
                 </div>
               )}
-              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:14,overflow:'hidden'}}>
+              <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,overflow:'hidden'}}>
                 {lignes.map((l,i)=>{
                   const dbl = conflits.has(l.num);
                   const ph = l.p.map(photoDe).find(Boolean);
                   return (
                     <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.danger}0e`:'transparent'}}>
-                      <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:INV_STATUS.online.color,borderRadius:9,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
-                      <span style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
+                      <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:INV_STATUS.online.color,borderRadius:3,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
+                      <span style={{width:38,height:38,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden'}}>
                         {ph && <img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                       </span>
                       <span style={{flex:1,minWidth:0}}>
@@ -18301,7 +18311,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>{
                 const txt = lignes.map(l=>`N°${l.num}\t${(l.p.map(x=>x.titre).filter(Boolean)[0]||'').replace(/\t/g,' ')}\t${l.p.map(x=>ou(x.type)).join(' + ')}`).join('\n');
                 try { navigator.clipboard.writeText(`Inventaire physique — ${lignes.length} paires\n\n${txt}`); toast('Liste copiée'); } catch(_) { toast('Copie impossible'); }
-              }} style={{width:'100%',marginTop:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier la liste (pour l'imprimer)</button>
+              }} style={{width:'100%',marginTop:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:4,padding:'11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier la liste (pour l'imprimer)</button>
             </div>
           </div>
         );
@@ -18330,8 +18340,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         );
         const Row = ({num,e}) => (
-          <div key={num} style={{display:'flex',gap:8,alignItems:'center',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'5px 8px'}}>
-            <div style={{width:30,height:30,borderRadius:6,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}>👟</span>}</div>
+          <div key={num} style={{display:'flex',gap:8,alignItems:'center',border:`1px solid ${C.border}`,background:C.card,borderRadius:3,padding:'5px 8px'}}>
+            <div style={{width:30,height:30,borderRadius:2,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}>👟</span>}</div>
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>N°{num}{e&&e.size?` · T${e.size}`:''}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(e&&e.title)||''}</div></div>
           </div>
         );
@@ -18352,7 +18362,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{marginBottom:4}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.muted}}>❓ Au garage, numéro inconnu ({unknownAtGarage.length})</div>
                   <div style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucune paire numérotée ne correspond (ancien numéro / faute de frappe).</div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{unknownAtGarage.slice(0,80).map(t=><span key={t} style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'3px 9px'}}>N°{t}</span>)}</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{unknownAtGarage.slice(0,80).map(t=><span key={t} style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'3px 9px'}}>N°{t}</span>)}</div>
                 </div>
               )}
             </div>
@@ -18376,26 +18386,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" onClick={()=>setLotOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
               </div>
               <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
-                <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:10,padding:'7px 10px',background:C.card}}>
+                <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:3,padding:'7px 10px',background:C.card}}>
                   <span style={{fontSize:11,color:C.muted,fontWeight:500}}>Prix du lot</span>
                   <input autoFocus value={lotTotal} onChange={e=>setLotTotal(e.target.value)} placeholder="0" inputMode="decimal" style={{width:70,border:'none',background:'transparent',color:C.text,fontSize:15,fontWeight:600,outline:'none'}}/>
                   <span style={{fontSize:11,color:C.muted}}>€</span>
                 </div>
                 {[['equal','À parts égales'],['price','Au prorata du prix']].map(([id,lb])=>(
-                  <button key={id} type="button" onClick={()=>setLotMode(id)} style={{border:`1px solid ${lotMode===id?C.accent:C.border}`,background:lotMode===id?C.accent:'transparent',color:lotMode===id?'#fff':C.text,borderRadius:999,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer'}}>{lb}</button>
+                  <button key={id} type="button" onClick={()=>setLotMode(id)} style={{border:`1px solid ${lotMode===id?C.accent:C.border}`,background:lotMode===id?C.accent:'transparent',color:lotMode===id?'#fff':C.text,borderRadius:3,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer'}}>{lb}</button>
                 ))}
               </div>
               <div style={{fontSize:12,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:600,marginTop:8}}>{nSel} paire{nSel>1?'s':''} sélectionnée{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')} € en moyenne`:''}</div>
-              <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Chercher une annonce (N°, titre, marque)…" style={{marginTop:8,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Chercher une annonce (N°, titre, marque)…" style={{marginTop:8,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px'}}>Aucune annonce.</div>}
               {list.map(it=>{ const sel=lotSel.has(it.id); const num=numeros[it.id]?.numero; const sh=shares[it.id];
                 return (
                 <button key={it.id} type="button" onClick={()=>setLotSel(prev=>{ const n=new Set(prev); if(n.has(it.id))n.delete(it.id); else n.add(it.id); return n; })}
-                  style={{display:'flex',gap:10,alignItems:'center',border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?`${C.accent}0e`:C.card,borderRadius:10,padding:'7px 9px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
-                  <div style={{width:20,height:20,borderRadius:6,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{sel?'✓':''}</div>
-                  <div style={{width:38,height:38,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}</div>
+                  style={{display:'flex',gap:10,alignItems:'center',border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?`${C.accent}0e`:C.card,borderRadius:3,padding:'7px 9px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                  <div style={{width:20,height:20,borderRadius:2,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{sel?'✓':''}</div>
+                  <div style={{width:38,height:38,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>👟</span>}</div>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:11,color:C.muted}}>{[it.size,prix(it.price,it.currency)||null].filter(Boolean).join(' · ')}</div></div>
                   {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')} €</div>}
                 </button>
@@ -18404,7 +18414,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flexShrink:0,padding:'12px 16px',borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center'}}>
               <div style={{flex:1,fontSize:12,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')} €`:'Renseigne le prix du lot et coche les paires.'}</div>
-              <button type="button" disabled={!(nSel>0&&total>0)} onClick={applyLot} style={{border:'none',borderRadius:12,padding:'11px 18px',background:(nSel>0&&total>0)?C.accent:C.border,color:'#fff',fontSize:15,fontWeight:600,cursor:(nSel>0&&total>0)?'pointer':'default',fontFamily:'inherit'}}>Appliquer</button>
+              <button type="button" disabled={!(nSel>0&&total>0)} onClick={applyLot} style={{border:'none',borderRadius:4,padding:'11px 18px',background:(nSel>0&&total>0)?C.accent:C.border,color:'#fff',fontSize:15,fontWeight:600,cursor:(nSel>0&&total>0)?'pointer':'default',fontFamily:'inherit'}}>Appliquer</button>
             </div>
           </div>
         </div>
@@ -18426,7 +18436,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setPassportFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{width:52,height:52,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <div style={{width:52,height:52,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {photo?<img src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
@@ -18441,7 +18451,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {steps.map((s,i)=>(
                     <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',position:'relative',paddingBottom:i<steps.length-1?16:0}}>
                       {i<steps.length-1 && <div style={{position:'absolute',left:15,top:30,bottom:0,width:2,background:C.border}}/>}
-                      <div style={{width:32,height:32,borderRadius:999,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,background:s.done?`${INV_STATUS.online.color}1a`:C.card,border:`1.5px solid ${s.done?INV_STATUS.online.color:C.border}`,zIndex:1}}>{s.icon}</div>
+                      <div style={{width:32,height:32,borderRadius:3,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,background:s.done?`${INV_STATUS.online.color}1a`:C.card,border:`1.5px solid ${s.done?INV_STATUS.online.color:C.border}`,zIndex:1}}>{s.icon}</div>
                       <div style={{flex:1,minWidth:0,paddingTop:4}}>
                         <div style={{fontSize:13,fontWeight:600,color:C.text}}>{s.label}</div>
                         {s.detail && <div style={{fontSize:12,color:C.muted,marginTop:1}}>{s.detail}</div>}
@@ -18459,8 +18469,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── QR de retrait en PLEIN ÉCRAN (pour scanner au point relais) ── */}
       {qrView && (
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:20,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
-            {qrView.photo && <img src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:12,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
+          <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:5,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+            {qrView.photo && <img src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:4,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
             {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
                 pas, on bascule sur le code — surtout pas sur un QR fabriqué. */}
@@ -18512,11 +18522,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 c'est de là qu'on récupère le QR quand on en veut un. */}
             {qrView.suivi && (
               <a href={trackUrl(qrView.carrier, qrView.suivi)} target="_blank" rel="noreferrer"
-                style={{textDecoration:'none',border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'9px 16px'}}>
+                style={{textDecoration:'none',border:'1px solid #ddd',borderRadius:4,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'9px 16px'}}>
                 {qrView.carrier==='mondialrelay' ? '📱 Ouvrir Mondial Relay (QR)' : '🔍 Suivre le colis'}
               </a>
             )}
-            <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:12,background:'#111',color:'#fff',fontSize:15,fontWeight:600,padding:'11px 22px',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
+            <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:4,background:'#111',color:'#fff',fontSize:15,fontWeight:600,padding:'11px 22px',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
           </div>
         </div>
       )}
@@ -18524,9 +18534,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Bandeau « Annuler » après avoir retiré un colis (mise à jour immédiate) ── */}
       {lastCollected && (
         <div style={{position:'fixed',left:16,right:16,bottom:'calc(90px + env(safe-area-inset-bottom))',zIndex:1300,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
-          <div style={{pointerEvents:'auto',display:'flex',alignItems:'center',gap:12,background:'#111',color:'#fff',borderRadius:999,padding:'10px 12px 10px 16px',boxShadow:'0 6px 20px rgba(0,0,0,0.3)',maxWidth:420,width:'100%'}}>
+          <div style={{pointerEvents:'auto',display:'flex',alignItems:'center',gap:12,background:'#111',color:'#fff',borderRadius:3,padding:'10px 12px 10px 16px',boxShadow:'0 6px 20px rgba(0,0,0,0.3)',maxWidth:420,width:'100%'}}>
             <span style={{flex:1,fontSize:13,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>✓ Colis retiré</span>
-            <button type="button" onClick={()=>unmarkCollected(lastCollected)} style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:'transparent',color:INV_STATUS.online.color,borderRadius:999,padding:'5px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+            <button type="button" onClick={()=>unmarkCollected(lastCollected)} style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:'transparent',color:INV_STATUS.online.color,borderRadius:3,padding:'5px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
             <button type="button" onClick={()=>setLastCollected(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:'#aaa',fontSize:20,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>×</button>
           </div>
         </div>
@@ -18786,7 +18796,7 @@ function PushPrefsSetting() {
   };
   const n = prefs ? PUSH_CATS.filter(actif).length : 0;
   return (
-    <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px'}}>
+    <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'10px 14px'}}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
@@ -18806,7 +18816,7 @@ function PushPrefsSetting() {
                 <div style={{fontSize:11,color:C.muted,marginTop:1,lineHeight:1.35}}>{c.desc}</div>
               </div>
               <button type="button" onClick={()=>bascule(c)} disabled={!prefs||busy} aria-label={`${c.titre} : ${on?'activé':'désactivé'}`}
-                style={{flexShrink:0,padding:'5px 13px',borderRadius:999,fontSize:11.5,fontWeight:600,cursor:prefs?'pointer':'default',fontFamily:'inherit',
+                style={{flexShrink:0,padding:'5px 13px',borderRadius:3,fontSize:11.5,fontWeight:600,cursor:prefs?'pointer':'default',fontFamily:'inherit',
                   background:on?C.accent:'transparent',color:on?'#fff':C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>
                 {on?'ON':'OFF'}
               </button>
@@ -18824,7 +18834,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
   // exactement ce qui fait « page web bricolée » au lieu d'« application ».
   const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
   const Row = ({icon,title,desc,onClick,color}) => (
-    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+    <button type="button" onClick={onClick} style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',padding:'15px 16px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,cursor:'pointer',marginBottom:10,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
       {/* Icône au trait dans sa tuile teintée si on connaît le nom ; sinon on
           retombe sur l'emoji (les écrans pas encore repris). */}
       {ICON_PATHS[icon] ? <IconTile name={icon} color={color||C.accent}/> : <span style={{fontSize:22,flexShrink:0}}>{icon}</span>}
@@ -18860,7 +18870,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
     return (
       <div onClick={close} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
         <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'20px 20px 0 0',padding:'16px 18px calc(18px + env(safe-area-inset-bottom))'}}>
-          <div style={{width:36,height:4,borderRadius:999,background:C.border,margin:'0 auto 14px'}}/>
+          <div style={{width:36,height:4,borderRadius:3,background:C.border,margin:'0 auto 14px'}}/>
           <div style={{fontSize:17,fontWeight:700,color:M==='out'?C.danger:C.text,letterSpacing:'-0.02em'}}>{titre}</div>
           <div style={{fontSize:12.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
             {M==='email' ? <>Tu recevras un lien de validation. <b style={{color:C.text}}>Tant qu'il n'est pas ouvert, ton adresse actuelle reste celle qui fonctionne</b> — tu ne peux pas te retrouver enfermé dehors.</>
@@ -18873,13 +18883,13 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
               placeholder={M==='email'?'nouvelle@adresse.com':'Nouveau mot de passe'}
               value={acct.val} onChange={e=>setAcct(a=>({...a,val:e.target.value,err:''}))}
               onKeyDown={e=>{ if(e.key==='Enter') valider(); }}
-              style={{width:'100%',boxSizing:'border-box',marginTop:12,border:`1px solid ${acct.err?C.danger:C.border}`,borderRadius:12,padding:'13px 14px',fontSize:15,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              style={{width:'100%',boxSizing:'border-box',marginTop:12,border:`1px solid ${acct.err?C.danger:C.border}`,borderRadius:4,padding:'13px 14px',fontSize:15,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
           )}
           {acct.err && <div style={{fontSize:12.5,color:C.danger,marginTop:8,lineHeight:1.4}}>{acct.err}</div>}
           <div style={{display:'flex',gap:9,marginTop:14}}>
-            <button type="button" onClick={close} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+            <button type="button" onClick={close} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:4,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
             <button type="button" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim())}
-              style={{flex:2,border:'none',background:M==='out'?C.danger:C.accent,color:'#fff',borderRadius:12,padding:'12px',fontSize:13.5,fontWeight:600,
+              style={{flex:2,border:'none',background:M==='out'?C.danger:C.accent,color:'#fff',borderRadius:4,padding:'12px',fontSize:13.5,fontWeight:600,
                 cursor:(acct.busy||(M!=='out'&&!acct.val.trim()))?'default':'pointer',opacity:(acct.busy||(M!=='out'&&!acct.val.trim()))?0.5:1,fontFamily:'inherit'}}>
               {acct.busy ? '…' : M==='out' ? 'Se déconnecter' : 'Enregistrer'}
             </button>
@@ -18902,8 +18912,8 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
         <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'0 0 8px 2px'}}>Ton compte</div>
 
         {AUTH.user ? (
-          <div style={{display:'flex',alignItems:'center',gap:12,padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
-            <span style={{width:38,height:38,borderRadius:999,flexShrink:0,background:`${C.accent}18`,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,padding:'15px 16px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+            <span style={{width:38,height:38,borderRadius:3,flexShrink:0,background:`${C.accent}18`,color:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
               {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
             </span>
             <span style={{flex:1,minWidth:0}}>
@@ -18914,14 +18924,14 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
             </span>
           </div>
         ) : (
-          <div style={{padding:'15px 16px',borderRadius:16,border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:8}}>
+          <div style={{padding:'15px 16px',borderRadius:4,border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:8}}>
             <div style={{fontSize:15,fontWeight:600,color:C.text}}>Tu n'es pas connecté</div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
               Tu es entré par l'accès temporaire. Tes données sont bien là, mais elles ne sont rattachées à aucun compte.
             </div>
             <button type="button"
               onClick={()=>{ try{ localStorage.removeItem('vrm_acces_direct'); }catch(_){} location.reload(); }}
-              style={{marginTop:10,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+              style={{marginTop:10,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:4,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
               Aller à l'écran de connexion
             </button>
           </div>
@@ -18931,7 +18941,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
             décorative. Un bouton Google qui mène à une page d'erreur ne rend
             service à personne : tant que le fournisseur n'est pas branché dans
             Supabase, on le dit. */}
-        <div style={{padding:'13px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+        <div style={{padding:'13px 16px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:8}}>Moyens de connexion</div>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0'}}>
             <span style={{fontSize:15,width:20,textAlign:'center'}}>✉️</span>
@@ -18947,7 +18957,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
                 {on
                   ? (AUTH.user
                       ? <span style={{fontSize:11,fontWeight:600,color:INV_STATUS.online.color}}>disponible</span>
-                      : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:999,padding:'4px 11px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
+                      : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:3,padding:'4px 11px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
                   : <span style={{fontSize:11,fontWeight:500,color:C.muted}}>à activer dans Supabase</span>}
               </div>
             );
@@ -18981,9 +18991,9 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
 
       {/* ICÔNE SUR L'ÉCRAN D'ACCUEIL — chacun met la sienne. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Icône de l'application</div>
-      <div style={{padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      <div style={{padding:'15px 16px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
         <div style={{display:'flex',alignItems:'center',gap:14}}>
-          <div style={{width:56,height:56,borderRadius:14,flexShrink:0,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          <div style={{width:56,height:56,borderRadius:4,flexShrink:0,overflow:'hidden',boxShadow:C.shadow||'none'}}>
             {customLogo ? <img src={customLogo} alt="" style={{width:56,height:56,objectFit:'cover'}}/> : <VrmLogo size={56}/>}
           </div>
           <div style={{flex:1,minWidth:0}}>
@@ -18993,12 +19003,12 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
         </div>
         <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
           <button type="button" onClick={onPickLogo}
-            style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:3,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             Choisir une image
           </button>
           {customLogo && (
             <button type="button" onClick={onResetLogo}
-              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:3,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
               Remettre celle de VRM
             </button>
           )}
@@ -19015,15 +19025,15 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
         const url=`https://vrm.center/api/widget?k=${tok}`;
         return (<>
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Widget iPhone</div>
-          <div style={{padding:'15px 16px',borderRadius:16,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+          <div style={{padding:'15px 16px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
             <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:3}}>Adresse de ton widget</div>
             <div style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.45}}>
               Elle contient <b>ta clé</b> : ne la partage pas. Colle-la dans Scriptable à la place de l'ancienne — l'ancienne, sans clé, ne répond plus.
             </div>
             <div style={{fontSize:11,fontFamily:'ui-monospace,SFMono-Regular,Menlo,monospace',color:C.text,background:C.bg,
-              border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 11px',wordBreak:'break-all',lineHeight:1.5,marginBottom:9}}>{url}</div>
+              border:`1px solid ${C.border}`,borderRadius:3,padding:'9px 11px',wordBreak:'break-all',lineHeight:1.5,marginBottom:9}}>{url}</div>
             <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(url); toast('✓ Adresse copiée');}catch(_){ toast('Copie impossible','error'); } }}
-              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:3,padding:'9px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
               Copier l'adresse
             </button>
           </div>
@@ -19066,13 +19076,13 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <div style={{height:10}}/>
       {/* Alertes locales (l'ancien bouton 🔔 du haut, déplacé ici) : bandeau +
           notification quand l'app est OUVERTE (ventes comptabilisées, factures). */}
-      <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+      <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🛎 Alertes dans l'app</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Bandeau + notification quand l'app est ouverte (ventes comptabilisées, factures reçues). Les notifications push ci-dessus couvrent le reste, app fermée.</div>
         </div>
         <button onClick={onToggleNotif} style={{
-          flexShrink:0,padding:'6px 16px',borderRadius:999,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+          flexShrink:0,padding:'6px 16px',borderRadius:3,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
           background:notifEnabled?C.accent:'transparent',color:notifEnabled?'#fff':C.muted,
           border:`1.5px solid ${notifEnabled?C.accent:C.border}`,
         }}>{notifEnabled?'ON':'OFF'}</button>
@@ -19128,18 +19138,18 @@ function ZoomSetting() {
   const [z, setZ] = React.useState(readZoom);
   const choisir = (v) => { setZ(v); applyZoom(v); };
   return (
-    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'13px 14px',marginBottom:8,boxShadow:C.shadow||'none'}}>
       <div style={{fontSize:14,fontWeight:600,color:C.text}}>Taille de l'affichage</div>
       <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
         Dézoome toute l'app : plus de choses tiennent à l'écran. Réglage propre à cet appareil.
       </div>
       <div role="group" aria-label="Taille de l'affichage"
-        style={{display:'flex',gap:4,background:C.bg,borderRadius:999,padding:3,border:`1px solid ${C.border}`,marginTop:11}}>
+        style={{display:'flex',gap:4,background:C.bg,borderRadius:3,padding:3,border:`1px solid ${C.border}`,marginTop:11}}>
         {ZOOMS.map(([v, label]) => {
           const on = v === z;
           return (
             <button key={v} type="button" onClick={() => choisir(v)} aria-pressed={on}
-              style={{flex:1,border:'none',borderRadius:999,padding:'8px 4px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+              style={{flex:1,border:'none',borderRadius:3,padding:'8px 4px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
                 background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,transition:'background .18s ease, color .18s ease'}}>
               {label}
             </button>
@@ -19186,19 +19196,19 @@ function ProFactureSetting() {
   };
   const upd = (field, val) => persist({ ...cfg, [field]: val });
 
-  if (cfg === null) return <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px',fontSize:12,color:C.muted}}>Chargement…</div>;
+  if (cfg === null) return <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px',fontSize:12,color:C.muted}}>Chargement…</div>;
 
   const input = (field, placeholder, flex) => (
     <input value={cfg[field]||''} onChange={e=>upd(field, e.target.value)} placeholder={placeholder}
-      style={{flex:flex||'1 1 130px',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',minWidth:0}}/>
+      style={{flex:flex||'1 1 130px',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',minWidth:0}}/>
   );
 
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:4}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>🧾 Facturation Pro</div>
         <button onClick={()=>upd('actif', !cfg.actif)} style={{
-          padding:'4px 14px',borderRadius:999,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+          padding:'4px 14px',borderRadius:3,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
           background:cfg.actif?C.accent:'transparent',color:cfg.actif?'#fff':C.muted,
           border:`1.5px solid ${cfg.actif?C.accent:C.border}`,
         }}>{cfg.actif?'Activée':'Désactivée'}</button>
@@ -19209,7 +19219,7 @@ function ProFactureSetting() {
       {cfg.actif && (<>
         {/* Logo */}
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-          {cfg.logo && <img src={cfg.logo} alt="logo" style={{height:46,width:46,objectFit:'contain',borderRadius:10,border:`1px solid ${C.border}`,background:'#fff'}}/>}
+          {cfg.logo && <img src={cfg.logo} alt="logo" style={{height:46,width:46,objectFit:'contain',borderRadius:3,border:`1px solid ${C.border}`,background:'#fff'}}/>}
           <label style={{cursor:'pointer'}}>
             <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{
               const f=e.target.files[0]; if(!f) return;
@@ -19217,11 +19227,11 @@ function ProFactureSetting() {
               r.onload=ev=>upd('logo', ev.target.result);
               r.readAsDataURL(f); e.target.value='';
             }}/>
-            <span style={{padding:'6px 12px',borderRadius:999,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.accent,border:`1.5px solid ${C.accent}66`,display:'inline-block'}}>
+            <span style={{padding:'6px 12px',borderRadius:3,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.accent,border:`1.5px solid ${C.accent}66`,display:'inline-block'}}>
               {cfg.logo?'Changer le logo':'Ajouter un logo'}
             </span>
           </label>
-          {cfg.logo && <button onClick={()=>upd('logo','')} style={{padding:'6px 12px',borderRadius:999,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Retirer</button>}
+          {cfg.logo && <button onClick={()=>upd('logo','')} style={{padding:'6px 12px',borderRadius:3,fontSize:12,fontWeight:600,cursor:'pointer',background:'transparent',color:C.danger,border:`1.5px solid ${C.danger}66`,fontFamily:'inherit'}}>Retirer</button>}
         </div>
         {/* Identité */}
         <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:8}}>
@@ -19238,7 +19248,7 @@ function ProFactureSetting() {
           {input('prefixe','FA','0 1 70px')}
           <span style={{fontSize:12,fontWeight:500,color:C.text,marginLeft:6}}>TVA</span>
           <select value={cfg.tauxTva||'0'} onChange={e=>upd('tauxTva', e.target.value)}
-            style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}>
+            style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}>
             <option value="0">0 % (franchise)</option>
             <option value="5.5">5,5 %</option>
             <option value="10">10 %</option>
@@ -19248,7 +19258,7 @@ function ProFactureSetting() {
         {/* Mentions */}
         <textarea value={cfg.mentions||''} onChange={e=>upd('mentions', e.target.value)} rows={2}
           placeholder="Mentions légales / pied de facture (ex : TVA non applicable – art. 293 B du CGI)"
-          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:12,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',resize:'vertical',marginBottom:8}}/>
+          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 10px',fontSize:12,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',resize:'vertical',marginBottom:8}}/>
         {/* Envoi automatique */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{minWidth:0}}>
@@ -19256,7 +19266,7 @@ function ProFactureSetting() {
             <div style={{fontSize:11,color:C.muted,marginTop:2,lineHeight:1.4}}>Rien ne part sans ton accord. Tu peux couper à tout moment — l'arrêt est immédiat. OFF = les factures attendent dans l'onglet Factures.</div>
           </div>
           <button onClick={()=>upd('autoSend', !cfg.autoSend)} style={{
-            flexShrink:0,padding:'6px 16px',borderRadius:999,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+            flexShrink:0,padding:'6px 16px',borderRadius:3,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
             background:cfg.autoSend?C.accent:'transparent',color:cfg.autoSend?'#fff':C.muted,
             border:`1.5px solid ${cfg.autoSend?C.accent:C.border}`,
           }}>{cfg.autoSend?'ON':'OFF'}</button>
@@ -19299,7 +19309,7 @@ function EmailStartSetting() {
   };
 
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>📬 Import des emails</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Les emails Vinted (ventes, bordereaux, paiements) ne sont pris en compte qu'à partir de cette date. Change-la ici, c'est appliqué à la prochaine synchro (≤ 5 min).
@@ -19307,7 +19317,7 @@ function EmailStartSetting() {
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontSize:12,fontWeight:500,color:C.text}}>À partir du</span>
         <input type="date" value={date} onChange={e=>saveDate(e.target.value)} disabled={status==='load'}
-          style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'6px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
+          style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
         <span style={{fontSize:11,color:status==='err'?C.danger:C.muted}}>
           {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':'✓ enregistré'}
         </span>
@@ -19424,7 +19434,7 @@ function PushSetting() {
   };
 
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>🔔 Notifications push</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
@@ -19434,7 +19444,7 @@ function PushSetting() {
           aucun appareil abonné, ou le serveur sans sa clé. On les sépare ici,
           au lieu de laisser deviner. */}
       {srv && !srv.pret && (
-        <div style={{display:'flex',gap:8,alignItems:'flex-start',padding:'9px 11px',borderRadius:10,border:`1px solid ${C.danger}55`,background:`${C.danger}12`,marginBottom:10}}>
+        <div style={{display:'flex',gap:8,alignItems:'flex-start',padding:'9px 11px',borderRadius:3,border:`1px solid ${C.danger}55`,background:`${C.danger}12`,marginBottom:10}}>
           <Icon name="alert" size={16} style={{color:C.danger,flexShrink:0,marginTop:1}}/>
           <div style={{fontSize:11.5,color:C.text,lineHeight:1.45,minWidth:0}}>
             <b style={{color:C.danger}}>Le serveur ne peut envoyer aucune notification.</b> La clé <code style={{fontSize:10.5}}>VAPID_PRIVATE_KEY</code> n'est pas configurée sur Vercel — elle a été sortie du code source pour raison de sécurité et doit y être remise une fois. Tant qu'elle manque, activer les notifications ici ne changera rien.
@@ -19449,12 +19459,12 @@ function PushSetting() {
       {state!=='unsupported' && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           {state!=='on' ? (
-            <button onClick={enable} disabled={state==='busy'||state==='checking'} style={{flex:1,minWidth:130,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:state==='busy'?0.6:1}}>
+            <button onClick={enable} disabled={state==='busy'||state==='checking'} style={{flex:1,minWidth:130,padding:'9px 12px',borderRadius:3,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',opacity:state==='busy'?0.6:1}}>
               {state==='busy'?'…':'Activer sur cet appareil'}
             </button>
           ) : (<>
-            <button onClick={test} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tester</button>
-            <button onClick={disable} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Désactiver</button>
+            <button onClick={test} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:3,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tester</button>
+            <button onClick={disable} style={{flex:1,minWidth:100,padding:'9px 12px',borderRadius:3,border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Désactiver</button>
           </>)}
         </div>
       )}
@@ -19489,21 +19499,21 @@ class EcranGardeFou extends React.Component {
     const msg = String((this.state.err && this.state.err.message) || this.state.err);
     return (
       <div style={{padding:'22px 18px'}}>
-        <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:16,padding:'18px 16px'}}>
+        <div style={{border:`1px solid ${C.danger}55`,background:`${C.danger}0e`,borderRadius:4,padding:'18px 16px'}}>
           <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Cet écran n'a pas pu s'afficher</div>
           <div style={{fontSize:13,color:C.muted,lineHeight:1.5,marginBottom:12}}>
             Le reste de l'application fonctionne : change d'onglet en bas, tes données ne sont pas touchées.
             Si ça se reproduit, envoie-moi cette ligne :
           </div>
           <div style={{fontSize:11.5,fontFamily:'ui-monospace,monospace',color:C.text,background:C.card,border:`1px solid ${C.border}`,
-            borderRadius:10,padding:'9px 11px',overflowX:'auto',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{msg}</div>
+            borderRadius:3,padding:'9px 11px',overflowX:'auto',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{msg}</div>
           <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
             <button type="button" onClick={()=>this.setState({err:null})}
-              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:3,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>
             <button type="button" onClick={()=>{ try{ navigator.clipboard.writeText(msg); }catch(_){} }}
-              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier l'erreur</button>
+              style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier l'erreur</button>
             <button type="button" onClick={()=>location.reload()}
-              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Recharger l'app</button>
+              style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:3,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Recharger l'app</button>
           </div>
         </div>
       </div>
@@ -19561,10 +19571,10 @@ function SecuriteSetting() {
   const s = st || {};
   const proteges = s.colonne === true && s.lisibleSansCompte === false;
   return (
-    <div style={{border:`1px solid ${proteges ? C.border : C.warn + '66'}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${proteges ? C.border : C.warn + '66'}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
-        <span style={{fontSize:11,fontWeight:600,color:proteges?INV_STATUS.online.color:C.warn,background:(proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:999,padding:'1px 8px'}}>
+        <span style={{fontSize:11,fontWeight:600,color:proteges?INV_STATUS.online.color:C.warn,background:(proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:3,padding:'1px 8px'}}>
           {st === null ? 'vérification…' : proteges ? 'cloisonnées' : 'partagées'}
         </span>
       </div>
@@ -19577,7 +19587,7 @@ function SecuriteSetting() {
           : "Sans elle, toutes les données vivent dans la même ligne : un deuxième compte ouvrirait TA boutique. C'est la migration SQL à passer dans Supabase → SQL Editor."}
         action={!s.colonne && (
           <button type="button" onClick={()=>copier(MIGRATION_SQL, 'sql')}
-            style={{marginTop:7,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:9,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            style={{marginTop:7,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:3,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : '📋 Copier la migration SQL'}
           </button>)}/>
       <Ligne t="Lecture sans compte" ok={s.lisibleSansCompte === false}
@@ -19718,24 +19728,24 @@ function EmailsSetting() {
   const liste = Object.keys(reg || {});
   const enAttente = quarantaine || [];
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
         Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et tu le réclames d'un tap.
       </div>
       {reg === null ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div> : liste.length === 0 ? (
-        <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:10,padding:'9px 11px',lineHeight:1.45}}>
+        <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:3,padding:'9px 11px',lineHeight:1.45}}>
           Aucune adresse déclarée. Tant qu'il n'y en a pas, les emails reçus sont attribués au propriétaire de cette installation — ce qui va très bien tant que tu es seul dessus.
         </div>
       ) : liste.map(adr => (
         <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
           <span style={{flex:'1 1 140px',minWidth:0,fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{adr}</span>
           <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
-            style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:9,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
+            style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
         </div>
       ))}
       <button type="button" onClick={ajouter}
-        style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:3,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
         + Ajouter une adresse
       </button>
       {enAttente.length > 0 && (
@@ -19743,7 +19753,7 @@ function EmailsSetting() {
           <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés sur une adresse non déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
           <button type="button" disabled={!!lot} onClick={toutRejouer}
-            style={{width:'100%',marginBottom:10,border:'none',background:lot?C.border:C.accent,color:lot?C.muted:(C.onAccent||'#fff'),borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:700,cursor:lot?'default':'pointer',fontFamily:'inherit'}}>
+            style={{width:'100%',marginBottom:10,border:'none',background:lot?C.border:C.accent,color:lot?C.muted:(C.onAccent||'#fff'),borderRadius:3,padding:'10px 12px',fontSize:12.5,fontWeight:700,cursor:lot?'default':'pointer',fontFamily:'inherit'}}>
             {lot ? `Traitement… ${lot.fait}/${lot.total}` : `▶ Tout rejouer (${enAttente.length})`}
           </button>
           {enAttente.slice(0,8).map(q => (
@@ -19752,7 +19762,7 @@ function EmailsSetting() {
                 {q.sujet || '(sans sujet)'} <span style={{color:C.muted}}>· {q.raison || ''}</span>
               </span>
               <button type="button" disabled={busy===q.id} onClick={()=>rattacher(q.id)}
-                style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:9,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:busy===q.id?'default':'pointer',fontFamily:'inherit',opacity:busy===q.id?0.6:1}}>
+                style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:3,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:busy===q.id?'default':'pointer',fontFamily:'inherit',opacity:busy===q.id?0.6:1}}>
                 {busy===q.id ? '…' : "C'est à moi"}
               </button>
             </div>
@@ -19795,7 +19805,7 @@ function ConnexionsSetting() {
                        : (Date.now() - ts) < 7 * 864e5 ? C.warn : C.danger;
   const Ligne = ({ t, etat, coul, d }) => (
     <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
-      <span style={{flexShrink:0,width:9,height:9,borderRadius:999,background:coul,marginTop:5}}/>
+      <span style={{flexShrink:0,width:9,height:9,borderRadius:3,background:coul,marginTop:5}}/>
       <div style={{minWidth:0,flex:'1 1 140px'}}>
         <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color:coul}}>· {etat}</span></div>
         <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
@@ -19803,7 +19813,7 @@ function ConnexionsSetting() {
     </div>
   );
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>État des connexions</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>Ce qui alimente l'app, et depuis quand.</div>
       <Ligne t="Extension Chrome" coul={ext.on ? INV_STATUS.online.color : C.warn}
@@ -19841,10 +19851,10 @@ function AiKeySetting() {
   const commit = (v) => { setKey(v); if (v.trim()) save('vrm_ai_key', v.trim()); else localStorage.removeItem('vrm_ai_key'); };
   const on = ready || (key && key.trim());
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Rédaction d'annonces par l'IA</div>
-        <span style={{fontSize:11,fontWeight:600,color:on?INV_STATUS.online.color:C.muted,background:(on?INV_STATUS.online.color:C.muted)+'18',borderRadius:999,padding:'1px 8px'}}>{on?'branchée':'non branchée'}</span>
+        <span style={{fontSize:11,fontWeight:600,color:on?INV_STATUS.online.color:C.muted,background:(on?INV_STATUS.online.color:C.muted)+'18',borderRadius:3,padding:'1px 8px'}}>{on?'branchée':'non branchée'}</span>
       </div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
         Sert à réécrire titres et descriptions dans l'atelier <b>Republier ✨</b>. {ready
@@ -19853,8 +19863,8 @@ function AiKeySetting() {
       </div>
       {!ready && (
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <input type={show?'text':'password'} value={key} onChange={e=>commit(e.target.value)} placeholder="sk-ant-…" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
-          <button type="button" onClick={()=>setShow(s=>!s)} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.muted,fontSize:12,fontWeight:600,padding:'8px 10px',cursor:'pointer',fontFamily:'inherit'}}>{show?'Cacher':'Voir'}</button>
+          <input type={show?'text':'password'} value={key} onChange={e=>commit(e.target.value)} placeholder="sk-ant-…" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 10px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+          <button type="button" onClick={()=>setShow(s=>!s)} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.muted,fontSize:12,fontWeight:600,padding:'8px 10px',cursor:'pointer',fontFamily:'inherit'}}>{show?'Cacher':'Voir'}</button>
         </div>
       )}
     </div>
@@ -19867,16 +19877,16 @@ function RegimeSetting() {
   const pick = (r) => { setRegime(r); save('vinted_regime', r); };
   const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>Adapte le rapport comptable à ta situation.</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA encaissé, bénéfice net, estimation des cotisations.'],
           ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
-          <button key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:10,cursor:'pointer',
+          <button key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:3,cursor:'pointer',
             border:`1px solid ${regime===id?C.accent:C.border}`,background:regime===id?`${C.accent}12`:'transparent'}}>
-            <span style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:999,border:`2px solid ${regime===id?C.accent:C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
-              {regime===id && <span style={{width:9,height:9,borderRadius:999,background:C.accent}}/>}
+            <span style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:3,border:`2px solid ${regime===id?C.accent:C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {regime===id && <span style={{width:9,height:9,borderRadius:3,background:C.accent}}/>}
             </span>
             <span style={{minWidth:0}}>
               <span style={{fontSize:13,fontWeight:600,color:C.text,display:'block'}}>{t}</span>
@@ -19888,7 +19898,7 @@ function RegimeSetting() {
       {regime==='marge' && (
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
           <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de TVA</span>
-          <input type="number" value={tva} onChange={e=>setRate(e.target.value)} style={{width:64,border:`1px solid ${C.border}`,borderRadius:10,padding:'4px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
+          <input type="number" value={tva} onChange={e=>setRate(e.target.value)} style={{width:64,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
           <span style={{fontSize:12,color:C.muted}}>%</span>
         </div>
       )}
@@ -20743,17 +20753,17 @@ export default function App() {
         borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto',visibility: ordi ? 'hidden' : undefined}}>
           {canBack && <button type="button" onClick={goBack} title="Retour" aria-label="Retour"
-            style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:999,border:`1px solid ${C.border}`,background:C.bg,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1}}>‹</button>}
+            style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:3,border:`1px solid ${C.border}`,background:C.bg,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1}}>‹</button>}
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div
             onClick={()=>logoInputRef.current&&logoInputRef.current.click()}
             onContextMenu={(e)=>{e.preventDefault();resetLogo();}}
             title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)"
-            style={{position:'relative',width:40,height:40,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:12,cursor:'pointer'}}>
+            style={{position:'relative',width:40,height:40,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,cursor:'pointer'}}>
             {/* Logo VRM par défaut ; remplacé par ton image si tu en as chargé une. */}
             {customLogo
-              ? <img src={logoSrc} alt="Logo" style={{width:40,height:40,objectFit:'cover',borderRadius:12}}/>
+              ? <img src={logoSrc} alt="Logo" style={{width:40,height:40,objectFit:'cover',borderRadius:4}}/>
               : <VrmLogo size={40}/>}
             {/* Repère « modifiable » : une pastille discrète en coin, et non plus
                 un bandeau noir en travers du logo — il masquait le bas du V. */}
@@ -20761,7 +20771,7 @@ export default function App() {
                 marque : un produit fini ne porte pas un crayon sur son logo.
                 Elle apparaît au SURVOL (ordinateur) ; le changement d'icône
                 reste accessible dans Réglages sur téléphone. */}
-            <div className="vrm-logo-edit" style={{position:'absolute',right:-1,bottom:-1,width:14,height:14,borderRadius:999,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:C.muted,lineHeight:1,opacity:0,transition:'opacity .15s ease'}}>✎</div>
+            <div className="vrm-logo-edit" style={{position:'absolute',right:-1,bottom:-1,width:14,height:14,borderRadius:3,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:C.muted,lineHeight:1,opacity:0,transition:'opacity .15s ease'}}>✎</div>
           </div>
           {/* minWidth:0 + nowrap : avec la flèche « retour », le numéro de version
               passait à la ligne et faisait grandir l'en-tête d'un écran à l'autre. */}
@@ -20801,7 +20811,7 @@ export default function App() {
           {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
           <div style={{display:'flex',gap:6}}>
             {false&&<button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
-              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {dark?'☀️':'🌙'}
             </button>}
             {false&&<button type="button" onClick={async()=>{
@@ -20819,20 +20829,20 @@ export default function App() {
                 setNotifEnabled(false); save('vinted_notif_enabled',false);
               }
             }} title={notifEnabled?'Notifications activées (cliquer pour désactiver)':'Activer les notifications'}
-              style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:3,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>}
             <button type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
-              style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:gsOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:C.border}`,borderRadius:3,padding:'6px 11px',color:gsOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
             </button>
             <button type="button" onClick={()=>setNotifOpen(o=>!o)} title="Notifications" aria-label="Notifications"
-              style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:notifOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:C.border}`,borderRadius:3,padding:'6px 11px',color:notifOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="bell2" size={17}/>
-              {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
+              {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:3,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
             </button>
             <button type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
-              style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:999,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:3,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="gear" size={17}/>
             </button>
           </div>
@@ -20863,16 +20873,16 @@ export default function App() {
         }
         const total = pairs.length+ventes.length+achats.length;
         const go=(tab)=>{ setGsOpen(false); setTab(tab); };
-        const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:10,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
-        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<img src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||'👟'}</span>}</div>;
+        const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:3,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
+        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<img src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||'👟'}</span>}</div>;
         return (
         <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
             <span style={{fontSize:20}}>🔍</span>
             <input autoFocus value={gsQ} onChange={e=>setGsQ(e.target.value)} placeholder="N°, nom du modèle ou marque…"
-              style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
+              style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:3,padding:'10px 12px',color:C.text,fontSize:15,fontFamily:'inherit',outline:'none'}}/>
             <button type="button" onClick={()=>{setGsOpen(false);}} aria-label="Fermer la recherche"
-              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,width:38,height:38,color:C.text,cursor:'pointer',fontSize:17,fontWeight:600,fontFamily:'inherit',flexShrink:0}}><Icon name="close" size={15}/></button>
+              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:3,width:38,height:38,color:C.text,cursor:'pointer',fontSize:17,fontWeight:600,fontFamily:'inherit',flexShrink:0}}><Icon name="close" size={15}/></button>
           </div>
           <div style={{flex:1,overflowY:'auto',padding:'8px 14px 40px',WebkitOverflowScrolling:'touch'}}>
             {!q && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:12}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
@@ -20880,7 +20890,7 @@ export default function App() {
             {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
             {pairs.map(p=>(
               <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 {numBadge(p.numero)}
                 {thumb(p.photo)}
                 <div style={{flex:1,minWidth:0}}>
@@ -20899,7 +20909,7 @@ export default function App() {
             {ventes.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Ventes ({ventes.length})</div>}
             {ventes.map((o,i)=>(
               <button key={'v'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_ventes')}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 {thumb(orderPhoto(o),'💸')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
@@ -20911,7 +20921,7 @@ export default function App() {
             {achats.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>Achats ({achats.length})</div>}
             {achats.map((o,i)=>(
               <button key={'a'+(o.transaction_id||i)} type="button" onClick={()=>go('cat_achats')}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:4,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 {thumb(orderPhoto(o),'📦')}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
@@ -20927,7 +20937,7 @@ export default function App() {
       {/* Centre de notifications : les actions du moment, chacune ouvre le bon onglet. */}
       {notifOpen && (
         <div onClick={()=>setNotifOpen(false)} style={{position:'fixed',inset:0,zIndex:60}}>
-          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:62,right:12,width:'min(330px,92vw)',background:C.card,border:`1px solid ${C.border}`,borderRadius:16,boxShadow:'0 10px 34px rgba(0,0,0,0.28)',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:'absolute',top:62,right:12,width:'min(330px,92vw)',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,boxShadow:'0 10px 34px rgba(0,0,0,0.28)',overflow:'hidden'}}>
             <div style={{padding:'11px 14px',borderBottom:`1px solid ${C.border}`,fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>🔔 Notifications</div>
             {notifItems.length===0 ? (
               <div style={{padding:'22px 16px',fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5}}>Rien qui presse pour l'instant ✨<br/><span style={{fontSize:11}}>Colis à retirer, ventes à expédier et messages non lus s'afficheront ici.</span></div>
@@ -20950,7 +20960,7 @@ export default function App() {
             {notifBanner.ventes>0&&notifBanner.factures>0&&' · '}
             {notifBanner.factures>0&&`${notifBanner.factures} facture${notifBanner.factures>1?'s':''} reçue${notifBanner.factures>1?'s':''}`}
           </span>
-          <button onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:6,color:C.onAccent,cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
+          <button onClick={()=>setNotifBanner(null)} style={{background:'transparent',border:'none',borderRadius:2,color:C.onAccent,cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
       {/* Bandeau nouveautés Vinted (à l'ouverture) — clic = va aux comptes */}
@@ -20962,7 +20972,7 @@ export default function App() {
             {vintedNotif.messages>0&&`${vintedNotif.messages} nouveau${vintedNotif.messages>1?'x':''} message${vintedNotif.messages>1?'s':''}`}
             {' '}sur Vinted
           </span>
-          <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:6,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
+          <button onClick={(e)=>{e.stopPropagation();setVintedNotif(null);}} style={{background:'transparent',border:'none',borderRadius:2,color:'#fff',cursor:'pointer',fontSize:17,fontWeight:700,padding:'2px 9px',lineHeight:1,opacity:0.8}}>×</button>
         </div>
       )}
       {/* ⚠️ LA LARGEUR DE LECTURE EST BORNÉE SUR ORDINATEUR.
