@@ -1722,33 +1722,126 @@ async function ventesSansBordereau(uid) {
   } catch (_) { return []; }
 }
 
-// Envoie la proposition à l'onglet Vinted actif. Le panneau (déjà injecté sur
-// la page) l'affiche en carte flottante — sans avoir à l'ouvrir.
-// ⚠️ Une seule proposition par vente et par jour : elle ne doit pas devenir un
-// bandeau qu'on finit par ne plus voir.
+// ══════════════════════════════════════════════════════════════════════════════
+// LE RÉCAP D'ARRIVÉE — « ça ne s'allume QUE s'il y a du nouveau »
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien : « je veux juste que ça s'allume s'il y a des nouveautés.
+// Il ne faut pas que ça s'allume s'il n'y a rien. Ou alors ça peut faire un
+// résumé de tout ce qui s'est passé depuis que j'ai fermé la session — ça
+// m'évite d'aller dans les messages, dans les notifications, etc. »
+//
+// ⚠️ HONNÊTETÉ SUR LE « DEPUIS QUE J'AI FERMÉ LA SESSION » : on ne sait pas
+// quand il ferme Vinted. Le repère est donc « depuis la dernière fois qu'on t'a
+// montré ce résumé » — c'est observable, et c'est ce que dit la fenêtre.
+// ⚠️ ZÉRO REQUÊTE VINTED : tout vient de la moisson déjà en base.
+const RECAP_MAX_CONVS = 400;   // borne du mémo (aucun égress, mais pas infini)
+
+async function recapVu() {
+  try { return (await chrome.storage.local.get('vrmRecapVu')).vrmRecapVu || {}; } catch (_) { return {}; }
+}
+
+// Ce qui a changé pour CE compte depuis le dernier récap montré.
+async function nouveautes(uid) {
+  const out = { ventes: [], eur: 0, messages: 0, offres: 0, aGenerer: [], premiere: false };
+  const memo = (await recapVu())[String(uid)] || null;
+  out.premiere = !memo;
+
+  // 1. LES VENTES — identité = n° de transaction, jamais un titre.
+  let ventes = [];
+  try {
+    const r = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    ventes = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.my_orders) || [];
+  } catch (_) {}
+  const vus = new Set((memo && memo.ventes) || []);
+  for (const o of ventes) {
+    const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+    if (!tx || vus.has(tx)) continue;
+    if (/annul|cancel|refus|rembours/i.test(String(o.status || ''))) continue;
+    const p = o.price && typeof o.price === 'object' ? o.price.amount : o.price;
+    const v = Number(String(p == null ? '' : p).replace(',', '.'));
+    out.ventes.push({ tx, title: String(o.title || ''), prix: isNaN(v) ? 0 : v });
+    if (!isNaN(v)) out.eur += v;
+  }
+
+  // 2. LES MESSAGES — une conversation compte comme nouvelle si elle est non
+  //    lue ET qu'elle a bougé depuis le dernier récap.
+  let convs = [];
+  try {
+    const r = await sbGet(`app_data?id=eq.harvest_${uid}_inbox&select=data`);
+    convs = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.conversations) || [];
+  } catch (_) {}
+  const vuConv = (memo && memo.convs) || {};
+  const convsMaj = {};
+  for (const c of convs) {
+    const id = c && c.id != null ? String(c.id) : '';
+    if (!id) continue;
+    const maj = String(c.updated_at || '');
+    convsMaj[id] = maj;
+    if (!c.unread) continue;
+    if (vuConv[id] && vuConv[id] === maj) continue;   // déjà vue dans cet état
+    out.messages++;
+  }
+
+  // 3. LES OFFRES en attente (argent, et 24 h pour répondre).
+  try { out.offres = (await offresEnAttente(uid)).length; } catch (_) { out.offres = 0; }
+
+  // 4. LES BORDEREAUX À GÉNÉRER — le seul point qui appelle une ACTION.
+  try { out.aGenerer = await ventesSansBordereau(uid); } catch (_) { out.aGenerer = []; }
+
+  out._marque = {
+    at: Date.now(),
+    ventes: ventes.map(o => o && o.transaction_id != null ? String(o.transaction_id) : '').filter(Boolean),
+    convs: Object.keys(convsMaj).slice(0, RECAP_MAX_CONVS)
+      .reduce((a, k) => { a[k] = convsMaj[k]; return a; }, {}),
+  };
+  return out;
+}
+
+// Envoie le récap à l'onglet Vinted actif. Le panneau (déjà injecté) l'affiche
+// au MILIEU de l'écran — sans avoir à l'ouvrir.
 async function proposerBordereaux(uid) {
   try {
-    const liste = await ventesSansBordereau(uid);
-    if (!liste.length) return;
-    const memo = (await chrome.storage.local.get('vrmPropose')).vrmPropose || {};
-    const frais = liste.filter(v => !memo[v.tx] || Date.now() - Number(memo[v.tx]) > 20 * 3600 * 1000);
-    if (!frais.length) return;
+    const n = await nouveautes(uid);
+    const rien = !n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length;
+    // ⚠️ RIEN DE NEUF = ON NE S'ALLUME PAS. C'est la demande, mot pour mot.
+    if (rien) { await marquerRecapVu(uid, n._marque); return; }
+    // ⚠️ PREMIÈRE FOIS SUR CE COMPTE : on ne déballe pas tout l'historique comme
+    // s'il venait de se produire (ce serait « 320 ventes ! » à la première
+    // visite). On pose seulement le repère, et on ne parle que des bordereaux
+    // à générer, qui eux sont vrais aujourd'hui.
+    if (n.premiere) { n.ventes = []; n.messages = 0; }
+    if (!n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length) {
+      await marquerRecapVu(uid, n._marque); return;
+    }
     const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
-    // ⚠️ ON NE NOTE « DÉJÀ DEMANDÉ » QUE SI LA QUESTION EST RÉELLEMENT POSÉE.
-    // Avant, le mémo était écrit AVANT l'envoi : si le script de la page n'était
-    // pas encore prêt (le cas le plus courant, on arrive 3 s après le
-    // chargement), la fenêtre ne s'affichait jamais ET la vente était marquée
-    // « demandée » pour 20 h. C'est exactement « la génération a du mal à se
-    // faire » : la question ne revenait plus.
+    // ⚠️ ON NE NOTE « DÉJÀ MONTRÉ » QUE SI LE RÉCAP EST RÉELLEMENT AFFICHÉ.
+    // Avant, le mémo partait AVANT l'envoi : si le script de la page n'était pas
+    // encore prêt (le cas courant, on arrive 3 s après le chargement), la
+    // fenêtre ne s'affichait jamais ET les ventes étaient marquées « vues ».
+    // C'est exactement « la génération a du mal à se faire ».
     let pose = false;
+    const charge = {
+      __vrm: 'recap', uid: String(uid),
+      ventes: n.ventes.slice(0, 12), eur: n.eur, messages: n.messages, offres: n.offres,
+      aGenerer: n.aGenerer.slice(0, 8),
+    };
     for (const t of tabs) {
-      try { await chrome.tabs.sendMessage(t.id, { __vrm: 'proposerBordereau', uid: String(uid), ventes: frais.slice(0, 8) }); pose = true; } catch (_) {}
+      try { await chrome.tabs.sendMessage(t.id, charge); pose = true; } catch (_) {}
     }
     if (!pose) return;
-    for (const v of frais) memo[v.tx] = Date.now();
-    await chrome.storage.local.set({ vrmPropose: memo });
+    await marquerRecapVu(uid, n._marque);
   } catch (_) {}
 }
+
+async function marquerRecapVu(uid, marque) {
+  if (!marque) return;
+  try {
+    const tout = await recapVu();
+    tout[String(uid)] = marque;
+    await chrome.storage.local.set({ vrmRecapVu: tout });
+  } catch (_) {}
+}
+
 try {
   chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
     if (!info || info.status !== 'complete') return;

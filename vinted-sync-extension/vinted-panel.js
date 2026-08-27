@@ -3198,58 +3198,80 @@
   let propo = null;
   function fermerPropo() { if (propo) { propo.remove(); propo = null; } }
   // ══════════════════════════════════════════════════════════════════════════
-  // « J'AI VENDU ? JE GÉNÈRE LES BORDEREAUX ? » — OUI / NON, AU MILIEU DE L'ÉCRAN
+  // LE RÉCAP D'ARRIVÉE — au milieu de l'écran, et SEULEMENT s'il y a du nouveau
   // ══════════════════════════════════════════════════════════════════════════
-  // Demande de Julien, mot pour mot : « je me connecte sur une tête et je veux
-  // avoir AU MILIEU DE MON ÉCRAN un message qui me dit à chaque fois lorsque je
-  // me reconnecte si j'ai fait une vente, et qui me demande si je génère les
-  // bordereaux. Je veux mettre oui, non et seulement cela. »
-  // L'ancienne version était une petite carte dans le coin, avec une ligne et un
-  // bouton PAR vente : on pouvait passer à côté, et il fallait cliquer trois
-  // fois pour trois colis. Ici : une question, deux boutons.
-  // ⚠️ « Oui » enchaîne les ventes UNE PAR UNE en attendant la réponse de Vinted
-  //    avant d'envoyer la suivante — jamais un lot lâché d'un coup (§5.36), et
-  //    aucune temporisation « faussement humaine » (§32) : c'est le rythme du
-  //    réseau. Un refus du garde-fou (autre compte, 20 actions/h) ARRÊTE la
-  //    série au lieu de s'acharner contre le même mur.
-  function afficherPropo(uid, ventes) {
+  // Demandes de Julien, dans l'ordre où elles sont venues :
+  //  1. « je veux avoir AU MILIEU DE MON ÉCRAN un message qui me dit si j'ai
+  //     fait une vente, et qui me demande si je génère les bordereaux. Je veux
+  //     mettre oui, non et seulement cela. »
+  //  2. « je veux juste que ça s'allume s'il y a des nouveautés. Il ne faut pas
+  //     que ça s'allume s'il n'y a rien. Ou alors ça peut faire un résumé de
+  //     tout ce qui s'est passé — ça m'évite d'aller dans les messages, dans
+  //     les notifications, etc. »
+  // Donc : une seule fenêtre. Elle résume ce qui a bougé, et elle ne pose la
+  // question OUI/NON que s'il y a vraiment un bordereau à générer. Le
+  // background ne l'envoie même pas quand il n'y a rien (voir `nouveautes`).
+  // ⚠️ « Oui » enchaîne les ventes UNE PAR UNE en attendant la réponse de
+  //    Vinted avant d'envoyer la suivante — jamais un lot lâché d'un coup
+  //    (§5.36), aucune temporisation « faussement humaine » (§32) : c'est le
+  //    rythme du réseau. Un refus du garde-fou ARRÊTE la série.
+  function afficherPropo(uid, recap) {
     fermerPropo();
-    if (!ventes || !ventes.length) return;
-    const n = ventes.length;
+    if (!recap) return;
+    const ventes = recap.ventes || [], aGen = recap.aGenerer || [];
+    const nMsg = recap.messages || 0, nOff = recap.offres || 0;
+    if (!ventes.length && !nMsg && !nOff && !aGen.length) return;
+
+    const eur = (v) => (Math.round(v * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
+    const lignes = [];
+    if (ventes.length) lignes.push(['💶', ventes.length === 1 ? '1 vente' : ventes.length + ' ventes',
+      recap.eur ? eur(recap.eur) : '']);
+    if (nMsg) lignes.push(['💬', nMsg === 1 ? '1 nouveau message' : nMsg + ' nouveaux messages', '']);
+    if (nOff) lignes.push(['🏷️', nOff === 1 ? '1 offre à trancher' : nOff + ' offres à trancher', '']);
+    if (aGen.length) lignes.push(['📦', aGen.length === 1 ? '1 bordereau à générer' : aGen.length + ' bordereaux à générer', '']);
+
     propo = document.createElement('div');
     propo.id = 'vrm-propo';
     propo.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;'
-      + 'background:rgba(15,23,42,.45);backdrop-filter:blur(2px);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+      + 'background:rgba(21,17,16,.45);backdrop-filter:blur(2px);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+    const question = aGen.length
+      ? (aGen.length === 1 ? 'Je génère le bordereau ?' : 'Je génère les ' + aGen.length + ' bordereaux ?')
+      : '';
     propo.innerHTML = `
-      <div id="vrm-propo-box" role="dialog" aria-modal="true" style="background:#fff;color:#0f172a;border-radius:16px;
-           box-shadow:0 24px 60px rgba(0,0,0,.35);padding:26px 24px 20px;width:340px;max-width:calc(100vw - 32px);text-align:center">
-        <div style="font-size:26px;line-height:1">📦</div>
-        <div id="vrm-propo-q" style="font-size:17px;font-weight:700;margin-top:10px">
-          ${n === 1 ? 'Tu as fait une vente.' : 'Tu as fait ' + n + ' ventes.'}
+      <div id="vrm-propo-box" role="dialog" aria-modal="true" style="background:#FBF7F0;color:#151110;border:1px solid #D9CFBE;
+           border-radius:8px;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:24px 22px 18px;width:340px;max-width:calc(100vw - 32px);text-align:center">
+        <div style="font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7a6d5f;font-weight:600">Depuis ton dernier passage</div>
+        <div id="vrm-propo-lignes" style="margin-top:12px;text-align:left">
+          ${lignes.map(([ic, t, v]) => `
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid #EFE6D8">
+              <span style="font-size:16px;flex:0 0 auto">${ic}</span>
+              <span style="flex:1;font-weight:600;font-size:14px">${esc(t)}</span>
+              ${v ? `<span style="font-weight:700;color:#D2401E;font-size:14px">${esc(v)}</span>` : ''}
+            </div>`).join('')}
         </div>
-        <div id="vrm-propo-s" style="font-size:13.5px;color:#475569;margin-top:6px">
-          ${n === 1 ? 'Je génère le bordereau ?' : 'Je génère les ' + n + ' bordereaux ?'}
-        </div>
-        <div id="vrm-propo-btns" style="display:flex;gap:10px;margin-top:20px">
-          <button id="vrm-propo-non" style="flex:1;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:11px;
-                  padding:11px 0;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">Non</button>
-          <button id="vrm-propo-oui" style="flex:1;border:none;background:#0f172a;color:#fff;border-radius:11px;
-                  padding:11px 0;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Oui</button>
-        </div>
+        <div id="vrm-propo-s" style="font-size:13.5px;color:#5c5148;margin-top:14px">${esc(question)}</div>
+        <div id="vrm-propo-btns" style="display:flex;gap:10px;margin-top:${question ? 14 : 16}px"></div>
       </div>`;
     document.documentElement.appendChild(propo);
-    const q = propo.querySelector('#vrm-propo-q');
     const sous = propo.querySelector('#vrm-propo-s');
     const btns = propo.querySelector('#vrm-propo-btns');
-    propo.querySelector('#vrm-propo-non').onclick = fermerPropo;
+    const bouton = (id, txt, plein) => `<button id="${id}" style="flex:1;border:${plein ? 'none' : '1px solid #C3B49C'};`
+      + `background:${plein ? '#151110' : '#FBF7F0'};color:${plein ? '#EFE8DC' : '#151110'};border-radius:6px;padding:11px 0;`
+      + `font-size:15px;font-weight:${plein ? 700 : 600};cursor:pointer;font-family:inherit">${txt}</button>`;
+    // Pas de bordereau à générer ⟹ c'est une information, pas une question.
+    btns.innerHTML = aGen.length ? bouton('vrm-propo-non', 'Non', false) + bouton('vrm-propo-oui', 'Oui', true)
+                                 : bouton('vrm-propo-ok', 'Fermer', true);
+    const ok = propo.querySelector('#vrm-propo-ok'); if (ok) ok.onclick = fermerPropo;
+    const non = propo.querySelector('#vrm-propo-non'); if (non) non.onclick = fermerPropo;
     // Cliquer à côté = « Non » (aucune action envoyée à Vinted).
     propo.onclick = (e) => { if (e.target === propo) fermerPropo(); };
 
-    propo.querySelector('#vrm-propo-oui').onclick = async () => {
+    const oui = propo.querySelector('#vrm-propo-oui');
+    if (oui) oui.onclick = async () => {
       btns.innerHTML = '';
       let faits = 0, rates = 0, arret = '';
-      for (const v of ventes) {
-        sous.textContent = `Génération ${faits + rates + 1} sur ${n}…`;
+      for (const v of aGen) {
+        sous.textContent = `Génération ${faits + rates + 1} sur ${aGen.length}…`;
         const r = await new Promise(res => {
           try { chrome.runtime.sendMessage({ action: 'genererBord', uid, tx: v.tx }, x => res(x || {})); }
           catch (_) { res({}); }
@@ -3261,21 +3283,19 @@
           if (r && r.code) { arret = r.error || r.raison || ''; break; }
         }
       }
-      q.textContent = faits ? (faits === 1 ? '1 bordereau généré' : faits + ' bordereaux générés') : 'Aucun bordereau généré';
       sous.textContent = arret ? arret
-        : rates ? `${rates} n'${rates > 1 ? 'ont' : 'a'} pas pu être généré${rates > 1 ? 's' : ''} — c'est écrit dans le panneau VRM.`
-        : 'Ils partent dans ton application.';
-      sous.style.color = rates ? '#b45309' : '#15803d';
-      btns.innerHTML = '<button id="vrm-propo-ok" style="flex:1;border:none;background:#0f172a;color:#fff;border-radius:11px;'
-        + 'padding:11px 0;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Fermer</button>';
-      const ok = propo.querySelector('#vrm-propo-ok');
-      if (ok) ok.onclick = fermerPropo;
+        : rates ? `${faits} généré${faits > 1 ? 's' : ''}, ${rates} non — le détail est dans le panneau VRM.`
+        : (faits === 1 ? 'Bordereau généré, il part dans ton application.' : faits + ' bordereaux générés, ils partent dans ton application.');
+      sous.style.color = rates ? '#b45309' : '#0f6b4f';
+      sous.style.fontWeight = '600';
+      btns.innerHTML = bouton('vrm-propo-ok', 'Fermer', true);
+      const o2 = propo.querySelector('#vrm-propo-ok'); if (o2) o2.onclick = fermerPropo;
       try { load(); } catch (_) {}
     };
   }
   try {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.__vrm === 'proposerBordereau') afficherPropo(msg.uid, msg.ventes);
+      if (msg && msg.__vrm === 'recap') afficherPropo(msg.uid, msg);
     });
   } catch (_) {}
 
