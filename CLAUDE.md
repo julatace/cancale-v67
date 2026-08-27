@@ -5757,3 +5757,94 @@ revalidait la même valeur → **deux écritures pour une saisie**. Le repère d
 | coffre | 156 lignes · **28 avec leur description** (9 avant le correctif) |
 | **prix d'achat** | **0 / 255** ⚠️ |
 | **prix plancher** | **0 / 255** ⚠️ (l'outil de saisie en série existe maintenant) |
+
+---
+
+## 5.72 — ⚠️ LE CODE DE RETRAIT VINTED GO EST DANS LA CONVERSATION, PAS DANS UN EMAIL
+
+Deux captures d'écran de Julien (27 août), prises dans le fil de discussion
+Vinted (pas dans sa boîte mail) :
+
+> **Ton colis est arrivé !** Il t'attend à l'adresse suivante : Kusmi Tea,
+> 13 Rue Saint-Vincent, 56000 Vannes, France. *Scanne ton code de retrait* ou
+> saisis le code **C65735** pour le récupérer.
+
+…et l'écran suivant, le QR en grand + « Tu n'arrives pas à le scanner ? Saisis
+le code suivant : **C65735** ».
+
+### Ce que la base disait (mesuré AVANT de coder, méthode §46)
+| | |
+|---|---|
+| conversations captées | **582** |
+| types de message | `message` 403 · `offer_request_message` 338 · `offer_message` 189 · **`status_message` 74** · **`action_message` 40** · `portal_message` 3 |
+| conversations parlant de retrait | 10 |
+| **message d'ARRIVÉE réellement capté** | **1** — `harvest_3156028798_conv_22488948907` |
+| conversations **côté acheteur** | **12 sur 343** (Julien vit sur ses ventes) |
+
+Forme exacte du message d'arrivée, relevée en base :
+```
+entity_type : action_message
+title       : « Ta commande est arrivée. »
+subtitle    : « Ton colis a été livré dans le Point Relais MAISON DE LA PRESSE,
+                40 RUE DU PORT, 35260 CANCALE. Tu peux … aller le récupérer. »
+actions     : track_shipment · mark_as_delivered
+```
+➡️ **L'adresse du relais et le code de retrait sont là — et RIEN ne les lisait.**
+Même famille que §5.26 (une ligne en base sans lecteur). Pour Vinted Go, c'est la
+**seule** source : aucun email transporteur ne les porte, et 2 comptes sur 8 ne
+reçoivent aucun email (§5.47). Sans ça, le colis repart chez l'expéditeur.
+
+### ⚠️ ET UN CODE DE RETRAIT PEUT COMMENCER PAR UNE LETTRE
+`codeRetrait` était `/^\d{3,10}$/` — la règle **strictement numérique** posée en
+§5.37 parce que le mot « suivant » avait été capté comme code. Vérifié :
+`C65735` était **REJETÉ**, `077831` accepté. La règle devient
+`/^[A-Z]{0,2}\d{3,10}$/` : au plus deux majuscules devant les chiffres — « suivant »
+n'a aucun chiffre, il reste écarté. Même famille que §5.37, dans l'autre sens :
+une règle trop large invente un code, une règle trop étroite en cache un vrai.
+
+### Ce qui est livré
+- **`retraitDeConversation(conv)`** (extension, fonction **pure**) : sort
+  `{tx, item, titre, photo, lieu, code, conv, url}` du **dernier** message
+  d'arrivée. ⚠️ **Côté ACHETEUR uniquement** (`current_user_side !== 'seller'`) :
+  côté vendeur, « la commande est arrivée » veut dire que l'ACHETEUR l'a reçue.
+  ⚠️ « Article à emballer et envoyer … dépose ton colis dans un point relais »
+  parle aussi de relais : c'est un colis qui **PART**, jamais un colis à retirer.
+  Ni adresse ni code ⟹ `null` (on n'affiche pas une carte vide).
+- **`noterRetrait(r)`** → ligne **DÉDIÉE `panel_colis_relais`** (motif
+  anti-clobber §35 : l'extension n'écrit jamais `main`), clé = **n° de
+  transaction** (identité, jamais un titre §24), purge à 45 j, **aucune écriture
+  si rien n'a changé** (§34).
+- **À la capture** : `storeHarvest` extrait dès qu'une conversation arrive.
+- **`capterRetraits(uid)`** (à chaque visite sur Vinted, après la moisson) : va
+  lire la conversation des achats que Vinted dit **« déposés en point relais »**
+  et dont on n'a pas le code. ⚠️ Garde-fous identiques au bordereau (§5.29) :
+  compte **connecté uniquement** (`garde`), plafond 20 actions/h, **3 par
+  visite**, pas de nouvel essai avant 6 h. C'est une **LECTURE** sur ses propres
+  achats — elle ne décide de rien, n'engage aucun argent.
+- **App** : `colisRelais` (une seule ligne lue, quelques Ko) + `relaisDe(o)`. La
+  carte « en point relais » porte désormais **l'adresse**, **le code en 20 px**
+  et **« Ouvrir la conversation (QR) ↗ »** — le QR vit dans le fil Vinted, on ne
+  le fabrique pas (§17).
+
+⚠️ **Honnêteté** : le code de la capture d'écran (`C65735`) **n'est pas en base**
+— sa conversation n'a jamais été ouverte avec l'extension. La chaîne est donc
+prouvée sur le message réel (Mondial Relay, adresse sans code) et sur la forme
+exacte de la capture ; elle se remplira à sa prochaine visite sur Vinted.
+
+### Vérifié
+`npm run build` OK · `node --check` sur les deux fichiers de l'extension ·
+**`scripts/audit-retrait-conv.cjs` — 8 contrôles**, et il **échoue bien sur le
+code d'avant** (la fonction n'existait pas ; et l'ancienne règle rejetait
+`C65735`, mesuré) · **12 audits au vert** · banc app dédié : la fixture
+`panel_colis_relais` est produite **par la VRAIE fonction** sur la **VRAIE**
+conversation en base, puis l'écran Achats est rendu → **adresse Kusmi Tea, CODE
+C65735, adresse Maison de la Presse, lien vers la conversation, 0 erreur d'app**
+(capture relue) · vrai `buildPanelData` contre la vraie base : 24 annonces,
+80 ventes, 12 colis à poster, 9 comptes — aucune régression · smoke app
+**11 écrans, 0 écran vide, 0 suspect**.
+⚠️ Le banc du PANNEAU (`panel.cjs`) sort 18 échecs — **tous des artefacts de
+banc connus** (`page.click` sur `.vrm-tab`, invisible au sens Playwright, §5.36 ;
+plus les onglets passés derrière « Plus » en 5.40). `vinted-panel.js` n'a pas été
+touché de la session : ces échecs sont antérieurs.
+
+Extension **5.45.0** — à recharger dans Chrome.
