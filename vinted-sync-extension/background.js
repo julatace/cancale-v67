@@ -508,6 +508,13 @@ async function storeHarvest(domain, type, id, body) {
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
+  // Une conversation vient d'arriver → si elle porte le message « ton colis est
+  // arrivé », on en sort l'adresse du relais et le CODE de retrait tout de
+  // suite. C'est le moment où on les a sous la main, et c'est la seule source
+  // pour Vinted Go (aucun email ne les porte).
+  if (type === 'conversation') {
+    try { const r = retraitDeConversation(parsed); if (r) await noterRetrait(r); } catch (_) {}
+  }
 
   // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
   // URL des photos). C'est le moment où on en sait le plus sur cette annonce.
@@ -1236,6 +1243,104 @@ const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some
 
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+// ══════════════════════════════════════════════════════════════════════════════
+// LE CODE DE RETRAIT VINTED GO EST DANS LA CONVERSATION, PAS DANS UN EMAIL
+// ══════════════════════════════════════════════════════════════════════════════
+// Capture d'écran de Julien (27 août), dans le fil de discussion Vinted :
+//   « Ton colis est arrivé ! Il t'attend à l'adresse suivante : Kusmi Tea,
+//     13 Rue Saint-Vincent, 56000 Vannes, France. Scanne ton code de retrait
+//     ou saisis le code C65735 pour le récupérer. »
+// MESURÉ en base avant de coder : ce message existe bien dans les conversations
+// captées, sous `entity_type: 'action_message'` —
+//   title    : « Ta commande est arrivée. »
+//   subtitle : « Ton colis a été livré dans le Point Relais MAISON DE LA PRESSE,
+//               40 RUE DU PORT, 35260 CANCALE. Tu peux … aller le récupérer. »
+//   actions  : track_shipment · mark_as_delivered
+// …et **rien ne le lisait**. Pour Vinted Go, l'adresse ET le code de retrait
+// n'arrivent QUE par là : aucun email transporteur ne les porte (§5.47 —
+// 2 comptes sur 8 ne reçoivent même aucun email). Sans ça, le colis repart chez
+// l'expéditeur au bout du délai, et c'est une vente perdue.
+const sansBalises = (s) => String(s == null ? '' : s)
+  .replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&')
+  .replace(/&#39;|&apos;/gi, "'").replace(/\s+/g, ' ').trim();
+// ⚠️ UN CODE DE RETRAIT PEUT COMMENCER PAR UNE LETTRE (« C65735 », relevé sur
+// une vraie capture Vinted Go). La règle strictement numérique de §5.37 — posée
+// parce que le mot « suivant » avait été capté comme code — l'aurait REJETÉ.
+// On accepte donc au plus deux lettres majuscules suivies de 4 à 10 chiffres :
+// « suivant » n'a aucun chiffre, il reste écarté.
+const CODE_APRES = /^([A-Z]{0,2}\d{4,10})\b/;
+// Le message d'ARRIVÉE, et lui seul. « Article à emballer et envoyer » parle
+// aussi de point relais : c'est un colis qui PART, pas un colis à retirer.
+const CONV_ARRIVE = /(?:ton\s+colis|ta\s+commande)\s+est\s+arriv|t['’]attend\s+à\s+l['’]adresse/i;
+function retraitDeConversation(conv) {
+  try {
+    const c = (conv && conv.conversation) || conv || {};
+    const t = c.transaction || {};
+    // ⚠️ CÔTÉ ACHETEUR UNIQUEMENT. Côté vendeur, « la commande est arrivée »
+    // veut dire que l'ACHETEUR l'a reçue — ce n'est pas un colis pour nous.
+    if (String(t.current_user_side || '') === 'seller') return null;
+    let trouve = null;
+    for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+      if (!m || (m.entity_type !== 'action_message' && m.entity_type !== 'status_message')) continue;
+      const e = m.entity || {};
+      const titre = sansBalises(e.title);
+      const sous = sansBalises(e.subtitle);
+      if (!CONV_ARRIVE.test(titre + ' ' + sous)) continue;
+      trouve = { titre, sous };                       // le DERNIER l'emporte
+    }
+    if (!trouve) return null;
+    const txt = trouve.titre + ' ' + trouve.sous;
+    // Lieu : ce qui suit le marqueur, jusqu'à la fin de la phrase.
+    let lieu = '';
+    for (const re of [/à\s+l['’]adresse\s+suivante\s*:\s*/i, /livr[ée]\s+dans\s+le\s+[Pp]oint\s+[Rr]elais\s+/i,
+                      /livr[ée]\s+(?:dans|à|au|chez)\s+/i, /t['’]attend\s+(?:dans|à|au|chez)\s+/i]) {
+      const m = txt.match(re); if (!m) continue;
+      lieu = txt.slice(m.index + m[0].length).split(/\.\s|\.$/)[0].trim();
+      if (lieu) break;
+    }
+    // Code : « saisis le code X », sinon « le code X pour ».
+    let code = '';
+    for (const re of [/sais(?:is|issez)\s+le\s+code\s+/i, /\bcode\s+(?=[A-Z]{0,2}\d{4,10}\b)/]) {
+      const m = txt.match(re); if (!m) continue;
+      const suite = txt.slice(m.index + m[0].length).match(CODE_APRES);
+      if (suite) { code = suite[1]; break; }
+    }
+    if (!lieu && !code) return null;                  // rien d'utile : on n'invente pas
+    const cid = String(c.id || '');
+    return {
+      tx: String(t.id || ''), item: String(t.item_id || ''),
+      titre: String(t.item_title || c.subtitle || c.description || ''),
+      photo: (t.item_photo && t.item_photo.url) || null,
+      lieu, code, conv: cid,
+      url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
+      at: new Date().toISOString(),
+    };
+  } catch (_) { return null; }
+}
+
+// La ligne DÉDIÉE que l'app lit (motif anti-clobber §35 : le panneau n'écrit
+// jamais `main`). Clé = n° de transaction, l'identité de l'achat (§24) — jamais
+// un rapprochement par titre. Une entrée de plus de 45 jours est purgée : un
+// colis n'attend pas si longtemps, et la ligne doit rester légère (§34).
+const RETRAIT_MAX_J = 45;
+async function noterRetrait(r) {
+  if (!r || !r.tx) return false;
+  try {
+    const rows = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const avant = cur[r.tx];
+    // Rien de neuf → aucune écriture (égress, §34).
+    if (avant && avant.code === r.code && avant.lieu === r.lieu) return false;
+    const limite = Date.now() - RETRAIT_MAX_J * 86400000;
+    const out = {};
+    for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
+    out[r.tx] = r;
+    await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
+    noterDiag('retrait_conv_ecrit');
+    return true;
+  } catch (_) { return false; }
+}
+
 function resumeCommandes(type, payload) {
   // ⚠️ EXACTEMENT `orders_sold` ou `orders_purchased`, jamais une ligne
   // générique. Une réponse `/my_orders` sans `?type=` MÉLANGE ventes et achats
@@ -1728,6 +1833,10 @@ async function visiteVinted() {
     //    travailler avant la capture reviendrait à décider sur des données
     //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
     await autoAccepterOffres(uid);
+    // ⚠️ APRÈS la moisson elle aussi : la liste des colis « déposés en point
+    // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
+    // photo d'hier et on redemanderait des conversations pour rien.
+    await capterRetraits(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
@@ -2705,6 +2814,64 @@ async function genererBordereau(uid, tx) {
 //  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
 const BORD_MAX_PAR_VISITE = 3;
 const BORD_RETRY_MS = 6 * 60 * 60 * 1000;
+
+// ── ALLER CHERCHER LE CODE DE RETRAIT D'UN COLIS QUI M'ATTEND ────────────────
+// La capture passive ne voit que ce que la page charge : mesuré en base, sur
+// 343 conversations captées, **12 seulement sont côté acheteur** — Julien passe
+// son temps sur ses ventes. Donc le message « ton colis est arrivé » n'arrive
+// presque jamais tout seul, alors que c'est LA seule source du code Vinted Go.
+//
+// On va donc le lire, mais de façon strictement bornée :
+//   · uniquement les ACHATS que Vinted dit « déposés en point relais »,
+//   · uniquement ceux dont on n'a pas déjà le code,
+//   · le compte CONNECTÉ dans cet onglet (`garde` — agir au nom d'un autre
+//     compte est LE signal multi-comptes que Vinted sanctionne, §48),
+//   · 3 par visite au plus, pas de nouvel essai avant 6 h.
+// ⚠️ Ce n'est ni une rafale ni un rythme « faussement humain » (§32) : c'est une
+// LECTURE, sur ses propres achats, plafonnée en volume — la même forme que la
+// récupération du bordereau (§5.29). Elle ne décide de rien et n'engage rien.
+const RETRAIT_MAX_PAR_VISITE = 3;
+async function capterRetraits(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_purchased&select=data`);
+    const achats = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const attend = achats.filter(o => o && AT_RELAY(o.status) && o.conversation_id != null);
+    if (!attend.length) return 0;
+    // Ce qu'on a déjà : inutile de redemander une conversation dont le code est
+    // en base (lecture d'une seule ligne, quelques Ko).
+    let deja = {};
+    try {
+      const r = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
+      deja = (r && r[0] && r[0].data) || {};
+    } catch (_) {}
+    const memo = (await chrome.storage.local.get('vrmRetraitFaits')).vrmRetraitFaits || {};
+    let n = 0;
+    for (const o of attend) {
+      if (n >= RETRAIT_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id || '');
+      if (tx && deja[tx] && deja[tx].code) continue;             // on a déjà le code
+      const cid = String(o.conversation_id);
+      if (memo[cid] && Date.now() - Number(memo[cid]) < BORD_RETRY_MS) continue;
+      const refus = await garde(uid, acc);
+      if (refus) { logActivity(`⚠️ Code de retrait non lu : ${refus.error}`); break; }
+      memo[cid] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/conversations/${encodeURIComponent(cid)}`);
+      if (!rep.ok || !rep.json) { noterDiag(`retrait_conv_refuse_${rep.status}`); continue; }
+      const r = retraitDeConversation(rep.json);
+      if (!r) { noterDiag('retrait_conv_sans_message'); continue; }
+      if (!r.tx && tx) r.tx = tx;                                 // identité de l'achat
+      const ecrit = await noterRetrait(r);
+      if (ecrit) logActivity(`📦 Code de retrait récupéré — ${(r.code || r.lieu || '').slice(0, 40)}`);
+    }
+    await chrome.storage.local.set({ vrmRetraitFaits: memo });
+    return n;
+  } catch (_) { return 0; }
+}
 
 // Une vente attend une GÉNÉRATION quand Vinted dit que le paiement est validé
 // ET qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au vendeur »

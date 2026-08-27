@@ -1695,11 +1695,16 @@ const CARRIERS = {
 // (`avn-webexternal.azureedge.net/avn-prod/FRA_DROPOFF_PICKUP_PARCEL`) — un
 // dessin de dépôt de colis, affiché jusqu'ici comme « le QR à scanner ».
 const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banniere|banni[eè]re|logo|header|footer|enquete|enqu[eê]te|satisfaction|unsubscribe|desabonn|d[eé]sabonn|facebook|instagram|twitter|linkedin|youtube|email-messaging\.com|avn-prod|azureedge|drop[_-]?off|dropoff|_parcel|illustration|visuel|\.svg(\?|$)/i;
-// ⚠️ UN CODE DE RETRAIT EST NUMÉRIQUE — et une ligne en base porte le mot
+// ⚠️ UN CODE DE RETRAIT PORTE DES CHIFFRES — et une ligne en base porte le mot
 // « suivant » comme code (capté par un ancien motif trop large). Elle ne sera
 // jamais réécrite : le filtre doit donc vivre ici aussi. Mieux vaut n'afficher
 // aucun code qu'un mot inventé devant le comptoir.
-const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^\d{3,10}$/.test(c) ? c : ''; };
+// ⚠️ CORRECTION (27 août) : la règle strictement numérique REJETAIT un vrai code
+// Vinted Go. Capture d'écran de Julien : « saisis le code C65735 pour le
+// récupérer » — une lettre puis cinq chiffres. On accepte donc au plus deux
+// lettres majuscules devant 3 à 10 chiffres ; « suivant » n'a aucun chiffre, il
+// reste écarté.
+const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) ? c : ''; };
 // L'image de QR réellement affichable pour ce colis (pièce jointe d'abord, puis
 // URL hébergée si elle est plausible). `null` = on n'affiche AUCUNE image.
 // ⚠️ LE VRAI PICKUP PASS EST SERVI PAR UN GÉNÉRATEUR (22 août).
@@ -11582,6 +11587,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     })();
     return () => { alive = false; };
   }, []);
+  // ── LE CODE DE RETRAIT VINTED GO VIENT DE LA CONVERSATION ─────────────────
+  // Capture d'écran de Julien (27 août) : dans le fil Vinted, « Ton colis est
+  // arrivé ! Il t'attend à l'adresse suivante : Kusmi Tea, 13 Rue Saint-Vincent,
+  // 56000 Vannes. Scanne ton code de retrait ou saisis le code C65735 ».
+  // Pour Vinted Go, l'adresse ET le code n'existent QUE là : aucun email
+  // transporteur ne les porte, et 2 de ses comptes ne reçoivent aucun email
+  // (§5.47). L'extension les sort de la conversation à la capture et les écrit
+  // dans une ligne DÉDIÉE (`panel_colis_relais`, jamais `main` — §35), indexée
+  // par n° de TRANSACTION : une identité, jamais un rapprochement par titre.
+  // ⚠️ Une seule ligne lue, quelques Ko (§34).
+  const [colisRelais, setColisRelais] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_relais&select=data`, { headers: sbAuth() });
+        if (!res.ok) return;
+        const rows = await res.json();
+        const data = (rows && rows[0] && rows[0].data) || {};
+        if (alive && Object.keys(data).length) setColisRelais(data);
+      } catch (_) { /* réseau : on affiche simplement sans le lieu ni le code */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  // Le retrait connu pour CETTE commande — par transaction uniquement.
+  const relaisDe = (o) => { const k = String((o && o.transaction_id) || ''); return (k && colisRelais[k]) || null; };
   const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev,[k]:new Date().toISOString()}; save('vinted_pickup_done',u); return u; }); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
@@ -15867,17 +15898,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   compteur dirait 2 et la liste n'en montrerait qu'1). */}
               {extra.length>0 && (
                 <div style={{marginBottom:12}}>
-                  {avail.length>0 && <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:8}}>📍 En point relais — code à venir</div>}
-                  {extra.map((o,i)=>(
-                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',marginBottom:7}}>
-                      {thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}
+                  {avail.length>0 && <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:8}}>En point relais (vu par Vinted)</div>}
+                  {extra.map((o,i)=>{
+                    // Ce que la CONVERSATION Vinted dit de ce colis : l'adresse du
+                    // relais et le code de retrait. Pour Vinted Go c'est la seule
+                    // source — aucun email ne les porte (voir `colisRelais`).
+                    const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
+                    return (
+                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:4,padding:'10px 12px',marginBottom:7}}>
+                      {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Déposé en point relais (Vinted) · le code arrive par email</div>
+                        {rel&&rel.lieu
+                          ? <div style={{fontSize:11,color:C.text,marginTop:2,fontWeight:600}}>{rel.lieu}</div>
+                          : null}
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>
+                          {cd ? "Donne ce code au comptoir, ou scanne le QR depuis la conversation Vinted"
+                              : (rel&&rel.lieu ? 'Déposé en point relais (Vinted)'
+                                               : 'Déposé en point relais (Vinted) · le code arrive par email ou dans la conversation')}
+                        </div>
+                        {rel&&rel.url&&(
+                          <a href={rel.url} target="_blank" rel="noreferrer" style={{fontSize:11,color:C.accent,fontWeight:600,textDecoration:'none',display:'inline-block',marginTop:3}}>Ouvrir la conversation (QR) ↗</a>
+                        )}
                       </div>
+                      {cd&&(
+                        <div style={{flexShrink:0,textAlign:'center',padding:'4px 10px',border:`1px solid ${C.border}`,borderRadius:3,background:C.card2||C.card}}>
+                          <div className="vrm-label" style={{fontSize:9,color:C.muted}}>CODE</div>
+                          <div style={{fontSize:20,fontWeight:800,color:C.text,fontFamily:'monospace',letterSpacing:1.5,whiteSpace:'nowrap'}}>{cd}</div>
+                        </div>
+                      )}
                       <button type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="Retiré" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:3,padding:'8px 11px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               {/* Colis cochés « retiré » que Vinted n'a pas encore confirmés :
