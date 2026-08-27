@@ -5639,3 +5639,85 @@ s'ouvre, et après confirmation la liste passe de **208 à 0**.
 **32 commits d'avance** et **aucune pull request ouverte**. Rien de tout ceci
 n'est chez Julien tant que la PR n'est pas ouverte puis fusionnée — c'est **sa**
 décision, l'agent n'ouvre pas de PR de lui-même.
+
+---
+
+## 5.71 — LE BORDEREAU PART TOUT SEUL · la vente captée vite · N° + prix mini sur les vignettes
+
+### 1. ⚠️ « Est-ce que ça réattribue le numéro d'avant ? » — NON, mesuré
+Julien, après un lot vendu puis annulé. Vérifié en base le 27 août :
+
+| | |
+|---|---|
+| numéros brûlés à vie | **329** · plus haut : 329 · prochain libre : **330** |
+| ventes annulées / remboursées | 38 · dont **11 portent un N°** |
+| leur numéro est-il toujours pris ? | **11 / 11** ✅ |
+
+`takenNums` est **append-only** (`vinted_used_numeros` + tous les `numeros` +
+tous les `saleOv` + les annonces en ligne + le garage) : `freedNums` a été
+supprimé en §5.40. **Aucun numéro ne retourne jamais dans le pool**, annulation
+comprise. Si Vinted rouvre la MÊME annonce (même id), elle garde son numéro
+toute seule ; s'il la repose (nouvel id), elle en reçoit un neuf et le bandeau
+♻️ propose de remettre l'ancien — c'est SON clic (§5.45).
+
+### 2. ⚠️ MAIS la paire annulée disparaissait de l'inventaire physique
+`porteursNum` ne comptait comme « présente » qu'une annonce en ligne, une vente
+qui attend l'envoi, ou une case du garage. Une vente **annulée** n'est ni l'un
+ni l'autre → la paire sortait de l'inventaire physique et du panneau « à
+ranger » du Garage, **alors qu'elle est sur l'étagère**.
+➡️ Une vente annulée **avant l'envoi** garde sa place (`type: 'annulee'`). Une
+vente annulée **après expédition** (remboursement) ne compte pas — `venteExpediee`,
+preuve certaine (statut Vinted, bordereau capté, ou email de bordereau, par n° de
+transaction, jamais par titre).
+⚠️ `venteExpediee` a été **remontée avant `porteursNum`** : un `useMemo`
+s'exécute immédiatement et ne peut pas lire un `const` déclaré après (§19).
+**Déplacée, pas recopiée** (§11). 3 contrôles permanents dans `audit-identite`.
+
+### 3. Le bordereau part tout seul (extension 5.42)
+« Une fois que la vente a été faite, je veux que le bordereau soit
+automatiquement envoyé dans l'app. » ⚠️ **Retour en arrière assumé sur §5.32**
+(où il avait demandé l'inverse) — c'est sa décision, et elle est cohérente avec
+§5.29 : générer un bordereau **n'engage aucun argent et ne décide de rien**.
+Garde-fous inchangés : compte connecté uniquement, 20 actions/h, **3 par
+visite**, pas de nouvel essai avant 6 h.
+Le récap **annonce** ce qui est parti (« 2 bordereaux envoyés dans l'app ») et
+ne pose la question **OUI/NON** que pour ce qui n'a **pas** pu être généré.
+
+### 4. « Ça prend du temps à ce que la vente soit captée »
+C'était le garde de **5 minutes** (`VISITE_DELAI_MS`), qui protège d'une moisson
+**complète** (dressing jusqu'à 600 articles, achats, boîte) à chaque page
+ouverte. Or « ai-je vendu ? » ne demande **qu'une** liste.
+➡️ **`rafraichirVentes(uid)`** rafraîchit les ventes **seules**, au plus une fois
+par **90 s**, puis relance la génération et le récap. ⚠️ Ce n'est **pas** un
+rythme « faussement humain » (§32) : c'est une limite de volume, comme le
+plafond horaire. Réutilise `fetchAllOrders` + `storeHarvestRow` — donc les
+garde-fous anti-capture-partielle de §5.19, et **pas une deuxième façon de lire
+les ventes** (§11).
+
+### 5. Les erreurs de génération sont MESURÉES, plus supposées
+« Il y a des messages d'erreur » — impossible d'aller plus loin sans savoir
+lesquels. `genererBordereau` compte désormais `bordereau_genere` /
+`bordereau_refuse_<statut>` dans `panel_diag_capture` et garde **un échantillon
+de la réponse de Vinted**. Et le message rendu est traduit : 401 = session
+expirée, 403 = refus pour ce compte, 404 = cette vente n'attend plus de
+bordereau, 422 = Vinted refuse ces informations d'envoi.
+➡️ **Prochaine session : lire `panel_diag_capture.rates.bordereau`.**
+
+### 6. Le N° et le prix minimum sur chaque vignette du profil
+« Je veux que le prix minimum s'affiche à côté des vues dans l'annonce quand on
+est sur le profil, ainsi que son numéro, pour voir d'un coup d'œil. »
+`decorerVignettes()` décore chaque lien d'annonce **qui est une des siennes**
+(présente dans `DATA.byId`) — jamais celle d'un autre vendeur.
+⚠️ **On n'écrit jamais dans le HTML de Vinted** : un enfant en surimpression sur
+la vignette. Si Vinted refond sa grille, le badge ne s'affiche pas — rien ne
+casse (§4.95). Redécoré au défilement par un `MutationObserver` limité à une
+passe / 400 ms.
+Vérifié au banc : 2 des 3 tuiles décorées (`N°7 · min 38,00 €` / `N°12 · min ?`),
+celle d'un autre vendeur **intacte**, redécoration après ajout dynamique,
+0 erreur.
+
+### Vérifié
+`npm run build` OK · **11 audits au vert** (`audit-recap` passe à 12 contrôles,
+les 3 nouveaux échouent bien sur le code d'avant ; `audit-identite` à 43) ·
+smoke app **11 écrans, 0 écran vide, 0 PAGEERROR, 0 artefact** (les 23 lignes
+console sont le 400 volontaire de `select=owner` et les resets de fin de test).
