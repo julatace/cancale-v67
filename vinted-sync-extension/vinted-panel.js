@@ -993,6 +993,50 @@
     } catch (_) {}
   }
 
+  // ── LE N° ET LE PRIX PLANCHER SUR CHAQUE VIGNETTE DU PROFIL ────────────────
+  // Demande de Julien : « je veux que le prix minimum s'affiche à côté des vues
+  // dans l'annonce quand on est sur le profil, ainsi que son numéro, comme ça
+  // on peut voir direct d'un coup d'œil. »
+  // On décore chaque lien d'annonce QUI EST UNE DES SIENNES (présente dans
+  // `DATA.byId`) — donc jamais l'annonce d'un autre vendeur.
+  // ⚠️ ON N'ÉCRIT JAMAIS DANS LE HTML DE VINTED : on ajoute un enfant en
+  //    surimpression sur la vignette. Si Vinted refond sa grille, le badge ne
+  //    s'affiche simplement pas — rien ne casse (§4.95).
+  const TAG = 'vrmTag';
+  function decorerVignettes() {
+    try {
+      if (!DATA || !DATA.byId) return;
+      const liens = document.querySelectorAll('a[href*="/items/"]');
+      for (const a of liens) {
+        const m = /\/items\/(\d+)/.exec(a.getAttribute('href') || '');
+        if (!m) continue;
+        const o = DATA.byId[m[1]];
+        if (!o || (o.numero == null && o.minPrice == null)) continue;
+        if (a.dataset[TAG] === m[1]) continue;          // déjà décorée
+        // Une vignette de grille, pas un lien de texte : on écarte le trop petit.
+        const r = a.getBoundingClientRect();
+        if (r.width < 90 || r.height < 90) continue;
+        a.dataset[TAG] = m[1];
+        if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
+        let b = a.querySelector(':scope > .vrm-vig');
+        if (!b) { b = document.createElement('div'); b.className = 'vrm-vig'; a.appendChild(b); }
+        b.style.cssText = 'position:absolute;top:6px;left:6px;z-index:20;display:flex;flex-direction:column;gap:3px;'
+          + 'pointer-events:none;font:700 11px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+        const pastille = (txt, fond, encre) => `<span style="background:${fond};color:${encre};border-radius:4px;`
+          + `padding:2px 6px;box-shadow:0 1px 4px rgba(0,0,0,.25);white-space:nowrap">${esc(txt)}</span>`;
+        b.innerHTML =
+          (o.numero != null ? pastille('N°' + o.numero, '#151110', '#EFE8DC') : '')
+          + (o.minPrice != null ? pastille('min ' + fmt(o.minPrice), '#D2401E', '#fff')
+                                : pastille('min ?', 'rgba(21,17,16,.55)', '#EFE8DC'));
+      }
+    } catch (_) {}
+  }
+  // La grille se remplit au défilement : on redécore quand le DOM bouge, mais
+  // au plus une fois par 400 ms (sinon on repasse sur toute la page en boucle).
+  let decoTimer = null;
+  function planifierDeco() { clearTimeout(decoTimer); decoTimer = setTimeout(decorerVignettes, 400); }
+  try { new MutationObserver(planifierDeco).observe(document.documentElement, { childList: true, subtree: true }); } catch (_) {}
+
   // ── LE PRIX D'ACHAT, LÀ OÙ TU REGARDES L'ANNONCE ────────────────────────────
   // Mesuré : 0 prix d'achat sur 177 paires — donc bénéfice, marge et rapport
   // comptable tournent tous avec un coût de zéro. La raison n'est pas la
@@ -1195,7 +1239,7 @@
 
   function render() {
     writeLS('vrm_panel_tab', tab); // garde l'onglet actif d'une page à l'autre
-    majBadge();                    // pastille N° sur la page Vinted (voir majBadge)
+    majBadge(); decorerVignettes();                    // pastille N° sur la page Vinted (voir majBadge)
     const s = (DATA && DATA.stats) || { online: 0, relance: 0, noNum: 0, value: 0 };
     const fresh = (DATA && DATA.freshestAt) ? ` · capté ${esc(timeago(DATA.freshestAt))}` : '';
     panel.innerHTML = `
@@ -3219,8 +3263,8 @@
     fermerPropo();
     if (!recap) return;
     const ventes = recap.ventes || [], aGen = recap.aGenerer || [];
-    const nMsg = recap.messages || 0, nOff = recap.offres || 0;
-    if (!ventes.length && !nMsg && !nOff && !aGen.length) return;
+    const nMsg = recap.messages || 0, nOff = recap.offres || 0, nEnv = recap.envoyes || 0;
+    if (!ventes.length && !nMsg && !nOff && !aGen.length && !nEnv) return;
 
     const eur = (v) => (Math.round(v * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
     const lignes = [];
@@ -3228,6 +3272,12 @@
       recap.eur ? eur(recap.eur) : '']);
     if (nMsg) lignes.push(['💬', nMsg === 1 ? '1 nouveau message' : nMsg + ' nouveaux messages', '']);
     if (nOff) lignes.push(['🏷️', nOff === 1 ? '1 offre à trancher' : nOff + ' offres à trancher', '']);
+    // Ce qui vient de partir tout seul dans l'app (Julien, 27 août : « une fois
+    // que la vente a été faite, je veux que le bordereau soit automatiquement
+    // envoyé dans l'app »). On le DIT : un geste silencieux n'inspire pas
+    // confiance, surtout celui-là.
+    if (nEnv) lignes.push(['🖨️', nEnv === 1 ? '1 bordereau envoyé dans l\'app' : nEnv + ' bordereaux envoyés dans l\'app', '✓']);
+    // Ce qui n'a PAS pu être généré tout seul : là, on demande.
     if (aGen.length) lignes.push(['📦', aGen.length === 1 ? '1 bordereau à générer' : aGen.length + ' bordereaux à générer', '']);
 
     propo = document.createElement('div');
@@ -3246,7 +3296,7 @@
             <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid #EFE6D8">
               <span style="font-size:16px;flex:0 0 auto">${ic}</span>
               <span style="flex:1;font-weight:600;font-size:14px">${esc(t)}</span>
-              ${v ? `<span style="font-weight:700;color:#D2401E;font-size:14px">${esc(v)}</span>` : ''}
+              ${v ? `<span style="font-weight:700;color:${v === '✓' ? '#0f6b4f' : '#D2401E'};font-size:14px">${esc(v)}</span>` : ''}
             </div>`).join('')}
         </div>
         <div id="vrm-propo-s" style="font-size:13.5px;color:#5c5148;margin-top:14px">${esc(question)}</div>

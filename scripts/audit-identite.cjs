@@ -408,5 +408,27 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
           '`vinted_sale_overrides` absent du rechargement : ils peuvent être écrasés par du vide');
 }
 
+
+// ── 14. UNE VENTE ANNULÉE AVANT L'ENVOI GARDE SA PLACE ──────────────────────
+// La paire n'a jamais quitté la maison : son carton est sur l'étagère avec son
+// numéro écrit dessus. Si `porteursNum` l'oublie, elle disparaît de l'inventaire
+// physique et du panneau « à ranger » du Garage — alors qu'elle est là.
+// ⚠️ Une vente annulée APRÈS expédition (remboursement) ne compte pas.
+{
+  const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const i = app.indexOf('const porteursNum = useMemo');
+  const bloc = i < 0 ? '' : app.slice(i, i + 2200);
+  const c1 = /classifyOrderStatus\(o\.status\) === 'cancelled'/.test(bloc) && /venteExpediee\(o\)/.test(bloc)
+    && /if \(!revenue && !needsBordereau\(o\.status\)\) continue;/.test(bloc);
+  c1 ? ok("une vente annulée avant l'envoi garde son numéro (porteursNum)")
+     : nok("une vente annulée avant l'envoi garde son numéro (porteursNum)", 'la règle a disparu de porteursNum');
+  const iv = app.indexOf('const venteExpediee');
+  (iv > 0 && iv < i) ? ok('venteExpediee est déclarée AVANT porteursNum (piège TDZ §19)')
+                     : nok('venteExpediee est déclarée AVANT porteursNum (piège TDZ §19)');
+  const nb = (app.match(/const venteExpediee = /g) || []).length;
+  nb === 1 ? ok("venteExpediee n'existe qu'une seule fois (une règle, un endroit)")
+           : nok("venteExpediee n'existe qu'une seule fois", nb + ' définitions');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);

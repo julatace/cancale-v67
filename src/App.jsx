@@ -12077,6 +12077,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Deux porteurs pour un même numéro = deux cartons identiques sur l'étagère.
   // Ce memo sert À LA FOIS à ne jamais réattribuer un numéro occupé ET à
   // signaler un conflit existant (§11 : une seule règle, deux usages).
+  // ⚠️ REMONTÉE ICI (elle vivait 1300 lignes plus bas) : `porteursNum` en a
+  // besoin, et un `useMemo` s'exécute IMMÉDIATEMENT — il ne peut pas lire un
+  // `const` déclaré après lui (§19, le piège TDZ). Une seule définition : on
+  // déplace, on ne recopie pas (§11).
+  // « Expédiée » = une preuve CERTAINE que le colis est parti : le statut Vinted,
+  // le bordereau capté par l'extension, ou l'email de bordereau — le tout par
+  // n° de transaction, jamais par titre (§24).
+  const venteExpediee = (o) => {
+    const tx = String(o && o.transaction_id || ''); if (!tx) return false;
+    if (/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test(o.status || '')) return true;
+    if (labelsCaptes[tx]) return true;
+    return (emailBords || []).some(b => String(b.transaction || '') === tx);
+  };
+
   const porteursNum = useMemo(() => {
     const m = {};
     const add = (num, quoi) => { const n = String(num || '').trim(); if (!n) return; (m[n] = m[n] || []).push(quoi); };
@@ -12087,10 +12101,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = numeros[it.id]; if (e && e.numero != null) add(e.numero, { type: 'annonce', titre: it.title, id: it.id });
     }
     for (const o of (sales.items || [])) {
-      if (!needsBordereau(o.status)) continue;                 // colis déjà parti : la place est libre
+      // ⚠️ UNE VENTE ANNULÉE AVANT L'ENVOI GARDE SA PLACE. La paire n'a jamais
+      // quitté la maison : son carton est toujours sur l'étagère, avec son
+      // numéro écrit dessus. Sans ça, une commande annulée (ou un lot annulé)
+      // faisait disparaître la paire de l'inventaire physique et du panneau
+      // « à ranger » du Garage — alors qu'elle est là, sous les yeux.
+      // Une vente annulée APRÈS expédition (remboursement) ne compte pas : la
+      // chaussure est bien partie (`venteExpediee`, preuve certaine).
+      const annulee = classifyOrderStatus(o.status) === 'cancelled';
+      const revenue = annulee && !venteExpediee(o);
+      if (!revenue && !needsBordereau(o.status)) continue;      // colis déjà parti : la place est libre
       if (isHidden(o)) continue;
       const e = effEntry(o); const n = e && e.numero;
-      if (n != null) add(n, { type: 'vente', titre: o.title, id: String(o.transaction_id || '') });
+      if (n != null) add(n, { type: revenue ? 'annulee' : 'vente', titre: o.title, id: String(o.transaction_id || '') });
     }
     for (const cell in (garageGrid || {})) {
       const vals = Array.isArray(garageGrid[cell]) ? garageGrid[cell] : [];
@@ -12098,7 +12121,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts]);
+  }, [listings.items, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
 
   // Numéros OCCUPÉS par une paire réellement présente — jamais réattribuables.
   const numsOccupes = useMemo(() => {
@@ -12156,7 +12179,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const presents = (porteursNum[n] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
       const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
-        : p.type === 'vente' ? `📮 à expédier « ${p.titre} »` : `🏠 ${p.titre}`).join('\n');
+        : p.type === 'vente' ? `📮 à expédier « ${p.titre} »`
+        : p.type === 'annulee' ? `↩️ vente annulée, la paire est restée « ${p.titre} »`
+        : `🏠 ${p.titre}`).join('\n');
       const prendre = await askConfirm({
         title: `Le N°${n} est déjà pris`,
         desc: `Une paire le porte encore :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
@@ -13386,12 +13411,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La preuve d'expédition est CERTAINE (jamais un rapprochement par titre) :
   // un bordereau existe pour ce n° de transaction, ou le statut Vinted lui-même
   // porte un mot d'acheminement.
-  const venteExpediee = (o) => {
-    const tx = String(o && o.transaction_id || ''); if (!tx) return false;
-    if (/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test(o.status || '')) return true;
-    if (labelsCaptes[tx]) return true;
-    return (emailBords || []).some(b => String(b.transaction || '') === tx);
-  };
   const venteStage = (o) => {
     const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
     if (classifyOrderStatus(o.status) === 'cancelled') return venteExpediee(o)
@@ -18485,13 +18504,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (it && it.photo) return it.photo;
             const e = numeros[por.id]; if (e && e.photo) return e.photo;
           }
-          if (por.type === 'vente') {
+          if (por.type === 'vente' || por.type === 'annulee') {
             const o = (sales.items || []).find(x => String(x.transaction_id || '') === String(por.id));
             if (o) { const ph = orderPhoto(o); if (ph) return ph; const e = effEntry(o); if (e && e.photo) return e.photo; }
           }
           return null;
         };
-        const ou = (t) => t === 'annonce' ? 'en ligne' : t === 'vente' ? 'à envoyer' : 'au garage';
+        const ou = (t) => t === 'annonce' ? 'en ligne' : t === 'vente' ? 'à envoyer'
+          : t === 'annulee' ? 'vente annulée — la paire est restée' : 'au garage';
         return (
           <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
             <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:620,maxHeight:'88vh',overflowY:'auto',padding:'16px 14px calc(20px + env(safe-area-inset-bottom))'}}>

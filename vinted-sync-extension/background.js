@@ -1661,31 +1661,69 @@ try {
 // §32) : c'est simplement ne pas refaire dix fois la même lecture pendant qu'on
 // navigue de page en page. Sans lui, ouvrir 30 annonces = 30 moissons complètes.
 const VISITE_DELAI_MS = 5 * 60 * 1000;   // au plus une moisson complète / 5 min / compte
+// ⚠️ « ÇA PREND DU TEMPS À CE QUE LA VENTE SOIT CAPTÉE » — c'était ce garde-là.
+// Il protège d'une moisson COMPLÈTE (dressing de 600 articles, achats, boîte…)
+// à chaque page ouverte. Mais une vente, c'est UNE requête (`my_orders?sold`) :
+// la rafraîchir plus souvent ne pèse presque rien et c'est ce qu'il attend.
+// Ce n'est pas un rythme « faussement humain » (§32) : c'est une limite de
+// volume, comme le plafond horaire.
+const VENTES_DELAI_MS = 90 * 1000;       // les VENTES seules : au plus 1 / 90 s / compte
 let visiteTimer = null;
+// ── LA VENTE, CAPTÉE VITE ───────────────────────────────────────────────────
+// Une moisson complète, c'est le dressing (jusqu'à 600 articles, 7 pages), les
+// achats, la boîte : lourd, d'où le garde de 5 minutes. Mais la question « ai-je
+// vendu ? » ne demande QU'UNE liste — `my_orders?type=sold`. On la rafraîchit
+// donc seule, plus souvent, pour que le récap et le bordereau ne soient pas en
+// retard d'un quart d'heure sur la réalité.
+// ⚠️ Réutilise `fetchAllOrders` + `storeHarvestRow` (donc les garde-fous
+//    existants : jamais écraser une capture plus riche par une plus pauvre,
+//    §5.19). On n'écrit pas une deuxième façon de lire les ventes (§11).
+async function rafraichirVentes(uid) {
+  const accts = await getStoredAccounts();
+  const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) return false;
+  const sold = await fetchAllOrders(acc, 'sold');
+  if (!sold || !sold.my_orders || !sold.my_orders.length) return false;
+  await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
+  noterDiag('ventes_rafraichies');
+  return true;
+}
+
 async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
     const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
     const der = Number(st[uid] || 0);
-    if (Date.now() - der < VISITE_DELAI_MS) return;     // déjà à jour, on ne rejoue pas
+    // ⚠️ LE GARDE COURT NE SAUTE PLUS LES VENTES. Avant, un `return` sec ici
+    // faisait qu'une vente conclue il y a deux minutes n'était pas captée tant
+    // qu'on n'avait pas laissé passer 5 min — et le récap ne pouvait rien dire.
+    if (Date.now() - der < VISITE_DELAI_MS) {
+      const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
+      if (Date.now() - Number(dv[uid] || 0) < VENTES_DELAI_MS) return;
+      dv[uid] = Date.now();
+      await chrome.storage.local.set({ vrmDerniereVente: dv });
+      try { await rafraichirVentes(uid); } catch (_) {}
+      const g = await genererBordereauxEnAttente(uid);
+      await proposerBordereaux(uid, g);
+      return;
+    }
     st[uid] = Date.now();
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     const ok = await runActive();
     logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
-    // ⚠️ LA VISITE NE GÉNÈRE PLUS RIEN. Demande de Julien : « ce n'est plus
-    // vraiment en automatique, c'est nous qui appuyons ». Générer, c'est agir
-    // sur Vinted — ça reste donc sur SON clic, depuis le panneau. Ce qui tourne
-    // tout seul ici est en LECTURE SEULE : aller chercher le PDF des bordereaux
-    // déjà émis pour le déposer dans l'app.
-    await genererBordereauxEnAttente(uid, { lectureSeule: true });
-    // ⚠️ « DÈS QUE JE ME CONNECTE SUR UN COMPTE VINTED, SANS MÊME AVOIR OUVERT
-    // L'EXTENSION, S'IL Y A UNE VENTE, PROPOSE DE GÉNÉRER ET D'ENVOYER LE
-    // BORDEREAU DANS L'APP » (Julien, 23 août).
-    // On PROPOSE — on ne génère pas tout seul (§5.32 : générer, c'est agir sur
-    // Vinted, ça reste son clic). La carte s'affiche sur la page, sans ouvrir le
-    // panneau ; un clic suffit.
-    await proposerBordereaux(uid);
+    // ⚠️ LA VISITE GÉNÈRE À NOUVEAU, TOUTE SEULE (Julien, 27 août) : « une fois
+    // que la vente a été faite, je veux que le bordereau soit automatiquement
+    // envoyé dans l'app ». C'est un retour en arrière assumé sur §5.32 — c'est
+    // sa décision, et elle est cohérente avec §5.29 : générer un bordereau
+    // n'engage AUCUN argent et ne décide de rien (la vente est faite, le colis
+    // doit partir). Tous les garde-fous restent : compte connecté uniquement,
+    // 20 actions/h, 3 par visite, pas de nouvel essai avant 6 h.
+    const genes = await genererBordereauxEnAttente(uid);
+    // Le récap arrive APRÈS la génération : il annonce ce qui est parti dans
+    // l'app, et ne pose la question que pour ce qui n'a PAS pu être généré
+    // (compte non connecté, plafond atteint, adresse inconnue).
+    await proposerBordereaux(uid, genes);
     // ⚠️ APRÈS la moisson : les offres viennent des conversations captées, donc
     //    travailler avant la capture reviendrait à décider sur des données
     //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
@@ -1799,10 +1837,11 @@ async function nouveautes(uid) {
 
 // Envoie le récap à l'onglet Vinted actif. Le panneau (déjà injecté) l'affiche
 // au MILIEU de l'écran — sans avoir à l'ouvrir.
-async function proposerBordereaux(uid) {
+async function proposerBordereaux(uid, genes) {
   try {
     const n = await nouveautes(uid);
-    const rien = !n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length;
+    n.envoyes = Number(genes) || 0;
+    const rien = !n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length && !n.envoyes;
     // ⚠️ RIEN DE NEUF = ON NE S'ALLUME PAS. C'est la demande, mot pour mot.
     if (rien) { await marquerRecapVu(uid, n._marque); return; }
     // ⚠️ PREMIÈRE FOIS SUR CE COMPTE : on ne déballe pas tout l'historique comme
@@ -1810,7 +1849,7 @@ async function proposerBordereaux(uid) {
     // visite). On pose seulement le repère, et on ne parle que des bordereaux
     // à générer, qui eux sont vrais aujourd'hui.
     if (n.premiere) { n.ventes = []; n.messages = 0; }
-    if (!n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length) {
+    if (!n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length && !n.envoyes) {
       await marquerRecapVu(uid, n._marque); return;
     }
     const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
@@ -1823,7 +1862,7 @@ async function proposerBordereaux(uid) {
     const charge = {
       __vrm: 'recap', uid: String(uid),
       ventes: n.ventes.slice(0, 12), eur: n.eur, messages: n.messages, offres: n.offres,
-      aGenerer: n.aGenerer.slice(0, 8),
+      aGenerer: n.aGenerer.slice(0, 8), envoyes: n.envoyes,
     };
     for (const t of tabs) {
       try { await chrome.tabs.sendMessage(t.id, charge); pose = true; } catch (_) {}
@@ -2626,7 +2665,22 @@ async function genererBordereau(uid, tx) {
   const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
     { seller_address_id: adr, drop_off_type: null, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
-  return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+  // ⚠️ ON MESURE LES ÉCHECS AU LIEU DE LES SUPPOSER (§5.24). Sans ça, « il y a
+  // des messages d'erreur » ne peut mener qu'à des hypothèses : on ne sait ni
+  // combien, ni ce que Vinted a répondu. Un échantillon de la réponse est gardé
+  // dans `panel_diag_capture.rates.bordereau` — assez pour reconnaître la cause,
+  // trop court pour peser.
+  noterDiag(r.ok ? 'bordereau_genere' : `bordereau_refuse_${r.status}`);
+  if (!r.ok) { try { echantillonRate('bordereau', String(tx), JSON.stringify(r.json || {})); } catch (_) {} }
+  // Le message brut de Vinted ne dit rien à Julien. On traduit ce qu'on sait.
+  const brut = (r.json && (r.json.message || r.json.error)) || '';
+  const clair = r.ok ? ''
+    : r.status === 401 ? 'session expirée pour ce compte — recharge une page Vinted et réessaie'
+    : r.status === 403 ? 'Vinted a refusé pour ce compte'
+    : r.status === 404 ? "cette vente n'attend plus de bordereau chez Vinted"
+    : r.status === 422 ? (brut || "Vinted refuse ces informations d'envoi — génère-en un à la main une fois")
+    : (brut || `Vinted a répondu ${r.status}`);
+  return { ok: !!r.ok, status: r.status, error: clair };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

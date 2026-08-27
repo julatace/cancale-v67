@@ -114,6 +114,29 @@ const V = (tx, titre, prix, statut) => ({ transaction_id: tx, title: titre, pric
     await b.ctx.proposerBordereaux('111');
     dit(b.envoyes.length === 1 && b.envoyes[0].messages === 1, 'un nouveau message dans la même conversation resonne');
   }
+  // 8. LE BORDEREAU PART TOUT SEUL : le récap l'annonce même si rien d'autre
+  //    n'a bougé (« une fois que la vente a été faite, je veux que le bordereau
+  //    soit automatiquement envoyé dans l'app », Julien 27 août).
+  {
+    const b = banc({ memo: { at: Date.now(), ventes: [], convs: {} } });
+    await b.ctx.proposerBordereaux('111', 2);
+    const m = b.envoyes[0];
+    dit(b.envoyes.length === 1 && m && m.envoyes === 2,
+      "un bordereau parti tout seul est ANNONCÉ, même sans autre nouveauté",
+      m ? `envoyes=${m.envoyes}` : 'aucun message');
+  }
+  // 9. LA VISITE GÉNÈRE (plus de lectureSeule) et rafraîchit les ventes vite.
+  {
+    const src2 = require('fs').readFileSync(require('path').join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+    const i = src2.indexOf('async function visiteVinted');
+    const bloc = src2.slice(i, i + 2600);
+    dit(/const genes = await genererBordereauxEnAttente\(uid\);/.test(bloc) && !/lectureSeule: true/.test(bloc),
+      'la visite génère le bordereau toute seule (plus de lecture seule)');
+    dit(/rafraichirVentes\(uid\)/.test(bloc) && /VENTES_DELAI_MS/.test(bloc),
+      'les ventes se rafraîchissent seules, sans attendre la moisson complète');
+    dit(/async function rafraichirVentes/.test(src2) && /fetchAllOrders\(acc, 'sold'\)/.test(src2),
+      'rafraichirVentes réutilise fetchAllOrders + storeHarvestRow (une seule règle)');
+  }
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : "\nLe récap ne s'allume que quand il y a vraiment du nouveau.");
   process.exit(ko ? 1 : 0);
 })();
