@@ -1020,17 +1020,97 @@
         if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
         let b = a.querySelector(':scope > .vrm-vig');
         if (!b) { b = document.createElement('div'); b.className = 'vrm-vig'; a.appendChild(b); }
-        b.style.cssText = 'position:absolute;top:6px;left:6px;z-index:20;display:flex;flex-direction:column;gap:3px;'
-          + 'pointer-events:none;font:700 11px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
-        const pastille = (txt, fond, encre) => `<span style="background:${fond};color:${encre};border-radius:4px;`
-          + `padding:2px 6px;box-shadow:0 1px 4px rgba(0,0,0,.25);white-space:nowrap">${esc(txt)}</span>`;
-        b.innerHTML =
-          (o.numero != null ? pastille('N°' + o.numero, '#151110', '#EFE8DC') : '')
-          + (o.minPrice != null ? pastille('min ' + fmt(o.minPrice), '#D2401E', '#fff')
-                                : pastille('min ?', 'rgba(21,17,16,.55)', '#EFE8DC'));
+        b.style.cssText = 'position:absolute;top:6px;left:6px;z-index:20;display:flex;flex-direction:column;gap:4px;'
+          + 'align-items:flex-start;pointer-events:none;font:700 11px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+        const pastille = (txt, fond, encre, extra) => `<span style="background:${fond};color:${encre};border-radius:4px;`
+          + `padding:2px 6px;box-shadow:0 1px 4px rgba(0,0,0,.3);white-space:nowrap;${extra || ''}">${esc(txt)}</span>`;
+        // ⚠️ LE N° EST CE QU'ON RECOPIE SUR LE CARTON : il se lit d'un coup d'œil
+        //    dans une grille, donc il est GROS (17 px, contre 11 pour le reste).
+        const numHtml = o.numero != null
+          ? pastille('N°' + o.numero, '#151110', '#EFE8DC', 'font-size:17px;font-weight:800;padding:3px 9px;border-radius:5px')
+          : '';
+        // ⚠️ LE PRIX PLANCHER SE REMPLIT ICI. Le badge est DANS le lien de
+        //    l'annonce : sans `pointer-events:auto` + `preventDefault`, cliquer
+        //    dessus ouvrait la page au lieu d'ouvrir la saisie. C'est exactement
+        //    ce que Julien décrit : « il y a min mais on ne peut pas remplir,
+        //    ça clique sur l'annonce ».
+        const minHtml = o.minPrice != null
+          ? pastille('min ' + fmt(o.minPrice), '#D2401E', '#fff', 'pointer-events:auto;cursor:pointer')
+          : pastille('min +', 'rgba(21,17,16,.6)', '#EFE8DC', 'pointer-events:auto;cursor:pointer');
+        b.innerHTML = numHtml + `<span class="vrm-vig-min" data-id="${esc(m[1])}">${minHtml}</span>`;
+        const zone = b.querySelector('.vrm-vig-min');
+        if (zone) {
+          zone.style.pointerEvents = 'auto';
+          zone.onclick = (ev) => { ev.preventDefault(); ev.stopPropagation(); saisirPlancher(m[1], o, zone); };
+        }
       }
     } catch (_) {}
   }
+  // Petite saisie posée SUR la vignette : on ne quitte pas la grille pour
+  // remplir un chiffre. Entrée valide, Échap annule, cliquer ailleurs ferme.
+  // ⚠️ Le champ vit dans le lien de l'annonce : chaque événement doit être
+  //    arrêté (`stopPropagation`), sinon un simple clic ouvre la page Vinted.
+  function saisirPlancher(id, o, ancre) {
+    try {
+      const vieux = document.getElementById('vrm-min-saisie');
+      if (vieux) vieux.remove();
+      const box = document.createElement('div');
+      box.id = 'vrm-min-saisie';
+      const r = ancre.getBoundingClientRect();
+      box.style.cssText = `position:fixed;top:${Math.round(r.bottom + 6)}px;left:${Math.round(r.left)}px;z-index:2147483001;`
+        + 'background:#FBF7F0;color:#151110;border:1px solid #C3B49C;border-radius:6px;padding:8px;'
+        + 'box-shadow:0 10px 30px rgba(0,0,0,.3);font:600 12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
+        + 'display:flex;flex-direction:column;gap:6px;width:190px';
+      box.innerHTML = `
+        <div style="font-size:11px;color:#7a6d5f">Prix minimum accepté${o && o.price != null ? ` · en ligne à ${esc(fmt(o.price))}` : ''}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="vrm-min-champ" type="text" inputmode="decimal" value="${o && o.minPrice != null ? esc(String(o.minPrice)) : ''}"
+                 placeholder="—" style="flex:1;min-width:0;border:1px solid #C3B49C;border-radius:4px;padding:6px 7px;
+                 font:700 14px/1.2 inherit;background:#fff;color:#151110">
+          <span style="font-weight:700">€</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button id="vrm-min-x" style="flex:1;border:1px solid #C3B49C;background:#FBF7F0;color:#151110;border-radius:4px;
+                  padding:6px 0;font:600 12px inherit;cursor:pointer">Annuler</button>
+          <button id="vrm-min-ok" style="flex:1;border:none;background:#151110;color:#EFE8DC;border-radius:4px;
+                  padding:6px 0;font:700 12px inherit;cursor:pointer">Enregistrer</button>
+        </div>`;
+      // ⚠️ La boîte est posée sur `documentElement`, PAS dans le lien de
+      //    l'annonce : rien ne remonte jusqu'à lui, il n'y a donc rien à
+      //    arrêter. Un `stopPropagation` en phase de CAPTURE ici empêchait
+      //    l'événement d'atteindre ses propres boutons — « Enregistrer » ne
+      //    faisait rien. On se contente d'arrêter la remontée, sans toucher à
+      //    la descente.
+      ['click', 'mousedown', 'mouseup', 'keydown'].forEach(t =>
+        box.addEventListener(t, e => e.stopPropagation()));
+      document.documentElement.appendChild(box);
+      const champ = box.querySelector('#vrm-min-champ');
+      const fermer = () => { box.remove(); document.removeEventListener('mousedown', dehors, true); };
+      const dehors = (e) => { if (!box.contains(e.target)) fermer(); };
+      setTimeout(() => document.addEventListener('mousedown', dehors, true), 0);
+      const valider = () => {
+        const brut = String(champ.value || '').replace(',', '.').trim();
+        const montant = brut === '' ? '' : String(parseFloat(brut));
+        if (brut !== '' && !isFinite(parseFloat(brut))) { fermer(); return; }
+        try {
+          chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setMinPrice', id: String(id), amount: montant }, () => {
+            // On repart de la source (`load()` relit DATA) plutôt que de peindre
+            // un chiffre à la main : sinon la vignette pourrait afficher autre
+            // chose que ce qui est réellement enregistré.
+            try { load(); } catch (_) {}
+            document.querySelectorAll('a[href*="/items/"]').forEach(a => { delete a.dataset[TAG]; });
+            setTimeout(decorerVignettes, 300);
+          });
+        } catch (_) {}
+        fermer();
+      };
+      box.querySelector('#vrm-min-ok').onclick = valider;
+      box.querySelector('#vrm-min-x').onclick = fermer;
+      champ.onkeydown = (e) => { if (e.key === 'Enter') valider(); else if (e.key === 'Escape') fermer(); };
+      champ.focus(); champ.select();
+    } catch (_) {}
+  }
+
   // La grille se remplit au défilement : on redécore quand le DOM bouge, mais
   // au plus une fois par 400 ms (sinon on repasse sur toute la page en boucle).
   let decoTimer = null;
