@@ -640,11 +640,16 @@
     // « Au-dessus du marché » : prix > +15 % de la médiane des paires comparables.
     const isOver = (o) => o.peer != null && o.price != null && Number(o.price) > Number(o.peer) * 1.15;
     const overCount = online.filter(isOver).length;
-    const FILTERS = [['all', 'Toutes', online.length], ['relance', '💡 À relancer', relanceIds.size], ['over', '📊 Trop cher', overCount], ['sleep', '😴 Dorment', sleepIds.size], ['nonum', '🔢 Sans N°', noNumIds.size]];
+    // ⚠️ 0 plancher posé sur 255 paires (mesuré le 27 août) : tant qu'il n'y
+    //    en a pas, le copilote d'offres n'a rien à dire. Une puce pour ne
+    //    voir que celles qui en manquent, et les remplir à la suite.
+    const sansMin = online.filter(o => o.minPrice == null).length;
+    const FILTERS = [['all', 'Toutes', online.length], ['relance', '💡 À relancer', relanceIds.size], ['over', '📊 Trop cher', overCount], ['sleep', '😴 Dorment', sleepIds.size], ['nonum', '🔢 Sans N°', noNumIds.size], ['nomin', '🏷 Sans minimum', sansMin]];
     const all = chaussuresFilter === 'relance' ? online.filter(o => relanceIds.has(String(o.id)))
       : chaussuresFilter === 'over' ? online.filter(isOver)
       : chaussuresFilter === 'sleep' ? online.filter(o => sleepIds.has(String(o.id)))
       : chaussuresFilter === 'nonum' ? online.filter(o => noNumIds.has(String(o.id)))
+      : chaussuresFilter === 'nomin' ? online.filter(o => o.minPrice == null)
       : online;
     const filterChips = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${FILTERS.map(([k, l, n]) => `<button class="vrm-chfilter" data-f="${k}" style="border:1px solid ${chaussuresFilter === k ? '#111' : '#dde'};background:${chaussuresFilter === k ? '#111' : '#fff'};color:${chaussuresFilter === k ? '#fff' : '#334'};border-radius:999px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer">${l}${n ? ` ${n}` : ''}</button>`).join('')}</div>`;
     // Bandeau « boutique en un coup d'œil » — calculé sur TOUTES les annonces en
@@ -692,7 +697,21 @@
             ${peerTag ? `<div class="vrm-m" style="margin-top:1px;font-weight:600">${peerTag}</div>` : ''}
           </div>
         </a>
-        <a href="https://www.vinted.fr/items/${esc(o.id)}/edit" target="_blank" rel="noreferrer" title="Modifier le prix sur Vinted" style="flex-shrink:0;align-self:center;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:#D2401E14;color:#D2401E;text-decoration:none;font-size:15px">✏️</a>
+        <div style="flex-shrink:0;align-self:center;display:flex;flex-direction:column;align-items:center;gap:4px">
+          <!-- ⚠️ LE PRIX PLANCHER SE REMPLIT ICI, EN SÉRIE. Mesuré le 27 août :
+               0 plancher posé sur 255 paires — donc le copilote d'offres n'a
+               jamais rien à dire et l'acceptation automatique ne peut pas
+               fonctionner. Le frein n'était pas la volonté : il fallait ouvrir
+               l'annonce une par une. Ici, une colonne, un champ par ligne.
+               ⚠️ On n'invente AUCUN montant par défaut : sans prix d'achat
+               connu (0 sur 255), un plancher suggéré pourrait faire vendre à
+               perte. C'est lui qui tape. -->
+          ${chaussuresVue === 'sold' ? '' : `<input class="vrm-ch-min" data-id="${esc(o.id)}" type="text" inputmode="decimal"
+                 value="${o.minPrice != null ? esc(String(o.minPrice)) : ''}" placeholder="min €" title="Prix minimum accepté sur une offre"
+                 style="width:62px;box-sizing:border-box;border:1px solid ${o.minPrice != null ? '#D2401E' : '#D7CDBB'};border-radius:5px;
+                 padding:5px 6px;font:700 12px inherit;text-align:center;background:${o.minPrice != null ? '#FDF0EC' : '#fff'};color:#151110">`}
+          <a href="https://www.vinted.fr/items/${esc(o.id)}/edit" target="_blank" rel="noreferrer" title="Modifier le prix sur Vinted" style="display:flex;align-items:center;justify-content:center;width:34px;height:28px;border-radius:5px;background:#D2401E14;color:#D2401E;text-decoration:none;font-size:15px">✏️</a>
+        </div>
       </div>`;
     }).join('');
     return `
@@ -705,6 +724,44 @@
       <div class="vrm-grid">${rows}</div>`;
   }
   function wireChaussures() {
+    // ⚠️ ON N'ÉCRIT PAS À CHAQUE FRAPPE, ET ON NE RE-RENDA PAS LA LISTE.
+    //    En tapant « 20 » on passe par « 1 » ; et un `render()` re-trie la
+    //    liste sous les doigts et vole le focus — c'est exactement le défaut
+    //    corrigé côté app en §5.44. On valide à la SORTIE du champ ou sur
+    //    Entrée, et on met à jour la mémoire + la vignette sans redessiner.
+    panel.querySelectorAll('.vrm-ch-min').forEach(inp => {
+      // ⚠️ `dernier` doit être RÉASSIGNABLE : sur Entrée on valide, puis le
+      //    `blur` qui suit revalidait la même valeur → deux écritures pour une
+      //    seule saisie. Mesuré au banc (« 201=30 » envoyé deux fois).
+      let dernier = inp.value;
+      const valider = () => {
+        const brut = String(inp.value || '').replace(',', '.').trim();
+        if (brut === dernier.replace(',', '.').trim()) return;    // rien n'a changé
+        if (brut !== '' && !isFinite(parseFloat(brut))) { inp.value = dernier; return; }
+        const montant = brut === '' ? '' : String(parseFloat(brut));
+        const id = inp.dataset.id;
+        dernier = inp.value;
+        try {
+          chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'setMinPrice', id, amount: montant }, () => {
+            const o = DATA && DATA.byId && DATA.byId[id];
+            if (o) o.minPrice = montant === '' ? null : Number(montant);
+            inp.style.borderColor = montant === '' ? '#D7CDBB' : '#D2401E';
+            inp.style.background = montant === '' ? '#fff' : '#FDF0EC';
+            // La vignette porte un marqueur « déjà décorée » : sans l'enlever,
+            // elle garderait l'ancien montant à l'écran.
+            try {
+              document.querySelectorAll(`a[href*="/items/${id}"]`).forEach(a => { delete a.dataset[TAG]; });
+              decorerVignettes();
+            } catch (_) {}
+          });
+        } catch (_) {}
+      };
+      inp.onblur = valider;
+      inp.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); valider(); inp.blur(); }
+        else if (e.key === 'Escape') { inp.value = dernier; inp.blur(); }
+      };
+    });
     panel.querySelectorAll('.vrm-chvue').forEach(b => { b.onclick = () => { chaussuresVue = b.dataset.v; render(); }; });
     panel.querySelectorAll('.vrm-vacct').forEach(b => { b.onclick = () => { ventesAcct = b.dataset.a; render(); }; });
     panel.querySelectorAll('.vrm-chfilter').forEach(b => { b.onclick = () => { chaussuresFilter = b.dataset.f; render(); }; });
