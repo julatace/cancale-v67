@@ -5511,3 +5511,131 @@ C'est l'explication complète du « on dirait que tu n'as rien fait » : tout es
 poussé sur la branche, rien n'est déployé. Le déploiement se fait en ouvrant une
 PR depuis cette branche et en la fusionnant — c'est **la décision de Julien**,
 l'agent n'ouvre pas de PR de lui-même.
+
+---
+
+## 5.70 — LE RÉCAP D'ARRIVÉE (extension 5.40) + le coffre qui se remplit + les ventes masquées chiffrées
+
+### 1. ⚠️ « LA GÉNÉRATION A DU MAL À SE FAIRE » — deux causes, toutes deux mesurées
+
+**a) Le mémo « déjà demandé » partait AVANT l'envoi.** `proposerBordereaux`
+écrivait `vrmPropose[tx] = now` puis envoyait le message à l'onglet. Or on
+arrive **3 s après le chargement** (§5.19) : si le script de page n'est pas
+encore prêt, `sendMessage` échoue en silence — la fenêtre ne s'affiche jamais
+**et la vente est marquée « demandée » pour 20 h**. La question ne revenait donc
+plus. ➡️ On ne note « déjà montré » **que si un onglet a réellement reçu**.
+
+**b) 3 comptes sur 9 ne peuvent PAS générer.** Relevé du 26 août :
+| adresse d'envoi captée | comptes |
+|---|---|
+| ✅ oui | julatace35260, llloollllaa, tomj606, julienf765, tomj683, angeled92 |
+| ❌ non | **julatace3535**, arthuror2, liliand653 (masqué) |
+
+Et sur les **2 ventes qui attendaient un bordereau ce jour-là**, une était
+justement sur `julatace3535`. Le refus était honnête mais ne se débloquait qu'en
+générant un bordereau **à la main** une fois.
+➡️ `adresseVendeur(uid, acc)` garde la capture comme source première, puis
+**demande ses propres adresses** (`GET /api/v2/user_addresses`) — une lecture,
+sur son compte, **derrière le garde-fou** (compte connecté, plafond 20/h), et
+mémorisée localement. ⚠️ La forme de la réponse **n'a jamais été observée** :
+lecture défensive (`idDAdresse`, plusieurs noms de champ), et si rien ne
+ressemble à une adresse **on ne prétend rien** et on garde un échantillon dans
+`panel_diag_capture` (§5.24).
+
+⚠️ **CORRECTION D'UNE DE MES MESURES (§21, encore)** : mon premier script
+annonçait « **aucun** compte n'a d'adresse ». Faux — le corps est stocké en
+**chaîne JSON**, donc `JSON.stringify(row.data)` échappe les guillemets et mon
+motif `"seller_address_id"` ne pouvait pas matcher. La vraie réponse est 6 sur 9.
+**Vérifier la FORME du champ avant de conclure à un zéro.**
+
+### 2. LE RÉCAP : « ça ne s'allume que s'il y a du nouveau »
+
+Demande, en deux temps : *« je veux avoir AU MILIEU DE MON ÉCRAN un message qui
+me dit si j'ai fait une vente et qui me demande si je génère les bordereaux —
+oui, non, et seulement cela »*, puis *« il ne faut pas que ça s'allume s'il n'y
+a rien ; ou alors ça peut faire un résumé de tout ce qui s'est passé, ça
+m'évite d'aller dans les messages, dans les notifications »*.
+
+- **`nouveautes(uid)`** compare l'état courant à un repère posé au **dernier
+  récap montré** (`vrmRecapVu`, local, aucun égress) : ventes nouvelles (+
+  montant), messages non lus **qui ont bougé**, offres en attente, bordereaux à
+  générer. **Zéro requête Vinted** : tout vient de la moisson déjà en base.
+- **Rien de neuf ⟹ aucun message n'est envoyé** : la fenêtre ne s'ouvre pas.
+- La fenêtre affiche **une ligne par nouveauté** et ne pose la question
+  **OUI / NON** que s'il y a vraiment un bordereau à générer ; sinon **un seul
+  bouton « Fermer »** — c'est une information, pas une question.
+- **« Oui »** enchaîne les ventes **une par une en attendant la réponse** de
+  Vinted (§5.36) — jamais un lot lâché d'un coup, **aucune temporisation
+  « faussement humaine »** (§32) : c'est le rythme du réseau. Un refus du
+  garde-fou **arrête la série** (les suivantes taperaient le même mur).
+
+⚠️ **Deux garde-fous à ne pas retirer :**
+1. **Première visite sur un compte** : on pose le repère **sans** annoncer tout
+   l'historique comme une nouveauté (sinon « 40 ventes ! » au premier passage).
+2. Une **conversation non lue laissée exprès** ne resonne pas ; elle resonne dès
+   qu'un nouveau message y arrive (comparaison sur `updated_at`) — même règle
+   que le bandeau de notification de l'app (§7).
+
+⚠️ **Honnêteté sur « depuis que j'ai fermé la session »** : on ne sait pas quand
+il ferme Vinted. Le repère est « **depuis ton dernier passage** » (= le dernier
+récap montré) — c'est observable, et c'est ce qui est écrit dans la fenêtre.
+
+**`scripts/audit-recap.cjs`** (nouveau) exécute le VRAI code du service worker
+dans un `vm` : **7 contrôles**, et **3 échouent bien sur le code d'avant**.
+
+### 3. Ergonomie du panneau : 12 pastilles → 6 + « Plus »
+Douze onglets sur trois rangées, c'est un mur : on ne lit plus, on cherche. Même
+remède que la barre du bas de l'app (§5.53) — **Ma journée · Cette paire\* · Mes
+paires · Bordereaux · Achats · Messages** restent visibles, le reste (Ventes,
+Chercher, Coffre, Litiges, Favoris) passe derrière **« Plus »**, qui porte leurs
+badges et s'allume quand l'onglet affiché vient de derrière.
+⚠️ **L'onglet « Republier » est RETIRÉ** (« ne mets pas l'onglet republié, ce
+n'est pas obligé »). `renderRepublier` reste dans le fichier mais **plus rien ne
+l'ouvre** — même parti pris que « Renuméroter à la suite » côté app (§5.45).
+⚠️ `svgi()` ne dessine que ce qui existe dans `ICONS` : `more-horizontal` a dû
+être ajoutée. Une icône absente ne lève **aucune** erreur, elle ne s'affiche
+simplement pas (même famille que `ICON_PATHS`, §5.69).
+
+### 4. L'extension avait gardé l'ancienne identité
+Turquoise `#09b1ba` sur blanc, alors que l'app est passée en **papier/vermillon**
+(§5.65) : deux outils du même produit, deux identités. Accent → `#D2401E`,
+surface → papier `#EFE8DC`, cartes `#FBF7F0` à coins nets, onglet actif à
+l'encre. 60 occurrences remplacées.
+
+### 5. LE COFFRE : 28 fiches sur 45 ne correspondaient à AUCUNE ligne
+| | |
+|---|---|
+| lignes de coffre | **144 · 9 avec leur description** |
+| fiches lues sur la page (`vinted_item_details`) | **45, toutes avec leur texte** |
+| fiches **sans aucune ligne de coffre** | **28** |
+
+Cause : on n'archivait que les annonces **EN LIGNE**. Or une fiche est lue dès
+qu'il **ouvre** une annonce — y compris une paire déjà vendue, et c'est
+justement celle-là qu'on veut au coffre (il sert à **recréer** une annonce
+disparue, §47).
+➡️ `archiverLot(uid, items, tous)` reçoit le dressing **complet** et archive en
+plus les articles **fermés dont la page a été lue**. L'identité vient de l'**id
+d'annonce Vinted**, et les extras ne peuvent venir que du **dressing du compte** :
+une annonce d'un autre vendeur qu'il aurait consultée ne peut pas y entrer.
+La passe de complétion tourne désormais **même sans annonce en ligne**.
+**Mesuré au banc** (vraies données, écritures capturées, **aucune écriture en
+prod**) : **5 nouvelles lignes** de coffre et **13 lignes qui gagnent leur
+description** sur 4 comptes ; sur le code d'avant, **0 nouvelle ligne**.
+⚠️ Seules **6 des 28** fiches orphelines appartiennent à un compte connu — les
+22 autres sont des annonces **d'autres vendeurs** qu'il a consultées. Elles ne
+doivent jamais entrer au coffre, et par construction elles ne le peuvent pas.
+
+### 6. Les ventes masquées : le compte ne disait pas l'enjeu
+**208 ventes masquées**, dont **131 retrouvées dans la moisson pour 2 927,60 €**
+hors de tous les totaux, réparties sur presque tous les mois. La ligne de
+l'écran Ventes porte maintenant le **montant**, sépare les deux causes
+(masquée **à la main** / **compte** masqué, qui se règle dans Réglages) et
+propose **« tout réafficher »** avec confirmation.
+Vérifié au rendu : « 131 ventes hors de la compta · 2 928 € », la feuille
+s'ouvre, et après confirmation la liste passe de **208 à 0**.
+
+### ⚠️ TOUJOURS PAS EN PRODUCTION
+`origin/main` est au 25 août. La branche `claude/new-session-gzdgur` a
+**32 commits d'avance** et **aucune pull request ouverte**. Rien de tout ceci
+n'est chez Julien tant que la PR n'est pas ouverte puis fusionnée — c'est **sa**
+décision, l'agent n'ouvre pas de PR de lui-même.
