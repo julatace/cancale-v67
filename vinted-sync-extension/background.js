@@ -1733,12 +1733,20 @@ async function proposerBordereaux(uid) {
     const memo = (await chrome.storage.local.get('vrmPropose')).vrmPropose || {};
     const frais = liste.filter(v => !memo[v.tx] || Date.now() - Number(memo[v.tx]) > 20 * 3600 * 1000);
     if (!frais.length) return;
+    const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
+    // ⚠️ ON NE NOTE « DÉJÀ DEMANDÉ » QUE SI LA QUESTION EST RÉELLEMENT POSÉE.
+    // Avant, le mémo était écrit AVANT l'envoi : si le script de la page n'était
+    // pas encore prêt (le cas le plus courant, on arrive 3 s après le
+    // chargement), la fenêtre ne s'affichait jamais ET la vente était marquée
+    // « demandée » pour 20 h. C'est exactement « la génération a du mal à se
+    // faire » : la question ne revenait plus.
+    let pose = false;
+    for (const t of tabs) {
+      try { await chrome.tabs.sendMessage(t.id, { __vrm: 'proposerBordereau', uid: String(uid), ventes: frais.slice(0, 8) }); pose = true; } catch (_) {}
+    }
+    if (!pose) return;
     for (const v of frais) memo[v.tx] = Date.now();
     await chrome.storage.local.set({ vrmPropose: memo });
-    const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
-    for (const t of tabs) {
-      try { await chrome.tabs.sendMessage(t.id, { __vrm: 'proposerBordereau', uid: String(uid), ventes: frais.slice(0, 5) }); } catch (_) {}
-    }
   } catch (_) {}
 }
 try {
@@ -2456,25 +2464,72 @@ async function capterAnnonce(uid, itemId) {
 //   {"seller_address_id":310525135,"drop_off_type":null,"label_type":null}
 // `seller_address_id` change par compte : on le relit dans la capture de CE
 // compte. Sans capture pour ce compte, on ne devine pas — on le dit.
-async function adresseVendeur(uid) {
+// ⚠️ MESURÉ LE 26 AOÛT : 6 comptes sur 9 ont une adresse d'envoi captée, et les
+// 3 qui n'en ont pas ne peuvent PAS générer de bordereau — dont `julatace3535`,
+// qui avait justement une vente en attente. C'est ça, « la génération a du mal
+// à se faire » : le refus est honnête mais il ne se débloquait qu'en générant
+// un bordereau à la main une fois.
+// La capture reste la source PREMIÈRE (c'est l'adresse qu'il a réellement
+// choisie). À défaut, on demande la liste de SES adresses à Vinted — une
+// lecture, sur son propre compte, avec les mêmes garde-fous. Le résultat est
+// mémorisé pour qu'on ne redemande pas.
+// ⚠️ La forme de la réponse n'a JAMAIS été observée : lecture défensive sur
+// plusieurs noms de champ, et si rien ne ressemble à une adresse on ne prétend
+// rien (§5.24 — on instrumente au lieu de supposer).
+function idDAdresse(j) {
+  const listes = [j && j.user_addresses, j && j.addresses, j && j.items, Array.isArray(j) ? j : null];
+  for (const l of listes) {
+    if (!Array.isArray(l) || !l.length) continue;
+    // Une adresse d'EXPÉDITION, sinon la première venue.
+    const pref = l.find(a => a && (a.is_default || a.default || a.entry_type === 2)) || l[0];
+    const id = pref && (pref.id != null ? pref.id : pref.user_address_id);
+    if (id != null && /^\d+$/.test(String(id))) return id;
+  }
+  const un = j && (j.user_address || j.address);
+  if (un && un.id != null) return un.id;
+  return null;
+}
+
+async function adresseVendeur(uid, acc) {
   try {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_wreq_api_v2_transactions_id_shipment_order&select=data`);
     const body = rows && rows[0] && rows[0].data && rows[0].data.body;
-    if (!body) return null;
-    const j = typeof body === 'string' ? JSON.parse(body) : body;
-    const id = j && j.seller_address_id;
-    return id != null ? id : null;
+    if (body) {
+      const j = typeof body === 'string' ? JSON.parse(body) : body;
+      if (j && j.seller_address_id != null) return j.seller_address_id;
+    }
+  } catch (_) {}
+  // Mémo local (aucun égress) : une fois trouvée, on ne redemande plus.
+  let memo = {};
+  try { memo = (await chrome.storage.local.get('vrmAdresses')).vrmAdresses || {}; } catch (_) {}
+  if (memo[String(uid)] != null) return memo[String(uid)];
+  if (!acc) return null;
+  try {
+    const r = await vintedSend(acc, 'GET', '/api/v2/user_addresses');
+    const id = r && r.ok ? idDAdresse(r.json) : null;
+    if (id == null) {
+      noterDiag(r && r.ok ? 'adresse_forme_inconnue' : 'adresse_refusee');
+      if (r && r.ok) echantillonRate('adresse', String(uid), JSON.stringify(r.json || {}));
+      return null;
+    }
+    memo[String(uid)] = id;
+    try { await chrome.storage.local.set({ vrmAdresses: memo }); } catch (_) {}
+    noterDiag('adresse_trouvee');
+    return id;
   } catch (_) { return null; }
 }
 
 async function genererBordereau(uid, tx) {
   if (!uid || !tx) return { ok: false, error: 'vente incomplète' };
-  const adr = await adresseVendeur(uid);
-  if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
   const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
+  // ⚠️ Le garde-fou passe AVANT la lecture d'adresse : celle-ci est une requête
+  // Vinted comme une autre, elle n'a pas à partir depuis la session d'un autre
+  // compte ni à dépasser le plafond horaire (§48).
+  const adr = await adresseVendeur(uid, acc);
+  if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
   const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
     { seller_address_id: adr, drop_off_type: null, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
