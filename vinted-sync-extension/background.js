@@ -2814,6 +2814,10 @@ async function genererBordereau(uid, tx) {
 //  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
 const BORD_MAX_PAR_VISITE = 3;
 const BORD_RETRY_MS = 6 * 60 * 60 * 1000;
+// Au-delà, on ne va plus chercher le PDF d'une vente : le colis est livré depuis
+// longtemps et le lien de Vinted n'existe plus. Mesuré : les 28 ventes sans PDF
+// qui ne sont pas encore livrées tiennent TOUTES dans cette fenêtre.
+const BORD_RATTRAPAGE_J = 21;
 
 // ── ALLER CHERCHER LE CODE DE RETRAIT D'UN COLIS QUI M'ATTEND ────────────────
 // La capture passive ne voit que ce que la page charge : mesuré en base, sur
@@ -3046,19 +3050,54 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
       for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
     } catch (_) { /* pas de ligne : rien de capté, on tente */ }
-    let recup = 0;
-    for (const o of ventes) {
-      if (recup >= BORD_MAX_PAR_VISITE) break;
-      if (!o || o.transaction_id == null) continue;
+    // ⚠️⚠️ ON N'ABANDONNE PLUS DÈS QUE VINTED FAIT AVANCER LE STATUT (27 août).
+    // Julien : « des fois je génère et la vente s'en va sans même avoir envoyé
+    // le bordereau à l'app ». La 2ᵉ passe ne regardait que `AWAITING_SHIP` : à
+    // la seconde où Vinted passe la vente à « expédiée » / « finalisée », on
+    // cessait DÉFINITIVEMENT d'aller chercher son PDF. Or le PDF n'est pas prêt
+    // à l'instant où on génère (Vinted le fabrique puis le dépose) — donc la
+    // seule fenêtre où on essayait était justement celle où ça échoue le plus.
+    // MESURÉ sur la vraie base : **90 ventes de moins de 45 jours** ont leur
+    // étiquette chez Vinted et AUCUN PDF dans l'app (ni capté, ni email) — et
+    // l'ancienne condition n'en couvrait qu'**1**. 28 d'entre elles ne sont même
+    // pas encore livrées.
+    // Nouvelle règle : toute vente RÉCENTE, non annulée, dont l'étiquette existe
+    // (donc au-delà de « paiement validé ») et dont on n'a pas le PDF. Les plus
+    // utiles d'abord : celles qui attendent encore l'envoi, puis les plus
+    // récentes. Le plafond de 3 par visite et le mémo de 6 h restent : c'est
+    // une limite de volume, pas un rythme déguisé (§32).
+    const limite = Date.now() - BORD_RATTRAPAGE_J * 86400000;
+    const aRecuperer = ventes.filter(o => {
+      if (!o || o.transaction_id == null) return false;
       const tx = String(o.transaction_id);
-      // Une vente qui attend l'envoi ET dont l'étiquette existe déjà.
-      if (!AWAITING_SHIP(o.status) || aGenererBordereau(o.status)) continue;
-      if (dejaMail.has(tx) || dejaCapte.has(tx)) continue;
+      if (dejaMail.has(tx) || dejaCapte.has(tx)) return false;   // on a déjà le PDF
+      if (aGenererBordereau(o.status)) return false;             // l'étiquette n'existe pas encore
+      if (/annul|cancel|refus|rembours/i.test(String(o.status || ''))) return false;
+      const d = Date.parse(o.date || '') || 0;
+      if (!d || d < limite) return false;                        // trop vieux : le lien n'existe plus
       const mk = 'get' + tx;
-      if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) continue;
-      memo[mk] = { t: Date.now() };
-      const eu = (await recupererLabel(acc, uid, tx)).ok;
-      if (eu) { recup++; logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`); }
+      if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) return false;
+      return true;
+    }).sort((a, b) => {
+      const pa = AWAITING_SHIP(a.status) ? 0 : 1, pb = AWAITING_SHIP(b.status) ? 0 : 1;
+      if (pa !== pb) return pa - pb;                             // ce qui attend TON envoi d'abord
+      return (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0);
+    });
+    let recup = 0;
+    for (const o of aRecuperer) {
+      if (recup >= BORD_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      memo['get' + tx] = { t: Date.now() };
+      // ⚠️ ON N'INSISTE QUE QUAND ÇA A UN SENS. L'insistance (§5.48) sert à
+      // attendre un PDF que Vinted est en train de fabriquer — donc uniquement
+      // sur une vente qui attend encore l'envoi. Sur une vente déjà partie, un
+      // « pas d'expédition exposée » ne s'arrangera pas : réessayer 4 fois, ce
+      // serait 4 requêtes pour rien dans l'empreinte du compte (§5, §48).
+      const eu = AWAITING_SHIP(o.status)
+        ? (await recupererLabelInsiste(acc, uid, tx)).ok
+        : (await recupererLabel(acc, uid, tx)).ok;
+      recup++;
+      if (eu) logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`);
     }
     await chrome.storage.local.set({ vrmBordFaits: memo });
     return faits + recup;

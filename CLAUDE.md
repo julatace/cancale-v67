@@ -5848,3 +5848,64 @@ plus les onglets passés derrière « Plus » en 5.40). `vinted-panel.js` n'a pa
 touché de la session : ces échecs sont antérieurs.
 
 Extension **5.45.0** — à recharger dans Chrome.
+
+### 5.72 (suite) — ⚠️ « LA VENTE S'EN VA SANS AVOIR ENVOYÉ LE BORDEREAU À L'APP »
+
+Julien : « des fois je génère et la vente s'en va sans même avoir envoyé le
+bordereau à l'app… dès que je navigue sur Vinted il doit capter les bordereaux
+des ventes où les bordereaux ont été téléchargés ». **Il avait raison, et le
+chiffre est gros.**
+
+### Mesuré AVANT de coder, sur la vraie base
+| | |
+|---|---|
+| bordereaux captés par l'extension | 29 lignes · **23 transactions** |
+| bordereaux reçus par email | 113 lignes · 112 transactions |
+| **ventes de moins de 45 j SANS aucun PDF** (ni capté, ni email) | **90** |
+| dont couvertes par l'ancienne 2ᵉ passe | **1** ⚠️ |
+| dont **déjà parties** (expédiée / finalisée / au relais) | **89** |
+| dont pas encore livrées (donc encore utiles) | **28**, toutes < 21 j |
+
+### La cause, en une ligne
+```js
+if (!AWAITING_SHIP(o.status) || aGenererBordereau(o.status)) continue;   // ancienne 2ᵉ passe
+```
+La 2ᵉ passe ne regardait QUE les ventes **encore en attente d'envoi**. À la
+seconde où Vinted fait avancer le statut (« expédiée », « finalisée »), on
+cessait **définitivement** d'aller chercher le PDF. Or Vinted **fabrique** le
+PDF après la génération et le dépose sur S3 : la seule fenêtre où on essayait
+était justement celle où ça échoue le plus. D'où « la vente s'en va sans que le
+bordereau soit arrivé ».
+
+### La nouvelle règle
+Toute vente **récente** (`BORD_RATTRAPAGE_J = 21`), **non annulée**, dont
+l'étiquette existe (donc au-delà de « paiement validé ») et dont on n'a **aucun**
+PDF — ni capté, ni email. Triée : **ce qui attend TON envoi d'abord**, puis les
+plus récentes. Plafond inchangé : **3 par visite**, mémo de 6 h.
+- **21 jours** parce que c'est mesuré : les 28 ventes sans PDF qui ne sont pas
+  encore livrées tiennent TOUTES dans cette fenêtre, et au-delà le lien de Vinted
+  n'existe plus (on ne part pas à la pêche sur 60 ventes finalisées anciennes).
+- ⚠️ **On n'insiste (§5.48) que sur une vente qui attend encore l'envoi** : là, le
+  PDF est en cours de fabrication. Sur une vente déjà partie, « pas d'expédition
+  exposée » ne s'arrangera pas — réessayer 4 fois serait 4 requêtes pour rien
+  dans l'empreinte du compte (§5, §48). Mesuré au banc : 1 requête contre 4.
+
+⚠️ Avec 89 en retard et 3 par visite, le rattrapage prend une trentaine de
+passages sur Vinted. C'est voulu : discret, et les plus utiles passent d'abord.
+
+### Vérifié
+**`scripts/audit-bordereau-rattrapage.cjs`** (nouveau) exécute le VRAI
+`genererBordereauxEnAttente()` dans un `vm` et mesure **quelles transactions sont
+réellement demandées à Vinted** — **11 contrôles**, dont **5 échouent bien sur le
+code d'avant** (§21) : vente expédiée récupérée, vente finalisée récupérée,
+plafond de 3, une seule requête sur une vente partie, insistance conservée sur
+une vente qui attend l'envoi. Plus : fenêtre de 21 j respectée, PDF déjà capté ou
+reçu par email → aucune requête, vente remboursée → jamais.
+`node --check` OK · **13 audits au vert** · vrai `buildPanelData` contre la vraie
+base : aucune régression.
+⚠️ Piège de banc rencontré : mes fixtures utilisaient des identifiants de
+transaction **non numériques** (`t1`), alors que le mock n'interceptait que
+`/transactions/(\d+)/` — le banc annonçait « aucune demande » pour un code qui
+marchait. Identifiants numériques, comme les vrais.
+
+Extension **5.46.0** — à recharger dans Chrome.
