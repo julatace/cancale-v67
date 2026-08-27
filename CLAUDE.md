@@ -5721,3 +5721,39 @@ celle d'un autre vendeur **intacte**, redécoration après ajout dynamique,
 les 3 nouveaux échouent bien sur le code d'avant ; `audit-identite` à 43) ·
 smoke app **11 écrans, 0 écran vide, 0 PAGEERROR, 0 artefact** (les 23 lignes
 console sont le 400 volontaire de `select=owner` et les resets de fin de test).
+
+### 5.71 (suite) — Le prix plancher se remplit en série (5.43 → 5.44)
+
+**Le badge de la vignette n'était pas remplissable** : il vit DANS le lien de
+l'annonce, donc cliquer dessus ouvrait la page Vinted. `pointer-events:auto` +
+`preventDefault` + une petite boîte de saisie posée sur `documentElement`.
+⚠️ **Piège trouvé au banc** : ma 1ʳᵉ version arrêtait les événements de la boîte
+en phase de **CAPTURE**. En capture, `stopPropagation` empêche l'événement
+d'atteindre les **descendants** — donc mes propres boutons : « Enregistrer » ne
+faisait rien. La boîte n'est pas dans le lien : il n'y a rien à arrêter à la
+descente, seulement à la remontée.
+Le **N° passe de 11 à 17 px** (gras 800) : c'est ce qu'on recopie sur le carton.
+
+**Et en série, dans « Mes paires »** — mesuré le 27 août : **0 plancher posé sur
+255 paires**, donc le copilote d'offres n'a jamais rien à dire et l'acceptation
+automatique ne peut pas fonctionner. Un champ `min` par ligne (vue *En ligne*
+seulement) + une puce **« 🏷 Sans minimum »**.
+⚠️ On n'écrit **pas** à chaque frappe et on ne **redessine pas** la liste (en
+tapant « 20 » on passe par « 1 », et un `render()` re-trie sous les doigts —
+c'est le défaut corrigé côté app en §5.44). Validation à la sortie du champ ou
+sur Entrée.
+⚠️ Deuxième piège du même banc : Entrée validait, puis le `blur` qui suit
+revalidait la même valeur → **deux écritures pour une saisie**. Le repère doit
+être réassigné après chaque validation.
+⚠️ **Aucun montant n'est suggéré par défaut** : sans prix d'achat connu (0 sur
+255), un plancher inventé pourrait faire vendre à perte (§5.38, §45).
+
+### État mesuré le 27 août (après les correctifs de la session)
+| | |
+|---|---|
+| annonces en ligne | **32 · 0 sans N° · 0 doublon de numéro** ✅ |
+| colis à envoyer | **13 · 0 sans numéro · 0 désaccord** entre le N° de l'annonce et celui de la vente ✅ |
+| colis sans PDF de bordereau | 4 (3 « étiquette déjà émise » + 1 à générer) |
+| coffre | 156 lignes · **28 avec leur description** (9 avant le correctif) |
+| **prix d'achat** | **0 / 255** ⚠️ |
+| **prix plancher** | **0 / 255** ⚠️ (l'outil de saisie en série existe maintenant) |
