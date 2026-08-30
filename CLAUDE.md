@@ -5909,3 +5909,106 @@ transaction **non numériques** (`t1`), alors que le mock n'interceptait que
 marchait. Identifiants numériques, comme les vrais.
 
 Extension **5.46.0** — à recharger dans Chrome.
+
+---
+
+## 5.73 — UN ENDROIT = UN BLOC (et deux bugs qu'aucun filet ne voyait)
+
+Julien : « améliore encore la réception dans les achats pour les Vinted Go, il y
+a les codes de retrait dans la conversation avec le QR code en lien ; je veux que
+tu t'améliores pareil pour les QR Chronopost et les codes Mondial Relay ; je veux
+bien que tu **sépares les différents endroits pour bien savoir où je vais** ».
+
+### État mesuré avant de coder
+| transporteur | lignes de suivi | colis « à retirer » | code | QR | lieu |
+|---|---|---|---|---|---|
+| Mondial Relay | 79 | **13** | 11 | 0 | 12 |
+| Chronopost | 38 | **5** | 3 | 4 | 2 |
+| Vinted / Shop2Shop / Colissimo | 10 | 0 | — | — | — |
+
+⚠️ `panel_colis_relais` était encore **ABSENT** : l'extension 5.45 n'avait pas
+encore tourné chez lui. Les données Vinted Go arriveront à sa prochaine visite.
+
+### 1. L'ENDROIT devient le niveau principal
+Avant : **transporteur** en titre, point relais en dessous. Avec un seul relais
+par transporteur, ça faisait un étage de titres pour rien — et **l'adresse, la
+seule chose qui décide où on va, arrivait en second**.
+Maintenant : **une destination = un bloc** (nom, adresse, horaires, « 🧭 Y aller »),
+et les colis dedans. Les blocs sont ordonnés par **urgence** : le point dont un
+colis expire le plus tôt d'abord — un colis non retiré repart chez l'expéditeur.
+
+### 2. Le GESTE est écrit SUR la destination — `methodeDuPoint(colis)`
+Chaque transporteur remet le colis à sa façon (§28). Le geste vit donc là où on
+lit l'adresse, pas répété sur chaque ligne :
+| ce qu'on a | ce que le bloc annonce |
+|---|---|
+| `consigne` ou `code2` | **Consigne automatique** — « Tape l'identifiant puis le code d'ouverture sur le casier » |
+| QR seul | **Au comptoir** — « Présente le QR de chaque colis » |
+| QR + code mélangés | **Au comptoir** — « QR pour certains colis, code pour les autres » |
+| code | **Au comptoir** — « Donne le code de retrait + une pièce d'identité » |
+| rien | **Au comptoir** — « Donne ton numéro de colis + une pièce d'identité » |
+⚠️ **Dérivé de `retraitMode`**, jamais d'une règle parallèle (§11) : deux règles
+pour « comment on retire ici », c'est l'écran et la modale qui finissent par ne
+plus dire la même chose. Un contrôle permanent le vérifie.
+
+Les **colis Vinted Go** sont groupés par lieu eux aussi (ils ont une adresse
+depuis §5.72). Ceux dont le lieu est encore inconnu restent à part, et on le
+dit : « Vinted dit "déposé" — l'adresse arrive avec le message de retrait ».
+
+Chaque ligne de colis ne porte plus que **ce qui lui est propre** : n° de suivi,
+jour d'arrivée, date limite, identifiant/code, QR. Le lieu et le geste étaient
+répétés trois fois sur un écran de téléphone.
+
+### 3. Le LIEN du QR, capté depuis la conversation
+« Scanne ton code de retrait » est une **ancre HTML** dans le message Vinted Go.
+`retraitDeConversation` la retient (`qr`) et l'app propose **« Voir le QR de
+retrait ↗ »**, sinon **« Ouvrir la conversation (QR) ↗ »**.
+⚠️ **Un lien qui ne mène nulle part n'est pas un lien** : dans les messages
+réellement captés, la plupart des ancres valent `href="/"` (Vinted les recâble
+côté client). Ouvrir la page d'accueil au lieu du QR serait pire que pas de
+bouton. Un `href` relatif est remis sur `vinted.fr`.
+
+### ⚠️⚠️ 4. DEUX BUGS PRÉ-EXISTANTS, TROUVÉS EN VÉRIFIANT
+**a) « overdue is not defined » — l'écran Colis tombait.** Depuis §5.64, le
+bandeau d'urgence faisait `const { total, danger, parts } = u;` puis lisait
+`overdue` deux lignes plus bas. L'écran **tombait dès qu'il y avait à la fois des
+colis en retard et des colis tranquilles** (si TOUS sont urgents, le bloc ne
+s'affiche pas — d'où un smoke qui passait un jour et pas l'autre : 1481
+caractères contre 288).
+
+**b) `syncFromSheets` / `syncToSheets` : mortes et cassées.** Restes de l'ancienne
+architecture Google Sheets (§2), **aucun appelant**, et toutes deux lisaient une
+constante **`API_URL` qui n'existe nulle part**. Pire : `syncFromSheets` écrasait
+`vinted_catalog` et `vinted_sales` avec la réponse d'un endpoint fantôme.
+Supprimées.
+
+### ✅ `scripts/audit-variables.cjs` — LA famille est enfin couverte
+C'est la **troisième fois** qu'une variable jamais déclarée casse un écran en
+production, et aucun filet ne la voyait :
+| | |
+|---|---|
+| §26 | `reel is not defined` → écran Ventes |
+| §5.42 | `useRef` pas importé → écran Annonces |
+| §5.73 | `overdue is not defined` → écran Colis |
+`npm run build` compile (la syntaxe est valable) et le smoke ne la voit que si
+les **données** font entrer dans le bloc conditionnel fautif.
+➡️ Vraie vérification **no-undef** sur `src/App.jsx` et `src/main.jsx` avec
+`@babel/parser` + `@babel/traverse` (déjà dans `node_modules`) : chaque
+identifiant lu doit être déclaré, importé, ou être un global du navigateur.
+**Rejoué sur le code d'avant : il sort les DEUX bugs** (`API_URL`, `overdue`).
+⚠️ À lancer avec les autres audits après toute modification de `App.jsx`.
+
+### Vérifié
+`npm run build` OK · **14 audits au vert** (dont `audit-variables` nouveau, et
+`audit-retrait-conv` passé à **13 contrôles** — 4 des 5 nouveaux échouent sur le
+code d'avant) · rendu réel de l'écran Achats avec les trois familles de
+destination : **Consigne Pickup Super U** (3 colis · consigne · identifiant +
+code d'ouverture + QR), **Maison de la Presse** (1 colis · comptoir · code
+946352), **Kusmi Tea** (Vinted Go · comptoir · code ou QR depuis la
+conversation) — **0 erreur d'app** · écran Colis remonté de 288 à **1481
+caractères** (7 colis à envoyer) · smoke **11 écrans, 0 écran vide, 0 suspect**.
+⚠️ Artefact de banc corrigé au passage : le détecteur de suspects flaggait
+« 1 colis » — **« colis » est invariable**, il n'avait rien à faire dans la liste
+des accords à vérifier (déjà noté en §5.22, jamais corrigé).
+
+Extension **5.47.0** — à recharger dans Chrome.
