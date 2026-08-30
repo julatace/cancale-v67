@@ -100,5 +100,37 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
   if (re) { const r = new RegExp('^' + re[1] + '$'); ok = r.test('C65735') && r.test('077831') && !r.test('suivant'); }
   dit(ok, 'src/App.jsx : `codeRetrait` accepte C65735, refuse « suivant »', ligne.trim().slice(0, 90));
 }
+// 9. LE LIEN DU QR EST CAPTÉ (« Scanne ton code de retrait » est un <a href>).
+{
+  const r = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    "Il t'attend à l'adresse suivante : Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes. <a href=\"https://www.vinted.fr/pickup/abc123\">Scanne ton code de retrait</a> ou saisis le code C65735 pour le récupérer.")]));
+  dit(!!r && r.qr === 'https://www.vinted.fr/pickup/abc123', 'le lien du QR est capté', r ? (r.qr || '(aucun)') : 'null');
+}
+// 10. ⚠️ UN LIEN QUI NE MÈNE NULLE PART N'EST PAS UN LIEN.
+//     Dans les messages réellement captés, la plupart des ancres valent href="/"
+//     (Vinted les recâble côté client). Ouvrir la page d'accueil au lieu du QR
+//     serait pire que de ne pas proposer de bouton.
+{
+  const r = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    "Il t'attend à l'adresse suivante : Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes. <a href=\"/\">Scanne ton code de retrait</a> ou saisis le code C65735 pour le récupérer.")]));
+  dit(!!r && !r.qr, 'href="/" → aucun lien de QR proposé', r ? (r.qr || '(aucun)') : 'null');
+}
+// 11. UN LIEN RELATIF EST REMIS SUR VINTED.
+{
+  const r = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    "Il t'attend à l'adresse suivante : Kusmi Tea, 13 Rue Saint-Vincent. <a href=\"/pickup/xyz\">Scanne ton code de retrait</a>")]));
+  dit(!!r && r.qr === 'https://www.vinted.fr/pickup/xyz', 'lien relatif → URL complète', r ? (r.qr || '(aucun)') : 'null');
+}
+// 12. ⚠️ LE GESTE À FAIRE SUR PLACE DÉRIVE DE `retraitMode`, PAS D'UNE 2ᵉ RÈGLE.
+//     Deux règles pour « comment on retire ici », c'est la garantie que l'écran
+//     et la modale finissent par ne plus dire la même chose (§11, §28).
+{
+  const app = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+  const i = app.indexOf('const methodeDuPoint');
+  const corps = i < 0 ? '' : app.slice(i, i + 1200);
+  dit(i > 0 && /retraitMode\(/.test(corps), '`methodeDuPoint` dérive de `retraitMode`', i < 0 ? 'fonction absente' : 'ok');
+  // Et le lieu/geste ne sont plus répétés sur CHAQUE ligne de colis.
+  dit(!/Donne ce code au comptoir 👉/.test(app), 'le geste n\'est plus répété sur chaque ligne de colis');
+}
 console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent');
 process.exit(ko ? 1 : 0);

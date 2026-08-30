@@ -1760,6 +1760,24 @@ const retraitMode = (t) => {
   if (code) return { mode: 'code', code, carrier: c.name || 'Transporteur' };
   return { mode: 'numero', carrier: c.name || 'Transporteur' };
 };
+// ── CE QU'ON FAIT EN ARRIVANT À CE POINT-LÀ (une seule règle, §11) ──────────
+// Julien : « sépare les différents endroits pour bien savoir où je vais ». Un
+// point relais, c'est une destination ET un geste : au comptoir on donne un
+// code, à la consigne on tape deux nombres, chez Chronopost on scanne. Écrire
+// le geste SUR la destination évite de relire le logo de chaque ligne.
+// ⚠️ Dérivé de `retraitMode` (§28), jamais d'une règle parallèle.
+const methodeDuPoint = (colis) => {
+  const l = colis || [];
+  if (l.some(t => t && (t.consigne || codeRetrait(t.code2)))) {
+    return { cle: 'casier', titre: 'Consigne automatique', geste: "Tape l'identifiant puis le code d'ouverture sur le casier" };
+  }
+  const modes = l.map(t => retraitMode(t).mode);
+  if (modes.includes('qr') && !modes.includes('code')) return { cle: 'qr', titre: 'Au comptoir', geste: 'Présente le QR de chaque colis' };
+  if (modes.includes('qr')) return { cle: 'mixte', titre: 'Au comptoir', geste: 'QR pour certains colis, code pour les autres' };
+  if (modes.includes('code')) return { cle: 'code', titre: 'Au comptoir', geste: 'Donne le code de retrait + une pièce d\'identité' };
+  if (modes.includes('home')) return { cle: 'home', titre: 'Livré chez toi', geste: 'Rien à retirer' };
+  return { cle: 'numero', titre: 'Au comptoir', geste: 'Donne ton numéro de colis + une pièce d\'identité' };
+};
 const carrierKey = (raw) => {
   const s = String(raw || '').toLowerCase();
   if (/mondial/.test(s)) return 'mondialrelay';
@@ -2947,36 +2965,12 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 };
 
-// Synchro avec Google Sheets
-async function syncFromSheets() {
-  try {
-    const r = await fetch(API_URL);
-    const data = await r.json();
-    if (data.error) { console.error('Sync error:', data.error); return null; }
-    if (data.catalog && data.catalog.length > 0) save('vinted_catalog', data.catalog);
-    if (data.sales && data.sales.length > 0) save('vinted_sales', data.sales);
-    if (data.garageGrid && Object.keys(data.garageGrid).length > 0) save('vinted_garage_grid', data.garageGrid);
-    return data;
-  } catch (err) {
-    console.error('Sync failed:', err);
-    return null;
-  }
-}
-
-async function syncToSheets(catalog, sales, garageGrid) {
-  try {
-    const r = await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ catalog, sales, garageGrid })
-    });
-    return true;
-  } catch (err) {
-    console.error('Sync up failed:', err);
-    return false;
-  }
-}
+// ⚠️ `syncFromSheets` / `syncToSheets` SUPPRIMÉES (30 août).
+// Restes de l'ancienne architecture Google Sheets (§2) : plus AUCUN appelant, et
+// toutes deux lisaient une constante `API_URL` **qui n'existe nulle part** — donc
+// elles auraient planté à la première ligne si on les avait rebranchées. Pire :
+// `syncFromSheets` écrasait `vinted_catalog` et `vinted_sales` avec la réponse
+// d'un endpoint fantôme. Trouvées par `scripts/audit-variables.cjs`.
 const fmt  = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',')+' €';
 const fmtN = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',');
 const uid  = () => Math.random().toString(36).slice(2,9);
@@ -15787,34 +15781,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   transporteur a sa façon de remettre le colis (§28) : Chronopost
                   au QR, Mondial Relay au code. Les mélanger obligeait à relire le
                   logo de chaque ligne pour savoir quoi présenter. */}
-              {(()=>{ const parTr={};
-                Object.entries(groups).forEach(([nom,g])=>{ const k=carrierName(g.carrier)||'Autre';
-                  (parTr[k]=parTr[k]||{carrier:g.carrier,relais:[],n:0,paires:0}); parTr[k].relais.push([nom,g]); parTr[k].n+=g.colis.length;
-                  parTr[k].paires += g.colis.filter(t=>String(t.artTitle||'').trim()).length; });
-                const ordre=Object.entries(parTr).sort((a,b)=>b[1].n-a[1].n);
-                return ordre.map(([tr,bloc])=>(
-                  <div key={'tr'+tr} style={{marginBottom:14}}>
-                    {/* En-tête TOUJOURS affiché, même s'il n'y a qu'un transporteur :
-                        savoir à qui on a affaire décide du geste (QR ou code). */}
-                    {(
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,paddingBottom:6,borderBottom:`1px solid ${C.border}`}}>
-                        {bloc.carrier&&<CarrierBadge carrier={bloc.carrier} size={20}/>}
-                        <div style={{flex:1,fontSize:13.5,fontWeight:700,color:C.text}}>{tr}</div>
-                        <div style={{fontSize:11.5,color:C.muted,fontWeight:600}}>{bloc.n} colis{bloc.paires>0?` · ${bloc.paires} paire${bloc.paires>1?'s':''}`:''}</div>
-                      </div>
-                    )}
-                    {bloc.relais.map(([nom,g])=>(
-                <div key={nom} style={{marginBottom:12}}>
-                  <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:8}}>
-                    {g.carrier&&<CarrierBadge carrier={g.carrier} size={22}/>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
-                      <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.adresse,`${g.colis.length} colis`].filter(Boolean).join(' · ')}</div>
+              {(()=>{
+                // ⚠️ L'ENDROIT D'ABORD (Julien : « sépare les différents endroits
+                // pour bien savoir où je vais »). Avant, le niveau principal était
+                // le TRANSPORTEUR, et le point relais en dessous : avec un seul
+                // relais par transporteur, ça faisait un étage de titres pour rien
+                // et l'adresse — la seule chose qui décide où on va — arrivait en
+                // second. Maintenant : une destination = un bloc, et le GESTE à
+                // faire là-bas est écrit dessus (§28 : chaque transporteur remet
+                // le colis à sa façon).
+                // Ordre : le point dont un colis expire le plus tôt d'abord — un
+                // colis non retiré repart chez l'expéditeur, c'est ça l'urgence ;
+                // à égalité, le point qui en porte le plus.
+                const urgence = (g) => {
+                  let min = Infinity;
+                  for (const t of g.colis) { const j = joursAvant(t.limite); if (j != null && j < min) min = j; }
+                  return min;
+                };
+                const ordrePoints = Object.entries(groups).sort((a,b)=>{
+                  const ua=urgence(a[1]), ub=urgence(b[1]);
+                  if (ua !== ub) return ua - ub;
+                  return b[1].colis.length - a[1].colis.length;
+                });
+                return ordrePoints.map(([nom,g])=>(
+                <div key={nom} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:4,background:C.card,overflow:'hidden'}}>
+                  {/* ── LA DESTINATION ────────────────────────────────────────
+                      Le nom du lieu en premier (c'est là qu'on va), l'adresse
+                      dessous, et LE GESTE à faire une fois sur place — chaque
+                      transporteur remet le colis à sa façon (§28). */}
+                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                    {g.carrier&&<CarrierBadge carrier={g.carrier} size={24}/>}
+                    <div style={{flex:'1 1 140px',minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
+                      {g.adresse && <div style={{fontSize:11.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.adresse}</div>}
                       {/* Ouverture du jour, quand Vinted l'a donnée pour CE point. */}
                       {g.horaires && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.horaires}</div>}
                     </div>
                     <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:3,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
                   </div>
+                  {(()=>{ const M=methodeDuPoint(g.colis);
+                    const urg=(()=>{ let m=null; for(const t of g.colis){ const j=joursAvant(t.limite); if(j!=null&&(m==null||j<m)) m=j; } return m; })();
+                    return (
+                      <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
+                        <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{g.colis.length} colis · {M.titre}</span>
+                        <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>{M.geste}</span>
+                        {urg!=null && (
+                          <span style={{fontSize:11,fontWeight:700,flexShrink:0,color:urg<0?C.danger:(urg<=2?C.accent:C.muted)}}>
+                            {urg<0?'délai dépassé':(urg===0?"dernier jour":(urg===1?'demain':`${urg} j`))}
+                          </span>
+                        )}
+                      </div>
+                    ); })()}
+                  <div style={{padding:'10px 12px 4px'}}>
                   {g.colis.map((t,i)=>{
                     const code=codeRetrait(t.code);
                     const ident=codeRetrait(t.code2);   // consigne Pickup : identifiant du casier
@@ -15829,8 +15847,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
-                          <div style={{fontSize:11,fontWeight:600,color:C.blue||C.accent,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1}}>{nom}{g.adresse?` — ${g.adresse}`:''}{g.guessed?<span style={{color:C.muted,fontWeight:600}}> (relais habituel)</span>:''}</div>
-                          <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{qrImage(t)?(code?(casier?'Scanne le QR, ou saisis ces nombres 👉':'Présente le QR au comptoir 👉'):'Présente ce QR pour retirer 👉'):code?(casier?'Saisis ces nombres sur le casier 👉':'Donne ce code au comptoir 👉'):'Code pas encore reçu'}</div>
+                          {/* ⚠️ NI LE LIEU NI LE GESTE ICI : ils sont écrits une
+                              fois, en tête de la destination. Les répéter sur
+                              chaque ligne, c'était trois fois la même phrase sur
+                              un écran de téléphone. Ne reste que ce qui est propre
+                              à CE colis. */}
+                          {g.guessed && <div style={{fontSize:11,color:C.muted,marginTop:1}}>relais habituel (l'email ne le disait pas)</div>}
+                          {!code && !qrImage(t) && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas encore reçu</div>}
                           {/* Le n° de suivi sur SA ligne, en chiffres lisibles :
                               au comptoir c'est ce qu'on demande quand le scan
                               ou le code ne passe pas. */}
@@ -15889,17 +15912,54 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     );
                   })}
-                </div>
-                    ))}
                   </div>
+                </div>
                 )); })()}
               {/* Colis vus « déposés » par Vinted mais dont le CODE n'est pas
                   encore arrivé par email → on les montre quand même (sinon le
                   compteur dirait 2 et la liste n'en montrerait qu'1). */}
-              {extra.length>0 && (
-                <div style={{marginBottom:12}}>
-                  {avail.length>0 && <div style={{fontSize:12.5,fontWeight:700,color:C.text,marginBottom:8}}>En point relais (vu par Vinted)</div>}
-                  {extra.map((o,i)=>{
+              {extra.length>0 && (()=>{
+                // ⚠️ MÊME RÈGLE QUE CI-DESSUS : une destination = un bloc. Depuis
+                // que la conversation nous donne l'adresse (Vinted Go, §5.72), ces
+                // colis ont un ENDROIT eux aussi — les laisser en vrac dans une
+                // liste « quelque part en point relais » obligerait à les relire un
+                // par un pour savoir où aller. Les colis dont on ne connaît pas
+                // encore le lieu restent groupés à part, et on le dit.
+                const pts = {};
+                extra.forEach(o => {
+                  const rel = relaisDe(o);
+                  const nom = (rel && rel.lieu) ? String(rel.lieu).split(',')[0].trim() : '';
+                  const k = nom || '__inconnu';
+                  (pts[k] = pts[k] || { nom, adresse: (rel && rel.lieu) || '', colis: [] }).colis.push(o);
+                });
+                const ordre = Object.entries(pts).sort((a,b)=>{
+                  if ((a[0]==='__inconnu') !== (b[0]==='__inconnu')) return a[0]==='__inconnu' ? 1 : -1;
+                  return b[1].colis.length - a[1].colis.length;
+                });
+                return ordre.map(([k,pt]) => (
+                <div key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:4,background:C.card,overflow:'hidden'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                    <CarrierBadge carrier="vinted" size={24}/>
+                    <div style={{flex:'1 1 140px',minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pt.nom || 'Point relais à confirmer'}</div>
+                      {pt.adresse
+                        ? <div style={{fontSize:11.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pt.adresse}</div>
+                        : <div style={{fontSize:11.5,color:C.muted}}>Vinted dit « déposé » — l'adresse arrive avec le message de retrait</div>}
+                    </div>
+                    {pt.adresse && (
+                      <a href={`https://maps.apple.com/?q=${encodeURIComponent(pt.adresse)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:3,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
+                    )}
+                  </div>
+                  <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
+                    <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{pt.colis.length} colis · Au comptoir</span>
+                    <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
+                      {pt.colis.some(o=>{const r=relaisDe(o);return r&&codeRetrait(r.code);})
+                        ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
+                        : 'Le code de retrait arrive dans la conversation Vinted'}
+                    </span>
+                  </div>
+                  <div style={{padding:'10px 12px 4px'}}>
+                  {pt.colis.map((o,i)=>{
                     // Ce que la CONVERSATION Vinted dit de ce colis : l'adresse du
                     // relais et le code de retrait. Pour Vinted Go c'est la seule
                     // source — aucun email ne les porte (voir `colisRelais`).
@@ -15909,16 +15969,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
-                        {rel&&rel.lieu
-                          ? <div style={{fontSize:11,color:C.text,marginTop:2,fontWeight:600}}>{rel.lieu}</div>
-                          : null}
-                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>
-                          {cd ? "Donne ce code au comptoir, ou scanne le QR depuis la conversation Vinted"
-                              : (rel&&rel.lieu ? 'Déposé en point relais (Vinted)'
-                                               : 'Déposé en point relais (Vinted) · le code arrive par email ou dans la conversation')}
-                        </div>
-                        {rel&&rel.url&&(
-                          <a href={rel.url} target="_blank" rel="noreferrer" style={{fontSize:11,color:C.accent,fontWeight:600,textDecoration:'none',display:'inline-block',marginTop:3}}>Ouvrir la conversation (QR) ↗</a>
+                        {/* L'adresse est déjà en tête du bloc : ici on ne met que
+                            ce qui est propre à CE colis. */}
+                        {!cd && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
+                        {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
+                            (§17). Si le message porte le lien direct du code, on
+                            l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
+                        {rel&&(rel.qr||rel.url)&&(
+                          <a href={rel.qr||rel.url} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
+                            {rel.qr ? 'Voir le QR de retrait ↗' : 'Ouvrir la conversation (QR) ↗'}
+                          </a>
                         )}
                       </div>
                       {cd&&(
@@ -15931,8 +15991,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     );
                   })}
+                  </div>
                 </div>
-              )}
+                )); })()}
               {/* Colis cochés « retiré » que Vinted n'a pas encore confirmés :
                   on les garde EN GRIS plutôt que de les faire disparaître d'un
                   coup — on voit que c'est fait, et on peut annuler. Ils sortent
@@ -17205,7 +17266,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* Rappel d'urgence quand l'app est ouverte (complète la notif push quotidienne). */}
         {(()=>{
-          const u = urgenceColis(); const { total, danger, parts } = u;
+          // ⚠️ `overdue` DOIT être destructuré : il est lu deux lignes plus bas.
+          // Il ne l'était pas depuis §5.64 — donc l'écran Colis TOMBAIT (« overdue
+          // is not defined ») dès que l'urgence était un sous-ensemble strict,
+          // c'est-à-dire dès qu'il y avait à la fois des colis en retard et des
+          // colis tranquilles. Famille §26 : une variable jamais déclarée dans un
+          // bloc conditionnel — ni le build ni un smoke sans les bonnes données
+          // ne la voient.
+          const u = urgenceColis(); const { total, danger, parts, overdue } = u;
           // ⚠️ Ne s'affiche que si l'urgence est un SOUS-ENSEMBLE strict : sinon
           // c'est le même ensemble que le bandeau du haut, qui le dit déjà.
           if (!total || total >= nAPoster()) return null;

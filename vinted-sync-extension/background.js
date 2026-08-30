@@ -1286,7 +1286,9 @@ function retraitDeConversation(conv) {
       const titre = sansBalises(e.title);
       const sous = sansBalises(e.subtitle);
       if (!CONV_ARRIVE.test(titre + ' ' + sous)) continue;
-      trouve = { titre, sous };                       // le DERNIER l'emporte
+      // On garde le HTML BRUT : « Scanne ton code de retrait » est un LIEN, et
+      // c'est derrière lui que vit le QR (capture d'écran de Julien).
+      trouve = { titre, sous, html: String(e.subtitle || ''), actions: e.actions || [] };
     }
     if (!trouve) return null;
     const txt = trouve.titre + ' ' + trouve.sous;
@@ -1305,13 +1307,27 @@ function retraitDeConversation(conv) {
       const suite = txt.slice(m.index + m[0].length).match(CODE_APRES);
       if (suite) { code = suite[1]; break; }
     }
-    if (!lieu && !code) return null;                  // rien d'utile : on n'invente pas
+    // ── LE LIEN DU QR ─────────────────────────────────────────────────────
+    // « Scanne ton code de retrait » est un <a href>. On ne garde QUE ce qui
+    // mène quelque part : dans les messages réellement captés, la plupart des
+    // liens valent `href="/"` (Vinted les recâble côté client). Un lien qui
+    // ouvre la page d'accueil serait pire que pas de lien du tout.
+    let qr = '';
+    for (const m of String(trouve.html).matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = String(m[1] || '').trim();
+      const texte = sansBalises(m[2]);
+      if (!/scanne|code de retrait|qr|retrait/i.test(texte)) continue;
+      if (!href || href === '/' || href === '#') continue;
+      qr = /^https?:/i.test(href) ? href : ('https://www.vinted.fr' + (href[0] === '/' ? '' : '/') + href);
+      break;
+    }
+    if (!lieu && !code && !qr) return null;           // rien d'utile : on n'invente pas
     const cid = String(c.id || '');
     return {
       tx: String(t.id || ''), item: String(t.item_id || ''),
       titre: String(t.item_title || c.subtitle || c.description || ''),
       photo: (t.item_photo && t.item_photo.url) || null,
-      lieu, code, conv: cid,
+      lieu, code, qr, conv: cid,
       url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
       at: new Date().toISOString(),
     };
@@ -1330,7 +1346,7 @@ async function noterRetrait(r) {
     const cur = (rows && rows[0] && rows[0].data) || {};
     const avant = cur[r.tx];
     // Rien de neuf → aucune écriture (égress, §34).
-    if (avant && avant.code === r.code && avant.lieu === r.lieu) return false;
+    if (avant && avant.code === r.code && avant.lieu === r.lieu && avant.qr === r.qr) return false;
     const limite = Date.now() - RETRAIT_MAX_J * 86400000;
     const out = {};
     for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
