@@ -208,6 +208,25 @@ function normaliserEntrant(body, prof = 0) {
   return vide;
 }
 
+// ⚠️ « HIDE MY EMAIL » D'iCLOUD RÉÉCRIT L'EXPÉDITEUR — mesuré le 30 août :
+// 37 des 453 emails conservés arrivent sous la forme
+//   no-reply_at_vinted_fr_t9zxbbb6tn7gbf_bcrq1890@icloud.com
+//   shipping_at_relay_vinted_com_t9zx4089tn7g48_18rq1890@icloud.com
+// au lieu de `no-reply@vinted.fr` / `shipping@relay.vinted.com`. Tout test sur
+// l'expéditeur (`/shipping@|relay\.vinted/`, `/chronopost/`, `/@team\.vinted/`)
+// échoue donc sur ces emails-là. Le cas mesuré était un VRAI email de
+// transporteur (SEUR, « Tu envío ha sido recogido ») que rien n'a reconnu.
+// ⚠️ On NE reconstruit PAS l'adresse exacte : on ne sait pas où s'arrête le
+// domaine et où commencent les jetons aléatoires, et deviner produirait une
+// adresse fausse. On rend le nom et le domaine LISIBLES dans la chaîne — c'est
+// tout ce dont les tests par sous-chaîne ont besoin — et on garde l'original.
+function demasquerRelais(adr) {
+  const a = String(adr || '');
+  const m = a.match(/([A-Za-z0-9][A-Za-z0-9._-]*)_at_([A-Za-z0-9_]+)@(?:icloud\.com|privaterelay\.appleid\.com|duck\.com|simplelogin\.[a-z]+|anonaddy\.me)/i);
+  if (!m) return '';
+  return m[1] + '@' + m[2].replace(/_/g, '.');
+}
+
 // Empreinte du contenant, pour le journal : les clés reçues, rien du contenu.
 function formeRecue(body) {
   if (body == null) return '(vide)';
@@ -217,4 +236,4 @@ function formeRecue(body) {
   return Object.keys(body).slice(0, 25).join(',');
 }
 
-export { normaliserEntrant, formeRecue, lireMime, decodeEnTete, decodeQP, ressembleAduMime };
+export { normaliserEntrant, formeRecue, lireMime, decodeEnTete, decodeQP, ressembleAduMime, demasquerRelais };

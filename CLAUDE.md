@@ -6104,3 +6104,108 @@ données** : À retirer (2 destinations, identifiants 1222/5789 et 8156/9539,
 relance le vendeur »), Reçus, Tous — **0 suspect d'affichage, 0 erreur d'app**
 (les 3 lignes console sont le 400 volontaire de `select=owner` et les resets de
 fin de test).
+
+---
+
+## 5.75 — « JE DOIS PASSER À CÔTÉ DE RIEN » : 4 colis disparaissaient en silence
+
+Julien : « continue encore à améliorer les achats, les QR codes, etc. Ça doit
+être parfait, je ne dois passer à côté de rien. » Méthode habituelle : mesurer la
+vraie base avant d'écrire une ligne.
+
+### Ce que portent vraiment les 127 lignes de suivi (valeurs NON VIDES)
+| champ | renseigné |
+|---|---|
+| `suivi` | 116 | 
+| `consigne` | 38 · `qrUrl` **28** · `code` **20** · `lieu` 15 |
+| `limite` | **3** · `code2` 2 · `qrB64` **0** |
+| **`artTitle`** | **0** ⚠️ |
+
+⚠️ **Aucun colis ne dit quelle paire il contient** — un email de transporteur ne
+nomme pas l'article. C'est mesuré, pas supposé, et ça ne se corrige pas par le
+code (voir plus bas).
+
+### ⚠️ LE DÉFAUT : 18 colis « disponibles », l'app en affichait 3
+Chaîne de filtres de l'app **rejouée sur les vraies lignes** :
+| | |
+|---|---|
+| lignes « colis disponible » | **18** |
+| cochés « récupéré » par Julien | 11 → écartés à raison ✅ |
+| **non cochés, écartés SANS RIEN DIRE** | **4** ⚠️ |
+| affichés | 3 |
+
+Les 4 : Chronopost `05488805839014` (23 j), Mondial Relay `74950536` (29 j),
+`15658327` (32 j, code 077831), `16100938` (33 j, code 184143). Aucun n'a de date
+limite dans son email, donc la **supposition** des 14 jours (`PICKUP_MAX_DAYS`)
+les faisait sortir de l'écran. Un colis non retiré repart chez l'expéditeur :
+c'est de l'argent perdu, et **rien ne l'annonçait**.
+
+➡️ **`pickupUnion.oublies`** + un bloc rouge « N colis jamais retirés » sur
+l'onglet À retirer : transporteur, lieu, n° de suivi, **âge réel**, le code
+quand il existe, « Vérifier » (suivi transporteur) et **« ✓ Je l'ai eu »**.
+⚠️ Ils ne reviennent **PAS** dans la liste de travail et ne comptent dans **aucun
+total** : l'action n'est pas « aller au comptoir » mais « réclamer », et un
+colis d'il y a un mois n'est plus un retrait.
+
+### ⚠️ « HIDE MY EMAIL » D'iCLOUD RÉÉCRIT L'EXPÉDITEUR
+Trouvé en cherchant pourquoi un email traînait chez les « non compris » :
+```
+SEUR via Vinted <shipping_at_relay_vinted_com_t9zx4089tn7g48_18rq1890@icloud.com>
+                 ↑ le vrai expéditeur est shipping@relay.vinted.com
+```
+**37 des 453 emails conservés** arrivent sous cette forme. Tout test sur
+l'expéditeur (`/relay\.vinted/`, `/chronopost/`, `/@team\.vinted/`) échoue alors
+— et le cas trouvé était un **VRAI email de transporteur** (« Tu envío ha sido
+recogido »), reconnu par **aucune** règle.
+
+➡️ **`demasquerRelais(adr)`** dans `api/_lib/lire-email.js` (iCloud, Apple
+private relay, DuckDuckGo, SimpleLogin, AnonAddy) ; `normalizeInbound` ajoute
+l'adresse lisible **à côté** de l'alias dans `from`.
+⚠️ **On ne reconstruit PAS l'adresse exacte** : on ne sait pas où s'arrête le
+domaine et où commencent les jetons aléatoires, et deviner produirait une adresse
+fausse. On rend le nom et le domaine **lisibles** — c'est tout ce dont un test
+par sous-chaîne a besoin — et l'original reste intact.
+⚠️ Ça ne touche **jamais** le rattachement au vendeur, qui lit l'adresse de
+**RÉCEPTION** (§5.16), jamais celle de l'expéditeur.
+
+**Prouvé dans les deux sens sur le vrai email** : code d'avant → `null`
+(l'email était perdu) · après → `vinted`. Trois contrôles permanents ajoutés à
+`scripts/audit-transporteurs.cjs` (dont « une adresse normale n'est pas
+réécrite »).
+
+### « Non compris » recommençait à crier au loup
+**453 emails conservés**, dont 93 qu'aucune famille ne reconnaissait :
+| | |
+|---|---|
+| « MISE EN DEMEURE – Demande d'intervention humaine… » | **76** — son courrier SORTANT vers Vinted |
+| « Le transfert bancaire est en cours » | **15** |
+| divers | 2 |
+
+Deux familles ajoutées (serveur **et** app — les lignes déjà en base ne seront
+jamais réécrites, §5.49), vérifiées par `audit-email-formes` sur 14 sujets réels.
+
+⚠️ **CE QUE JE N'AI PAS FAIT, ET POURQUOI** : router « transfert bancaire » vers
+`email_final_*`. C'est tentant (c'est de l'argent) — mais `email_final` compte
+l'argent **entrant dans le porte-monnaie** quand une vente se finalise. Un
+virement, c'est le porte-monnaie qui **se vide** vers sa banque : le même euro
+serait compté **deux fois** dans « encaissé ». Aucune action à faire → famille
+reconnue, pas alerte.
+
+### Ce qui NE se corrige pas par le code (dit franchement)
+- **Nommer la paire d'un colis** : `artTitle` est vide sur 127/127. La seule voie
+  certaine est la conversation Vinted (§5.72) — or, mesuré en exécutant la VRAIE
+  fonction sur les **636 conversations captées** : **12 seulement sont côté
+  acheteur**, et **1 seule** produirait une ligne. Julien vit sur ses VENTES.
+  Cette voie ne couvrira donc jamais qu'une poignée d'achats.
+- **`panel_colis_relais` est toujours ABSENTE** alors que le diagnostic de
+  l'extension est frais (30 août 20:47, 519 conversations rangées) et ne porte
+  **aucune clé `retrait_*`** ⟹ **l'extension installée chez lui est antérieure à
+  la 5.45**. Il faut la recharger dans Chrome pour que cette chaîne démarre.
+- **Rien ne dort ailleurs** : sur les 125 lignes de quarantaine non traitées et
+  les 453 emails « inconnus », **0 email de colis**. La lecture ne perd rien.
+
+### Vérifié
+`npm run build` OK · `node --check` sur les deux fichiers `api/` · **14 audits au
+vert** · rendu réel de l'onglet À retirer : le bloc « 4 colis jamais retirés »
+affiche les 4 colis **mesurés en base**, avec leur âge exact (23 / 29 / 32 / 33 j)
+et leurs codes (077831, 184143) · **0 suspect, 0 erreur d'app**.

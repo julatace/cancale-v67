@@ -107,6 +107,13 @@ const v = normaliserEntrant({ inconnu: 42 });
       ['Contestation formelle – Demande de réexamen humain', 'vinted@vinted.fr', true],
       ['DEMANDE URGENTE – Je souhaite être mis en relation avec un conseiller', 'vinted@vinted.fr', true],
       ["C'est déjà l'heure de la rentrée ? 😲", 'Vinted <no-reply@team.vinted.com>', true],
+      // ⚠️ Mesurés le 30 août : 76 « MISE EN DEMEURE » (son courrier SORTANT) et
+      // 15 « transfert bancaire » (le porte-monnaie qui se vide vers sa banque)
+      // tombaient dans « emails non compris » — le compteur criait au loup.
+      // Le virement n'est PAS une vente finalisée : le ranger dans `email_final`
+      // compterait l'argent deux fois.
+      ['MISE EN DEMEURE – Demande d\u2019intervention humaine et contestation', 'vinted@vinted.fr', true],
+      ['Le transfert bancaire est en cours', "L'équipe Vinted <no-reply@vinted.fr>", true],
       // ⚠️ Ce qui ne doit JAMAIS être rangé en « sans action » :
       ['Votre colis Chronopost est arrivé en consigne Pickup', 'chronopost@network1.pickup.fr', false],
       ['Nouvelle offre pour nike zoom fly 5', "L'équipe Vinted <no-reply@vinted.fr>", false],

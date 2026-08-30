@@ -1251,7 +1251,8 @@ const familleEmail = (subject, from) => {
   if (/laiss[ée] une [ée]valuation|^Laisse une [ée]valuation/i.test(s)) return 'évaluation';
   if (/Commande mise [àa] jour/i.test(s)) return 'commande mise à jour (le statut vient de la moisson)';
   if (/a mis en ligne un nouvel article/i.test(s)) return "nouvel article d'un membre suivi";
-  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain/i.test(s)) return 'ton propre email envoyé à Vinted';
+  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain|MISE EN DEMEURE|intervention humaine|contestation/i.test(s)) return 'ton propre email envoyé à Vinted';
+  if (/transfert bancaire|virement bancaire/i.test(s)) return 'virement du porte-monnaie vers ta banque';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
   return '';
@@ -11715,7 +11716,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const j = (Date.now() - new Date(quand).getTime()) / 86400000;
       return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;
     });
-    return { emailList, extra, attente, attenteMail, total: emailList.length + extra.length };
+    // ── ⚠️ LES COLIS QUI DISPARAISSAIENT EN SILENCE ──────────────────────────
+    // « Je dois passer à côté de rien » (Julien). Mesuré sur la vraie base :
+    // 18 lignes « colis disponible », l'app en affichait 3. Sur les 15 écartés,
+    // 11 sont cochés « récupéré » (normal) — mais **4 ne l'étaient PAS** : ils
+    // avaient 23 à 33 jours et aucune date limite dans l'email, donc la
+    // supposition des 14 jours (`PICKUP_MAX_DAYS`) les faisait disparaître
+    // SANS RIEN DIRE. Un colis jamais retiré repart chez l'expéditeur : c'est
+    // de l'argent perdu, et il ne le savait pas.
+    // ⚠️ Ils ne reviennent PAS dans la liste de travail (on ne va pas au comptoir
+    // pour un colis d'il y a un mois) et ne comptent JAMAIS dans le total : ils
+    // sortent dans un bloc à part, parce que l'action n'est pas la même —
+    // c'est une réclamation à faire, pas un retrait.
+    const oublies = (tracking || []).filter(t => {
+      if (!t || t.status !== 'available') return false;
+      if (collected && collected.has(colisKey(t))) return false;      // il l'a déjà eu
+      if (colisRetireAilleurs(t, retires)) return false;              // le transporteur a confirmé
+      if (isColisActive(t, collected)) return false;                  // encore dans la fenêtre → déjà affiché
+      return true;
+    }).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+    return { emailList, extra, attente, attenteMail, oublies, total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone]);
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
@@ -16139,6 +16159,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* ── ⚠️ LES COLIS JAMAIS RETIRÉS ────────────────────────────────────────
+            « Je dois passer à côté de rien. » Ces colis-là sortaient de l'écran
+            SANS RIEN DIRE dès qu'ils dépassaient 14 jours (mesuré : 4 colis de
+            23 à 33 jours, jamais cochés, invisibles). Un colis non retiré repart
+            chez l'expéditeur — c'est de l'argent perdu, et rien ne l'annonçait.
+            ⚠️ Ils ne remontent PAS dans la liste de travail et ne comptent dans
+            aucun total : l'action n'est pas « aller au comptoir », c'est
+            « réclamer » ou « je l'avais eu ». */}
+        {aFilter==='attente' && (pickupUnion.oublies||[]).length>0 && (
+          <div style={{border:`1px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:4,padding:'12px 14px',marginBottom:10}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:7}}>
+              <Icon name="alert" size={16} color={C.danger}/>{pickupUnion.oublies.length} colis jamais retirés
+            </div>
+            <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.45}}>
+              Arrivés il y a plus de {PICKUP_MAX_DAYS} jours et jamais cochés. Un point relais rend le colis
+              à l'expéditeur au bout de quelques jours : <b>si tu ne l'as pas eu, réclame à Vinted</b> —
+              sinon coche ✓, il disparaîtra.
+            </div>
+            <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
+              {pickupUnion.oublies.map((t,i)=>{
+                const cl=cleanLieu(t.lieu); const code=codeRetrait(t.code);
+                const j=Math.floor((Date.now()-new Date(t.receivedAt||0).getTime())/86400000);
+                return (
+                  <div key={colisKey(t)||i} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:3,padding:'8px 10px'}}>
+                    <CarrierBadge carrier={t.carrier} size={20}/>
+                    <div style={{flex:'1 1 150px',minWidth:0}}>
+                      <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {cl.nom || carrierName(t.carrier)}
+                      </div>
+                      <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        n° {t.suivi||'?'} · arrivé le {new Date(t.receivedAt||0).toLocaleDateString('fr-FR')} · <b style={{color:C.danger}}>il y a {isFinite(j)?j:'?'} j</b>
+                      </div>
+                    </div>
+                    {code && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:3,padding:'2px 7px'}}>{code}</span>}
+                    {t.suivi && <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:3,padding:'5px 9px',fontSize:11.5,fontWeight:600}}>Vérifier</a>}
+                    <button type="button" title="Je l'avais récupéré" onClick={()=>markCollected(t)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:3,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {/* Carte des points relais : où retirer tes colis + codes/QR de retrait.
             Repliée par défaut quand il n'y a AUCUN colis à retirer (elle prenait
             tout l'écran avant les achats). */}
