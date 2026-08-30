@@ -6012,3 +6012,95 @@ caractères** (7 colis à envoyer) · smoke **11 écrans, 0 écran vide, 0 suspe
 des accords à vérifier (déjà noté en §5.22, jamais corrigé).
 
 Extension **5.47.0** — à recharger dans Chrome.
+
+---
+
+## 5.74 — L'ÉCRAN ACHATS DEVIENT UN OUTIL DE RÉCEPTION (une étape = un onglet)
+
+Julien : « les achats ça ne me convient pas, conçois VRM un outil parfait pour
+la réception des colis ».
+
+### Ce que l'écran montrait vraiment (relevé ligne par ligne avant de coder)
+**336 lignes affichées, dont ~40 parlaient de colis.** Le reste, c'était la
+liste des 538 commandes de l'historique, filtrée par « En attente / Reçus /
+Tous » — c'est-à-dire des **états de commande**, pas des **étapes de colis**.
+
+Pipeline réel mesuré sur ses 441 achats de comptes vivants :
+| étape | nombre |
+|---|---|
+| en route vers lui | **26** |
+| arrivés au point relais | **13** |
+| reçus | 317 |
+| annulés / remboursés | 146 |
+
+➡️ Les **26 colis en route** — exactement ce qu'un outil de réception doit
+montrer — étaient **noyés au milieu de 538 lignes**, sans tri ni âge.
+
+### La règle : les onglets sont les ÉTAPES du colis
+`phaseReception(o)` (une seule définition, §11) : `annule` → `relais` → `recu` →
+`route`. Les pastilles portent leur compte, donc **un onglet vide se voit avant
+d'être ouvert** : `À retirer 4 · En route 25 · Reçus 284 · Tous`.
+
+⚠️ **« À retirer » lit `pickupUnion.total`**, pas le nombre d'achats « au
+relais ». Les deux ne donnent pas le même chiffre (union email + statut Vinted),
+et ma première version affichait **2 en haut, « 4 colis à retirer » en dessous,
+sur le même écran** — le doublon que §11 interdit.
+
+⚠️ **« Retour initié » n'est PAS un colis qui arrive** : c'est une paire qu'on
+renvoie. Le laisser dans « En route » faisait attendre une livraison qui ne
+viendra jamais (1 cas sur les 26).
+
+### Une étape = un écran
+- **« À retirer » ne déroule plus de liste** : les colis qui l'attendent sont
+  déjà en haut, groupés par destination avec leur code (§5.73). Les répéter en
+  dessous, c'était le doublon qui faisait les 336 lignes.
+- **Les blocs de destination ne s'affichent QUE sur « À retirer »**. Ils
+  apparaissaient au-dessus des trois onglets — le même bloc, trois fois. La
+  pastille du haut porte le compte : rien n'est caché.
+
+### Ce qui manquait vraiment : DEPUIS QUAND
+Un outil de réception répond à « est-ce que je dois m'inquiéter ? ». La date
+d'achat seule oblige à compter dans sa tête. Chaque ligne en route affiche
+désormais **« depuis N j »**, en rouge au-delà de `ACHAT_RETARD_J = 21` avec
+« relance le vendeur ».
+Mesuré : 12 colis à 7-15 j (le rythme normal Vinted), 10 à 15-30 j, et
+**4 au-delà du mois** dont un « en transit » depuis 120 jours — un statut Vinted
+qui ne bouge plus. ⚠️ On ne les **cache pas** (un colis caché est un colis
+perdu, §5.43) : on affiche le chiffre.
+**« En route » est trié du PLUS ANCIEN au plus récent** — c'est celui qui traîne
+qu'on veut voir, pas le dernier acheté. Partout ailleurs le plus récent d'abord
+(§5.35) : le tri ne change que sur cette étape.
+
+### Deux légendes recopiées à chaque ligne
+- **Les 4 libellés sous la barre de progression** (`Payé · Expédié · Au relais ·
+  Reçu`) étaient **104 des 286 lignes** de l'onglet En route — une légende
+  répétée 26 fois, alors que la pastille juste au-dessus nomme déjà l'étape en
+  cours. Même défaut que les lignes de vente (§5.69), même correctif : les
+  segments colorés restent, le texte part.
+- **Le badge de délai du bloc de destination** répétait mot pour mot ce que
+  chaque colis dit en dessous quand ils sont tous hors délai — quatre fois la
+  même information dans un bloc de six lignes. Il ne s'affiche plus que si les
+  colis **n'ont pas le même état** (là seulement « au plus tôt » veut dire
+  quelque chose). Le tri des blocs par urgence, lui, est inchangé — il n'a pas
+  besoin d'être écrit.
+
+### Et le total dit enfin le hors-délai
+« 4 colis à retirer » : sur les 4, **3 avaient leur date limite passée**. Ce
+n'est pas la même liste de travail (soit il l'a récupéré sans cocher, soit le
+colis est reparti chez l'expéditeur et il faut le réclamer). La ligne dit
+maintenant **« 4 colis à retirer · 3 hors délai à vérifier »**.
+
+### Mesuré
+| onglet | avant | après |
+|---|---|---|
+| **À retirer** | **336 lignes** | **64** |
+| En route | 286 | **201** |
+
+### Vérifié
+`npm run build` OK · **14 audits au vert** (`audit-coherence` : 5 règles,
+**0 désaccord sur 12 statuts**) · les **4 onglets rendus sur les vraies
+données** : À retirer (2 destinations, identifiants 1222/5789 et 8156/9539,
+âges, hors-délai), En route (25 lignes, plus ancien d'abord, « depuis 120 j —
+relance le vendeur »), Reçus, Tous — **0 suspect d'affichage, 0 erreur d'app**
+(les 3 lignes console sont le 400 volontaire de `select=owner` et les resets de
+fin de test).

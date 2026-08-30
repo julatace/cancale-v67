@@ -10205,6 +10205,11 @@ const PICKUP_GRACE_DAYS = 10;   // au-delà, un point relais a forcément rendu 
 // Combien de temps on affiche un colis coché « retiré » en gris, le temps que
 // Vinted enregistre le retrait. Au-delà on n'attend plus : la ligne s'efface,
 // sinon un statut Vinted qui ne bouge jamais encombrerait la liste pour toujours.
+// ⚠️ AU-DELÀ, UN ACHAT « EN ROUTE » EST ANORMAL — mesuré sur ses 441 achats :
+// 12 colis en transit ont 7 à 15 j (le rythme normal Vinted), mais 4 dépassent
+// le mois avec un statut qui ne bouge plus. On ne les CACHE pas (un colis caché
+// est un colis perdu, §5.43) : on affiche leur âge en rouge pour qu'il réclame.
+const ACHAT_RETARD_J = 21;
 const PICKUP_CONFIRM_DAYS = 7;
 const loadCollected = () => new Set((load('vrm_colis_collected', []) || []).map(String));
 // ⚠️ LA DATE LIMITE DE L'EMAIL PRIME SUR LES 14 JOURS — dans UN SEUL SENS.
@@ -11543,6 +11548,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [aFilter, setAFilter] = useState('attente'); // attente | recus | all
   // Statut d'un ACHAT : un achat "reçu" n'a pas le mot "finalisé" (c'est
   // spécifique aux ventes). On élargit donc la détection pour les achats.
+  // ── LES ÉTAPES D'UN COLIS, UNE SEULE FOIS (§11) ────────────────────────────
+  // « Conçois VRM un outil parfait pour la réception des colis » (Julien).
+  // Mesuré sur ses 538 achats : **48 en route, 13 arrivés au relais**, 317 reçus,
+  // 146 annulés. L'écran ne montrait que « 4 colis à retirer » et noyait les
+  // 48 EN ROUTE au milieu d'une liste de 538 commandes — or « en route » est
+  // exactement ce qu'un outil de réception doit montrer.
+  // ⚠️ `relais` s'appuie sur `isAtRelayStatus` (la définition déjà partagée par
+  // l'accueil, l'onglet Achats et les notifications, §11), jamais sur un test
+  // réécrit ici.
+  const phaseReception = (o) => {
+    const s = (o && o.status) || '';
+    // ⚠️ « Retour initié » n'est PAS un colis qui arrive : c'est une paire qu'on
+    // renvoie. Le laisser dans « En route » faisait attendre une livraison qui
+    // ne viendra jamais (1 cas mesuré sur les 26).
+    if (/annul|rembours|refus|retour/i.test(s)) return 'annule';
+    if (isAtRelayStatus(s)) return 'relais';
+    if (purchasePhase(s) === 'completed') return 'recu';
+    return 'route';
+  };
   const purchasePhase = (status) => {
     const s = status || '';
     if (/annul|rembours|refus|litige/i.test(s)) return 'cancelled';
@@ -15709,9 +15733,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
         <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-          {[['attente','En attente'],['recus','Reçus'],['all','Tous']].map(([id,label])=>(
-            <button key={id} onClick={()=>setAFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:3,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
-          ))}
+          {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
+              C'est ça, un outil de réception : où en est chaque paire entre
+              « payée » et « dans le carton chez moi ». Le compte est affiché :
+              un onglet vide se voit avant d'être ouvert. */}
+          {(()=>{ const n={relais:0,route:0,recu:0};
+            buysBase.forEach(o=>{ const p=phaseReception(o); if(n[p]!=null) n[p]++; });
+            // ⚠️ « À retirer » DOIT afficher LE MÊME NOMBRE que la section juste
+            // en dessous. `pickupUnion.total` est LA définition (union email +
+            // statut Vinted, déjà partagée par Ma journée et cet onglet, §11) —
+            // compter les achats « au relais » à la place donnait 2 en haut et
+            // « 4 colis à retirer » en dessous, sur le même écran.
+            return [['attente','À retirer',pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
+            <button key={id} onClick={()=>setAFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:3,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
+          )); })()}
         </div>
         {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
         {buysBase.length>0 && (
@@ -15733,6 +15768,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (la règle « un code de retrait est numérique » vit au niveau module :
           //  `codeRetrait`. Trois copies traînaient, c'est le doublon que §11 interdit.)
           if (!avail.length && !extra.length) return null;
+          // ⚠️ UNE ÉTAPE = UN ÉCRAN. Les destinations sont le contenu de l'étape
+          // « À retirer » : les afficher aussi au-dessus de « En route » ou de
+          // « Reçus », c'était le même bloc répété sur trois onglets. La pastille
+          // du haut porte le compte (« À retirer 4 ») : rien n'est caché, on sait
+          // qu'il y a des colis à aller chercher même en regardant autre chose.
+          if (aFilter !== 'attente') return null;
           // Photo de la paire par titre : les achats moissonnés portent la vraie
           // photo Vinted → on la montre à côté du code de retrait (savoir quelle
           // paire on va chercher / si on l'a déjà retirée).
@@ -15765,7 +15806,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:4,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:C.text}}>{pickupUnion.total} colis à retirer</div>
+                  {/* ⚠️ UN TOTAL QUI NE DIT PAS LE HORS-DÉLAI EST TROMPEUR : sur
+                      les 4 colis affichés, 3 avaient leur date limite passée.
+                      Ce n'est pas la même liste de travail — soit tu l'as déjà
+                      récupéré sans cocher, soit il est reparti chez l'expéditeur
+                      et il faut le réclamer. On le dit sur la même ligne. */}
+                  {(()=>{ const hd = avail.filter(t=>{ const j=joursAvant(t.limite); return j!=null && j<0; }).length;
+                    return (<div style={{fontSize:15,fontWeight:700,color:C.text}}>
+                      {pickupUnion.total} colis à retirer
+                      {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
+                    </div>); })()}
                   {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
                       reçoit » (Julien). On compte les colis dont on SAIT nommer
                       la paire — jamais un total gonflé : quand il en manque, ça
@@ -15825,11 +15875,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
                         <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{g.colis.length} colis · {M.titre}</span>
                         <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>{M.geste}</span>
-                        {urg!=null && (
-                          <span style={{fontSize:11,fontWeight:700,flexShrink:0,color:urg<0?C.danger:(urg<=2?C.accent:C.muted)}}>
-                            {urg<0?'délai dépassé':(urg===0?"dernier jour":(urg===1?'demain':`${urg} j`))}
-                          </span>
-                        )}
+                        {/* ⚠️ LE RÉSUMÉ N'A SA PLACE QUE S'IL AJOUTE QUELQUE CHOSE
+                            (§5.64). Quand les 3 colis du point sont tous hors
+                            délai, le badge « délai dépassé » répétait mot pour
+                            mot ce que chaque ligne dit juste en dessous — quatre
+                            fois la même information dans un bloc de six lignes.
+                            On ne l'affiche que si les colis N'ONT PAS le même
+                            état : là seulement « le plus urgent » veut dire
+                            quelque chose. Le tri des blocs, lui, s'appuie
+                            toujours sur `urg` — il n'a pas besoin d'être écrit. */}
+                        {urg!=null && (()=>{
+                          const seau=(j)=> j==null?'?':(j<0?'x':(j===0?'0':(j===1?'1':'+')));
+                          const etats=new Set(g.colis.map(t=>seau(joursAvant(t.limite))));
+                          if (etats.size<2) return null;
+                          return (
+                            <span style={{fontSize:11,fontWeight:700,flexShrink:0,color:urg<0?C.danger:(urg<=2?C.accent:C.muted)}}>
+                              au plus tôt : {urg<0?'délai dépassé':(urg===0?"dernier jour":(urg===1?'demain':`${urg} j`))}
+                            </span>
+                          );
+                        })()}
                       </div>
                     ); })()}
                   <div style={{padding:'10px 12px 4px'}}>
@@ -16428,10 +16492,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Les lignes portent deja `flexWrap` et une largeur plancher
             (§26), elles supportent la colonne plus etroite. */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px, 100%), 1fr))',gap:8,alignItems:'start'}}>
-          {buysBase.filter(o=>{ const s=purchasePhase(o.status); if(aFilter==='attente')return s==='pending'; if(aFilter==='recus')return s==='completed'; return true; }).filter(o=>matchOrd(o))
+          {buysBase.filter(o=>{ const p=phaseReception(o);
+            // « À retirer » ne déroule PAS une liste : les colis qui t'attendent
+            // sont déjà en haut, groupés par endroit avec leur code. Répéter la
+            // même chose en dessous, c'était le doublon qui rendait l'écran
+            // illisible (336 lignes pour 4 colis).
+            if(aFilter==='attente')return false;
+            if(aFilter==='route')return p==='route';
+            if(aFilter==='recus')return p==='recu';
+            return true; }).filter(o=>matchOrd(o))
             .sort(parDateDesc)
             .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
-            .sort((a,b)=>{ const pr=x=> x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4; const d=pr(a)-pr(b); return d!==0?d:(new Date(b.o.date||0)-new Date(a.o.date||0)); })
+            // ⚠️ EN ROUTE : LE PLUS ANCIEN EN PREMIER. Ce qu'on veut voir quand on
+            // attend des colis, ce n'est pas le dernier acheté — c'est celui qui
+            // traîne depuis trois semaines. Partout ailleurs le plus récent
+            // d'abord (§5.35) : le tri ne change QUE sur cette étape.
+            .sort((a,b)=>{ const pr=x=> x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4; const d=pr(a)-pr(b); if(d!==0) return d;
+              return aFilter==='route' ? ((tsCommande(a.o)||0)-(tsCommande(b.o)||0)) : (new Date(b.o.date||0)-new Date(a.o.date||0)); })
             .map(({o,tk,st})=>{
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
@@ -16455,6 +16532,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:3,padding:'1px 6px'}}>email</span>}
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     <span style={{fontWeight:700,color:st.color,background:`${st.color}18`,borderRadius:3,padding:'1px 8px'}}>{st.label}</span>
+                    {/* DEPUIS COMBIEN DE TEMPS. C'est LA question d'un outil de
+                        réception : « est-ce que je dois m'inquiéter ? ». La date
+                        d'achat seule ne répond pas — il faut compter dans sa
+                        tête. Au-delà de trois semaines, le chiffre passe en
+                        rouge : c'est le moment de relancer le vendeur. */}
+                    {!cancelled && st.step>=1 && st.step<4 && (()=>{
+                      const t=tsCommande(o); if(!t) return null;
+                      const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null;
+                      const tard=j>ACHAT_RETARD_J;
+                      return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>;
+                    })()}
                     {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
                   </div>
                 </div>
@@ -16469,15 +16557,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   « ✅ Reçu » suffit. La liste est deux fois plus courte. */}
               {!cancelled && st.step<4 && (
                 <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}>
-                  {[['Payé',1],['Expédié',2],['Au relais',3],['Reçu',4]].map(([lbl,idx])=>{
-                    const done=st.step>=idx; const cur2=st.step===idx;
-                    return (
-                      <div key={idx} style={{flex:1,textAlign:'center'}}>
-                        <div style={{height:4,borderRadius:3,background:done?st.color:C.border}}/>
-                        <div style={{fontSize:9,marginTop:3,fontWeight:cur2?700:500,color:done?st.color:C.muted,whiteSpace:'nowrap'}}>{lbl}</div>
-                      </div>
-                    );
-                  })}
+                  {/* ⚠️ LES QUATRE LIBELLÉS SONT RETIRÉS (même défaut que les
+                      lignes de vente, §5.69) : la pastille juste au-dessus dit
+                      DÉJÀ l'étape en cours (« En transit », « Au relais »…).
+                      Écrire « Payé · Expédié · Au relais · Reçu » sur chaque
+                      ligne, c'est une légende recopiée 26 fois — mesuré, 104 des
+                      286 lignes de l'écran. Les segments colorés suffisent. */}
+                  {[1,2,3,4].map((idx)=>(
+                    <div key={idx} style={{flex:1,height:4,borderRadius:3,background:st.step>=idx?st.color:C.border}}/>
+                  ))}
                 </div>
               )}
               {/* Actions : Suivre le colis + reçu/justif */}
