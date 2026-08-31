@@ -284,11 +284,28 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('les couleurs d\'un titre sont lues en ensemble',
           'seule `extractColor` existe : un titre bicolore ne rend rien, donc plus aucun test de couleur');
   // b) le score du sélecteur compare des ensembles, plus une couleur unique
-  /const couleursRef = extractColors\(item\?\.title\)/.test(SRC)
-    && /const cs = extractColors\(t\);[\s\S]{0,260}?couleursRef\.includes\(c\)/.test(SRC)
+  // ⚠️ Le barème a DÉMÉNAGÉ au niveau module (`refAchat` / `scoreAchat`) : il
+  // vivait dans `openPicker`, donc la modale de saisie en série ne pouvait pas
+  // s'en servir et le banc devait en recopier les poids. Le contrôle suit la
+  // définition unique, pas l'ancien emplacement.
+  /couleurs:\s*extractColors\(item\?\.title\)/.test(SRC)
+    && /const cs = extractColors\(t\);[\s\S]{0,200}?ref\.couleurs\.includes\(c\)/.test(SRC)
     ? ok('le sélecteur d\'achat compare des ensembles de couleurs')
     : nok('le sélecteur d\'achat compare des ensembles de couleurs',
           'il compare encore une couleur unique : une paire bicolore désactive le test');
+  // ⚠️ MARQUE + POINTURE + COULEUR font EXACTEMENT le seuil (4+4+4 = 12). Sans
+  // malus, « Baskets Nike blanche et grise pointure 45 » — un titre qui désigne
+  // des centaines de paires — était donné comme « suggéré ». Il faut le modèle
+  // des DEUX côtés, sinon la preuve est insuffisante. Mesuré : 19 → 17
+  // suggestions, les 2 perdues sont les 2 génériques.
+  /else pts -= 3;/.test(SRC)
+    ? ok('un achat au titre générique ne peut pas atteindre le seuil « suggéré »')
+    : nok('un achat au titre générique ne peut pas atteindre le seuil « suggéré »',
+          'marque + pointure + couleur = 12 = le seuil : un titre sans modèle passe');
+  // le seuil est une CONSTANTE partagée, pas un 12 recopié dans le rendu
+  /const SEUIL_SUGGERE = 12;/.test(SRC) && !/_score\|\|0\) >= 12/.test(SRC)
+    ? ok('le seuil « suggéré » est une seule constante')
+    : nok('le seuil « suggéré » est une seule constante', 'un 12 est recopié ailleurs');
   // c) l'ancienne comparaison une-couleur-contre-une-couleur a bien disparu du score
   /couleurRef && co && co !== couleurRef/.test(SRC)
     ? nok('l\'ancien test de couleur unique a disparu du score', 'il est encore là')
@@ -353,6 +370,64 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     ? ok('le reçu d\'achat exige un candidat UNIQUE (titre comme transaction)')
     : nok('le reçu d\'achat exige un candidat unique',
           'il prend encore le premier titre égal sans vérifier qu\'il est seul');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 13) UNE ANNONCE CAPTÉE APRÈS SA VENTE REPREND LE NUMÉRO DU CARTON
+//     Julien : « si je poste une annonce depuis ma tablette et que je la vends
+//     en direct, l'extension n'a que la vente ». L'app numérote alors la vente
+//     (autoShip, 98 cas en base). Si Vinted laisse l'annonce ouverte, elle
+//     arrive ensuite SANS numéro : sans ces trois règles elle en reçoit un
+//     NEUF, et la même paire porte deux numéros — le risque n°1 (§19), avec un
+//     numéro qui ne se reprend jamais (§5.40), donc une erreur définitive.
+{
+  /const numVentesParIdentite = useMemo/.test(SRC)
+    ? ok('les numéros déjà posés sur des ventes sont indexés par identité')
+    : nok('les numéros déjà posés sur des ventes sont indexés par identité',
+          '`numVentesParIdentite` absent : une annonce captée après sa vente prendra un numéro neuf');
+
+  const i = SRC.indexOf('let num = numVentesParIdentite');
+  i >= 0
+    ? ok('la numérotation réutilise ce numéro AVANT d\'en créer un neuf')
+    : nok('la numérotation réutilise ce numéro avant d\'en créer un neuf',
+          'la réutilisation par vente ne passe pas avant l\'attribution');
+
+  /if \(sales\.items === null \|\| !txnPret\) return;/.test(SRC)
+    ? ok('aucun numéro n\'est gravé avant que ventes et identités aient répondu')
+    : nok('aucun numéro n\'est gravé avant que ventes et identités aient répondu',
+          'la course est ouverte : le numéro neuf est écrit puis plus rien ne le corrige');
+
+  // Le rechargement au cloud : sans lui, `saleOv` est vide au premier rendu sur
+  // un appareil neuf et `setSaleOv({ ...saleOv })` REMPLACE les 361 numéros de
+  // vente par du vide. Reproduit au banc (N°777 ressorti en N°319).
+  const j = SRC.indexOf('setCloudReady(true)');
+  const bloc = j < 0 ? '' : SRC.slice(Math.max(0, j - 700), j);
+  /setSaleOv\(load\('vinted_sale_overrides'/.test(bloc)
+    ? ok('les numéros de vente sont relus quand le cloud arrive')
+    : nok('les numéros de vente sont relus quand le cloud arrive',
+          '`vinted_sale_overrides` absent du rechargement : ils peuvent être écrasés par du vide');
+}
+
+
+// ── 14. UNE VENTE ANNULÉE AVANT L'ENVOI GARDE SA PLACE ──────────────────────
+// La paire n'a jamais quitté la maison : son carton est sur l'étagère avec son
+// numéro écrit dessus. Si `porteursNum` l'oublie, elle disparaît de l'inventaire
+// physique et du panneau « à ranger » du Garage — alors qu'elle est là.
+// ⚠️ Une vente annulée APRÈS expédition (remboursement) ne compte pas.
+{
+  const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const i = app.indexOf('const porteursNum = useMemo');
+  const bloc = i < 0 ? '' : app.slice(i, i + 2200);
+  const c1 = /classifyOrderStatus\(o\.status\) === 'cancelled'/.test(bloc) && /venteExpediee\(o\)/.test(bloc)
+    && /if \(!revenue && !needsBordereau\(o\.status\)\) continue;/.test(bloc);
+  c1 ? ok("une vente annulée avant l'envoi garde son numéro (porteursNum)")
+     : nok("une vente annulée avant l'envoi garde son numéro (porteursNum)", 'la règle a disparu de porteursNum');
+  const iv = app.indexOf('const venteExpediee');
+  (iv > 0 && iv < i) ? ok('venteExpediee est déclarée AVANT porteursNum (piège TDZ §19)')
+                     : nok('venteExpediee est déclarée AVANT porteursNum (piège TDZ §19)');
+  const nb = (app.match(/const venteExpediee = /g) || []).length;
+  nb === 1 ? ok("venteExpediee n'existe qu'une seule fois (une règle, un endroit)")
+           : nok("venteExpediee n'existe qu'une seule fois", nb + ' définitions');
 }
 
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');

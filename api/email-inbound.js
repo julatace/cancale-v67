@@ -22,7 +22,7 @@ import { stampBordereau } from './_lib/stamp.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { adressesDeLivraison, resoudreProprietaire } from './_lib/proprietaire-email.js';
-import { normaliserEntrant, formeRecue } from './_lib/lire-email.js';
+import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -84,7 +84,15 @@ function normalizeInbound(body) {
   // ouvrir un email BRUT (MIME) et les formes emballées — ce que cette fonction
   // ne savait pas faire, d'où un email arrivé le 23 août avec expéditeur et
   // sujet vides, classé « ignoré », et perdu sans laisser de trace.
-  return normaliserEntrant(body);
+  const m = normaliserEntrant(body);
+  // ⚠️ L'expéditeur réel est écrit DANS `from`, à côté de l'alias iCloud.
+  // Tous les tests d'expéditeur sont des tests par sous-chaîne (`/chronopost/`,
+  // `/relay\.vinted/`, `/@team\.vinted/`) : leur rendre le vrai domaine lisible
+  // suffit, et on ne détruit rien — l'alias reste là pour l'affichage et pour
+  // le rattachement au vendeur, qui lit l'adresse de RÉCEPTION, jamais celle-ci
+  // (§5.16 : c'est l'adresse de livraison qui décide, jamais le contenu).
+  const reel = demasquerRelais(m.from);
+  return reel && !String(m.from || '').includes(reel) ? { ...m, from: `${m.from} (${reel})` } : m;
 }
 
 // ⚠️ LE PROPRIÉTAIRE EST PROPRE À CHAQUE REQUÊTE, PAS AU MODULE.
@@ -386,7 +394,15 @@ function familleConnue(subject, from) {
   if (/laiss[ée] une [ée]valuation|^Laisse une [ée]valuation/i.test(s)) return 'évaluation';
   if (/Commande mise [àa] jour/i.test(s)) return 'commande mise à jour (le statut vient de la moisson)';
   if (/a mis en ligne un nouvel article/i.test(s)) return "nouvel article d'un membre suivi";
-  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain/i.test(s)) return 'ton propre email envoyé à Vinted';
+  // ⚠️ 76 emails « MISE EN DEMEURE … » manquaient à cette famille (mesuré le
+  // 30 août) : c'est SON courrier sortant vers Vinted, pas un email à traiter.
+  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain|MISE EN DEMEURE|intervention humaine|contestation/i.test(s)) return 'ton propre email envoyé à Vinted';
+  // ⚠️ « Le transfert bancaire est en cours » (15 emails) = le porte-monnaie
+  // Vinted qui se vide vers SA banque. Ce n'est PAS une vente finalisée : le
+  // ranger dans `email_final_*` compterait l'argent DEUX FOIS (une fois quand la
+  // vente se finalise dans le porte-monnaie, une fois quand il en sort). Aucune
+  // action à faire — donc une famille reconnue, pas une alerte.
+  if (/transfert bancaire|virement bancaire/i.test(s)) return 'virement du porte-monnaie vers ta banque';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
   return '';
@@ -504,9 +520,23 @@ function parseCarrierEmail(mail, carrier) {
   const t = all.toLowerCase();
   const suj = String(mail.subject || '').toLowerCase();
   let status = 'info', label = 'Mise à jour';
+  // ⚠️⚠️ UNE CONFIRMATION DE DÉPÔT N'EST PAS UN COLIS QUI T'ATTEND.
+  // Mesuré le 31 août : le Mondial Relay `74950536` (« Votre colis est entre de
+  // bonnes mains 📦 », c'est-à-dire SA preuve de dépôt) était rangé en
+  // `available` — donc affiché comme un colis à aller chercher, puis promu en
+  // « colis jamais retiré, va le réclamer ». Cause : le sujet ne matchait rien,
+  // on retombait sur le CORPS, et le corps d'un email de dépôt contient
+  // « disponible » / « prêt » (le §5.43 en petit).
+  // Sur 128 lignes de suivi, **76 sont des colis sortants** : c'est la moitié du
+  // bruit de l'onglet Achats.
+  // ⚠️ On ne tranche que sur du CERTAIN (§24) : une confirmation de dépôt ne
+  // peut pas vouloir dire autre chose. Le reste garde le comportement d'avant.
+  const SUJ_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/;
+  const sortant = !!(suj && SUJ_SORTANT.test(suj));
   const SUJ_RETIRE = /a\s+[ée]t[ée]\s+(?:retir[ée]|livr[ée]|remis)|colis\s+retir[ée]|livraison\s+de\s+votre\s+colis|bien\s+re[çc]u/;
   const SUJ_DISPO  = /disponible|à\s+retirer|a\s+retirer|arriv[ée]\s+(?:en|au|dans)|vous\s+attend|pr[êe]t/;
-  if (suj && SUJ_RETIRE.test(suj))      { status = 'delivered'; label = 'Livré / retiré'; }
+  if (sortant)                          { status = 'transit';  label = 'Colis déposé (ta vente)'; }
+  else if (suj && SUJ_RETIRE.test(suj))      { status = 'delivered'; label = 'Livré / retiré'; }
   else if (suj && SUJ_DISPO.test(suj))  { status = 'available'; label = 'Arrivé au point de retrait'; }
   else
   // Priorité STRICTE : livré/retiré > disponible > en transit. Les trois sont
@@ -636,7 +666,7 @@ function parseCarrierEmail(mail, carrier) {
   // scanne), au comptoir on présente un code et une pièce d'identité.
   const consigne = /consigne\s+pickup|casier|locker/i.test(all);
 
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne };
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, ...(sortant ? { sens: 'sortant' } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).

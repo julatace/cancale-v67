@@ -4662,3 +4662,1913 @@ séparées par un trait d'1 px, un vert unique posé partout.
 
 **Vérifié** : `npm run build` OK · smoke **11 écrans, 0 vide, 0 erreur** ·
 **9 audits au vert** · captures relues (Ventes, Réglages).
+
+---
+
+## 5.59 — LA 3D SUR LE FOND : parquet, lumière, et ce qu'on regarde en premier
+
+### Le sol décide de tout
+C'est la plus grande surface de l'image : une texture de bois « bruitée » étirée
+sur six mètres n'a **aucune échelle**, l'œil n'a rien pour mesurer la profondeur.
+`makeParquet` pose de vraies **lames** avec leurs joints, à coupe perdue
+(décalage d'un rang à l'autre), chacune avec sa teinte et son veinage — un joint
+sombre en bas/droite, un liseré clair en haut, c'est ce contraste qui donne le
+relief. **Une tuile = ~1,6 m** : les lames gardent une taille crédible quelle
+que soit la pièce (avant, elles s'étiraient avec elle).
+
+### Les murs : la lumière tombe
+Un mur d'une seule teinte du sol au plafond est le signe le plus sûr d'une image
+de synthèse. `makeWall` pose un dégradé vertical très léger (le haut prend la
+lumière du plafond, le bas s'assombrit) plus une trame fine.
+
+### La pièce d'abord, les réglages ensuite
+La vue 3D était **sous quinze rangées de boutons** : il fallait défiler tout
+l'écran de configuration avant de voir son garage. Elle passe en premier.
+
+### ⚠️ « undefined » sur chaque meuble — et pourquoi le DOM ne le voyait pas
+Vu au **rendu** : chaque étiquette de meuble portait le mot « undefined ». Mon
+scan du DOM ne trouvait rien — normal, **ce sont des sprites WebGL, pas du
+HTML**. C'était mon banc qui servait des meubles sans `name`, mais l'app ne s'en
+protégeait pas (un plan importé ferait pareil) : on retombe désormais sur le
+libellé du TYPE. Le banc sert maintenant des meubles complets.
+➡️ **Un défaut dans un canvas ne se cherche pas dans le DOM. Il faut regarder
+l'image.**
+
+### Le décor ne porte pas d'étiquette
+Huit pastilles sombres flottaient au-dessus de la pièce et masquaient
+précisément ce qu'on vient regarder. Une chaise se reconnaît sans qu'on écrive
+« Chaise » dessus ; un **rangement** garde son nom et son compte — c'est
+l'information utile (où sont les paires).
+
+---
+
+## 5.60 — LE GARAGE SERT À RANGER, PAS À MEUBLER (3D cadrée + écran remis dans l'ordre)
+
+Julien : « améliore la 3D, c'est pas ouf comme ça ; **mets-toi à la place d'un
+revendeur pour son rangement**, vraiment ça doit être mieux, plus facile à
+prendre en main ». Méthode : **regarder la capture** avant de toucher au code
+(§5.56 — un défaut dans un canvas ne se cherche pas dans le DOM).
+
+### 1. ⚠️ LA CAMÉRA ÉTAIT DANS LA PIÈCE, PAS DEVANT
+La position de départ était **fixe** : `x = w*0.1, y = max(2.2, max(w,h)*0.5),
+z = h*1.05`. Sur une pièce de 7×6 ça met la caméra à **~7 m du centre**, donc à
+l'intérieur : sur la capture, l'étagère était **coupée en haut** et à moitié
+cachée par le canapé. On ne voyait pas son rangement — c'est très exactement le
+« pas ouf ».
+
+➡️ `cadrerPiece()` calcule la **distance qui fait entrer les 8 COINS** de la
+pièce dans le champ, en tenant compte du **format du canvas** (sur un écran
+étroit c'est la largeur qui contraint, pas la hauteur). `maxDistance` est relevé
+en conséquence — sinon OrbitControls ramenait la caméra plus près à la première
+mise à jour et **annulait le calcul en silence**.
+
+⚠️ **Ma première version cadrait la SPHÈRE englobante** (demi-diagonale de la
+pièce) : la caméra partait beaucoup trop loin et la pièce **flottait au milieu
+d'un grand vide gris**. La diagonale d'une boîte est bien plus grande que ce
+qu'on voit réellement d'un point de vue donné. Vu en capture, corrigé en
+projetant les coins — exact, et ça s'adapte tout seul à la forme de la pièce.
+
+### 2. Chercher un N° amène DE FACE, plus en trois-quarts
+Ce qu'on veut voir quand on cherche une paire, c'est la **grille de cases** du
+meuble : de biais, les rangées se chevauchent et on ne compte plus rien.
+`flyTo` vise désormais le meuble **de face**, depuis le côté dégagé —
+direction « meuble → centre de la pièce » : un rangement est contre un mur, il
+s'ouvre vers l'intérieur. ⚠️ **Aucune convention de rotation à deviner** (elle
+diffère d'un type de meuble à l'autre). Un meuble au centre (< 0,35 m) retombe
+sur une direction par défaut.
+Bouton **« 👁 De face »** dans la vue, visible dès qu'un meuble est sélectionné.
+
+### 3. L'écran s'ouvre sur la PIÈCE + la RECHERCHE
+Tout l'outillage de **construction** (palette de meubles, dimensions, plafond,
+couleur des murs, mode déplacement) part derrière un dépliant **« Aménager la
+pièce »**. Un revendeur ouvre son garage pour **retrouver une paire ou en ranger
+une**, pas pour ajouter un canapé. Le sélecteur de pièces reste visible : c'est
+de la navigation, pas de la construction.
+
+### 4. Trois défauts d'affichage relevés en capture
+- **Les 5 ambiances** étaient une rangée de pastilles qui **défilait en travers
+  du haut de la vue** — la dernière coupée, et elles couvraient précisément
+  l'étagère qu'on vient regarder. Un seul bouton « Ambiance » les déplie.
+- **Les 6 boutons de vue** étaient collés dans le même coin, en trois groupes qui
+  se chevauchaient. Deux grappes séparées : **cadrage à gauche, navigation à
+  droite**.
+- **Le vide autour de la pièce** était un **aplat gris uni** — la chose qui fait
+  le plus « rendu 3D pas fini ». Dégradé vertical léger (même recette que les
+  murs, §5.59), **régénéré à chaque changement d'ambiance** (`fondDegrade`).
+
+### 5. ⚠️ « Version : … · 🔄 Forcer la mise à jour » trônait au milieu du Garage
+De l'outillage de développeur posé dans un écran de travail, **juste au-dessus
+de la 3D**. §5.54 avait sorti la version de l'en-tête ; ce bloc-là était resté.
+Il **ne disparaît pas** (c'est le seul bouton de forçage de l'app) : il rejoint
+la version dans **Réglages**, là où on le cherche.
+
+### ⚠️ CE QUE J'AI CASSÉ EN CHEMIN (et comment ça a été rattrapé)
+Ma première tentative de réorganisation découpait des **plages de lignes** et les
+réinsérait ailleurs. Elle a attrapé le bloc « Recherche » du **mauvais
+composant** (celui du garage-photo, qui lit `photos`/`cur`/`pins`) et produit un
+JSX déséquilibré — `npm run build` refusait de compiler.
+➡️ Réparé en **isolant les seuls morceaux voulus** dans le diff (`git apply` de
+la palette seule sur un fichier propre) puis en refaisant le déplacement avec
+des **assertions sur la première et la dernière ligne de chaque bloc**.
+**Une découpe par numéros de ligne se vérifie sur ce qui RESTE** (§5.56) — et
+chaque bloc extrait doit être reconnu par son contenu, jamais par sa position.
+
+### Palette : identité assumée
+Ma tentative précédente déplaçait les couleurs de ~2 % : Julien a dit deux fois
+« rien n'a changé », et **il avait raison**. Nouvelle base : accent vert franc
+(`#00875a` / `#2ee08f`) réservé aux actions et aux chiffres qui comptent,
+surfaces **nettement étagées** en sombre (`#0a0e11` → `#151b20` → `#1d252b`), gris
+légèrement froid (le vert-olive rendait terne).
+
+### Vérifié
+`npm run build` OK · **9 audits au vert** (secrets, identité, cohérence 0
+désaccord sur 12 statuts, qr, offres, transporteurs, formes d'email, bordereau,
+diagnostic) · smoke **11 écrans, 0 ECRAN VIDE, 0 PAGEERROR, 0 texte
+« undefined »** (les lignes console restantes sont le 400 volontaire de
+`select=owner` et les resets de fin de test) · **captures relues** : la pièce
+entière tient dans le cadre, les boutons ne se chevauchent plus, le fond est
+dégradé · banc dédié **« De face »** : un tap dans le canvas sélectionne le
+meuble, le bouton apparaît, le clic **change réellement la vue** (images
+comparées à l'octet) et l'étagère se présente **de face, ses rayons lisibles**.
+
+### ⚠️ Reste ouvert (pas fait, dit franchement)
+- L'onglet **par défaut du Garage reste « Grille »** (25 cases grises vides). La
+  3D est derrière « Plan ». Changer le défaut est un changement de comportement :
+  **à trancher avec Julien**, pas à décider seul.
+- Le cadre reste un peu haut par rapport à une pièce large (bandes vides en haut
+  et en bas sur un écran de téléphone). Sur ordinateur — la cible qu'il a fixée
+  pour l'app comme pour l'extension (§42) — le canvas est large et la pièce
+  remplit le cadre.
+
+---
+
+## 5.61 — LES NOTIFICATIONS COUPÉES PAR MA PROPRE CORRECTION + une vraie typographie + on range une VRAIE paire
+
+Julien : « remets les notifications, je ne les reçois plus… améliore le
+graphisme, les couleurs, les contrastes, les logos, les boutons, qu'on n'ait
+pas l'impression que ce soit fait par une IA… et la 3D doit être une
+application dans l'application : tu sélectionnes ce que tu ranges, la taille,
+on voit les animations. »
+
+### 1. ⚠️⚠️ POURQUOI IL NE RECEVAIT PLUS RIEN — c'est §5.53 qui l'a cassé
+En sortant la clé privée VAPID du dépôt public, la **paire a été régénérée** :
+la clé **PUBLIQUE a changé elle aussi**. Or un abonnement push est **scellé à
+la clé publique avec laquelle il a été créé**. Les abonnements déjà posés sur
+ses deux appareils sont donc devenus inutilisables — le service de push refuse
+l'envoi — et `getSubscription()` les rend **quand même**. L'écran affichait
+donc « activé » pendant que plus rien n'arrivait, et le bouton « Test »
+répondait « aucun appareil n'a reçu », ce qui désignait le mauvais coupable.
+
+- **`memeCle(sub)`** compare la clé de l'abonnement à la clé courante et
+  **ré-abonne tout seul** quand elles diffèrent (désabonnement + nouvel
+  abonnement + renvoi au serveur), avec un mot dans l'écran.
+- **`GET /api/push?etat=1`** répond « le serveur peut-il envoyer ? » (booléen +
+  nombre d'appareils, **aucun secret exposé**). Réglages → Notifications
+  affiche le verdict en rouge quand la clé manque.
+- Le bouton **Test remonte la RAISON du serveur** : « aucun appareil abonné »
+  et « le serveur n'a pas sa clé » produisaient exactement le même silence.
+
+⚠️ **Ce que le code ne peut PAS faire** : poser `VAPID_PRIVATE_KEY` dans les
+variables d'environnement Vercel. Tant qu'elle manque, **zéro notification
+part**, quel que soit le nombre d'appareils abonnés. L'app le dit désormais
+noir sur blanc au lieu de laisser chercher.
+
+### 2. LE GRAPHISME — les deux tells d'une interface générée
+**Tell n°1 : une seule police neutre à toutes les tailles.** Rien ne distingue
+un titre d'un paragraphe sinon la taille. On oppose désormais une police
+d'**AFFICHAGE** (Bricolage Grotesque — titres d'écran, montants, gros
+chiffres, N° des paires) à la police de **TEXTE** (Inter), avec un contraste
+tenu : affichage resserré (**-0,03 em**) contre micro-étiquettes aérées en
+capitales (**+0,09 em**, classe `.vrm-label`). C'est ce couple qui fait lire
+« composé par quelqu'un ».
+**Tell n°2 : l'aplat parfaitement lisse.** Aucune surface réelle ne l'est. Une
+trame de bruit à **2,8 %**, non cliquable, sur toute la page (`body::after`,
+SVG `feTurbulence` en `data:`) — personne ne sait dire pourquoi, mais ça ne
+ressemble plus à du CSS pur.
+
+**Les boutons** (il les a nommés) : tous les boutons de l'app portent des
+styles **en ligne**, donc une règle CSS ne peut pas les repeindre — mais les
+**états** (`:hover`, `:active`, `:focus-visible`) n'existent pas en style en
+ligne. Ces règles-là s'appliquent donc partout **sans jamais écraser une
+intention de couleur** : légère montée en luminosité au survol, enfoncement au
+clic, anneau de focus aux couleurs de la marque.
+⚠️ `:hover` borné à `(hover:hover) and (pointer:fine)` : sur mobile le survol
+reste « collé » après un tap et le bouton paraît bloqué.
+
+⚠️ **Le fond de page gardait les ANCIENNES couleurs** (`#eef2ef` / `#0b0f0d`)
+alors que la palette était passée à `#f1f4f2` / `#0a0e11` : une bande d'une
+autre teinte derrière les cartes, visible sur tous les écrans. Resynchronisé.
+
+⚠️ **Défaut vu en capture, pas à la relecture** : les étiquettes en capitales
+sont **plus longues**. « COÛT D'ACHAT » et « BÉNÉFICE NET » passaient sur deux
+lignes et les trois `StatBox` d'une rangée ne s'alignaient plus. On réserve
+deux lignes pour tout le monde — les chiffres restent sur la même ligne d'œil.
+
+### 3. LA 3D — on range une VRAIE paire, et le carton tombe
+Avant, remplir une case demandait de **taper un numéro de mémoire** : rien ne
+vérifiait qu'il existe, ni qu'il n'est pas déjà rangé ailleurs.
+
+- **`RangerSheet`** : on choisit dans la liste de ses paires — **photo, N°,
+  titre, POINTURE**, recherche. La liste dérive de **`vinted_nums_physiques`**
+  (§5.14), la définition unique de « cette paire est chez toi » : aucune règle
+  n'est réécrite ici (§11).
+  ⚠️ **Sans cette liste** (écran Annonces jamais ouvert sur cet appareil), on
+  propose **tout plutôt que rien** — mais on trie les **plus récemment
+  numérotées en tête** et **on l'écrit dans la feuille**. On ne fait pas
+  semblant de savoir.
+- **`animerDepot`** : la boîte **tombe** dans sa case — chute accélérée, rebond
+  amorti, halo qui s'éteint. ⚠️ Déclenchée **APRÈS** la reconstruction du
+  meuble (l'effet sur `items`) : la boîte n'existe qu'à ce moment-là. React
+  exécute les effets dans l'ordre de déclaration, c'est ce qui garantit
+  l'enchaînement.
+- **`poserDansCase`** : un seul chemin d'écriture pour les trois entrées
+  (choix, saisie libre, effacement) — gravité, croissance de la grille,
+  animation.
+- **Garde-fou `dejaPoseOu(num)`** : un même numéro dans deux cases, c'est
+  « dans quelle boîte est-elle ? » — le pendant, au garage, des deux paires
+  sous le même numéro (§19). La feuille l'empêche par construction (elle ne
+  propose que ce qui n'est pas rangé) ; ce garde-fou couvre la **saisie
+  libre**, qui ne vérifiait rien, et nomme le meuble où la paire se trouve.
+
+### 4. État des données mesuré AVANT de coder (25 août)
+| | |
+|---|---|
+| paires numérotées | **225** |
+| annonces en ligne | 26 |
+| **numéros portés par deux annonces en ligne** | **0** ✅ |
+| **annonces en ligne sans numéro** | **0** ✅ |
+| **prix d'achat renseignés** | **0 / 225** ⚠️ |
+
+Les garde-fous de §5.40 (aucun numéro réattribué) et §5.45 (rien ne bouge tout
+seul) **tiennent** : le N°4 corrigé la veille n'est pas revenu, et aucune
+annonce n'est sortie sans numéro. Le seul trou reste **le prix d'achat** —
+l'outil de saisie en série existe (§5.47), c'est de la frappe.
+
+### ⚠️ Deux pièges de banc, encore (§21)
+1. **J'ai failli signaler un bug qui n'existe pas** : la capture
+   `smoke-cat_journee.png` montrait un commentaire JSX affiché EN TEXTE sur
+   l'écran d'accueil. Vérification : la capture datait de **10:49**, d'un run
+   précédent, et `cat_journee` n'était **pas** dans les onglets du banc. Le
+   bundle courant ne contient **aucune** occurrence du texte. **Regarder la
+   date du fichier avant d'accuser le code.** L'onglet a été ajouté au banc, et
+   un **détecteur permanent** cherche désormais `/*` et `*/` dans le texte
+   affiché — la famille §5.55/§5.56 ne repassera plus.
+2. **Mon banc lisait la mauvaise clé** : `vrm_room` au lieu de
+   `vrm_room_plan` → il concluait « rien n'a été rangé » alors que tout
+   marchait.
+
+### Vérifié
+`npm run build` OK · `node --check api/push.js` OK · **9 audits au vert** ·
+banc : la police d'affichage est **réellement chargée et appliquée**
+(`document.fonts.check('700 22px "Bricolage Grotesque"')` = **true**, famille
+calculée du titre = Bricolage Grotesque) · **banc de rangement dédié** : deux
+taps sur une case → la feuille s'ouvre (**175 paires**, nom de case
+« colonne 3 · 2ᵉ depuis le bas », avertissement d'honnêteté affiché) → un tap
+sur N°154 → **`Étagère:3_2=154`** en base (la gravité l'a fait tomber en bas de
+la colonne), l'étiquette du meuble passe à **« Étagère (1) »** et le panneau à
+**« 1 boîte rangée · 14 places libres »** · smoke tous écrans, **0 ECRAN
+VIDE, 0 PAGEERROR**.
+
+### 5.61 (suite) — le garage s'ouvre sur la 3D + le banc ne ment plus
+
+- **`vinted_garage_view` passe par défaut à `plan`.** Julien : « je veux
+  vraiment que la 3D soit une application dans l'application ». Le choix reste
+  **mémorisé par appareil** : qui préfère la grille la retrouve au prochain
+  passage — on change le point de départ, pas son habitude. Les trois onglets
+  passent des emojis (🗄️ 📸 🪑) aux **icônes au trait** (§5.55) et s'appellent
+  **Ma pièce / Grille / Photos**.
+- **La pastille ✎ quitte le logo** : elle n'apparaît qu'au survol (ordinateur).
+  Un produit fini ne porte pas un crayon sur sa marque ; le changement d'icône
+  reste dans Réglages.
+
+⚠️ **TROIS FOIS dans la même session j'ai lu une capture PÉRIMÉE** et failli
+signaler un bug qui n'existait pas — dont un commentaire JSX prétendument
+affiché en clair sur l'écran d'accueil (le bundle n'en contenait aucune trace ;
+la capture datait d'un run précédent). Deux durcissements du banc :
+1. **il efface toutes ses captures au démarrage** — une capture qui survit à un
+   run planté est un piège ;
+2. **détecteur permanent** de `/*` et `*/` dans le texte affiché, pour que la
+   famille §5.55/§5.56 (commentaire JSX rendu comme texte) ne repasse plus.
+⚠️ Et : **ne jamais lancer `npm run build` pendant qu'un banc sert `dist/`** —
+le dossier est vidé, le banc plante, et on croit à une régression.
+
+**État final vérifié** : smoke **11 écrans, 0 ECRAN VIDE, 0 suspect
+d'affichage, 0 erreur non-réseau** · 9 audits au vert · base de production :
+225 paires numérotées, 26 annonces en ligne, **0 doublon de numéro**,
+**0 annonce sans numéro**.
+
+---
+
+## 5.62 — ⚠️ LE VRAI PROBLÈME N'ÉTAIT NI LES COULEURS NI LA POLICE : LA FORME ÉTAIT MOBILE
+
+Julien, **trois fois** : « le rendu est presque pareil, je veux quelque chose
+qui révolutionne ». Il avait raison les trois fois, et mes réponses (palette,
+typographie, grain, états de boutons) étaient **des retouches sur une structure
+qui ne changeait pas**.
+
+### Ce que la mesure a montré — et il fallait la faire au 1er message
+Rendu de l'app à **1440×900**, l'écran où il travaille (§42 : ordinateur
+d'abord). C'était une **app mobile étirée** :
+
+| constat (capture) | |
+|---|---|
+| largeur d'une carte d'action pour porter trois mots | **1170 px** |
+| navigation | **en bas**, comme sur un téléphone |
+| vide noir sous le contenu | **~350 px** |
+| écrans accessibles d'un coup | **5 sur 9** (les autres derrière « Plus ») |
+
+➡️ **Aucune retouche de teinte ne corrige ça.** Un lecteur relie mal le début
+d'une ligne de 1170 px à sa fin ; une barre d'onglets en bas d'un écran de
+bureau, personne n'en met ; et cacher la moitié de la navigation derrière un
+bouton est une contrainte de **téléphone**, sans raison d'être sur 1440 px.
+
+### Le shell d'ordinateur — `useOrdinateur()` (≥ 1024 px)
+- **`SideBar`** : les **neuf** écrans visibles d'un coup, groupés
+  « Au quotidien » / « Le reste », la marque en haut, Réglages en bas. La barre
+  du bas disparaît — **une seule navigation à la fois, jamais les deux**.
+- **Largeur de lecture bornée à 980 px**, collée à gauche sous la barre : la
+  respiration passe **à droite**, plus dans la carte.
+- **En-tête décalé** après la barre latérale, et **la marque n'y est plus** :
+  deux logos sur le même écran, c'est ce qui fait « assemblé » plutôt que
+  « conçu ».
+- **Actions de Ma journée en GRILLE** :
+  `repeat(auto-fit, minmax(340px, 1fr))` → **deux colonnes** sur grand écran,
+  **une** sur téléphone. La même règle pour les deux, **sans test de largeur
+  dans le JavaScript** — donc rien à maintenir en double.
+- **Une lueur** (deux dégradés radiaux très doux, `body::before`) sous tout le
+  contenu. Sur grand écran il reste forcément du vide une journée calme : un
+  aplat noir qui s'arrête net fait « page pas finie », une source de lumière en
+  fait de la respiration.
+
+⚠️ **En dessous de 1024 px, RIEN ne change** : `ordi` est faux, la barre du bas
+et la pleine largeur sont exactement celles d'avant. **Le téléphone est
+intact** — c'est la condition de ce changement, et elle est vérifiée au banc à
+430 px.
+
+### La leçon, et elle vaut pour la suite
+**Quand quelqu'un dit trois fois « c'est pareil », arrêter de retoucher et aller
+mesurer l'objet dans SES conditions.** Deux sessions de palette et de
+typographie n'ont pas déplacé son impression parce que le défaut n'était pas
+là ; une capture à sa vraie résolution l'a montré en trente secondes.
+
+⚠️ **Piège d'outillage rencontré cinq fois aujourd'hui** : lancer
+`npm run build` pendant qu'un banc sert `dist/` vide le dossier sous ses pieds —
+le banc plante ou se fige, et on croit à une régression. **Un seul des deux à
+la fois.**
+
+---
+
+## 5.63 — LE GARAGE MONTRE ET SORT · LES LISTES EN DEUX COLONNES
+
+Deux briques livrées avec le shell d'ordinateur (§5.62) et pas encore écrites
+ici.
+
+### 1. ⚠️ LE GARAGE NE SAVAIT QUE RANGER
+`RangerSheet` (§5.61) permettait de poser une paire dans une case. Rien, ensuite,
+ne disait **ce qu'un meuble contient**, et **rien ne permettait d'en sortir une
+paire** — sauf le vieux ✕ de la vue Grille, sur un numéro nu, sans photo. Un
+rangement où l'on ne peut que faire entrer se remplit et ne sert plus.
+
+- **`contenuMeuble(it)`** : le contenu réel d'un meuble, **trié par numéro**,
+  chaque ligne enrichie par `ficheParNum` — photo, titre, et le drapeau
+  `ambigu`. Panneau sous la 3D dès qu'un meuble est sélectionné.
+- **`ficheParNum`** = la résolution numéro → paire. ⚠️ **Deux fiches peuvent
+  porter le même numéro** (héritage d'avant §5.40, la réattribution). Dans ce
+  cas on préfère celle d'une paire **réellement présente** (`vinted_nums_physiques`,
+  §5.14 — la définition unique, on ne la refait pas), sinon la plus récemment
+  numérotée, **et on le SIGNALE** (`ambigu`) au lieu de choisir en silence.
+  Montrer la mauvaise chaussure à côté d'un numéro est exactement le risque n°1
+  (§19).
+- **`sortirDeCase(itemId, cellKey, numero)`** : la boîte **monte et s'efface**
+  (`animerSortie`, 380 ms) **PUIS** on écrit — `fini()` est rappelé par la scène
+  quand l'animation est finie. Écrire d'abord ferait disparaître la boîte avant
+  qu'on la voie partir : le geste n'aurait aucun retour.
+- **`dejaPoseOu(num)`** couvre la **saisie libre** (le champ « numéro à ranger »,
+  qui ne vérifiait rien) : un même numéro dans deux cases, c'est « dans quelle
+  boîte est-elle ? ». Le message nomme le meuble où la paire se trouve déjà.
+
+⚠️ Le garage **n'écrit jamais de numéro** : il déplace une paire déjà numérotée
+d'un endroit à l'autre. Aucun des chemins de §5.45 n'est touché.
+
+### 2. Les listes Ventes et Achats en deux colonnes (ordinateur)
+Une ligne de vente sur **1170 px** pour une photo, un titre et un prix, c'est le
+même défaut que les cartes d'action de Ma journée (§5.62). Les deux listes
+passent en `repeat(auto-fit, minmax(430px, 1fr))` + `alignItems:'start'` :
+**deux colonnes** au-delà de ~900 px, **une seule** en dessous — la même règle
+pour les deux, **sans test de largeur en JavaScript**. Le téléphone est
+strictement inchangé.
+
+⚠️ **Largeur de lecture portée de 980 à 1180 px** : sur un écran de 1512, 980 px
+laissait 230 px de vide à droite — ni rempli ni centré, ça se lisait comme un
+décalage. À 1180 px, avec les listes en deux colonnes, la ligne ne redevient pas
+trop longue.
+
+### Vérifié
+Banc de rangement dédié : deux taps sur une case → feuille → N°154 posé
+(`Étagère:3_2=154`, la gravité le fait tomber en bas de colonne) → le panneau
+affiche **« Étagère (1) · 1 boîte rangée »** avec photo et titre → « sortir » →
+la case revient à **`[]`**. Rendu ordinateur (1512×950) : barre latérale, les
+9 écrans groupés, listes Achats **en deux colonnes**. Rendu final à 1180 px :
+**0 écran vide, 0 artefact**. Mobile 430 px rejoué : **0 écran vide** — le shell
+n'a rien changé au téléphone. 9 audits au vert.
+
+---
+
+## 5.64 — LE PRIX D'ACHAT SE RELIE EN UN TAP (et le barème n'existe plus en deux exemplaires)
+
+État inchangé depuis §22 : **0 prix d'achat sur 225 paires**, donc tout le
+bénéfice, la marge, la « meilleure marque » et le rapport comptable tournent
+avec un **coût de zéro**. La saisie en série existait (§5.47) mais il fallait
+**taper** 225 fois ; le sélecteur d'achat classait bien les candidats (§5.23,
+§5.38, §5.51) mais il fallait l'ouvrir **paire par paire**.
+
+### 1. ⚠️ LE BARÈME VIVAIT DANS UN COMPOSANT
+Le score de pertinence était écrit **à l'intérieur de `openPicker`**. Deux
+conséquences : la modale de saisie en série ne pouvait pas s'en servir, et le
+banc `prix.mjs` devait en **RECOPIER les poids** — deux barèmes qui finissent
+par diverger, exactement ce que §11 interdit (c'était même écrit dans la note de
+§5.38 : « si les poids changent d'un côté, les remettre des deux »).
+
+➡️ **`refAchat(item)` / `scoreAchat(ref, o)` / `SEUIL_SUGGERE`** vivent au niveau
+module. `openPicker`, la modale de saisie et le badge « suggéré » lisent la même
+chose. Le `12` recopié dans le rendu devient la constante.
+
+### 2. La suggestion s'affiche dans la liste, un tap la relie
+- Les achats sont chargés **UNE SEULE FOIS** pour toute la modale
+  (`fillBuyAchats`), pas une fois par paire — la même lecture que le sélecteur,
+  refaite 225 fois ce serait le trou d'égress de §34.
+- `fillBuySugg` retient le meilleur candidat **≥ `SEUIL_SUGGERE`** par paire, et
+  sert les lignes **dans l'ordre de la liste** (ventes au plus gros CA d'abord).
+- ⚠️ **Un achat ne peut être proposé qu'à UNE SEULE paire.** Sans ça, deux paires
+  au même titre se voyaient proposer le même achat, donc **le même coût compté
+  deux fois**. Un achat retenu sort du pot (`pris`), et `linkedBuyIds` exclut
+  d'entrée ceux déjà reliés.
+- `linkBuyForKey` écrit comme `choosePick`, **instantané compris** (`buyFrom`,
+  §5.36) : sans lui, réafficher la photo et le reçu de l'achat obligerait à
+  recharger les ~700 achats.
+- ⚠️ **Rien n'est écrit tout seul** : la suggestion s'affiche, c'est lui qui tape
+  dessus. La règle de §22/§5.23/§5.38 tient — mieux vaut un blanc qu'un faux.
+
+### 3. ⚠️ MARQUE + POINTURE + COULEUR FONT EXACTEMENT LE SEUIL
+En regardant les 19 premières suggestions produites sur les vraies données, 18
+étaient justes et **une ne l'était pas** :
+`« nike zoom fly 5 bleu et blanc 45 » ← « Baskets Nike blanche et grise
+pointure 45 » (payé 30,23 €, revendu 24 €)`.
+4 + 4 + 4 = **12**, soit le seuil pile, alors que l'achat ne porte **aucun
+modèle** — c'est le piège nommé en §5.23 : « nike » + « 45 » désigne des
+centaines de paires.
+
+⚠️ **Ma première correction n'a pénalisé qu'un sens** (paire avec modèle / achat
+sans modèle). Re-mesuré : **le même achat générique est aussitôt reparti sur une
+AUTRE paire** dont le modèle n'est pas reconnu non plus (« Nike zoom vapor pro
+Carlos Alcaraz blanc 45 »). Dès qu'il manque le modèle **d'un côté OU de
+l'autre**, la preuve est insuffisante → **−3** (un manque, pas une
+contradiction : on ne descend pas à −6).
+
+**Mesuré : 19 → 17 suggestions.** Les 2 perdues sont les 2 génériques. Une
+troisième, correcte, disparaît aussi (« salomon XT-6 noir 38 » ← « Salomon
+schwarz 38 ») : l'achat n'a pas de modèle reconnu. **Rien n'est perdu pour
+autant** — la paire reste dans la liste avec son champ, et le sélecteur la
+classe toujours en tête ; c'est seulement le badge qui ne s'allume plus.
+
+Les **17 restantes** ont toutes la même marque, le même modèle et la même
+pointure des deux côtés, couleur compatible.
+
+### Vérifié
+`npm run build` OK · banc `fillbuy.cjs` (vraies données) : 196 paires listées,
+**17 achats retrouvés**, le tap relie (`N°9 → 22,05 € · Adidas spezial 39.5`),
+**0 achat relié deux fois**, Entrée passe toujours au champ suivant, **0 erreur
+d'app** · `audit-identite` **40 contrôles**, dont **3 réancrés/ajoutés qui
+échouent bien sur le code d'avant** (§21) : le barème compare des ensembles de
+couleurs à son nouvel emplacement, un titre générique ne peut plus atteindre le
+seuil, le seuil est une seule constante · 8 autres audits au vert.
+
+### 5.64 (suite) — L'URGENCE DES COLIS ÉTAIT UN SECOND BLOC POUR LE MÊME ENSEMBLE
+
+Même famille que le doublon des Annonces, vue en capture sur l'écran **Colis** :
+```
+[vert]  3 colis à envoyer · 0 bordereau prêt · 3 en attente de bordereau
+[rouge] 3 à poster en priorité — du retard · 3 en retard
+```
+Deux blocs consécutifs pour **les mêmes 3 colis**. §5.17 avait déjà corrigé le
+*vocabulaire* de ce bandeau (« à poster en priorité » au lieu de « colis à
+expédier ») pour qu'on ne croie pas à une contradiction — mais quand **tous** les
+colis sont urgents, les deux ensembles sont identiques et le second bloc n'ajoute
+que le détail.
+
+Cause structurelle : le calcul d'urgence vivait **dans le bloc de rendu** du
+bandeau rouge, donc le bandeau du haut ne pouvait pas savoir si l'urgence
+couvrait tout ou une partie.
+
+➡️ **`urgenceColis()` et `nAPoster()` au niveau du composant, une seule fois.**
+Le bandeau rouge ne s'affiche plus que si l'urgence est un **sous-ensemble
+strict** ; sinon la ligne d'urgence passe dans le sous-titre du bandeau du haut,
+en rouge. Les deux conditions sont complémentaires : exactement un des deux
+s'affiche.
+
+**Vérifié au rendu** : « 3 colis à envoyer · 0 bordereau prêt à imprimer · 3 en
+attente de bordereau · **3 en retard — les plus urgents sont en haut de la
+liste** » en un seul bloc, les cartes remontent d'un cran. 9 audits au vert,
+smoke **0 PAGEERROR, 0 écran vide, 0 suspect**.
+
+---
+
+## 5.65 — ⚠️ REFONTE TOTALE : PAPIER, ENCRE, VERMILLON (on ne reconnaît plus l'app)
+
+Julien, **quatre fois**, la dernière avec de l'agacement légitime : « je veux
+que ça soit choquant tellement c'est bien que limite on ne reconnaisse pas
+l'application — les couleurs, les formes, tout ». Les passes précédentes
+(§5.54, §5.58, §5.61, §5.62) retouchaient une identité qu'elles gardaient. Ici
+on **change de famille**, pas de nuance.
+
+### La direction
+| | avant | maintenant |
+|---|---|---|
+| fond | ardoise froide `#f1f4f2` / `#0a0e11` | **papier chaud** `#EFE8DC` / encre `#151110` |
+| accent | vert émeraude `#00875a` | **vermillon** `#D2401E` / `#FF6B3D` |
+| formes | arrondis 10-16 px | **carré, 3-4 px** (582 rayons convertis, pastilles 999 → 3) |
+| profondeur | ombres douces empilées | **filets nets** — une carte est imprimée, pas posée |
+| titre d'écran | 23 px + pastille ronde teintée | **manchette** : trait d'accent, titre 27-38 px, filet d'encre 2 px |
+| chiffres | trois cartes grises « KPI » | **hors de la boîte** : filet d'accent en haut, nombre en 34 px |
+| police d'affichage | Bricolage Grotesque | **Space Grotesk** |
+| fond de page | lueur radiale verte | **trame de papier** (la page a une matière, pas une source de lumière) |
+
+### ⚠️ LE CHROME EST À L'ENCRE, MÊME EN CLAIR
+Nouveaux jetons **`chrome` / `onChrome` / `chromeMuted` / `chromeLine`** : la
+**navigation** (barre latérale sur ordinateur, barre du bas sur téléphone) est
+un bloc d'encre contre la page papier. C'est la signature qui rend l'app
+reconnaissable en une seconde.
+Ça règle aussi un vrai défaut vu en capture : `C` est une **variable de module
+mutable** (§4), donc un composant qui ne se redessine pas garde les couleurs de
+l'ancien thème — la barre latérale restait sombre sur une page claire. Avec un
+jeton dédié, ce n'est plus une incohérence, c'est le dessin voulu.
+
+### Ce qui n'a PAS changé, volontairement
+- **Aucune donnée, aucune règle métier touchée.** Uniquement les jetons, les
+  rayons et quatre primitives (`ScreenHead`, `StatBox`, `SideBar`, `BottomBar`).
+- Le mode sombre reste disponible et suit la même identité (encre chaude, même
+  vermillon éclairci pour tenir le contraste sur le brun).
+- Le grain de §5.61 est conservé (passé à 4,5 % en `multiply` : sur du papier il
+  doit se voir), les états de boutons aussi.
+
+### ⚠️ Le surtitre a failli répéter la marque
+Première version : un surtitre « VRM » sur **chaque** écran — la marque est déjà
+dans la barre de navigation, juste à côté. Remplacé par un simple trait
+d'accent : la manchette garde son rythme sans rien répéter.
+
+### Vérifié
+`npm run build` OK · **9 audits au vert** · rendu ordinateur 1512 px en mode
+**papier** ET en mode **encre** : manchette, filets, chiffres hors boîte, rail
+d'encre, badges N° vermillon carrés · rendu mobile 430 px : barre du bas à
+l'encre, cartes d'action carrées.
+
+### ⚠️ ET UNE RÉGRESSION À MOI, ATTRAPÉE EN CAPTURE MOBILE
+Les listes Ventes/Achats passées en deux colonnes (§5.63) utilisaient
+`repeat(auto-fit, minmax(430px, 1fr))`. **`minmax(Npx, 1fr)` force une piste de
+N px** : sur un écran de 430 px, une fois les marges enlevées, la grille déborde
+et le prix se coupe au bord droit. Vu en capture, invisible pour le smoke (il ne
+lit que le texte). Correctif standard : **`minmax(min(430px, 100%), 1fr)`** —
+6 grilles corrigées, y compris les cartes d'action de Ma journée.
+
+---
+
+## 5.66 — « IL Y A TROP D'INFORMATIONS PARTOUT » : la passe MOINS
+
+Julien, photos à l'appui : avant de voir **un seul colis** ou **une seule
+annonce**, il fallait passer cinq à sept blocs de conseils, de diagnostics et
+d'explications. Il a raison, et c'est mesurable.
+
+### Ce qui a été SUPPRIMÉ (pas replié — supprimé)
+| bloc | pourquoi |
+|---|---|
+| **la description sous chaque titre d'écran** | elle explique ce que fait l'écran : on la lit UNE fois, puis c'est du bruit tous les jours, en haut de chaque page. Le texte reste passé par les appelants — rien à réécrire si on veut le remettre pour un nouveau venu. |
+| **« N j sans capture de l'extension »** | doublon : la ligne « X annonces viennent d'un compte dont les données datent » dit déjà la même chose, juste sous les puces de comptes — donc à côté de ce qu'elle qualifie, et repliée. |
+| **« Un compte masqué n'apparaît ni dans les annonces ni dans la compta… »** | règle qu'on comprend au premier tap, affichée en permanence. |
+| **« Les numéros se mettent automatiquement (modifiables à la main)… »** | mode d'emploi permanent. Le prochain numéro libre reste visible là où il sert : dans le champ N° d'une paire qui n'en a pas. |
+
+### ⚠️ TROIS DÉPLIANTS DE CONSEILS EMPILÉS → UN SEUL
+« N signalements », « N paires qui te reviennent » et « Conseils &
+signalements » posaient **trois lignes à ouvrir, l'une sous l'autre**, avant la
+moindre annonce. Les deux premières rejoignent la troisième, qui existait déjà
+et comptait déjà ce genre de choses. **Un seul endroit où regarder**, avec un
+compteur unique.
+
+### Ce qui RESTE au-dessus de la grille, et pourquoi
+1. le titre ;
+2. **le numéro porté par deux annonces** — le seul défaut irréversible de l'app
+   (§19), il ne se replie pas ;
+3. les **puces de comptes** — une commande, pas un conseil ;
+4. le bandeau de stats — une ligne, un chiffre par métrique ;
+5. **un** dépliant « Conseils & signalements ».
+
+### Mesuré
+| | ce matin | maintenant |
+|---|---|---|
+| première annonce | **1146 px** du haut | **490 px** |
+| hauteur de la page Annonces | 3262 px | 2606 px |
+| blocs avant la grille | 9 | **5** |
+
+### Vérifié
+`npm run build` OK · 9 audits au vert · smoke 11 écrans, 0 écran vide,
+0 PAGEERROR · rendu ordinateur : la grille d'annonces est visible sans défiler.
+
+### 5.66 (suite) — DES COULEURS DE L'ANCIENNE IDENTITÉ SURVIVAIENT EN DUR
+Les badges N° des colis s'affichaient encore en **vert menthe** au milieu d'une
+app vermillon. Cause : `INV_STATUS` portait quatre teintes **codées en dur**
+depuis l'origine (`#22a06b`, `#2f80ed`, `#c0392b`, `#f39c12`) — elles ne lisent
+pas `C.*`, donc elles survivaient à tous les changements de palette et
+réimportaient l'ancienne identité par petits morceaux.
+Alignées sur la famille papier/encre. Et le **N° d'un colis** passe à l'accent :
+c'est L'information de cette carte (on le recopie sur le carton), pas une
+couleur d'état.
+⚠️ **À vérifier après tout changement de palette** : `grep -oE '#[0-9a-fA-F]{6}'`
+sur `src/App.jsx` — ce qui n'est pas dans `THEMES` ne suivra pas.
+
+---
+
+## 5.67 — PLUS MINIMALISTE : l'écran Ventes passe de 11 blocs à 7
+
+Julien : « ça ne me convient toujours pas, je veux que ce soit **plus
+minimaliste** ». La passe §5.66 avait traité Annonces ; **Ventes était le pire
+écran** et n'avait pas été touché — mesuré, **onze blocs** avant la première
+vente.
+
+### La règle, tenue jusqu'au bout
+**Au-dessus de la liste, uniquement : un réglage, un chiffre, ou une vente.**
+Tout le reste descend dans « Analyse de tes ventes », qui existait déjà.
+
+| bloc | où il va |
+|---|---|
+| « 3 colis à expédier · 3 en retard » | **dans Analyse** — il a son propre écran (Colis) ET sa tuile sur Ma journée. Trois endroits pour la même action. |
+| la grande carte « Argent en attente » + son détail par compte | **dans Analyse** — mais le **montant reste un chiffre visible** : il prend sa place dans la rangée (`EN ATTENTE · 807 € · 25 en cours`). C'est ce que Julien vient regarder ; c'est le pavé explicatif qui partait. |
+| « 1 vente repérée via bordereau » | dans Analyse |
+| « Ventes par jour » | dans Analyse |
+| **« Rétrospective 2026 »** | dans Analyse — deux lignes « regarder des chiffres » l'une sous l'autre, c'était une de trop |
+| « 112 ventes finalisées sans prix d'achat » | dans Analyse — **le chiffre est déjà dans la rangée** (`COÛT D'ACHAT · 0/112 renseigné`) |
+| « 100 ventes masquées sur la période » | dans Analyse |
+
+### Ce qui reste, dans l'ordre
+titre · recherche · **quatre chiffres** · une ligne « Analyse » · filtres ·
+période · la ligne des ventes masquées · la liste.
+
+### ⚠️ Un champ qui n'existait pas
+La nouvelle case affichait `EN ATTENTE —` : j'avais écrit `totals.attente`, le
+champ s'appelle **`totals.enAttente`**. Vu au rendu, pas à la relecture — le
+build ne dit rien d'une propriété absente.
+
+### Mesuré
+| écran | blocs avant le contenu |
+|---|---|
+| Ventes | **11 → 7** |
+| Annonces | 9 → 5 (§5.66) |
+
+### Vérifié
+`npm run build` OK · 9 audits au vert · smoke 11 écrans, 0 écran vide,
+0 PAGEERROR · rendu ordinateur relu : les ventes commencent juste sous les
+filtres.
+
+---
+
+## 5.68 — LE TÉLÉPHONE : mesuré à 390 px, pas à l'œil
+
+Julien : « ça ne me va toujours pas surtout sur mon téléphone, le rendu ne me
+va pas ». Les deux passes précédentes (§5.65 identité, §5.66/§5.67 densité)
+avaient été **vérifiées sur grand écran**. Rendu à **390×844** (iPhone), le
+défaut saute : ce n'est pas le style, c'est que **tout ce qui était sur une
+ligne passait sur trois ou quatre**.
+
+### Ce que la mesure montrait
+| écran | rangées empilées |
+|---|---|
+| en-tête | **8 éléments** : retour, icône VRM, mot « VRM », nuage, heure de synchro, loupe, cloche, rouage |
+| Ventes | filtres sur **2 rangées**, période sur **3** |
+| Annonces | puces de compte sur **4 rangées**, stats sur **3** |
+| lignes de vente | titre coupé à ~15 caractères (« adidas spezial n… ») |
+
+### La règle : `flexWrap:'wrap'` → une seule rangée QUI DÉFILE
+`flexWrap:'nowrap'` + `overflowX:'auto'` + `WebkitOverflowScrolling:'touch'` +
+`scrollbarWidth:'none'`/`msOverflowStyle:'none'` sur le conteneur, et
+**`flexShrink:0` + `whiteSpace:'nowrap'` sur CHAQUE enfant**.
+⚠️ **Les deux moitiés sont obligatoires** : sans `flexShrink:0`, les enfants se
+compriment jusqu'à l'illisible **au lieu de défiler** — le conteneur ne déborde
+jamais, donc rien ne défile. C'est le piège de §26 (une pastille écrasée à 0 px
+plutôt que renvoyée à la ligne), dans l'autre sens.
+⚠️ `alignItems:'center'` sur le conteneur, sinon chaque pastille s'étire à la
+hauteur de la plus grande.
+
+Appliqué aux 5 rangées : période (`PeriodePicker`), filtres Ventes, filtres
+Achats, puces de compte (Annonces), bandeau de stats (Annonces).
+
+### L'en-tête : 8 éléments → 6
+- **Le mot « VRM » était écrit deux fois** — l'icône carrée porte déjà les
+  lettres. Le mot seul reste dans la **barre latérale**, sur ordinateur.
+- **L'heure de synchro est retirée** : l'icône de nuage dit déjà si c'est
+  synchronisé, l'heure exacte est dans Réglages (comme le numéro de version,
+  §5.54).
+
+### Deux corrections de fond
+- **`StatBox`** : les tailles étaient des **pixels fixes** (34 / 28 / 21 …),
+  calibrées sur un écran large. Elles passent en `clamp(min, vw, max)` — le
+  chiffre rétrécit avec l'écran au lieu de déborder de sa colonne.
+- **Titre d'une ligne de vente** : `nowrap + ellipsis` coupait à ~15 caractères
+  sur 390 px, donc deux paires de la même marque étaient indiscernables. Passe
+  en **deux lignes** (`-webkit-box` + `WebkitLineClamp:2`).
+
+### ⚠️ Le contrôle qui manquait au banc : le DÉBORDEMENT HORIZONTAL
+Un écran trop large **ne lève aucune erreur** et ne compte pas comme vide — le
+smoke passait au vert pendant que la page débordait. `telall.cjs` compare
+`documentElement.scrollWidth` à `clientWidth` sur **les 11 écrans à 390 px** et
+**nomme l'élément coupable** quand ça dépasse. C'est le pendant du contrôle
+« écran vide » de §5.56 : *un défaut de mise en page ne se voit ni au build, ni
+au compte d'erreurs — il faut le mesurer.*
+
+### Vérifié
+`npm run build` OK · banc **telall.cjs à 390×844 : 11 écrans, 0 DÉBORDEMENT,
+0 ÉCRAN VIDE, 0 PAGEERROR, 0 artefact** (les lignes console restantes sont le
+400 volontaire de `select=owner` et les resets de fin de test) · captures
+relues (Ma journée, Achats, Ventes, Annonces, Colis) · **9 audits au vert** ·
+smoke complet inchangé.
+
+---
+
+## 5.69 — ⚠️ LE CA DU JOUR VENAIT DES EMAILS · le numéro d'une paire vendue avant d'être captée · menu en haut
+
+### 1. ⚠️ « Les ventes d'aujourd'hui, ça ne représente pas 45 € » — il avait raison
+Mesuré avant de coder : la base porte **13 ventes / 152 €** pour le 26 août,
+l'app affichait **45 € / 9 paires**.
+
+**Cause** : la tuile « Vendu aujourd'hui » et le bloc « Ta semaine » de Ma
+journée se calculaient sur les **emails de vente** (`email_sale_*`), avec en
+commentaire « même source que le tableau de bord ». **Faux depuis §33** : le
+tableau de bord est passé à la moisson Vinted, précisément parce que les emails
+en voient moins (12 ventes / 308 € là où la moisson en voit 17 / 437 €). Un
+email n'arrive pas pour tout : offres acceptées, lots, et **2 comptes sur 8**
+dont la boîte ne transfère rien (§5.47).
+
+- **`montantCommande(o)`** (module-level) = LA lecture du prix. Vinted rend un
+  **objet** `{amount, currency_code}` : `Number(o.price)` donne NaN et la somme
+  tombe à 0 — deux faux diagnostics déjà causés par ça (§5.27).
+- **`bilanVentes(depuis, jusqua)`** = LA règle (§11) : ventes moissonnées, par
+  date de vente, hors annulées, hors ventes masquées et comptes masqués
+  (`isHidden`, déjà partagé par tout l'écran Ventes). Les deux tuiles la
+  consomment ; elles ne peuvent plus contredire le tableau de bord.
+
+**Mesuré après, au rendu réel** : jour **45 € / 9 → 152 € / 13** · semaine
+**24 ventes / 409 € → 56 / 1 129 €**. Les deux correspondent à l'euro près au
+recomptage direct dans la base.
+
+### 2. Le trou qu'il a vu venir : poster du téléphone et vendre en direct
+Julien : « si je poste une annonce sur ma tablette et que je la vends en direct,
+l'extension n'a pas eu le temps de capter l'annonce en ligne, elle a juste la
+vente — donc elle va devoir écrire un numéro pour la vente ».
+
+C'est exact, et c'est prévu (`autoShip`, **98 cas en base**). **La suite ne
+l'était pas** : quand l'extension capte enfin le dressing et que Vinted a
+**laissé l'annonce ouverte** (ça arrive, §5.39), cette annonce arrive sans
+numéro. La numérotation automatique ne réutilisait que `numeros` (les annonces
+déjà numérotées) — **jamais `saleOv`** — donc elle lui donnait un numéro NEUF.
+Le carton porte N°A, l'app affiche N°B pour la même paire : c'est le risque n°1
+(§19), avec un numéro qui ne se reprend jamais (§5.40), donc **définitif**.
+
+Mesuré le 26 août : **0 conflit aujourd'hui** (les annonces vendues sont presque
+toujours fermées par Vinted). On ferme un trou latent — le bon moment.
+
+- **`numVentesParIdentite`** : les numéros déjà posés sur des ventes, indexés par
+  identité **certaine** (item_id Vinted, sinon photo ; une photo portée par deux
+  ventes de numéros différents est écartée). Jamais par titre (§5.34).
+- La numérotation des annonces le consulte **avant** de créer un numéro.
+- **Elle n'écrit plus rien tant que les ventes et les identités n'ont pas
+  répondu** (`sales.items === null || !txnPret`). Sinon elle grave d'abord et
+  découvre l'identité ensuite : au banc, la paire recevait N°319 alors que son
+  carton portait N°777, et le second passage ne pouvait plus rien corriger.
+
+### ⚠️ 3. LE DÉFAUT PLUS GRAVE TROUVÉ EN CHERCHANT CELUI-LÀ
+L'effet « le cloud est arrivé » relisait `vinted_annonce_numeros` et
+`vinted_used_numeros` depuis le localStorage… **mais pas
+`vinted_sale_overrides`**. Sur un appareil neuf (localStorage vide au premier
+rendu), la numérotation voyait donc **toutes les ventes sans numéro**, leur en
+attribuait, et `setSaleOv({ ...saleOv })` repartait d'un objet **VIDE** — les
+**361 numéros de vente** pouvaient être remplacés par du vide.
+Le commentaire de l'effet de numérotation annonçait justement cette protection
+(« sans ça, au démarrage `saleOv` est vide → l'app écrase les numéros saisis à
+la main ») ; **elle n'existait pas**.
+➡️ **Règle : tout état initialisé par `load(...)` ET réécrit ensuite par un
+effet automatique doit être rechargé dans `onCloudReady`.** `hiddenSales` a été
+ajouté au passage (le CA du jour en dépend maintenant).
+
+### 4. Ergonomie — ce qu'il a demandé, mot pour mot
+- **« Pour les offres reçues, tu peux juste mettre le nombre »** : six cartes
+  avec photo, titre, date et deux boutons chacune (~300 px sur l'accueil) → une
+  ligne « N offres reçues » + Répondre + tout marquer traité. Une offre se
+  répond sur Vinted de toute façon (§5).
+- **« Un menu déroulant à gauche, en haut, plutôt qu'en bas avec le plus »** :
+  `MenuEcrans`. Le bouton « Plus » disparaît de la barre du bas — c'était un
+  **sixième bouton d'un genre différent des cinq autres** (il n'ouvrait pas un
+  écran mais une liste) et **son libellé changeait selon l'écran affiché**, donc
+  la barre n'avait jamais tout à fait la même tête. Elle porte maintenant les
+  cinq écrans du quotidien, un point c'est tout. ⚠️ Absent sur ordinateur : la
+  barre latérale montre déjà les neuf écrans.
+- **« On dirait quelque chose de brouillon »** : « Ta semaine » et les quatre
+  cartes d'action étaient des encadrés teintés empilés, **quatre couleurs à la
+  suite**. Surface neutre ; la couleur reste sur l'icône et les chiffres. Il ne
+  reste qu'**une** zone teintée sur l'accueil : le chiffre du jour.
+- **Ventes** : les quatre libellés sous la barre de progression sont retirés (la
+  pastille de statut, trois lignes plus haut, dit déjà l'étape — la même
+  information deux fois, une ligne de texte par vente).
+- **Colis** : « N bordereaux sans vente correspondante » était un pavé de cinq
+  lignes d'explication en permanence, au-dessus des colis, pour un cas qui ne
+  demande aucun geste. Gabarit `Notice` : une ligne + « Pourquoi ? ». La
+  première carte remonte d'environ 90 px.
+
+### ⚠️ 5. `ICON_PATHS` ATTEND DU JSX — deux icônes ne se dessinaient pas
+Trouvé en ajoutant l'icône du menu : `Icon` fait `{d}` dans la `<svg>`, donc une
+**chaîne** y devient du **texte** — invisible. `pin` et `nav` étaient des chaînes
+depuis leur ajout (§5.26) : **les deux repères des points relais n'ont jamais
+été dessinés**. Corrigées, et le commentaire le dit à côté de la table.
+
+### Vérifié
+`npm run build` OK · **9 audits au vert**, dont **4 contrôles permanents
+ajoutés** à `audit-identite.cjs` qui **échouent bien sur le code d'avant** (§21 :
+la première tentative de preuve lançait le script depuis `/tmp`, où il plantait
+sur un chemin absent — **un test qui ne s'exécute pas ressemble à un test qui
+passe**) · banc dédié du scénario (vente au N°777, annonce captée ensuite) :
+avant **N°319**, après **N°777** · banc de numérotation : 28 annonces, **0 sans
+numéro, 0 numéro qui bouge** · **11 écrans à 390 px** sans débordement, écran
+vide, erreur ni artefact · captures relues (Ma journée, Ventes, Colis, menu
+ouvert).
+
+### ⚠️ Piège de banc rencontré (§21, encore)
+`num_tous.cjs` choisissait sa fixture parmi **toutes** les annonces des lignes
+moissonnées — y compris celles d'un compte **sans jetons** (3170782324), que
+l'app ne charge jamais (§5.20/§5.21). Il concluait « l'annonce dépouillée n'a
+rien reçu » pour une annonce invisible. Le banc filtre désormais sur les comptes
+vivants.
+
+### ⚠️ RIEN DE CETTE SESSION N'EST EN PRODUCTION
+`origin/main` est au **25 août** (PR #55). La branche `claude/new-session-gzdgur`
+a **29 commits d'avance** et **aucune pull request n'est ouverte** pour elle.
+C'est l'explication complète du « on dirait que tu n'as rien fait » : tout est
+poussé sur la branche, rien n'est déployé. Le déploiement se fait en ouvrant une
+PR depuis cette branche et en la fusionnant — c'est **la décision de Julien**,
+l'agent n'ouvre pas de PR de lui-même.
+
+---
+
+## 5.70 — LE RÉCAP D'ARRIVÉE (extension 5.40) + le coffre qui se remplit + les ventes masquées chiffrées
+
+### 1. ⚠️ « LA GÉNÉRATION A DU MAL À SE FAIRE » — deux causes, toutes deux mesurées
+
+**a) Le mémo « déjà demandé » partait AVANT l'envoi.** `proposerBordereaux`
+écrivait `vrmPropose[tx] = now` puis envoyait le message à l'onglet. Or on
+arrive **3 s après le chargement** (§5.19) : si le script de page n'est pas
+encore prêt, `sendMessage` échoue en silence — la fenêtre ne s'affiche jamais
+**et la vente est marquée « demandée » pour 20 h**. La question ne revenait donc
+plus. ➡️ On ne note « déjà montré » **que si un onglet a réellement reçu**.
+
+**b) 3 comptes sur 9 ne peuvent PAS générer.** Relevé du 26 août :
+| adresse d'envoi captée | comptes |
+|---|---|
+| ✅ oui | julatace35260, llloollllaa, tomj606, julienf765, tomj683, angeled92 |
+| ❌ non | **julatace3535**, arthuror2, liliand653 (masqué) |
+
+Et sur les **2 ventes qui attendaient un bordereau ce jour-là**, une était
+justement sur `julatace3535`. Le refus était honnête mais ne se débloquait qu'en
+générant un bordereau **à la main** une fois.
+➡️ `adresseVendeur(uid, acc)` garde la capture comme source première, puis
+**demande ses propres adresses** (`GET /api/v2/user_addresses`) — une lecture,
+sur son compte, **derrière le garde-fou** (compte connecté, plafond 20/h), et
+mémorisée localement. ⚠️ La forme de la réponse **n'a jamais été observée** :
+lecture défensive (`idDAdresse`, plusieurs noms de champ), et si rien ne
+ressemble à une adresse **on ne prétend rien** et on garde un échantillon dans
+`panel_diag_capture` (§5.24).
+
+⚠️ **CORRECTION D'UNE DE MES MESURES (§21, encore)** : mon premier script
+annonçait « **aucun** compte n'a d'adresse ». Faux — le corps est stocké en
+**chaîne JSON**, donc `JSON.stringify(row.data)` échappe les guillemets et mon
+motif `"seller_address_id"` ne pouvait pas matcher. La vraie réponse est 6 sur 9.
+**Vérifier la FORME du champ avant de conclure à un zéro.**
+
+### 2. LE RÉCAP : « ça ne s'allume que s'il y a du nouveau »
+
+Demande, en deux temps : *« je veux avoir AU MILIEU DE MON ÉCRAN un message qui
+me dit si j'ai fait une vente et qui me demande si je génère les bordereaux —
+oui, non, et seulement cela »*, puis *« il ne faut pas que ça s'allume s'il n'y
+a rien ; ou alors ça peut faire un résumé de tout ce qui s'est passé, ça
+m'évite d'aller dans les messages, dans les notifications »*.
+
+- **`nouveautes(uid)`** compare l'état courant à un repère posé au **dernier
+  récap montré** (`vrmRecapVu`, local, aucun égress) : ventes nouvelles (+
+  montant), messages non lus **qui ont bougé**, offres en attente, bordereaux à
+  générer. **Zéro requête Vinted** : tout vient de la moisson déjà en base.
+- **Rien de neuf ⟹ aucun message n'est envoyé** : la fenêtre ne s'ouvre pas.
+- La fenêtre affiche **une ligne par nouveauté** et ne pose la question
+  **OUI / NON** que s'il y a vraiment un bordereau à générer ; sinon **un seul
+  bouton « Fermer »** — c'est une information, pas une question.
+- **« Oui »** enchaîne les ventes **une par une en attendant la réponse** de
+  Vinted (§5.36) — jamais un lot lâché d'un coup, **aucune temporisation
+  « faussement humaine »** (§32) : c'est le rythme du réseau. Un refus du
+  garde-fou **arrête la série** (les suivantes taperaient le même mur).
+
+⚠️ **Deux garde-fous à ne pas retirer :**
+1. **Première visite sur un compte** : on pose le repère **sans** annoncer tout
+   l'historique comme une nouveauté (sinon « 40 ventes ! » au premier passage).
+2. Une **conversation non lue laissée exprès** ne resonne pas ; elle resonne dès
+   qu'un nouveau message y arrive (comparaison sur `updated_at`) — même règle
+   que le bandeau de notification de l'app (§7).
+
+⚠️ **Honnêteté sur « depuis que j'ai fermé la session »** : on ne sait pas quand
+il ferme Vinted. Le repère est « **depuis ton dernier passage** » (= le dernier
+récap montré) — c'est observable, et c'est ce qui est écrit dans la fenêtre.
+
+**`scripts/audit-recap.cjs`** (nouveau) exécute le VRAI code du service worker
+dans un `vm` : **7 contrôles**, et **3 échouent bien sur le code d'avant**.
+
+### 3. Ergonomie du panneau : 12 pastilles → 6 + « Plus »
+Douze onglets sur trois rangées, c'est un mur : on ne lit plus, on cherche. Même
+remède que la barre du bas de l'app (§5.53) — **Ma journée · Cette paire\* · Mes
+paires · Bordereaux · Achats · Messages** restent visibles, le reste (Ventes,
+Chercher, Coffre, Litiges, Favoris) passe derrière **« Plus »**, qui porte leurs
+badges et s'allume quand l'onglet affiché vient de derrière.
+⚠️ **L'onglet « Republier » est RETIRÉ** (« ne mets pas l'onglet republié, ce
+n'est pas obligé »). `renderRepublier` reste dans le fichier mais **plus rien ne
+l'ouvre** — même parti pris que « Renuméroter à la suite » côté app (§5.45).
+⚠️ `svgi()` ne dessine que ce qui existe dans `ICONS` : `more-horizontal` a dû
+être ajoutée. Une icône absente ne lève **aucune** erreur, elle ne s'affiche
+simplement pas (même famille que `ICON_PATHS`, §5.69).
+
+### 4. L'extension avait gardé l'ancienne identité
+Turquoise `#09b1ba` sur blanc, alors que l'app est passée en **papier/vermillon**
+(§5.65) : deux outils du même produit, deux identités. Accent → `#D2401E`,
+surface → papier `#EFE8DC`, cartes `#FBF7F0` à coins nets, onglet actif à
+l'encre. 60 occurrences remplacées.
+
+### 5. LE COFFRE : 28 fiches sur 45 ne correspondaient à AUCUNE ligne
+| | |
+|---|---|
+| lignes de coffre | **144 · 9 avec leur description** |
+| fiches lues sur la page (`vinted_item_details`) | **45, toutes avec leur texte** |
+| fiches **sans aucune ligne de coffre** | **28** |
+
+Cause : on n'archivait que les annonces **EN LIGNE**. Or une fiche est lue dès
+qu'il **ouvre** une annonce — y compris une paire déjà vendue, et c'est
+justement celle-là qu'on veut au coffre (il sert à **recréer** une annonce
+disparue, §47).
+➡️ `archiverLot(uid, items, tous)` reçoit le dressing **complet** et archive en
+plus les articles **fermés dont la page a été lue**. L'identité vient de l'**id
+d'annonce Vinted**, et les extras ne peuvent venir que du **dressing du compte** :
+une annonce d'un autre vendeur qu'il aurait consultée ne peut pas y entrer.
+La passe de complétion tourne désormais **même sans annonce en ligne**.
+**Mesuré au banc** (vraies données, écritures capturées, **aucune écriture en
+prod**) : **5 nouvelles lignes** de coffre et **13 lignes qui gagnent leur
+description** sur 4 comptes ; sur le code d'avant, **0 nouvelle ligne**.
+⚠️ Seules **6 des 28** fiches orphelines appartiennent à un compte connu — les
+22 autres sont des annonces **d'autres vendeurs** qu'il a consultées. Elles ne
+doivent jamais entrer au coffre, et par construction elles ne le peuvent pas.
+
+### 6. Les ventes masquées : le compte ne disait pas l'enjeu
+**208 ventes masquées**, dont **131 retrouvées dans la moisson pour 2 927,60 €**
+hors de tous les totaux, réparties sur presque tous les mois. La ligne de
+l'écran Ventes porte maintenant le **montant**, sépare les deux causes
+(masquée **à la main** / **compte** masqué, qui se règle dans Réglages) et
+propose **« tout réafficher »** avec confirmation.
+Vérifié au rendu : « 131 ventes hors de la compta · 2 928 € », la feuille
+s'ouvre, et après confirmation la liste passe de **208 à 0**.
+
+### ⚠️ TOUJOURS PAS EN PRODUCTION
+`origin/main` est au 25 août. La branche `claude/new-session-gzdgur` a
+**32 commits d'avance** et **aucune pull request ouverte**. Rien de tout ceci
+n'est chez Julien tant que la PR n'est pas ouverte puis fusionnée — c'est **sa**
+décision, l'agent n'ouvre pas de PR de lui-même.
+
+---
+
+## 5.71 — LE BORDEREAU PART TOUT SEUL · la vente captée vite · N° + prix mini sur les vignettes
+
+### 1. ⚠️ « Est-ce que ça réattribue le numéro d'avant ? » — NON, mesuré
+Julien, après un lot vendu puis annulé. Vérifié en base le 27 août :
+
+| | |
+|---|---|
+| numéros brûlés à vie | **329** · plus haut : 329 · prochain libre : **330** |
+| ventes annulées / remboursées | 38 · dont **11 portent un N°** |
+| leur numéro est-il toujours pris ? | **11 / 11** ✅ |
+
+`takenNums` est **append-only** (`vinted_used_numeros` + tous les `numeros` +
+tous les `saleOv` + les annonces en ligne + le garage) : `freedNums` a été
+supprimé en §5.40. **Aucun numéro ne retourne jamais dans le pool**, annulation
+comprise. Si Vinted rouvre la MÊME annonce (même id), elle garde son numéro
+toute seule ; s'il la repose (nouvel id), elle en reçoit un neuf et le bandeau
+♻️ propose de remettre l'ancien — c'est SON clic (§5.45).
+
+### 2. ⚠️ MAIS la paire annulée disparaissait de l'inventaire physique
+`porteursNum` ne comptait comme « présente » qu'une annonce en ligne, une vente
+qui attend l'envoi, ou une case du garage. Une vente **annulée** n'est ni l'un
+ni l'autre → la paire sortait de l'inventaire physique et du panneau « à
+ranger » du Garage, **alors qu'elle est sur l'étagère**.
+➡️ Une vente annulée **avant l'envoi** garde sa place (`type: 'annulee'`). Une
+vente annulée **après expédition** (remboursement) ne compte pas — `venteExpediee`,
+preuve certaine (statut Vinted, bordereau capté, ou email de bordereau, par n° de
+transaction, jamais par titre).
+⚠️ `venteExpediee` a été **remontée avant `porteursNum`** : un `useMemo`
+s'exécute immédiatement et ne peut pas lire un `const` déclaré après (§19).
+**Déplacée, pas recopiée** (§11). 3 contrôles permanents dans `audit-identite`.
+
+### 3. Le bordereau part tout seul (extension 5.42)
+« Une fois que la vente a été faite, je veux que le bordereau soit
+automatiquement envoyé dans l'app. » ⚠️ **Retour en arrière assumé sur §5.32**
+(où il avait demandé l'inverse) — c'est sa décision, et elle est cohérente avec
+§5.29 : générer un bordereau **n'engage aucun argent et ne décide de rien**.
+Garde-fous inchangés : compte connecté uniquement, 20 actions/h, **3 par
+visite**, pas de nouvel essai avant 6 h.
+Le récap **annonce** ce qui est parti (« 2 bordereaux envoyés dans l'app ») et
+ne pose la question **OUI/NON** que pour ce qui n'a **pas** pu être généré.
+
+### 4. « Ça prend du temps à ce que la vente soit captée »
+C'était le garde de **5 minutes** (`VISITE_DELAI_MS`), qui protège d'une moisson
+**complète** (dressing jusqu'à 600 articles, achats, boîte) à chaque page
+ouverte. Or « ai-je vendu ? » ne demande **qu'une** liste.
+➡️ **`rafraichirVentes(uid)`** rafraîchit les ventes **seules**, au plus une fois
+par **90 s**, puis relance la génération et le récap. ⚠️ Ce n'est **pas** un
+rythme « faussement humain » (§32) : c'est une limite de volume, comme le
+plafond horaire. Réutilise `fetchAllOrders` + `storeHarvestRow` — donc les
+garde-fous anti-capture-partielle de §5.19, et **pas une deuxième façon de lire
+les ventes** (§11).
+
+### 5. Les erreurs de génération sont MESURÉES, plus supposées
+« Il y a des messages d'erreur » — impossible d'aller plus loin sans savoir
+lesquels. `genererBordereau` compte désormais `bordereau_genere` /
+`bordereau_refuse_<statut>` dans `panel_diag_capture` et garde **un échantillon
+de la réponse de Vinted**. Et le message rendu est traduit : 401 = session
+expirée, 403 = refus pour ce compte, 404 = cette vente n'attend plus de
+bordereau, 422 = Vinted refuse ces informations d'envoi.
+➡️ **Prochaine session : lire `panel_diag_capture.rates.bordereau`.**
+
+### 6. Le N° et le prix minimum sur chaque vignette du profil
+« Je veux que le prix minimum s'affiche à côté des vues dans l'annonce quand on
+est sur le profil, ainsi que son numéro, pour voir d'un coup d'œil. »
+`decorerVignettes()` décore chaque lien d'annonce **qui est une des siennes**
+(présente dans `DATA.byId`) — jamais celle d'un autre vendeur.
+⚠️ **On n'écrit jamais dans le HTML de Vinted** : un enfant en surimpression sur
+la vignette. Si Vinted refond sa grille, le badge ne s'affiche pas — rien ne
+casse (§4.95). Redécoré au défilement par un `MutationObserver` limité à une
+passe / 400 ms.
+Vérifié au banc : 2 des 3 tuiles décorées (`N°7 · min 38,00 €` / `N°12 · min ?`),
+celle d'un autre vendeur **intacte**, redécoration après ajout dynamique,
+0 erreur.
+
+### Vérifié
+`npm run build` OK · **11 audits au vert** (`audit-recap` passe à 12 contrôles,
+les 3 nouveaux échouent bien sur le code d'avant ; `audit-identite` à 43) ·
+smoke app **11 écrans, 0 écran vide, 0 PAGEERROR, 0 artefact** (les 23 lignes
+console sont le 400 volontaire de `select=owner` et les resets de fin de test).
+
+### 5.71 (suite) — Le prix plancher se remplit en série (5.43 → 5.44)
+
+**Le badge de la vignette n'était pas remplissable** : il vit DANS le lien de
+l'annonce, donc cliquer dessus ouvrait la page Vinted. `pointer-events:auto` +
+`preventDefault` + une petite boîte de saisie posée sur `documentElement`.
+⚠️ **Piège trouvé au banc** : ma 1ʳᵉ version arrêtait les événements de la boîte
+en phase de **CAPTURE**. En capture, `stopPropagation` empêche l'événement
+d'atteindre les **descendants** — donc mes propres boutons : « Enregistrer » ne
+faisait rien. La boîte n'est pas dans le lien : il n'y a rien à arrêter à la
+descente, seulement à la remontée.
+Le **N° passe de 11 à 17 px** (gras 800) : c'est ce qu'on recopie sur le carton.
+
+**Et en série, dans « Mes paires »** — mesuré le 27 août : **0 plancher posé sur
+255 paires**, donc le copilote d'offres n'a jamais rien à dire et l'acceptation
+automatique ne peut pas fonctionner. Un champ `min` par ligne (vue *En ligne*
+seulement) + une puce **« 🏷 Sans minimum »**.
+⚠️ On n'écrit **pas** à chaque frappe et on ne **redessine pas** la liste (en
+tapant « 20 » on passe par « 1 », et un `render()` re-trie sous les doigts —
+c'est le défaut corrigé côté app en §5.44). Validation à la sortie du champ ou
+sur Entrée.
+⚠️ Deuxième piège du même banc : Entrée validait, puis le `blur` qui suit
+revalidait la même valeur → **deux écritures pour une saisie**. Le repère doit
+être réassigné après chaque validation.
+⚠️ **Aucun montant n'est suggéré par défaut** : sans prix d'achat connu (0 sur
+255), un plancher inventé pourrait faire vendre à perte (§5.38, §45).
+
+### État mesuré le 27 août (après les correctifs de la session)
+| | |
+|---|---|
+| annonces en ligne | **32 · 0 sans N° · 0 doublon de numéro** ✅ |
+| colis à envoyer | **13 · 0 sans numéro · 0 désaccord** entre le N° de l'annonce et celui de la vente ✅ |
+| colis sans PDF de bordereau | 4 (3 « étiquette déjà émise » + 1 à générer) |
+| coffre | 156 lignes · **28 avec leur description** (9 avant le correctif) |
+| **prix d'achat** | **0 / 255** ⚠️ |
+| **prix plancher** | **0 / 255** ⚠️ (l'outil de saisie en série existe maintenant) |
+
+---
+
+## 5.72 — ⚠️ LE CODE DE RETRAIT VINTED GO EST DANS LA CONVERSATION, PAS DANS UN EMAIL
+
+Deux captures d'écran de Julien (27 août), prises dans le fil de discussion
+Vinted (pas dans sa boîte mail) :
+
+> **Ton colis est arrivé !** Il t'attend à l'adresse suivante : Kusmi Tea,
+> 13 Rue Saint-Vincent, 56000 Vannes, France. *Scanne ton code de retrait* ou
+> saisis le code **C65735** pour le récupérer.
+
+…et l'écran suivant, le QR en grand + « Tu n'arrives pas à le scanner ? Saisis
+le code suivant : **C65735** ».
+
+### Ce que la base disait (mesuré AVANT de coder, méthode §46)
+| | |
+|---|---|
+| conversations captées | **582** |
+| types de message | `message` 403 · `offer_request_message` 338 · `offer_message` 189 · **`status_message` 74** · **`action_message` 40** · `portal_message` 3 |
+| conversations parlant de retrait | 10 |
+| **message d'ARRIVÉE réellement capté** | **1** — `harvest_3156028798_conv_22488948907` |
+| conversations **côté acheteur** | **12 sur 343** (Julien vit sur ses ventes) |
+
+Forme exacte du message d'arrivée, relevée en base :
+```
+entity_type : action_message
+title       : « Ta commande est arrivée. »
+subtitle    : « Ton colis a été livré dans le Point Relais MAISON DE LA PRESSE,
+                40 RUE DU PORT, 35260 CANCALE. Tu peux … aller le récupérer. »
+actions     : track_shipment · mark_as_delivered
+```
+➡️ **L'adresse du relais et le code de retrait sont là — et RIEN ne les lisait.**
+Même famille que §5.26 (une ligne en base sans lecteur). Pour Vinted Go, c'est la
+**seule** source : aucun email transporteur ne les porte, et 2 comptes sur 8 ne
+reçoivent aucun email (§5.47). Sans ça, le colis repart chez l'expéditeur.
+
+### ⚠️ ET UN CODE DE RETRAIT PEUT COMMENCER PAR UNE LETTRE
+`codeRetrait` était `/^\d{3,10}$/` — la règle **strictement numérique** posée en
+§5.37 parce que le mot « suivant » avait été capté comme code. Vérifié :
+`C65735` était **REJETÉ**, `077831` accepté. La règle devient
+`/^[A-Z]{0,2}\d{3,10}$/` : au plus deux majuscules devant les chiffres — « suivant »
+n'a aucun chiffre, il reste écarté. Même famille que §5.37, dans l'autre sens :
+une règle trop large invente un code, une règle trop étroite en cache un vrai.
+
+### Ce qui est livré
+- **`retraitDeConversation(conv)`** (extension, fonction **pure**) : sort
+  `{tx, item, titre, photo, lieu, code, conv, url}` du **dernier** message
+  d'arrivée. ⚠️ **Côté ACHETEUR uniquement** (`current_user_side !== 'seller'`) :
+  côté vendeur, « la commande est arrivée » veut dire que l'ACHETEUR l'a reçue.
+  ⚠️ « Article à emballer et envoyer … dépose ton colis dans un point relais »
+  parle aussi de relais : c'est un colis qui **PART**, jamais un colis à retirer.
+  Ni adresse ni code ⟹ `null` (on n'affiche pas une carte vide).
+- **`noterRetrait(r)`** → ligne **DÉDIÉE `panel_colis_relais`** (motif
+  anti-clobber §35 : l'extension n'écrit jamais `main`), clé = **n° de
+  transaction** (identité, jamais un titre §24), purge à 45 j, **aucune écriture
+  si rien n'a changé** (§34).
+- **À la capture** : `storeHarvest` extrait dès qu'une conversation arrive.
+- **`capterRetraits(uid)`** (à chaque visite sur Vinted, après la moisson) : va
+  lire la conversation des achats que Vinted dit **« déposés en point relais »**
+  et dont on n'a pas le code. ⚠️ Garde-fous identiques au bordereau (§5.29) :
+  compte **connecté uniquement** (`garde`), plafond 20 actions/h, **3 par
+  visite**, pas de nouvel essai avant 6 h. C'est une **LECTURE** sur ses propres
+  achats — elle ne décide de rien, n'engage aucun argent.
+- **App** : `colisRelais` (une seule ligne lue, quelques Ko) + `relaisDe(o)`. La
+  carte « en point relais » porte désormais **l'adresse**, **le code en 20 px**
+  et **« Ouvrir la conversation (QR) ↗ »** — le QR vit dans le fil Vinted, on ne
+  le fabrique pas (§17).
+
+⚠️ **Honnêteté** : le code de la capture d'écran (`C65735`) **n'est pas en base**
+— sa conversation n'a jamais été ouverte avec l'extension. La chaîne est donc
+prouvée sur le message réel (Mondial Relay, adresse sans code) et sur la forme
+exacte de la capture ; elle se remplira à sa prochaine visite sur Vinted.
+
+### Vérifié
+`npm run build` OK · `node --check` sur les deux fichiers de l'extension ·
+**`scripts/audit-retrait-conv.cjs` — 8 contrôles**, et il **échoue bien sur le
+code d'avant** (la fonction n'existait pas ; et l'ancienne règle rejetait
+`C65735`, mesuré) · **12 audits au vert** · banc app dédié : la fixture
+`panel_colis_relais` est produite **par la VRAIE fonction** sur la **VRAIE**
+conversation en base, puis l'écran Achats est rendu → **adresse Kusmi Tea, CODE
+C65735, adresse Maison de la Presse, lien vers la conversation, 0 erreur d'app**
+(capture relue) · vrai `buildPanelData` contre la vraie base : 24 annonces,
+80 ventes, 12 colis à poster, 9 comptes — aucune régression · smoke app
+**11 écrans, 0 écran vide, 0 suspect**.
+⚠️ Le banc du PANNEAU (`panel.cjs`) sort 18 échecs — **tous des artefacts de
+banc connus** (`page.click` sur `.vrm-tab`, invisible au sens Playwright, §5.36 ;
+plus les onglets passés derrière « Plus » en 5.40). `vinted-panel.js` n'a pas été
+touché de la session : ces échecs sont antérieurs.
+
+Extension **5.45.0** — à recharger dans Chrome.
+
+### 5.72 (suite) — ⚠️ « LA VENTE S'EN VA SANS AVOIR ENVOYÉ LE BORDEREAU À L'APP »
+
+Julien : « des fois je génère et la vente s'en va sans même avoir envoyé le
+bordereau à l'app… dès que je navigue sur Vinted il doit capter les bordereaux
+des ventes où les bordereaux ont été téléchargés ». **Il avait raison, et le
+chiffre est gros.**
+
+### Mesuré AVANT de coder, sur la vraie base
+| | |
+|---|---|
+| bordereaux captés par l'extension | 29 lignes · **23 transactions** |
+| bordereaux reçus par email | 113 lignes · 112 transactions |
+| **ventes de moins de 45 j SANS aucun PDF** (ni capté, ni email) | **90** |
+| dont couvertes par l'ancienne 2ᵉ passe | **1** ⚠️ |
+| dont **déjà parties** (expédiée / finalisée / au relais) | **89** |
+| dont pas encore livrées (donc encore utiles) | **28**, toutes < 21 j |
+
+### La cause, en une ligne
+```js
+if (!AWAITING_SHIP(o.status) || aGenererBordereau(o.status)) continue;   // ancienne 2ᵉ passe
+```
+La 2ᵉ passe ne regardait QUE les ventes **encore en attente d'envoi**. À la
+seconde où Vinted fait avancer le statut (« expédiée », « finalisée »), on
+cessait **définitivement** d'aller chercher le PDF. Or Vinted **fabrique** le
+PDF après la génération et le dépose sur S3 : la seule fenêtre où on essayait
+était justement celle où ça échoue le plus. D'où « la vente s'en va sans que le
+bordereau soit arrivé ».
+
+### La nouvelle règle
+Toute vente **récente** (`BORD_RATTRAPAGE_J = 21`), **non annulée**, dont
+l'étiquette existe (donc au-delà de « paiement validé ») et dont on n'a **aucun**
+PDF — ni capté, ni email. Triée : **ce qui attend TON envoi d'abord**, puis les
+plus récentes. Plafond inchangé : **3 par visite**, mémo de 6 h.
+- **21 jours** parce que c'est mesuré : les 28 ventes sans PDF qui ne sont pas
+  encore livrées tiennent TOUTES dans cette fenêtre, et au-delà le lien de Vinted
+  n'existe plus (on ne part pas à la pêche sur 60 ventes finalisées anciennes).
+- ⚠️ **On n'insiste (§5.48) que sur une vente qui attend encore l'envoi** : là, le
+  PDF est en cours de fabrication. Sur une vente déjà partie, « pas d'expédition
+  exposée » ne s'arrangera pas — réessayer 4 fois serait 4 requêtes pour rien
+  dans l'empreinte du compte (§5, §48). Mesuré au banc : 1 requête contre 4.
+
+⚠️ Avec 89 en retard et 3 par visite, le rattrapage prend une trentaine de
+passages sur Vinted. C'est voulu : discret, et les plus utiles passent d'abord.
+
+### Vérifié
+**`scripts/audit-bordereau-rattrapage.cjs`** (nouveau) exécute le VRAI
+`genererBordereauxEnAttente()` dans un `vm` et mesure **quelles transactions sont
+réellement demandées à Vinted** — **11 contrôles**, dont **5 échouent bien sur le
+code d'avant** (§21) : vente expédiée récupérée, vente finalisée récupérée,
+plafond de 3, une seule requête sur une vente partie, insistance conservée sur
+une vente qui attend l'envoi. Plus : fenêtre de 21 j respectée, PDF déjà capté ou
+reçu par email → aucune requête, vente remboursée → jamais.
+`node --check` OK · **13 audits au vert** · vrai `buildPanelData` contre la vraie
+base : aucune régression.
+⚠️ Piège de banc rencontré : mes fixtures utilisaient des identifiants de
+transaction **non numériques** (`t1`), alors que le mock n'interceptait que
+`/transactions/(\d+)/` — le banc annonçait « aucune demande » pour un code qui
+marchait. Identifiants numériques, comme les vrais.
+
+Extension **5.46.0** — à recharger dans Chrome.
+
+---
+
+## 5.73 — UN ENDROIT = UN BLOC (et deux bugs qu'aucun filet ne voyait)
+
+Julien : « améliore encore la réception dans les achats pour les Vinted Go, il y
+a les codes de retrait dans la conversation avec le QR code en lien ; je veux que
+tu t'améliores pareil pour les QR Chronopost et les codes Mondial Relay ; je veux
+bien que tu **sépares les différents endroits pour bien savoir où je vais** ».
+
+### État mesuré avant de coder
+| transporteur | lignes de suivi | colis « à retirer » | code | QR | lieu |
+|---|---|---|---|---|---|
+| Mondial Relay | 79 | **13** | 11 | 0 | 12 |
+| Chronopost | 38 | **5** | 3 | 4 | 2 |
+| Vinted / Shop2Shop / Colissimo | 10 | 0 | — | — | — |
+
+⚠️ `panel_colis_relais` était encore **ABSENT** : l'extension 5.45 n'avait pas
+encore tourné chez lui. Les données Vinted Go arriveront à sa prochaine visite.
+
+### 1. L'ENDROIT devient le niveau principal
+Avant : **transporteur** en titre, point relais en dessous. Avec un seul relais
+par transporteur, ça faisait un étage de titres pour rien — et **l'adresse, la
+seule chose qui décide où on va, arrivait en second**.
+Maintenant : **une destination = un bloc** (nom, adresse, horaires, « 🧭 Y aller »),
+et les colis dedans. Les blocs sont ordonnés par **urgence** : le point dont un
+colis expire le plus tôt d'abord — un colis non retiré repart chez l'expéditeur.
+
+### 2. Le GESTE est écrit SUR la destination — `methodeDuPoint(colis)`
+Chaque transporteur remet le colis à sa façon (§28). Le geste vit donc là où on
+lit l'adresse, pas répété sur chaque ligne :
+| ce qu'on a | ce que le bloc annonce |
+|---|---|
+| `consigne` ou `code2` | **Consigne automatique** — « Tape l'identifiant puis le code d'ouverture sur le casier » |
+| QR seul | **Au comptoir** — « Présente le QR de chaque colis » |
+| QR + code mélangés | **Au comptoir** — « QR pour certains colis, code pour les autres » |
+| code | **Au comptoir** — « Donne le code de retrait + une pièce d'identité » |
+| rien | **Au comptoir** — « Donne ton numéro de colis + une pièce d'identité » |
+⚠️ **Dérivé de `retraitMode`**, jamais d'une règle parallèle (§11) : deux règles
+pour « comment on retire ici », c'est l'écran et la modale qui finissent par ne
+plus dire la même chose. Un contrôle permanent le vérifie.
+
+Les **colis Vinted Go** sont groupés par lieu eux aussi (ils ont une adresse
+depuis §5.72). Ceux dont le lieu est encore inconnu restent à part, et on le
+dit : « Vinted dit "déposé" — l'adresse arrive avec le message de retrait ».
+
+Chaque ligne de colis ne porte plus que **ce qui lui est propre** : n° de suivi,
+jour d'arrivée, date limite, identifiant/code, QR. Le lieu et le geste étaient
+répétés trois fois sur un écran de téléphone.
+
+### 3. Le LIEN du QR, capté depuis la conversation
+« Scanne ton code de retrait » est une **ancre HTML** dans le message Vinted Go.
+`retraitDeConversation` la retient (`qr`) et l'app propose **« Voir le QR de
+retrait ↗ »**, sinon **« Ouvrir la conversation (QR) ↗ »**.
+⚠️ **Un lien qui ne mène nulle part n'est pas un lien** : dans les messages
+réellement captés, la plupart des ancres valent `href="/"` (Vinted les recâble
+côté client). Ouvrir la page d'accueil au lieu du QR serait pire que pas de
+bouton. Un `href` relatif est remis sur `vinted.fr`.
+
+### ⚠️⚠️ 4. DEUX BUGS PRÉ-EXISTANTS, TROUVÉS EN VÉRIFIANT
+**a) « overdue is not defined » — l'écran Colis tombait.** Depuis §5.64, le
+bandeau d'urgence faisait `const { total, danger, parts } = u;` puis lisait
+`overdue` deux lignes plus bas. L'écran **tombait dès qu'il y avait à la fois des
+colis en retard et des colis tranquilles** (si TOUS sont urgents, le bloc ne
+s'affiche pas — d'où un smoke qui passait un jour et pas l'autre : 1481
+caractères contre 288).
+
+**b) `syncFromSheets` / `syncToSheets` : mortes et cassées.** Restes de l'ancienne
+architecture Google Sheets (§2), **aucun appelant**, et toutes deux lisaient une
+constante **`API_URL` qui n'existe nulle part**. Pire : `syncFromSheets` écrasait
+`vinted_catalog` et `vinted_sales` avec la réponse d'un endpoint fantôme.
+Supprimées.
+
+### ✅ `scripts/audit-variables.cjs` — LA famille est enfin couverte
+C'est la **troisième fois** qu'une variable jamais déclarée casse un écran en
+production, et aucun filet ne la voyait :
+| | |
+|---|---|
+| §26 | `reel is not defined` → écran Ventes |
+| §5.42 | `useRef` pas importé → écran Annonces |
+| §5.73 | `overdue is not defined` → écran Colis |
+`npm run build` compile (la syntaxe est valable) et le smoke ne la voit que si
+les **données** font entrer dans le bloc conditionnel fautif.
+➡️ Vraie vérification **no-undef** sur `src/App.jsx` et `src/main.jsx` avec
+`@babel/parser` + `@babel/traverse` (déjà dans `node_modules`) : chaque
+identifiant lu doit être déclaré, importé, ou être un global du navigateur.
+**Rejoué sur le code d'avant : il sort les DEUX bugs** (`API_URL`, `overdue`).
+⚠️ À lancer avec les autres audits après toute modification de `App.jsx`.
+
+### Vérifié
+`npm run build` OK · **14 audits au vert** (dont `audit-variables` nouveau, et
+`audit-retrait-conv` passé à **13 contrôles** — 4 des 5 nouveaux échouent sur le
+code d'avant) · rendu réel de l'écran Achats avec les trois familles de
+destination : **Consigne Pickup Super U** (3 colis · consigne · identifiant +
+code d'ouverture + QR), **Maison de la Presse** (1 colis · comptoir · code
+946352), **Kusmi Tea** (Vinted Go · comptoir · code ou QR depuis la
+conversation) — **0 erreur d'app** · écran Colis remonté de 288 à **1481
+caractères** (7 colis à envoyer) · smoke **11 écrans, 0 écran vide, 0 suspect**.
+⚠️ Artefact de banc corrigé au passage : le détecteur de suspects flaggait
+« 1 colis » — **« colis » est invariable**, il n'avait rien à faire dans la liste
+des accords à vérifier (déjà noté en §5.22, jamais corrigé).
+
+Extension **5.47.0** — à recharger dans Chrome.
+
+---
+
+## 5.74 — L'ÉCRAN ACHATS DEVIENT UN OUTIL DE RÉCEPTION (une étape = un onglet)
+
+Julien : « les achats ça ne me convient pas, conçois VRM un outil parfait pour
+la réception des colis ».
+
+### Ce que l'écran montrait vraiment (relevé ligne par ligne avant de coder)
+**336 lignes affichées, dont ~40 parlaient de colis.** Le reste, c'était la
+liste des 538 commandes de l'historique, filtrée par « En attente / Reçus /
+Tous » — c'est-à-dire des **états de commande**, pas des **étapes de colis**.
+
+Pipeline réel mesuré sur ses 441 achats de comptes vivants :
+| étape | nombre |
+|---|---|
+| en route vers lui | **26** |
+| arrivés au point relais | **13** |
+| reçus | 317 |
+| annulés / remboursés | 146 |
+
+➡️ Les **26 colis en route** — exactement ce qu'un outil de réception doit
+montrer — étaient **noyés au milieu de 538 lignes**, sans tri ni âge.
+
+### La règle : les onglets sont les ÉTAPES du colis
+`phaseReception(o)` (une seule définition, §11) : `annule` → `relais` → `recu` →
+`route`. Les pastilles portent leur compte, donc **un onglet vide se voit avant
+d'être ouvert** : `À retirer 4 · En route 25 · Reçus 284 · Tous`.
+
+⚠️ **« À retirer » lit `pickupUnion.total`**, pas le nombre d'achats « au
+relais ». Les deux ne donnent pas le même chiffre (union email + statut Vinted),
+et ma première version affichait **2 en haut, « 4 colis à retirer » en dessous,
+sur le même écran** — le doublon que §11 interdit.
+
+⚠️ **« Retour initié » n'est PAS un colis qui arrive** : c'est une paire qu'on
+renvoie. Le laisser dans « En route » faisait attendre une livraison qui ne
+viendra jamais (1 cas sur les 26).
+
+### Une étape = un écran
+- **« À retirer » ne déroule plus de liste** : les colis qui l'attendent sont
+  déjà en haut, groupés par destination avec leur code (§5.73). Les répéter en
+  dessous, c'était le doublon qui faisait les 336 lignes.
+- **Les blocs de destination ne s'affichent QUE sur « À retirer »**. Ils
+  apparaissaient au-dessus des trois onglets — le même bloc, trois fois. La
+  pastille du haut porte le compte : rien n'est caché.
+
+### Ce qui manquait vraiment : DEPUIS QUAND
+Un outil de réception répond à « est-ce que je dois m'inquiéter ? ». La date
+d'achat seule oblige à compter dans sa tête. Chaque ligne en route affiche
+désormais **« depuis N j »**, en rouge au-delà de `ACHAT_RETARD_J = 21` avec
+« relance le vendeur ».
+Mesuré : 12 colis à 7-15 j (le rythme normal Vinted), 10 à 15-30 j, et
+**4 au-delà du mois** dont un « en transit » depuis 120 jours — un statut Vinted
+qui ne bouge plus. ⚠️ On ne les **cache pas** (un colis caché est un colis
+perdu, §5.43) : on affiche le chiffre.
+**« En route » est trié du PLUS ANCIEN au plus récent** — c'est celui qui traîne
+qu'on veut voir, pas le dernier acheté. Partout ailleurs le plus récent d'abord
+(§5.35) : le tri ne change que sur cette étape.
+
+### Deux légendes recopiées à chaque ligne
+- **Les 4 libellés sous la barre de progression** (`Payé · Expédié · Au relais ·
+  Reçu`) étaient **104 des 286 lignes** de l'onglet En route — une légende
+  répétée 26 fois, alors que la pastille juste au-dessus nomme déjà l'étape en
+  cours. Même défaut que les lignes de vente (§5.69), même correctif : les
+  segments colorés restent, le texte part.
+- **Le badge de délai du bloc de destination** répétait mot pour mot ce que
+  chaque colis dit en dessous quand ils sont tous hors délai — quatre fois la
+  même information dans un bloc de six lignes. Il ne s'affiche plus que si les
+  colis **n'ont pas le même état** (là seulement « au plus tôt » veut dire
+  quelque chose). Le tri des blocs par urgence, lui, est inchangé — il n'a pas
+  besoin d'être écrit.
+
+### Et le total dit enfin le hors-délai
+« 4 colis à retirer » : sur les 4, **3 avaient leur date limite passée**. Ce
+n'est pas la même liste de travail (soit il l'a récupéré sans cocher, soit le
+colis est reparti chez l'expéditeur et il faut le réclamer). La ligne dit
+maintenant **« 4 colis à retirer · 3 hors délai à vérifier »**.
+
+### Mesuré
+| onglet | avant | après |
+|---|---|---|
+| **À retirer** | **336 lignes** | **64** |
+| En route | 286 | **201** |
+
+### Vérifié
+`npm run build` OK · **14 audits au vert** (`audit-coherence` : 5 règles,
+**0 désaccord sur 12 statuts**) · les **4 onglets rendus sur les vraies
+données** : À retirer (2 destinations, identifiants 1222/5789 et 8156/9539,
+âges, hors-délai), En route (25 lignes, plus ancien d'abord, « depuis 120 j —
+relance le vendeur »), Reçus, Tous — **0 suspect d'affichage, 0 erreur d'app**
+(les 3 lignes console sont le 400 volontaire de `select=owner` et les resets de
+fin de test).
+
+---
+
+## 5.75 — « JE DOIS PASSER À CÔTÉ DE RIEN » : 4 colis disparaissaient en silence
+
+Julien : « continue encore à améliorer les achats, les QR codes, etc. Ça doit
+être parfait, je ne dois passer à côté de rien. » Méthode habituelle : mesurer la
+vraie base avant d'écrire une ligne.
+
+### Ce que portent vraiment les 127 lignes de suivi (valeurs NON VIDES)
+| champ | renseigné |
+|---|---|
+| `suivi` | 116 | 
+| `consigne` | 38 · `qrUrl` **28** · `code` **20** · `lieu` 15 |
+| `limite` | **3** · `code2` 2 · `qrB64` **0** |
+| **`artTitle`** | **0** ⚠️ |
+
+⚠️ **Aucun colis ne dit quelle paire il contient** — un email de transporteur ne
+nomme pas l'article. C'est mesuré, pas supposé, et ça ne se corrige pas par le
+code (voir plus bas).
+
+### ⚠️ LE DÉFAUT : 18 colis « disponibles », l'app en affichait 3
+Chaîne de filtres de l'app **rejouée sur les vraies lignes** :
+| | |
+|---|---|
+| lignes « colis disponible » | **18** |
+| cochés « récupéré » par Julien | 11 → écartés à raison ✅ |
+| **non cochés, écartés SANS RIEN DIRE** | **4** ⚠️ |
+| affichés | 3 |
+
+Les 4 : Chronopost `05488805839014` (23 j), Mondial Relay `74950536` (29 j),
+`15658327` (32 j, code 077831), `16100938` (33 j, code 184143). Aucun n'a de date
+limite dans son email, donc la **supposition** des 14 jours (`PICKUP_MAX_DAYS`)
+les faisait sortir de l'écran. Un colis non retiré repart chez l'expéditeur :
+c'est de l'argent perdu, et **rien ne l'annonçait**.
+
+➡️ **`pickupUnion.oublies`** + un bloc rouge « N colis jamais retirés » sur
+l'onglet À retirer : transporteur, lieu, n° de suivi, **âge réel**, le code
+quand il existe, « Vérifier » (suivi transporteur) et **« ✓ Je l'ai eu »**.
+⚠️ Ils ne reviennent **PAS** dans la liste de travail et ne comptent dans **aucun
+total** : l'action n'est pas « aller au comptoir » mais « réclamer », et un
+colis d'il y a un mois n'est plus un retrait.
+
+### ⚠️ « HIDE MY EMAIL » D'iCLOUD RÉÉCRIT L'EXPÉDITEUR
+Trouvé en cherchant pourquoi un email traînait chez les « non compris » :
+```
+SEUR via Vinted <shipping_at_relay_vinted_com_t9zx4089tn7g48_18rq1890@icloud.com>
+                 ↑ le vrai expéditeur est shipping@relay.vinted.com
+```
+**37 des 453 emails conservés** arrivent sous cette forme. Tout test sur
+l'expéditeur (`/relay\.vinted/`, `/chronopost/`, `/@team\.vinted/`) échoue alors
+— et le cas trouvé était un **VRAI email de transporteur** (« Tu envío ha sido
+recogido »), reconnu par **aucune** règle.
+
+➡️ **`demasquerRelais(adr)`** dans `api/_lib/lire-email.js` (iCloud, Apple
+private relay, DuckDuckGo, SimpleLogin, AnonAddy) ; `normalizeInbound` ajoute
+l'adresse lisible **à côté** de l'alias dans `from`.
+⚠️ **On ne reconstruit PAS l'adresse exacte** : on ne sait pas où s'arrête le
+domaine et où commencent les jetons aléatoires, et deviner produirait une adresse
+fausse. On rend le nom et le domaine **lisibles** — c'est tout ce dont un test
+par sous-chaîne a besoin — et l'original reste intact.
+⚠️ Ça ne touche **jamais** le rattachement au vendeur, qui lit l'adresse de
+**RÉCEPTION** (§5.16), jamais celle de l'expéditeur.
+
+**Prouvé dans les deux sens sur le vrai email** : code d'avant → `null`
+(l'email était perdu) · après → `vinted`. Trois contrôles permanents ajoutés à
+`scripts/audit-transporteurs.cjs` (dont « une adresse normale n'est pas
+réécrite »).
+
+### « Non compris » recommençait à crier au loup
+**453 emails conservés**, dont 93 qu'aucune famille ne reconnaissait :
+| | |
+|---|---|
+| « MISE EN DEMEURE – Demande d'intervention humaine… » | **76** — son courrier SORTANT vers Vinted |
+| « Le transfert bancaire est en cours » | **15** |
+| divers | 2 |
+
+Deux familles ajoutées (serveur **et** app — les lignes déjà en base ne seront
+jamais réécrites, §5.49), vérifiées par `audit-email-formes` sur 14 sujets réels.
+
+⚠️ **CE QUE JE N'AI PAS FAIT, ET POURQUOI** : router « transfert bancaire » vers
+`email_final_*`. C'est tentant (c'est de l'argent) — mais `email_final` compte
+l'argent **entrant dans le porte-monnaie** quand une vente se finalise. Un
+virement, c'est le porte-monnaie qui **se vide** vers sa banque : le même euro
+serait compté **deux fois** dans « encaissé ». Aucune action à faire → famille
+reconnue, pas alerte.
+
+### Ce qui NE se corrige pas par le code (dit franchement)
+- **Nommer la paire d'un colis** : `artTitle` est vide sur 127/127. La seule voie
+  certaine est la conversation Vinted (§5.72) — or, mesuré en exécutant la VRAIE
+  fonction sur les **636 conversations captées** : **12 seulement sont côté
+  acheteur**, et **1 seule** produirait une ligne. Julien vit sur ses VENTES.
+  Cette voie ne couvrira donc jamais qu'une poignée d'achats.
+- **`panel_colis_relais` est toujours ABSENTE** alors que le diagnostic de
+  l'extension est frais (30 août 20:47, 519 conversations rangées) et ne porte
+  **aucune clé `retrait_*`** ⟹ **l'extension installée chez lui est antérieure à
+  la 5.45**. Il faut la recharger dans Chrome pour que cette chaîne démarre.
+- **Rien ne dort ailleurs** : sur les 125 lignes de quarantaine non traitées et
+  les 453 emails « inconnus », **0 email de colis**. La lecture ne perd rien.
+
+### Vérifié
+`npm run build` OK · `node --check` sur les deux fichiers `api/` · **14 audits au
+vert** · rendu réel de l'onglet À retirer : le bloc « 4 colis jamais retirés »
+affiche les 4 colis **mesurés en base**, avec leur âge exact (23 / 29 / 32 / 33 j)
+et leurs codes (077831, 184143) · **0 suspect, 0 erreur d'app**.
+
+---
+
+## 5.76 — « C'EST MON MÉTIER, FAIS ÇA COMME UN PRO » : j'ai enfin REGARDÉ l'écran
+
+Julien, après plusieurs passes : « ça ne me convient toujours pas, c'est mon
+métier ». Il avait raison, et la leçon de §5.62 s'appliquait encore : **j'avais
+lu des listes de lignes de texte, jamais REGARDÉ l'écran**. Une capture à sa
+résolution de travail (1512 px, ordinateur — §42) a montré cinq défauts en
+trente secondes, dont trois qu'aucun banc ne pouvait voir.
+
+### ⚠️ 1. LES QR NE S'AFFICHAIENT PAS — et rien ne prenait le relais
+Sur la capture, les trois vignettes QR étaient des **icônes « image cassée »**.
+Vérifié au `curl` : **les 3 vrais QR de Julien répondent parfaitement**
+(`image/png`, 645 à 873 octets) — l'image morte était un artefact du banc (pas de
+réseau vers `pickup-services.com`).
+**Mais le défaut, lui, est réel** : `onError` n'existait que dans la **modale**
+plein écran (§17). Sur la carte, une image morte restait une image morte —
+et un lien de transporteur expire. **Au comptoir, il n'aurait rien eu à
+présenter.**
+
+⚠️ **Ma première correction ne marchait pas** : `e.target.closest(...).style.display='none'`
+est **effacé au premier re-render de React**, qui réapplique son style en ligne.
+Vu en capture (le cadre vide restait), pas à la relecture.
+➡️ Le repli vit maintenant dans l'**ÉTAT** (`imgMortes` / `noterImgMorte`), et il
+sert aussi aux **photos de paires** (même famille : le CDN Vinted expire).
+
+➡️ Et **ni QR ni code ⟹ le NUMÉRO DE COLIS en gros** (§17 le disait, ce n'était
+pas fait sur cette carte) : mesuré, le colis `09447431562792` n'avait
+**strictement rien** à montrer.
+
+### 2. Le n° de suivi était écrit DEUX FOIS par ligne
+« Colis n°08448878300059 » en titre, puis « n° 08448878300059 » juste en dessous.
+Un email de transporteur ne nomme jamais l'article (mesuré : `artTitle` vide sur
+**127 lignes sur 127**) — donc à défaut on écrit ce qu'on SAIT, **le
+transporteur**, et le numéro reste sur sa ligne, une seule fois.
+
+### 3. « délai de retrait dépassé » ne disait pas de combien
+Ça se lisait comme une contradiction juste sous « arrivé il y a 6 j ». Devenu
+**« délai dépassé depuis 2 j (29/08/2026) — va vite le chercher »** : c'est ce
+qui décide si on court au relais ou si on réclame. Et ça distingue enfin ce bloc
+du bloc « colis jamais retirés » (§5.75), dont l'action est « réclame à Vinted ».
+
+### ⚠️ 4. L'ÉCRAN ACHATS N'AVAIT AUCUN CHIFFRE
+Ventes porte quatre chiffres depuis toujours ; **Achats, zéro** — alors que
+l'achat, c'est la moitié de la marge. Mesuré sur ses **534 achats réels** :
+
+| | paires | montant |
+|---|---|---|
+| reçus | 326 | 8 064 € |
+| en route | 62 | 1 672 € |
+| au relais | 13 | 346 € |
+| **annulés / remboursés** | **146** | **3 980 €** → **27,3 %** ⚠️ |
+
+**Plus d'un achat sur quatre n'aboutit pas, et rien ne le lui disait.** Quatre
+`StatBox` ajoutées (Dépensé · Prix médian · En route · Annulés), qui **suivent la
+période choisie** comme sur Ventes.
+⚠️ On ne remet **PAS** « à retirer » dans cette rangée : ce compte a sa
+définition (`pickupUnion.total`) et il est déjà affiché deux fois plus bas. Deux
+nombres proches pour deux notions différentes sur le même écran, c'est
+exactement ce qu'on s'interdit (§11).
+⚠️ Le libellé disait « Prix moyen » pour une **médiane** — corrigé.
+
+### 5. « Reçu » se lisait « colis reçu »
+Le bouton du justificatif PDF s'appelait **« 📄 Reçu »**, juste à côté d'une
+pastille **« En transit »**. Un pro clique dessus en croyant marquer le colis
+reçu. Devenu **« 📄 Justificatif »**.
+Et le bandeau « 2 comptes ne reçoivent aucun email » s'affichait sur les
+**quatre** onglets, donc au-dessus de la liste des achats en route où il ne dit
+rien : c'est une information de **configuration**, sa place est sur « À
+retirer », là où les codes manquent.
+
+### La leçon, à ne plus oublier
+**Un défaut d'affichage ne se voit ni au build, ni dans une liste de textes, ni
+dans un compte d'erreurs.** Trois des cinq défauts ci-dessus (image cassée,
+numéro en double, style React qui écrase le DOM) n'étaient visibles **que sur
+l'image**. Regarder la capture fait partie du test — c'est déjà écrit en §5.56,
+et je ne l'avais pas fait sur cet écran.
+
+### Vérifié
+`npm run build` OK · **14 audits au vert** · les 4 onglets rendus sur les vraies
+données (À retirer 105 lignes, En route 214) : **0 suspect, 0 PAGEERROR** ·
+captures relues avant/après · 11 écrans à 390 px : 0 débordement, 0 écran vide.
+
+---
+
+## 5.77 — ⚠️⚠️ LES NOTIFICATIONS ÉTAIENT MORTES DEPUIS LE 25 AOÛT, ET C'ÉTAIT MA FAUTE
+
+Julien : « remets les notifs, ça ne marche plus du tout ». **Il avait raison, la
+cause est chez moi, et elle est mesurée.**
+
+### Ce que la production contenait vraiment (`origin/main`, 25 août)
+| contrôle | état |
+|---|---|
+| clé privée VAPID disponible | **NON** → `sendPushToAll` sort sur « VAPID_PRIVATE_KEY absente » |
+| route `GET /api/push?etat=1` | **NON** → l'app reçoit **405**, elle ne peut pas savoir |
+| l'app affiche l'alerte | **NON** → l'écran dit « activées » |
+
+➡️ **Depuis le 25 août, zéro notification n'est partie**, pendant que l'écran
+affichait « activées ». Vérifié en direct : `https://vrm.center/api/push?etat=1`
+→ **405 « POST only »**, et 2 appareils toujours abonnés (mis à jour hier 20:17).
+
+### La cause exacte : §5.53
+En sortant la clé privée du dépôt public, j'ai **régénéré la paire** — donc
+`BBQbRWE86gwZ…` (avec sa privée en dur, qui marchait) est devenue
+`BLw4VOxC3CXI…` **sans privée nulle part**. La note disait « à faire par
+Julien : poser `VAPID_PRIVATE_KEY` sur Vercel »… **sans jamais lui donner la
+valeur à poser**. C'était donc impossible à faire.
+⚠️ Confirmé dans l'historique : `ffa1c18` et antérieurs → clé publique
+`BBQbRWE86gwZ…` + privée en dur ; `75733c4` (§5.53) → nouvelle publique, plus
+aucune privée. **La privée de la paire actuelle n'a jamais existé ailleurs que
+dans ma session.**
+
+### Ce qui est livré
+1. **Paire régénérée**, la publique posée **aux deux endroits** (`src/App.jsx` et
+   `api/_lib/push.js`) ; **la privée est remise à Julien en main propre**, jamais
+   dans le dépôt (le dépôt est public — c'est tout l'objet de §5.53).
+2. **L'alerte devient actionnable** : elle donnait le nom de la variable sans
+   dire quoi faire. Elle liste maintenant les trois étapes exactes, avec le
+   **lien direct** vers les variables d'environnement du projet Vercel.
+   ⚠️ Une alerte qui ne dit pas quoi faire ne sert à rien quand la personne en
+   face n'est pas développeur.
+3. Le **ré-abonnement automatique** (`memeCle`, §5.61) était déjà écrit : la clé
+   publique ayant changé, les 2 abonnements existants sont périmés et seront
+   remplacés tout seuls à la première ouverture après déploiement.
+
+### ✅ `scripts/audit-push.cjs` — 7 contrôles permanents
+La chaîne push casse **en silence** : c'est ça qui a coûté six jours.
+1. l'app et le serveur partagent **la même clé publique** (si elles divergent,
+   chaque abonnement est scellé sur une clé que le serveur n'utilise pas —
+   refus à l'envoi, et rien ne le dit) ;
+2. **aucune clé privée en dur** (le dépôt est public) ;
+3. la privée vient **uniquement** de la variable d'environnement ;
+4. le serveur **annonce** « clé absente » au lieu d'échouer en silence ;
+5. l'app **interroge** l'état du serveur ;
+6. l'app **affiche** l'alerte ;
+7. la route `GET ?etat=1` **existe** côté serveur — sinon l'app reçoit 405 et
+   n'alerte jamais (exactement le cas de production).
+
+⚠️ **Prouvé dans les deux sens** (§21) : rejoué sur `origin/main`, il sort
+**3 maillons cassés** (points 5, 6, 7) ; sur la branche, 7 au vert.
+
+### ⚠️ CE QUI RESTE À FAIRE PAR JULIEN, ET QUE LE CODE NE PEUT PAS FAIRE
+Poser **`VAPID_PRIVATE_KEY`** dans les variables d'environnement Vercel, puis
+redéployer. Une clé privée ne peut pas vivre dans le dépôt (public) ni dans
+Supabase (lisible avec la clé anon publique — ce serait la même faille). C'est
+le seul endroit sûr, et c'est un geste unique.
+
+---
+
+## 5.78 — TEST NOTIF FAIT EN DIRECT : trois pannes empilées, toutes mesurées
+
+Julien : « fait un test notif, je ne reçois pas les ventes etc ». Test réel
+lancé contre la production et contre ses **2 vrais appareils** — pas une
+relecture de code.
+
+### Ce que le test a donné (31 août, en direct)
+| test | résultat |
+|---|---|
+| `GET https://vrm.center/api/push?etat=1` | **405 « POST only »** → la production tourne l'ancien code, l'app ne peut même pas demander « peux-tu envoyer ? » |
+| `POST /api/push {action:'test'}` (production) | `{"sent":0,"total":0,"erreur":"VAPID_PRIVATE_KEY absente"}` |
+| appareils abonnés en base | **2** (Chrome/FCM + Apple), réabonnés **le matin même à 06:59** |
+| **envoi RÉEL tenté** avec la paire régénérée (§5.77) | Chrome **403** « the VAPID credentials … do not correspond » · Apple **400 `{"reason":"VapidPkHashMismatch"}` » |
+| clé publique dans le bundle **déployé** | **DEUX clés différentes** — `BBQbRWE86gwZ…` (bloc de réabonnement hérité) et `BLw4VOxC3CXI…` (§5.53) |
+| clé publique sur la **branche** | **une seule**, `BIImaPEF…`, app et serveur d'accord |
+
+➡️ **Trois pannes empilées**, et chacune suffit à elle seule :
+1. le serveur n'a **aucune** clé privée → il n'envoie rien, jamais (§5.77) ;
+2. la production ne porte pas la route `GET ?etat=1` → l'app ne peut pas
+   l'annoncer, elle affiche « activées » ;
+3. les 2 abonnements sont **scellés sur une clé publique dont la privée
+   n'existe nulle part** — même en posant la clé sur Vercel, ces deux-là
+   resteraient morts.
+
+### ✅ CE QUE LE TEST PROUVE EN POSITIF (et c'était la vraie inconnue)
+**Les deux endpoints sont VIVANTS.** Un appareil désinstallé ou une permission
+retirée renvoie **404/410** ; ici les deux services ont **accepté la requête et
+ne l'ont refusée que sur la clé**. Donc la chaîne Supabase → service de push →
+téléphone fonctionne de bout en bout : il ne manque que la clé.
+⚠️ Sans ce test, impossible de distinguer « clé absente » de « téléphones
+partis ». C'est pour ça qu'on l'a lancé pour de vrai au lieu de relire le code.
+
+### ⚠️ LE DÉFAUT CORRIGÉ : un abonnement à clé périmée était compté comme vivant
+`sendPushToAll` ne purgeait que sur **404/410**. Un abonnement scellé sur une
+ancienne clé (403 / `VapidPkHashMismatch`) restait donc dans la liste **pour
+toujours** : « 2 appareils abonnés » s'affichait pendant que rien n'arrivait —
+la panne silencieuse exacte qui a coûté six jours.
+- **`cleSansRapport(e)`** reconnaît les deux formes RÉELLES relevées ci-dessus.
+- ⚠️ **Jamais sur un 403/400 nu** : on exige le MOTIF. Un refus passager ou une
+  charge mal formée effacerait sinon **tous** les appareils d'un coup.
+- `sendPushToAll` renvoie `perimes`, et le bouton **Test** de l'app dit quoi
+  faire : « N appareils étaient abonnés avec une ancienne clé — ils viennent
+  d'être retirés, rouvre l'app sur chaque appareil ». Avant, on lisait
+  « 2 abonnés, 0 joint » sans savoir quoi en faire.
+
+### L'ORDRE COMPTE (sinon ça ne marchera toujours pas)
+`memeCle()` — le réabonnement automatique qui re-scelle les appareils sur la
+clé courante (§5.61) — **n'existe QUE sur la branche**. Donc :
+1. **déployer la branche** (sans ça, les abonnements ne se re-scellent jamais) ;
+2. poser **`VAPID_PRIVATE_KEY`** dans les variables d'environnement Vercel ;
+3. **ouvrir l'app une fois sur chaque appareil** → il se réabonne tout seul ;
+4. refaire le test.
+⚠️ Inverser 1 et 3 ne marche pas : c'est le point qui manquait à §5.77.
+
+### Vérifié
+`npm run build` OK · **15 audits au vert** · `audit-push` passe à **10
+contrôles**, dont **3 nouveaux qui échouent bien sur le code d'avant** (§21 :
+rejoué sur `HEAD`, il sort les 3) · banc unitaire sur la VRAIE fonction
+`cleSansRapport` contre les erreurs mesurées : **8/8** (les 2 vraies purgent,
+403 nu / 400 nu / 429 / 500 / 404 / sans corps ne purgent pas).
+
+### 5.78 (suite) — ⚠️ « AUCUN APPAREIL ABONNÉ » ÉTAIT UN MENSONGE DU CODE
+
+Julien : « pour les notifs ça met qu'aucun appareil n'est abonné ». Mesuré
+immédiatement : **la base porte bien 2 abonnements**, rafraîchis le matin même
+à 06:59. Le message est donc **faux**, et il l'envoyait chercher du côté de son
+téléphone alors que le problème est la clé du serveur.
+
+### La chaîne exacte du mensonge
+1. `sendPushToAll` sort sur `if (!PUSH_PRET) return { sent:0, **total:0**, … }`
+   — **sans jamais lire la liste des abonnés** ;
+2. le bundle **déployé** (25 août) ne connaît ni le champ `erreur` ni la route
+   `?etat=1` — vérifié en cherchant dans le vrai fichier servi par vrm.center :
+   `VAPID_PRIVATE_KEY absente` → **0 occurrence**, `etat=1` → **0**,
+   `Aucun appareil abonné` → **1** ;
+3. l'app lit donc `total === 0` et affiche **« Aucun appareil abonné »**.
+
+➡️ **`total` veut dire « appareils abonnés », jamais « ce qu'on a réussi à
+faire ».** Sans clé, on lit quand même la liste et on renvoie le vrai nombre.
+La lecture est une ligne minuscule (`push_subs`, quelques centaines d'octets) et
+n'a lieu que dans un état cassé qu'on veut justement diagnostiquer.
+
+⚠️ **C'est la troisième fois d'affilée qu'un chiffre à 0 vient de MON code qui
+abandonne, pas de la donnée** (§21 : `my_orders`, §5.27 : `price` objet, ici
+`total`). **Avant d'afficher un compteur à zéro, vérifier qu'on a vraiment
+regardé.**
+
+`audit-push` passe à **11 contrôles** ; le nouveau (« sans clé, on compte quand
+même les appareils abonnés ») **échoue bien sur le code d'avant**.
+
+### ⚠️ CE QUI BLOQUE N'EST PLUS DU CODE
+Trois plaintes d'affilée — notifications mortes, « tu n'as rien modifié dans
+Achats », « aucun appareil abonné » — ont **la même cause unique** : la
+production date du **25 août** et la branche a ~50 commits d'avance. Chaque
+correctif décrit ici est invisible tant que la branche n'est pas déployée.
+
+---
+
+## 5.79 — LES 183 € : CE N'ÉTAIT PAS LE CODE DE LA BRANCHE, C'ÉTAIT LA PRODUCTION
+
+Julien : « j'ai fait plus que 183 € aujourd'hui… dans les ventes elles
+apparaissent bien, mais elles ne sont pas catégorisées dans vendu aujourd'hui ».
+
+### Ce que la mesure a donné (31 août)
+| source | ventes du jour | total |
+|---|---|---|
+| moisson Vinted (base) | **6** sur 4 comptes | **400,00 €** |
+| **emails `email_sale_*` du jour** | **3** | **183,00 €** ⚠️ |
+| ce que Julien voit | — | **183 €** |
+
+Les 3 emails manquants = `julienf765` (87 €) et `tomj606` (80 + 50 €).
+
+➡️ **C'est exactement §5.69**, déjà corrigé sur la branche : la tuile « Vendu
+aujourd'hui » calculait sur les EMAILS. Preuve dans le bundle **déployé** :
+`bilanVentes` → **0 occurrence**, `montantCommande` → **0**, `email_sale` → 1.
+La production date du 25 août, §5.69 du 26.
+**Vérifié au banc sur les vraies données : la branche affiche `400 € · 6 paires`.**
+
+### ⚠️ J'AI FAILLI ACCUSER LA MAUVAISE CAUSE
+Ma première hypothèse était `vinted_accounts_blocked` (liste **locale à
+l'appareil**, donc invisible depuis la base — §5.21). J'ai construit un banc qui
+la seedait avec les 2 comptes… et il affichait **400 € dans les deux cas** : la
+réparation automatique de §5.09 les retire au démarrage. **L'hypothèse était
+fausse, et c'est le banc qui l'a dit.** Ne pas conclure sur un raisonnement quand
+un banc peut trancher en trois minutes.
+
+### Corrigé quand même, parce que la règle était mauvaise
+`acctOff` incluait `blockedAccts` — une liste **auto-détectée** et **locale** —
+donc une heuristique sur un refus d'authentification pouvait retirer de l'argent
+de TOUS les totaux, en silence et sans trace en base.
+➡️ **Une vente réalisée est de l'argent gagné.** Qu'un jeton soit refusé
+aujourd'hui ne change rien au fait que la paire est partie. §5.09 l'avait posé
+pour les annonces, §5.22 pour la suppression d'un compte : c'était la même
+règle, jamais appliquée ici. Le compte affiche « connexion refusée » en orange
+et **ne masque plus rien**. Ne masquent encore que ses choix explicites
+(`vinted_accounts_hidden`, `panel_accounts_off`).
+
+---
+
+## 5.80 — ⚠️ 76 LIGNES DE SUIVI SUR 128 SONT DES COLIS QU'IL ENVOIE
+
+Demande : « améliore l'onglet achat avec les colis que je reçois, les QR codes,
+les codes de retrait, adapte-toi aux nouveaux emails ».
+
+### Mesuré avant de coder
+| | |
+|---|---|
+| lignes de suivi | 128 |
+| **colis SORTANTS** (ses ventes qui partent, sujet certain) | **76** |
+| colis entrants | 22 · indéterminés 30 |
+| **sortants classés « disponible »** (donc affichés à retirer) | **1** ⚠️ |
+
+Le coupable : Mondial Relay **`74950536`**, « Votre colis est entre de bonnes
+mains 📦 » — **sa propre preuve de dépôt**. Il était affiché comme un colis à
+aller chercher, puis promu en « colis jamais retiré, va le réclamer » (§5.75).
+**L'app lui demandait de réclamer un colis qu'il avait posté lui-même.**
+
+**Cause** : le sujet ne matchait aucune règle, on retombait sur le CORPS — et le
+corps d'un email de dépôt contient « disponible » et « prêt » (le piège de §5.43,
+en plus discret).
+
+### La règle : `sensColis(t)` / `SUJ_SORTANT`
+- **On ne tranche que sur du CERTAIN** (§24) : une **confirmation de dépôt** ne
+  peut pas vouloir dire autre chose. « votre colis a été retiré », « en cours
+  d'acheminement » restent **indéterminés** — comportement inchangé.
+- **La règle vit aux DEUX endroits** (§5.37, §5.49) : sur le serveur pour les
+  emails à venir (un dépôt est classé `transit`, jamais `available`), et **dans
+  l'app** parce que les 128 lignes déjà en base ne seront jamais réécrites.
+- ⚠️ **Le panneau « jamais retirés » écarte aussi les sortants** : il liste
+  précisément ce que `isColisActive` refuse, donc sans ce second test la fausse
+  alerte était simplement **déplacée d'un bloc**.
+
+**Vérifié au rendu réel** : `74950536` a disparu, « colis jamais retirés »
+passe de **4 à 3**, les colis Chronopost gardent QR + identifiant 8156 + code
+d'ouverture 9539. `scripts/audit-colis-sens.cjs` — **7 contrôles, 6 échouent
+sur le code d'avant**.
+
+---
+
+## 5.81 — 5 COMPTES NE PEUVENT DÉCLENCHER AUCUNE NOTIFICATION DE VENTE
+
+Julien : « dès demain je vais avoir besoin de ces notifications, je ne vais pas
+pouvoir me connecter tout le temps ».
+
+**Une notification de vente naît d'un EMAIL de vente, pas de la moisson.**
+Mesuré : sur les 6 ventes du jour, **3 emails seulement**. Et par compte :
+
+| compte | emails de vente reçus |
+|---|---|
+| julatace35260 · julienf765 · llloollllaa · tomj683 | 36 · 33 · 27 · 18 |
+| **tomj606 · angeled92 · arthuror2 · liliand653 · julatace3535** | **0** |
+
+⚠️ `tomj606` a vendu **130 € aujourd'hui** : aucune notification n'était
+possible. Ce n'est **pas réparable côté code** — ces boîtes ne font pas suivre
+vers l'adresse de réception de l'app.
+➡️ Réglages → Notifications le **dit maintenant, sans avoir à déplier** :
+« ⚠ 5 comptes ne te préviendraient d'aucune vente ». Lecture scalaire, une seule
+requête (§34) ; `null` tant qu'on ne sait pas — on n'accuse jamais sur une
+lecture ratée.
+
+**Au passage, vérifié** : `push_prefs` = `{achat, suivi, favori, facture,
+message}` — il a allumé les 5 catégories bruyantes. **`vente` est absente, donc
+au DÉFAUT, donc active** (§5.41 : une catégorie absente vaut son défaut, jamais
+« muet »). Les notifications de vente sont bien armées.
+
+### État de la chaîne bordereau (mesuré)
+14 ventes attendent son envoi · **10 ont déjà leur PDF** (extension ou email) ·
+4 sans. Les compteurs de l'extension (`label_url_trouve: 4`) montrent que la
+chaîne fonctionne.
+⚠️ **Son extension installée est antérieure à la 5.34** : `panel_colis_relais`
+est ABSENTE et `abandon_json_item` monte encore (104) — donc ni le rattrapage
+des bordereaux (5.46), ni les codes de retrait Vinted Go depuis les
+conversations (5.45) ne tournent chez lui. **Zip 5.47 livré.**

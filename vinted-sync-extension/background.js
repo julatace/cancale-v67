@@ -508,6 +508,13 @@ async function storeHarvest(domain, type, id, body) {
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
+  // Une conversation vient d'arriver → si elle porte le message « ton colis est
+  // arrivé », on en sort l'adresse du relais et le CODE de retrait tout de
+  // suite. C'est le moment où on les a sous la main, et c'est la seule source
+  // pour Vinted Go (aucun email ne les porte).
+  if (type === 'conversation') {
+    try { const r = retraitDeConversation(parsed); if (r) await noterRetrait(r); } catch (_) {}
+  }
 
   // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
   // URL des photos). C'est le moment où on en sait le plus sur cette annonce.
@@ -522,7 +529,7 @@ async function storeHarvest(domain, type, id, body) {
   // lectures + 200 écritures à chaque chargement du dressing. C'est la faute
   // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
   if (type === 'listings') {
-    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+    try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
   }
 
   // Le profil contient le vrai id de profil (different de l'account_id, utile
@@ -678,6 +685,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'setMinPrice' && msg.id) { const ok = await setMinPrice(msg.id, msg.amount); sendResponse({ ok }); return; }
           // Une offre, sur TON clic uniquement (jamais en arrière-plan).
           if (msg.action === 'offre') { const r = await repondreOffre(msg); sendResponse(r); return; }
+          // Acceptation automatique au-dessus du prix plancher : l'interrupteur
+          // vit dans `chrome.storage.local` (par navigateur, comme les autres
+          // réglages d'extension), et il est ÉTEINT par défaut.
+          if (msg.action === 'autoOffresEtat') {
+            const cfg = (await chrome.storage.local.get('vrmAutoOffres')).vrmAutoOffres || {};
+            sendResponse({ ok: true, actif: !!cfg.actif }); return;
+          }
+          if (msg.action === 'autoOffresSet') {
+            await chrome.storage.local.set({ vrmAutoOffres: { actif: !!msg.actif, majAt: Date.now() } });
+            logActivity(msg.actif
+              ? '🏷 Acceptation automatique des offres ACTIVÉE (au-dessus de ton prix plancher)'
+              : '🏷 Acceptation automatique des offres désactivée');
+            sendResponse({ ok: true, actif: !!msg.actif }); return;
+          }
           // Générer un bordereau (formalité obligatoire, aucun argent engagé).
           // ⚠️ UN MESSAGE = UN BORDEREAU, volontairement. Le panneau sait
           //    traiter une SÉLECTION, mais il envoie un message par vente et
@@ -1222,6 +1243,120 @@ const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some
 
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+// ══════════════════════════════════════════════════════════════════════════════
+// LE CODE DE RETRAIT VINTED GO EST DANS LA CONVERSATION, PAS DANS UN EMAIL
+// ══════════════════════════════════════════════════════════════════════════════
+// Capture d'écran de Julien (27 août), dans le fil de discussion Vinted :
+//   « Ton colis est arrivé ! Il t'attend à l'adresse suivante : Kusmi Tea,
+//     13 Rue Saint-Vincent, 56000 Vannes, France. Scanne ton code de retrait
+//     ou saisis le code C65735 pour le récupérer. »
+// MESURÉ en base avant de coder : ce message existe bien dans les conversations
+// captées, sous `entity_type: 'action_message'` —
+//   title    : « Ta commande est arrivée. »
+//   subtitle : « Ton colis a été livré dans le Point Relais MAISON DE LA PRESSE,
+//               40 RUE DU PORT, 35260 CANCALE. Tu peux … aller le récupérer. »
+//   actions  : track_shipment · mark_as_delivered
+// …et **rien ne le lisait**. Pour Vinted Go, l'adresse ET le code de retrait
+// n'arrivent QUE par là : aucun email transporteur ne les porte (§5.47 —
+// 2 comptes sur 8 ne reçoivent même aucun email). Sans ça, le colis repart chez
+// l'expéditeur au bout du délai, et c'est une vente perdue.
+const sansBalises = (s) => String(s == null ? '' : s)
+  .replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&')
+  .replace(/&#39;|&apos;/gi, "'").replace(/\s+/g, ' ').trim();
+// ⚠️ UN CODE DE RETRAIT PEUT COMMENCER PAR UNE LETTRE (« C65735 », relevé sur
+// une vraie capture Vinted Go). La règle strictement numérique de §5.37 — posée
+// parce que le mot « suivant » avait été capté comme code — l'aurait REJETÉ.
+// On accepte donc au plus deux lettres majuscules suivies de 4 à 10 chiffres :
+// « suivant » n'a aucun chiffre, il reste écarté.
+const CODE_APRES = /^([A-Z]{0,2}\d{4,10})\b/;
+// Le message d'ARRIVÉE, et lui seul. « Article à emballer et envoyer » parle
+// aussi de point relais : c'est un colis qui PART, pas un colis à retirer.
+const CONV_ARRIVE = /(?:ton\s+colis|ta\s+commande)\s+est\s+arriv|t['’]attend\s+à\s+l['’]adresse/i;
+function retraitDeConversation(conv) {
+  try {
+    const c = (conv && conv.conversation) || conv || {};
+    const t = c.transaction || {};
+    // ⚠️ CÔTÉ ACHETEUR UNIQUEMENT. Côté vendeur, « la commande est arrivée »
+    // veut dire que l'ACHETEUR l'a reçue — ce n'est pas un colis pour nous.
+    if (String(t.current_user_side || '') === 'seller') return null;
+    let trouve = null;
+    for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+      if (!m || (m.entity_type !== 'action_message' && m.entity_type !== 'status_message')) continue;
+      const e = m.entity || {};
+      const titre = sansBalises(e.title);
+      const sous = sansBalises(e.subtitle);
+      if (!CONV_ARRIVE.test(titre + ' ' + sous)) continue;
+      // On garde le HTML BRUT : « Scanne ton code de retrait » est un LIEN, et
+      // c'est derrière lui que vit le QR (capture d'écran de Julien).
+      trouve = { titre, sous, html: String(e.subtitle || ''), actions: e.actions || [] };
+    }
+    if (!trouve) return null;
+    const txt = trouve.titre + ' ' + trouve.sous;
+    // Lieu : ce qui suit le marqueur, jusqu'à la fin de la phrase.
+    let lieu = '';
+    for (const re of [/à\s+l['’]adresse\s+suivante\s*:\s*/i, /livr[ée]\s+dans\s+le\s+[Pp]oint\s+[Rr]elais\s+/i,
+                      /livr[ée]\s+(?:dans|à|au|chez)\s+/i, /t['’]attend\s+(?:dans|à|au|chez)\s+/i]) {
+      const m = txt.match(re); if (!m) continue;
+      lieu = txt.slice(m.index + m[0].length).split(/\.\s|\.$/)[0].trim();
+      if (lieu) break;
+    }
+    // Code : « saisis le code X », sinon « le code X pour ».
+    let code = '';
+    for (const re of [/sais(?:is|issez)\s+le\s+code\s+/i, /\bcode\s+(?=[A-Z]{0,2}\d{4,10}\b)/]) {
+      const m = txt.match(re); if (!m) continue;
+      const suite = txt.slice(m.index + m[0].length).match(CODE_APRES);
+      if (suite) { code = suite[1]; break; }
+    }
+    // ── LE LIEN DU QR ─────────────────────────────────────────────────────
+    // « Scanne ton code de retrait » est un <a href>. On ne garde QUE ce qui
+    // mène quelque part : dans les messages réellement captés, la plupart des
+    // liens valent `href="/"` (Vinted les recâble côté client). Un lien qui
+    // ouvre la page d'accueil serait pire que pas de lien du tout.
+    let qr = '';
+    for (const m of String(trouve.html).matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = String(m[1] || '').trim();
+      const texte = sansBalises(m[2]);
+      if (!/scanne|code de retrait|qr|retrait/i.test(texte)) continue;
+      if (!href || href === '/' || href === '#') continue;
+      qr = /^https?:/i.test(href) ? href : ('https://www.vinted.fr' + (href[0] === '/' ? '' : '/') + href);
+      break;
+    }
+    if (!lieu && !code && !qr) return null;           // rien d'utile : on n'invente pas
+    const cid = String(c.id || '');
+    return {
+      tx: String(t.id || ''), item: String(t.item_id || ''),
+      titre: String(t.item_title || c.subtitle || c.description || ''),
+      photo: (t.item_photo && t.item_photo.url) || null,
+      lieu, code, qr, conv: cid,
+      url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
+      at: new Date().toISOString(),
+    };
+  } catch (_) { return null; }
+}
+
+// La ligne DÉDIÉE que l'app lit (motif anti-clobber §35 : le panneau n'écrit
+// jamais `main`). Clé = n° de transaction, l'identité de l'achat (§24) — jamais
+// un rapprochement par titre. Une entrée de plus de 45 jours est purgée : un
+// colis n'attend pas si longtemps, et la ligne doit rester légère (§34).
+const RETRAIT_MAX_J = 45;
+async function noterRetrait(r) {
+  if (!r || !r.tx) return false;
+  try {
+    const rows = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
+    const cur = (rows && rows[0] && rows[0].data) || {};
+    const avant = cur[r.tx];
+    // Rien de neuf → aucune écriture (égress, §34).
+    if (avant && avant.code === r.code && avant.lieu === r.lieu && avant.qr === r.qr) return false;
+    const limite = Date.now() - RETRAIT_MAX_J * 86400000;
+    const out = {};
+    for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
+    out[r.tx] = r;
+    await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
+    noterDiag('retrait_conv_ecrit');
+    return true;
+  } catch (_) { return false; }
+}
+
 function resumeCommandes(type, payload) {
   // ⚠️ EXACTEMENT `orders_sold` ou `orders_purchased`, jamais une ligne
   // générique. Une réponse `/my_orders` sans `?type=` MÉLANGE ventes et achats
@@ -1276,7 +1411,7 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
   if (type === 'listings') {
-    try { await archiverLot(uid, ((brut && brut.items) || []).filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft)); } catch (_) {}
+    try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
   }
 }
 
@@ -1647,31 +1782,77 @@ try {
 // §32) : c'est simplement ne pas refaire dix fois la même lecture pendant qu'on
 // navigue de page en page. Sans lui, ouvrir 30 annonces = 30 moissons complètes.
 const VISITE_DELAI_MS = 5 * 60 * 1000;   // au plus une moisson complète / 5 min / compte
+// ⚠️ « ÇA PREND DU TEMPS À CE QUE LA VENTE SOIT CAPTÉE » — c'était ce garde-là.
+// Il protège d'une moisson COMPLÈTE (dressing de 600 articles, achats, boîte…)
+// à chaque page ouverte. Mais une vente, c'est UNE requête (`my_orders?sold`) :
+// la rafraîchir plus souvent ne pèse presque rien et c'est ce qu'il attend.
+// Ce n'est pas un rythme « faussement humain » (§32) : c'est une limite de
+// volume, comme le plafond horaire.
+const VENTES_DELAI_MS = 90 * 1000;       // les VENTES seules : au plus 1 / 90 s / compte
 let visiteTimer = null;
+// ── LA VENTE, CAPTÉE VITE ───────────────────────────────────────────────────
+// Une moisson complète, c'est le dressing (jusqu'à 600 articles, 7 pages), les
+// achats, la boîte : lourd, d'où le garde de 5 minutes. Mais la question « ai-je
+// vendu ? » ne demande QU'UNE liste — `my_orders?type=sold`. On la rafraîchit
+// donc seule, plus souvent, pour que le récap et le bordereau ne soient pas en
+// retard d'un quart d'heure sur la réalité.
+// ⚠️ Réutilise `fetchAllOrders` + `storeHarvestRow` (donc les garde-fous
+//    existants : jamais écraser une capture plus riche par une plus pauvre,
+//    §5.19). On n'écrit pas une deuxième façon de lire les ventes (§11).
+async function rafraichirVentes(uid) {
+  const accts = await getStoredAccounts();
+  const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+  if (!acc) return false;
+  const sold = await fetchAllOrders(acc, 'sold');
+  if (!sold || !sold.my_orders || !sold.my_orders.length) return false;
+  await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
+  noterDiag('ventes_rafraichies');
+  return true;
+}
+
 async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
     const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
     const der = Number(st[uid] || 0);
-    if (Date.now() - der < VISITE_DELAI_MS) return;     // déjà à jour, on ne rejoue pas
+    // ⚠️ LE GARDE COURT NE SAUTE PLUS LES VENTES. Avant, un `return` sec ici
+    // faisait qu'une vente conclue il y a deux minutes n'était pas captée tant
+    // qu'on n'avait pas laissé passer 5 min — et le récap ne pouvait rien dire.
+    if (Date.now() - der < VISITE_DELAI_MS) {
+      const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
+      if (Date.now() - Number(dv[uid] || 0) < VENTES_DELAI_MS) return;
+      dv[uid] = Date.now();
+      await chrome.storage.local.set({ vrmDerniereVente: dv });
+      try { await rafraichirVentes(uid); } catch (_) {}
+      const g = await genererBordereauxEnAttente(uid);
+      await proposerBordereaux(uid, g);
+      return;
+    }
     st[uid] = Date.now();
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     const ok = await runActive();
     logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
-    // ⚠️ LA VISITE NE GÉNÈRE PLUS RIEN. Demande de Julien : « ce n'est plus
-    // vraiment en automatique, c'est nous qui appuyons ». Générer, c'est agir
-    // sur Vinted — ça reste donc sur SON clic, depuis le panneau. Ce qui tourne
-    // tout seul ici est en LECTURE SEULE : aller chercher le PDF des bordereaux
-    // déjà émis pour le déposer dans l'app.
-    await genererBordereauxEnAttente(uid, { lectureSeule: true });
-    // ⚠️ « DÈS QUE JE ME CONNECTE SUR UN COMPTE VINTED, SANS MÊME AVOIR OUVERT
-    // L'EXTENSION, S'IL Y A UNE VENTE, PROPOSE DE GÉNÉRER ET D'ENVOYER LE
-    // BORDEREAU DANS L'APP » (Julien, 23 août).
-    // On PROPOSE — on ne génère pas tout seul (§5.32 : générer, c'est agir sur
-    // Vinted, ça reste son clic). La carte s'affiche sur la page, sans ouvrir le
-    // panneau ; un clic suffit.
-    await proposerBordereaux(uid);
+    // ⚠️ LA VISITE GÉNÈRE À NOUVEAU, TOUTE SEULE (Julien, 27 août) : « une fois
+    // que la vente a été faite, je veux que le bordereau soit automatiquement
+    // envoyé dans l'app ». C'est un retour en arrière assumé sur §5.32 — c'est
+    // sa décision, et elle est cohérente avec §5.29 : générer un bordereau
+    // n'engage AUCUN argent et ne décide de rien (la vente est faite, le colis
+    // doit partir). Tous les garde-fous restent : compte connecté uniquement,
+    // 20 actions/h, 3 par visite, pas de nouvel essai avant 6 h.
+    const genes = await genererBordereauxEnAttente(uid);
+    // Le récap arrive APRÈS la génération : il annonce ce qui est parti dans
+    // l'app, et ne pose la question que pour ce qui n'a PAS pu être généré
+    // (compte non connecté, plafond atteint, adresse inconnue).
+    await proposerBordereaux(uid, genes);
+    // ⚠️ APRÈS la moisson : les offres viennent des conversations captées, donc
+    //    travailler avant la capture reviendrait à décider sur des données
+    //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
+    await autoAccepterOffres(uid);
+    // ⚠️ APRÈS la moisson elle aussi : la liste des colis « déposés en point
+    // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
+    // photo d'hier et on redemanderait des conversations pour rien.
+    await capterRetraits(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
@@ -1704,25 +1885,127 @@ async function ventesSansBordereau(uid) {
   } catch (_) { return []; }
 }
 
-// Envoie la proposition à l'onglet Vinted actif. Le panneau (déjà injecté sur
-// la page) l'affiche en carte flottante — sans avoir à l'ouvrir.
-// ⚠️ Une seule proposition par vente et par jour : elle ne doit pas devenir un
-// bandeau qu'on finit par ne plus voir.
-async function proposerBordereaux(uid) {
+// ══════════════════════════════════════════════════════════════════════════════
+// LE RÉCAP D'ARRIVÉE — « ça ne s'allume QUE s'il y a du nouveau »
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien : « je veux juste que ça s'allume s'il y a des nouveautés.
+// Il ne faut pas que ça s'allume s'il n'y a rien. Ou alors ça peut faire un
+// résumé de tout ce qui s'est passé depuis que j'ai fermé la session — ça
+// m'évite d'aller dans les messages, dans les notifications, etc. »
+//
+// ⚠️ HONNÊTETÉ SUR LE « DEPUIS QUE J'AI FERMÉ LA SESSION » : on ne sait pas
+// quand il ferme Vinted. Le repère est donc « depuis la dernière fois qu'on t'a
+// montré ce résumé » — c'est observable, et c'est ce que dit la fenêtre.
+// ⚠️ ZÉRO REQUÊTE VINTED : tout vient de la moisson déjà en base.
+const RECAP_MAX_CONVS = 400;   // borne du mémo (aucun égress, mais pas infini)
+
+async function recapVu() {
+  try { return (await chrome.storage.local.get('vrmRecapVu')).vrmRecapVu || {}; } catch (_) { return {}; }
+}
+
+// Ce qui a changé pour CE compte depuis le dernier récap montré.
+async function nouveautes(uid) {
+  const out = { ventes: [], eur: 0, messages: 0, offres: 0, aGenerer: [], premiere: false };
+  const memo = (await recapVu())[String(uid)] || null;
+  out.premiere = !memo;
+
+  // 1. LES VENTES — identité = n° de transaction, jamais un titre.
+  let ventes = [];
   try {
-    const liste = await ventesSansBordereau(uid);
-    if (!liste.length) return;
-    const memo = (await chrome.storage.local.get('vrmPropose')).vrmPropose || {};
-    const frais = liste.filter(v => !memo[v.tx] || Date.now() - Number(memo[v.tx]) > 20 * 3600 * 1000);
-    if (!frais.length) return;
-    for (const v of frais) memo[v.tx] = Date.now();
-    await chrome.storage.local.set({ vrmPropose: memo });
-    const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
-    for (const t of tabs) {
-      try { await chrome.tabs.sendMessage(t.id, { __vrm: 'proposerBordereau', uid: String(uid), ventes: frais.slice(0, 5) }); } catch (_) {}
+    const r = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    ventes = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.my_orders) || [];
+  } catch (_) {}
+  const vus = new Set((memo && memo.ventes) || []);
+  for (const o of ventes) {
+    const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+    if (!tx || vus.has(tx)) continue;
+    if (/annul|cancel|refus|rembours/i.test(String(o.status || ''))) continue;
+    const p = o.price && typeof o.price === 'object' ? o.price.amount : o.price;
+    const v = Number(String(p == null ? '' : p).replace(',', '.'));
+    out.ventes.push({ tx, title: String(o.title || ''), prix: isNaN(v) ? 0 : v });
+    if (!isNaN(v)) out.eur += v;
+  }
+
+  // 2. LES MESSAGES — une conversation compte comme nouvelle si elle est non
+  //    lue ET qu'elle a bougé depuis le dernier récap.
+  let convs = [];
+  try {
+    const r = await sbGet(`app_data?id=eq.harvest_${uid}_inbox&select=data`);
+    convs = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.conversations) || [];
+  } catch (_) {}
+  const vuConv = (memo && memo.convs) || {};
+  const convsMaj = {};
+  for (const c of convs) {
+    const id = c && c.id != null ? String(c.id) : '';
+    if (!id) continue;
+    const maj = String(c.updated_at || '');
+    convsMaj[id] = maj;
+    if (!c.unread) continue;
+    if (vuConv[id] && vuConv[id] === maj) continue;   // déjà vue dans cet état
+    out.messages++;
+  }
+
+  // 3. LES OFFRES en attente (argent, et 24 h pour répondre).
+  try { out.offres = (await offresEnAttente(uid)).length; } catch (_) { out.offres = 0; }
+
+  // 4. LES BORDEREAUX À GÉNÉRER — le seul point qui appelle une ACTION.
+  try { out.aGenerer = await ventesSansBordereau(uid); } catch (_) { out.aGenerer = []; }
+
+  out._marque = {
+    at: Date.now(),
+    ventes: ventes.map(o => o && o.transaction_id != null ? String(o.transaction_id) : '').filter(Boolean),
+    convs: Object.keys(convsMaj).slice(0, RECAP_MAX_CONVS)
+      .reduce((a, k) => { a[k] = convsMaj[k]; return a; }, {}),
+  };
+  return out;
+}
+
+// Envoie le récap à l'onglet Vinted actif. Le panneau (déjà injecté) l'affiche
+// au MILIEU de l'écran — sans avoir à l'ouvrir.
+async function proposerBordereaux(uid, genes) {
+  try {
+    const n = await nouveautes(uid);
+    n.envoyes = Number(genes) || 0;
+    const rien = !n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length && !n.envoyes;
+    // ⚠️ RIEN DE NEUF = ON NE S'ALLUME PAS. C'est la demande, mot pour mot.
+    if (rien) { await marquerRecapVu(uid, n._marque); return; }
+    // ⚠️ PREMIÈRE FOIS SUR CE COMPTE : on ne déballe pas tout l'historique comme
+    // s'il venait de se produire (ce serait « 320 ventes ! » à la première
+    // visite). On pose seulement le repère, et on ne parle que des bordereaux
+    // à générer, qui eux sont vrais aujourd'hui.
+    if (n.premiere) { n.ventes = []; n.messages = 0; }
+    if (!n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length && !n.envoyes) {
+      await marquerRecapVu(uid, n._marque); return;
     }
+    const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
+    // ⚠️ ON NE NOTE « DÉJÀ MONTRÉ » QUE SI LE RÉCAP EST RÉELLEMENT AFFICHÉ.
+    // Avant, le mémo partait AVANT l'envoi : si le script de la page n'était pas
+    // encore prêt (le cas courant, on arrive 3 s après le chargement), la
+    // fenêtre ne s'affichait jamais ET les ventes étaient marquées « vues ».
+    // C'est exactement « la génération a du mal à se faire ».
+    let pose = false;
+    const charge = {
+      __vrm: 'recap', uid: String(uid),
+      ventes: n.ventes.slice(0, 12), eur: n.eur, messages: n.messages, offres: n.offres,
+      aGenerer: n.aGenerer.slice(0, 8), envoyes: n.envoyes,
+    };
+    for (const t of tabs) {
+      try { await chrome.tabs.sendMessage(t.id, charge); pose = true; } catch (_) {}
+    }
+    if (!pose) return;
+    await marquerRecapVu(uid, n._marque);
   } catch (_) {}
 }
+
+async function marquerRecapVu(uid, marque) {
+  if (!marque) return;
+  try {
+    const tout = await recapVu();
+    tout[String(uid)] = marque;
+    await chrome.storage.local.set({ vrmRecapVu: tout });
+  } catch (_) {}
+}
+
 try {
   chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
     if (!info || info.status !== 'complete') return;
@@ -1952,6 +2235,140 @@ async function empreinte() {
 //   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/accept   (corps vide)
 //   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/reject   (corps vide)
 //   POST /api/v2/transactions/{tx}/offers  {"offer":{"price":"32","currency":"EUR"}}
+// ══════════════════════════════════════════════════════════════════════════════
+// ACCEPTER AUTOMATIQUEMENT UNE OFFRE ≥ TON PRIX PLANCHER
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, plusieurs fois : « pour chaque annonce que je poste je mets un prix
+// minimum que l'app accepte dès que je reçois une offre ».
+//
+// ⚠️ CE QUI BLOQUAIT AVANT, ET QUI EST LEVÉ (26 août). Le refus précédent
+// n'était pas de principe : accepter engage une VENTE FERME qu'on n'annule pas,
+// et le champ qui dit « cette offre est ENCORE EN ATTENTE » n'avait jamais été
+// observé — les 21 offres captées étaient toutes en 20 (acceptée) ou 30
+// (refusée). Un moteur aurait tranché sur un code inconnu, avec de l'argent au
+// bout. Relevé du 26 août sur **326 offres** dans 557 conversations captées :
+//   10 = En attente (4)   ·   20 = Offre acceptée (118)
+//   30 = Refusée (195)    ·   40 = Annulée (9)
+// Le code « en attente » EXISTE et vaut **10**. On sait donc lire l'état, et le
+// moteur peut être écrit sans deviner.
+//
+// ⚠️ CE QUI DÉCIDE, C'EST TOI, À L'AVANCE. Le plancher est posé annonce par
+// annonce : accepter au-dessus n'est pas une décision de la machine, c'est
+// l'exécution d'un ordre déjà donné — comme un ordre à cours limité. Sans
+// plancher sur CETTE annonce, on ne touche à rien.
+const OFFRE_EN_ATTENTE = 10;                 // relevé en base, pas deviné
+const OFFRES_MAX_PAR_VISITE = 3;             // limite de VOLUME, pas un rythme déguisé
+
+// Le prix plancher d'une annonce. ⚠️ UN SEUL PROPRIÉTAIRE : l'app l'écrit dans
+// `vinted_annonce_numeros[itemId].minPrice` (elle est déjà propriétaire de cette
+// structure — numéro, prix d'achat, boost). L'extension le LIT, et garde sa
+// propre ligne `panel_min_prices` en repli pour ce qui a été saisi ici avant.
+// Deux écrivains sur la même donnée finissent toujours par diverger (§5.15).
+async function planchers() {
+  const out = {};
+  try {
+    const rows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
+    const d = (rows && rows[0] && rows[0].data) || {};
+    for (const k in d) { const n = Number(d[k]); if (isFinite(n) && n > 0) out[String(k)] = n; }
+  } catch (_) {}
+  try {
+    const rows = await sbGet('app_data?id=eq.main&select=nums:data->vinted_annonce_numeros');
+    const nums = (rows && rows[0] && rows[0].nums) || {};
+    for (const k in nums) {
+      const n = Number(nums[k] && nums[k].minPrice);
+      if (isFinite(n) && n > 0) out[String(k)] = n;      // l'app prime
+    }
+  } catch (_) {}
+  return out;
+}
+
+// Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
+// conversations déjà captées (aucun appel Vinted ajouté).
+async function offresEnAttente(uid) {
+  const out = [];
+  try {
+    const rows = await sbGet(`app_data?id=like.harvest_${uid}_conv_*&select=id,data`) || [];
+    // ⚠️ TRI INLINÉ, PAS `parFraicheur` : ce helper vit DANS `buildPanelData`.
+    //    L'appeler d'ici lève une ReferenceError avalée par le try/catch — la
+    //    fonction rendait donc toujours une liste vide, en silence. Troisième
+    //    fois que ce piège se présente (§5.46, §5.48) : dans ce fichier, un
+    //    helper n'existe que dans la fonction où il est déclaré.
+    rows.sort((a, b) => (Date.parse((b.data && b.data.capturedAt) || '') || 0) - (Date.parse((a.data && a.data.capturedAt) || '') || 0));
+    const vus = new Set();
+    for (const r of rows) {
+      const p = (r.data && r.data.payload) || {};
+      const c = p.conversation || p;
+      const cid = String(c.id || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
+      const opp = (c.opposite_user && c.opposite_user.id) != null ? c.opposite_user.id : null;
+      let derniere = null;
+      for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+        if (!m || m.entity_type !== 'offer_request_message') continue;
+        const e = m.entity || {};
+        // Quatre conditions, toutes nécessaires :
+        //  • c'est l'ACHETEUR qui propose (sinon c'est ma propre contre-offre) ;
+        //  • l'offre est la COURANTE (une plus récente l'a peut-être remplacée) ;
+        //  • Vinted la dit EN ATTENTE (10), pas acceptée/refusée/annulée ;
+        //  • le libellé ne dit rien de tranché non plus (ceinture + bretelles).
+        if (opp != null && e.user_id !== opp) continue;
+        if (e.current === false) continue;
+        if (e.status !== OFFRE_EN_ATTENTE) continue;
+        if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
+        const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
+        const prix = Number(String(px == null ? '' : px).replace(',', '.'));
+        if (!isFinite(prix) || prix <= 0) continue;      // sans montant, on ne décide rien
+        if (e.transaction_id == null || e.offer_request_id == null) continue;
+        derniere = { conv: cid, prix,
+          tx: String(e.transaction_id), oid: String(e.offer_request_id),
+          item: String((c.transaction && c.transaction.item_id) || ''),
+          titre: String(c.description || '') };
+      }
+      if (derniere) out.push(derniere);
+    }
+  } catch (_) { /* forme inattendue → aucune offre plutôt qu'une fausse */ }
+  return out;
+}
+
+// Le moteur. Appelé à chaque visite sur Vinted, APRÈS la moisson (sinon on
+// travaillerait sur des offres périmées).
+async function autoAccepterOffres(uid) {
+  try {
+    const cfg = (await chrome.storage.local.get('vrmAutoOffres')).vrmAutoOffres || {};
+    if (!cfg.actif) return 0;                            // ÉTEINT PAR DÉFAUT
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    // ⚠️ Jamais au nom d'un compte qui n'est pas celui connecté dans cet onglet :
+    //    c'est LE signal multi-comptes que Vinted sanctionne (§48).
+    if (await garde(uid, acc)) return 0;
+
+    const [offres, mins] = await Promise.all([offresEnAttente(uid), planchers()]);
+    if (!offres.length) return 0;
+    const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
+    const limite = Date.now() - 7 * 86400000;
+    for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
+
+    let faites = 0;
+    for (const o of offres) {
+      if (faites >= OFFRES_MAX_PAR_VISITE) break;        // limite de volume
+      if (st[o.oid]) continue;                           // déjà traitée : jamais deux fois
+      const min = o.item ? mins[o.item] : null;
+      if (!(isFinite(min) && min > 0)) continue;         // pas de plancher → on ne touche à rien
+      if (o.prix < min) continue;                        // en dessous : c'est à toi de contrer
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi: 'accept' });
+      st[o.oid] = Date.now();
+      await chrome.storage.local.set({ vrmOffresFaites: st });
+      if (r && r.ok) {
+        faites += 1;
+        logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton minimum : ${min} €) — ${o.titre.slice(0, 40)}`);
+      } else {
+        logActivity(`⚠️ Offre de ${o.prix.toFixed(2)} € : Vinted a refusé (${(r && r.error) || '?'})`);
+        if (r && r.code) break;                          // garde-fou atteint : on arrête le lot
+      }
+    }
+    return faites;
+  } catch (_) { return 0; }
+}
+
 async function repondreOffre({ uid, tx, oid, quoi, prix }) {
   if (!uid || !tx) return { ok: false, error: 'offre incomplète' };
   if (quoi !== 'contre' && !oid) return { ok: false, error: 'offre incomplète' };
@@ -2078,8 +2495,12 @@ async function archiverAnnonce(uid, it, fiche) {
 // Archivage EN LOT (tout le dressing d'un compte) : une lecture, une écriture.
 // Ne dégrade jamais un enregistrement déjà riche (la description vient de la
 // fiche, le dressing ne l'a pas — on complète, on n'écrase pas).
-async function archiverLot(uid, items) {
-  if (!items || !items.length) return false;
+async function archiverLot(uid, items, tous) {
+  items = items || [];
+  // ⚠️ ON NE SORT PLUS QUAND IL N'Y A AUCUNE ANNONCE EN LIGNE : la passe de
+  // complétion ci-dessous (le texte lu sur la page) doit tourner même pour un
+  // compte dont tout le stock est vendu — c'est justement là qu'on republie.
+  if (!items.length && !(tous && tous.length)) return false;
   const rows = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id,data`) || [];
   const anciens = {};
   for (const r of rows) { const d = r && r.data; if (d && d.id) anciens[String(d.id)] = d; }
@@ -2097,8 +2518,25 @@ async function archiverLot(uid, items) {
     pages = (dr && dr[0] && dr[0].data) || {};
   } catch (_) { pages = {}; }
   const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+
+  // ⚠️ MESURÉ LE 26 AOÛT : 45 fiches lues sur la page, **28 ne correspondaient à
+  // AUCUNE ligne du coffre**. Cause : on n'archivait que les annonces EN LIGNE,
+  // alors qu'une fiche est lue dès que Julien ouvre l'annonce — y compris une
+  // paire déjà vendue ou retirée. Or c'est exactement celle-là qu'on veut au
+  // coffre : le coffre sert à RECRÉER une annonce disparue (§47).
+  // On ajoute donc les articles fermés **dont la page a été lue** : la preuve
+  // qu'il s'y est intéressé, et l'identité vient de l'id d'annonce Vinted
+  // (jamais du titre, §5.34). Borné aux fiches existantes → pas d'inflation.
+  const enLigne = new Set(items.map(it => String(it && it.id)));
+  const extras = [];
+  for (const it of (tous || [])) {
+    const id = String(it && it.id || '');
+    if (!id || enLigne.has(id) || !pages[id]) continue;
+    extras.push(it);
+  }
+
   const out = [];
-  for (const it of items.slice(0, 300)) {
+  for (const it of items.slice(0, 300).concat(extras.slice(0, 200))) {
     const rec = coffreRecord(uid, it, null);
     if (!rec.id) continue;
     // Ce que la page de l'annonce a livré : le vrai texte du vendeur + les
@@ -2283,29 +2721,91 @@ async function capterAnnonce(uid, itemId) {
 //   {"seller_address_id":310525135,"drop_off_type":null,"label_type":null}
 // `seller_address_id` change par compte : on le relit dans la capture de CE
 // compte. Sans capture pour ce compte, on ne devine pas — on le dit.
-async function adresseVendeur(uid) {
+// ⚠️ MESURÉ LE 26 AOÛT : 6 comptes sur 9 ont une adresse d'envoi captée, et les
+// 3 qui n'en ont pas ne peuvent PAS générer de bordereau — dont `julatace3535`,
+// qui avait justement une vente en attente. C'est ça, « la génération a du mal
+// à se faire » : le refus est honnête mais il ne se débloquait qu'en générant
+// un bordereau à la main une fois.
+// La capture reste la source PREMIÈRE (c'est l'adresse qu'il a réellement
+// choisie). À défaut, on demande la liste de SES adresses à Vinted — une
+// lecture, sur son propre compte, avec les mêmes garde-fous. Le résultat est
+// mémorisé pour qu'on ne redemande pas.
+// ⚠️ La forme de la réponse n'a JAMAIS été observée : lecture défensive sur
+// plusieurs noms de champ, et si rien ne ressemble à une adresse on ne prétend
+// rien (§5.24 — on instrumente au lieu de supposer).
+function idDAdresse(j) {
+  const listes = [j && j.user_addresses, j && j.addresses, j && j.items, Array.isArray(j) ? j : null];
+  for (const l of listes) {
+    if (!Array.isArray(l) || !l.length) continue;
+    // Une adresse d'EXPÉDITION, sinon la première venue.
+    const pref = l.find(a => a && (a.is_default || a.default || a.entry_type === 2)) || l[0];
+    const id = pref && (pref.id != null ? pref.id : pref.user_address_id);
+    if (id != null && /^\d+$/.test(String(id))) return id;
+  }
+  const un = j && (j.user_address || j.address);
+  if (un && un.id != null) return un.id;
+  return null;
+}
+
+async function adresseVendeur(uid, acc) {
   try {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_wreq_api_v2_transactions_id_shipment_order&select=data`);
     const body = rows && rows[0] && rows[0].data && rows[0].data.body;
-    if (!body) return null;
-    const j = typeof body === 'string' ? JSON.parse(body) : body;
-    const id = j && j.seller_address_id;
-    return id != null ? id : null;
+    if (body) {
+      const j = typeof body === 'string' ? JSON.parse(body) : body;
+      if (j && j.seller_address_id != null) return j.seller_address_id;
+    }
+  } catch (_) {}
+  // Mémo local (aucun égress) : une fois trouvée, on ne redemande plus.
+  let memo = {};
+  try { memo = (await chrome.storage.local.get('vrmAdresses')).vrmAdresses || {}; } catch (_) {}
+  if (memo[String(uid)] != null) return memo[String(uid)];
+  if (!acc) return null;
+  try {
+    const r = await vintedSend(acc, 'GET', '/api/v2/user_addresses');
+    const id = r && r.ok ? idDAdresse(r.json) : null;
+    if (id == null) {
+      noterDiag(r && r.ok ? 'adresse_forme_inconnue' : 'adresse_refusee');
+      if (r && r.ok) echantillonRate('adresse', String(uid), JSON.stringify(r.json || {}));
+      return null;
+    }
+    memo[String(uid)] = id;
+    try { await chrome.storage.local.set({ vrmAdresses: memo }); } catch (_) {}
+    noterDiag('adresse_trouvee');
+    return id;
   } catch (_) { return null; }
 }
 
 async function genererBordereau(uid, tx) {
   if (!uid || !tx) return { ok: false, error: 'vente incomplète' };
-  const adr = await adresseVendeur(uid);
-  if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
   const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
+  // ⚠️ Le garde-fou passe AVANT la lecture d'adresse : celle-ci est une requête
+  // Vinted comme une autre, elle n'a pas à partir depuis la session d'un autre
+  // compte ni à dépasser le plafond horaire (§48).
+  const adr = await adresseVendeur(uid, acc);
+  if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
   const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
     { seller_address_id: adr, drop_off_type: null, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
-  return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+  // ⚠️ ON MESURE LES ÉCHECS AU LIEU DE LES SUPPOSER (§5.24). Sans ça, « il y a
+  // des messages d'erreur » ne peut mener qu'à des hypothèses : on ne sait ni
+  // combien, ni ce que Vinted a répondu. Un échantillon de la réponse est gardé
+  // dans `panel_diag_capture.rates.bordereau` — assez pour reconnaître la cause,
+  // trop court pour peser.
+  noterDiag(r.ok ? 'bordereau_genere' : `bordereau_refuse_${r.status}`);
+  if (!r.ok) { try { echantillonRate('bordereau', String(tx), JSON.stringify(r.json || {})); } catch (_) {} }
+  // Le message brut de Vinted ne dit rien à Julien. On traduit ce qu'on sait.
+  const brut = (r.json && (r.json.message || r.json.error)) || '';
+  const clair = r.ok ? ''
+    : r.status === 401 ? 'session expirée pour ce compte — recharge une page Vinted et réessaie'
+    : r.status === 403 ? 'Vinted a refusé pour ce compte'
+    : r.status === 404 ? "cette vente n'attend plus de bordereau chez Vinted"
+    : r.status === 422 ? (brut || "Vinted refuse ces informations d'envoi — génère-en un à la main une fois")
+    : (brut || `Vinted a répondu ${r.status}`);
+  return { ok: !!r.ok, status: r.status, error: clair };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2330,6 +2830,68 @@ async function genererBordereau(uid, tx) {
 //  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
 const BORD_MAX_PAR_VISITE = 3;
 const BORD_RETRY_MS = 6 * 60 * 60 * 1000;
+// Au-delà, on ne va plus chercher le PDF d'une vente : le colis est livré depuis
+// longtemps et le lien de Vinted n'existe plus. Mesuré : les 28 ventes sans PDF
+// qui ne sont pas encore livrées tiennent TOUTES dans cette fenêtre.
+const BORD_RATTRAPAGE_J = 21;
+
+// ── ALLER CHERCHER LE CODE DE RETRAIT D'UN COLIS QUI M'ATTEND ────────────────
+// La capture passive ne voit que ce que la page charge : mesuré en base, sur
+// 343 conversations captées, **12 seulement sont côté acheteur** — Julien passe
+// son temps sur ses ventes. Donc le message « ton colis est arrivé » n'arrive
+// presque jamais tout seul, alors que c'est LA seule source du code Vinted Go.
+//
+// On va donc le lire, mais de façon strictement bornée :
+//   · uniquement les ACHATS que Vinted dit « déposés en point relais »,
+//   · uniquement ceux dont on n'a pas déjà le code,
+//   · le compte CONNECTÉ dans cet onglet (`garde` — agir au nom d'un autre
+//     compte est LE signal multi-comptes que Vinted sanctionne, §48),
+//   · 3 par visite au plus, pas de nouvel essai avant 6 h.
+// ⚠️ Ce n'est ni une rafale ni un rythme « faussement humain » (§32) : c'est une
+// LECTURE, sur ses propres achats, plafonnée en volume — la même forme que la
+// récupération du bordereau (§5.29). Elle ne décide de rien et n'engage rien.
+const RETRAIT_MAX_PAR_VISITE = 3;
+async function capterRetraits(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_purchased&select=data`);
+    const achats = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const attend = achats.filter(o => o && AT_RELAY(o.status) && o.conversation_id != null);
+    if (!attend.length) return 0;
+    // Ce qu'on a déjà : inutile de redemander une conversation dont le code est
+    // en base (lecture d'une seule ligne, quelques Ko).
+    let deja = {};
+    try {
+      const r = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
+      deja = (r && r[0] && r[0].data) || {};
+    } catch (_) {}
+    const memo = (await chrome.storage.local.get('vrmRetraitFaits')).vrmRetraitFaits || {};
+    let n = 0;
+    for (const o of attend) {
+      if (n >= RETRAIT_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id || '');
+      if (tx && deja[tx] && deja[tx].code) continue;             // on a déjà le code
+      const cid = String(o.conversation_id);
+      if (memo[cid] && Date.now() - Number(memo[cid]) < BORD_RETRY_MS) continue;
+      const refus = await garde(uid, acc);
+      if (refus) { logActivity(`⚠️ Code de retrait non lu : ${refus.error}`); break; }
+      memo[cid] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/conversations/${encodeURIComponent(cid)}`);
+      if (!rep.ok || !rep.json) { noterDiag(`retrait_conv_refuse_${rep.status}`); continue; }
+      const r = retraitDeConversation(rep.json);
+      if (!r) { noterDiag('retrait_conv_sans_message'); continue; }
+      if (!r.tx && tx) r.tx = tx;                                 // identité de l'achat
+      const ecrit = await noterRetrait(r);
+      if (ecrit) logActivity(`📦 Code de retrait récupéré — ${(r.code || r.lieu || '').slice(0, 40)}`);
+    }
+    await chrome.storage.local.set({ vrmRetraitFaits: memo });
+    return n;
+  } catch (_) { return 0; }
+}
 
 // Une vente attend une GÉNÉRATION quand Vinted dit que le paiement est validé
 // ET qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au vendeur »
@@ -2504,19 +3066,54 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
       for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
     } catch (_) { /* pas de ligne : rien de capté, on tente */ }
-    let recup = 0;
-    for (const o of ventes) {
-      if (recup >= BORD_MAX_PAR_VISITE) break;
-      if (!o || o.transaction_id == null) continue;
+    // ⚠️⚠️ ON N'ABANDONNE PLUS DÈS QUE VINTED FAIT AVANCER LE STATUT (27 août).
+    // Julien : « des fois je génère et la vente s'en va sans même avoir envoyé
+    // le bordereau à l'app ». La 2ᵉ passe ne regardait que `AWAITING_SHIP` : à
+    // la seconde où Vinted passe la vente à « expédiée » / « finalisée », on
+    // cessait DÉFINITIVEMENT d'aller chercher son PDF. Or le PDF n'est pas prêt
+    // à l'instant où on génère (Vinted le fabrique puis le dépose) — donc la
+    // seule fenêtre où on essayait était justement celle où ça échoue le plus.
+    // MESURÉ sur la vraie base : **90 ventes de moins de 45 jours** ont leur
+    // étiquette chez Vinted et AUCUN PDF dans l'app (ni capté, ni email) — et
+    // l'ancienne condition n'en couvrait qu'**1**. 28 d'entre elles ne sont même
+    // pas encore livrées.
+    // Nouvelle règle : toute vente RÉCENTE, non annulée, dont l'étiquette existe
+    // (donc au-delà de « paiement validé ») et dont on n'a pas le PDF. Les plus
+    // utiles d'abord : celles qui attendent encore l'envoi, puis les plus
+    // récentes. Le plafond de 3 par visite et le mémo de 6 h restent : c'est
+    // une limite de volume, pas un rythme déguisé (§32).
+    const limite = Date.now() - BORD_RATTRAPAGE_J * 86400000;
+    const aRecuperer = ventes.filter(o => {
+      if (!o || o.transaction_id == null) return false;
       const tx = String(o.transaction_id);
-      // Une vente qui attend l'envoi ET dont l'étiquette existe déjà.
-      if (!AWAITING_SHIP(o.status) || aGenererBordereau(o.status)) continue;
-      if (dejaMail.has(tx) || dejaCapte.has(tx)) continue;
+      if (dejaMail.has(tx) || dejaCapte.has(tx)) return false;   // on a déjà le PDF
+      if (aGenererBordereau(o.status)) return false;             // l'étiquette n'existe pas encore
+      if (/annul|cancel|refus|rembours/i.test(String(o.status || ''))) return false;
+      const d = Date.parse(o.date || '') || 0;
+      if (!d || d < limite) return false;                        // trop vieux : le lien n'existe plus
       const mk = 'get' + tx;
-      if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) continue;
-      memo[mk] = { t: Date.now() };
-      const eu = (await recupererLabel(acc, uid, tx)).ok;
-      if (eu) { recup++; logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`); }
+      if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) return false;
+      return true;
+    }).sort((a, b) => {
+      const pa = AWAITING_SHIP(a.status) ? 0 : 1, pb = AWAITING_SHIP(b.status) ? 0 : 1;
+      if (pa !== pb) return pa - pb;                             // ce qui attend TON envoi d'abord
+      return (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0);
+    });
+    let recup = 0;
+    for (const o of aRecuperer) {
+      if (recup >= BORD_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      memo['get' + tx] = { t: Date.now() };
+      // ⚠️ ON N'INSISTE QUE QUAND ÇA A UN SENS. L'insistance (§5.48) sert à
+      // attendre un PDF que Vinted est en train de fabriquer — donc uniquement
+      // sur une vente qui attend encore l'envoi. Sur une vente déjà partie, un
+      // « pas d'expédition exposée » ne s'arrangera pas : réessayer 4 fois, ce
+      // serait 4 requêtes pour rien dans l'empreinte du compte (§5, §48).
+      const eu = AWAITING_SHIP(o.status)
+        ? (await recupererLabelInsiste(acc, uid, tx)).ok
+        : (await recupererLabel(acc, uid, tx)).ok;
+      recup++;
+      if (eu) logActivity(`📎 Bordereau récupéré chez Vinted — ${String(o.title || '').slice(0, 40)}`);
     }
     await chrome.storage.local.set({ vrmBordFaits: memo });
     return faits + recup;
@@ -3315,8 +3912,12 @@ async function buildPanelData() {
     }
   } catch (_) { /* aucune suggestion plutôt qu'une fausse */ }
 
-  const minRows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
-  const minPrices = (minRows && minRows[0] && minRows[0].data) || {};
+  // ⚠️ MÊME SOURCE QUE LE MOTEUR D'ACCEPTATION (`planchers()`) : l'app est
+  //    propriétaire du prix minimum (`vinted_annonce_numeros[id].minPrice`),
+  //    la ligne `panel_min_prices` n'est qu'un repli pour ce qui a été saisi ici
+  //    avant. Si le panneau affichait un plancher différent de celui qu'applique
+  //    le moteur, on aurait deux vérités sur de l'argent (§5.15).
+  const minPrices = await planchers();
   for (const o of online) { const m = Number(minPrices[String(o.id)]); if (isFinite(m) && m > 0) o.minPrice = m; }
   // Prix d'achat posés depuis le panneau (ligne dédiée) → visibles tout de suite,
   // sans attendre que l'app les reporte sur la paire.

@@ -55,6 +55,30 @@ for (const [nom, brut] of [['MIME brut', mime], ['MIME emballé', { raw: mime }]
     : nok(`bout en bout — ${nom}`, 'détecté ' + detecterTransporteur(m));
 }
 
+// ── ⚠️ « HIDE MY EMAIL » D'iCLOUD (mesuré le 30 août sur la vraie base) ─────
+// Julien reçoit une partie de ses emails via un alias iCloud, qui RÉÉCRIT
+// l'expéditeur : `shipping@relay.vinted.com` devient
+// `shipping_at_relay_vinted_com_t9zx4089tn7g48_18rq1890@icloud.com`. Tout test
+// sur l'expéditeur échoue alors. Le cas réel trouvé était un VRAI email de
+// transporteur (SEUR, « Tu envío ha sido recogido ») qui n'a été reconnu par
+// AUCUNE règle et s'est retrouvé dans les emails « non compris ».
+// ⚠️ Ce contrôle échoue sur le code d'avant : détection `null` au lieu de
+//    `vinted` — vérifié.
+const { demasquerRelais } = await import('file://' + path.resolve(__dirname, '../api/_lib/lire-email.js'));
+{
+  const alias = 'SEUR via Vinted <shipping_at_relay_vinted_com_t9zx4089tn7g48_18rq1890@icloud.com>';
+  const reel = demasquerRelais(alias);
+  /relay\.vinted/i.test(reel) ? ok('alias iCloud → le domaine réel redevient lisible')
+    : nok('alias iCloud démasqué', 'obtenu ' + JSON.stringify(reel));
+  const mailAlias = { from: `${alias} (${reel})`, subject: 'Tu envío ha sido recogido', text: 'Vinted te transfère cet e-mail de la part de SEUR.' };
+  detecterTransporteur(mailAlias) ? ok('email de colis derrière un alias iCloud → reconnu')
+    : nok('email de colis derrière un alias iCloud', 'détecté null');
+  // et l'inverse : une adresse normale ne doit pas être touchée
+  demasquerRelais('Chronopost <chronopost@network1.pickup.fr>') === ''
+    ? ok('une adresse normale n\'est pas réécrite')
+    : nok('adresse normale intacte', 'démasquée à tort');
+}
+
 console.log(ko ? `\n${ko} email(s) mal aiguillés.` : '\nAucun email de colis ne passe à travers.');
 process.exit(ko ? 1 : 0);
 })();
