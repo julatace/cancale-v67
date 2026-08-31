@@ -6454,3 +6454,121 @@ Trois plaintes d'affilée — notifications mortes, « tu n'as rien modifié dan
 Achats », « aucun appareil abonné » — ont **la même cause unique** : la
 production date du **25 août** et la branche a ~50 commits d'avance. Chaque
 correctif décrit ici est invisible tant que la branche n'est pas déployée.
+
+---
+
+## 5.79 — LES 183 € : CE N'ÉTAIT PAS LE CODE DE LA BRANCHE, C'ÉTAIT LA PRODUCTION
+
+Julien : « j'ai fait plus que 183 € aujourd'hui… dans les ventes elles
+apparaissent bien, mais elles ne sont pas catégorisées dans vendu aujourd'hui ».
+
+### Ce que la mesure a donné (31 août)
+| source | ventes du jour | total |
+|---|---|---|
+| moisson Vinted (base) | **6** sur 4 comptes | **400,00 €** |
+| **emails `email_sale_*` du jour** | **3** | **183,00 €** ⚠️ |
+| ce que Julien voit | — | **183 €** |
+
+Les 3 emails manquants = `julienf765` (87 €) et `tomj606` (80 + 50 €).
+
+➡️ **C'est exactement §5.69**, déjà corrigé sur la branche : la tuile « Vendu
+aujourd'hui » calculait sur les EMAILS. Preuve dans le bundle **déployé** :
+`bilanVentes` → **0 occurrence**, `montantCommande` → **0**, `email_sale` → 1.
+La production date du 25 août, §5.69 du 26.
+**Vérifié au banc sur les vraies données : la branche affiche `400 € · 6 paires`.**
+
+### ⚠️ J'AI FAILLI ACCUSER LA MAUVAISE CAUSE
+Ma première hypothèse était `vinted_accounts_blocked` (liste **locale à
+l'appareil**, donc invisible depuis la base — §5.21). J'ai construit un banc qui
+la seedait avec les 2 comptes… et il affichait **400 € dans les deux cas** : la
+réparation automatique de §5.09 les retire au démarrage. **L'hypothèse était
+fausse, et c'est le banc qui l'a dit.** Ne pas conclure sur un raisonnement quand
+un banc peut trancher en trois minutes.
+
+### Corrigé quand même, parce que la règle était mauvaise
+`acctOff` incluait `blockedAccts` — une liste **auto-détectée** et **locale** —
+donc une heuristique sur un refus d'authentification pouvait retirer de l'argent
+de TOUS les totaux, en silence et sans trace en base.
+➡️ **Une vente réalisée est de l'argent gagné.** Qu'un jeton soit refusé
+aujourd'hui ne change rien au fait que la paire est partie. §5.09 l'avait posé
+pour les annonces, §5.22 pour la suppression d'un compte : c'était la même
+règle, jamais appliquée ici. Le compte affiche « connexion refusée » en orange
+et **ne masque plus rien**. Ne masquent encore que ses choix explicites
+(`vinted_accounts_hidden`, `panel_accounts_off`).
+
+---
+
+## 5.80 — ⚠️ 76 LIGNES DE SUIVI SUR 128 SONT DES COLIS QU'IL ENVOIE
+
+Demande : « améliore l'onglet achat avec les colis que je reçois, les QR codes,
+les codes de retrait, adapte-toi aux nouveaux emails ».
+
+### Mesuré avant de coder
+| | |
+|---|---|
+| lignes de suivi | 128 |
+| **colis SORTANTS** (ses ventes qui partent, sujet certain) | **76** |
+| colis entrants | 22 · indéterminés 30 |
+| **sortants classés « disponible »** (donc affichés à retirer) | **1** ⚠️ |
+
+Le coupable : Mondial Relay **`74950536`**, « Votre colis est entre de bonnes
+mains 📦 » — **sa propre preuve de dépôt**. Il était affiché comme un colis à
+aller chercher, puis promu en « colis jamais retiré, va le réclamer » (§5.75).
+**L'app lui demandait de réclamer un colis qu'il avait posté lui-même.**
+
+**Cause** : le sujet ne matchait aucune règle, on retombait sur le CORPS — et le
+corps d'un email de dépôt contient « disponible » et « prêt » (le piège de §5.43,
+en plus discret).
+
+### La règle : `sensColis(t)` / `SUJ_SORTANT`
+- **On ne tranche que sur du CERTAIN** (§24) : une **confirmation de dépôt** ne
+  peut pas vouloir dire autre chose. « votre colis a été retiré », « en cours
+  d'acheminement » restent **indéterminés** — comportement inchangé.
+- **La règle vit aux DEUX endroits** (§5.37, §5.49) : sur le serveur pour les
+  emails à venir (un dépôt est classé `transit`, jamais `available`), et **dans
+  l'app** parce que les 128 lignes déjà en base ne seront jamais réécrites.
+- ⚠️ **Le panneau « jamais retirés » écarte aussi les sortants** : il liste
+  précisément ce que `isColisActive` refuse, donc sans ce second test la fausse
+  alerte était simplement **déplacée d'un bloc**.
+
+**Vérifié au rendu réel** : `74950536` a disparu, « colis jamais retirés »
+passe de **4 à 3**, les colis Chronopost gardent QR + identifiant 8156 + code
+d'ouverture 9539. `scripts/audit-colis-sens.cjs` — **7 contrôles, 6 échouent
+sur le code d'avant**.
+
+---
+
+## 5.81 — 5 COMPTES NE PEUVENT DÉCLENCHER AUCUNE NOTIFICATION DE VENTE
+
+Julien : « dès demain je vais avoir besoin de ces notifications, je ne vais pas
+pouvoir me connecter tout le temps ».
+
+**Une notification de vente naît d'un EMAIL de vente, pas de la moisson.**
+Mesuré : sur les 6 ventes du jour, **3 emails seulement**. Et par compte :
+
+| compte | emails de vente reçus |
+|---|---|
+| julatace35260 · julienf765 · llloollllaa · tomj683 | 36 · 33 · 27 · 18 |
+| **tomj606 · angeled92 · arthuror2 · liliand653 · julatace3535** | **0** |
+
+⚠️ `tomj606` a vendu **130 € aujourd'hui** : aucune notification n'était
+possible. Ce n'est **pas réparable côté code** — ces boîtes ne font pas suivre
+vers l'adresse de réception de l'app.
+➡️ Réglages → Notifications le **dit maintenant, sans avoir à déplier** :
+« ⚠ 5 comptes ne te préviendraient d'aucune vente ». Lecture scalaire, une seule
+requête (§34) ; `null` tant qu'on ne sait pas — on n'accuse jamais sur une
+lecture ratée.
+
+**Au passage, vérifié** : `push_prefs` = `{achat, suivi, favori, facture,
+message}` — il a allumé les 5 catégories bruyantes. **`vente` est absente, donc
+au DÉFAUT, donc active** (§5.41 : une catégorie absente vaut son défaut, jamais
+« muet »). Les notifications de vente sont bien armées.
+
+### État de la chaîne bordereau (mesuré)
+14 ventes attendent son envoi · **10 ont déjà leur PDF** (extension ou email) ·
+4 sans. Les compteurs de l'extension (`label_url_trouve: 4`) montrent que la
+chaîne fonctionne.
+⚠️ **Son extension installée est antérieure à la 5.34** : `panel_colis_relais`
+est ABSENTE et `abandon_json_item` monte encore (104) — donc ni le rattrapage
+des bordereaux (5.46), ni les codes de retrait Vinted Go depuis les
+conversations (5.45) ne tournent chez lui. **Zip 5.47 livré.**

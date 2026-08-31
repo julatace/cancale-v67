@@ -1223,6 +1223,25 @@ const reclassifyTrack = (d) => {
 // jamais jusqu'à l'app. C'est exactement le trou qui explique les codes
 // introuvables : la boîte de ce compte ne transfère pas.
 // Lecture SCALAIRE uniquement (compte + date), jamais le corps (§34).
+// ⚠️ UNE NOTIFICATION DE VENTE NAÎT D'UN EMAIL DE VENTE, PAS DE LA MOISSON.
+// Mesuré le 31 août : 6 ventes dans la journée, **3 emails de vente seulement**.
+// Les comptes `tomj606`, `angeled92`, `arthuror2`, `liliand653` et
+// `julatace3535` n'ont JAMAIS envoyé un seul email de vente à l'app — leurs
+// ventes ne peuvent donc déclencher aucune notification, quoi qu'on fasse dans
+// le code. Ce n'est pas réparable côté app : il faut que ces boîtes fassent
+// suivre vers l'adresse de réception. Autant le DIRE, à l'endroit où il règle
+// ses notifications, plutôt que de le laisser découvrir un lundi matin.
+// Lecture SCALAIRE (une colonne, §34) et une seule requête.
+const fetchComptesSansEmailVente = async (comptes) => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=acc:data->>account&limit=1000`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const vus = new Set();
+    for (const row of await r.json()) { const a = String(row.acc || '').trim(); if (a) vus.add(a); }
+    if (!vus.size) return null;                       // rien lu : on n'accuse personne
+    return (comptes || []).filter(a => { const l = String(a.login || '').trim(); return l && !vus.has(l); });
+  } catch (_) { return null; }
+};
 const fetchEmailsParCompte = async () => {
   const out = {};
   try {
@@ -19430,9 +19449,17 @@ const PUSH_CATS = [
   { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
   { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
 ];
-function PushPrefsSetting() {
+function PushPrefsSetting({ comptes }) {
   const [prefs, setPrefs] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Comptes dont aucune vente ne peut déclencher de notification (voir
+  // `fetchComptesSansEmailVente`). `null` tant qu'on ne sait pas : on
+  // n'affiche jamais une accusation sur une lecture ratée.
+  const [muets, setMuets] = useState(null);
+  useEffect(() => { let mort = false;
+    if (comptes && comptes.length) fetchComptesSansEmailVente(comptes).then(r => { if (!mort) setMuets(r); });
+    return () => { mort = true; };
+  }, [comptes]);
   useEffect(() => { let mort = false;
     (async () => {
       try {
@@ -19465,10 +19492,28 @@ function PushPrefsSetting() {
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
             {prefs ? `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.` : 'Chargement…'}
+            {muets && muets.length > 0 && (
+              <div style={{color:C.warn,fontWeight:600,marginTop:3}}>
+                ⚠ {muets.length} compte{muets.length>1?'s':''} ne te préviendra{muets.length>1?'ient':''} d'aucune vente — déplie pour savoir lesquels.
+              </div>
+            )}
           </div>
         </div>
         <span style={{color:C.muted,fontSize:13,flexShrink:0}}>▾</span>
       </summary>
+      {muets && muets.length > 0 && (
+        <div style={{marginTop:10,border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:3,padding:'9px 11px'}}>
+          <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>
+            {muets.length} compte{muets.length>1?'s':''} ne te préviendra{muets.length>1?'ient':''} d'aucune vente
+          </div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
+            <b style={{color:C.text}}>{muets.map(a=>a.login).join(', ')}</b> — une notification de vente part d'un
+            email Vinted, et ces boîtes n'en font suivre aucun vers l'app. Leurs ventes s'afficheront bien
+            dans l'onglet Ventes (elles viennent de l'extension), mais ton téléphone ne sonnera pas.
+            Fais suivre ces boîtes vers l'adresse de réception de l'app pour les activer.
+          </div>
+        </div>
+      )}
       <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:2}}>
         {PUSH_CATS.map(c => {
           const on = actif(c);
@@ -19490,7 +19535,7 @@ function PushPrefsSetting() {
     </details>
   );
 }
-function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif, customLogo, onPickLogo, onResetLogo }) {
+function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif, customLogo, onPickLogo, onResetLogo }) {
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -19735,7 +19780,7 @@ function SettingsScreen({ setTab, onExport, onImport, dark, toggleDark, notifEna
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Notifications</div>
       <PushSetting/>
       <div style={{height:10}}/>
-      <PushPrefsSetting/>
+      <PushPrefsSetting comptes={comptes}/>
       <div style={{height:10}}/>
       {/* Alertes locales (l'ancien bouton 🔔 du haut, déplacé ici) : bandeau +
           notification quand l'app est OUVERTE (ventes comptabilisées, factures). */}
@@ -21676,7 +21721,7 @@ export default function App() {
         paddingRight: ordi ? 28 : undefined,
         paddingBottom: ordi ? 40 : 'calc(84px + env(safe-area-inset-bottom))'}}>
         <EcranGardeFou resetKey={tab}>
-        {tab==='settings'&&<SettingsScreen setTab={setTab}
+        {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}
           onToggleNotif={async()=>{
