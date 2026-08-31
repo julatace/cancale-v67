@@ -520,9 +520,23 @@ function parseCarrierEmail(mail, carrier) {
   const t = all.toLowerCase();
   const suj = String(mail.subject || '').toLowerCase();
   let status = 'info', label = 'Mise à jour';
+  // ⚠️⚠️ UNE CONFIRMATION DE DÉPÔT N'EST PAS UN COLIS QUI T'ATTEND.
+  // Mesuré le 31 août : le Mondial Relay `74950536` (« Votre colis est entre de
+  // bonnes mains 📦 », c'est-à-dire SA preuve de dépôt) était rangé en
+  // `available` — donc affiché comme un colis à aller chercher, puis promu en
+  // « colis jamais retiré, va le réclamer ». Cause : le sujet ne matchait rien,
+  // on retombait sur le CORPS, et le corps d'un email de dépôt contient
+  // « disponible » / « prêt » (le §5.43 en petit).
+  // Sur 128 lignes de suivi, **76 sont des colis sortants** : c'est la moitié du
+  // bruit de l'onglet Achats.
+  // ⚠️ On ne tranche que sur du CERTAIN (§24) : une confirmation de dépôt ne
+  // peut pas vouloir dire autre chose. Le reste garde le comportement d'avant.
+  const SUJ_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/;
+  const sortant = !!(suj && SUJ_SORTANT.test(suj));
   const SUJ_RETIRE = /a\s+[ée]t[ée]\s+(?:retir[ée]|livr[ée]|remis)|colis\s+retir[ée]|livraison\s+de\s+votre\s+colis|bien\s+re[çc]u/;
   const SUJ_DISPO  = /disponible|à\s+retirer|a\s+retirer|arriv[ée]\s+(?:en|au|dans)|vous\s+attend|pr[êe]t/;
-  if (suj && SUJ_RETIRE.test(suj))      { status = 'delivered'; label = 'Livré / retiré'; }
+  if (sortant)                          { status = 'transit';  label = 'Colis déposé (ta vente)'; }
+  else if (suj && SUJ_RETIRE.test(suj))      { status = 'delivered'; label = 'Livré / retiré'; }
   else if (suj && SUJ_DISPO.test(suj))  { status = 'available'; label = 'Arrivé au point de retrait'; }
   else
   // Priorité STRICTE : livré/retiré > disponible > en transit. Les trois sont
@@ -652,7 +666,7 @@ function parseCarrierEmail(mail, carrier) {
   // scanne), au comptoir on présente un code et une pièce d'identité.
   const consigne = /consigne\s+pickup|casier|locker/i.test(all);
 
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne };
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, ...(sortant ? { sens: 'sortant' } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).

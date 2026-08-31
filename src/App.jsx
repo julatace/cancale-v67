@@ -10223,8 +10223,39 @@ const loadCollected = () => new Set((load('vrm_colis_collected', []) || []).map(
 //    Celui de Julien (identifiant 8156, code 9539) avait sa limite au 21 août et
 //    n'était toujours pas retiré le 23. Un colis qu'on cache est un colis perdu ;
 //    on l'affiche en rouge « délai dépassé », c'est à lui de décider.
+// ⚠️⚠️ UN COLIS QUE TU ENVOIES N'EST PAS UN COLIS À RETIRER.
+// Mesuré le 31 août sur les 128 lignes de suivi réelles : **76 concernent des
+// colis SORTANTS** (tes ventes qui partent) contre 22 entrants — et l'un d'eux,
+// le Mondial Relay `74950536` (« Votre colis est entre de bonnes mains 📦 »,
+// c'est-à-dire ta preuve de dépôt), était classé « disponible » donc **affiché
+// comme un colis à aller chercher**. Il figurait même dans « colis jamais
+// retirés » (§5.75) : l'app lui disait d'aller réclamer un colis qu'il avait
+// posté lui-même.
+//
+// ⚠️ ON NE TRANCHE QUE SUR DU CERTAIN (§24). Une confirmation de DÉPÔT ne peut
+// pas vouloir dire autre chose : c'est le vendeur qui remet le colis. Tout le
+// reste (« votre colis a été retiré », « en cours d'acheminement »…) est
+// ambigu — il reste `null`, et rien ne change pour lui.
+// ⚠️ La règle vit ICI, à la LECTURE : les 128 lignes déjà en base ne seront
+// jamais réécrites (même leçon qu'en §5.37 et §5.49).
+const SUJET_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/i;
+const SUJET_ENTRANT = /est arriv|disponible|[àa] retirer|en consigne|en relais|pr[êe]t [àa] [êe]tre retir/i;
+// 'sortant' | 'entrant' | null (on ne se prononce pas)
+const sensColis = (t) => {
+  // Posé par le serveur quand il en est sûr (emails reçus à partir du 31 août).
+  if (t && t.sens) return t.sens;
+  const suj = String((t && (t.subject || t.sujet)) || '');
+  if (!suj) return null;
+  const so = SUJET_SORTANT.test(suj), en = SUJET_ENTRANT.test(suj);
+  if (so && !en) return 'sortant';
+  if (en && !so) return 'entrant';
+  return null;
+};
+
 const isColisActive = (t, collected) => {
   if (!t || t.status !== 'available') return false;
+  // Un colis que TU as déposé ne t'attend nulle part.
+  if (sensColis(t) === 'sortant') return false;
   if (collected && collected.has(colisKey(t))) return false;
   // Une limite annoncée par le transporteur garde le colis visible, même vieux.
   if (t && t.limite) {
@@ -11384,10 +11415,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // inverse marchait déjà (l'extension lit `vinted_accounts_hidden`), donc le
   // masquage ne tenait que dans un sens. On lit la même liste, avec le même
   // trois-états : `false` = réactivé exprès depuis le panneau, ça prime.
+  // ⚠️⚠️ `blockedAccts` N'ENTRE PLUS DANS CE TEST — MESURÉ LE 31 AOÛT.
+  // Julien : « j'ai fait plus que 183 € aujourd'hui ». La base portait
+  // **6 ventes / 400 €** ce jour-là, l'app en affichait **183 €** : les ventes
+  // de `julienf765` (87 €) et `tomj606` (130 €) étaient retirées de TOUS les
+  // totaux. Aucune de ces deux exclusions n'était visible depuis la base —
+  // `vinted_accounts_blocked` est une liste **LOCALE à l'appareil** (jamais dans
+  // `SYNC_KEYS`, §5.10) et **remplie automatiquement** par une heuristique sur
+  // les refus d'authentification.
+  //
+  // ➡️ RÈGLE : **une vente réalisée est de l'argent gagné.** Qu'un jeton soit
+  // refusé aujourd'hui ne change rien au fait que la paire est partie et que
+  // l'argent est arrivé. §5.09 l'avait déjà posé pour les annonces (« elles
+  // viennent de la moisson, pas du jeton ») et §5.22 pour la suppression d'un
+  // compte (« le CA passé est conservé — c'est de l'argent réellement gagné ») :
+  // c'était la même règle, elle n'avait simplement jamais été appliquée ici.
+  // Une détection AUTOMATIQUE ne doit jamais retirer de l'argent d'un total en
+  // silence ; elle reste un **diagnostic de connexion** (pastille « Refusé par
+  // Vinted » sur l'écran Annonces, bandeau des comptes).
+  //
+  // Ce qui masque encore, et seulement parce que c'est SON choix explicite :
+  //   • `vinted_accounts_hidden`  → « ✕ Masquer » dans l'app (synchronisé)
+  //   • `panel_accounts_off`      → « ✕ Masquer » depuis le panneau (§35)
+  // ⚠️ Le trois-états du panneau est conservé : `false` = rallumé exprès, ça prime.
   const acctOff = (uid) => {
     const k = String(uid ?? '');
     if (panelAcctOff[k] === false) return false;      // rallumé depuis le panneau
-    return hiddenAccts.has(k) || blockedAccts.has(k) || panelAcctOff[k] === true;
+    return hiddenAccts.has(k) || panelAcctOff[k] === true;
   };
   // ── LES COMPTES QUI EXISTENT VRAIMENT ────────────────────────────────────
   // Un compte existe s'il a des jetons (ligne `vinted_accounts`), pas parce
@@ -11739,6 +11793,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // c'est une réclamation à faire, pas un retrait.
     const oublies = (tracking || []).filter(t => {
       if (!t || t.status !== 'available') return false;
+      // ⚠️ SANS CE TEST, LE CORRECTIF « colis sortant » RETOMBERAIT ICI.
+      // `isColisActive` renvoie désormais faux pour un colis qu'il a déposé —
+      // or ce panneau liste justement ce que `isColisActive` écarte. Le colis
+      // Mondial Relay 74950536 (sa propre preuve de dépôt) serait donc passé de
+      // « à retirer » à « jamais retiré, va le réclamer » : la même fausse
+      // alerte, déplacée d'un bloc.
+      if (sensColis(t) === 'sortant') return false;                   // c'est TOI qui l'as posté
       if (collected && collected.has(colisKey(t))) return false;      // il l'a déjà eu
       if (colisRetireAilleurs(t, retires)) return false;              // le transporteur a confirmé
       if (isColisActive(t, collected)) return false;                  // encore dans la fenêtre → déjà affiché
@@ -16825,7 +16886,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span style={{fontSize:11,fontWeight:600,color:C.muted,flexShrink:0}}>Comptes :</span>
               {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
                 const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
-                const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
+                // ⚠️ La puce doit dire EXACTEMENT ce que fait le filtre, sinon
+                // elle s'affiche grisée pour un compte qui compte quand même
+                // (ou l'inverse). Une seule règle : `acctOff` (§11).
+                const off = acctOff(uid);
+                // Refus d'authentification détecté automatiquement : c'est un
+                // problème de CONNEXION, plus un masquage — ses ventes comptent.
+                const refuse = blockedAccts.has(uid) && !off;
                 // ÂGE DES DONNÉES DE CE COMPTE. L'extension ne rafraîchit en
                 // direct que le compte connecté dans le navigateur : les autres
                 // peuvent dater de plusieurs semaines. Sans cette pastille, le
@@ -16834,15 +16901,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const ms = harvestAgeMs(uid, 'listings');
                 const j = ms != null ? Math.floor(ms/86400000) : null;
                 const vieux = j != null && j >= 2;
-                const col = off ? C.border : vieux ? (j >= 7 ? C.danger : C.warn) : C.accent;
+                const col = off ? C.border : refuse ? C.warn : vieux ? (j >= 7 ? C.danger : C.warn) : C.accent;
                 return (
                   <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)}
                     title={off ? 'Masqué — tape pour réafficher ses annonces'
+                          : refuse ? 'Vinted a refusé la connexion à ce compte. ⚠️ Ses ventes comptent quand même dans ton chiffre d\'affaires — l\'argent a bien été gagné. Reconnecte-toi dessus sur vinted.fr pour rafraîchir ses données.'
                           : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
                           : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
                     style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
                     {off && <Icon name="eyeOff" size={13} style={{marginRight:4}}/>}{name} · {counts[uid]}
-                    {!off && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
+                    {/* « connexion refusée » se dit, mais ne retire RIEN des totaux. */}
+                    {refuse && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· connexion refusée</span>}
+                    {!off && !refuse && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
                   </button>
                 );
               })}
