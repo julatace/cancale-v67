@@ -6419,3 +6419,38 @@ contrôles**, dont **3 nouveaux qui échouent bien sur le code d'avant** (§21 :
 rejoué sur `HEAD`, il sort les 3) · banc unitaire sur la VRAIE fonction
 `cleSansRapport` contre les erreurs mesurées : **8/8** (les 2 vraies purgent,
 403 nu / 400 nu / 429 / 500 / 404 / sans corps ne purgent pas).
+
+### 5.78 (suite) — ⚠️ « AUCUN APPAREIL ABONNÉ » ÉTAIT UN MENSONGE DU CODE
+
+Julien : « pour les notifs ça met qu'aucun appareil n'est abonné ». Mesuré
+immédiatement : **la base porte bien 2 abonnements**, rafraîchis le matin même
+à 06:59. Le message est donc **faux**, et il l'envoyait chercher du côté de son
+téléphone alors que le problème est la clé du serveur.
+
+### La chaîne exacte du mensonge
+1. `sendPushToAll` sort sur `if (!PUSH_PRET) return { sent:0, **total:0**, … }`
+   — **sans jamais lire la liste des abonnés** ;
+2. le bundle **déployé** (25 août) ne connaît ni le champ `erreur` ni la route
+   `?etat=1` — vérifié en cherchant dans le vrai fichier servi par vrm.center :
+   `VAPID_PRIVATE_KEY absente` → **0 occurrence**, `etat=1` → **0**,
+   `Aucun appareil abonné` → **1** ;
+3. l'app lit donc `total === 0` et affiche **« Aucun appareil abonné »**.
+
+➡️ **`total` veut dire « appareils abonnés », jamais « ce qu'on a réussi à
+faire ».** Sans clé, on lit quand même la liste et on renvoie le vrai nombre.
+La lecture est une ligne minuscule (`push_subs`, quelques centaines d'octets) et
+n'a lieu que dans un état cassé qu'on veut justement diagnostiquer.
+
+⚠️ **C'est la troisième fois d'affilée qu'un chiffre à 0 vient de MON code qui
+abandonne, pas de la donnée** (§21 : `my_orders`, §5.27 : `price` objet, ici
+`total`). **Avant d'afficher un compteur à zéro, vérifier qu'on a vraiment
+regardé.**
+
+`audit-push` passe à **11 contrôles** ; le nouveau (« sans clé, on compte quand
+même les appareils abonnés ») **échoue bien sur le code d'avant**.
+
+### ⚠️ CE QUI BLOQUE N'EST PLUS DU CODE
+Trois plaintes d'affilée — notifications mortes, « tu n'as rien modifié dans
+Achats », « aucun appareil abonné » — ont **la même cause unique** : la
+production date du **25 août** et la branche a ~50 commits d'avance. Chaque
+correctif décrit ici est invisible tant que la branche n'est pas déployée.

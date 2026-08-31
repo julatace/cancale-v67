@@ -147,7 +147,17 @@ export async function sendPushToAll(payload) {
   // on le dit clairement — plutôt que de repartir sur la clé qui traînait dans
   // le dépôt public. Un envoi silencieusement impossible est pire qu'un refus
   // explicite : le vendeur croirait ses notifications actives.
-  if (!PUSH_PRET) return { sent: 0, total: 0, erreur: 'VAPID_PRIVATE_KEY absente' };
+  // ⚠️ ON COMPTE QUAND MÊME LES APPAREILS. Renvoyer `total: 0` parce qu'on
+  // abandonne avant de lire la liste est un MENSONGE : l'app lit ce chiffre et
+  // affichait « Aucun appareil abonné » alors que les 2 téléphones du vendeur
+  // étaient bien enregistrés (mesuré le 31 août : 2 abonnements, rafraîchis le
+  // matin même à 06:59). Il a donc cherché du côté de son téléphone pendant que
+  // le problème était la clé du serveur. `total` veut dire « appareils
+  // abonnés », jamais « ce qu'on a réussi à faire ».
+  if (!PUSH_PRET) {
+    const abonnes = await loadSubs();
+    return { sent: 0, total: abonnes.length, erreur: 'VAPID_PRIVATE_KEY absente' };
+  }
   const subs = await loadSubs();
   if (!subs.length) return { sent: 0, total: 0 };
   const body = JSON.stringify(payload);

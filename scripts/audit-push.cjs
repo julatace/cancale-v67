@@ -59,6 +59,14 @@ enDur ? nok('aucune clé privée VAPID en dur dans le dépôt public')
   ? ok('la route GET ?etat=1 existe côté serveur')
   : nok('la route GET ?etat=1 existe', 'l\'app recevrait 405 et n\'alerterait jamais');
 
+// 3bis) ⚠️ `total` NE DOIT JAMAIS MENTIR SUR LE NOMBRE D'APPAREILS.
+// Sans clé, l'ancien code sortait sur `{sent:0, total:0}` — sans même lire la
+// liste. L'app lit ce chiffre et affichait « Aucun appareil abonné » alors que
+// les 2 téléphones étaient bien enregistrés (mesuré le 31 août). Le vendeur a
+// donc cherché du côté de son téléphone pendant que le problème était la clé.
+!/if \(!PUSH_PRET\) return \{ sent: 0, total: 0/.test(srv)
+  ? ok('sans clé, on compte quand même les appareils abonnés')
+  : nok('`total` dit le vrai nombre d\'appareils', 'l\'app afficherait « aucun appareil abonné »');
 // 4) ⚠️ UN ABONNEMENT SCELLÉ SUR UNE ANCIENNE CLÉ DOIT ÊTRE PURGÉ.
 // Mesuré en direct sur les 2 appareils du vendeur : Chrome répond 403 « the
 // VAPID credentials … do not correspond », Apple 400 « VapidPkHashMismatch ».
