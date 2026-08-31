@@ -11547,6 +11547,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
   const [aFilter, setAFilter] = useState('attente'); // attente | recus | all
+  // ⚠️ UNE IMAGE MORTE (QR OU PHOTO) DOIT LAISSER SA PLACE — et le repli doit vivre dans
+  // l'ÉTAT, pas dans le DOM : poser `style.display='none'` sur le bouton était
+  // effacé au premier re-render de React, donc le cadre vide restait à l'écran
+  // (vu en capture, pas à la relecture). Les 3 vrais QR de Julien répondent bien
+  // (PNG 645-873 o), mais un lien de transporteur expire — et c'est au comptoir
+  // qu'on ne peut pas se le permettre.
+  const [imgMortes, setImgMortes] = useState(() => new Set());
+  const qrVivant = (t) => { const u = qrImage(t); return u && !imgMortes.has(u) ? u : ''; };
+  const noterImgMorte = (u) => setImgMortes(prev => prev.has(u) ? prev : new Set(prev).add(u));
   // Statut d'un ACHAT : un achat "reçu" n'a pas le mot "finalisé" (c'est
   // spécifique aux ventes). On élargit donc la détection pour les achats.
   // ── LES ÉTAPES D'UN COLIS, UNE SEULE FOIS (§11) ────────────────────────────
@@ -15773,11 +15782,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, vendeur)…"
             style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
         )}
+        {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
+            « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
+            quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,
+            c'est la moitié de la marge. Mesuré sur ses 534 achats réels :
+              reçus 326 · 8 064 €   ·   en route 62 · 1 672 €
+              au relais 13 · 346 €  ·   ⚠️ annulés/remboursés 146 · 3 980 € = 27,3 %
+            Plus d'un achat sur quatre n'aboutit pas, et rien ne le lui disait.
+            ⚠️ Les chiffres suivent LA PÉRIODE choisie (`matchOrd`), comme sur
+            Ventes — sinon deux écrans jumeaux ne compteraient pas pareil (§11).
+            ⚠️ On ne remet PAS « à retirer » ici : ce compte-là a sa définition
+            (`pickupUnion.total`, union email + statut Vinted) et il est déjà
+            affiché deux fois plus haut. Deux nombres proches pour deux notions
+            différentes sur le même écran, c'est exactement ce qu'on s'interdit. */}
+        {buysBase.length>0 && (()=>{
+          const dans = buysBase.filter(o=>matchOrd(o));
+          const M = (o)=>montantCommande(o);
+          const annule = (o)=>/annul|rembours|refus/i.test(o.status||'');
+          const enRoute = (o)=>!annule(o) && phaseReception(o)==='route';
+          const somme = (l)=>l.reduce((a,o)=>a+M(o),0);
+          const vrais = dans.filter(o=>!annule(o));
+          const ann = dans.filter(annule);
+          const rte = dans.filter(enRoute);
+          const tauxAnn = dans.length ? Math.round(100*ann.length/dans.length) : 0;
+          const prix = vrais.map(M).filter(v=>v>0).sort((a,b)=>a-b);
+          const med = prix.length ? prix[Math.floor(prix.length/2)] : 0;
+          return (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(150px, 100%), 1fr))',gap:8,marginBottom:12}}>
+              <StatBox label="Dépensé" value={fmtE0(somme(vrais))} sub={`${vrais.length} paire${vrais.length>1?'s':''}`}/>
+              <StatBox label="Prix médian" value={fmtE0(med)} sub="par paire achetée"/>
+              <StatBox label="En route" value={fmtE0(somme(rte))} color={rte.length?C.warn:C.muted} sub={`${rte.length} paire${rte.length>1?'s':''} en chemin`}/>
+              <StatBox label="Annulés" value={fmtE0(somme(ann))} color={tauxAnn>=20?C.danger:C.muted} sub={`${ann.length} sur ${dans.length} · ${tauxAnn} %`}/>
+            </div>
+          );
+        })()}
         {/* Compte des colis à retirer PAR TRANSPORTEUR, pour que Chronopost,
             Mondial Relay et Vinted Go aient chacun leur ligne sur l'onglet
             Achats — même quand ils n'ont rien (demande de Julien). */}
-        <ReceptionEmails tracking={tracking} comptes={accounts}
-          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>
+        {/* ⚠️ CE BANDEAU N'A DE SENS QUE LÀ OÙ LES CODES MANQUENT. Il s'affichait
+            sur les quatre onglets — donc au-dessus de la liste des achats en
+            route, où il ne dit rien d'utile. C'est une information de
+            configuration (une boîte mail qui ne transfère pas), pas une alerte
+            de tous les jours. */}
+        {aFilter==='attente' && <ReceptionEmails tracking={tracking} comptes={accounts}
+          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>}
         {/* À RETIRER — liste simple façon appli de colis : groupée par point relais,
             avec LE CODE de retrait en gros (c'est ça qu'on donne au comptoir) et un
             « Y aller ». Source = emails transporteur (qui portent le code), et non
@@ -15799,8 +15847,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // paire on va chercher / si on l'a déjà retirée).
           const photoByTitle = {};
           buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=orderPhoto(o); if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
-          const thumb = (src) => src
-            ? <img src={src} alt="" loading="lazy" style={{width:38,height:38,borderRadius:3,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
+          // ⚠️ MÊME RÈGLE QUE LE QR : une photo morte ne laisse pas un carré cassé.
+          // Les photos viennent du CDN Vinted et leurs liens expirent ; l'icône
+          // « image brisée » du navigateur au milieu d'une carte de colis, c'est
+          // ce qui fait « pas fini » (vu en capture sur « Salomon sneakers »).
+          const thumb = (src) => src && !imgMortes.has(src)
+            ? <img src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
+                style={{width:38,height:38,borderRadius:3,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
             : <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="bag" size={22}/></span>;
           // Point relais HABITUEL par transporteur : certains emails ne contiennent
           // pas l'adresse du relais (juste un lien « juste ici »). On déduit alors
@@ -15930,7 +15983,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',marginBottom:7}}>
                         {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
+                          {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
+                              relecture : « Colis n°08448878300059 » en titre, puis
+                              « n° 08448878300059 » juste en dessous. Un email de
+                              transporteur ne nomme pas l'article (mesuré : artTitle
+                              vide sur 127 lignes sur 127), donc à défaut on écrit ce
+                              qu'on SAIT — le transporteur — et le n° reste sur sa
+                              ligne, une seule fois. */}
+                          <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||carrierName(t.carrier)}</div>
                           {/* ⚠️ NI LE LIEU NI LE GESTE ICI : ils sont écrits une
                               fois, en tête de la destination. Les répéter sur
                               chaque ligne, c'était trois fois la même phrase sur
@@ -15959,7 +16019,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
                             <div style={{fontSize:11,fontWeight:jours<=2?700:600,color:jours<=2?C.danger:C.warn,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {jours<0?'délai de retrait dépassé':jours===0?'dernier jour pour le retirer':jours===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} · ${jours} j`}
+                              {/* ⚠️ « délai dépassé » tout court se lit comme une
+                                  contradiction quand la ligne du dessus dit
+                                  « arrivé il y a 6 j ». On donne LA date et de
+                                  COMBIEN c'est dépassé : c'est ce qui décide si
+                                  on court au relais ou si on réclame. */}
+                              {jours<0?`délai dépassé depuis ${-jours} j (${new Date(t.limite).toLocaleDateString('fr-FR')}) — va vite le chercher`:jours===0?"dernier jour pour le retirer":jours===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} · ${jours} j`}
                             </div>
                           )}
                         </div>
@@ -15970,11 +16035,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             servent qu'au casier, et en relais il n'y avait
                             littéralement rien à présenter au comptoir.
                             Il passe EN PREMIER : c'est le geste principal. */}
-                        {qrImage(t) && (
+                        {/* ⚠️ SI L'IMAGE NE CHARGE PAS, ON NE LAISSE PAS UN CARRÉ CASSÉ.
+                            Le repli existait UNIQUEMENT dans la modale plein écran
+                            (§17) — sur la carte, une image morte restait une image
+                            morte, et au comptoir il n'y avait rien à présenter.
+                            Les 3 vrais QR de Julien répondent bien (PNG, 645-873 o),
+                            mais un lien de transporteur expire, et c'est justement
+                            au comptoir qu'on ne peut pas se le permettre.
+                            `onError` efface la vignette : le code prend sa place. */}
+                        {qrVivant(t) && (
                           <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
                             style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:3,padding:3,cursor:'pointer',width:64,height:64,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                            <img src={qrImage(t)} alt="QR de retrait" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                            <img src={qrVivant(t)} alt="QR de retrait" onError={()=>noterImgMorte(qrImage(t))}
+                              style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                           </button>
+                        )}
+                        {/* ⚠️ NI QR NI CODE : on affiche le NUMÉRO DE COLIS en gros,
+                            honnêtement (§17). Sans ça, un colis dont le seul moyen
+                            de retrait était un QR mort ne laissait RIEN à présenter
+                            au comptoir — vu en capture sur 09447431562792. */}
+                        {!qrVivant(t) && !code && !ident && t.suivi && (
+                          <div style={{flexShrink:0,textAlign:'center',background:`${C.warn}12`,border:`1.5px solid ${C.warn}`,borderRadius:3,padding:'4px 11px'}}>
+                            <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>N° de colis</div>
+                            <div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{t.suivi}</div>
+                          </div>
                         )}
                         {(code||ident) && (
                           <div style={{flexShrink:0,display:'flex',gap:6}}>
@@ -16641,10 +16725,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{marginLeft:'auto'}}>
                   {(()=>{ const rc=receiptFor(o); return rc ? (
                     <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
-                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:3,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}>📄 Reçu</button>
+                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:3,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}>📄 Justificatif</button>
                   ) : (
                     <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:buyNumByTxn[String(o.transaction_id)]||'' })}
-                      title="Télécharger le reçu d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}>📄 Reçu</button>
+                      title="Télécharger le justificatif d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}>📄 Justificatif</button>
                   ); })()}
                 </div>
               </div>

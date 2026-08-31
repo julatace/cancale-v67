@@ -6209,3 +6209,86 @@ reconnue, pas alerte.
 vert** · rendu réel de l'onglet À retirer : le bloc « 4 colis jamais retirés »
 affiche les 4 colis **mesurés en base**, avec leur âge exact (23 / 29 / 32 / 33 j)
 et leurs codes (077831, 184143) · **0 suspect, 0 erreur d'app**.
+
+---
+
+## 5.76 — « C'EST MON MÉTIER, FAIS ÇA COMME UN PRO » : j'ai enfin REGARDÉ l'écran
+
+Julien, après plusieurs passes : « ça ne me convient toujours pas, c'est mon
+métier ». Il avait raison, et la leçon de §5.62 s'appliquait encore : **j'avais
+lu des listes de lignes de texte, jamais REGARDÉ l'écran**. Une capture à sa
+résolution de travail (1512 px, ordinateur — §42) a montré cinq défauts en
+trente secondes, dont trois qu'aucun banc ne pouvait voir.
+
+### ⚠️ 1. LES QR NE S'AFFICHAIENT PAS — et rien ne prenait le relais
+Sur la capture, les trois vignettes QR étaient des **icônes « image cassée »**.
+Vérifié au `curl` : **les 3 vrais QR de Julien répondent parfaitement**
+(`image/png`, 645 à 873 octets) — l'image morte était un artefact du banc (pas de
+réseau vers `pickup-services.com`).
+**Mais le défaut, lui, est réel** : `onError` n'existait que dans la **modale**
+plein écran (§17). Sur la carte, une image morte restait une image morte —
+et un lien de transporteur expire. **Au comptoir, il n'aurait rien eu à
+présenter.**
+
+⚠️ **Ma première correction ne marchait pas** : `e.target.closest(...).style.display='none'`
+est **effacé au premier re-render de React**, qui réapplique son style en ligne.
+Vu en capture (le cadre vide restait), pas à la relecture.
+➡️ Le repli vit maintenant dans l'**ÉTAT** (`imgMortes` / `noterImgMorte`), et il
+sert aussi aux **photos de paires** (même famille : le CDN Vinted expire).
+
+➡️ Et **ni QR ni code ⟹ le NUMÉRO DE COLIS en gros** (§17 le disait, ce n'était
+pas fait sur cette carte) : mesuré, le colis `09447431562792` n'avait
+**strictement rien** à montrer.
+
+### 2. Le n° de suivi était écrit DEUX FOIS par ligne
+« Colis n°08448878300059 » en titre, puis « n° 08448878300059 » juste en dessous.
+Un email de transporteur ne nomme jamais l'article (mesuré : `artTitle` vide sur
+**127 lignes sur 127**) — donc à défaut on écrit ce qu'on SAIT, **le
+transporteur**, et le numéro reste sur sa ligne, une seule fois.
+
+### 3. « délai de retrait dépassé » ne disait pas de combien
+Ça se lisait comme une contradiction juste sous « arrivé il y a 6 j ». Devenu
+**« délai dépassé depuis 2 j (29/08/2026) — va vite le chercher »** : c'est ce
+qui décide si on court au relais ou si on réclame. Et ça distingue enfin ce bloc
+du bloc « colis jamais retirés » (§5.75), dont l'action est « réclame à Vinted ».
+
+### ⚠️ 4. L'ÉCRAN ACHATS N'AVAIT AUCUN CHIFFRE
+Ventes porte quatre chiffres depuis toujours ; **Achats, zéro** — alors que
+l'achat, c'est la moitié de la marge. Mesuré sur ses **534 achats réels** :
+
+| | paires | montant |
+|---|---|---|
+| reçus | 326 | 8 064 € |
+| en route | 62 | 1 672 € |
+| au relais | 13 | 346 € |
+| **annulés / remboursés** | **146** | **3 980 €** → **27,3 %** ⚠️ |
+
+**Plus d'un achat sur quatre n'aboutit pas, et rien ne le lui disait.** Quatre
+`StatBox` ajoutées (Dépensé · Prix médian · En route · Annulés), qui **suivent la
+période choisie** comme sur Ventes.
+⚠️ On ne remet **PAS** « à retirer » dans cette rangée : ce compte a sa
+définition (`pickupUnion.total`) et il est déjà affiché deux fois plus bas. Deux
+nombres proches pour deux notions différentes sur le même écran, c'est
+exactement ce qu'on s'interdit (§11).
+⚠️ Le libellé disait « Prix moyen » pour une **médiane** — corrigé.
+
+### 5. « Reçu » se lisait « colis reçu »
+Le bouton du justificatif PDF s'appelait **« 📄 Reçu »**, juste à côté d'une
+pastille **« En transit »**. Un pro clique dessus en croyant marquer le colis
+reçu. Devenu **« 📄 Justificatif »**.
+Et le bandeau « 2 comptes ne reçoivent aucun email » s'affichait sur les
+**quatre** onglets, donc au-dessus de la liste des achats en route où il ne dit
+rien : c'est une information de **configuration**, sa place est sur « À
+retirer », là où les codes manquent.
+
+### La leçon, à ne plus oublier
+**Un défaut d'affichage ne se voit ni au build, ni dans une liste de textes, ni
+dans un compte d'erreurs.** Trois des cinq défauts ci-dessus (image cassée,
+numéro en double, style React qui écrase le DOM) n'étaient visibles **que sur
+l'image**. Regarder la capture fait partie du test — c'est déjà écrit en §5.56,
+et je ne l'avais pas fait sur cet écran.
+
+### Vérifié
+`npm run build` OK · **14 audits au vert** · les 4 onglets rendus sur les vraies
+données (À retirer 105 lignes, En route 214) : **0 suspect, 0 PAGEERROR** ·
+captures relues avant/après · 11 écrans à 390 px : 0 débordement, 0 écran vide.
