@@ -67,6 +67,12 @@ enDur ? nok('aucune clé privée VAPID en dur dans le dépôt public')
 !/if \(!PUSH_PRET\) return \{ sent: 0, total: 0/.test(srv)
   ? ok('sans clé, on compte quand même les appareils abonnés')
   : nok('`total` dit le vrai nombre d\'appareils', 'l\'app afficherait « aucun appareil abonné »');
+// 3ter) ⚠️ LA PANNE DOIT SE VOIR SUR L'ACCUEIL, PAS DANS LES RÉGLAGES.
+// Quand on compte sur les notifications pour ne PAS ouvrir l'app, apprendre la
+// panne en ouvrant l'écran de réglages est le pire des deux mondes.
+/function NotifsMuettes/.test(app) && /<NotifsMuettes/.test(app)
+  ? ok('« Ma journée » alerte quand le serveur ne peut rien envoyer')
+  : nok('l\'accueil alerte sur des notifications mortes', 'la panne resterait invisible');
 // 4) ⚠️ UN ABONNEMENT SCELLÉ SUR UNE ANCIENNE CLÉ DOIT ÊTRE PURGÉ.
 // Mesuré en direct sur les 2 appareils du vendeur : Chrome répond 403 « the
 // VAPID credentials … do not correspond », Apple 400 « VapidPkHashMismatch ».
