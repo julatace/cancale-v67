@@ -10260,7 +10260,16 @@ const loadCollected = () => new Set((load('vrm_colis_collected', []) || []).map(
 const SUJET_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/i;
 const SUJET_ENTRANT = /est arriv|disponible|[àa] retirer|en consigne|en relais|pr[êe]t [àa] [êe]tre retir/i;
 // 'sortant' | 'entrant' | null (on ne se prononce pas)
-const sensColis = (t) => {
+// ⚠️ `envoyes` = les n° de suivi de SES BORDEREAUX. C'est la preuve la plus
+// forte qu'un colis est sortant : un bordereau est l'étiquette qu'il colle sur
+// SON colis, et le n° de suivi est une identité, pas une ressemblance (§24).
+// Mesuré sur les 128 lignes de suivi : 18 portent le n° d'un de ses bordereaux,
+// dont **9 que le sujet ne permettait pas de trancher** — et **0 conflit** avec
+// la lecture du sujet. Le pont ajoute donc de la précision sans jamais
+// contredire la règle existante.
+const sensColis = (t, envoyes) => {
+  // Preuve certaine d'abord : ce n° de suivi est celui d'un bordereau à lui.
+  if (envoyes && t && t.suivi && envoyes.has(String(t.suivi).trim().toUpperCase())) return 'sortant';
   // Posé par le serveur quand il en est sûr (emails reçus à partir du 31 août).
   if (t && t.sens) return t.sens;
   const suj = String((t && (t.subject || t.sujet)) || '');
@@ -10271,10 +10280,10 @@ const sensColis = (t) => {
   return null;
 };
 
-const isColisActive = (t, collected) => {
+const isColisActive = (t, collected, envoyes) => {
   if (!t || t.status !== 'available') return false;
   // Un colis que TU as déposé ne t'attend nulle part.
-  if (sensColis(t) === 'sortant') return false;
+  if (sensColis(t, envoyes) === 'sortant') return false;
   if (collected && collected.has(colisKey(t))) return false;
   // Une limite annoncée par le transporteur garde le colis visible, même vieux.
   if (t && t.limite) {
@@ -10290,7 +10299,7 @@ const isColisActive = (t, collected) => {
 // CODE : un colis Chronopost/Pickup dont le seul moyen de retrait est le Pickup
 // Pass n'apparaissait donc **nulle part** — mesuré sur « Votre colis VINTED est
 // arrivé en relais Pickup », qui n'a ni code ni adresse dans l'email.
-const isColisRetirable = (t, collected) => isColisActive(t, collected) && (!!cleanLieu(t.lieu).nom || !!codeRetrait(t && t.code) || !!qrImage(t));
+const isColisRetirable = (t, collected, envoyes) => isColisActive(t, collected, envoyes) && (!!cleanLieu(t.lieu).nom || !!codeRetrait(t && t.code) || !!qrImage(t));
 // ⚠️ UN MÊME COLIS PEUT AVOIR PLUSIEURS LIGNES. Mesuré en base : 3 n° de suivi
 // existent en double (`email_track_vinted_04103186091937` ET
 // `email_track_chronopost_04103186091937`) — le transporteur et Vinted envoient
@@ -10939,6 +10948,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setCloudReady(true);
   }), []);
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
+  // ⚠️ LES N° DE SUIVI DE SES PROPRES BORDEREAUX = ses colis SORTANTS.
+  // Preuve certaine (le n° de suivi est une identité, §24), et gratuite :
+  // `fetchEmailBordereaux` projette déjà le champ `suivi` (§23).
+  // ⚠️ Déclaré ICI, juste après `emailBords`, donc AVANT tout ce qui le lit —
+  // un `useMemo` s'exécute immédiatement (piège TDZ, §19).
+  const suivisEnvoyes = useMemo(() => {
+    const set = new Set();
+    for (const b of (emailBords || [])) if (b && b.suivi) set.add(String(b.suivi).trim().toUpperCase());
+    return set;
+  }, [emailBords]);
   // Bordereau PDF capté par l'extension quand tu le télécharges sur Vinted → on
   // signale qu'il est dispo pour le tamponner en 1 clic (cf. startBordereau).
   const [freshLabel, setFreshLabel] = useState(null); // { name, mins } ou null
@@ -11107,11 +11126,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Un colis « à retirer » (available) qui traîne depuis > 14 j est forcément
   // déjà récupéré (un point relais ne garde pas un colis plus longtemps) : on
   // arrête de le compter, même si aucun email « retiré » n'est arrivé.
-  const isPickupActive = (t) => isColisActive(t, collected);
+  const isPickupActive = (t) => isColisActive(t, collected, suivisEnvoyes);
   // Colis RÉELLEMENT à retirer = actif ET identifiable (on sait OÙ aller ou on a
   // un code). Écarte les lignes de suivi parasites (ni lieu, ni code valide) qui
   // polluaient la liste. Utilisé partout pour que les compteurs concordent.
-  const isRetirable = (t) => isColisRetirable(t, collected);
+  const isRetirable = (t) => isColisRetirable(t, collected, suivisEnvoyes);
   // Ouvre la vue « scan » en grand : QR authentique de Vinted (qrB64) si présent,
   // sinon on génère un QR à partir du code de retrait ou du n° de suivi.
   // ⚠️ ON NE FABRIQUE PLUS DE QR. Vérifié sur les 61 colis reçus : le QR
@@ -11765,7 +11784,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // encore arrivé par email. Utilisé À L'IDENTIQUE par Ma journée ET l'onglet Achats.
   const pickupUnion = useMemo(() => {
     const retires = suivisRetires(tracking);
-    const emailList = (tracking || []).filter(t => isColisRetirable(t, collected) && !colisRetireAilleurs(t, retires));
+    const emailList = (tracking || []).filter(t => isColisRetirable(t, collected, suivisEnvoyes) && !colisRetireAilleurs(t, retires));
     const seen = new Set(emailList.map(t => normTitle(t.artTitle || t.article || t.modele || '')).filter(Boolean));
     const extra = vintedToPickup.filter(o => { const n = normTitle(o.title || ''); return !n || !seen.has(n); });
     // ── « JE L'AI RETIRÉ » : GRISÉ, PAS DISPARU ───────────────────────────────
@@ -11818,10 +11837,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Mondial Relay 74950536 (sa propre preuve de dépôt) serait donc passé de
       // « à retirer » à « jamais retiré, va le réclamer » : la même fausse
       // alerte, déplacée d'un bloc.
-      if (sensColis(t) === 'sortant') return false;                   // c'est TOI qui l'as posté
+      if (sensColis(t, suivisEnvoyes) === 'sortant') return false;    // c'est TOI qui l'as posté
       if (collected && collected.has(colisKey(t))) return false;      // il l'a déjà eu
       if (colisRetireAilleurs(t, retires)) return false;              // le transporteur a confirmé
-      if (isColisActive(t, collected)) return false;                  // encore dans la fenêtre → déjà affiché
+      if (isColisActive(t, collected, suivisEnvoyes)) return false;   // encore dans la fenêtre → déjà affiché
       return true;
     }).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
     return { emailList, extra, attente, attenteMail, oublies, total: emailList.length + extra.length };
@@ -13401,7 +13420,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
   useEffect(() => { (async () => {

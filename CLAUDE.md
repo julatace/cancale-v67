@@ -6572,3 +6572,54 @@ chaîne fonctionne.
 est ABSENTE et `abandon_json_item` monte encore (104) — donc ni le rattrapage
 des bordereaux (5.46), ni les codes de retrait Vinted Go depuis les
 conversations (5.45) ne tournent chez lui. **Zip 5.47 livré.**
+
+### 5.80 (suite) — LE N° DE SUIVI D'UN BORDEREAU EST UNE PREUVE, PAS UN INDICE
+
+Un bordereau est l'étiquette qu'il colle sur SON colis : son n° de suivi
+identifie donc un colis **sortant**, de façon certaine (§24 — un n° de suivi est
+une identité). `fetchEmailBordereaux` projette déjà le champ `suivi` (§23),
+donc le pont est **gratuit**.
+
+**Mesuré sur les 128 lignes de suivi** : 18 portent le n° d'un de ses
+bordereaux, dont **9 que la lecture du sujet ne permettait pas de trancher** —
+et **0 conflit** avec cette lecture. Le pont ajoute de la précision sans jamais
+contredire la règle existante.
+
+⚠️ **Honnêteté** : aucun colis actuellement affiché « à retirer » n'était en
+fait un envoi (mesuré : 0 sur 17). Ce pont ne corrige donc rien de visible
+aujourd'hui — il ferme la porte pour la suite, là où le sujet ne suffit pas.
+Vérifié au rendu : 14 à retirer / 3 jamais retirés / QR + 8156 + 9539 — chiffres
+**identiques** avant et après, comme prévu.
+
+⚠️ L'onglet Achats charge désormais `emailBords` (13 colonnes scalaires, ~21 Ko,
+jamais le PDF — §23/§34) : il en a besoin pour ce pont.
+⚠️ `suivisEnvoyes` est déclaré juste après `emailBords`, donc avant tout ce qui
+le lit (piège TDZ, §19).
+
+### ⚠️ PIÈGE DE PREUVE, ÉVITÉ DE JUSTESSE (le même qu'en §5.69)
+Pour prouver que l'audit échoue sur le code d'avant, j'ai d'abord lancé
+`node /home/user/cancale-v67/scripts/audit-colis-sens.cjs` depuis `/tmp/av4`.
+Le script résout ses chemins avec `path.join(__dirname, '..')` : il a donc relu
+**le dépôt courant** et affiché « tout va bien ». **Il faut copier le script dans
+l'arbre de test et le lancer DEPUIS cet arbre.** Fait : **6 contrôles en échec**
+sur le code d'avant, 7/7 sur la branche.
+
+### Santé de la base au moment du déploiement (31 août)
+| | |
+|---|---|
+| annonces en ligne (comptes vivants) | **30** |
+| sans numéro | **0** ✅ |
+| numéros portés par deux annonces | **0** ✅ |
+| paires numérotées | 278 |
+| **avec un prix d'achat** | **0 / 278** ⚠️ (saisie manuelle, §5.47/§5.64) |
+
+### ✅ DÉPLOYÉ (31 août, PR #56)
+La production était figée au 25 août, 54 commits de retard — c'était la cause
+unique de trois plaintes d'affilée. Fusionnée après vérification complète
+(build, 16 audits, smoke 10 écrans : 0 vide / 0 artefact).
+**Vérifié en direct sur `vrm.center` après déploiement** : les nouvelles chaînes
+sont dans le bundle servi, `GET /api/push?etat=1` répond **200** (au lieu de
+405) avec `{"pret":false,"devices":2}`, et le test renvoie **`total: 2`** au
+lieu de 0. La production dit enfin la vérité sur ses notifications.
+⚠️ **Reste `VAPID_PRIVATE_KEY` à poser dans Vercel** — aucun outil de la session
+ne donne accès aux variables d'environnement, c'est son geste.

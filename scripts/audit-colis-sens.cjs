@@ -49,10 +49,10 @@ f ? nok(f + ' colis à retirer classés « sortant » par erreur')
   : ok('aucun colis réellement à retirer n\'est pris pour un envoi');
 
 // 3) le sortant ne peut pas revenir par la porte de derrière
-/if \(sensColis\(t\) === 'sortant'\) return false;/.test(app)
+/sensColis\(t[^)]*\) === 'sortant'\) return false;/.test(app)
   ? ok('un colis sortant ne peut pas être « à retirer »')
   : nok('isColisActive écarte les colis sortants');
-(app.match(/sensColis\(t\) === 'sortant'/g) || []).length >= 2
+(app.match(/sensColis\(t[^)]*\) === 'sortant'/g) || []).length >= 2
   ? ok('… ni retomber dans « colis jamais retirés »')
   : nok('le panneau « jamais retirés » écarte aussi les sortants',
         'sinon la fausse alerte est juste déplacée d\'un bloc');
