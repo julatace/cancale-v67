@@ -6356,3 +6356,66 @@ Poser **`VAPID_PRIVATE_KEY`** dans les variables d'environnement Vercel, puis
 redéployer. Une clé privée ne peut pas vivre dans le dépôt (public) ni dans
 Supabase (lisible avec la clé anon publique — ce serait la même faille). C'est
 le seul endroit sûr, et c'est un geste unique.
+
+---
+
+## 5.78 — TEST NOTIF FAIT EN DIRECT : trois pannes empilées, toutes mesurées
+
+Julien : « fait un test notif, je ne reçois pas les ventes etc ». Test réel
+lancé contre la production et contre ses **2 vrais appareils** — pas une
+relecture de code.
+
+### Ce que le test a donné (31 août, en direct)
+| test | résultat |
+|---|---|
+| `GET https://vrm.center/api/push?etat=1` | **405 « POST only »** → la production tourne l'ancien code, l'app ne peut même pas demander « peux-tu envoyer ? » |
+| `POST /api/push {action:'test'}` (production) | `{"sent":0,"total":0,"erreur":"VAPID_PRIVATE_KEY absente"}` |
+| appareils abonnés en base | **2** (Chrome/FCM + Apple), réabonnés **le matin même à 06:59** |
+| **envoi RÉEL tenté** avec la paire régénérée (§5.77) | Chrome **403** « the VAPID credentials … do not correspond » · Apple **400 `{"reason":"VapidPkHashMismatch"}` » |
+| clé publique dans le bundle **déployé** | **DEUX clés différentes** — `BBQbRWE86gwZ…` (bloc de réabonnement hérité) et `BLw4VOxC3CXI…` (§5.53) |
+| clé publique sur la **branche** | **une seule**, `BIImaPEF…`, app et serveur d'accord |
+
+➡️ **Trois pannes empilées**, et chacune suffit à elle seule :
+1. le serveur n'a **aucune** clé privée → il n'envoie rien, jamais (§5.77) ;
+2. la production ne porte pas la route `GET ?etat=1` → l'app ne peut pas
+   l'annoncer, elle affiche « activées » ;
+3. les 2 abonnements sont **scellés sur une clé publique dont la privée
+   n'existe nulle part** — même en posant la clé sur Vercel, ces deux-là
+   resteraient morts.
+
+### ✅ CE QUE LE TEST PROUVE EN POSITIF (et c'était la vraie inconnue)
+**Les deux endpoints sont VIVANTS.** Un appareil désinstallé ou une permission
+retirée renvoie **404/410** ; ici les deux services ont **accepté la requête et
+ne l'ont refusée que sur la clé**. Donc la chaîne Supabase → service de push →
+téléphone fonctionne de bout en bout : il ne manque que la clé.
+⚠️ Sans ce test, impossible de distinguer « clé absente » de « téléphones
+partis ». C'est pour ça qu'on l'a lancé pour de vrai au lieu de relire le code.
+
+### ⚠️ LE DÉFAUT CORRIGÉ : un abonnement à clé périmée était compté comme vivant
+`sendPushToAll` ne purgeait que sur **404/410**. Un abonnement scellé sur une
+ancienne clé (403 / `VapidPkHashMismatch`) restait donc dans la liste **pour
+toujours** : « 2 appareils abonnés » s'affichait pendant que rien n'arrivait —
+la panne silencieuse exacte qui a coûté six jours.
+- **`cleSansRapport(e)`** reconnaît les deux formes RÉELLES relevées ci-dessus.
+- ⚠️ **Jamais sur un 403/400 nu** : on exige le MOTIF. Un refus passager ou une
+  charge mal formée effacerait sinon **tous** les appareils d'un coup.
+- `sendPushToAll` renvoie `perimes`, et le bouton **Test** de l'app dit quoi
+  faire : « N appareils étaient abonnés avec une ancienne clé — ils viennent
+  d'être retirés, rouvre l'app sur chaque appareil ». Avant, on lisait
+  « 2 abonnés, 0 joint » sans savoir quoi en faire.
+
+### L'ORDRE COMPTE (sinon ça ne marchera toujours pas)
+`memeCle()` — le réabonnement automatique qui re-scelle les appareils sur la
+clé courante (§5.61) — **n'existe QUE sur la branche**. Donc :
+1. **déployer la branche** (sans ça, les abonnements ne se re-scellent jamais) ;
+2. poser **`VAPID_PRIVATE_KEY`** dans les variables d'environnement Vercel ;
+3. **ouvrir l'app une fois sur chaque appareil** → il se réabonne tout seul ;
+4. refaire le test.
+⚠️ Inverser 1 et 3 ne marche pas : c'est le point qui manquait à §5.77.
+
+### Vérifié
+`npm run build` OK · **15 audits au vert** · `audit-push` passe à **10
+contrôles**, dont **3 nouveaux qui échouent bien sur le code d'avant** (§21 :
+rejoué sur `HEAD`, il sort les 3) · banc unitaire sur la VRAIE fonction
+`cleSansRapport` contre les erreurs mesurées : **8/8** (les 2 vraies purgent,
+403 nu / 400 nu / 429 / 500 / 404 / sans corps ne purgent pas).

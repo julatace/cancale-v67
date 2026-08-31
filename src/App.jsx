@@ -20022,6 +20022,12 @@ function PushSetting() {
         : (j.erreur === 'VAPID_PRIVATE_KEY absente'
             ? '⚠ Le serveur ne peut RIEN envoyer : la clé VAPID_PRIVATE_KEY n\'est pas configurée sur Vercel. Tant qu\'elle manque, aucune notification ne partira.'
             : (j.total === 0 ? '⚠ Aucun appareil abonné. Active les notifications sur cet appareil d\'abord.'
+            // ⚠️ Un abonnement scellé sur une ANCIENNE clé publique est mort pour
+            // toujours (mesuré : 403 côté Chrome, VapidPkHashMismatch côté Apple).
+            // Le serveur vient de le purger ; il faut rouvrir l'app sur chaque
+            // appareil pour qu'il se réabonne sur la clé courante. Sans ce
+            // message, on lisait « 2 abonnés, 0 joint » sans savoir quoi faire.
+               : j.perimes ? `⚠ ${j.perimes} appareil(s) étai(en)t abonné(s) avec une ancienne clé — ils viennent d\'être retirés. Rouvre l\'app sur chaque appareil : il se réabonnera tout seul, puis refais ce test.`
                              : `⚠ ${j.total} appareil(s) abonné(s), 0 joint. Réactive les notifications sur cet appareil.`)));
     } catch (e) { setMsg('Erreur test : ' + (e?.message || e)); }
   };

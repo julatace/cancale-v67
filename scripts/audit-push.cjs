@@ -59,6 +59,26 @@ enDur ? nok('aucune clé privée VAPID en dur dans le dépôt public')
   ? ok('la route GET ?etat=1 existe côté serveur')
   : nok('la route GET ?etat=1 existe', 'l\'app recevrait 405 et n\'alerterait jamais');
 
+// 4) ⚠️ UN ABONNEMENT SCELLÉ SUR UNE ANCIENNE CLÉ DOIT ÊTRE PURGÉ.
+// Mesuré en direct sur les 2 appareils du vendeur : Chrome répond 403 « the
+// VAPID credentials … do not correspond », Apple 400 « VapidPkHashMismatch ».
+// L'ancien code ne purgeait que sur 404/410 : ces abonnements restaient donc
+// comptés comme vivants pour toujours, et l'écran affichait « 2 appareils
+// abonnés » pendant que rien n'arrivait.
+/cleSansRapport/.test(srv) && /VapidPkHashMismatch/i.test(srv)
+  ? ok('un abonnement scellé sur une ancienne clé est reconnu et purgé')
+  : nok('les abonnements à clé périmée sont purgés', 'ils resteraient comptés comme vivants');
+// ⚠️ …mais JAMAIS sur un 403/400 nu : un refus passager effacerait tous les
+// appareils d'un coup. Le MOTIF doit être exigé.
+srv.includes('code !== 400 && code !== 403') && /return false;/.test(srv)
+ && /(do not correspond|mismatch|invalid)/.test(srv)
+  ? ok('la purge exige le MOTIF, jamais un 403/400 nu')
+  : nok('la purge exige le motif', 'un refus passager viderait la liste');
+// et l'app doit DIRE quoi faire, sinon on lit « 2 abonnés, 0 joint » sans savoir
+/j.perimes/.test(app)
+  ? ok('l\'app dit quoi faire quand les abonnements étaient périmés')
+  : nok('l\'app explique le cas « clé périmée »');
+
 console.log(ko ? `\n${ko} maillon(s) cassé(s) dans la chaîne push.`
                 : '\nLa chaîne push ne peut plus casser en silence.');
 process.exit(ko ? 1 : 0);

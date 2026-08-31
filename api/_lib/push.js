@@ -117,8 +117,31 @@ export async function saveSubs(subs) {
   } catch (_) {}
 }
 
+// ⚠️ UN ABONNEMENT SCELLÉ SUR UNE ANCIENNE CLÉ EST MORT POUR TOUJOURS.
+// Un abonnement push est scellé à la clé PUBLIQUE avec laquelle il a été créé.
+// Quand la paire change (ça est arrivé : §5.53 puis §5.77), les abonnements
+// déjà posés deviennent définitivement inutilisables — mais ils restent dans la
+// liste et sont comptés comme des appareils vivants. Mesuré en direct sur les
+// 2 appareils du vendeur :
+//     Chrome/FCM → 403 « the VAPID credentials in the authorization header do
+//                        not correspond to the credentials used to create the
+//                        subscription »
+//     Apple      → 400 {"reason":"VapidPkHashMismatch"}
+// Sans ce test, « 2 appareils abonnés » s'affiche pendant que rien n'arrive :
+// exactement la panne silencieuse qui a coûté six jours.
+// ⚠️ On NE purge PAS sur un 403/400 nu — un refus passager ou une charge mal
+// formée effacerait tous les appareils d'un coup. On exige le MOTIF.
+const cleSansRapport = (e) => {
+  const code = e && e.statusCode;
+  if (code !== 400 && code !== 403) return false;
+  const txt = String((e && (e.body || e.message)) || '').toLowerCase();
+  return /vapidpkhashmismatch/.test(txt)
+      || (/vapid/.test(txt) && /(do not correspond|mismatch|invalid)/.test(txt));
+};
+
 // Envoie la notification à tous les appareils abonnés.
-// Les abonnements morts (appli désinstallée, permission retirée) sont purgés.
+// Les abonnements morts (appli désinstallée, permission retirée) sont purgés,
+// ainsi que ceux scellés sur une clé qui n'est plus la nôtre (voir ci-dessus).
 export async function sendPushToAll(payload) {
   // ⚠️ Sans clé privée (variable d'environnement absente), on n'envoie RIEN et
   // on le dit clairement — plutôt que de repartir sur la clé qui traînait dans
@@ -129,16 +152,21 @@ export async function sendPushToAll(payload) {
   if (!subs.length) return { sent: 0, total: 0 };
   const body = JSON.stringify(payload);
   const alive = [];
-  let sent = 0;
+  let sent = 0, perimes = 0;
   for (const s of subs) {
     try {
       await webpush.sendNotification(s, body);
       alive.push(s); sent += 1;
     } catch (e) {
       const code = e && e.statusCode;
-      if (code !== 404 && code !== 410) alive.push(s); // erreur passagère : on garde
+      const mort = code === 404 || code === 410;      // appareil disparu
+      const perime = cleSansRapport(e);               // scellé sur une clé morte
+      if (perime) perimes += 1;
+      if (!mort && !perime) alive.push(s);            // erreur passagère : on garde
     }
   }
   if (alive.length !== subs.length) await saveSubs(alive);
-  return { sent, total: subs.length };
+  // `perimes` remonte jusqu'à l'écran : « 0 envoyé sur 2 » ne dit pas POURQUOI,
+  // « 2 appareils scellés sur une ancienne clé » dit quoi faire (rouvrir l'app).
+  return { sent, total: subs.length, ...(perimes ? { perimes } : {}) };
 }
