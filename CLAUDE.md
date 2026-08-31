@@ -6623,3 +6623,45 @@ sont dans le bundle servi, `GET /api/push?etat=1` répond **200** (au lieu de
 lieu de 0. La production dit enfin la vérité sur ses notifications.
 ⚠️ **Reste `VAPID_PRIVATE_KEY` à poser dans Vercel** — aucun outil de la session
 ne donne accès aux variables d'environnement, c'est son geste.
+
+---
+
+## 5.82 — « TU ES SÛR QUE LES NOTIFS MARCHENT ? » — NON, ET ÇA SE VOIT MAINTENANT
+
+Réponse honnête au moment où il l'a posée, vérifiée en direct sur la
+production : **non**. `GET https://vrm.center/api/push?etat=1` →
+`{"pret":false,"devices":2}` — deux téléphones abonnés, **zéro notification
+possible**, faute de `VAPID_PRIVATE_KEY` côté Vercel.
+
+⚠️ L'information existait déjà… **dans Réglages → Notifications**. Or on compte
+sur les notifications précisément pour **ne pas** avoir à ouvrir l'app :
+découvrir la panne en ouvrant un écran de réglages, c'est le pire des deux
+mondes.
+
+➡️ **`NotifsMuettes`** en tête de « Ma journée » : bandeau rouge « Ton téléphone
+ne recevra aucune notification », avec les trois étapes exactes. Il **disparaît
+tout seul** dès que la clé est posée.
+⚠️ On n'affiche **rien** tant que la réponse n'est pas arrivée (`null`) : une
+lecture ratée ne doit pas faire croire à une panne.
+
+**Vérifié au banc dans les DEUX sens** (le point qui compte — un bandeau qui
+s'affiche toujours ne vaut rien) : `pret:false` → bandeau rendu ;
+`pret:true` → **absent**. 0 erreur dans les deux cas.
+
+⚠️ **Piège de banc, nouveau** : Playwright teste les routes **de la plus
+récente à la plus ancienne**. Ma route spécifique `**/api/push*` était
+enregistrée AVANT le fourre-tout `**/api/**`, donc le fourre-tout gagnait et
+renvoyait `{}` — le bandeau n'apparaissait dans **aucun** des deux sens, et
+j'aurais conclu que le composant ne marche pas. **La route la plus spécifique
+s'enregistre en DERNIER.**
+
+### Le rappel du matin : mesuré, il ne dira rien demain (et c'est correct)
+Le vrai handler `api/ship-reminders.js` exécuté contre la vraie base :
+`{"ok":true,"skipped":"déjà notifié","total":0}`.
+Décomposé : 8 transactions attendent son envoi, **3 ont un bordereau avec une
+date limite** — toutes au **07/09**. Rien n'est donc en retard, ni dû
+aujourd'hui ou demain : `total = 0` est le bon chiffre.
+⚠️ **À savoir** : un bordereau **sans `dateLimite`** est ignoré par ce rappel
+(`if (!iso) continue;`). Aujourd'hui aucun n'est dans ce cas, mais le jour où
+un email de bordereau arrive sans date, le colis ne déclenchera aucun rappel.
+Ne pas « corriger » en inventant une date : c'est le transporteur qui la donne.

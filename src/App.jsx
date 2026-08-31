@@ -3308,6 +3308,39 @@ function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
 // 3 px sur le côté et à l'icône. Le titre garde la couleur du texte — c'est le
 // CHIFFRE qui porte la couleur quand il y a urgence. L'explication longue passe
 // derrière « Pourquoi ? » : elle reste disponible, elle n'occupe plus l'écran.
+// ⚠️⚠️ SI LE SERVEUR NE PEUT RIEN ENVOYER, ÇA DOIT SE VOIR SUR L'ACCUEIL.
+// Mesuré le 31 août, en direct sur la production : `GET /api/push?etat=1`
+// répondait `{"pret":false,"devices":2}` — deux téléphones abonnés, et **zéro
+// notification possible**, faute de `VAPID_PRIVATE_KEY` côté Vercel.
+// L'info existait déjà, mais dans Réglages → Notifications : personne ne va
+// voir un écran de réglages pour découvrir que son téléphone est muet. Quand
+// on compte sur les notifications pour ne PAS avoir à ouvrir l'app, une panne
+// silencieuse est exactement ce qu'il ne faut pas.
+// ⚠️ On n'affiche RIEN tant qu'on n'a pas la réponse (`null`) : une lecture
+// ratée ne doit pas faire croire à une panne.
+function NotifsMuettes({ onNav }) {
+  const [etat, setEtat] = useState(null);
+  useEffect(() => { let mort = false;
+    fetch('/api/push?etat=1').then(r => r.ok ? r.json() : null)
+      .then(j => { if (!mort && j && typeof j.pret === 'boolean') setEtat(j); })
+      .catch(() => {});
+    return () => { mort = true; };
+  }, []);
+  if (!etat || etat.pret) return null;
+  return (
+    <Notice tone="danger" icon="alert"
+      title="Ton téléphone ne recevra aucune notification"
+      value={etat.devices ? `${etat.devices} appareil${etat.devices>1?'s':''} abonné${etat.devices>1?'s':''}` : null}
+      desc="Le serveur n'a pas sa clé d'envoi : ni vente, ni colis, ni offre ne feront sonner ton téléphone tant qu'elle manque."
+      detail={"Vercel → projet cancale-v67 → Settings → Environment Variables → ajouter VAPID_PRIVATE_KEY, puis redéployer. Rouvre ensuite l'app une fois sur chaque téléphone : il se réabonne tout seul."}
+      action={onNav && <button type="button" onClick={()=>onNav('settings')}
+        style={{border:'none',background:C.danger,color:'#fff',borderRadius:3,padding:'8px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+        Voir les réglages
+      </button>}
+      style={{marginBottom:14}}/>
+  );
+}
+
 function Notice({ tone='info', icon, title, value, desc, detail, action, style={} }) {
   const col = tone==='danger' ? C.danger : tone==='warn' ? C.warn : tone==='ok' ? C.accent : C.blue;
   return (
@@ -14951,6 +14984,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               )}
             </div>
+
+            {/* ⚠️ Avant tout le reste : si le serveur ne peut envoyer aucune
+                notification, il faut le voir ICI. Compter sur les notifications
+                pour ne pas ouvrir l'app, et n'apprendre la panne qu'en ouvrant
+                l'app, c'est le pire des deux mondes. Le bandeau se retire tout
+                seul dès que la clé est posée. */}
+            <NotifsMuettes onNav={onNav}/>
 
             {/* RÉSULTAT DU JOUR : ce que tu as vendu aujourd'hui. Placé tout en
                 haut parce que c'est la première chose qu'on veut savoir en
