@@ -19922,7 +19922,7 @@ function EmailStartSetting() {
 // Notifications push : ventes / bordereaux / argent reçu en temps réel, même
 // app fermée. Nécessite l'app installée sur l'écran d'accueil (iPhone) et le
 // pipeline email branché (api/email-inbound.js). Un abonnement par appareil.
-const VAPID_PUBLIC_KEY='BLw4VOxC3CXI_yY521zsKXiVbjbQ_YsQtNWqHBDBWsPBD6y4AdCrA_rBv-9vJ3_UgtfcKBjPLPyGFRwANjfBFSk';
+const VAPID_PUBLIC_KEY='BIImaPEF-sZb0ohfXGjjR2eKYVVAyz1I3-fYXNlsSUrTQfGM4le_OxJbUML2YyL5ctFea-LS7NfPD9RotDJ0bbc';
 function PushSetting() {
   const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
   const [msg, setMsg] = useState(null);
@@ -20040,7 +20040,17 @@ function PushSetting() {
         <div style={{display:'flex',gap:8,alignItems:'flex-start',padding:'9px 11px',borderRadius:3,border:`1px solid ${C.danger}55`,background:`${C.danger}12`,marginBottom:10}}>
           <Icon name="alert" size={16} style={{color:C.danger,flexShrink:0,marginTop:1}}/>
           <div style={{fontSize:11.5,color:C.text,lineHeight:1.45,minWidth:0}}>
-            <b style={{color:C.danger}}>Le serveur ne peut envoyer aucune notification.</b> La clé <code style={{fontSize:10.5}}>VAPID_PRIVATE_KEY</code> n'est pas configurée sur Vercel — elle a été sortie du code source pour raison de sécurité et doit y être remise une fois. Tant qu'elle manque, activer les notifications ici ne changera rien.
+            <b style={{color:C.danger}}>Le serveur ne peut envoyer aucune notification.</b> Tant que c'est le cas, activer les notifications ici ne changera rien : l'interrupteur serait un mensonge.
+            {/* ⚠️ UNE ALERTE QUI NE DIT PAS QUOI FAIRE NE SERT À RIEN. Julien n'est
+                pas développeur : la marche à suivre doit être exacte, dans l'ordre,
+                avec le nom du réglage à taper. */}
+            <div style={{marginTop:7,paddingTop:7,borderTop:`1px solid ${C.danger}33`}}>
+              <div style={{fontWeight:700,marginBottom:3}}>Ce qu'il faut faire, une seule fois :</div>
+              <div>1. Ouvrir <a href="https://vercel.com/shopcancale35-7638s-projects/cancale-v67/settings/environment-variables" target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Vercel → Settings → Environment Variables</a></div>
+              <div>2. Ajouter la variable <code style={{fontSize:10.5}}>VAPID_PRIVATE_KEY</code> avec la clé privée que je t'ai donnée</div>
+              <div>3. Redéployer (Deployments → ⋯ → Redeploy)</div>
+              <div style={{marginTop:4,color:C.muted}}>La clé privée ne peut pas vivre dans le code : le dépôt est public, n'importe qui pourrait envoyer des notifications sur ton téléphone.</div>
+            </div>
           </div>
         </div>
       )}

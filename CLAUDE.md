@@ -6292,3 +6292,67 @@ et je ne l'avais pas fait sur cet écran.
 `npm run build` OK · **14 audits au vert** · les 4 onglets rendus sur les vraies
 données (À retirer 105 lignes, En route 214) : **0 suspect, 0 PAGEERROR** ·
 captures relues avant/après · 11 écrans à 390 px : 0 débordement, 0 écran vide.
+
+---
+
+## 5.77 — ⚠️⚠️ LES NOTIFICATIONS ÉTAIENT MORTES DEPUIS LE 25 AOÛT, ET C'ÉTAIT MA FAUTE
+
+Julien : « remets les notifs, ça ne marche plus du tout ». **Il avait raison, la
+cause est chez moi, et elle est mesurée.**
+
+### Ce que la production contenait vraiment (`origin/main`, 25 août)
+| contrôle | état |
+|---|---|
+| clé privée VAPID disponible | **NON** → `sendPushToAll` sort sur « VAPID_PRIVATE_KEY absente » |
+| route `GET /api/push?etat=1` | **NON** → l'app reçoit **405**, elle ne peut pas savoir |
+| l'app affiche l'alerte | **NON** → l'écran dit « activées » |
+
+➡️ **Depuis le 25 août, zéro notification n'est partie**, pendant que l'écran
+affichait « activées ». Vérifié en direct : `https://vrm.center/api/push?etat=1`
+→ **405 « POST only »**, et 2 appareils toujours abonnés (mis à jour hier 20:17).
+
+### La cause exacte : §5.53
+En sortant la clé privée du dépôt public, j'ai **régénéré la paire** — donc
+`BBQbRWE86gwZ…` (avec sa privée en dur, qui marchait) est devenue
+`BLw4VOxC3CXI…` **sans privée nulle part**. La note disait « à faire par
+Julien : poser `VAPID_PRIVATE_KEY` sur Vercel »… **sans jamais lui donner la
+valeur à poser**. C'était donc impossible à faire.
+⚠️ Confirmé dans l'historique : `ffa1c18` et antérieurs → clé publique
+`BBQbRWE86gwZ…` + privée en dur ; `75733c4` (§5.53) → nouvelle publique, plus
+aucune privée. **La privée de la paire actuelle n'a jamais existé ailleurs que
+dans ma session.**
+
+### Ce qui est livré
+1. **Paire régénérée**, la publique posée **aux deux endroits** (`src/App.jsx` et
+   `api/_lib/push.js`) ; **la privée est remise à Julien en main propre**, jamais
+   dans le dépôt (le dépôt est public — c'est tout l'objet de §5.53).
+2. **L'alerte devient actionnable** : elle donnait le nom de la variable sans
+   dire quoi faire. Elle liste maintenant les trois étapes exactes, avec le
+   **lien direct** vers les variables d'environnement du projet Vercel.
+   ⚠️ Une alerte qui ne dit pas quoi faire ne sert à rien quand la personne en
+   face n'est pas développeur.
+3. Le **ré-abonnement automatique** (`memeCle`, §5.61) était déjà écrit : la clé
+   publique ayant changé, les 2 abonnements existants sont périmés et seront
+   remplacés tout seuls à la première ouverture après déploiement.
+
+### ✅ `scripts/audit-push.cjs` — 7 contrôles permanents
+La chaîne push casse **en silence** : c'est ça qui a coûté six jours.
+1. l'app et le serveur partagent **la même clé publique** (si elles divergent,
+   chaque abonnement est scellé sur une clé que le serveur n'utilise pas —
+   refus à l'envoi, et rien ne le dit) ;
+2. **aucune clé privée en dur** (le dépôt est public) ;
+3. la privée vient **uniquement** de la variable d'environnement ;
+4. le serveur **annonce** « clé absente » au lieu d'échouer en silence ;
+5. l'app **interroge** l'état du serveur ;
+6. l'app **affiche** l'alerte ;
+7. la route `GET ?etat=1` **existe** côté serveur — sinon l'app reçoit 405 et
+   n'alerte jamais (exactement le cas de production).
+
+⚠️ **Prouvé dans les deux sens** (§21) : rejoué sur `origin/main`, il sort
+**3 maillons cassés** (points 5, 6, 7) ; sur la branche, 7 au vert.
+
+### ⚠️ CE QUI RESTE À FAIRE PAR JULIEN, ET QUE LE CODE NE PEUT PAS FAIRE
+Poser **`VAPID_PRIVATE_KEY`** dans les variables d'environnement Vercel, puis
+redéployer. Une clé privée ne peut pas vivre dans le dépôt (public) ni dans
+Supabase (lisible avec la clé anon publique — ce serait la même faille). C'est
+le seul endroit sûr, et c'est un geste unique.
