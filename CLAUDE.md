@@ -6931,3 +6931,29 @@ aucune seconde règle à maintenir.
 console sont le 400 volontaire de `select=owner` et les resets de fin de test) ·
 capture du tableau de bord relue : les deux rangées portent le même dessin que
 le reste de l'app, séparées par leur étiquette.
+
+### ✅ 5.84 (suite) — LES NOTIFICATIONS PARTENT (1er septembre, vérifié en direct)
+
+Julien a posé **`VAPID_PRIVATE_KEY`** dans les variables d'environnement Vercel.
+C'était le dernier maillon, et il était hors de portée du code (§5.77, §5.78).
+
+Mesuré sur la **production**, pas déduit :
+```
+GET  /api/push?etat=1        → {"pret":true,"devices":1}
+POST /api/push {test}        → {"ok":true,"sent":1,"total":1}
+```
+➡️ La chaîne complète fonctionne : clé serveur → abonnement scellé → service de
+push → téléphone. **La notification est réellement partie**, ce n'est pas un
+« ça devrait marcher maintenant ».
+
+⚠️ **`devices` est passé de 2 à 1** : le second appareil était abonné sous
+l'ancienne clé publique et a été **purgé** par `cleSansRapport` (§5.78) — c'est
+le comportement voulu, un abonnement mort ne doit pas être compté comme vivant.
+Il se réabonne **tout seul** (`memeCle`, §5.61) à la première ouverture de l'app
+sur cet appareil. **Rien à faire d'autre que l'ouvrir une fois.**
+
+⚠️ **Ne pas conclure de ce test que Julien recevra une notification pour chaque
+vente** : une notification de vente naît d'un **email de vente**, et **5 comptes
+sur 9 ne reçoivent aucun email** (§5.81 — leurs boîtes ne transfèrent pas vers
+l'adresse de réception de l'app). Le canal est réparé ; la couverture par compte
+reste le point ouvert, et il est affiché dans Réglages → Notifications.
