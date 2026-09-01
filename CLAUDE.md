@@ -6830,3 +6830,46 @@ réellement ouverte (⋯ Outils → Rapport) et rendue sans erreur · smoke **11
 ⚠️ **Ceci ne remplace pas la saisie des prix d'achat** (0 sur 278, §22) — Julien
 s'en charge lui-même (« je vais faire les coûts d'achat »). Le correctif garantit
 seulement que l'app **ne raconte rien de faux en attendant**.
+
+
+### 5.84 (suite) — ANNONCES : 6 COLONNES DE 180 px, TOUS LES CHAMPS TRONQUÉS
+
+Rendu à 1512 px (son écran de travail, §42). La grille était en
+`minmax(160px, 1fr)` : sur un écran large, `auto-fill` fabrique donc **plus de
+colonnes**, pas des cartes plus grandes — **6 colonnes de ~180 px**. Résultat
+mesuré à l'écran : « **acha€** » pour « achat € », « **N° 15(** », « **N° 38!** »,
+« Min. accepté » cassé sur deux lignes, « Prix conseill ». Or c'est
+**précisément cet écran** qui porte le N° de la paire, le prix d'achat et le prix
+plancher.
+
+➡️ **`minmax(clamp(160px, 25%, 240px), 1fr)`**. Le pourcentage se résout sur la
+largeur de la grille, donc le **plancher monte avec l'écran** :
+| | plancher | résultat mesuré |
+|---|---|---|
+| ordinateur (grille 1124 px) | 240 px | **4 colonnes de 270 px** — tous les champs lisibles |
+| téléphone (grille ~362 px) | 160 px (25 % = 90) | **2 colonnes, strictement inchangé** |
+
+Une seule règle, **aucun test de largeur en JavaScript** (§5.62).
+
+⚠️ **Effet de bord immédiat, vu en capture** : à 270 px de large, le ratio `3/4`
+portait la photo à **~360 px de haut** — une SEULE rangée d'annonces tenait à
+l'écran. Une chaussure ne se voit pas mieux en 360 px qu'en 250 : `maxHeight: 250`
++ `overflow: hidden` (l'image reste cadrée par `objectFit: cover`).
+
+### Deux défauts de plus sur l'écran Colis
+- ⚠️ **« Bordereau déjà généré chez Vinted — le PDF arrive par email. »** est
+  **faux depuis §5.31/§5.72** : c'est l'extension qui va chercher le PDF à chaque
+  visite (rattrapage 21 j), l'email n'est plus que le filet. Le texte l'envoyait
+  surveiller sa boîte mail au lieu de simplement repasser sur Vinted — même
+  famille que « ouvre ton porte-monnaie » (§5.27), un conseil qui survit à la
+  fonction qu'il décrivait. Devenu « **l'extension le récupère** à ta prochaine
+  visite sur Vinted (l'email sert de filet) ».
+- Le bouton **« 🖨 Imprimer »** était `flex:'1 1 160px'` et **seul enfant de sa
+  rangée** quand le PDF est là : mesuré **~1100 px de large** sur un écran de
+  1512. `maxWidth: 340` — il grandit toujours sur téléphone, il s'arrête à une
+  taille de bouton sur ordinateur.
+
+**Vérifié** : `npm run build` OK · **17 audits au vert** · colonnes mesurées au
+banc (`getComputedStyle(...).gridTemplateColumns`) : **4 × 270,5 px** sur
+ordinateur · **11 écrans à 390 px : 0 débordement, 0 écran vide, 0 PAGEERROR,
+0 suspect** — le téléphone est intact.

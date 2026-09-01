@@ -17403,7 +17403,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items && listings.items.length>0 && annShown.length===0 && (
           <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px'}}>Aucune annonce ne correspond.</div>
         )}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
+        {/* ⚠️ SUR ORDINATEUR, `minmax(160px, …)` FAISAIT DES COLONNES, PAS DES
+            CARTES. Mesuré à 1512 px : 6 colonnes de ~180 px, donc tous les champs
+            de saisie tronqués — « acha€ » pour « achat € », « N° 15( », « Min.
+            accepté » sur deux lignes, « Prix conseill ». Or c'est précisément
+            cet écran qui porte le N°, le prix d'achat et le prix plancher.
+            `clamp(160px, 25%, 240px)` : le pourcentage se résout sur la largeur
+            de la grille, donc le plancher MONTE avec l'écran — 4 colonnes de
+            ~284 px sur ordinateur, et **2 colonnes inchangées sur téléphone**
+            (25 % de 362 px = 90 px, ramené au plancher de 160). Une seule règle,
+            aucun test de largeur en JavaScript (§5.62). */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(clamp(160px, 25%, 240px), 1fr))',gap:14}}>
           {annShown.map(it=>{
             const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };
             const e = numeros[it.id] || {}; const num = e.numero || ''; const buy = e.buyPrice ?? '';
@@ -17421,7 +17431,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // du numéro qui porte la couleur.
               <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:4,overflow:'hidden',background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',...(soldBord?{opacity:0.85}:{}),display:'flex',flexDirection:'column'}}>
                 <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
-                  <div style={{width:'100%',aspectRatio:'3/4',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{width:'100%',aspectRatio:'3/4',maxHeight:250,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                     {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:32}}>👟</span>}
                   </div>
                   {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:700,padding:'4px 8px',borderRadius:3,textAlign:'center'}}>📦 VENDUE — bordereau reçu</div>}
@@ -17907,7 +17917,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!bytes) { toast('PDF illisible.'); return; }
                           processBordereau(num, titre, bytes);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
-                        style={{flex:'1 1 160px',border:'none',background:C.accent,color:'#fff',borderRadius:4,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
+                        style={{flex:'1 1 160px',maxWidth:340,border:'none',background:C.accent,color:'#fff',borderRadius:4,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
                             qui génère le bordereau manquant dès que tu arrives sur
@@ -17917,7 +17927,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
                           {aGenererBordereau(o && o.status)
                             ? <><b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
-                            : <><b>Bordereau déjà généré</b> chez Vinted — le PDF arrive par email.</>}
+                            : <><b>Bordereau déjà généré</b> chez Vinted — <b>l'extension le récupère</b> à ta prochaine visite sur Vinted (l'email sert de filet).</>}
                         </div>
                         <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
