@@ -11876,7 +11876,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (isColisActive(t, collected, suivisEnvoyes)) return false;   // encore dans la fenêtre → déjà affiché
       return true;
     }).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
-    return { emailList, extra, attente, attenteMail, oublies, total: emailList.length + extra.length };
+    // ── CE QU'IL PEUT VRAIMENT FAIRE, MAINTENANT (§11 : une seule règle) ─────
+    // Mesuré le 1er septembre : Ma journée annonçait « Retirer 15 colis —
+    // récupère-les avec ton code », alors que **3 seulement** portaient un code
+    // ou une adresse (et les 3 étaient HORS DÉLAI), les 12 autres n'étant que
+    // des « déposé » vus côté Vinted, sans code, sans lieu. L'accueil l'envoyait
+    // donc au relais pour 15 colis dont 12 ne peuvent pas être retirés.
+    // ⚠️ On ne cache RIEN (un colis caché est un colis perdu, §5.43) : le total
+    // ne bouge pas. On sépare seulement ce qui appelle un déplacement de ce qui
+    // appelle une attente — et le hors-délai vit ICI, plus recalculé à la main
+    // dans l'écran Achats, sinon les deux écrans finissent par ne plus dire le
+    // même nombre.
+    const horsDelai = emailList.filter(t => { const j = joursAvant(t && t.limite); return j != null && j < 0; });
+    return { emailList, extra, attente, attenteMail, oublies, horsDelai,
+             prets: emailList.length, sansCode: extra.length,
+             total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone]);
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
@@ -14956,9 +14970,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         const jobs=[];
-        if(toShip.length) jobs.push({icon:'truck',color:late>0?C.danger:C.warn,title:`Expédier ${toShip.length} colis`,sub:late>0?`${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_bord',prio:late>0?0:1});
+        if(toShip.length) jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub:late>0?`${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_bord',prio:late>0?0:1});
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
-        if(pickupCount) jobs.push({icon:'box',color:C.blue||C.accent,title:`Retirer ${pickupCount} colis`,sub:'Déposés en point relais — récupère-les avec ton code',tab:'cat_achats',prio:2});
+        // ⚠️ LE SOUS-TITRE DOIT DIRE CE QU'IL PEUT FAIRE, PAS SEULEMENT COMBIEN.
+        // Mesuré le 1er septembre : « Retirer 15 colis — récupère-les avec ton
+        // code » pour 3 colis réellement retirables (tous hors délai) et 12 sans
+        // code ni adresse. Le total reste le même (on ne cache pas un colis,
+        // §5.43) ; c'est la consigne qui change, et le hors-délai fait remonter
+        // la ligne en tête parce qu'un colis non retiré repart chez l'expéditeur.
+        if(pickupCount){
+          const hd=pickupUnion.horsDelai.length, pr=pickupUnion.prets, sc=pickupUnion.sansCode;
+          const sub = hd>0 ? `${hd} hors délai — va vite ${hd>1?'les':'le'} chercher`
+            : pr>0 && sc>0 ? `${pr} avec ton code · ${sc} en attente de leur code`
+            : pr>0 ? 'Tu as le code — plus qu\'à aller les chercher'
+            : 'Vinted dit « déposé » — le code arrive par email ou dans la conversation';
+          jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
+        }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
         jobs.sort((a,b)=>a.prio-b.prio);
@@ -15075,7 +15102,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{width:42,height:42,borderRadius:3,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
-                      <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
+                      {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
+                          « 3 en retard — à poster en priorité » et « 3 hors
+                          délai — va vite les chercher » se lisaient de la même
+                          couleur que « Bordereau + paire au garage ». La
+                          consigne porte la couleur seulement quand il y a
+                          vraiment quelque chose à rattraper (§5.65 : c'est le
+                          chiffre qui se colore, pas le fond). */}
+                      <div style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
                     </div>
                     <div style={{fontSize:22,color:j.color,fontWeight:700,flexShrink:0}}>›</div>
                   </button>
@@ -16023,7 +16057,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Ce n'est pas la même liste de travail — soit tu l'as déjà
                       récupéré sans cocher, soit il est reparti chez l'expéditeur
                       et il faut le réclamer. On le dit sur la même ligne. */}
-                  {(()=>{ const hd = avail.filter(t=>{ const j=joursAvant(t.limite); return j!=null && j<0; }).length;
+                  {(()=>{ const hd = pickupUnion.horsDelai.length;   // §11 : calculé UNE fois, dans pickupUnion
                     return (<div style={{fontSize:15,fontWeight:700,color:C.text}}>
                       {pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
