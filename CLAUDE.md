@@ -6734,3 +6734,37 @@ cette session qu'**aucun outil disponible ne peut écrire une variable
 d'environnement Vercel** (pas de CLI, pas de jeton, le connecteur Vercel ne
 couvre que projets/déploiements/protection). C'est son geste, et c'est le seul
 qui reste pour que les notifications partent.
+
+
+### 5.83 (suite) — L'ONGLET « À RETIRER » COMMENCE PAR LES COLIS
+
+Toujours en regardant la capture, sur le même écran : avant d'atteindre le
+premier colis il fallait passer **la période, la recherche, quatre chiffres
+comptables et un bandeau d'avertissement**.
+
+⚠️ **Ces trois commandes n'agissent sur RIEN sur cet onglet.** Vérifié dans le
+code : `aFilter === 'attente'` renvoie **faux** dans le filtre de la liste des
+commandes — l'onglet n'affiche aucune liste, seulement les colis groupés par
+point relais. La période et la recherche filtrent donc du contenu absent, et
+« Dépensé / Prix médian / En route / Annulés » sont des chiffres de comptabilité
+au-dessus d'un écran opérationnel. Ils reviennent **tels quels** sur En route /
+Reçus / Tous, où ils filtrent vraiment quelque chose.
+
+**Le bandeau « N comptes ne reçoivent aucun email » passe SOUS les colis.** Il
+reste sur cet onglet (c'est bien là que les codes manquent) mais c'est une
+information de **configuration** — vraie pendant des semaines, réglée une fois,
+et pas depuis cet écran. En tête, il repoussait chaque jour les codes et les QR
+d'une centaine de pixels.
+
+### ⚠️ La ligne la plus urgente de l'écran était la seule tronquée
+`délai dépassé depuis 3 j (29/08/2026) — va …` : elle portait
+`nowrap + overflow + ellipsis` comme ses voisines. Un n° de suivi peut se
+couper, une date limite non — elle passe en `lineHeight` normal et se replie.
+
+**Mesuré au rendu, 430 px** : le premier colis passe de **~830 px du haut à
+~400 px** — il est visible sans défiler, avec son identifiant et son code
+d'ouverture en gros.
+
+**Vérifié** : `npm run build` OK · **16 audits au vert** · smoke 11 écrans à
+390 px : **0 débordement horizontal, 0 écran vide, 0 suspect d'affichage,
+0 texte « undefined »**.

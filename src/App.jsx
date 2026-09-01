@@ -15950,8 +15950,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button key={id} onClick={()=>setAFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:3,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
           )); })()}
         </div>
-        {buysBase.length>0 && <PeriodePicker value={periode} onChange={setPeriode}/>}
-        {buysBase.length>0 && (
+        {/* ⚠️ SUR « À RETIRER », CES TROIS COMMANDES N'AGISSENT SUR RIEN.
+            Cet onglet n'affiche AUCUNE liste de commandes (`aFilter==='attente'`
+            renvoie faux dans le filtre plus bas) : il montre les colis groupés
+            par point relais. La période, la recherche et les quatre chiffres
+            comptables portent donc sur du contenu qui n'est pas là — et ils
+            repoussaient les colis, leur code et leur QR de plus d'un écran vers
+            le bas, alors que c'est exactement ce qu'on vient chercher quand on
+            part au relais. Ils reviennent tels quels sur En route / Reçus /
+            Tous, où ils filtrent vraiment quelque chose. */}
+        {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode}/>}
+        {buysBase.length>0 && aFilter!=='attente' && (
           <input value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher (titre, N°, vendeur)…"
             style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:3,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',marginBottom:12}}/>
         )}
@@ -15968,7 +15977,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (`pickupUnion.total`, union email + statut Vinted) et il est déjà
             affiché deux fois plus haut. Deux nombres proches pour deux notions
             différentes sur le même écran, c'est exactement ce qu'on s'interdit. */}
-        {buysBase.length>0 && (()=>{
+        {buysBase.length>0 && aFilter!=='attente' && (()=>{
           const dans = buysBase.filter(o=>matchOrd(o));
           const M = (o)=>montantCommande(o);
           const annule = (o)=>/annul|rembours|refus/i.test(o.status||'');
@@ -15997,8 +16006,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             route, où il ne dit rien d'utile. C'est une information de
             configuration (une boîte mail qui ne transfère pas), pas une alerte
             de tous les jours. */}
-        {aFilter==='attente' && <ReceptionEmails tracking={tracking} comptes={accounts}
-          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>}
         {/* À RETIRER — liste simple façon appli de colis : groupée par point relais,
             avec LE CODE de retrait en gros (c'est ça qu'on donne au comptoir) et un
             « Y aller ». Source = emails transporteur (qui portent le code), et non
@@ -16191,7 +16198,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
-                            <div style={{fontSize:11,fontWeight:jours<=2?700:600,color:jours<=2?C.danger:C.warn,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            /* ⚠️ CETTE LIGNE-LÀ NE SE COUPE PAS. Elle était en
+                               `nowrap + ellipsis` comme ses voisines : à 430 px
+                               elle s'affichait « délai dépassé depuis 3 j
+                               (29/08/2026) — va … », donc la consigne la plus
+                               urgente de l'écran était la seule tronquée. Un
+                               n° de suivi peut se couper, une date limite non. */
+                            <div style={{fontSize:11,fontWeight:jours<=2?700:600,color:jours<=2?C.danger:C.warn,marginTop:1,lineHeight:1.3}}>
                               {/* ⚠️ « délai dépassé » tout court se lit comme une
                                   contradiction quand la ligne du dessus dit
                                   « arrivé il y a 6 j ». On donne LA date et de
@@ -16416,6 +16429,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* ⚠️ SOUS LES COLIS, PAS AU-DESSUS. Ce panneau dit quelles boîtes mail
+            ne transfèrent pas — une information de configuration, vraie pendant
+            des semaines, qu'on règle une fois. Placé en tête, il repoussait
+            chaque jour les colis, leurs codes et leurs QR d'une centaine de
+            pixels : ce qu'on vient chercher passait après ce qu'on ne peut pas
+            régler d'ici. Il reste sur cet onglet (c'est bien là que les codes
+            manquent), simplement après. */}
+        {aFilter==='attente' && <ReceptionEmails tracking={tracking} comptes={accounts}
+          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>}
         {/* ── ⚠️ LES COLIS JAMAIS RETIRÉS ────────────────────────────────────────
             « Je dois passer à côté de rien. » Ces colis-là sortaient de l'écran
             SANS RIEN DIRE dès qu'ils dépassaient 14 jours (mesuré : 4 colis de
