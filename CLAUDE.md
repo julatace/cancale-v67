@@ -6665,3 +6665,72 @@ aujourd'hui ou demain : `total = 0` est le bon chiffre.
 (`if (!iso) continue;`). Aujourd'hui aucun n'est dans ce cas, mais le jour où
 un email de bordereau arrive sans date, le colis ne déclenchera aucun rappel.
 Ne pas « corriger » en inventant une date : c'est le transporteur qui la donne.
+
+
+---
+
+## 5.83 — « RETIRER 15 COLIS » QUAND IL N'EN A QUE 3 DE RETIRABLES
+
+Trouvé en **regardant l'écran** (§5.76), pas en relisant du code. Sur les
+**mêmes** données du 1er septembre :
+
+| écran | ce qu'il affichait |
+|---|---|
+| **Ma journée** | « Retirer 15 colis — **récupère-les avec ton code** » |
+| **Achats** | 3 colis avec un code ou une adresse… **tous les 3 hors délai**, et **12 « Code de retrait pas encore reçu · Point relais à confirmer »** |
+
+Les 12 ne viennent pas d'un email de transporteur : ce sont des achats que
+**Vinted** dit « déposés en point relais », sans code, sans adresse, sans QR.
+L'écran Achats était honnête ; c'est **l'accueil** qui l'envoyait au comptoir
+pour 15 colis dont 12 ne peuvent pas être retirés — et qui taisait que les 3
+retirables étaient **hors délai** (un point relais rend le colis à l'expéditeur).
+
+### Le correctif : le total ne bouge pas, la consigne change
+⚠️ **On ne cache RIEN** (§5.43 : un colis caché est un colis perdu). `total`
+reste l'union des deux signaux. Ce qui change, c'est ce que la tuile **dit** :
+| état | consigne |
+|---|---|
+| des colis hors délai | « N hors délai — va vite les chercher » (rouge, **remonte en tête**) |
+| code pour une partie | « N avec ton code · M en attente de leur code » |
+| tous avec code | « Tu as le code — plus qu'à aller les chercher » |
+| aucun code | « Vinted dit "déposé" — le code arrive par email ou dans la conversation » (gris, **descend en bas**) |
+
+### ⚠️ Le hors-délai était calculé DEUX FOIS
+L'écran Achats le recomptait **en ligne** dans son bandeau. `pickupUnion` porte
+désormais **`horsDelai`**, `prets` et `sansCode` (§11 : une notion, une règle) —
+les deux écrans ne peuvent plus annoncer des nombres différents.
+
+### Une urgence écrite en gris n'est pas une urgence
+Les sous-titres des cartes d'action étaient **tous** en `C.muted` : « 3 en retard
+— à poster en priorité » se lisait de la même couleur que « Bordereau + paire au
+garage ». Drapeau `urgent` sur la carte → la consigne porte la couleur, et
+seulement quand il y a vraiment quelque chose à rattraper (§5.65 : c'est le
+chiffre qui se colore, pas le fond).
+
+**Vérifié au rendu réel** (vraies données rafraîchies du jour) : la ligne remonte
+en tête et affiche **« Retirer 15 colis · 3 hors délai — va vite les chercher »**
+en rouge ; l'écran Achats affiche **le même 3**. `npm run build` OK ·
+**16 audits au vert** · smoke : 0 écran vide, 0 suspect, 0 PAGEERROR.
+
+### État mesuré le 1er septembre (après rechargement de l'extension par Julien)
+| | |
+|---|---|
+| comptes captés dans l'heure | **7 sur 9** (`julatace3535` 4,8 j · `liliand653` masqué, 30 j) |
+| colis à envoyer | 14 — **12 ont déjà leur PDF**, 2 sans (les deux `tomj606`, « Bordereau envoyé au vendeur ») |
+| colis réellement retirables | **3, tous hors délai** · 12 « déposés » sans code · 3 jamais retirés (25 à 35 j) |
+| annonces en ligne | 30 · **0 sans numéro · 0 doublon de numéro** ✅ |
+| prix d'achat | **0 / 278** ⚠️ |
+
+⚠️ **L'extension installée chez lui est antérieure à la 5.45** — mesuré :
+`panel_colis_relais` **absente** et le compteur `retrait_conv_ecrit` à zéro,
+alors que `ventes_rafraichies: 5` prouve qu'elle est ≥ 5.42. C'est ce qui bloque
+les deux choses qu'il a demandées : le bordereau envoyé tout seul dans l'app
+(rattrapage 5.46) et les codes de retrait Vinted Go lus dans la conversation
+(5.45). **Zip 5.47 relivré.**
+
+⚠️ **`VAPID_PRIVATE_KEY` toujours absente de Vercel** : `GET
+https://vrm.center/api/push?etat=1` → `{"pret":false,"devices":2}`. Vérifié dans
+cette session qu'**aucun outil disponible ne peut écrire une variable
+d'environnement Vercel** (pas de CLI, pas de jeton, le connecteur Vercel ne
+couvre que projets/déploiements/protection). C'est son geste, et c'est le seul
+qui reste pour que les notifications partent.
