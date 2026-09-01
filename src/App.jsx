@@ -3381,7 +3381,7 @@ function Card({children,style={}}) {
 function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:3,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
 }
-function StatBox({label,value,color=C.text,sub=null}) {
+function StatBox({label,value,color=C.text,sub=null,subColor=null}) {
   // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
   // c'est le gabarit « KPI » de n'importe quel tableau de bord. Ici : un FILET
   // d'accent en haut, l'étiquette en capitales dessous, puis le nombre en très
@@ -3396,7 +3396,7 @@ function StatBox({label,value,color=C.text,sub=null}) {
     <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.accent:color}`}}>
       <div className="vrm-label" style={{color:C.muted,minHeight:'2.44em'}}>{label}</div>
       <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,marginTop:2,whiteSpace:'nowrap'}}>{value}</div>
-      {sub && <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.35}}>{sub}</div>}
+      {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
     </div>
   );
 }
@@ -13837,6 +13837,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (§11). C'est exactement ce qu'on veut pour une déclaration mensuelle.
     const items = (sales.items || []).filter(o => dansPeriode(o, periode));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeSum=0, margeNb=0, enAttente=0, nbAttente=0;
+    // ⚠️ LE BÉNÉFICE NE SE CALCULE QUE SUR CE QU'ON CONNAÎT.
+    // `benef = ca - cout` suppose que les ventes SANS prix d'achat ont coûté
+    // ZÉRO. Mesuré le 1er septembre : 1 prix d'achat sur 175 → l'écran
+    // affichait « BÉNÉFICE NET 5 739 € » en vert pour un CA de 5 741 €.
+    // Ce n'est pas un bénéfice, c'est le CA avec un autre nom.
+    // `benefConnu` ne somme QUE les ventes dont le coût est réellement
+    // saisi : le chiffre est petit tant qu'il manque des prix, mais il est
+    // VRAI. Un total partiel qui se présente comme complet est pire qu'un
+    // total absent (§5.27, la même règle que pour l'argent en attente).
+    let benefConnu = 0;
     // Finalisées dont l'encaissement n'est pas encore daté : elles sortent du
     // total plutôt que d'être posées au hasard sur la date de vente. On les
     // compte pour le dire — un chiffre incomplet qui se présente comme complet
@@ -13870,9 +13880,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = effEntry(o);
       const fee = feesOf(e); frais += fee;
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
-      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; benefConnu += sell-buy-fee; if (sell>0){ margeSum+=((sell-buy-fee)/sell)*100; margeNb+=1; } }
     }
-    return { ca, cout, frais, benef:ca-cout-frais, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
+    return { ca, cout, frais, benef:ca-cout-frais, benefConnu, nb, nbCout, sansCout: nb-nbCout, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode]);
 
@@ -14473,7 +14483,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
-    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0;
+    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
     const saleLines=[];
     for (const o of (sales.items||[])) {
       if (isHidden(o)) continue;
@@ -14483,7 +14493,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       ca+=sell; nb+=1; frais+=fee;
-      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); }
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; }
       saleLines.push({ date:o.date, num:e?.numero||'', title:o.title, sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee });
     }
     // Registre d'achats du mois (hors annulés).
@@ -14496,8 +14506,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       achatsTotal+=montant;
       buyLines.push({ o, date:o.date, seller:o.seller||o.user_login||o.opposite_user?.login||'', title:o.title, montant });
     }
-    const benefNet = ca - cout - frais;
-    const marge = margeKnown - frais; // marge = ventes - achats - boosts (sur ventes au coût connu)
+    // ⚠️ MÊME RÈGLE QUE L'ÉCRAN VENTES : `ca - cout` suppose que les ventes sans
+    // prix d'achat ont coûté ZÉRO. Ce rapport part chez un comptable — un
+    // « bénéfice » qui vaut en réalité le chiffre d'affaires n'a rien à y faire.
+    // On ne somme QUE les ventes dont le coût est saisi ; `nbCout/nb` dit la
+    // couverture, et elle est imprimée juste à côté du chiffre.
+    const benefNet = margeKnown - fraisConnu;
+    const marge = margeKnown - fraisConnu; // ventes - achats - boosts, sur les ventes au coût connu
     const tvaMarge = (regime==='marge' && marge>0) ? marge * (tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
     const urssaf = ca * 0.135;
@@ -14523,7 +14538,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push(['CA encaissé',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
+    else { L.push(['CA encaissé',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.csv`; document.body.appendChild(a); a.click(); a.remove();
@@ -14542,7 +14557,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
     if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR', true); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
     kv('Nombre de ventes', String(R.nb));
     kv('Achats du mois (registre)', R.buyLines.length+' — '+R.achatsTotal.toFixed(2)+' EUR');
     y-=6; page.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
@@ -14564,7 +14579,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
-    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0;
+    let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
     for (const o of (sales.items||[])) {
       if (isHidden(o)) continue;
@@ -14575,7 +14590,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       const mo=months[d.getMonth()];
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
-      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); mo.cout+=buy; mo.nbCout+=1; }
+      if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; mo.cout+=buy; mo.nbCout+=1; }
       saleLines.push({ date:o.date, num:(e&&e.numero)||'', title:o.title||'', account:accName(o._acc), sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, marge:(buy!=null&&!isNaN(buy))?(sell-buy-fee):null });
     }
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
@@ -14589,7 +14604,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       buyLines.push({ o, date:o.date, seller:o.seller||o.user_login||o.opposite_user?.login||'', title:o.title, montant });
     }
     buyLines.sort((a,b)=> new Date(b.date)-new Date(a.date));
-    const benefNet = ca - cout - frais;
+    const benefNet = margeKnown - fraisConnu;   // ⚠️ ventes au coût connu uniquement (cf. rapport mensuel)
     const marge = margeKnown - frais;
     const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
@@ -14651,7 +14666,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const kv=(k,v)=>{ T(k,40,y,10,reg,rgb(0.4,0.4,0.4)); T(v,300,y,11,bold); y-=20; };
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
     const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.pdf`; document.body.appendChild(a); a.click(); a.remove();
@@ -15237,7 +15252,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
             {totals.nbCout===0
               ? <StatBox label="Bénéfice net" value="n/d" color={C.muted} sub="saisis tes prix d'achat"/>
-              : <StatBox label="Bénéfice net" value={fmtE0(totals.benef)} color={totals.benef>=0?INV_STATUS.online.color:C.danger} sub={totals.nbCout<totals.nb?`sur ${totals.nbCout}/${totals.nb} avec prix d'achat`:(totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût'))}/>}
+              : <StatBox label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?INV_STATUS.online.color:C.danger}
+                  subColor={totals.nbCout<totals.nb?C.warn:undefined}
+                  sub={totals.nbCout<totals.nb
+                    ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
+                    : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:(totals.frais>0?'CA − coût − boosts':'CA − coût'))}/>}
           </div>
         )}
         {/* Boosts détectés automatiquement (facturation Vinted captée par
@@ -18113,7 +18132,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={fmtE(annual.tvaMarge)} color={C.warn}/>
                   <StatBox label="Marge HT" value={fmtE(annual.margeHT)}/>
                 </>) : (<>
-                  <StatBox label="Bénéfice net" value={fmtE(annual.benefNet)} color={annual.benefNet>=0?INV_STATUS.online.color:C.danger} sub={annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined}/>
+                  <StatBox label="Bénéfice net" value={fmtE(annual.benefNet)} color={annual.benefNet>=0?INV_STATUS.online.color:C.danger}
+                    subColor={annual.nbCout<annual.nb?C.warn:undefined}
+                    sub={annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub="13,5% du CA"/>
                 </>)}
               </div>
@@ -18583,7 +18604,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label={`TVA marge ${report.tvaRate}%`} value={fmtE(report.tvaMarge)} color={C.warn}/>
                   <StatBox label="Marge HT" value={fmtE(report.margeHT)}/>
                 </>) : (<>
-                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?INV_STATUS.online.color:C.danger} sub={report.frais>0?`boosts ${fmtE(report.frais)}`:undefined}/>
+                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?INV_STATUS.online.color:C.danger}
+                    subColor={report.nbCout<report.nb?C.warn:undefined}
+                    sub={report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={fmtE(report.urssaf)} color={C.warn} sub="13,5% du CA"/>
                 </>)}
               </div>
