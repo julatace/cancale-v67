@@ -6957,3 +6957,106 @@ vente** : une notification de vente naît d'un **email de vente**, et **5 compte
 sur 9 ne reçoivent aucun email** (§5.81 — leurs boîtes ne transfèrent pas vers
 l'adresse de réception de l'app). Le canal est réparé ; la couverture par compte
 reste le point ouvert, et il est affiché dans Réglages → Notifications.
+
+---
+
+## 5.85 — ⚠️ LE DÉTAIL D'EXPÉDITION NE PARLE PAS LA LANGUE DE LA COMMANDE
+
+Julien : « j'ai généré manuellement le bordereau et l'extension m'a mis encore
+que c'était **en paiement validé** et non en génération de bordereau. Et ensuite
+quand j'ai actualisé l'extension, **la vente s'est automatiquement supprimée** et
+ça n'a pas marqué que le bordereau a été généré. »
+
+Deux symptômes, **trois défauts**, tous mesurés sur la vraie base avant d'écrire
+une ligne (§46).
+
+### Ce que la base dit — deux vocabulaires, pas un
+| statut de COMMANDE (`orders_sold`) | n | statut d'EXPÉDITION (`txn.shipment.status_title`) | n |
+|---|---|---|---|
+| Commande finalisée… | 278 | **`1`** (un NOMBRE) | **284** |
+| Remboursement effectué | 42 | Commande livrée ! | 110 |
+| Commande expédiée… | 40 | Commande expédiée… | 28 |
+| Bordereau envoyé au vendeur | 14 | Bordereau envoyé au vendeur | 17 |
+| colis déposé en point relais | 11 | Commande annulée - article indisponible | 16 |
+| | | **Commande du bordereau d'envoi validée** | **3** |
+| | | Le paiement a échoué | 1 |
+
+⚠️ **Le détail emploie des libellés que la commande n'utilise JAMAIS** — dont
+**« Commande du bordereau d'envoi validée »**, qui est très exactement le statut
+qui apparaît **juste après une génération manuelle**.
+
+### A. La vente DISPARAÎT sur un statut qu'on ne sait pas lire
+`encoreAExpedier` passait le statut du détail à **`awaitingShip`**, une **liste
+POSITIVE de deux phrases** (« bordereau envoyé au vendeur » / « paiement
+validé »). Tout le reste du vocabulaire d'expédition répondait donc « non, plus
+rien à expédier » → **la vente sortait de la liste**. C'est le symptôme #2, mot
+pour mot.
+⚠️ §5.17 avait déjà tiré cette leçon **côté app** (« la liste positive laissait
+passer 4 cas ») ; l'extension ne l'a jamais reçue.
+
+### B. Un CODE NUMÉRIQUE traité comme un libellé
+Sur **284 lignes**, `shipment` vaut `{}` et `status_title` vaut `""` : la chaîne
+de replis `sh.status_title || sh.status || t.status_title || t.status` retombe
+alors sur **`t.status` = le nombre `1`**. On demandait donc à une règle de texte
+de lire un code. Aucune de ces 284 ne coïncide avec une vente en attente
+aujourd'hui — mais c'est un piège armé, pas une hypothèse.
+
+### C. Le LIBELLÉ et le FILTRE ne lisaient pas la même source (§11)
+`aGenerer` / `emis` lisaient `o.status` (la **commande**, périmée) pendant que le
+filtre lisait la **capture la plus fraîche**. La ligne survivait donc grâce au
+détail frais mais **se décrivait avec l'ancien statut** → « pas encore générée »
+alors que le bordereau existait. C'est le symptôme #1.
+
+### La règle : `etatExpedition(st)` — TROIS états, et le 3ᵉ est le plus important
+Au **niveau module** (une seule définition, §11), à côté de `aGenererBordereau` :
+`'attend'` · `'parti'` · **`null` = « ce statut ne nous dit rien »**.
+➡️ **On ne conclut JAMAIS « le colis est parti » depuis un statut illisible** —
+un code numérique, une chaîne vide, un libellé que Vinted inventera demain. Le
+détail ne tranche que lorsqu'il **dit** quelque chose ; sinon la commande reste
+la référence. C'est §16 (« une liste vide n'est jamais une réponse ») appliqué
+aux statuts.
+`statutFrais(tx, …)` nomme **une fois** le statut qui gouverne : le filtre ET
+l'étiquette le lisent.
+⚠️ `awaitingShip` est **inchangée** (elle reste la règle du vocabulaire des
+COMMANDES, et `audit-coherence` la compare à `isAwaitingShipStatus` de l'app par
+un regex sur sa ligne — ne pas la reformater).
+
+### La génération travaillait aussi sur le statut périmé
+Conséquence directe, jamais vue jusqu'ici : après une génération manuelle,
+**la 1ʳᵉ passe REGÉNÈRE** une étiquette qui existe déjà (requête pour rien,
+refusée par Vinted → « il y a des messages d'erreur », §5.71) **et la 2ᵉ passe
+REFUSE d'aller chercher le PDF** (`aGenererBordereau(o.status)` la fait sortir).
+**Donc le bordereau n'arrive jamais dans l'app** — c'est la plainte §5.72 qui
+revenait par une autre porte.
+➡️ `genererBordereauxEnAttente` lit le détail de CE compte en **SCALAIRES**
+(`select=id,st:…->shipment->>status_title,cap:data->>capturedAt` — jamais
+`select=data`, §34) et travaille sur le statut qui gouverne.
+
+### ✅ Prouvé sur la VRAIE base, dans les deux sens
+Banc `vm` exécutant le VRAI `buildPanelData`, avec **une seule fixture de banc**
+(jamais écrite en base) : un détail frais portant « Commande du bordereau d'envoi
+validée » sur une vente réelle (`tx=21883380310`, nike zoomX vaporfly).
+| | colis à envoyer | la cible |
+|---|---|---|
+| **code d'avant** | 14 → **13** | **ABSENTE (disparue de la liste)** |
+| **code corrigé** | **14** | **PRÉSENTE** · `aGenerer=false emis=true` → « étiquette prête » |
+
+⚠️ **Piège de banc** : la fixture doit porter un `uid` de compte VIVANT —
+`txnRows` est filtré par `keepAcc`, donc une ligne à `uid: ""` est écartée en
+silence et on mesure « rien n'a changé » (§21, encore).
+
+**`scripts/audit-bordereau-etat.cjs`** (nouveau, **9 contrôles**) exécute la
+vraie fonction sur les **11 statuts d'expédition relevés en base** + les valeurs
+illisibles, et vérifie le câblage des trois défauts.
+⚠️ Il ne **s'arrête pas** quand `etatExpedition` est absente : il rejoue
+l'ancienne sémantique pour montrer, statut réel par statut réel, ce qu'elle
+cassait — un audit qui sort au premier manque ne prouve qu'une chose.
+**Rejoué sur le code d'avant : 8 contrôles en échec**, dont
+`"Commande du bordereau d'envoi validée" → parti` et `"1" → parti`.
+
+### Vérifié
+`node --check` OK · **18 audits au vert** (`audit-coherence` : 0 désaccord sur
+les 12 statuts réels — `awaitingShip` et `etatExpedition` sont d'accord sur tout
+le vocabulaire des COMMANDES, aucune régression) · vrai `buildPanelData` contre
+la vraie base : **14 colis, mêmes chiffres qu'avant** hors scénario.
+Extension **5.48.0** — à recharger dans Chrome.

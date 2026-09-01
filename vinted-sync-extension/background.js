@@ -2893,6 +2893,31 @@ async function capterRetraits(uid) {
   } catch (_) { return 0; }
 }
 
+// ⚠️ LE DÉTAIL D'EXPÉDITION PARLE UNE AUTRE LANGUE QUE LA COMMANDE.
+// Mesuré en base le 1er septembre : `shipment.status_title` emploie des
+// libellés que la commande n'utilise jamais — « Commande du bordereau d'envoi
+// validée » (le statut qui apparaît JUSTE APRÈS une génération manuelle),
+// « Commande annulée - article indisponible », « Le paiement a échoué ». Et
+// 284 lignes portent `shipment: {}` + `status_title: ""` : la chaîne de replis
+// retombe alors sur `t.status`, le NOMBRE 1 — un code, pas un libellé.
+// `awaitingShip` étant une liste POSITIVE de deux phrases, tout ce vocabulaire
+// répondait « non, plus rien à expédier » et la vente DISPARAISSAIT de la liste
+// (plainte de Julien : « la vente s'est automatiquement supprimée »).
+// ➡️ Trois états, et le troisième est le plus important : `null` = « ce statut
+// ne nous dit rien ». On ne conclut JAMAIS « le colis est parti » depuis un
+// statut qu'on ne sait pas lire. C'est la règle de §5.17 (la bonne question
+// n'est pas « ça ressemble à un colis parti ? ») et de §16 (une réponse
+// illisible n'est pas une réponse).
+const etatExpedition = (st) => {
+  const s = String(st == null ? '' : st).trim();
+  if (!s || /^\d+$/.test(s)) return null;                       // un code n'est pas un libellé
+  if (/annul|refus|rembours|retour|suspend|non r[ée]clam|[ée]chou/i.test(s)) return 'parti';
+  if (/bordereau/i.test(s) && /envoy|valid|pr[êe]t|disponible/i.test(s)) return 'attend';
+  if (/paiement.*valid/i.test(s)) return 'attend';
+  if (/exp[ée]di|achemin|livr|d[ée]pos|finalis|remis/i.test(s)) return 'parti';
+  return null;                                                  // libellé inconnu : on ne tranche pas
+};
+
 // Une vente attend une GÉNÉRATION quand Vinted dit que le paiement est validé
 // ET qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au vendeur »
 // veut dire qu'il EXISTE DÉJÀ : le regénérer ne sert à rien (et c'est une
@@ -3022,7 +3047,36 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     if (!acc) return 0;
     // Les ventes telles que Vinted les a rendues à la dernière moisson.
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
-    const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const ventesBrutes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const capCmd = Date.parse((rows && rows[0] && rows[0].data && rows[0].data.capturedAt) || '') || 0;
+    // ⚠️ LE STATUT DE LA COMMANDE EST PÉRIMÉ JUSTE APRÈS UNE GÉNÉRATION MANUELLE.
+    // Julien génère le bordereau lui-même sur Vinted : le détail de transaction
+    // passe à « Commande du bordereau d'envoi validée », mais la ligne
+    // `orders_sold` dit encore « Le paiement a été validé » jusqu'à la prochaine
+    // moisson. Avec ce seul statut, la 1ʳᵉ passe REGÉNÈRE une étiquette qui
+    // existe déjà (une requête pour rien, refusée par Vinted → « message
+    // d'erreur ») et la 2ᵉ passe REFUSE d'aller chercher le PDF qui vient
+    // d'apparaître (`aGenererBordereau` la fait sortir). Résultat : le bordereau
+    // n'arrive jamais dans l'app.
+    // ➡️ On lit le détail de transaction de CE compte, en SCALAIRES (§34 : jamais
+    // `select=data`), et il fait foi quand il est plus frais ET lisible.
+    const detFrais = new Map();
+    try {
+      const dr = await sbGet(`app_data?id=like.harvest_${uid}_txn_*&select=id,st:data->payload->transaction->shipment->>status_title,cap:data->>capturedAt`);
+      for (const r of (dr || [])) {
+        const tx = (/_txn_(\d+)$/.exec(String(r.id || '')) || [])[1];
+        if (!tx || !r.st) continue;
+        const c = Date.parse(r.cap || '') || 0;
+        if (!detFrais.has(tx) || c > detFrais.get(tx).cap) detFrais.set(tx, { st: String(r.st), cap: c });
+      }
+    } catch (_) { /* sans le détail on retombe sur la commande, comme avant */ }
+    const statutDe = (o) => {
+      const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+      const d = tx ? detFrais.get(tx) : null;
+      if (d && d.cap >= capCmd && etatExpedition(d.st)) return d.st;
+      return (o && o.status) || '';
+    };
+    const ventes = ventesBrutes.map(o => (o ? { ...o, status: statutDe(o) } : o));
     const candidates = ventes.filter(o => aGenererBordereau(o && o.status) && (o.transaction_id != null));
     // ⚠️ PAS DE SORTIE ANTICIPÉE ICI : même sans rien à générer, la 2ᵉ passe doit
     // tourner pour aller chercher les bordereaux DÉJÀ émis (c'est le cas le plus
@@ -3525,8 +3579,20 @@ async function buildPanelData() {
   // « Encore à expédier » = ce que dit la capture LA PLUS RÉCENTE dont on dispose.
   const encoreAExpedier = (tx, statutCommande, capCommande) => {
     const d = tx ? txnEtat[String(tx)] : null;
-    if (d && d.cap >= (capCommande || 0)) return awaitingShip(d.st);
+    if (d && d.cap >= (capCommande || 0)) {
+      const e = etatExpedition(d.st);
+      if (e) return e === 'attend';        // le détail tranche…
+    }                                      // …sinon il ne dit rien : la commande reste la référence
     return awaitingShip(statutCommande);
+  };
+  // Le LIBELLÉ et le FILTRE doivent lire la MÊME source (§11). Avant, la ligne
+  // était FILTRÉE sur la capture la plus fraîche mais ÉTIQUETÉE sur la commande :
+  // après une génération manuelle, elle affichait encore « pas encore générée »
+  // alors que le bordereau existait déjà (plainte de Julien).
+  const statutFrais = (tx, statutCommande, capCommande) => {
+    const d = tx ? txnEtat[String(tx)] : null;
+    if (d && d.cap >= (capCommande || 0) && etatExpedition(d.st)) return d.st;
+    return statutCommande;
   };
   const toShip = [];
   const seenTx = new Set();
@@ -3541,16 +3607,19 @@ async function buildPanelData() {
       if (!encoreAExpedier(tx0, o.status, capR)) { if (tx0) seenTx.add(tx0); continue; }
       const tx = tx0;
       if (tx) seenTx.add(tx);
+      // ⚠️ MÊME SOURCE QUE LE FILTRE : sinon la ligne survit grâce au détail frais
+      // mais se décrit avec la commande périmée.
+      const stFrais = statutFrais(tx0, o.status, capR);
       toShip.push({
         ...acctOfRow(r), photo: photoDeCommande(o),
-        transaction: tx, title: o.title || '', status: o.status || '',
+        transaction: tx, title: o.title || '', status: stFrais || o.status || '',
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
         conv: o.conversation_id != null ? String(o.conversation_id) : null,
         url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : (o.conversation_id ? `https://www.vinted.fr/inbox/${o.conversation_id}` : 'https://www.vinted.fr/member/transactions?type=sold'),
         hasBord: tx ? bordTxns.has(tx) : false,
         // Compte rendu, colis par colis : où en est-on vraiment ?
-        aGenerer: aGenererBordereau(o.status),                 // l'étiquette n'existe pas encore
-        emis: !aGenererBordereau(o.status),                    // Vinted l'a émise
+        aGenerer: aGenererBordereau(stFrais),                  // l'étiquette n'existe pas encore
+        emis: !aGenererBordereau(stFrais),                     // Vinted l'a émise
         envoye: tx ? !!labelParTx[tx] : false,                 // l'extension l'a mise dans l'app
         envoyeAt: tx ? (labelParTx[tx] || null) : null,
         numero: (tx && numParTx[tx]) || null,                  // le N° posé par l'app
