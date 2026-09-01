@@ -6768,3 +6768,65 @@ d'ouverture en gros.
 **Vérifié** : `npm run build` OK · **16 audits au vert** · smoke 11 écrans à
 390 px : **0 débordement horizontal, 0 écran vide, 0 suspect d'affichage,
 0 texte « undefined »**.
+
+
+---
+
+## 5.84 — ⚠️ « BÉNÉFICE NET 5 739 € » ÉTAIT LE CHIFFRE D'AFFAIRES SOUS UN AUTRE NOM
+
+Trouvé en regardant l'écran Ventes à sa résolution de travail (1512 px). Deux
+cases côte à côte, sur les vraies données du 1er septembre :
+
+```
+CA FINALISÉ   5 741 €      COÛT D'ACHAT  2 €          BÉNÉFICE NET  5 739 €
+175 ventes                 1/175 renseigné            (en vert, 34 px)
+```
+
+`benef = ca - cout - frais` suppose que les **174 ventes sans prix d'achat ont
+coûté ZÉRO**. Le « bénéfice net » valait donc mécaniquement le CA — affiché en
+vert, en gros, à côté de lui. Un chiffre faux présenté comme fiable.
+
+⚠️ **Un garde-fou existait déjà… et ne couvrait que `nbCout === 0`.** Son
+commentaire disait : « prix connus en partie → on affiche le bénéfice mais on
+précise "sur X/Y" ». Ce raisonnement ne tient pas à 1/175 : une légende grise de
+11 px ne neutralise pas un nombre vert de 34 px.
+
+### La règle : on ne somme QUE ce dont on connaît le coût
+**`benefConnu`** additionne `vente − achat − boost` **uniquement** sur les ventes
+au coût saisi. Le chiffre devient petit tant qu'il manque des prix, mais il est
+**vrai**. C'est la règle de §5.27 (l'argent en attente) appliquée ici : *un total
+partiel qui se présente comme complet est pire qu'un total absent.*
+
+**Mesuré au rendu : 5 739 € → 38 €** (la seule vente au coût connu : 40 − 2),
+avec « sur 1 vente sur 175 — les autres n'ont pas de prix d'achat » **en orange
+gras** (`StatBox` gagne `subColor` : une légende qui AVERTIT ne peut pas être du
+même gris qu'une légende ordinaire).
+
+### ⚠️ LE MÊME CALCUL PARTAIT CHEZ LE COMPTABLE
+`benefNet = ca - cout - frais` alimentait **le rapport mensuel ET le rapport
+annuel** — modale, **CSV et PDF**. Les deux passent à `margeKnown - fraisConnu`,
+et la **couverture voyage avec le chiffre** : « (sur 1/175 ventes au coût
+connu) » est imprimé à côté du bénéfice dans les deux PDF, et une ligne dédiée
+part dans le CSV.
+⚠️ `marge` (régime société-marge) avait la même incohérence : `margeKnown`
+(sous-ensemble connu) **moins `frais`** (toutes les ventes). Aligné sur
+`fraisConnu`.
+
+### ✅ `scripts/audit-chiffres.cjs` — 6 contrôles permanents
+« Aucun total ne se présente comme complet quand il ne l'est pas » : le calcul
+sur le sous-ensemble, l'affichage de CE chiffre, la couleur d'avertissement de
+la couverture, les deux rapports, l'absence de tout `ca - cout - frais`, et la
+couverture dans les PDF.
+⚠️ **Prouvé dans les deux sens** (§21) : `git archive HEAD` dans un arbre à
+part, script copié DEDANS et lancé DEPUIS cet arbre (le piège de §5.80 :
+`__dirname/..` relit sinon le dépôt courant) → **6 contrôles sur 6 en échec** sur
+le code d'avant.
+
+**Vérifié** : `npm run build` OK · **17 audits au vert** · écran Ventes rendu sur
+les vraies données (38 € + avertissement orange) · modale « Rapport comptable »
+réellement ouverte (⋯ Outils → Rapport) et rendue sans erreur · smoke **11
+écrans, 0 écran vide, 0 PAGEERROR, 0 suspect d'affichage**.
+
+⚠️ **Ceci ne remplace pas la saisie des prix d'achat** (0 sur 278, §22) — Julien
+s'en charge lui-même (« je vais faire les coûts d'achat »). Le correctif garantit
+seulement que l'app **ne raconte rien de faux en attendant**.
