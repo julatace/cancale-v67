@@ -6873,3 +6873,61 @@ l'écran. Une chaussure ne se voit pas mieux en 360 px qu'en 250 : `maxHeight: 2
 banc (`getComputedStyle(...).gridTemplateColumns`) : **4 × 270,5 px** sur
 ordinateur · **11 écrans à 390 px : 0 débordement, 0 écran vide, 0 PAGEERROR,
 0 suspect** — le téléphone est intact.
+
+### 5.84 (suite) — LE TABLEAU DE BORD AVAIT GARDÉ L'ANCIENNE IDENTITÉ
+
+Trois défauts trouvés en **regardant l'écran** (§5.76), tous sur des écrans que
+les passes de refonte n'avaient pas ouverts.
+
+### ⚠️ 1. DEUX DESSINS POUR LA MÊME CHOSE, DANS LA MÊME APPLICATION
+`Dashboard` avait sa **propre** carte de statistique (`StatCard`) : encadrée,
+ombre douce, coins arrondis, **et un EMOJI de 17 px devant chaque chiffre**.
+Or tous les écrans du quotidien sont passés au **filet d'accent + chiffre hors
+boîte** (§5.65), et la règle « un emoji utilisé COMME icône devient une icône au
+trait » date de §5.55. Le tableau de bord était donc resté sur l'identité
+d'avant — visible d'un coup d'œil en changeant d'onglet.
+
+➡️ **`StatCard` n'est plus qu'un ALIAS de `StatBox`** (§11 : une seule
+définition). `icon` et `gradient` restent **acceptés** dans la signature — les
+10 appels ne changent pas — mais ne sont plus dessinés. Cet écran hérite
+désormais de tout ce qui arrivera ensuite sur `StatBox`, au lieu de diverger un
+peu plus à chaque passe.
+Les 4 cartes cliquables « Vinted en direct » deviennent des **boutons nus**
+(`border:none, background:transparent, padding:0`) enveloppant un `StatBox` :
+le geste reste, le dessin est celui de tout le monde.
+
+### 2. Deux rangées de chiffres qui ne parlaient pas de la même période
+« Vinted en direct » (le mois en cours) et les 6 chiffres du dessous (**tout
+l'historique**) se suivaient sans rien pour les séparer : on lit « 30 annonces »
+puis « 278 paires » et on croit à une contradiction. Une étiquette
+**« Depuis le début »** ouvre la seconde rangée — même gabarit que
+« Vinted en direct · ce mois » juste au-dessus.
+
+### ⚠️ 3. « ENCAISSÉ (CA) » COMPTAIT DES VENTES NON ENCAISSÉES
+Le bloc « Ta semaine » (Ma journée) affichait `wca` sous le libellé
+**« encaissé (CA) »**. Or `wca` vient de **`bilanVentes`** (§5.69), qui somme les
+ventes **par date de VENTE** — et §5.57 a explicitement retiré la date
+d'encaissement de toute l'app (« on ne te parle pas de transfert d'argent »).
+Le chiffre était donc juste, le mot faux : sur cet écran, « argent en attente
+≈ 1 339 € » s'affiche trois lignes plus bas, donc annoncer « encaissé » à côté
+revient à dire deux choses contradictoires sur le même écran.
+➡️ **« vendu sur 7 j »**. ⚠️ Ne pas réintroduire « encaissé » ici sans remettre
+d'abord une vraie date d'encaissement (§5.57 : elle n'existe que pour une partie
+des ventes, c'est pour ça qu'elle a été retirée).
+
+### 4. La cloche disait « 15 colis à retirer », l'écran Achats « 3 »
+Même contradiction que §5.83, au même endroit et pour la même raison : le
+compteur est l'**union** des deux signaux (email + statut Vinted), donc il
+inclut les colis « déposés » dont on n'a ni code ni adresse. §5.83 avait corrigé
+la tuile de Ma journée ; la cloche portait encore le nombre nu.
+➡️ **« N colis à retirer — tu as le code ou l'adresse »**. ⚠️ Le nombre **ne
+change pas** (un colis caché est un colis perdu, §5.43) : c'est la phrase qui
+dit ce qu'on peut réellement en faire, sans recalculer quoi que ce soit — donc
+aucune seconde règle à maintenir.
+
+**Vérifié** : `npm run build` OK · **17 audits au vert** (dont
+`audit-variables` : aucun identifiant non déclaré) · **11 écrans à 390 px :
+0 débordement, 0 écran vide, 0 PAGEERROR, 0 suspect d'affichage** (les 23 lignes
+console sont le 400 volontaire de `select=owner` et les resets de fin de test) ·
+capture du tableau de bord relue : les deux rangées portent le même dessin que
+le reste de l'app, séparées par leur étiquette.

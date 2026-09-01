@@ -5172,23 +5172,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
   };
 
   // Carte avec icône et taille
-  const StatCard=({icon,label,value,color=C.text,sub,gradient})=>(
-    // Carte de statistique : coins plus généreux, ombre douce et chiffre mis en
-    // avant. Le rendu « plat à angles durs » faisait daté.
-    <div style={{
-      flex:1,minWidth:140,
-      background:gradient||C.card,
-      border:`1px solid ${C.border}`,borderRadius:4,padding:'16px 18px',
-      boxShadow:C.shadow||'none',
-    }}>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:9}}>
-        <span style={{fontSize:17,opacity:0.9}}>{icon}</span>
-        <span style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.4,fontWeight:500}}>{label}</span>
-      </div>
-      <div className="vrm-display" style={{fontSize:28,fontWeight:700,color,lineHeight:1.02}}>{value}</div>
-      {sub&&<div style={{fontSize:11,color:C.muted,marginTop:5,lineHeight:1.35}}>{sub}</div>}
-    </div>
-  );
+  // ⚠️ LE TABLEAU DE BORD AVAIT GARDÉ L'ANCIENNE IDENTITÉ : cartes encadrées à
+  // l'ombre douce, avec un EMOJI devant chaque chiffre — alors que tous les
+  // écrans du quotidien sont passés au filet d'accent et au chiffre hors boîte
+  // (§5.65), et que « un emoji utilisé COMME icône devient une icône au trait »
+  // (§5.55). Deux dessins pour la même chose, dans la même application.
+  // `StatCard` n'est plus qu'un ALIAS de `StatBox` : une seule définition (§11),
+  // donc cet écran hérite désormais de tout ce qui arrivera ensuite.
+  // `icon` et `gradient` restent acceptés — les 10 appels ne changent pas — mais
+  // ne sont plus dessinés.
+  const StatCard=({label,value,color=C.text,sub})=>
+    <StatBox label={label} value={value} color={color} sub={sub}/>;
 
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
@@ -5251,10 +5245,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
               {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.blue||C.accent},
               {k:'unread', icon:'💬', label:'Messages non lus', val:liveStats.unread, go:'cat_msg', color:liveStats.unread>0?C.danger:C.muted},
             ].map(s=>(
-              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'13px 15px',cursor:'pointer',display:'flex',flexDirection:'column',gap:3,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-                <span style={{fontSize:17}}>{s.icon}</span>
-                <span style={{fontSize:22,fontWeight:700,color:s.color,letterSpacing:-0.7,lineHeight:1.05}}>{s.val}</span>
-                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{s.label}</span>
+              <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
+                style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
+                <StatBox label={s.label} value={s.val} color={s.color}/>
               </button>
             ))}
           </div>
@@ -5265,6 +5258,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA encaissé = finalisé tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
         <StatCard icon="📦" label="Paires en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.accent} sub="numéros au garage"/>
         <StatCard icon="💰" label="Valeur stock" value={fmt(liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue)} color={C.warn} sub="prix d'achat des annonces en ligne"/>
@@ -15071,7 +15065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:'1 1 90px'}}>
                       <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{wca.toFixed(0)} €</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>encaissé (CA)</div>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vendu sur 7 j</div>
                     </div>
                     <div style={{flex:'1 1 90px'}}>
                       <div style={{fontSize:22,fontWeight:700,color:toShip.length?C.warn:C.muted,lineHeight:1}}>{toShip.length}</div>
@@ -21493,7 +21487,7 @@ export default function App() {
           items.push({icon:'🚫', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts'});
         }
       }catch(_){}
-      if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer`, n:colisCount, tab:'cat_achats'});
+      if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer — tu as le code ou l'adresse`, n:colisCount, tab:'cat_achats'});
       if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(unreadTotal>0){
