@@ -7155,4 +7155,14 @@ aucune régression.
 depuis un arbre de test il relisait le dépôt courant, donc la preuve « ça échoue
 sur le code d'avant » aurait été truquée (§5.80). Passé en `__dirname`.
 
+Banc panneau complet : **14 onglets rendus, 0 PAGEERROR**.
+⚠️ **Le banc du panneau criait au loup depuis la 5.40** : sa liste d'onglets
+datait d'avant le dépliant « Plus », donc il annonçait « onglet absent » pour
+`ventes`, `recherche`, `coffre`, `litiges`, `favoris` — cinq onglets
+parfaitement vivants — et `republier`, retiré exprès en 5.70. **12 échecs → 6**,
+tous des artefacts assumés (l'onglet `reponse` n'existe que sur une page de
+conversation ; `republier` n'existe plus). Un banc qui crie au loup n'est plus
+lu (§5.14) : sa liste doit suivre `PANEL_TABS`, et ouvrir « Plus » avant de
+cliquer un onglet caché.
+
 Extension **5.49.0** — à recharger dans Chrome.
