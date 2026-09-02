@@ -7060,3 +7060,99 @@ les 12 statuts réels — `awaitingShip` et `etatExpedition` sont d'accord sur t
 le vocabulaire des COMMANDES, aucune régression) · vrai `buildPanelData` contre
 la vraie base : **14 colis, mêmes chiffres qu'avant** hors scénario.
 Extension **5.48.0** — à recharger dans Chrome.
+
+---
+
+## 5.86 — ⚠️⚠️ L'INSTRUMENTATION NE SURVIVAIT PAS AU SERVICE WORKER (et 2 colis introuvables)
+
+Julien : « pour l'extension c'est pas encore parfait quand il y a une vente ».
+Méthode habituelle : lire la base avant de coder (§46).
+
+### Ce que la base dit (2 septembre)
+| | |
+|---|---|
+| ventes qui attendent l'envoi | **16** |
+| avec un bordereau capté par l'extension | 12 |
+| **sans AUCUN PDF** (ni capté, ni email) | **2 — les deux de `tomj606`** ⚠️ |
+| comptes **sans un seul** bordereau capté | **2 : `julienf765`, `tomj606`** (les 7 autres en ont) |
+
+⚠️ Ce n'est **pas** la fraîcheur ni le garde-fou « compte connecté » : ces deux
+comptes sont captés **le jour même** (235 et 205 lignes). C'est spécifique à eux.
+
+### 1. ⚠️⚠️ POURQUOI ON NE POUVAIT PAS L'EXPLIQUER : les sondes mouraient
+`_diag.n` et `_rates` étaient des variables de **MODULE**, écrites en base au plus
+une fois par minute. Or **Chrome tue un service worker MV3 après ~30 s
+d'inactivité** : le tampon mourait donc AVANT le flush.
+
+**Preuve directe en base, pas une hypothèse.** `recupererLabel` pose **trois**
+échantillons dans la même boucle (`label_url`, `shipments/{id}`, `label_options`),
+à quelques centaines de millisecondes. Le premier écrivait et **consommait le
+quota d'une minute** ; les deux suivants étaient jetés, puis mouraient avec le
+worker. En base, `rates` ne contient QUE **`label_label_url`** — jamais `label`,
+jamais `label_label_options`.
+➡️ **C'est exactement pour ça qu'après trois sessions d'instrumentation on ne
+connaissait toujours la forme d'AUCUNE de ces réponses.** La sonde posée en §5.24
+et réparée en §5.52 ne pouvait structurellement pas écrire ce qu'on lui demandait.
+
+Même dégât sur les compteurs : **`label_url_trouve = 6` pour `label_envoye = 2`,
+sans aucun compteur d'échec entre les deux** — les deltas manquants n'ont jamais
+été flushés. J'ai raisonné plusieurs sessions sur des compteurs sous-comptés.
+
+➡️ **Le tampon vit désormais dans `chrome.storage.local`** (`vrmDiagBuf`) : local,
+gratuit, zéro égress, et il **survit à la mort du worker**. Le throttle ne protège
+plus que l'écriture Supabase ; il ne peut plus rien perdre. `majTampon()`
+sérialise les lecture-modification-écriture (deux appels concurrents perdaient
+sinon des incréments), le tampon **n'est vidé que si l'écriture a abouti**, et une
+alarme le réveille pour qu'il ne dorme pas indéfiniment.
+
+⚠️ **Règle** : dans un service worker MV3, **aucun tampon de plus de ~30 s ne
+peut vivre en variable de module**. Ça vaut pour toute future sonde.
+
+### Le seul échantillon qui a survécu, et ce qu'il dit
+```
+label_label_url · shipId 51111914706 → {"label_url":null,"code":0}
+```
+Vinted répond donc **200 avec un `label_url` NUL** pour au moins certaines
+expéditions dont le bordereau a pourtant été « envoyé au vendeur ». On ne sait
+**pas encore** pourquoi (transporteur ? PDF pas encore déposé sur S3 ?) — et
+c'est justement ce que les deux échantillons manquants diront à la prochaine
+visite, maintenant qu'ils peuvent être écrits.
+
+### 2. ⚠️ DEUX COLIS À LA FOIS = LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ
+`storeLabel` n'attribue le PDF qu'à condition qu'il n'existe **qu'un seul** colis
+possible pour ce compte (règle juste, §24 : on ne devine jamais). Or `tomj606` a
+**exactement deux** ventes en attente sans bordereau : même en les téléchargeant à
+la main, **aucun des deux n'était relié à sa vente**, et le second écrasait le
+premier dans `label_latest`. C'est très exactement le compte dont Julien se plaint.
+
+Et à l'écran, l'échec était un **cul-de-sac** : le panneau affichait la raison
+technique (« Vinted n'a pas donné l'URL du PDF ») et il n'avait plus rien.
+
+➡️ **Le rendez-vous** (`attendreBordereau`) : quand c'est NOUS qui l'envoyons
+télécharger UNE vente précise, on sait laquelle. Ce n'est pas une devinette —
+c'est l'identité de la vente qu'il vient d'ouvrir, **sur son clic**. Court
+(15 min), **à usage unique**, borné au compte concerné. La règle « un seul
+candidat » reste en second, inchangée.
+➡️ Le bandeau d'échec porte maintenant **« ⬇ Ouvrir la vente sur Vinted »** : il
+pose le rendez-vous puis ouvre `/member/transactions/{tx}`. Il télécharge le
+bordereau, `chrome.downloads` le capte (§5.46) et le range **sur la bonne vente**.
+
+### Vérifié
+`node --check` OK sur les deux fichiers · **18 audits au vert** ·
+`audit-diagnostic.cjs` passe à **10 contrôles** et **5 échouent sur le code
+d'avant** — dont « les 3 échantillons de la chaîne bordereau arrivent en base »,
+qui manque exactement `label` et `label_label_options`, **la situation mesurée en
+base** · `audit-bordereau-pdf.cjs` passe à **14 contrôles**, **3 échouent sur le
+code d'avant** (§21), et l'audit **ne s'arrête plus** au premier manque : il
+rejoue l'ancien `storeLabel` pour montrer contrôle par contrôle ce qu'il ne
+savait pas faire — « un seul colis possible → toujours relié » passe dans les
+deux sens, donc aucune régression · banc panneau dédié sur le **cas réel**
+(les 2 ventes de `tomj606`) : le bouton de secours apparaît, le rendez-vous part
+avec **`tx=21928427030`**, la bonne page s'ouvre, **0 erreur d'app** · vrai
+`buildPanelData` contre la vraie base : 32 annonces, 80 ventes, **16 colis** —
+aucune régression.
+⚠️ `audit-bordereau-pdf.cjs` lisait le fichier par un **chemin absolu** : lancé
+depuis un arbre de test il relisait le dépôt courant, donc la preuve « ça échoue
+sur le code d'avant » aurait été truquée (§5.80). Passé en `__dirname`.
+
+Extension **5.49.0** — à recharger dans Chrome.

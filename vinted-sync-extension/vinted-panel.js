@@ -1474,10 +1474,25 @@
     // ⚠️ Classe DISTINCTE de `.vrm-gen-bord` (les lignes de vente) : deux
     // câblages sur la même classe, le second écrase le premier — et le bouton
     // paraît mort. C'est exactement ce qui s'est passé au premier essai.
+    // Le chemin de secours : on ouvre LA vente et on prévient l'extension de
+    // quelle vente il s'agit, pour que le PDF téléchargé soit relié à elle.
+    const bm = panel.querySelector('#vrm-bord-manuel');
+    if (bm) bm.onclick = async () => {
+      const { uid, tx } = bordManuel || {};
+      if (!uid || !tx) return;
+      bm.disabled = true; bm.textContent = '⏳ …';
+      try {
+        await new Promise(res => chrome.runtime.sendMessage(
+          { from: 'cancale-vpanel', action: 'attendreBord', uid, tx }, () => res(null)));
+      } catch (_) {}
+      window.open(`https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`, '_blank', 'noopener');
+      bm.textContent = '✓ page ouverte — télécharge le bordereau';
+    };
     panel.querySelectorAll('.vrm-bord-act').forEach(b => {
       b.onclick = async () => {
         const { uid, tx, act } = b.dataset;
         if (!uid || !tx) return;
+        alerte = null; bordManuel = null;
         const avant = b.textContent;
         b.disabled = true; b.textContent = act === 'gen' ? '⏳ Génération…' : '⏳ Récupération…';
         try {
@@ -1486,7 +1501,21 @@
             (x) => res(chrome.runtime.lastError ? { ok: false, error: chrome.runtime.lastError.message } : x)));
           if (r && r.ok && r.envoye) { b.textContent = '✓ envoyé à l\'app'; b.style.background = '#0f6b4f'; setTimeout(load, 1200); }
           else if (r && r.ok) { b.textContent = '✓ généré'; b.style.background = '#0f6b4f'; b.title = "Le PDF n'est pas encore récupérable — il arrivera par email"; setTimeout(load, 1200); }
-          else { b.disabled = false; b.textContent = avant; alerte = (r && (r.error || r.message)) || 'Vinted a refusé'; render(); }
+          // ⚠️ UN ÉCHEC N'EST PAS UN CUL-DE-SAC. Avant, on affichait la raison
+          // technique (« Vinted n'a pas donné l'URL du PDF ») et Julien n'avait
+          // plus rien : ni PDF capté, ni email. Mesuré le 2 septembre —
+          // `tomj606` a DEUX colis dans ce cas, aucun imprimable.
+          // Le chemin qui marche existe : il télécharge le bordereau sur
+          // Vinted, `chrome.downloads` le capte et le range (§5.46). On lui
+          // ouvre donc la vente, en disant à l'extension DE QUELLE vente il
+          // s'agit — sinon, avec deux colis en attente, le PDF arriverait sans
+          // identité et le second écraserait le premier.
+          else {
+            b.disabled = false; b.textContent = avant;
+            alerte = ((r && (r.error || r.message)) || 'Vinted a refusé') + " — télécharge-le sur Vinted, l'extension le rangera toute seule";
+            bordManuel = { uid, tx };
+            render();
+          }
         } catch (e) { b.disabled = false; b.textContent = avant; alerte = String(e).slice(0, 120); render(); }
       };
     });
@@ -2377,9 +2406,15 @@
   let q = '', passeport = null;
   // Message d'alerte affiché en haut du panneau (refus du garde-fou anti-blocage).
   let alerte = null;
+  // Quand la récupération automatique échoue, on garde SOUS LA MAIN la vente
+  // concernée : le bandeau propose alors de la télécharger sur Vinted, ce qui
+  // est le seul chemin qui marche à coup sûr — et l'extension le range.
+  let bordManuel = null;
   const bandeauAlerte = () => alerte ? `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
       <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} Action non envoyée</div>
       <div class="vrm-m" style="font-size:11.5px;margin-top:3px">${esc(alerte)}</div>
+      ${bordManuel ? `<button id="vrm-bord-manuel" style="margin-top:7px;border:none;background:#0f172a;color:#fff;border-radius:9px;padding:7px 11px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">⬇ Ouvrir la vente sur Vinted</button>
+      <div class="vrm-m" style="font-size:11px;margin-top:4px">Télécharge le bordereau depuis cette page : l'extension le capte et le relie <b>à cette vente</b>, sans rien te demander.</div>` : ''}
     </div>` : '';
   const cont = (s, t) => String(s || '').toLowerCase().includes(t);
   function renderRecherche() {

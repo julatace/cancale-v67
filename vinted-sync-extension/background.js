@@ -351,50 +351,82 @@ async function logActivity(text) {
 // abandon, par type. Aucune donnée personnelle : des nombres.
 // Conséquence concrète : sans fiche article, pas de description → « Republier »
 // obligerait à tout retaper. C'est le vrai blocage de cette fonction.
-const _diag = { n: {}, dernier: 0 };
+// ⚠️⚠️ L'INSTRUMENTATION NE SURVIVAIT PAS AU SERVICE WORKER (2 septembre).
+// `_diag.n` et `_rates` étaient des variables de MODULE, écrites en base au plus
+// une fois par minute. Or Chrome tue un service worker MV3 après ~30 s
+// d'inactivité : le tampon mourait donc AVANT le flush, et les compteurs comme
+// les échantillons partaient avec lui.
+// PREUVE DIRECTE EN BASE, pas une hypothèse : `recupererLabel` pose TROIS
+// échantillons dans la même boucle (label_url, shipments/{id}, label_options),
+// à quelques centaines de millisecondes d'intervalle. Le premier écrivait et
+// consommait le quota d'une minute ; les deux suivants étaient jetés. En base,
+// `rates` ne contient QUE `label_label_url` — jamais `label` ni
+// `label_label_options`. C'est exactement pour ça qu'après trois sessions
+// d'instrumentation on ne connaissait toujours la forme d'AUCUNE de ces
+// réponses : on ne pouvait pas la capturer.
+// Même dégât sur les compteurs : `label_url_trouve = 6` pour `label_envoye = 2`
+// sans aucun compteur d'échec entre les deux — les deltas manquants n'ont jamais
+// été flushés.
+// ➡️ LE TAMPON VIT DÉSORMAIS DANS `chrome.storage.local` : local, gratuit, zéro
+// égress, et il SURVIT à la mort du worker. Le throttle ne protège plus que
+// l'écriture Supabase ; il ne peut plus rien perdre.
+const DIAG_BUF = 'vrmDiagBuf';
+let _diagChaine = Promise.resolve();   // sérialise les lecture-modification-écriture
+let _diagFlushAt = 0;
+
+// Toute modification du tampon passe par ici : deux appels concurrents feraient
+// sinon un lire-modifier-écrire croisé et perdraient des incréments.
+function majTampon(fn) {
+  _diagChaine = _diagChaine.then(async () => {
+    let buf = {};
+    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) {}
+    buf.n = buf.n || {}; buf.rates = buf.rates || {};
+    fn(buf);
+    try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
+    // Le flux Supabase reste throttlé — mais s'il ne part pas, rien n'est perdu.
+    if (Date.now() - _diagFlushAt < 60000) return;
+    _diagFlushAt = Date.now();
+    await viderTampon(buf);
+  }).catch(() => {});
+  return _diagChaine;
+}
+
+// Envoie le tampon en base et ne le vide QUE si l'écriture a abouti.
+async function viderTampon(buf) {
+  const aDesN = Object.keys(buf.n || {}).length, aDesR = Object.keys(buf.rates || {}).length;
+  if (!aDesN && !aDesR) return;
+  const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+  const tout = (rows && rows[0] && rows[0].data) || {};
+  const n = { ...(tout.n || {}) };
+  for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
+  // ⚠️ ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
+  // `rates` — les échantillons de réponses ratées. Et comme les compteurs
+  // partent à chaque capture (des centaines de fois par jour) alors qu'un
+  // échantillon n'est posé que sur un échec, la preuve était détruite dans la
+  // minute (constaté le 24 août).
+  await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
+    ...tout, n, rates: { ...(tout.rates || {}), ...(buf.rates || {}) }, majAt: new Date().toISOString(),
+  } }], 'id');
+  buf.n = {}; buf.rates = {};
+  try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
+}
+
 // Un exemplaire par type, écrasé à chaque fois (pas d'accumulation).
-const _rates = {};
-let _ratesEcritAt = 0;
 async function echantillonRate(type, id, body) {
-  try {
-    const t = String(type || 'inconnu');
-    _rates[t] = {
+  const t = String(type || 'inconnu');
+  return majTampon((buf) => {
+    buf.rates[t] = {
       id: String(id == null ? '' : id).slice(0, 40),
       taille: body == null ? null : String(body).length,
       type: typeof body,
       tete: String(body == null ? '' : body).slice(0, 160),
       at: new Date().toISOString(),
     };
-    if (Date.now() - _ratesEcritAt < 60000) return;
-    _ratesEcritAt = Date.now();
-    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-    const cur = (rows && rows[0] && rows[0].data) || {};
-    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { ...cur, rates: { ...(cur.rates || {}), ..._rates } } }], 'id');
-  } catch (_) {}
+  });
 }
 
 async function noterDiag(cle) {
-  try {
-    _diag.n[cle] = (_diag.n[cle] || 0) + 1;
-    // On n'écrit qu'une fois par minute (le compteur vit en mémoire entre-temps).
-    if (Date.now() - _diag.dernier < 60000) return;
-    _diag.dernier = Date.now();
-    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-    const tout = (rows && rows[0] && rows[0].data) || {};
-    const cur = tout.n || {};
-    const n = { ...cur };
-    for (const k in _diag.n) n[k] = (n[k] || 0) + _diag.n[k];
-    _diag.n = {};
-    // ⚠️ ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
-    // `rates` — les échantillons de réponses ratées gardés par
-    // `echantillonRate`. Et comme `noterDiag` part à chaque capture (des
-    // centaines de fois par jour) alors qu'un échantillon n'est posé que sur un
-    // échec, la preuve était détruite dans la minute. Constaté le 24 août :
-    // `rates: {}` en base alors que `abandon_json_item` était à 73 et
-    // `label_url_introuvable` à 1 — l'instrumentation détruisait ses propres
-    // preuves, donc on ne pouvait pas expliquer les échecs qu'elle comptait.
-    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { ...tout, n, majAt: new Date().toISOString() } }], 'id');
-  } catch (_) {}
+  return majTampon((buf) => { buf.n[cle] = (buf.n[cle] || 0) + 1; });
 }
 
 // Le dressing qui arrive est-il au moins aussi riche que celui déjà en base ?
@@ -739,6 +771,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: r2.ok, envoye: r2.ok, error: r2.ok ? '' : (r2.raison || 'échec') });
             return;
           }
+          // « Je vais le télécharger moi-même » : on note pour quelle vente,
+          // pour que le PDF capté par `chrome.downloads` soit relié à ELLE et
+          // pas laissé sans identité (cas mesuré : 2 colis à la fois).
+          if (msg.action === 'attendreBord') { sendResponse(await attendreBordereau(msg.uid, msg.tx)); return; }
           // Lire la fiche d'une de TES annonces (description, catégorie) pour
           // pouvoir la republier sans tout retaper. Lecture seule.
           if (msg.action === 'capterAnnonce') { const r = await capterAnnonce(msg.uid, msg.itemId); sendResponse(r); return; }
@@ -907,15 +943,50 @@ async function storeWriteReq(domain, method, url, body) {
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
 }
 
+// ⚠️ LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ QUAND IL Y EN A DEUX.
+// `storeLabel` n'attribue le PDF que s'il n'existe QU'UN seul colis possible
+// (règle juste : on ne devine jamais, §24). Mais mesuré le 2 septembre :
+// `tomj606` a EXACTEMENT DEUX ventes qui attendent l'envoi et dont aucun
+// bordereau n'a pu être récupéré — donc même en les téléchargeant à la main,
+// aucun des deux n'était relié à sa vente, et le second écrasait le premier
+// dans `label_latest`. C'est précisément le compte dont Julien se plaint.
+// ➡️ Quand c'est NOUS qui l'envoyons télécharger UNE vente précise (le bouton
+// « Télécharger sur Vinted » du panneau), on sait laquelle : on pose un rendez-
+// vous. Ce n'est pas une devinette — c'est l'identité de la vente qu'il vient
+// d'ouvrir, sur SON clic. Court (15 min) et à usage unique.
+const BORD_ATTENDU = 'vrmBordAttendu';
+const BORD_ATTENDU_MS = 15 * 60 * 1000;
+
+async function attendreBordereau(uid, tx) {
+  if (!uid || !tx) return { ok: false };
+  try { await chrome.storage.local.set({ [BORD_ATTENDU]: { uid: String(uid), tx: String(tx), at: Date.now() } }); } catch (_) {}
+  return { ok: true };
+}
+
+// Le rendez-vous vaut-il pour ce compte, et est-il encore frais ? Usage unique :
+// on l'efface en le consommant, pour qu'un PDF suivant ne reprenne pas la même
+// identité.
+async function bordereauAttendu(uid) {
+  try {
+    const s = await chrome.storage.local.get(BORD_ATTENDU);
+    const a = s && s[BORD_ATTENDU];
+    if (!a || String(a.uid) !== String(uid)) return null;
+    if (Date.now() - (a.at || 0) > BORD_ATTENDU_MS) return null;
+    await chrome.storage.local.remove(BORD_ATTENDU);
+    return String(a.tx);
+  } catch (_) { return null; }
+}
+
 // Range le dernier bordereau (PDF) telecharge, pour que l'app le tamponne.
 async function storeLabel(domain, url, b64) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
   // À quel colis appartient ce PDF ? Le téléchargement ne le dit pas. On ne
-  // DEVINE pas (§24) : on ne l'attribue que s'il n'y a QU'UN SEUL colis possible
+  // DEVINE pas (§24) : soit on l'a envoyé télécharger CETTE vente-là (rendez-
+  // vous ci-dessus, identité certaine), soit il n'y a QU'UN SEUL colis possible
   // pour ce compte — là ce n'est plus une supposition, c'est le seul candidat.
-  let tx = null;
-  try {
+  let tx = await bordereauAttendu(uid);
+  if (!tx) try {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const dejaCapte = new Set();
@@ -1763,6 +1834,10 @@ try {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
     else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
+    // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
+    // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
+    // une longue période calme attendrait la prochaine capture pour être écrit.
+    majTampon(() => {});
   });
 } catch (_) {}
 
