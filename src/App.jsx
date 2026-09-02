@@ -574,7 +574,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
-  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
+  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
@@ -2319,6 +2319,55 @@ const montantCommande = (o) => {
   return isNaN(n) ? 0 : n;
 };
 const parDateDesc = (a, b) => tsCommande(b) - tsCommande(a);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE CHIFFRE D'AFFAIRES À DÉCLARER — UNE SEULE RÈGLE (§11)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux un rapport tous les mois de la somme de toutes les ventes
+// finalisées pour mon URSSAF ». Trois endroits calculaient ça chacun de leur
+// côté (tableau de bord, récap mensuel, rapport comptable) — donc trois chiffres
+// qui pouvaient se contredire sur un document qui part à l'administration.
+//
+// ⚠️⚠️ DEUX DÉFAUTS MESURÉS LE 2 SEPTEMBRE, TOUS DEUX SUR DE L'ARGENT DÉCLARÉ :
+//  1. le rapport ÉCARTAIT les ventes masquées dans l'app (`isHidden`) —
+//     **101 ventes finalisées, 2 174,80 €**. Sur juin 2026 il affichait
+//     **41 €** au lieu de **1 512,70 €**. Masquer une carte range un écran ;
+//     ça n'annule pas une vente encaissée. **On inclut tout, et on le DIT.**
+//  2. le récap du tableau de bord lisait l'archive `vinted_sales`, **vide
+//     depuis juillet 2026** (§4) → il affichait 0 € partout.
+//
+// La règle : une vente compte si Vinted la dit FINALISÉE, à sa DATE DE VENTE
+// (§5.57 : « on ne te parle pas de transfert d'argent, simplement des ventes
+// finalisées »). Annulées et remboursées ne comptent jamais — ce n'est pas du
+// chiffre d'affaires.
+const TAUX_URSSAF_DEFAUT = 13.5;
+// Le taux est un RÉGLAGE, pas une constante : il dépend de l'activité et de
+// l'option pour le versement libératoire, et lui seul connaît le sien. On garde
+// 13,5 % par défaut pour ne rien changer en silence à ce qu'il voyait avant.
+const tauxUrssaf = () => {
+  const v = parseFloat(String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)).replace(',', '.'));
+  return (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT;
+};
+const moisDeVente = (o) => {
+  const t = tsCommande(o); if (!t) return null;
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'completed';
+// Répartition par mois du CA déclarable. `masquee(o)` sert UNIQUEMENT à compter
+// à part ce que l'app cache à l'écran : le total, lui, ne l'écarte jamais.
+const caUrssafParMois = (ventes, masquee) => {
+  const map = {};
+  for (const o of (ventes || [])) {
+    if (!venteFinalisee(o)) continue;
+    const ym = moisDeVente(o); if (!ym) continue;
+    const eur = montantCommande(o);
+    const m = map[ym] || (map[ym] = { ym, n: 0, ca: 0, nMasq: 0, caMasq: 0 });
+    m.n += 1; m.ca += eur;
+    if (masquee && masquee(o)) { m.nMasq += 1; m.caMasq += eur; }
+  }
+  return map;
+};
 // Heure locale d'une vente (« 14:07 »), affichée à côté de la date.
 const heureCommande = (o) => {
   const t = tsCommande(o); if (!t) return '';
@@ -5063,17 +5112,36 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
     return {ca:caM, profit:profitM, count:countM, nom:labels[now.getMonth()]};
   },[encaissees]);
 
-  // Cotisations + impôt du MOIS EN COURS : 13,5 % du CA encaissé du mois.
-  // C'est la somme à payer à la fin du mois (versement libératoire).
-  const TAUX_URSSAF=0.135;
-  const urssafEstime=moisCourant.ca*TAUX_URSSAF;
-  const netApresUrssaf=moisCourant.ca-urssafEstime;
+  // ⚠️ LE RÉCAP URSSAF NE VIENT PLUS DE L'ARCHIVE (elle est vide depuis
+  // juillet 2026, §4 — il affichait donc 0 € partout). Il vient de la photo
+  // publiée par l'écran Ventes, qui est le propriétaire des ventes (§11) :
+  // ventes FINALISÉES, à leur date de vente, ventes masquées comprises.
+  const urssafMois = useMemo(() => {
+    const v = load('vinted_urssaf_mois', null);
+    return (v && Array.isArray(v.mois)) ? v.mois : null;
+  }, [liveStats]);
+  const TAUX_URSSAF = tauxUrssaf()/100;
+  const moisCourantCA = useMemo(() => {
+    if (!urssafMois) return moisCourant.ca;
+    const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const e = urssafMois.find(m=>m.ym===ym);
+    return e ? e.ca : 0;
+  }, [urssafMois, moisCourant.ca]);
+  const urssafEstime=moisCourantCA*TAUX_URSSAF;
+  const netApresUrssaf=moisCourantCA-urssafEstime;
   // Échéance de déclaration URSSAF (fréquence réglable) + CA encaissé de la
   // période concernée → somme estimée à déclarer/payer à cette date.
   const [urssafFreq,setUrssafFreq]=useState(()=>load('vinted_urssaf_freq','trimestriel'));
   const urssafDue=useMemo(()=>nextUrssafDeadline(urssafFreq),[urssafFreq]);
   const urssafPeriodCA=useMemo(()=>{
     if(!urssafDue) return 0;
+    if (urssafMois) {
+      // Un mois publié tombe dans la période si son 1er jour y est.
+      return urssafMois.reduce((s,m)=>{
+        const [y,mo]=m.ym.split('-'); const d=new Date(Number(y),Number(mo)-1,1);
+        return (d>=urssafDue.periodStart && d<=urssafDue.periodEnd) ? s+m.ca : s;
+      },0);
+    }
     return encaissees.filter(v=>{
       const p=(v.receiveDate||'').trim().split('/'); if(p.length!==3) return false;
       const d=new Date(+p[2],+p[1]-1,+p[0]); if(isNaN(d)) return false;
@@ -5150,18 +5218,28 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         map[key].ca+=+v.sellPrice; map[key].profit+=(+v.sellPrice-+v.buyPrice); map[key].count++;
       }
     });
-    return Object.keys(map).sort().reverse().map(k=>({
+    const depuisArchive = Object.keys(map).sort().reverse().map(k=>({
       label:`${moisNoms[map[k].mois-1]||map[k].mois} ${map[k].annee}`,
       ca:map[k].ca, profit:map[k].profit, count:map[k].count,
-      urssaf:map[k].ca*0.135, net:map[k].ca-map[k].ca*0.135
+      urssaf:map[k].ca*TAUX_URSSAF, net:map[k].ca-map[k].ca*TAUX_URSSAF
     }));
-  },[encaissees]);
+    if (!urssafMois) return depuisArchive;
+    // ⚠️ Le bénéfice n'est PAS calculable ici (les prix d'achat vivent sur
+    // l'écran Annonces) : on le laisse à null et la colonne affiche « — »
+    // plutôt qu'un zéro qui passerait pour un vrai chiffre.
+    return urssafMois.map(m=>{
+      const [y,mo]=m.ym.split('-');
+      return { label:`${moisNoms[Number(mo)-1]||mo} ${y}`, ca:m.ca, profit:null, count:m.n,
+               nMasq:m.nMasq, caMasq:m.caMasq,
+               urssaf:m.ca*TAUX_URSSAF, net:m.ca-m.ca*TAUX_URSSAF };
+    });
+  },[encaissees,urssafMois,TAUX_URSSAF]);
 
   // Téléchargement du récap comptable MENSUEL en CSV
   const exportCompta=()=>{
     try{
-      const rows=[['Mois','Ventes','CA encaisse','Benefice','Cotisations+impot 13,5%','Net estime']];
-      moisRecap.forEach(m=>rows.push([m.label,m.count,m.ca.toFixed(2),m.profit.toFixed(2),m.urssaf.toFixed(2),m.net.toFixed(2)]));
+      const rows=[['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'Net estime']];
+      moisRecap.forEach(m=>rows.push([m.label,m.count,m.ca.toFixed(2),m.profit==null?'':m.profit.toFixed(2),m.urssaf.toFixed(2),m.net.toFixed(2)]));
       const csv=rows.map(r=>r.join(';')).join('\n');
       const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -5298,7 +5376,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
       {/* Estimation cotisations du MOIS EN COURS */}
       <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
         <div style={{fontSize:11,color:C.warn,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
-          🧾 À payer pour {moisCourant.nom} (13,5 % du CA encaissé)
+          🧾 À payer pour {moisCourant.nom} ({String(tauxUrssaf()).replace('.',',')} % du CA finalisé)
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
           <div>
@@ -5311,7 +5389,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           </div>
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          Calculé sur le CA encaissé de {moisCourant.nom} ({fmt(moisCourant.ca)}). C'est la somme à verser à la fin du mois (versement libératoire). Vérifie ton taux sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
+          Calculé sur le CA des ventes <b>finalisées</b> de {moisCourant.nom} ({fmt(moisCourant.ca)}), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).
+        </div>
+        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ sur la période.
+            L'app date chaque vente au jour où elle a été VENDUE — la date à
+            laquelle Vinted libère l'argent n'est pas connue pour toutes les
+            ventes, donc on ne peut pas l'utiliser sans exclure des lignes en
+            silence. L'écart est de quelques jours à quelques semaines : on le
+            DIT au lieu de laisser croire à un chiffre officiel. */}
+        <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
+          ⚠️ Ces ventes sont datées au jour de la <b>vente</b>, pas au jour où Vinted t'a versé l'argent (l'app ne connaît pas cette date pour toutes). Sur une fin de mois, un ou deux jours d'écart sont possibles — vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr, je ne suis pas comptable.
         </div>
         {/* Prochaine échéance de DÉCLARATION (rappel) */}
         <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
@@ -5332,8 +5419,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
                   <span style={{fontSize:15,fontWeight:700,color:col}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                   <span style={{fontSize:12,fontWeight:600,color:col}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
                 </div>
-                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA encaissé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(urssafPeriodCA*TAUX_URSSAF)}</b></div>
-                <div style={{fontSize:9,color:C.muted,marginTop:5}}>Estimation (13,5 %). La vraie déclaration se fait sur autoentrepreneur.urssaf.fr.</div>
+                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA finalisé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(urssafPeriodCA*TAUX_URSSAF)}</b></div>
+                <div style={{fontSize:9,color:C.muted,marginTop:5}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %). La vraie déclaration se fait sur autoentrepreneur.urssaf.fr.</div>
               </div>
             );
           })() : <div style={{fontSize:11,color:C.muted}}>Aucune échéance à venir.</div>}
@@ -5496,7 +5583,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                  {['Mois','Ventes','CA encaissé','Bénéfice','Cotis.+impôt 13,5 %','Net estimé'].map(h=>(
+                  {['Mois','Ventes','CA finalisé','Bénéfice',`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'Net estimé'].map(h=>(
                     <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
@@ -5507,7 +5594,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.accent,whiteSpace:'nowrap'}}>{m.label}</td>
                     <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500}}>{fmt(m.ca)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.accent}}>{fmt(m.profit)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.accent}}>{m.profit==null?'—':fmt(m.profit)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.warn}}>{fmt(m.urssaf)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(m.net)}</td>
                   </tr>
@@ -5516,7 +5603,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             </table>
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
-            Cotisations + impôt estimés à 13,5 % du CA encaissé chaque mois (versement libératoire). Vérifie auprès de l'URSSAF.
+            Somme des ventes que Vinted a marquées <b>finalisées</b>, à leur date de vente — annulées et remboursements exclus, ventes masquées comprises. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </Card>
       )}
@@ -12261,6 +12348,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
   }, [listings.items, sales.items, numeros, saleOv]);
 
+  // ⚠️⚠️ LE RÉCAP URSSAF DU TABLEAU DE BORD AFFICHAIT 0 € PARTOUT.
+  // Il lit `vinted_sales` — l'archive des anciennes ventes, VIDÉE en juillet
+  // 2026 (§4). Donc « cotisations du mois », « CA de la période à déclarer » et
+  // le tableau « récap comptable par mois » étaient tous à zéro, alors que la
+  // moisson Vinted porte 5 814 € de ventes finalisées (mesuré le 2 septembre).
+  // C'est cet écran-là que Julien appelle « mon rapport tous les mois ».
+  // L'écran Ventes est le PROPRIÉTAIRE des ventes (§11) : il publie le récap,
+  // le tableau de bord le consomme — même motif que `vinted_nums_physiques`.
+  useEffect(() => {
+    if (!sales.items) return;                       // rien de sûr à publier
+    try {
+      const parMois = caUrssafParMois(sales.items, isHidden);
+      const liste = Object.values(parMois)
+        .map(m => ({ ym: m.ym, n: m.n, ca: Math.round(m.ca*100)/100, nMasq: m.nMasq, caMasq: Math.round(m.caMasq*100)/100 }))
+        .sort((a,b)=> a.ym < b.ym ? 1 : -1);
+      const avant = load('vinted_urssaf_mois', null);
+      const memeChose = avant && JSON.stringify(avant.mois) === JSON.stringify(liste);
+      if (!memeChose) save('vinted_urssaf_mois', { mois: liste, at: Date.now() });
+    } catch (_) {}
+  }, [sales.items, hiddenSales, hiddenAccts]);
+
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
   // dans les Ventes les prix saisis dans Annonces, même après vente/republication.
@@ -14478,11 +14586,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tvaRate = Number(load('vinted_tva',20))||20;
     const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
+    let nMasq=0, caMasq=0;
     const saleLines=[];
     for (const o of (sales.items||[])) {
-      if (isHidden(o)) continue;
-      if (classifyOrderStatus(o.status)!=='completed') continue;
+      // ⚠️ ON N'ÉCARTE PLUS LES VENTES MASQUÉES. Le ✕ d'une carte range un
+      // écran ; il n'annule pas une vente encaissée. Mesuré le 2 septembre :
+      // l'exclusion retirait 101 ventes finalisées / 2 174,80 €, et faisait
+      // afficher 41 € au lieu de 1 512,70 € sur juin 2026. On les compte, et
+      // on affiche à part combien elles pèsent pour que ce soit vérifiable.
+      if (!venteFinalisee(o)) continue;
       if (ymOf(o.date)!==reportMonth) continue;
+      if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
@@ -14509,8 +14623,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const marge = margeKnown - fraisConnu; // ventes - achats - boosts, sur les ventes au coût connu
     const tvaMarge = (regime==='marge' && marge>0) ? marge * (tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
-    const urssaf = ca * 0.135;
-    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
+    const taux = tauxUrssaf();
+    const urssaf = ca * (taux/100);
+    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
@@ -14532,7 +14647,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push(['CA encaissé',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
+    else { L.push(['CA des ventes finalisées',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.csv`; document.body.appendChild(a); a.click(); a.remove();
@@ -14551,7 +14667,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
     if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     kv('Nombre de ventes', String(R.nb));
     kv('Achats du mois (registre)', R.buyLines.length+' — '+R.achatsTotal.toFixed(2)+' EUR');
     y-=6; page.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
@@ -14574,11 +14691,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tvaRate = Number(load('vinted_tva',20))||20;
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
+    let nMasq=0, caMasq=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
     for (const o of (sales.items||[])) {
-      if (isHidden(o)) continue;
-      if (classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
+      // ⚠️ MÊME RÈGLE QUE LE RAPPORT MENSUEL : une vente masquée à l'écran
+      // reste du chiffre d'affaires. On la compte, et on dit combien elle pèse.
+      if (!venteFinalisee(o) || !o.date) continue;
       const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
+      if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
@@ -14599,11 +14719,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     buyLines.sort((a,b)=> new Date(b.date)-new Date(a.date));
     const benefNet = margeKnown - fraisConnu;   // ⚠️ ventes au coût connu uniquement (cf. rapport mensuel)
-    const marge = margeKnown - frais;
+    // ⚠️ `marge` retranchait `frais` (les boosts de TOUTES les ventes) d'un
+    // `margeKnown` qui ne porte que les ventes au coût connu — deux ensembles
+    // différents dans la même soustraction. §5.84 l'avait corrigé sur le
+    // rapport MENSUEL et pas ici : le rapport annuel sortait donc une marge
+    // trop basse, sur un document qui part chez le comptable.
+    const marge = margeKnown - fraisConnu;
     const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
-    const urssaf = ca*0.135;
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines, saleLines };
+    const taux = tauxUrssaf();
+    const urssaf = ca*(taux/100);
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
@@ -14624,7 +14750,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push([`Bilan annuel ${R.year}`]);
     L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
     L.push([]);
-    L.push(['Mois','CA encaissé','Coût achat','Boosts','Bénéfice net','Ventes']);
+    L.push(['Mois','CA des ventes finalisees','Cout achat','Boosts','Benefice net','Ventes']);
     R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.ca-m.cout-m.frais).toFixed(2), String(m.nb)]));
     L.push(['TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2), String(R.nb)]);
     L.push([]);
@@ -14638,7 +14764,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
+    else { L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.csv`; document.body.appendChild(a); a.click(); a.remove();
@@ -14660,7 +14787,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const kv=(k,v)=>{ T(k,40,y,10,reg,rgb(0.4,0.4,0.4)); T(v,300,y,11,bold); y-=20; };
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
     const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.pdf`; document.body.appendChild(a); a.click(); a.remove();
@@ -18130,7 +18258,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
               <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA encaissé" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`}/>
+                <StatBox label="CA des ventes finalisées" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`}/>
                 {annual.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={fmtE(annual.marge)} color={annual.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={fmtE(annual.tvaMarge)} color={C.warn}/>
@@ -18139,10 +18267,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Bénéfice net" value={fmtE(annual.benefNet)} color={annual.benefNet>=0?INV_STATUS.online.color:C.danger}
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
                     sub={annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub="13,5% du CA"/>
+                  <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub={`${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
               </div>
               {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
+              {annual.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>
+                <b>{annual.nMasq} vente{annual.nMasq>1?'s':''} masquée{annual.nMasq>1?'s':''} dans l'app</b> ({fmtE(annual.caMasq)}) {annual.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
+                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
+              </div>}
               {/* Tableau mensuel */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Détail par mois</div>
               <div style={{overflowX:'auto',marginBottom:12}}>
@@ -18602,7 +18734,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
               {/* Chiffres clés selon le régime */}
               <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA encaissé" value={fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`}/>
+                <StatBox label="CA des ventes finalisées" value={fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`}/>
                 {report.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={fmtE(report.marge)} color={report.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${report.tvaRate}%`} value={fmtE(report.tvaMarge)} color={C.warn}/>
@@ -18611,10 +18743,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?INV_STATUS.online.color:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
                     sub={report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} color={C.warn} sub="13,5% du CA"/>
+                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} color={C.warn} sub={`${String(report.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
               </div>
               {report.nb>report.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>⚠️ {report.nb-report.nbCout} vente(s) sans prix d'achat — le calcul de marge est incomplet.</div>}
+              {/* ⚠️ Les ventes masquées à l'écran COMPTENT dans le CA déclaré.
+                  On l'écrit, sinon le chiffre paraîtrait inexplicablement plus
+                  haut que la liste de l'onglet Ventes. */}
+              {report.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>
+                <b>{report.nMasq} vente{report.nMasq>1?'s':''} masquée{report.nMasq>1?'s':''} dans l'app</b> ({fmtE(report.caMasq)}) {report.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
+                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
+              </div>}
               {/* Registre d'achats */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(report.achatsTotal)} ({report.buyLines.length})</div>
               {report.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat ce mois-ci{buys.items===null?' (registre en cours de chargement)':''}.</div>}
@@ -20740,6 +20879,11 @@ function AiKeySetting() {
 function RegimeSetting() {
   const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
   const [tva, setTva] = useState(() => Number(load('vinted_tva', 20)) || 20);
+  // ⚠️ LE TAUX DE COTISATIONS EST UN RÉGLAGE, PAS UNE CONSTANTE. Il était écrit
+  // 13,5 % en dur à SIX endroits, et il tombe sur un document qu'il recopie
+  // pour l'URSSAF. Le bon taux dépend de son activité et de son option pour le
+  // versement libératoire — lui seul le connaît, et il change chaque année.
+  const [txUrs, setTxUrs] = useState(() => String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)));
   const pick = (r) => { setRegime(r); save('vinted_regime', r); };
   const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
   return (
@@ -20761,6 +20905,22 @@ function RegimeSetting() {
           </button>
         ))}
       </div>
+      {regime!=='marge' && (
+        <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de cotisations</span>
+            <input type="text" inputMode="decimal" value={txUrs}
+              onChange={e=>setTxUrs(e.target.value)}
+              onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; setTxUrs(String(ok)); save('vinted_urssaf_taux', ok); }}
+              style={{width:70,border:`1px solid ${C.border}`,borderRadius:3,padding:'5px 8px',fontSize:13,fontWeight:600,background:C.bg,color:C.text,outline:'none'}}/>
+            <span style={{fontSize:12,color:C.muted}}>% du CA</span>
+          </div>
+          <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
+            Sert au rapport mensuel et annuel. Il se compose des <b>cotisations sociales</b>, de la <b>contribution à la formation</b>, et du <b>versement libératoire de l'impôt</b> si tu l'as choisi — donc il dépend de ta situation et il change d'une année à l'autre.
+            <b> Vérifie le tien sur autoentrepreneur.urssaf.fr</b> : l'app ne le devine pas, elle applique celui que tu poses ici.
+          </div>
+        </div>
+      )}
       {regime==='marge' && (
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
           <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de TVA</span>

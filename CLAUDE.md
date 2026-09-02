@@ -7166,3 +7166,110 @@ lu (§5.14) : sa liste doit suivre `PANEL_TABS`, et ouvrir « Plus » avant de
 cliquer un onglet caché.
 
 Extension **5.49.0** — à recharger dans Chrome.
+
+---
+
+## 5.87 — LE RAPPORT URSSAF : il existait, et il ÉCARTAIT 2 174 € de ventes finalisées
+
+Julien : « je veux aussi que tu me fasses un rapport tous les mois de la somme de
+toutes les ventes finalisées pour mon URSSAF ; si c'est déjà fait, améliore la
+viabilité. » **C'était déjà fait** (§7, le rapport comptable) — donc la demande
+est bien « fiabilise-le ». Méthode habituelle : mesurer la vraie base avant
+d'écrire une ligne (§46).
+
+### ⚠️⚠️ 1. LE DÉFAUT : les ventes masquées à l'écran sortaient du CA DÉCLARÉ
+Les deux rapports (mensuel ET annuel) commençaient par `if (isHidden(o)) continue;`.
+Or `vinted_sales_hidden` contient **209 ventes masquées à la main** (§5.57) : un ✕
+sur une carte range un écran, **ça n'annule pas une vente encaissée**.
+
+| mesuré le 2 septembre | |
+|---|---|
+| CA que le rapport affichait | 5 814,09 € |
+| **CA écarté parce que masqué** | **2 174,80 € · 101 ventes finalisées** ⚠️ |
+| juin 2026 | **1 vente / 41 €** affiché contre **42 ventes / 1 512,70 €** réels |
+
+➡️ **Un chiffre destiné à une déclaration ne peut pas dépendre d'un geste
+d'affichage.** Les ventes masquées **comptent** dans le CA, et leur poids est
+affiché à part (`nMasq` / `caMasq`) — auditable, jamais silencieux. C'est la
+règle de §5.27 : *un total partiel qui se présente comme complet est pire qu'un
+total absent.*
+
+### 2. Le récap du tableau de bord lisait une archive VIDE
+Le bloc « À payer pour <mois> » et le tableau des 12 mois lisaient
+`vinted_sales` — **0 ligne en base** (l'ancien catalogue, vidé en juillet 2026,
+§4). Donc **0 € partout**, en permanence.
+➡️ L'écran Ventes **publie** `vinted_urssaf_mois` (§11 : un propriétaire, les
+autres consomment — exactement le motif de `vinted_nums_physiques`, §5.14), et le
+tableau de bord le consomme. **Mesuré au rendu : 22 mois publiés**, et le bloc
+d'échéance affiche « Période août 2026 · CA finalisé 3 163,20 € → à payer
+≈ 427,03 € » — le chiffre de la moisson, plus un zéro.
+⚠️ Clé **locale**, pas dans `SYNC_KEYS` : c'est une photo recalculable.
+
+### 3. Le taux de cotisations était écrit en dur à 14 endroits
+13,5 % figé dans le code — donc faux le jour où son taux change (ACRE, activité
+mixte, versement libératoire). `vinted_urssaf_taux` (réglable dans Réglages →
+Régime, **synchronisé**) + `tauxUrssaf()` au niveau module : modale, CSV, PDF et
+tableau de bord lisent la même valeur. Un taux illisible **retombe sur 13,5**,
+jamais sur zéro.
+
+### ⚠️ 4. LA MARGE ANNUELLE MÉLANGEAIT DEUX ENSEMBLES
+`marge = margeKnown - frais` : le sous-ensemble des ventes **au coût connu**
+moins les boosts de **TOUTES** les ventes. §5.84 avait corrigé le mensuel — pas
+l'annuel, qui part pourtant chez le comptable lui aussi. Aligné sur `fraisConnu`.
+
+### ⚠️ 5. « CA ENCAISSÉ » ÉTAIT LE MAUVAIS MOT (et ça compte ici)
+Les deux rapports et le tableau de bord annonçaient un **« CA encaissé »**. Or
+§5.57 a retiré la date d'encaissement de toute l'app : tout est daté au jour de
+la **VENTE**. Sur un écran de gestion c'est un détail ; sur un document destiné à
+l'URSSAF — qui demande légalement les recettes **encaissées** sur la période —
+c'est une affirmation fausse.
+➡️ Partout « **CA des ventes finalisées** », et le tableau de bord **le dit** :
+« ces ventes sont datées au jour de la vente, pas au jour où Vinted t'a versé
+l'argent — vérifie ton chiffre sur autoentrepreneur.urssaf.fr, je ne suis pas
+comptable ». On n'invente pas une date d'encaissement pour faire joli (§5.57 :
+elle n'existe que pour une partie des ventes, c'est pour ça qu'elle a été
+retirée).
+
+### ✅ `scripts/audit-urssaf.cjs` — 18 contrôles permanents
+Il **exécute** la règle (`caUrssafParMois`) dans un `vm` contre les **8 statuts
+réellement présents en base** : seules les finalisées comptent, une vente masquée
+reste dans le total (141 €, pas 41 €), son poids est compté à part, un
+remboursement n'est jamais du chiffre d'affaires, le taux vient du réglage
+(virgule acceptée) et un taux illisible retombe sur le défaut. Puis, en statique :
+les deux rapports n'écartent plus les masquées, comptent `nMasq`, appliquent le
+taux, ne disent plus « encaissé », la marge annuelle ne mélange plus deux
+ensembles, le récap est publié ET consommé, et plus aucun 13,5 % n'est en dur.
+⚠️ **Prouvé dans les deux sens** (§21) : rejoué sur le code d'avant (`git archive
+HEAD` dans un arbre à part, script copié DEDANS et lancé DEPUIS cet arbre — le
+piège de §5.80), il sort **13 contrôles en échec**.
+
+### ⚠️ Piège d'outillage : `vm.runInContext` n'expose PAS les `const`
+Une déclaration `const` est **lexicale** : contrairement à une `function`, elle ne
+devient jamais une propriété de l'objet de contexte. L'audit plantait sur
+`ctx.venteFinalisee is not a function` alors que le code était juste. Il faut
+**exporter explicitement** à la fin de la source évaluée
+(`Object.assign(this, { … })`) — le motif déjà utilisé dans
+`audit-bordereau-pdf.cjs`.
+
+### Vérifié au RENDU RÉEL (§20, vraies données)
+| | |
+|---|---|
+| rapport **mensuel**, juin 2026 | **CA des ventes finalisées 1 512,70 € · 42 ventes · cotisations 204,21 €**, avec « 41 ventes masquées dans l'app (1 471,70 €) sont comptées dans ce CA » |
+| rapport **annuel** 2026 | **7 626,89 € · 235 ventes**, dont 1 885,80 € masqués |
+| `vinted_urssaf_mois` publié | **22 mois** (2026-08 : 101 ventes / 3 163,20 €) |
+| tableau de bord | « Période août 2026 · CA finalisé 3 163,20 € → à payer ≈ 427,03 € » |
+
+⚠️ **Piège de banc, deux fois** : (1) la modale s'ouvre sur le **mois en cours** —
+le 2 du mois il est vide, on mesure « 0 € » et on conclut à tort que le rapport
+ne marche pas ; il faut choisir un mois qui a des ventes. (2) `body.innerText`
+place la modale **à la fin** du texte : lire les 700 premiers caractères ne
+montre que l'écran derrière, et on croit que rien ne s'est ouvert.
+
+`npm run build` OK · **19 audits au vert** · smoke **11 écrans, 0 écran vide,
+0 PAGEERROR, 0 suspect** · banc 390 px : **0 débordement**.
+
+### ⚠️ CE QUE CE RAPPORT NE RÈGLE PAS
+**0 prix d'achat sur 278 paires** (§22) : le CA déclaré est juste, le **bénéfice**
+reste calculé sur la seule vente au coût connu (et le dit — §5.84). Julien s'en
+charge lui-même (« je vais faire les coûts d'achat ») ; les outils de saisie
+existent (§5.47 en série, §5.64 en un tap).
