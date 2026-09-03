@@ -7546,3 +7546,78 @@ défilement démarre, **« Ouvrir » copie `38` et ouvre la bonne annonce**,
 sans ce champ → 7 contrôles rouges sur un code qui marchait.
 
 Extension **5.51.0** — à recharger dans Chrome.
+
+---
+
+## 5.90 — ARDOISE, BLANC, UN SEUL BLEU : la couleur devient RARE
+
+Julien : « je veux un meilleur visuel de l'app, je n'aime pas les couleurs »,
+puis « je te laisse choisir ».
+
+⚠️ **Cinq passes de palette avaient déjà échoué** (§5.54, §5.58, §5.61, §5.65,
+§5.66). J'ai donc commencé par **RENDRE l'app et la REGARDER** à sa résolution de
+travail (§5.76) avant de toucher une teinte — et le défaut se nomme, il n'est pas
+une affaire de goût :
+
+| ce que la capture montrait | pourquoi ça rate |
+|---|---|
+| les **4 chiffres de Ventes** en rouge / ambre / encre / vert, chacun avec un filet d'accent | quatre couleurs côte à côte ⟹ **plus rien ne ressort** |
+| un **bouton vermillon PLEIN répété sur chaque ligne** de vente | l'aplat le plus fort de l'écran servait le geste le moins important (un PDF) |
+| les **pastilles de compte** teintées (orange, bleu, violet, jaune) | une 5ᵉ famille de couleurs, pour une information secondaire |
+| fond beige `#EFE8DC` sous des cartes crème `#FFFCF6` | **écart trop faible : les cartes ne se détachaient pas** → bouillie |
+| le rail affichait le carré « VRM » **et** le mot « VRM » | §5.68 avait retiré le doublon de l'en-tête, pas celui-ci |
+
+### La règle posée — elle vaut plus que la teinte choisie
+> ⚠️ **UNE SEULE couleur d'accent, et elle est RARE.** Tout le reste est neutre.
+> Un chiffre ne porte une couleur que s'il y a **vraiment quelque chose à
+> rattraper** ; sinon il est à l'encre.
+
+### La nouvelle famille
+| | avant (papier/vermillon) | maintenant |
+|---|---|---|
+| fond | `#EFE8DC` beige | **`#F6F7F9`** gris froid |
+| cartes | `#FFFCF6` crème | **`#FFFFFF`** blanc franc + ombre très douce |
+| accent | `#D2401E` vermillon | **`#1E5FCC`** bleu profond, **rare** |
+| encre | `#1A1512` brune | **`#10151B`** ardoise |
+| chrome (rail, barre du bas) | encre brune | **`#131820`** ardoise — il reste sombre, c'est la signature |
+
+**Le froid est un choix, pas un hasard** : les photos de paires sont chaudes
+(cuir, beige, orange). Un cadre neutre froid les fait ressortir ; le beige leur
+faisait concurrence. Et le vert comme le turquoise ont déjà été essayés et
+rejetés (§5.58, §5.60, §5.70).
+
+### Ce qui change dans le code (et pas seulement dans les jetons)
+- **`StatBox`** : le filet du haut est **NEUTRE par défaut**. Une couleur ne se
+  pose que si l'appelant en passe une. Ventes : « Bénéfice net » et « En
+  attente » repassent à l'encre (le rouge reste sur un bénéfice **négatif**).
+- **« Ta semaine »** (Ma journée) : ses trois chiffres passent à l'encre — même
+  défaut, autre écran, ce bloc n'utilise pas `StatBox`.
+- **La carte « Argent en attente »** de l'accueil quitte son fond teinté pleine
+  largeur pour la **même surface blanche** que les cartes d'action au-dessus :
+  c'était la tache la plus forte de l'écran… pour une estimation.
+- **`AcctTag`** : seule la **pastille** reste colorée (elle sert à distinguer les
+  comptes) ; le fond et le texte deviennent neutres.
+- Les deux boutons **répétés sur chaque ligne** (« bordereau » sur Ventes,
+  « Baisser » sur Annonces) passent de l'aplat au **contour**.
+- **Rail** : la marque n'est plus écrite deux fois, et l'onglet actif est un
+  **liseré d'accent** au lieu d'un pavé plein — posée en aplat sur la navigation
+  à longueur de journée, la couleur d'accent ne signalait plus rien.
+- **`INV_STATUS`** (couleurs en dur, le piège de §5.66) réaligné.
+- **`index.html`** : la trame « papier » (rayures verticales) est **retirée** —
+  sur de l'ardoise elle se lisait comme une salissure ; le **grain** passe
+  DERRIÈRE les cartes (`z-index:-1`) au lieu de recouvrir la page en `multiply`,
+  qui **grisait les cartes blanches**. Barre de défilement, `::selection` et
+  `theme-color` réalignés.
+
+### Vérifié
+`npm run build` OK · **19 audits au vert** (dont `audit-variables` : aucun
+identifiant fantôme) · **`verif_visuel.cjs`** (nouveau banc) sur **10 écrans ×
+2 tailles (390 px et 1512 px)** : **0 écran vide, 0 débordement horizontal,
+0 artefact d'affichage, 0 erreur d'app** · captures relues avant/après sur Ma
+journée, Ventes et Annonces — c'est la lecture des images qui a trouvé les cinq
+défauts ci-dessus, aucun n'était visible au build ni au compte d'erreurs (§5.56,
+§5.76).
+
+⚠️ **Ce qui reste, dit franchement** : sur un grand écran, « Ma journée » laisse
+un vide en bas quand la journée est calme — la page est courte, c'est tout. Je
+ne l'ai pas rempli de décoration.

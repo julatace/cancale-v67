@@ -13,52 +13,60 @@ const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
 // conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
-  // ── IDENTITÉ : PAPIER, ENCRE, VERMILLON ───────────────────────────────────
-  // Julien, quatre fois : « je veux que ce soit choquant, qu'on ne reconnaisse
-  // presque plus l'application ». Les passes précédentes déplaçaient les
-  // couleurs de quelques pour cent — invisible, et il avait raison de le dire.
-  // On change donc de FAMILLE, pas de nuance :
-  //  · on quitte le tableau de bord sombre vert/teal (celui de tous les
-  //    outils SaaS) pour un fond PAPIER chaud et une ENCRE brune ;
-  //  · l'accent devient un VERMILLON franc — la couleur de la sneaker, pas
-  //    celle d'un graphique ;
-  //  · plus d'ombres portées en clair : des FILETS nets à la place. Une carte
-  //    ne flotte pas, elle est imprimée sur la page ;
-  //  · les formes passent de l'arrondi générique au CARRÉ (rayon 3-4 px).
+  // ── IDENTITÉ : ARDOISE, BLANC, UN SEUL BLEU ───────────────────────────────
+  // Julien, 3 septembre : « je veux un meilleur visuel, je n'aime pas les
+  // couleurs ». En REGARDANT l'écran (§5.76) le défaut se nomme : ce n'était
+  // pas une teinte à corriger, c'était QUATRE FAMILLES DE COULEURS qui se
+  // battaient sur le même écran — les 4 chiffres de Ventes en rouge / ambre /
+  // noir / vert, un bouton vermillon plein répété sur chaque ligne pour le
+  // geste le moins important, des pastilles de compte multicolores, et un fond
+  // beige trop proche du crème des cartes (elles ne se détachaient pas).
+  //
+  // La règle posée ici, et elle vaut plus que la teinte choisie :
+  //   ⚠️ UNE SEULE couleur d'accent, et elle est RARE. Tout le reste est
+  //      neutre. Un chiffre ne porte une couleur que s'il y a vraiment
+  //      quelque chose à rattraper — sinon il est à l'encre.
+  //
+  // Le froid est un choix, pas un hasard : les photos de paires sont chaudes
+  // (cuir, beige, orange). Un cadre neutre FROID les fait ressortir ; le beige
+  // leur faisait concurrence. Et le vert comme le turquoise ont déjà été
+  // essayés et rejetés (§5.58, §5.60, §5.70).
   // Les clés existantes sont conservées : tout le fichier lit toujours C.xxx.
   light: {
-    bg:"#EFE8DC", surface:"#FFFCF6", card:"#FFFCF6", card2:"#F6EFE2", border:"#D9CDB8",
-    accent:"#D2401E", accentSoft:"#E85B33", onAccent:"#FFFFFF",
-    danger:"#A8231A", warn:"#96650B", gold:"#8A6A2F",
-    blue:"#1F5A78", purple:"#584a86", text:"#1A1512", muted:"#6B6055",
-    // Pas d'ombre douce : un filet net sous la carte, comme une impression.
-    shadow:"0 1px 0 rgba(26,21,18,.07)",
-    shadowMd:"0 2px 0 rgba(26,21,18,.10)",
-    shadowLg:"0 3px 0 rgba(26,21,18,.13)",
-    ring:"rgba(210,64,30,.13)",
-    glass:"rgba(255,252,246,.90)",
-    // LE CHROME EST À L'ENCRE, MÊME EN CLAIR. Barre latérale, en-tête et barre
-    // du bas sont un bloc d'encre contre la page papier : c'est la signature
-    // qui rend l'app reconnaissable en une seconde, et ça règle au passage
+    bg:"#F6F7F9", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F1F3F6", border:"#E3E7EC",
+    accent:"#1E5FCC", accentSoft:"#3D7BE0", onAccent:"#FFFFFF",
+    danger:"#C0392B", warn:"#A15C00", gold:"#7A6636",
+    blue:"#1E5FCC", purple:"#5B4B9E", text:"#10151B", muted:"#5C6672",
+    // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
+    // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
+    // du papier n'ont plus de sens ici.
+    shadow:"0 1px 2px rgba(16,21,27,.06)",
+    shadowMd:"0 2px 6px rgba(16,21,27,.08)",
+    shadowLg:"0 8px 24px rgba(16,21,27,.10)",
+    ring:"rgba(30,95,204,.14)",
+    glass:"rgba(255,255,255,.88)",
+    // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
+    // sombre contre la page claire — c'est la signature, et ça règle au passage
     // l'incohérence du thème sur les composants qui ne se redessinent pas
-    // (`C` est une variable de module mutable, cf. §4).
-    chrome:"#1A1512", onChrome:"#F5EEE3", chromeMuted:"#9C8D7E", chromeLine:"#332A23",
-    s1:"#D2401E", s2:"#1F5A78",
+    // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
+    // plus brune : deux températures sur le même écran, ça se voit.
+    chrome:"#131820", onChrome:"#E7ECF2", chromeMuted:"#8592A3", chromeLine:"#242C37",
+    s1:"#1E5FCC", s2:"#0F8A6A",
   },
   dark: {
-    // Le sombre reste CHAUD (encre, pas ardoise) : c'est la même identité, la
-    // nuit. Le vermillon s'éclaircit pour tenir le contraste sur le brun.
-    bg:"#151110", surface:"#1E1917", card:"#1E1917", card2:"#292320", border:"#3D342E",
-    accent:"#FF6B3D", accentSoft:"#FF8A63", onAccent:"#1B0C05",
-    danger:"#FF7F6B", warn:"#E0A945", gold:"#D8B071",
-    blue:"#69B4D6", purple:"#a795e0", text:"#F6EFE6", muted:"#A2948A",
-    shadow:"0 1px 0 rgba(0,0,0,.55)",
-    shadowMd:"0 2px 0 rgba(0,0,0,.6)",
-    shadowLg:"0 3px 0 rgba(0,0,0,.7)",
-    ring:"rgba(255,107,61,.16)",
-    glass:"rgba(30,25,23,.90)",
-    chrome:"#0F0C0B", onChrome:"#F6EFE6", chromeMuted:"#9C8D7E", chromeLine:"#2C2521",
-    s1:"#FF6B3D", s2:"#69B4D6",
+    // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
+    // éclairci pour tenir le contraste. Ce n'est pas un inversement mécanique.
+    bg:"#0E1116", surface:"#171B22", card:"#171B22", card2:"#1F242C", border:"#2C333D",
+    accent:"#5B9BFF", accentSoft:"#7FB4FF", onAccent:"#08111F",
+    danger:"#FF7A6E", warn:"#E0A945", gold:"#C9AE78",
+    blue:"#5B9BFF", purple:"#A99AF0", text:"#E8ECF1", muted:"#98A3B2",
+    shadow:"0 1px 2px rgba(0,0,0,.5)",
+    shadowMd:"0 2px 8px rgba(0,0,0,.55)",
+    shadowLg:"0 10px 28px rgba(0,0,0,.6)",
+    ring:"rgba(91,155,255,.18)",
+    glass:"rgba(23,27,34,.90)",
+    chrome:"#0A0D12", onChrome:"#E8ECF1", chromeMuted:"#8592A3", chromeLine:"#1D242D",
+    s1:"#5B9BFF", s2:"#37D39A",
   },
 };
 let C = THEMES.light;
@@ -3438,11 +3446,16 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null}) {
   // dans une page imprimée.
   // La taille suit toujours la LONGUEUR de la valeur : un montant à 5 chiffres
   // ne doit jamais se couper (§5.26).
+  // ⚠️ LE FILET EST NEUTRE PAR DÉFAUT. Avant, chaque chiffre portait un filet
+  // d'accent : quatre côte à côte, donc quatre couleurs, donc plus rien qui
+  // ressort (mesuré en regardant l'écran Ventes, §5.90). Une couleur ne se pose
+  // ici QUE si l'appelant en passe une — c'est-à-dire quand il y a vraiment
+  // quelque chose à rattraper.
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
   const fs = !L ? 'clamp(22px,7.4vw,34px)' : L <= 5 ? 'clamp(22px,7.4vw,34px)' : L <= 7 ? 'clamp(19px,6.2vw,28px)' : L <= 9 ? 'clamp(16px,4.8vw,21px)' : L <= 11 ? 'clamp(14px,3.9vw,17px)' : 'clamp(12px,3.2vw,14px)';
   return (
-    <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.accent:color}`}}>
+    <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`}}>
       <div className="vrm-label" style={{color:C.muted,minHeight:'2.44em'}}>{label}</div>
       <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,marginTop:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
@@ -4322,9 +4335,11 @@ function SideBar({ tab, setTab }) {
       display:'flex',flexDirection:'column',gap:2,
       background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,
       padding:'14px 12px 14px',overflowY:'auto'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,padding:'2px 6px 16px'}}>
-        <VrmLogo size={34}/>
-        <VrmWord height={17} color={C.onChrome} accent={C.accent}/>
+      {/* ⚠️ LA MARQUE EST ÉCRITE UNE SEULE FOIS. Le carré porte déjà les trois
+          lettres : le poser à côté du mot revenait à écrire « VRM VRM » en haut
+          de chaque écran (§5.68 l'avait corrigé dans l'en-tête, pas ici). */}
+      <div style={{display:'flex',alignItems:'center',padding:'6px 8px 18px'}}>
+        <VrmWord height={19} color={C.onChrome} accent={C.accent}/>
       </div>
       {groupes.map(g => (
         <div key={g.titre} style={{marginBottom:6}}>
@@ -4335,9 +4350,16 @@ function SideBar({ tab, setTab }) {
               <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={on?'page':undefined}
                 style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
                   padding:'9px 10px',marginBottom:2,borderRadius:3,border:'none',cursor:'pointer',fontFamily:'inherit',
-                  background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.onChrome,
+                  position:'relative',
+                  // ⚠️ L'onglet actif est un LISERÉ, plus un pavé plein d'accent.
+                  // La couleur d'accent doit rester rare : posée en aplat sur la
+                  // navigation, elle était la tache la plus forte de l'écran à
+                  // longueur de journée, donc elle ne signalait plus rien.
+                  background:on?'rgba(255,255,255,.09)':'transparent',
+                  color:on?'#fff':C.onChrome,
                   fontSize:13.5,fontWeight:on?600:500,transition:'background .15s ease,color .15s ease'}}>
-                <Icon name={t.icon} size={19} style={{opacity:on?1:.68,flexShrink:0}}/>
+                {on && <span aria-hidden="true" style={{position:'absolute',left:0,top:6,bottom:6,width:3,borderRadius:2,background:C.accent}}/>}
+                <Icon name={t.icon} size={19} style={{opacity:on?1:.68,flexShrink:0,color:on?C.accent:undefined}}/>
                 <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
               </button>
             );
@@ -10318,10 +10340,10 @@ function VintedAccounts({ accounts, setAccounts }) {
 // l'ancienne identité au milieu de la nouvelle — les badges N° restaient VERTS
 // sur une app vermillon. Elles suivent maintenant la famille papier/encre.
 const INV_STATUS = {
-  online:       { label: 'En ligne',      color: '#1F7A5C', icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#1F5A78', icon: '⏳' },
-  sold:         { label: 'Vendu',         color: '#D2401E', icon: '💸' },
-  stock:        { label: 'Stock',         color: '#96650B', icon: '📦' },
+  online:       { label: 'En ligne',      color: '#0F8A6A', icon: '🟢' },
+  pending_sale: { label: 'Vente en cours', color: '#1E5FCC', icon: '⏳' },
+  sold:         { label: 'Vendu',         color: '#5C6672', icon: '💸' },
+  stock:        { label: 'Stock',         color: '#A15C00', icon: '📦' },
 };
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
@@ -10880,9 +10902,14 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 const ACCT_COLORS = ['#2f80ed','#9b51e0','#eb5757','#27ae60','#f2994a','#00b8a9','#e056fd','#f39c12'];
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 function AcctTag({ acc, name }) {
+  // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
+  // comptes, huit étiquettes teintées ajoutaient une famille de couleurs
+  // complète sur des écrans qui en portaient déjà trois (§5.90) — alors que la
+  // couleur ne sert ici qu'à distinguer les comptes entre eux. Le point suffit
+  // pour ça ; le texte redevient neutre.
   const col = acctColor(acc?.vinted_user_id);
-  return <span style={{display:'inline-flex',alignItems:'center',gap:4,background:col+'22',color:col,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:3,whiteSpace:'nowrap'}}>
-    <span style={{width:6,height:6,borderRadius:3,background:col}}/>{name}
+  return <span style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:3,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
+    <span style={{width:6,height:6,borderRadius:3,background:col,flexShrink:0}}/>{name}
   </span>;
 }
 
@@ -15212,7 +15239,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-label" style={{color:C.muted,marginBottom:9}}>Ta semaine</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 90px'}}>
-                      <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1}}>{sem.n}</div>
+                      <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{sem.n}</div>
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vente{sem.n>1?'s':''} · 7 j</div>
                     </div>
                     <div style={{flex:'1 1 90px'}}>
@@ -15220,7 +15247,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vendu sur 7 j</div>
                     </div>
                     <div style={{flex:'1 1 90px'}}>
-                      <div style={{fontSize:22,fontWeight:700,color:toShip.length?C.warn:C.muted,lineHeight:1}}>{toShip.length}</div>
+                      {/* ⚠️ Les trois chiffres de la semaine sont à l'ENCRE.
+                          Trois couleurs côte à côte (bleu, noir, ambre), c'est
+                          le même défaut que la rangée de Ventes : plus rien ne
+                          ressort (§5.90). Ce sont des repères, pas des alertes —
+                          l'urgence est dite juste en dessous, sur la carte. */}
+                      <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{toShip.length}</div>
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>à expédier</div>
                     </div>
                   </div>
@@ -15325,13 +15357,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const val=escrow?escrow.total:inRouteSum;
               if(loading||val<=0) return null;
               return (
-              <div style={{marginTop:16,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:4,border:`1px solid ${C.accent}33`,background:`${C.accent}0c`}}>
-                <div style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
+              /* ⚠️ MÊME SURFACE QUE LES CARTES D'ACTION AU-DESSUS. Un fond
+                 teinté pleine largeur faisait de cette ligne la tache la plus
+                 forte de l'accueil — pour une ESTIMATION, alors que les vraies
+                 actions juste au-dessus sont sur fond blanc (§5.90). */
+              <div style={{marginTop:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                <div style={{color:C.muted,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en attente{escrow?'':' (estimation)'}</div>
-                  <div style={{fontSize:20,fontWeight:700,color:C.accent}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
+                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
                 </div>
-                <button type="button" onClick={()=>onNav && onNav('cat_ventes')} style={{border:'none',background:'transparent',color:C.accent,fontSize:22,fontWeight:700,cursor:'pointer'}}>›</button>
+                <button type="button" onClick={()=>onNav && onNav('cat_ventes')} style={{border:'none',background:'transparent',color:C.muted,fontSize:22,fontWeight:700,cursor:'pointer'}}>›</button>
               </div>
               );
             })()}
@@ -15382,7 +15418,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
                 Julien vient regarder : il prend sa place dans la rangée. */}
-            {totals.nbAttente>0 && <StatBox label="En attente" value={fmtE0(totals.enAttente)} color={C.warn} sub={`${totals.nbAttente} en cours`}/>}
+            {totals.nbAttente>0 && <StatBox label="En attente" value={fmtE0(totals.enAttente)} sub={`${totals.nbAttente} en cours`}/>}
             {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
                 affiche déjà ce montant, avec le détail par compte et l'avertissement
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
@@ -15398,7 +15434,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
             {totals.nbCout===0
               ? <StatBox label="Bénéfice net" value="n/d" color={C.muted} sub="saisis tes prix d'achat"/>
-              : <StatBox label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?INV_STATUS.online.color:C.danger}
+              : <StatBox label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                   subColor={totals.nbCout<totals.nb?C.warn:undefined}
                   sub={totals.nbCout<totals.nb
                     ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
@@ -16029,7 +16065,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}>📍</button>
                 )}
                 {needsBordereau(o.status) && !hidden && (
-                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:3,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
+                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
                   <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:3,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
@@ -17482,7 +17518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
                           {atFloor && <div style={{fontSize:9,color:C.muted}}>= prix d'achat (plancher)</div>}
                         </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'6px 11px',borderRadius:3}}>🏷️ Baisser</a>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:3}}>🏷️ Baisser</a>
                       </div>
                     );
                   })}
@@ -17663,7 +17699,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 10px 10px',padding:'6px 8px',borderRadius:3,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
                       <span style={{fontSize:11,color:C.text,fontWeight:500,flex:1,minWidth:0,lineHeight:1.3}}>💸 Prix conseillé <b>{sugg} {cur(it.currency)}</b> <span style={{color:C.muted}}>(−15 %{sleeps?` · dort ${age}j`:''})</span></span>
-                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:3}}>🏷️ Baisser</a>
+                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:3}}>🏷️ Baisser</a>
                     </div>
                   );
                 })()}
