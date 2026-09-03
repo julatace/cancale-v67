@@ -7273,3 +7273,77 @@ montre que l'écran derrière, et on croit que rien ne s'est ouvert.
 reste calculé sur la seule vente au coût connu (et le dit — §5.84). Julien s'en
 charge lui-même (« je vais faire les coûts d'achat ») ; les outils de saisie
 existent (§5.47 en série, §5.64 en un tap).
+
+
+---
+
+## 5.86 — LE MOIS DU RAPPORT SE CHOISIT LIBREMENT, ET UN MOIS N'EST PAS FINI QUAND IL SE TERMINE
+
+Julien : « tu es sûr de juin ? et en plus je veux août — je veux pouvoir
+sélectionner tous les mois comme je veux ».
+
+### La mesure d'août, telle qu'il l'a demandée (3 septembre)
+**110 ventes finalisées du 1er au 31 août 2026 = 3 345,20 €**, tous comptes
+confondus : julatace3535 20/733,40 · llloollllaa 18/593,10 · julatace35260
+20/592,30 · julienf765 16/415,20 · tomj606 11/350,20 · tomj683 12/329,00 ·
+angeled92 9/284,00 · arthuror2 4/48,00.
+⚠️ Non compté sur la même fenêtre : **59 pas encore finalisées → 1 174,90 €** et
+14 annulées/remboursées → 186,20 €. Toutes ventes d'août confondues : 183 →
+4 706,30 €. Le total INCLUT 1 vente masquée à la main (2,00 €), et rien ne vient
+d'un compte masqué ni supprimé.
+⚠️ **Le chiffre a bougé dans la journée** : 3 285,20 € le matin → 3 345,20 € le
+soir (3 ventes finalisées entre-temps). C'est normal, pas un bug — et c'est
+exactement ce que l'encart ci-dessous annonce désormais.
+
+### 1. Un mois n'est PAS complet le jour où il se termine
+Une vente Vinted se finalise ~2 semaines après. Le rapport compte et **annonce**
+les ventes du mois **pas encore finalisées** (« ce mois va encore monter »).
+⚠️ Elles n'entrent **jamais** dans le CA déclaré ; le montant passe par
+`montantCommande` (le prix Vinted est un **objet** `{amount}` — §5.27), et une
+**annulée** n'est jamais comptée comme « en attente ».
+⚠️ **La réserve VOYAGE avec le document** : ligne dédiée dans le CSV **et** dans
+le PDF. Un rapport imprimé qui présente un mois comme terminé, c'est le risque
+(§5.84).
+
+### 2. Le mois s'ouvrait sur le MOIS EN COURS, dans un `<select>`
+Le 2 d'un mois, ce mois est vide : on ouvre « Rapport », on lit 0 €, on croit
+que ses ventes ont disparu. Et un menu déroulant n'atteint que les mois de sa
+propre liste.
+- **`derniersMoisDeclarables`** = les mois qui portent vraiment des ventes
+  **finalisées** → la modale s'ouvre sur le dernier (mesuré : août 2026).
+- ⚠️ **`moisChoisiMain`** : dès qu'il a choisi un mois, on ne le déplace plus
+  sous ses doigts.
+- **Grille de 12 mois + année navigable** (la même que le sélecteur de période
+  de l'écran Ventes, §5.57), mois à venir grisés, pastille `VENTES` sur ceux qui
+  en portent. `reportMonths`, devenu mort, est **supprimé** — un helper mort est
+  un piège pour la session suivante (§5.39).
+
+### ⚠️ LA LEÇON LA PLUS CHÈRE DE LA SESSION : J'AI PERDU CE TRAVAIL, PUIS JE L'AI REFAIT EN DOUBLE
+Ce travail avait été écrit, commité **en local**, jamais poussé. Le conteneur a
+été recyclé → tout était à refaire. Je l'ai refait **sur un clone périmé**
+(`origin` avait entre-temps 5 commits de plus, dont §5.85 sur le même écran) :
+mon correctif « ventes masquées » **doublonnait** une règle déjà posée, et en
+sens INVERSE (j'excluais en l'annonçant ; §5.85 les **compte dans le CA**, ce
+qui est la bonne réponse — masquer une carte range un écran, ça n'annule pas une
+vente encaissée). Commit jeté, version distante reprise, seule la partie
+réellement manquante portée dessus.
+➡️ **Deux règles, toutes deux déjà écrites et toutes deux ignorées :**
+1. **`git fetch` AVANT de comparer ou de coder** (§5.21 — une référence locale
+   jamais rafraîchie ment en silence) ;
+2. **pousser à CHAQUE modification** (§5.11) : ce n'est pas une préférence, c'est
+   ce qui empêche une session de perdre son travail et la suivante de le refaire
+   à l'envers.
+
+### Vérifié
+`npm run build` OK · `scripts/audit-urssaf.cjs` : **12 contrôles ajoutés**, et
+**les 12 échouent sur le code d'avant** (§21, méthode §5.80 : `git archive HEAD`
+dans un arbre à part, script copié DEDANS et lancé DEPUIS cet arbre) ·
+**19 audits au vert** · modale RENDUE sur les vraies données : s'ouvre sur
+**août 2026 — 3 345,20 € / 110 ventes** (= le chiffre mesuré à l'euro près),
+« 57 ventes pas encore finalisées — 1 148,90 € », et un clic sur **juin** donne
+**1 512,70 € / 42 ventes** · smoke **10 écrans à 390 px : 0 vide, 0 débordement,
+0 artefact, 0 erreur**.
+⚠️ **Piège de banc (§21, encore)** : mon mock ne servait que `id=like.`, pas
+`id=eq.` → l'écran Annonces affichait « Impossible de charger ces données » et
+j'ai failli conclure à une régression. **Servir toutes les FORMES de requête,
+pas seulement toutes les familles de lignes.**

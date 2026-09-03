@@ -157,5 +157,71 @@ enDur.length
   ? nok('aucun taux de cotisations écrit en dur', enDur.map(([n]) => 'l.' + n).join(', '))
   : ok('aucun taux de cotisations écrit en dur');
 
+
+// ────────────────────────────────────────────────────────────────────────────
+// LE MOIS SE CHOISIT LIBREMENT, ET UN MOIS N'EST PAS COMPLET LE JOUR OÙ IL SE
+// TERMINE (§5.85).
+//
+// La modale s'ouvrait sur le MOIS EN COURS : le 2 d'un mois, elle affichait
+// 0 € et Julien croyait ses ventes disparues. Et le mois vivait dans un
+// <select> : impossible d'atteindre un mois absent de la liste.
+//
+// Une vente Vinted se finalise ~2 semaines après. Mesuré le 3 septembre :
+// août portait 110 ventes finalisées (3 345,20 €) ET 59 encore en cours
+// (1 174,90 €). Le rapport les compte et le dit.
+// ────────────────────────────────────────────────────────────────────────────
+/derniersMoisDeclarables\s*=\s*useMemo\([\s\S]{0,400}venteFinalisee\(o\)/.test(SRC)
+  ? ok("les mois déclarables sont ceux qui portent des ventes finalisées")
+  : nok("les mois déclarables sont ceux qui portent des ventes finalisées");
+
+/openReport\s*=\s*\(\)\s*=>\s*\{[\s\S]{0,400}setReportMonth\(derniersMoisDeclarables\[0\]\)/.test(SRC)
+  ? ok("le rapport s'ouvre sur le dernier mois déclarable, pas sur un mois vide")
+  : nok("le rapport s'ouvre sur le dernier mois déclarable");
+
+(/moisChoisiMain\s*=\s*useRef\(false\)/.test(SRC) &&
+ /if\s*\(!moisChoisiMain\.current\s*&&/.test(SRC) &&
+ /moisChoisiMain\.current=true/.test(SRC))
+  ? ok("un mois choisi à la main n'est plus déplacé sous ses doigts")
+  : nok("un mois choisi à la main n'est plus déplacé");
+
+!/<select value=\{reportMonth\}/.test(SRC)
+  ? ok("plus de menu déroulant pour le mois du rapport")
+  : nok("le menu déroulant du mois est encore là");
+
+!/const reportMonths\b/.test(SRC)
+  ? ok("le helper mort `reportMonths` n'a pas été laissé dans le fichier")
+  : nok("`reportMonths` traîne encore (piège pour la session suivante, §5.39)");
+
+(/setReportAnnee/.test(SRC) && /MOIS_FR\.map\(\(nom,m\)=>/.test(SRC) &&
+ /moisChoisiMain\.current=true;\s*setReportMonth\(ym\)/.test(SRC))
+  ? ok("n'importe quel mois s'ouvre depuis la grille (année navigable)")
+  : nok("n'importe quel mois s'ouvre depuis la grille");
+
+/const futur = reportAnnee>now\.getFullYear\(\)/.test(SRC)
+  ? ok("les mois à venir ne se déclarent pas")
+  : nok("les mois à venir ne se déclarent pas");
+
+(/let nMasq=0, caMasq=0, nAttente=0, caAttente=0;/.test(SRC) &&
+ /nAttente\+=1;\s*caAttente\+=montantCommande\(o\);/.test(SRC))
+  ? ok("les ventes du mois pas encore finalisées sont comptées (montantCommande : le prix est un objet)")
+  : nok("les ventes du mois pas encore finalisées sont comptées");
+
+/if \(classifyOrderStatus\(o\.status\)!=='cancelled'\) \{ nAttente\+=1;/.test(SRC)
+  ? ok("une annulée n'est jamais comptée comme « en attente »")
+  : nok("une annulée n'est jamais comptée comme « en attente »");
+
+(/report\.nAttente>0 && \(/.test(SRC) && /fmtE\(report\.caAttente\)/.test(SRC))
+  ? ok("elles sont annoncées dans la modale, avec leur montant")
+  : nok("elles sont annoncées dans la modale");
+
+(/L\.push\(\[`Ventes de ce mois pas encore finalisees \(hors CA\)`/.test(SRC) &&
+ /kv\('Ventes de ce mois pas encore finalisees \(hors CA\)'/.test(SRC))
+  ? ok("le CSV et le PDF emportent la réserve avec eux")
+  : nok("le CSV et le PDF emportent la réserve");
+
+/if \(!venteFinalisee\(o\)\) \{/.test(SRC)
+  ? ok("une vente non finalisée n'entre jamais dans le CA déclaré")
+  : nok("une vente non finalisée n'entre jamais dans le CA déclaré");
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nLe CA déclaré suit une seule règle, et rien n\'en est écarté en silence.');
 process.exit(ko ? 1 : 0);

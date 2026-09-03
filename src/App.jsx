@@ -14571,22 +14571,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [moisOuvert, setMoisOuvert] = useState(false);
+  const [reportAnnee, setReportAnnee] = useState(() => new Date().getFullYear());
   const ymOf = (dstr) => { if(!dstr) return null; const d=new Date(dstr); if(isNaN(d)) return null; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
-  // Mois disponibles (ventes + achats) pour le sélecteur.
-  const reportMonths = useMemo(() => {
+  // ⚠️ Les mois qui portent vraiment des ventes FINALISÉES — c'est ce qu'on
+  // déclare. Sert à ouvrir le rapport sur un mois qui a du contenu (le 2 du
+  // mois, le mois en cours est vide : on croit que ses ventes ont disparu) et
+  // à marquer les mois de la grille.
+  const derniersMoisDeclarables = useMemo(() => {
     const s = new Set();
-    (sales.items||[]).forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
-    buysBase.forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
-    s.add(reportMonth);
+    (sales.items||[]).forEach(o=>{ if(venteFinalisee(o)){ const m=ymOf(o.date); if(m) s.add(m); } });
     return [...s].sort().reverse();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase]);
+  }, [sales.items]);
   const report = useMemo(() => {
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
-    let nMasq=0, caMasq=0;
+    let nMasq=0, caMasq=0, nAttente=0, caAttente=0;
     const saleLines=[];
     for (const o of (sales.items||[])) {
       // ⚠️ ON N'ÉCARTE PLUS LES VENTES MASQUÉES. Le ✕ d'une carte range un
@@ -14594,8 +14597,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // l'exclusion retirait 101 ventes finalisées / 2 174,80 €, et faisait
       // afficher 41 € au lieu de 1 512,70 € sur juin 2026. On les compte, et
       // on affiche à part combien elles pèsent pour que ce soit vérifiable.
-      if (!venteFinalisee(o)) continue;
       if (ymOf(o.date)!==reportMonth) continue;
+      if (!venteFinalisee(o)) {
+        // ⚠️ Un mois n'est PAS complet le jour où il se termine : une vente se
+        // finalise ~2 semaines après. Mesuré le 3 septembre, août portait 110
+        // ventes finalisées (3 345,20 €) et 59 ENCORE EN COURS (1 174,90 €).
+        // Annoncer le premier chiffre sans dire que le second existe, c'est
+        // présenter comme définitif un CA qui va encore monter.
+        if (classifyOrderStatus(o.status)!=='cancelled') { nAttente+=1; caAttente+=montantCommande(o); }
+        continue;
+      }
       if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
@@ -14625,11 +14636,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = ca * (taux/100);
-    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, saleLines, buyLines, achatsTotal };
+    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
-  const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
+  // ⚠️ Il a choisi un mois : on ne le déplace plus sous ses doigts.
+  const moisChoisiMain = useRef(false);
+  const openReport = () => {
+    setShowReport(true);
+    if (!moisChoisiMain.current && derniersMoisDeclarables[0]) {
+      setReportMonth(derniersMoisDeclarables[0]);
+      setReportAnnee(Number(derniersMoisDeclarables[0].slice(0,4)));
+    }
+    if (buys.items===null && accounts.length) loadOrders('purchased', setBuys);
+  };
 
   // Export CSV du rapport (ventes + registre d'achats).
   const exportReportCsv = () => {
@@ -14649,6 +14669,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
     else { L.push(['CA des ventes finalisées',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
     if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
+    // ⚠️ Le document part chez un comptable : ce qui n'y est PAS encore doit
+    // partir avec lui, sinon un mois se présente comme terminé (§5.84).
+    if (R.nAttente>0) L.push([`Ventes de ce mois pas encore finalisees (hors CA)`,`${R.nAttente}`,R.caAttente.toFixed(2)]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.csv`; document.body.appendChild(a); a.click(); a.remove();
@@ -14669,6 +14692,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
     else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
+    if (R.nAttente>0) kv('Ventes de ce mois pas encore finalisees (hors CA)', R.nAttente+' — '+R.caAttente.toFixed(2)+' EUR');
     kv('Nombre de ventes', String(R.nb));
     kv('Achats du mois (registre)', R.buyLines.length+' — '+R.achatsTotal.toFixed(2)+' EUR');
     y-=6; page.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
@@ -18725,11 +18749,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
-                <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
-                <select value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 10px',fontSize:13,fontWeight:500,background:C.card,color:C.text,cursor:'pointer'}}>
-                  {reportMonths.map(m=>{ const [y,mo]=m.split('-'); const lbl=new Date(Number(y),Number(mo)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); return <option key={m} value={m}>{lbl}</option>; })}
-                </select>
+              {/* ⚠️ N'IMPORTE QUEL MOIS, pas seulement ceux d'une liste : la même
+                  grille que le sélecteur de période de l'écran Ventes (§5.57).
+                  Un menu déroulant enterrait le mois qu'il cherchait. */}
+              <div style={{marginBottom:14}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
+                  <button type="button" onClick={()=>setMoisOuvert(v=>!v)} style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 12px',fontSize:13,fontWeight:600,background:C.card,color:C.text,cursor:'pointer',textTransform:'capitalize',fontFamily:'inherit'}}>
+                    {report.monthLabel} ▾
+                  </button>
+                </div>
+                {moisOuvert && (
+                  <div style={{marginTop:8,border:`1px solid ${C.border}`,borderRadius:4,background:C.card,padding:10}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                      <button type="button" aria-label="Année précédente" onClick={()=>setReportAnnee(a=>a-1)} style={{border:'none',background:'transparent',color:C.text,fontSize:18,cursor:'pointer',lineHeight:1,padding:'0 8px'}}>‹</button>
+                      <div style={{fontSize:13,fontWeight:700,color:C.text}}>{reportAnnee}</div>
+                      <button type="button" aria-label="Année suivante" onClick={()=>setReportAnnee(a=>a+1)} disabled={reportAnnee>=new Date().getFullYear()} style={{border:'none',background:'transparent',color:reportAnnee>=new Date().getFullYear()?C.muted:C.text,fontSize:18,cursor:reportAnnee>=new Date().getFullYear()?'default':'pointer',lineHeight:1,padding:'0 8px',opacity:reportAnnee>=new Date().getFullYear()?0.4:1}}>›</button>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
+                      {MOIS_FR.map((nom,m)=>{
+                        const ym = `${reportAnnee}-${String(m+1).padStart(2,'0')}`;
+                        const now = new Date();
+                        const futur = reportAnnee>now.getFullYear() || (reportAnnee===now.getFullYear() && m>now.getMonth());
+                        const actif = ym===reportMonth;
+                        const aDesVentes = derniersMoisDeclarables.includes(ym);
+                        return (
+                          <button key={ym} type="button" disabled={futur}
+                            onClick={()=>{ moisChoisiMain.current=true; setReportMonth(ym); setMoisOuvert(false); }}
+                            style={{border:`1px solid ${actif?C.accent:C.border}`,borderRadius:3,padding:'7px 4px',fontSize:12.5,fontWeight:actif?700:500,fontFamily:'inherit',
+                              background:actif?`${C.accent}1a`:'transparent',color:futur?C.muted:(actif?C.accent:C.text),
+                              cursor:futur?'default':'pointer',opacity:futur?0.35:1,textTransform:'capitalize',lineHeight:1.25}}>
+                            {nom}
+                            <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.06em',color:actif?C.accent:C.muted,minHeight:11}}>{aDesVentes?'VENTES':''}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
               {/* Chiffres clés selon le régime */}
@@ -18750,6 +18807,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* ⚠️ Les ventes masquées à l'écran COMPTENT dans le CA déclaré.
                   On l'écrit, sinon le chiffre paraîtrait inexplicablement plus
                   haut que la liste de l'onglet Ventes. */}
+              {report.nAttente>0 && (
+                <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.warn}`,borderRadius:3,padding:'9px 12px',marginBottom:12}}>
+                  <div style={{fontSize:12.5,color:C.text,lineHeight:1.45}}>
+                    <b>{report.nAttente} vente{report.nAttente>1?'s':''} de ce mois {report.nAttente>1?'ne sont':"n'est"} pas encore finalisée{report.nAttente>1?'s':''}</b> — <b style={{color:C.warn}}>{fmtE(report.caAttente)}</b> qui ne {report.nAttente>1?'sont':'est'} pas dans le CA ci-dessus.
+                    <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>Vinted finalise ~2 semaines après la vente : ce mois va encore monter.</div>
+                  </div>
+                </div>
+              )}
               {report.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>
                 <b>{report.nMasq} vente{report.nMasq>1?'s':''} masquée{report.nMasq>1?'s':''} dans l'app</b> ({fmtE(report.caMasq)}) {report.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
                 <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
