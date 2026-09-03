@@ -166,6 +166,47 @@ const V = (tx, titre, prix, statut) => ({ transaction_id: tx, title: titre, pric
     dit(/VISITE_DELAI_MS\) return;/.test(bloc),
       'le garde de 5 min ne protège plus que la moisson complète');
   }
+  // 12. LE RÉCAP N'ATTEND PLUS POUR RIEN (§5.89) — mesuré : `orders_sold` (le
+  //     payload ENTIER des ventes) était demandé jusqu'à TROIS fois de suite sur
+  //     une seule arrivée, et les quatre sources du récap s'enchaînaient au lieu
+  //     de partir ensemble. Chaque aller-retour est du temps d'attente pur.
+  {
+    const fs2 = require('fs'), path2 = require('path');
+    const src4 = fs2.readFileSync(path2.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+    dit(/function sbGetMemo\(/.test(src4) && /_memoVisite/.test(src4),
+      'un mémo de visite existe (la même lecture lourde ne repart pas deux fois)');
+    // Les ventes se lisent par le mémo sur LE CHEMIN RAPIDE (la visite).
+    // ⚠️ Volontairement PAS ailleurs : `storeLabel` part d'un téléchargement qui
+    // peut arriver bien plus tard, il lui faut des ventes fraîches — servir un
+    // mémo de 20 s y serait un bug, pas une optimisation.
+    const rapide = ['ventesSansBordereau', 'nouveautes', 'genererBordereauxEnAttente']
+      .map(f => { const i = src4.indexOf('async function ' + f); return i < 0 ? '' : src4.slice(i, i + 4000); })
+      .join('\n');
+    const brut = (rapide.match(/[^o]sbGet\(`app_data\?id=eq\.harvest_\$\{uid\}_orders_sold/g) || []).length;
+    dit(brut === 0,
+      'sur le chemin rapide, les ventes ne sont plus relues directement', `restantes: ${brut}`);
+    // …et le mémo est vidé dès qu'on écrit des ventes fraîches : jamais de
+    // ventes périmées servies au récap.
+    const iR = src4.indexOf('async function rafraichirVentes');
+    dit(iR > 0 && /viderMemoVisite\(uid\)/.test(src4.slice(iR, iR + 900)),
+      'le mémo est vidé juste après avoir écrit des ventes fraîches');
+    // Les quatre sources du récap partent EN MÊME TEMPS.
+    const iN = src4.indexOf('async function nouveautes');
+    const blocN = src4.slice(iN, iN + 3000);
+    dit(/await Promise\.all\(\[/.test(blocN) && /offresEnAttente\(uid\)/.test(blocN)
+      && /ventesSansBordereau\(uid\)/.test(blocN),
+      'les sources du récap sont lues en parallèle, pas à la file');
+    // Le récap ne se perd plus si le script de la page n'est pas encore prêt.
+    dit(/async function envoyerRecap\(/.test(src4) && /RECAP_ESSAIS/.test(src4),
+      "le récap réessaie tant que l'onglet n'est pas prêt à le recevoir");
+    const iP = src4.indexOf('async function proposerBordereaux');
+    dit(iP > 0 && /if \(!\(await envoyerRecap\(charge\)\)\) return;/.test(src4.slice(iP, iP + 3000)),
+      "« déjà montré » n'est noté que si un onglet a VRAIMENT reçu le récap");
+    // Et l'attente après le chargement de page ne dépasse plus 400 ms.
+    const m = /visiteTimer = setTimeout\(\(\) => \{ visiteVinted\(\); \}, (\d+)\)/.exec(src4);
+    dit(!!m && Number(m[1]) <= 400,
+      'on attend au plus 400 ms après le chargement de la page', m ? m[1] + ' ms' : 'introuvable');
+  }
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : "\nLe récap ne s'allume que quand il y a vraiment du nouveau.");
   process.exit(ko ? 1 : 0);
 })();

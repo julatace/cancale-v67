@@ -1850,12 +1850,22 @@
   // Règle : on descend au prix plancher s'il est posé, sinon −10 % arrondi.
   // ⚠️ Jamais en dessous du prix d'achat : on le signale au lieu de proposer
   //    une vente à perte (le prix d'achat, quand il est connu, fait foi).
-  function remiseLigne(o) {
-    const prix = Number(o.price);
-    if (!isFinite(prix) || prix <= 0) return '';
+  // LE montant à proposer aux favoris — une seule définition, lue partout
+  // (la ligne d'info, le bouton « Copier », et le clic « Ouvrir »). Deux
+  // calculs pour un même chiffre, c'est deux chiffres qui finissent par ne
+  // plus dire la même chose (§11).
+  function montantRemise(o) {
+    const prix = Number(o && o.price);
+    if (!isFinite(prix) || prix <= 0) return null;
     const plancher = Number(o.minPrice);
     const cible = Math.max(1, Math.round(isFinite(plancher) && plancher > 0 ? plancher : prix * 0.9));
-    if (cible >= prix) return '';
+    return cible >= prix ? null : cible;
+  }
+
+  function remiseLigne(o) {
+    const prix = Number(o.price);
+    const cible = montantRemise(o);
+    if (cible == null) return '';
     const achat = Number(o.buyPrice);
     const perte = isFinite(achat) && cible <= achat;
     const pct = Math.round((1 - cible / prix) * 100);
@@ -1875,11 +1885,8 @@
       return `
         <div class="vrm-m" style="margin-bottom:8px">Annonce <b>${i + 1}</b> / ${total} — ouvre-la, propose une remise à tes <b>${o.favs} favori${o.favs > 1 ? 's' : ''}</b> (bouton Vinted « offre aux favoris »), puis <b>Suivante</b>.</div>
         ${card(o, `<div class="vrm-m" style="margin-top:3px">❤️ ${o.favs} favori${o.favs > 1 ? 's' : ''}${o.views != null ? ` · 👁 ${o.views}` : ''}</div>${remiseLigne(o)}${(() => {
-          const prix = Number(o.price), plancher = Number(o.minPrice);
-          if (!isFinite(prix) || prix <= 0) return '';
-          const cible = Math.max(1, Math.round(isFinite(plancher) && plancher > 0 ? plancher : prix * 0.9));
-          if (cible >= prix) return '';
-          return `<button class="vrm-copy-line" data-c="${cible}" style="margin-top:6px;border:1px solid #0f6b4f;background:#0f6b4f;color:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">📋 Copier ${cible} €</button>`;
+          const cible = montantRemise(o);
+          return cible == null ? '' : `<button class="vrm-copy-line" data-c="${cible}" style="margin-top:6px;border:1px solid #0f6b4f;background:#0f6b4f;color:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">📋 Copier ${cible} €</button>`;
         })()}`)}
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="vrm-fav-go" data-act="open" style="flex:1;border:none;background:#D2401E;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir ↗</button>
@@ -1899,7 +1906,8 @@
         <div class="vrm-st"><b style="color:#e2456b">❤️ ${favTot}</b><span class="vrm-m">favoris en attente</span></div>
         <div class="vrm-st"><b>${list.length}</b><span class="vrm-m">annonce${list.length > 1 ? 's' : ''} likée${list.length > 1 ? 's' : ''}</span></div>
       </div>
-      <div class="vrm-m" style="margin-bottom:8px">Ces annonces ont été mises en <b>favori</b> par des acheteurs. Coche celles où tu veux <b>leur envoyer une petite remise</b> pour déclencher la vente. L'extension t'ouvre chaque annonce, tu cliques le bouton <b>« Proposer une remise »</b> de Vinted. Rien n'est envoyé automatiquement.</div>
+      <div class="vrm-m" style="margin-bottom:8px">Ces annonces ont été mises en <b>favori</b> par des acheteurs. Coche celles où tu veux <b>leur proposer une remise</b> pour déclencher la vente : l'extension t'ouvre chaque annonce et <b>copie le montant</b>, tu cliques le bouton <b>« Proposer une remise »</b> de Vinted et tu colles.</div>
+      <div class="vrm-m" style="margin-bottom:8px;padding:7px 9px;border-radius:8px;background:#fff6ec;color:#9a5b16;border:1px solid #ffd7a8">ℹ️ <b>Vinted ne dit jamais QUI a mis en favori</b> — il donne seulement le nombre. Personne n'est donc joignable un par un. Sa remise aux favoris, elle, part <b>à tous en une fois</b> : c'est le seul canal qui les touche, et une remise convertit mieux qu'un message.</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-fav-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
         <button class="vrm-fav-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
@@ -1917,7 +1925,16 @@
         else if (act === 'none') { favSel.clear(); render(); }
         else if (act === 'start') { if (!favSel.size) return; favRun = { queue: list.filter(o => favSel.has(o.id)).sort((a, b) => (b.favs || 0) - (a.favs || 0)), idx: 0 }; render(); }
         else if (act === 'stop') { favRun = null; render(); }
-        else if (act === 'open') { const o = favRun && favRun.queue[favRun.idx]; if (o && o.url) window.open(o.url, '_blank', 'noopener'); }
+        else if (act === 'open') {
+          // Le montant part dans le presse-papier EN MÊME TEMPS que l'annonce
+          // s'ouvre : sur l'écran de Vinted il n'y a plus qu'à coller. C'était
+          // le seul geste en trop du parcours.
+          const o = favRun && favRun.queue[favRun.idx];
+          const cible = montantRemise(o);
+          if (cible != null) { try { navigator.clipboard.writeText(String(cible)); } catch (_) {} }
+          if (o && o.url) window.open(o.url, '_blank', 'noopener');
+          if (cible != null) { const p = b.textContent; b.textContent = `Ouvert · ${cible} € copié`; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1600); }
+        }
         else if (act === 'next') { if (favRun) { favRun.idx++; render(); } }
       };
     });

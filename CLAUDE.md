@@ -7442,3 +7442,107 @@ finalisées », pas « encaissé » (§5.87), et c'est exactement pour ça.
 (`harvest_*_billing` = `{main, escrow}`) mais **pas son historique**. Capter
 l'historique daté réglerait le problème pour de bon — c'est le vrai chantier
 suivant sur ce sujet.
+
+---
+
+## 5.89 — LA LENTEUR ÉTAIT DANS LES LECTURES RÉPÉTÉES + ⚠️ VINTED NE NOMME JAMAIS LES LIKERS
+
+Julien : « pour l'extension fais un effort et fais plus vite. Je veux aussi un
+bouton pour envoyer des messages aux favoris : je sélectionne les personnes qui
+ont mis en fav, je pré-remplis un message et ça envoie tout seul. »
+
+### 1. ⚠️ LA MÊME LECTURE LOURDE PARTAIT JUSQU'À QUATRE FOIS PAR VISITE
+§5.88 avait remis la visite dans le bon ORDRE ; il restait que le chemin rapide
+**relisait la même chose**. Mesuré en exécutant le VRAI `visiteVinted()` en `vm`
+avec un compteur de requêtes (`reads.cjs`) :
+
+| lecture | avant | après |
+|---|---|---|
+| `harvest_{uid}_orders_sold` (`select=data`, le payload ENTIER des ventes) | **4×** sur le chemin rapide | **1×** |
+| requêtes Supabase sur une visite | 8 | **7** |
+| octets rendus (données de banc) | 16 Ko | 11 Ko |
+
+Les quatre venaient de `genererBordereauxEnAttente`, `nouveautes`, et
+`ventesSansBordereau` que `nouveautes` appelle. Chacune est un **aller-retour
+réseau AVANT que le récap puisse s'afficher** — et quatre fois l'égress (§34).
+⚠️ En base, cette ligne pèse jusqu'à **41 Ko** sur un compte chargé.
+
+➡️ **`sbGetMemo(query)` + `viderMemoVisite(uid)`** (à côté de `sbGet`) : on
+mémorise la **PROMESSE**, pas seulement le résultat — deux appelants lancés en
+même temps partagent un seul aller-retour (le motif `cachedRow` de §23). TTL
+**20 s**, et **vidé par `rafraichirVentes` juste après l'écriture des ventes
+fraîches** : ce mémo ne doit JAMAIS servir des ventes plus vieilles que la
+capture qu'on vient de faire — ce serait le piège `updated_at` de §15 sous une
+autre forme.
+⚠️ **`storeLabel` n'utilise PAS le mémo, volontairement** : il part d'un
+téléchargement qui peut arriver bien plus tard, il lui faut des ventes fraîches.
+Un contrôle permanent borne donc la règle au chemin rapide, pas au fichier.
+
+### 2. LES QUATRE SOURCES DU RÉCAP PARTENT EN MÊME TEMPS
+`nouveautes` enchaînait ventes → boîte → offres → bordereaux, alors qu'aucune ne
+dépend d'une autre : le récap attendait **quatre** allers-retours au lieu d'un.
+`Promise.all` sur les quatre ; `ventesSansBordereau` fait de même pour ses deux
+lectures indépendantes (`email_bord_*` et `label_*`).
+
+### 3. L'ATTENTE APRÈS LE CHARGEMENT DE PAGE : 1,2 s → 250 ms
+Une fois les lectures dédoublonnées, **notre propre minuterie était devenue le
+plus gros morceau du délai** — on attendait plus longtemps qu'on ne travaillait.
+⚠️ C'est NOTRE timer, pas un rythme montré à Vinted (§32) ; la capture passive
+continue de tourner pendant ce temps.
+
+**Contrepartie, et elle est traitée** : à 250 ms le script de la page peut ne pas
+être injecté, donc le récap se serait **perdu** — le défaut exact de §5.70.
+**`envoyerRecap(charge)`** réessaie (6 × 350 ms) jusqu'à ce qu'un onglet accepte,
+et ne rend `true` que si un onglet a **vraiment** reçu — c'est ce booléen qui
+autorise à noter « déjà montré ».
+⚠️ Ce n'est pas un rythme déguisé : **aucune requête ne part vers Vinted ici**,
+on parle à notre propre onglet.
+
+### Mesuré, bout en bout (banc `chrono.cjs`, vrai `visiteVinted()`, 120 ms/requête)
+| | récap affiché |
+|---|---|
+| **avant** | 1 210 ms (+ 1 200 ms d'attente) = **≈ 2,4 s** |
+| **après** | **742 ms** (+ 250 ms d'attente) = **≈ 1,0 s** |
+
+### ⚠️ 4. LES FAVORIS : VINTED NE DIT JAMAIS *QUI*
+Mesuré avant de répondre (§46), pas supposé :
+| source | ce qu'elle porte |
+|---|---|
+| une annonce du dressing | **`favourite_count`** — un NOMBRE |
+| les 76 fiches lues sur la page (`vinted_item_details`) | `photos`, `readAt`, `description` — **rien sur les likers** |
+| les URL réellement observées, 8 comptes | **aucun endpoint favoris** |
+| les 1 000 lignes de la base | seule famille « favourites » : `user_favourites_toggle` = **Julien qui met un article en favori**, pas la liste de ceux qui likent les siens |
+
+➡️ **« Je sélectionne les personnes qui ont mis en fav » n'a aucun destinataire
+techniquement atteignable.** Ce n'est pas un refus, c'est une absence de donnée :
+Vinted ne l'expose nulle part. Il n'y a donc personne à qui envoyer un message,
+automatiquement ou non.
+➡️ **Le seul canal qui touche ces gens est la remise aux favoris de Vinted** —
+un clic, elle part **à tous en une fois**, et une remise convertit mieux qu'un
+message (§5.02). L'onglet Favoris faisait déjà la sélection, le calcul du montant
+et le défilement ; il gagne deux choses :
+- **« Ouvrir ↗ » copie le montant EN MÊME TEMPS** — c'était le seul geste en trop
+  du parcours : sur l'écran de Vinted il n'y a plus qu'à coller ;
+- un encart qui **dit** que Vinted ne nomme pas les personnes, au lieu de laisser
+  chercher un bouton qui ne peut pas exister.
+- **`montantRemise(o)`** devient la définition unique du montant (§11) : il était
+  calculé en deux endroits (la ligne d'info et le bouton « Copier »).
+⚠️ Le refus de l'**envoi automatique en série** reste entier (§32/§43) — mais ici
+il est même sans objet : il n'y a pas de liste de destinataires.
+
+### Vérifié
+`node --check` sur les deux fichiers · **19 audits au vert** ·
+`audit-recap.cjs` **+7 contrôles**, et **les 7 échouent sur le code d'avant**
+(§21, méthode §5.80 : `git archive` dans un arbre à part, script copié DEDANS et
+lancé DEPUIS cet arbre) — dont « 4 lectures directes restantes » sur l'ancien
+code · banc `visite_banc.cjs` (ordre inchangé, récap à 41 ms sur 357) · banc
+`recap_banc.cjs` (un seul bouton « Fermer », 0 génération envoyée depuis le
+récap) · **banc `fav_banc.cjs`** (nouveau) : l'onglet rend, le montant est
+calculé (38 € sur une annonce à 45 €), **jamais sous le prix d'achat**, le
+défilement démarre, **« Ouvrir » copie `38` et ouvre la bonne annonce**,
+0 erreur d'app.
+⚠️ Piège de banc (§21, encore) : le panneau **jette toute réponse sans `ok:true`**
+(`DATA = (resp && resp.ok) ? resp : {…}`). Mon premier banc servait les données
+sans ce champ → 7 contrôles rouges sur un code qui marchait.
+
+Extension **5.51.0** — à recharger dans Chrome.

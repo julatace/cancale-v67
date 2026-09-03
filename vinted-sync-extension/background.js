@@ -1881,6 +1881,9 @@ async function rafraichirVentes(uid) {
   const sold = await fetchAllOrders(acc, 'sold');
   if (!sold || !sold.my_orders || !sold.my_orders.length) return false;
   await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
+  // ⚠️ On vient d'écrire des ventes FRAÎCHES : tout ce que le mémo de visite
+  // garde sur ce compte est périmé à la milliseconde près. On le vide.
+  viderMemoVisite(uid);
   noterDiag('ventes_rafraichies');
   return true;
 }
@@ -1943,20 +1946,21 @@ async function visiteVinted() {
 // Vinted les a rendues à la dernière moisson. Lecture seule, aucun appel Vinted.
 async function ventesSansBordereau(uid) {
   try {
-    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    const rows = await sbGetMemo(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const cand = ventes.filter(o => o && o.transaction_id != null && aGenererBordereau(o.status));
     if (!cand.length) return [];
-    // Un bordereau déjà reçu par email prouve qu'il existe : rien à proposer.
+    // Un bordereau déjà reçu par email — ou déjà capté — prouve qu'il existe :
+    // rien à proposer. ⚠️ LES DEUX LECTURES PARTENT EN MÊME TEMPS : elles ne
+    // dépendent pas l'une de l'autre, les enchaîner ajoutait un aller-retour
+    // réseau au temps que le récap fait attendre.
     const deja = new Set();
-    try {
-      const mails = await sbGet('app_data?id=like.email_bord_*&select=tx:data->>transaction');
-      for (const m of (mails || [])) if (m && m.tx) deja.add(String(m.tx));
-    } catch (_) {}
-    try {
-      const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
-      for (const r of (cur || [])) if (r && r.tx) deja.add(String(r.tx));
-    } catch (_) {}
+    const [mails, cur] = await Promise.all([
+      sbGetMemo('app_data?id=like.email_bord_*&select=tx:data->>transaction').catch(() => null),
+      sbGetMemo(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`).catch(() => null),
+    ]);
+    for (const m of (mails || [])) if (m && m.tx) deja.add(String(m.tx));
+    for (const r of (cur || [])) if (r && r.tx) deja.add(String(r.tx));
     return cand.filter(o => !deja.has(String(o.transaction_id)))
       // ⚠️ La photo se lit ICI, pas via un helper d'une autre portée :
       //    `photoDeCommande` vit dans `buildPanelData` — l'appeler d'ici lèverait
@@ -1990,12 +1994,20 @@ async function nouveautes(uid) {
   const memo = (await recapVu())[String(uid)] || null;
   out.premiere = !memo;
 
+  // ⚠️ LES QUATRE SOURCES PARTENT EN MÊME TEMPS. Elles ne dépendent pas les
+  // unes des autres : les enchaîner faisait attendre le récap le temps de
+  // QUATRE allers-retours au lieu d'un. Les ventes sont servies par le mémo de
+  // visite (la génération vient de les lire) — donc aucune requête de plus.
+  const [rVentes, rConvs, nOffres, aGen] = await Promise.all([
+    sbGetMemo(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`).catch(() => null),
+    sbGetMemo(`app_data?id=eq.harvest_${uid}_inbox&select=data`).catch(() => null),
+    offresEnAttente(uid).then(l => l.length).catch(() => 0),
+    ventesSansBordereau(uid).catch(() => []),
+  ]);
+
   // 1. LES VENTES — identité = n° de transaction, jamais un titre.
-  let ventes = [];
-  try {
-    const r = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
-    ventes = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.my_orders) || [];
-  } catch (_) {}
+  const ventes = (rVentes && rVentes[0] && rVentes[0].data && rVentes[0].data.payload
+    && rVentes[0].data.payload.my_orders) || [];
   const vus = new Set((memo && memo.ventes) || []);
   for (const o of ventes) {
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
@@ -2009,11 +2021,8 @@ async function nouveautes(uid) {
 
   // 2. LES MESSAGES — une conversation compte comme nouvelle si elle est non
   //    lue ET qu'elle a bougé depuis le dernier récap.
-  let convs = [];
-  try {
-    const r = await sbGet(`app_data?id=eq.harvest_${uid}_inbox&select=data`);
-    convs = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.conversations) || [];
-  } catch (_) {}
+  const convs = (rConvs && rConvs[0] && rConvs[0].data && rConvs[0].data.payload
+    && rConvs[0].data.payload.conversations) || [];
   const vuConv = (memo && memo.convs) || {};
   const convsMaj = {};
   for (const c of convs) {
@@ -2027,10 +2036,10 @@ async function nouveautes(uid) {
   }
 
   // 3. LES OFFRES en attente (argent, et 24 h pour répondre).
-  try { out.offres = (await offresEnAttente(uid)).length; } catch (_) { out.offres = 0; }
+  out.offres = nOffres;
 
   // 4. LES BORDEREAUX À GÉNÉRER — le seul point qui appelle une ACTION.
-  try { out.aGenerer = await ventesSansBordereau(uid); } catch (_) { out.aGenerer = []; }
+  out.aGenerer = aGen;
 
   out._marque = {
     at: Date.now(),
@@ -2039,6 +2048,24 @@ async function nouveautes(uid) {
       .reduce((a, k) => { a[k] = convsMaj[k]; return a; }, {}),
   };
   return out;
+}
+
+// Remet le récap à l'onglet Vinted actif, en laissant au script de la page le
+// temps d'être là. Rend `true` seulement si un onglet l'a VRAIMENT reçu — c'est
+// ce booléen qui autorise à noter « déjà montré » (§5.70).
+const RECAP_ESSAIS = 6, RECAP_PAUSE_MS = 350;
+async function envoyerRecap(charge) {
+  for (let i = 0; i < RECAP_ESSAIS; i++) {
+    let tabs = [];
+    try {
+      tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
+    } catch (_) { tabs = []; }
+    for (const t of tabs) {
+      try { await chrome.tabs.sendMessage(t.id, charge); return true; } catch (_) {}
+    }
+    await new Promise(r => setTimeout(r, RECAP_PAUSE_MS));
+  }
+  return false;
 }
 
 // Envoie le récap à l'onglet Vinted actif. Le panneau (déjà injecté) l'affiche
@@ -2058,13 +2085,12 @@ async function proposerBordereaux(uid, genes) {
     if (!n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length && !n.envoyes) {
       await marquerRecapVu(uid, n._marque); return;
     }
-    const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
+
     // ⚠️ ON NE NOTE « DÉJÀ MONTRÉ » QUE SI LE RÉCAP EST RÉELLEMENT AFFICHÉ.
     // Avant, le mémo partait AVANT l'envoi : si le script de la page n'était pas
     // encore prêt (le cas courant, on arrive 3 s après le chargement), la
     // fenêtre ne s'affichait jamais ET les ventes étaient marquées « vues ».
     // C'est exactement « la génération a du mal à se faire ».
-    let pose = false;
     const charge = {
       __vrm: 'recap', uid: String(uid),
       ventes: n.ventes.slice(0, 12), eur: n.eur, messages: n.messages, offres: n.offres,
@@ -2073,10 +2099,13 @@ async function proposerBordereaux(uid, genes) {
       bloque: (dernierBlocage[String(uid)] && Date.now() - dernierBlocage[String(uid)].at < 30 * 60 * 1000)
         ? dernierBlocage[String(uid)] : null,
     };
-    for (const t of tabs) {
-      try { await chrome.tabs.sendMessage(t.id, charge); pose = true; } catch (_) {}
-    }
-    if (!pose) return;
+    // ⚠️ ON ATTEND QUE L'ONGLET SOIT PRÊT À RECEVOIR, au lieu d'abandonner.
+    // On part maintenant 250 ms après le chargement (au lieu de 1,2 s) : le
+    // script de la page peut ne pas être encore injecté à cet instant précis.
+    // Sans ces quelques essais, le récap serait simplement perdu — le défaut
+    // exact de §5.70. Ce n'est PAS un rythme déguisé (§32) : aucune requête ne
+    // part vers Vinted ici, on parle à notre propre onglet.
+    if (!(await envoyerRecap(charge))) return;
     await marquerRecapVu(uid, n._marque);
   } catch (_) {}
 }
@@ -2097,11 +2126,14 @@ try {
     if (!/^https:\/\/(www\.)?vinted\.(fr|com|it|de)\//.test(u)) return;
     // Petit délai : on laisse la page finir de se charger, la capture passive
     // en profite aussi (elle observe ce que la page demande d'elle-même).
-    // ⚠️ 3 s → 1,2 s : c'est NOTRE minuterie, pas un rythme montré à Vinted
-    // (§32). La capture passive continue de tourner pendant ce temps, elle ne
-    // perd rien ; c'est juste le récap qui n'attend plus pour rien.
+    // ⚠️ 3 s → 1,2 s → 250 ms : c'est NOTRE minuterie, pas un rythme montré à
+    // Vinted (§32). Une fois les lectures dédoublonnées et mises en parallèle,
+    // cette attente était devenue le plus GROS morceau du délai — on attendait
+    // plus longtemps qu'on ne travaillait. La capture passive continue de
+    // tourner pendant ce temps, elle ne perd rien ; et le récap sait désormais
+    // patienter tout seul si l'onglet n'est pas encore prêt à le recevoir.
     clearTimeout(visiteTimer);
-    visiteTimer = setTimeout(() => { visiteVinted(); }, 1200);
+    visiteTimer = setTimeout(() => { visiteVinted(); }, 250);
   });
 } catch (_) {}
 
@@ -3144,7 +3176,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
     // Les ventes telles que Vinted les a rendues à la dernière moisson.
-    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    const rows = await sbGetMemo(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventesBrutes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const capCmd = Date.parse((rows && rows[0] && rows[0].data && rows[0].data.capturedAt) || '') || 0;
     // ⚠️ LE STATUT DE LA COMMANDE EST PÉRIMÉ JUSTE APRÈS UNE GÉNÉRATION MANUELLE.
@@ -3160,7 +3192,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     // `select=data`), et il fait foi quand il est plus frais ET lisible.
     const detFrais = new Map();
     try {
-      const dr = await sbGet(`app_data?id=like.harvest_${uid}_txn_*&select=id,st:data->payload->transaction->shipment->>status_title,cap:data->>capturedAt`);
+      const dr = await sbGetMemo(`app_data?id=like.harvest_${uid}_txn_*&select=id,st:data->payload->transaction->shipment->>status_title,cap:data->>capturedAt`);
       for (const r of (dr || [])) {
         const tx = (/_txn_(\d+)$/.exec(String(r.id || '')) || [])[1];
         if (!tx || !r.st) continue;
@@ -4247,6 +4279,41 @@ async function sbGet(query) {
     if (!res.ok) return null;
     return await res.json();
   } catch (_) { return null; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE MÉMO DE VISITE — la même lecture lourde ne repart plus trois fois
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré (banc `reads.cjs`, vrai `visiteVinted()` en vm) : sur UNE arrivée sur
+// Vinted, `harvest_{uid}_orders_sold` — le payload ENTIER des ventes, plusieurs
+// centaines de Ko même après l'allègement (§23) — était demandé TROIS fois de
+// suite : par `genererBordereauxEnAttente`, par `nouveautes`, puis par
+// `ventesSansBordereau` que `nouveautes` appelle. Trois allers-retours réseau
+// AVANT que le récap puisse s'afficher, et trois fois l'égress (§34).
+//
+// On mémorise la PROMESSE, pas seulement le résultat : deux appelants lancés en
+// même temps partagent le même aller-retour au lieu d'en faire deux (le motif
+// `cachedRow` de l'app, §23).
+//
+// ⚠️ TTL très court, et VIDÉ par `rafraichirVentes` juste après l'écriture des
+// ventes fraîches : ce mémo ne doit JAMAIS servir des ventes plus vieilles que
+// la capture qu'on vient de faire — ce serait le piège `updated_at` de §15 sous
+// une autre forme.
+const VISITE_MEMO_MS = 20 * 1000;
+const _memoVisite = new Map();          // requête → { at, p }
+
+function sbGetMemo(query) {
+  const e = _memoVisite.get(query);
+  if (e && Date.now() - e.at < VISITE_MEMO_MS) return e.p;
+  const p = sbGet(query);
+  _memoVisite.set(query, { at: Date.now(), p });
+  return p;
+}
+
+function viderMemoVisite(uid) {
+  if (uid == null) { _memoVisite.clear(); return; }
+  const k = String(uid);
+  for (const q of [..._memoVisite.keys()]) if (q.includes(k)) _memoVisite.delete(q);
 }
 // Correspondance de catégorie Vinted → Leboncoin. La boutique = sneakers → la
 // catégorie Leboncoin est « Chaussures » (Mode). On garde une logique simple et
