@@ -3449,16 +3449,22 @@
     // envoyé dans l'app »). On le DIT : un geste silencieux n'inspire pas
     // confiance, surtout celui-là.
     if (nEnv) lignes.push(['🖨️', nEnv === 1 ? '1 bordereau envoyé dans l\'app' : nEnv + ' bordereaux envoyés dans l\'app', '✓']);
-    // Ce qui n'a PAS pu être généré tout seul : là, on demande.
-    if (aGen.length) lignes.push(['📦', aGen.length === 1 ? '1 bordereau à générer' : aGen.length + ' bordereaux à générer', '']);
+    // ⚠️ CE QUI RESTE N'EST PLUS UNE QUESTION (Julien, 3 septembre : « que ça
+    // envoie direct dans l'app sans me demander »). La génération a déjà eu
+    // lieu juste avant ce récap ; ce qui reste est bloqué par un garde-fou, et
+    // cliquer « Oui » retomberait sur le même mur. On l'ANNONCE, avec la raison.
+    if (aGen.length) lignes.push(['📦', aGen.length === 1 ? '1 bordereau pas encore généré' : aGen.length + ' bordereaux pas encore générés', '']);
 
     propo = document.createElement('div');
     propo.id = 'vrm-propo';
     propo.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;'
       + 'background:rgba(21,17,16,.45);backdrop-filter:blur(2px);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
-    const question = aGen.length
-      ? (aGen.length === 1 ? 'Je génère le bordereau ?' : 'Je génère les ' + aGen.length + ' bordereaux ?')
-      : '';
+    // Plus de question : une phrase qui dit ce qui va se passer tout seul.
+    const bl = recap.bloque;
+    const question = !aGen.length ? ''
+      : bl && bl.code === 'autre-compte' ? 'Ton navigateur est sur un autre compte — bascule dessus et ils partiront tout seuls.'
+      : bl && bl.code === 'trop-d-actions' ? "Plafond d'actions atteint sur ce compte — ils partiront à ta prochaine visite."
+      : 'Ils partiront tout seuls à ta prochaine visite sur Vinted.';
     propo.innerHTML = `
       <div id="vrm-propo-box" role="dialog" aria-modal="true" style="background:#FBF7F0;color:#151110;border:1px solid #D9CFBE;
            border-radius:8px;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:24px 22px 18px;width:340px;max-width:calc(100vw - 32px);text-align:center">
@@ -3480,40 +3486,14 @@
     const bouton = (id, txt, plein) => `<button id="${id}" style="flex:1;border:${plein ? 'none' : '1px solid #C3B49C'};`
       + `background:${plein ? '#151110' : '#FBF7F0'};color:${plein ? '#EFE8DC' : '#151110'};border-radius:6px;padding:11px 0;`
       + `font-size:15px;font-weight:${plein ? 700 : 600};cursor:pointer;font-family:inherit">${txt}</button>`;
-    // Pas de bordereau à générer ⟹ c'est une information, pas une question.
-    btns.innerHTML = aGen.length ? bouton('vrm-propo-non', 'Non', false) + bouton('vrm-propo-oui', 'Oui', true)
-                                 : bouton('vrm-propo-ok', 'Fermer', true);
+    // ⚠️ UN SEUL BOUTON, TOUJOURS : ce récap est une information, jamais une
+    // question (§5.88). Le bouton « Générer » par vente reste disponible dans
+    // l'onglet Bordereaux du panneau, pour le cas exceptionnel (§5.32).
+    btns.innerHTML = bouton('vrm-propo-ok', 'Fermer', true);
     const ok = propo.querySelector('#vrm-propo-ok'); if (ok) ok.onclick = fermerPropo;
-    const non = propo.querySelector('#vrm-propo-non'); if (non) non.onclick = fermerPropo;
-    // Cliquer à côté = « Non » (aucune action envoyée à Vinted).
+    // Cliquer à côté ferme aussi (aucune action envoyée à Vinted).
     propo.onclick = (e) => { if (e.target === propo) fermerPropo(); };
 
-    const oui = propo.querySelector('#vrm-propo-oui');
-    if (oui) oui.onclick = async () => {
-      btns.innerHTML = '';
-      let faits = 0, rates = 0, arret = '';
-      for (const v of aGen) {
-        sous.textContent = `Génération ${faits + rates + 1} sur ${aGen.length}…`;
-        const r = await new Promise(res => {
-          try { chrome.runtime.sendMessage({ action: 'genererBord', uid, tx: v.tx }, x => res(x || {})); }
-          catch (_) { res({}); }
-        });
-        if (r && r.ok) faits++;
-        else {
-          rates++;
-          // Un refus du garde-fou vaut pour toutes les suivantes : on s'arrête.
-          if (r && r.code) { arret = r.error || r.raison || ''; break; }
-        }
-      }
-      sous.textContent = arret ? arret
-        : rates ? `${faits} généré${faits > 1 ? 's' : ''}, ${rates} non — le détail est dans le panneau VRM.`
-        : (faits === 1 ? 'Bordereau généré, il part dans ton application.' : faits + ' bordereaux générés, ils partent dans ton application.');
-      sous.style.color = rates ? '#b45309' : '#0f6b4f';
-      sous.style.fontWeight = '600';
-      btns.innerHTML = bouton('vrm-propo-ok', 'Fermer', true);
-      const o2 = propo.querySelector('#vrm-propo-ok'); if (o2) o2.onclick = fermerPropo;
-      try { load(); } catch (_) {}
-    };
   }
   try {
     chrome.runtime.onMessage.addListener((msg) => {

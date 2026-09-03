@@ -1889,37 +1889,43 @@ async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
-    const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
-    const der = Number(st[uid] || 0);
-    // ⚠️ LE GARDE COURT NE SAUTE PLUS LES VENTES. Avant, un `return` sec ici
-    // faisait qu'une vente conclue il y a deux minutes n'était pas captée tant
-    // qu'on n'avait pas laissé passer 5 min — et le récap ne pouvait rien dire.
-    if (Date.now() - der < VISITE_DELAI_MS) {
-      const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
-      if (Date.now() - Number(dv[uid] || 0) < VENTES_DELAI_MS) return;
+
+    // ═══ 1. CE QU'IL ATTEND, TOUT DE SUITE ═══════════════════════════════
+    // ⚠️ ORDRE INVERSÉ (Julien, 3 septembre : « quand je me connecte, que ça me
+    // demande plus vite de générer le bordereau »). Avant, la vente, le
+    // bordereau et le récap arrivaient APRÈS `runActive()` — une moisson
+    // COMPLÈTE : dressing jusqu'à 7 pages avec pauses, achats, boîte,
+    // porte-monnaie. Le récap pouvait donc mettre une minute à s'afficher
+    // alors que la vente ne demande QU'UNE requête (`my_orders?type=sold`).
+    // Ce bloc ne coûte rien de plus : ce sont les mêmes appels, simplement
+    // placés avant le lourd. Rien à voir avec un « rythme humain » (§32).
+    const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
+    if (Date.now() - Number(dv[uid] || 0) >= VENTES_DELAI_MS) {
       dv[uid] = Date.now();
       await chrome.storage.local.set({ vrmDerniereVente: dv });
       try { await rafraichirVentes(uid); } catch (_) {}
-      const g = await genererBordereauxEnAttente(uid);
-      await proposerBordereaux(uid, g);
-      return;
     }
+    // ⚠️ LA VISITE GÉNÈRE, TOUTE SEULE (Julien, 27 août puis 3 septembre :
+    // « que ça envoie direct dans l'app sans me demander »). Cohérent avec
+    // §5.29 : générer un bordereau n'engage AUCUN argent et ne décide de rien
+    // — la vente est faite, le colis doit partir. Tous les garde-fous restent :
+    // compte connecté uniquement, 20 actions/h, plafond par visite, pas de
+    // nouvel essai avant 6 h.
+    const genes = await genererBordereauxEnAttente(uid);
+    // Le récap arrive APRÈS la génération : il ANNONCE ce qui est parti dans
+    // l'app. Il ne demande plus rien (§5.88).
+    await proposerBordereaux(uid, genes);
+
+    // ═══ 2. LE RESTE, ENSUITE ════════════════════════════════════════════
+    // Le garde de 5 min ne protège plus que la moisson COMPLÈTE — c'est elle
+    // qui est lourde, et refaire dix fois la même en naviguant de page en page
+    // n'apporte rien (§5.19).
+    const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
+    if (Date.now() - Number(st[uid] || 0) < VISITE_DELAI_MS) return;
     st[uid] = Date.now();
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     const ok = await runActive();
     logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
-    // ⚠️ LA VISITE GÉNÈRE À NOUVEAU, TOUTE SEULE (Julien, 27 août) : « une fois
-    // que la vente a été faite, je veux que le bordereau soit automatiquement
-    // envoyé dans l'app ». C'est un retour en arrière assumé sur §5.32 — c'est
-    // sa décision, et elle est cohérente avec §5.29 : générer un bordereau
-    // n'engage AUCUN argent et ne décide de rien (la vente est faite, le colis
-    // doit partir). Tous les garde-fous restent : compte connecté uniquement,
-    // 20 actions/h, 3 par visite, pas de nouvel essai avant 6 h.
-    const genes = await genererBordereauxEnAttente(uid);
-    // Le récap arrive APRÈS la génération : il annonce ce qui est parti dans
-    // l'app, et ne pose la question que pour ce qui n'a PAS pu être généré
-    // (compte non connecté, plafond atteint, adresse inconnue).
-    await proposerBordereaux(uid, genes);
     // ⚠️ APRÈS la moisson : les offres viennent des conversations captées, donc
     //    travailler avant la capture reviendrait à décider sur des données
     //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
@@ -2063,6 +2069,9 @@ async function proposerBordereaux(uid, genes) {
       __vrm: 'recap', uid: String(uid),
       ventes: n.ventes.slice(0, 12), eur: n.eur, messages: n.messages, offres: n.offres,
       aGenerer: n.aGenerer.slice(0, 8), envoyes: n.envoyes,
+      // pourquoi il en reste, quand il en reste (jamais une question, §5.88)
+      bloque: (dernierBlocage[String(uid)] && Date.now() - dernierBlocage[String(uid)].at < 30 * 60 * 1000)
+        ? dernierBlocage[String(uid)] : null,
     };
     for (const t of tabs) {
       try { await chrome.tabs.sendMessage(t.id, charge); pose = true; } catch (_) {}
@@ -2088,8 +2097,11 @@ try {
     if (!/^https:\/\/(www\.)?vinted\.(fr|com|it|de)\//.test(u)) return;
     // Petit délai : on laisse la page finir de se charger, la capture passive
     // en profite aussi (elle observe ce que la page demande d'elle-même).
+    // ⚠️ 3 s → 1,2 s : c'est NOTRE minuterie, pas un rythme montré à Vinted
+    // (§32). La capture passive continue de tourner pendant ce temps, elle ne
+    // perd rien ; c'est juste le récap qui n'attend plus pour rien.
     clearTimeout(visiteTimer);
-    visiteTimer = setTimeout(() => { visiteVinted(); }, 3000);
+    visiteTimer = setTimeout(() => { visiteVinted(); }, 1200);
   });
 } catch (_) {}
 
@@ -2903,8 +2915,19 @@ async function genererBordereau(uid, tx) {
 //    horaire. Le reste part à la visite suivante. Mesuré sur les vraies
 //    données : il y a 1 vente à générer aujourd'hui, la rafale est théorique.
 //  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
-const BORD_MAX_PAR_VISITE = 3;
+// ⚠️ 3 → 6 (Julien, 3 septembre : « améliore encore la rapidité »). Ce n'est
+// PAS le garde-fou anti-blocage : le vrai plafond reste `ACTIONS_MAX_HEURE`
+// (20 actions/h par compte, §48), et il est vérifié AVANT chaque requête. Ce
+// nombre-ci ne fait que borner une seule visite pour ne pas tout envoyer d'un
+// coup ; à 3, une journée à 8 ventes demandait trois passages sur Vinted.
+// Les requêtes restent envoyées UNE PAR UNE, jamais en rafale (§5.36).
+const BORD_MAX_PAR_VISITE = 6;
 const BORD_RETRY_MS = 6 * 60 * 60 * 1000;
+// ⚠️ Le récap ne DEMANDE plus rien (§5.88) : il annonce. Donc quand la
+// génération s'arrête sur un garde-fou, il faut pouvoir DIRE pourquoi, sinon
+// « il reste 2 bordereaux » est un mur sans explication. Mémoire volatile : un
+// blocage périmé ne doit pas ressortir demain.
+let dernierBlocage = {};
 // Au-delà, on ne va plus chercher le PDF d'une vente : le colis est livré depuis
 // longtemps et le lien de Vinted n'existe plus. Mesuré : les 28 ventes sans PDF
 // qui ne sont pas encore livrées tiennent TOUTES dans cette fenêtre.
@@ -3173,6 +3196,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       memo[tx] = { t: Date.now(), ok: !!r.ok };
       if (r.ok) {
         faits++;
+        delete dernierBlocage[String(uid)];
         const eu = (await recupererLabelInsiste(acc, uid, tx)).ok;
         logActivity(eu ? `📄 Bordereau généré et rangé dans l'app — ${String(o.title || '').slice(0, 40)}`
                        : `📄 Bordereau généré — ${String(o.title || '').slice(0, 40)} (le PDF arrivera par email)`);
@@ -3180,7 +3204,10 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
         logActivity(`⚠️ Bordereau non généré : ${r.error || 'refus Vinted'}`);
         // Compte connecté ailleurs / plafond atteint : inutile d'insister sur
         // les suivantes, elles échoueront pareil.
-        if (r.code === 'autre-compte' || r.code === 'trop-d-actions') break;
+        if (r.code === 'autre-compte' || r.code === 'trop-d-actions') {
+          dernierBlocage[String(uid)] = { code: r.code, error: r.error || '', at: Date.now() };
+          break;
+        }
       }
     }
     // ── 2ᵉ PASSE : LE BORDEREAU EXISTE DÉJÀ, ON VA LE CHERCHER ──────────────

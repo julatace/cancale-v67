@@ -7347,3 +7347,98 @@ dans un arbre à part, script copié DEDANS et lancé DEPUIS cet arbre) ·
 `id=eq.` → l'écran Annonces affichait « Impossible de charger ces données » et
 j'ai failli conclure à une régression. **Servir toutes les FORMES de requête,
 pas seulement toutes les familles de lignes.**
+
+
+---
+
+## 5.88 — LE BORDEREAU PART SANS RIEN DEMANDER, ET LE RÉCAP N'ATTEND PLUS LA MOISSON
+
+Julien : « améliore encore la rapidité, et pareil quand je me connecte que ça me
+demande plus vite de générer le bordereau — et que ça envoie direct dans l'app
+sans me demander ».
+
+### ⚠️ 1. LA VRAIE CAUSE DE LA LENTEUR : L'ORDRE, PAS LE RÉSEAU
+`visiteVinted()` faisait **`runActive()` d'abord** — une moisson COMPLÈTE :
+dressing jusqu'à 7 pages avec pauses, achats, boîte, porte-monnaie. Le
+bordereau et le récap n'arrivaient qu'**après**. Or « ai-je vendu ? » ne demande
+**qu'une** requête (`my_orders?type=sold`).
+
+**Mesuré en exécutant le VRAI `visiteVinted()` dans un `vm`, sondes chronométrées :**
+| | séquence | récap affiché |
+|---|---|---|
+| **avant** | `moisson complète → bordereaux → récap` | **321 ms sur 337** (à la toute fin) |
+| **après** | `ventes → bordereaux → récap → moisson complète` | **40 ms sur 357** |
+
+En vrai, la moisson complète ne dure pas 300 ms mais plusieurs secondes : c'est
+tout ce temps que le récap attendait pour rien.
+⚠️ **Aucune requête ajoutée** : ce sont exactement les mêmes appels, remis dans
+l'ordre. Rien à voir avec un « rythme humain » (§32). Le garde de 5 min ne
+protège plus que la moisson complète — c'est elle qui est lourde.
+Le délai après chargement de page passe de **3 s à 1,2 s** (notre minuterie, pas
+un signal montré à Vinted ; la capture passive continue pendant ce temps).
+
+### 2. LE RÉCAP N'EST PLUS UNE QUESTION
+La fenêtre demandait **Oui / Non** pour ce qui restait à générer. Or la
+génération **a déjà eu lieu juste avant** de l'afficher : ce qui reste est bloqué
+par un garde-fou (mauvais compte connecté, plafond horaire), donc cliquer
+« Oui » **retombait sur le même mur**. La question ne servait à rien.
+➡️ **Un seul bouton, toujours : « Fermer ».** Et quand il en reste, on DIT
+pourquoi — `dernierBlocage[uid]` (mémoire volatile, 30 min) remonte le motif :
+« ton navigateur est sur un autre compte, bascule dessus » / « plafond d'actions
+atteint, ils partiront à ta prochaine visite ».
+⚠️ Le bouton « Générer » **par vente** reste dans l'onglet Bordereaux du panneau
+(§5.32) : c'est la porte du cas exceptionnel, pas la voie normale.
+
+### 3. Le plafond par visite : 3 → 6
+⚠️ **Ce n'est PAS le garde-fou anti-blocage.** Le vrai plafond reste
+`ACTIONS_MAX_HEURE = 20` par compte (§48), vérifié **avant chaque requête**.
+`BORD_MAX_PAR_VISITE` ne fait que borner une seule visite pour ne pas tout
+envoyer d'un coup ; à 3, une journée à 8 ventes demandait **trois passages** sur
+Vinted. Les requêtes partent toujours **une par une**, jamais en rafale (§5.36).
+⚠️ L'audit ne fige plus le chiffre (il a bougé, il rebougera) : il lit la
+constante dans la source, sert `cap + 2` ventes et vérifie qu'il en part
+**exactement `cap`** — plus un contrôle « le plafond par visite reste sous le
+plafond horaire ».
+
+### Vérifié
+`node --check` sur les deux fichiers · **19 audits au vert** ·
+`audit-recap.cjs` **+5 contrôles**, `audit-bordereau-rattrapage.cjs` réancré ·
+**Prouvé dans les deux sens** (§21, méthode §5.80 — `git archive HEAD` dans un
+arbre à part, scripts copiés DEDANS et lancés DEPUIS cet arbre) : 4 des 5
+nouveaux contrôles échouent sur le code d'avant, et le **banc `vm` d'ordre**
+sort `moisson → bordereaux → récap` avec le récap à **321 ms sur 337**.
+⚠️ **Honnêteté sur un contrôle** : « le récap passe avant la moisson » PASSE
+aussi sur le code d'avant en lecture statique — l'ancienne branche courte
+appelait bien `proposerBordereaux` avant `runActive()`. C'est un garde-fou
+anti-régression, **pas** une preuve du changement ; la preuve, c'est le banc `vm`.
+· Banc panneau dédié (faux `chrome`, 3 scénarios) : **1 seul bouton « Fermer »**
+dans les trois, les deux motifs de blocage affichés, **0 requête de génération
+envoyée depuis le récap**, 0 erreur d'app.
+
+Extension **5.50.0** — à recharger dans Chrome.
+
+### ⚠️ CE QUI N'EST PAS RÉGLÉ (et ne l'est pas par du code)
+La question du jour portait sur sa **déclaration URSSAF**. Réponse mesurée, à
+ne pas oublier : **je ne peux pas garantir un chiffre à 100 %**, pour deux
+raisons distinctes.
+1. **La fraîcheur de capture fausse le total en silence.** Mesuré en direct :
+   le total d'août est passé de **3 345,20 € à 3 739,60 €** pendant la
+   conversation, parce que `julatace3535` n'avait pas été capté depuis **7
+   jours** et que 17 ventes d'août sont apparues d'un coup.
+2. **Ce n'est pas la bonne base.** Il déclare l'argent **reçu** ; le chiffre de
+   l'app est « ventes finalisées dont la VENTE est en août ». La date de
+   finalisation n'existe **nulle part** dans la moisson (**0 sur 401
+   transactions** — le `shipment.status_title` ne porte que l'état du colis,
+   jamais « finalisé », §5.85).
+   Elle existe dans les emails **« La transaction est finalisée »** (`email_final_*`,
+   103 lignes, avec montant ET date) → **août 2026 = 2 131,80 €** — mais
+   **4 comptes sur 8 n'envoient aucun email** (julatace3535 1 102,80 €,
+   tomj606 350,20 €, angeled92 309,00 €, arthuror2 48,00 €).
+➡️ **La seule source complète ET juste est le porte-monnaie Vinted de chaque
+compte** (historique daté des crédits). ⚠️ **Ne jamais laisser croire qu'un
+chiffre de l'app suffit pour déclarer** : le rapport dit déjà « CA des ventes
+finalisées », pas « encaissé » (§5.87), et c'est exactement pour ça.
+➡️ Piste à ouvrir : l'extension lit déjà le SOLDE du porte-monnaie
+(`harvest_*_billing` = `{main, escrow}`) mais **pas son historique**. Capter
+l'historique daté réglerait le problème pour de bon — c'est le vrai chantier
+suivant sur ce sujet.

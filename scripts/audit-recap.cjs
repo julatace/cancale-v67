@@ -137,6 +137,35 @@ const V = (tx, titre, prix, statut) => ({ transaction_id: tx, title: titre, pric
     dit(/async function rafraichirVentes/.test(src2) && /fetchAllOrders\(acc, 'sold'\)/.test(src2),
       'rafraichirVentes réutilise fetchAllOrders + storeHarvestRow (une seule règle)');
   }
+  // 10. LE RÉCAP N'EST PLUS UNE QUESTION (§5.88) — « que ça envoie direct dans
+  //     l'app sans me demander ». La génération a déjà eu lieu avant l'affichage ;
+  //     ce qui reste est bloqué par un garde-fou, donc cliquer « Oui » retomberait
+  //     sur le même mur. On annonce, et on dit pourquoi il en reste.
+  {
+    const pan = require('fs').readFileSync(require('path').join(__dirname, '..', 'vinted-sync-extension', 'vinted-panel.js'), 'utf8');
+    const i = pan.indexOf('function afficherPropo');
+    const bloc = pan.slice(i, i + 5200);
+    dit(!/vrm-propo-oui/.test(bloc) && !/vrm-propo-non/.test(bloc),
+      "le récap n'a plus de bouton Oui/Non");
+    dit(/btns\.innerHTML = bouton\('vrm-propo-ok'/.test(bloc),
+      'un seul bouton, toujours : Fermer');
+    dit(/recap\.bloque/.test(bloc) && /autre-compte/.test(bloc) && /trop-d-actions/.test(bloc),
+      'quand il en reste, le récap DIT pourquoi (compte, plafond) au lieu de demander');
+  }
+  // 11. LA VISITE FAIT L'URGENT AVANT LE LOURD (§5.88) — la vente, le bordereau
+  //     et le récap ne doivent plus attendre la fin d'une moisson complète.
+  {
+    const src3 = require('fs').readFileSync(require('path').join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+    const i = src3.indexOf('async function visiteVinted');
+    const bloc = src3.slice(i, src3.indexOf('\n}\n', i));
+    const pRecap = bloc.indexOf('proposerBordereaux');
+    const pLourd = bloc.indexOf('const ok = await runActive();');
+    dit(pRecap > 0 && pLourd > 0 && pRecap < pLourd,
+      'le récap et le bordereau passent AVANT la moisson complète',
+      `recap@${pRecap} lourd@${pLourd}`);
+    dit(/VISITE_DELAI_MS\) return;/.test(bloc),
+      'le garde de 5 min ne protège plus que la moisson complète');
+  }
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : "\nLe récap ne s'allume que quand il y a vraiment du nouveau.");
   process.exit(ko ? 1 : 0);
 })();
