@@ -17864,19 +17864,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     même donnée finiraient par diverger (§5.15).
                     ⚠️ Il ne se remplit JAMAIS tout seul : sans plancher sur cette
                     annonce, l'extension ne touche à aucune offre. */}
-                <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${e.minPrice?C.accent:C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}}
-                     title="Offre acceptée automatiquement à partir de ce montant (si tu as activé l'acceptation auto dans l'extension). Vide = aucune offre n'est acceptée toute seule.">
-                  <span style={{fontSize:11,color:e.minPrice?C.accent:C.muted,fontWeight:600}}>Min. accepté</span>
-                  <ChampSaisie value={e.minPrice ?? ''} onCommit={v=>updatePair(item,{minPrice:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                  <span style={{fontSize:11,color:C.muted}}>€</span>
-                </div>
-                {num && (
-                  <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,margin:'0 10px 10px'}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
-                    <span style={{fontSize:11,color:C.muted,fontWeight:500}}>💡 boost</span>
-                    <ChampSaisie value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} placeholder="0" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                    <span style={{fontSize:11,color:C.muted}}>€</span>
-                  </div>
-                )}
+                {/* ⚠️ CES DEUX CHAMPS SE REPLIENT. Mesuré : 0 prix plancher et
+                    0 boost posés sur 255 paires — ils occupaient pourtant deux
+                    rangées permanentes sur CHAQUE carte, donc la moitié des
+                    contrôles d'un écran qui en affiche jusqu'à quatre de front.
+                    Une carte d'annonce doit se lire comme une paire, pas comme un
+                    formulaire. Ils restent DÉPLIÉS D'OFFICE dès qu'une valeur est
+                    posée : un réglage rempli ne doit jamais se cacher. */}
+                {(() => {
+                  const rempli = (e.minPrice != null && e.minPrice !== '') || (e.fees != null && e.fees !== '');
+                  return (
+                    <details open={rempli} style={{margin:'0 10px 10px'}}>
+                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11,color:C.muted,fontWeight:600,padding:'3px 0',userSelect:'none'}}>
+                        Prix plancher &amp; boost{rempli ? '' : ' ›'}
+                      </summary>
+                      <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${e.minPrice?C.accent:C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,marginTop:5}}
+                           title="Offre acceptée automatiquement à partir de ce montant (si tu as activé l'acceptation auto dans l'extension). Vide = aucune offre n'est acceptée toute seule.">
+                        <span style={{fontSize:11,color:e.minPrice?C.accent:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Min. accepté</span>
+                        <ChampSaisie value={e.minPrice ?? ''} onCommit={v=>updatePair(item,{minPrice:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                        <span style={{fontSize:11,color:C.muted}}>€</span>
+                      </div>
+                      {num && (
+                        <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:3,padding:'2px 6px',background:C.bg,marginTop:6}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
+                          <span style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap'}}>💡 boost</span>
+                          <ChampSaisie value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} placeholder="0" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                          <span style={{fontSize:11,color:C.muted}}>€</span>
+                        </div>
+                      )}
+                    </details>
+                  );
+                })()}
                 {/* Assistant de baisse de prix : sur les paires qui dorment ou tres
                     vues sans favori, on suggere un prix (-15%, arrondi) et un lien
                     direct vers l'annonce pour le baisser. Le vrai 1-clic (ecriture
