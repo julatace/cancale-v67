@@ -3463,6 +3463,34 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null}) {
   );
 }
 
+// LE SEUL GRAPHIQUE DE L'APP : la forme des 14 derniers jours.
+// ⚠️ Une seule série, donc UNE seule couleur et aucune légende — le titre au-dessus
+// nomme ce qu'on regarde. Un jour sans vente garde une trace grise : un trou dans
+// la rangée se lirait comme une donnée manquante, pas comme un zéro.
+function MiniBarres({ jours, hauteur = 84 }) {
+  const max = Math.max(1, ...jours.map(j => j.eur));
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'flex-end',gap:5,height:hauteur}}>
+        {jours.map((j) => {
+          const h = j.eur > 0 ? Math.max(6, Math.round((j.eur / max) * hauteur)) : 3;
+          return (
+            <div key={j.cle} title={`${j.long} · ${j.n} vente${j.n > 1 ? 's' : ''} · ${j.eur.toFixed(0)} €`}
+              style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',justifyContent:'flex-end',height:'100%'}}>
+              <div style={{height:h,background:j.eur > 0 ? C.accent : C.border,borderRadius:'3px 3px 0 0'}}/>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:'flex',gap:5,marginTop:6,borderTop:`1px solid ${C.border}`,paddingTop:5}}>
+        {jours.map((j) => (
+          <div key={j.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:9,letterSpacing:.2,color:C.muted,fontWeight:600,overflow:'hidden'}}>{j.jour}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CountUp({ value, format, duration = 950, style }) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -4190,18 +4218,19 @@ function ScreenHead({ icon, title, desc, right }) {
   // serré, et un FILET D'ENCRE qui ferme le bloc. C'est ce filet, plus que la
   // taille, qui fait lire « page composée » au lieu de « widget ».
   return (
-    <div style={{marginBottom:18,paddingBottom:12,borderBottom:`2px solid ${C.text}`}}>
+    /* ⚠️ TROIS ÉLÉMENTS DÉCORATIFS ONT SAUTÉ : le trait d'accent flottant, le
+       titre à 38 px et le filet d'ENCRE de 2 px qui barrait l'écran. Mis bout à
+       bout, ça faisait 90 px de haut pour porter un seul mot, sur chaque écran,
+       tous les jours. L'icône rejoint le titre sur sa ligne (elle nomme déjà
+       l'écran dans la barre de navigation) et le filet redevient une simple
+       séparation. Mesuré : 40 px rendus au contenu, en haut de chaque page. */
+    <div style={{marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
       <div style={{display:'flex',alignItems:'flex-end',gap:14,flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div className="vrm-label" style={{color:C.accent,marginBottom:6,display:'flex',alignItems:'center',gap:7}}>
-            {line
-              ? <span aria-hidden="true" style={{display:'flex',color:C.accent}}><Icon name={icon} size={14}/></span>
-              : (icon ? <span aria-hidden="true" style={{fontSize:13}}>{icon}</span> : null)}
-            {/* Un trait d'accent tient lieu de surtitre : écrire « VRM » sur
-                chaque écran répétait la marque déjà présente dans la barre. */}
-            <span aria-hidden="true" style={{display:'block',width:26,height:2,background:C.accent}}/>
-          </div>
-          <h2 className="vrm-display" style={{margin:0,fontSize:'clamp(27px, 4.6vw, 38px)',fontWeight:700,color:C.text,lineHeight:1.02}}>{title}</h2>
+        <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:10}}>
+          {line
+            ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
+            : (icon ? <span aria-hidden="true" style={{fontSize:18}}>{icon}</span> : null)}
+          <h2 className="vrm-display" style={{margin:0,fontSize:'clamp(21px, 3vw, 27px)',fontWeight:700,color:C.text,lineHeight:1.05,letterSpacing:'-0.02em'}}>{title}</h2>
           {/* ⚠️ LA DESCRIPTION D'ÉCRAN N'EST PLUS AFFICHÉE. Julien : « il y a trop
               d'informations partout, c'est horrible ». Ce paragraphe explique ce
               que fait l'écran — on le lit UNE fois, puis c'est du bruit tous les
@@ -12034,6 +12063,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
 
+  // Les 14 derniers jours, en UN SEUL parcours des ventes — appeler bilanVentes
+  // quatorze fois relirait la liste entière autant de fois. Mêmes règles que les
+  // tuiles du jour et de la semaine (§11) : moisson, hors annulées, hors ventes
+  // et comptes masqués. ⚠️ Clé de jour LOCALE : toISOString() est en UTC et
+  // décalerait chaque vente d'après 22 h sur le lendemain.
+  const jours14 = useMemo(() => {
+    const cle = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const d0 = new Date(); d0.setHours(0,0,0,0);
+    const J = [], par = {};
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(d0.getTime() - i*86400000);
+      const j = { cle: cle(d), jour: ['D','L','M','M','J','V','S'][d.getDay()],
+        long: d.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'short' }), n:0, eur:0 };
+      J.push(j); par[j.cle] = j;
+    }
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const t = tsCommande(o); if (!t) continue;
+      const j = par[cle(new Date(t))]; if (!j) continue;
+      j.n += 1; j.eur += montantCommande(o);
+    }
+    return J;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
+
+  // Les six dernières ventes, mêmes règles que les autres compteurs (§11).
+  const dernieresVentes = useMemo(() => {
+    const v = [];
+    for (const o of (sales.items || [])) {
+      if (isHidden(o)) continue;
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const t = tsCommande(o); if (!t) continue;
+      v.push({ o, t });
+    }
+    v.sort((x, y) => y.t - x.t);
+    return v.slice(0, 6).map(x => ({ ...x.o, _t: x.t }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
+
   const soldByTxn = useMemo(() => { const m = {}; (sales.items || []).forEach(o => { if (o.transaction_id != null) m[String(o.transaction_id)] = o; }); return m; }, [sales.items]);
   // Un bordereau est « expédié » (donc à retirer de la liste à imprimer) dès que
   // Vinted a fait avancer la vente au-delà de « bordereau envoyé » (pris en charge,
@@ -15281,7 +15350,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    couleur qui se suivent, plus rien ne ressort et l'écran a
                    l'air « décoré » (§5.54). Ici la couleur ne sert qu'aux
                    chiffres. */
-                <div style={{marginBottom:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'13px 15px',boxShadow:C.shadow||'none'}}>
+                /* Sur grand écran, les trois chiffres tenaient sur une ligne de
+                   1100 px et laissaient la moitié de la carte vide. Le graphe
+                   occupe cette moitié : même bloc, aucune information de plus à
+                   lire, et la page cesse de s'arrêter au tiers de l'écran. */
+                <div style={{marginBottom:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'14px 16px',boxShadow:C.shadow||'none',
+                  display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(250px,100%), 1fr))',gap:22,alignItems:'start'}}>
+                  <div>
                   <div className="vrm-label" style={{color:C.muted,marginBottom:9}}>Ta semaine</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 90px'}}>
@@ -15301,6 +15376,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{toShip.length}</div>
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>à expédier</div>
                     </div>
+                  </div>
+                  </div>
+                  <div>
+                    <div className="vrm-label" style={{color:C.muted,marginBottom:9,display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8}}>
+                      <span>14 derniers jours</span>
+                      <span style={{color:C.text,fontWeight:700}}>{jours14.reduce((a,j)=>a+j.eur,0).toFixed(0)} €</span>
+                    </div>
+                    <MiniBarres jours={jours14}/>
                   </div>
                 </div>
               );
@@ -15417,6 +15500,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               );
             })()}
+
+            {/* ⚠️ L'ACCUEIL S'ARRÊTAIT AU TIERS DE L'ÉCRAN. Sur ordinateur il
+                restait 500 px d'aplat gris sous la dernière carte — ce vide est
+                ce qui fait lire « page pas finie », plus sûrement qu'une couleur.
+                On ne le remplit pas de décoration : on y met ce qu'il vient
+                regarder, ses dernières ventes. Ce n'est pas un conseil ni un
+                diagnostic (ceux-là restent bannis de l'accueil, §5.66) — c'est
+                du contenu, et il mène à l'écran Ventes. */}
+            {!loading && dernieresVentes.length>0 && (
+              <div style={{marginTop:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:4,boxShadow:C.shadow||'none',overflow:'hidden'}}>
+                <div style={{display:'flex',alignItems:'baseline',gap:8,padding:'12px 15px 9px'}}>
+                  <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
+                  <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                    style={{border:'none',background:'transparent',color:C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
+                </div>
+                {dernieresVentes.map((o,i)=>{
+                  const ph = orderPhoto(o);
+                  const d = new Date(o._t);
+                  return (
+                    <button key={o.transaction_id||i} type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                      style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',padding:'9px 15px',border:'none',borderTop:`1px solid ${C.border}`,background:'transparent',cursor:'pointer',fontFamily:'inherit'}}>
+                      <div style={{width:36,height:36,borderRadius:3,background:C.bg,border:`1px solid ${C.border}`,flexShrink:0,overflow:'hidden'}}>
+                        {/* Le CDN Vinted expire : sans ce repli, la vignette
+                            devient l'icône « image cassée » du navigateur (§5.76). */}
+                        {ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'—'}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>{d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}{o._acc?` · ${accName(o._acc)}`:''}</div>
+                      </div>
+                      <div style={{fontSize:14,fontWeight:700,color:C.text,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} €</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {accounts.length===0 && (
               <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
@@ -17281,15 +17400,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // passait pour du direct.
                 const ms = harvestAgeMs(uid, 'listings');
                 const j = ms != null ? Math.floor(ms/86400000) : null;
-                const vieux = j != null && j >= 2;
-                const col = off ? C.border : refuse ? C.warn : vieux ? (j >= 7 ? C.danger : C.warn) : C.accent;
+                // ⚠️ LE SEUIL ÉTAIT DE 2 JOURS, DONC PRESQUE TOUJOURS FRANCHI :
+                // l'extension ne rafraîchit en direct que le compte connecté, les
+                // autres datent forcément de quelques jours. Sept puces sur huit
+                // s'affichaient donc en ambre pour un état parfaitement normal —
+                // un signal qu'on voit tous les jours n'est plus un signal (§5.49).
+                // Une semaine, c'est le moment où il faut vraiment y repasser.
+                const vieux = j != null && j >= 7;
+                // ⚠️ ET LA PUCE EST NEUTRE. Chaque compte portait sa couleur
+                // (bordure + fond + TEXTE), donc six couleurs sur une ligne pour
+                // une information secondaire : c'est ce qui faisait « sapin de
+                // Noël » sur l'écran Annonces (§5.90 — une seule couleur d'accent,
+                // et elle est rare). La couleur ne revient que si le compte
+                // demande quelque chose : connexion refusée, ou données figées
+                // depuis une semaine.
+                const alerte = refuse || vieux;
+                const col = off ? C.border : alerte ? C.warn : C.border;
+                const encre = off ? C.muted : alerte ? C.warn : C.text;
                 return (
                   <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)}
                     title={off ? 'Masqué — tape pour réafficher ses annonces'
                           : refuse ? 'Vinted a refusé la connexion à ce compte. ⚠️ Ses ventes comptent quand même dans ton chiffre d\'affaires — l\'argent a bien été gagné. Reconnecte-toi dessus sur vinted.fr pour rafraîchir ses données.'
                           : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
                           : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
-                    style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':`${col}12`,color:off?C.muted:col,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
+                    style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':(alerte?`${col}12`:C.card),color:encre,borderRadius:3,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
                     {off && <Icon name="eyeOff" size={13} style={{marginRight:4}}/>}{name} · {counts[uid]}
                     {/* « connexion refusée » se dit, mais ne retire RIEN des totaux. */}
                     {refuse && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· connexion refusée</span>}
@@ -17368,9 +17502,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.hasFav && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
             {annStats.hasView && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>👁 {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
-            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
+            {/* ⚠️ « qui dorment » était en ROUGE, à côté d'un « sans N° » ambre et
+                d'un bouton bleu plein : trois couleurs dans une rangée de stats.
+                Le rouge est réservé à ce qui est irréversible — deux paires sous
+                le même numéro (§5.56). Une paire qui dort depuis un mois se
+                rattrape ; c'est de l'ambre. */}
+            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
 
-            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{fontSize:12,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}`,borderRadius:3,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
+            {/* La seule ACTION de la rangée garde l'accent, mais en contour :
+                un aplat de couleur posé à côté de cinq pastilles neutres tirait
+                l'œil vers un raccourci, pas vers les chiffres. */}
+            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:3,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
               Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
@@ -21955,8 +22097,16 @@ export default function App() {
           écran, c'est le genre de doublon qui fait « assemblé », pas « conçu ». */}
       <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',
         marginLeft: ordi ? NAV_LARGEUR : undefined,
-        background:C.glass||C.surface,backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
-        borderBottom:`1px solid ${C.border}`}}>
+        /* ⚠️ SUR ORDINATEUR C'ÉTAIT UNE BANDE BLANCHE VIDE de 62 px : la moitié
+           gauche est masquée (la barre latérale porte déjà la marque et la
+           navigation), donc il ne restait qu'un bandeau plein largeur avec
+           quatre icônes collées à droite. Il prend maintenant la couleur du
+           FOND et perd sa bordure : les icônes flottent au-dessus de la page,
+           il n'y a plus de barre à regarder. Sur téléphone, rien ne change —
+           le bandeau y porte le menu, le logo et la synchro. */
+        background: ordi ? 'transparent' : (C.glass||C.surface),
+        backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
+        borderBottom: ordi ? '1px solid transparent' : `1px solid ${C.border}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto',visibility: ordi ? 'hidden' : undefined}}>
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
