@@ -529,6 +529,10 @@ async function storeHarvest(domain, type, id, body) {
   // (`minimum_price`) avait REMPLACÉ le vrai solde d'un compte — il n'y a qu'une
   // ligne `harvest_{uid}_billing`, donc la dernière réponse gagne. On n'écrit
   // que ce qui porte vraiment un montant de porte-monnaie.
+  // Le RELEVÉ part dans sa propre ligne, AVANT le tri ci-dessous : une réponse
+  // peut porter les mouvements sans porter de solde, et il n'y a qu'une ligne
+  // `billing` par compte — c'est elle qui écrasait le relevé (§5.91).
+  if (type === 'billing') { try { await storeReleve(uid, parsed, domain); } catch (_) {} }
   if (type === 'billing' && !estPorteMonnaie(parsed)) { noterDiag('ignore_billing_hors_sujet'); return; }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
@@ -1312,6 +1316,191 @@ function alleger(type, payload) {
 const MONTANTS_PM = ['main', 'escrow', 'balance', 'pending_balance'];
 const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some(k => p[k] && p[k].amount != null));
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LE RELEVÉ DU PORTE-MONNAIE : l'argent réellement crédité, DATÉ
+// ══════════════════════════════════════════════════════════════════════════════
+// §5.88 avait nommé ça « le vrai chantier suivant » : pour sa déclaration,
+// Julien doit compter l'argent REÇU, alors que l'app ne sait dater que la VENTE
+// (7 jours d'écart en médiane, jusqu'à 25). La date de finalisation n'existe
+// nulle part dans la moisson des commandes.
+// MESURÉ EN BASE avant de coder (méthode §46) : la réponse de
+// `/api/v2/users/{id}/payouts` — que l'extension appelle DÉJÀ à chaque moisson
+// — porte le relevé complet, et personne ne le lisait (même famille que §5.26) :
+//   starting_date  : "2026-08-01"                     ← le mois du relevé
+//   history        : [{year:2026, month:7, …}]        ← les mois consultables
+//   invoice_lines  : [{ id, date:"2026-08-07T18:02:15Z", type:"credit",
+//                       title:"Transfert vers le compte bancaire",
+//                       amount:{amount:"-54.0"}, pending, entity_type:"payout" }]
+// ⚠️ POURQUOI ON CAPTE SANS RIEN CALCULER. Le seul exemplaire observé est un
+// VIREMENT SORTANT vers sa banque — et il porte `type:"credit"`. Donc « credit »
+// ne veut PAS dire « recette », et la forme d'une ligne de VENTE n'a jamais été
+// vue. Bâtir un chiffre de déclaration là-dessus serait deviner, exactement ce
+// que §22/§5.23 s'interdisent : un montant faux ne se voit pas. On capte
+// d'abord, on mesurera sur du vrai ensuite.
+// ⚠️ ET SURTOUT : il n'y a qu'UNE ligne `harvest_{uid}_billing`, donc la
+// dernière réponse gagne (§5.14). Le porte-monnaie de la page renvoie
+// `{main,escrow}` et écrase donc le relevé de `payouts` — c'est pour ça qu'AUCUN
+// compte vivant ne porte d'`invoice_lines` aujourd'hui alors que l'appel est
+// fait à chaque visite. Le relevé a donc sa PROPRE ligne, une par mois.
+const RELEVE_MAX_PAR_VISITE = 2;
+const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
+
+// Un mouvement, réduit à ce qui l'identifie et le date. On ne garde pas le
+// libellé complet ni les champs de présentation : ces lignes repartent à chaque
+// lecture (§34), et un relevé se lit sur la date, le sens et le montant.
+function ligneReleve(l) {
+  if (!l || typeof l !== 'object') return null;
+  const brut = l.amount && typeof l.amount === 'object' ? l.amount.amount : l.amount;
+  const n = parseFloat(String(brut == null ? '' : brut).replace(',', '.'));
+  if (!isFinite(n)) return null;                       // sans montant, ce n'est pas un mouvement
+  const d = l.date || l.created_at || l.updated_at || null;
+  return {
+    id: l.id != null ? String(l.id) : undefined,
+    date: d ? String(d) : undefined,
+    montant: n,
+    type: l.type ? String(l.type).slice(0, 40) : undefined,
+    quoi: l.entity_type ? String(l.entity_type).slice(0, 40) : undefined,
+    ref: l.entity_id != null ? String(l.entity_id) : undefined,
+    titre: l.title ? String(l.title).slice(0, 80) : undefined,
+    attente: l.pending === true ? true : undefined,
+  };
+}
+
+// Le mois que ce relevé décrit. `starting_date` fait foi (c'est Vinted qui le
+// dit) ; à défaut on prend le mois du mouvement le plus récent. Jamais la date
+// du jour : un relevé de juillet capté en septembre n'est pas un relevé de
+// septembre.
+function moisDuReleve(p) {
+  const sd = p && p.starting_date;
+  if (sd && /^\d{4}-\d{2}/.test(String(sd))) return String(sd).slice(0, 7);
+  const l = (p && Array.isArray(p.invoice_lines) ? p.invoice_lines : [])
+    .map(x => x && x.date).filter(Boolean).sort();
+  const der = l[l.length - 1];
+  return der && /^\d{4}-\d{2}/.test(String(der)) ? String(der).slice(0, 7) : null;
+}
+
+// Range le relevé dans SA ligne, une par compte et par mois. Appelé depuis les
+// deux voies d'écriture (§5.27 : un garde-fou vit dans la fonction qui écrit).
+// Aucune requête Vinted ajoutée : c'est la réponse qu'on a déjà sous la main.
+async function storeReleve(uid, payload, domain) {
+  try {
+    const lignes = payload && Array.isArray(payload.invoice_lines) ? payload.invoice_lines : null;
+    if (!lignes || !lignes.length) return false;
+    const mois = moisDuReleve(payload);
+    if (!mois) { noterDiag('releve_sans_mois'); echantillonRate('releve', String(uid), JSON.stringify(payload).slice(0, 400)); return false; }
+    const propres = lignes.map(ligneReleve).filter(Boolean);
+    if (!propres.length) { noterDiag('releve_sans_montant'); return false; }
+    // ⚠️ On n'écrase un relevé que par un relevé AU MOINS aussi complet — même
+    // règle que le dressing (§5.13) : `invoice_lines_has_more` dit que Vinted
+    // en a gardé sous le coude, et une réponse tronquée ne doit pas remplacer
+    // une réponse entière.
+    const rowId = `harvest_${uid}_releve_${mois}`;
+    try {
+      const av = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=n:data->>nLignes`);
+      const avant = Number(av && av[0] && av[0].n);
+      if (isFinite(avant) && avant > propres.length) { noterDiag('ignore_releve_partiel'); return false; }
+    } catch (_) {}
+    // ⚠️ `supabaseUpsert` pose DÉJÀ le propriétaire et choisit la cible du
+    // conflit (§12) : rappeler `withOwner` ici écrivait une Promise à la place
+    // du relevé — la ligne partait avec un `data` VIDE, et ni le build ni
+    // `node --check` ne le voyaient. C'est le banc qui l'a attrapé.
+    const ok = await supabaseUpsert('app_data', [{
+      id: rowId,
+      data: {
+        type: 'releve', uid: String(uid), mois, domain: domain || 'www.vinted.fr',
+        capturedAt: new Date().toISOString(),
+        nLignes: propres.length,
+        complet: payload.invoice_lines_has_more === false ? true : undefined,
+        // ⚠️ LE RÉSUMÉ EST CALCULÉ ICI, À LA CAPTURE — même motif que le widget
+        // (§5.14) : un mois chargé pèse des dizaines de Ko par compte, et l'app
+        // n'a besoin que de trois nombres. Elle les lira en SCALAIRES (§34) ;
+        // le détail ne repart que quand on ouvre vraiment le relevé.
+        // Ce sont trois FAITS arithmétiques, pas une interprétation : la seule
+        // chose que Vinted nous dit avec certitude, c'est qu'un mouvement
+        // `entity_type:"payout"` est un virement vers SA banque (donc un
+        // déplacement entre ses propres comptes, jamais une recette).
+        resume: {
+          virements: +propres.filter(l => l.quoi === 'payout').reduce((a, l) => a + l.montant, 0).toFixed(2),
+          entrees: +propres.filter(l => l.quoi !== 'payout' && l.montant > 0).reduce((a, l) => a + l.montant, 0).toFixed(2),
+          sorties: +propres.filter(l => l.quoi !== 'payout' && l.montant < 0).reduce((a, l) => a + l.montant, 0).toFixed(2),
+          n: propres.length,
+        },
+        lignes: propres,
+      },
+    }], 'id');
+    noterDiag(ok === false ? 'releve_ecriture_ratee' : 'releve_ecrit');
+    return ok !== false;
+  } catch (_) { return false; }
+}
+
+// Les mois PASSÉS. `history` les liste ; on va les chercher un par un, sur le
+// compte connecté, avec les mêmes garde-fous que partout (§48) : plafond
+// horaire, compte connecté, N par visite, pas de nouvel essai avant 24 h.
+// ⚠️ LE PARAMÈTRE N'A JAMAIS ÉTÉ OBSERVÉ. On tente `?year=&month=` ; si Vinted
+// l'ignore, il rend le mois COURANT — on le voit à `starting_date`, on garde un
+// échantillon et ON ARRÊTE (`vrmReleveMuet`). Boucler sur un endpoint qui
+// ignore nos paramètres, ce serait des requêtes pour rien dans l'empreinte du
+// compte, et c'est exactement ce que §5.52 a dû retirer après 73 échecs.
+async function capterReleves(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const muet = (await chrome.storage.local.get('vrmReleveMuet')).vrmReleveMuet || {};
+    if (muet[String(uid)]) return 0;                    // ce compte a déjà prouvé que le paramètre ne passe pas
+    // Ce qu'on a déjà (une seule lecture, deux scalaires — jamais le payload).
+    let cur = [];
+    try { cur = await sbGet(`app_data?id=like.harvest_${uid}_releve_*&select=m:data->>mois`); } catch (_) {}
+    const dejaMois = new Set((cur || []).map(r => r && r.m).filter(Boolean));
+    const bill = await sbGet(`app_data?id=eq.harvest_${uid}_billing&select=h:data->payload->history`);
+    const hist = (bill && bill[0] && bill[0].h) || [];
+    if (!Array.isArray(hist) || !hist.length) return 0;
+    // ⚠️ LE DRESSING ET LE PORTE-MONNAIE UTILISENT L'ID DE PROFIL, PAS
+    // L'IDENTIFIANT DE COMPTE (§7 : sans ça, 0 annonce — et ici, 0 relevé).
+    // `vinted_accounts` ne porte PAS ce champ : il vit dans la réponse
+    // `users/current` déjà moissonnée. On le lit en SCALAIRE (§34), zéro
+    // requête Vinted ajoutée.
+    let pid = null;
+    try {
+      const pr = await sbGet(`app_data?id=eq.harvest_${uid}_profile&select=pid:data->payload->user->>id`);
+      pid = (pr && pr[0] && pr[0].pid) || null;
+    } catch (_) {}
+    const memo = (await chrome.storage.local.get('vrmReleveFaits')).vrmReleveFaits || {};
+    let n = 0;
+    // Du plus récent au plus ancien : c'est le mois qu'il déclare qui compte.
+    const voulus = hist
+      .filter(h => h && h.year && h.month)
+      .map(h => ({ y: Number(h.year), m: Number(h.month), cle: `${h.year}-${String(h.month).padStart(2, '0')}` }))
+      .filter(h => !dejaMois.has(h.cle))
+      .sort((a, b) => b.cle.localeCompare(a.cle));
+    for (const v of voulus) {
+      if (n >= RELEVE_MAX_PAR_VISITE) break;
+      const k = `${uid}_${v.cle}`;
+      if (memo[k] && Date.now() - Number(memo[k]) < RELEVE_RETRY_MS) continue;
+      const refus = await garde(uid, acc);
+      if (refus) { logActivity(`⚠️ Relevé non lu : ${refus.error}`); break; }
+      memo[k] = Date.now();
+      n++;
+      if (!pid) { noterDiag('releve_sans_profil'); break; }
+      const rep = await vintedGet(acc, `/api/v2/users/${encodeURIComponent(pid)}/payouts?year=${v.y}&month=${v.m}`);
+      if (!rep.ok || !rep.json) { noterDiag(`releve_refuse_${rep.status}`); continue; }
+      const recu = moisDuReleve(rep.json);
+      // Le mois rendu n'est pas celui demandé ⟹ le paramètre est ignoré.
+      if (recu && recu !== v.cle) {
+        noterDiag('releve_parametre_ignore');
+        echantillonRate('releve_mois', v.cle, JSON.stringify({ demande: v.cle, recu, starting_date: rep.json.starting_date }).slice(0, 300));
+        muet[String(uid)] = Date.now();
+        await chrome.storage.local.set({ vrmReleveMuet: muet });
+        break;
+      }
+      await storeReleve(uid, rep.json, 'www.vinted.fr');
+    }
+    await chrome.storage.local.set({ vrmReleveFaits: memo });
+    return n;
+  } catch (_) { return 0; }
+}
+
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1464,6 +1653,9 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // Mesuré en base : 4 comptes sur 8 avaient un `payload: {}`, donc leur argent
   // en attente n'apparaissait nulle part. Un garde-fou doit vivre dans la
   // fonction qui écrit, pas chez ceux qui l'appellent.
+  // Idem côté moisson active — depuis le payload BRUT : l'allègement ne touche
+  // pas `billing` aujourd'hui, mais un relevé ne doit pas dépendre de ça.
+  if (type === 'billing') { try { await storeReleve(uid, brut, domain); } catch (_) {} }
   if (type === 'billing' && !estPorteMonnaie(payload)) return;
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
@@ -1937,6 +2129,10 @@ async function visiteVinted() {
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
     await capterRetraits(uid);
+    // ⚠️ APRÈS la moisson : le mois COURANT vient d'être capté gratuitement par
+    // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
+    // PASSÉS encore absents, deux par visite au plus.
+    await capterReleves(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 

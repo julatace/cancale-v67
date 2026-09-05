@@ -14611,6 +14611,52 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return [...s].sort().reverse();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items]);
+  // ── LE RELEVÉ DU PORTE-MONNAIE : l'argent réellement crédité ────────────
+  // ⚠️ CE QUE CE RAPPORT NE PEUT PAS DIRE, ET POURQUOI ON L'AFFICHE QUAND MÊME.
+  // Julien déclare l'argent REÇU ; ce rapport date tout au jour de la VENTE
+  // (§5.57 — la date d'encaissement n'existe nulle part dans la moisson des
+  // commandes, elle a donc été retirée). Mesuré : 7 jours d'écart en médiane,
+  // jusqu'à 25. Le relevé du porte-monnaie Vinted, lui, est daté — l'extension
+  // le capte depuis la 5.52 (§5.91) et le range par mois.
+  // On le montre À CÔTÉ du CA, comme une VÉRIFICATION, jamais à sa place :
+  // c'est un fait mesuré, pas un chiffre de déclaration.
+  // ⚠️ Lecture en SCALAIRES (§34) : les trois totaux sont précalculés à la
+  // capture. Le détail des mouvements ne repart jamais dans l'app.
+  const [releveMois, setReleveMois] = useState({ mois:null, lignes:null });
+  useEffect(() => {
+    if (!showReport || !reportMonth) return;
+    if (releveMois.mois === reportMonth) return;
+    let mort = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_releve_${encodeURIComponent(reportMonth)}`
+          + `&select=id,vir:data->resume->>virements,ent:data->resume->>entrees,sor:data->resume->>sorties,n:data->resume->>n`,
+          { headers: sbAuth() });
+        const j = r.ok ? await r.json() : [];
+        if (!mort) setReleveMois({ mois: reportMonth, lignes: Array.isArray(j) ? j : [] });
+      } catch (_) { if (!mort) setReleveMois({ mois: reportMonth, lignes: [] }); }
+    })();
+    return () => { mort = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReport, reportMonth]);
+  const releveTotaux = useMemo(() => {
+    const l = releveMois.mois === reportMonth ? (releveMois.lignes || []) : null;
+    if (!l || !l.length) return null;
+    const n = (v) => { const x = parseFloat(String(v ?? '').replace(',','.')); return isFinite(x) ? x : 0; };
+    // ⚠️ Un compte SUPPRIMÉ ne compte pas (même règle que partout, §5.20) :
+    // ses lignes restent en base, elles n'ont rien à faire dans un total.
+    const vivants = new Set(accounts.map(a => String(a.vinted_user_id)));
+    const gardees = l.filter(r => { const m = /^harvest_(\d+)_releve_/.exec(String(r.id||'')); return m && vivants.has(m[1]); });
+    if (!gardees.length) return null;
+    return {
+      comptes: gardees.length,
+      entrees: gardees.reduce((a,r)=>a+n(r.ent),0),
+      sorties: gardees.reduce((a,r)=>a+n(r.sor),0),
+      virements: gardees.reduce((a,r)=>a+n(r.vir),0),
+      n: gardees.reduce((a,r)=>a+n(r.n),0),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [releveMois, reportMonth, accounts]);
   const report = useMemo(() => {
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
@@ -18833,13 +18879,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label={`TVA marge ${report.tvaRate}%`} value={fmtE(report.tvaMarge)} color={C.warn}/>
                   <StatBox label="Marge HT" value={fmtE(report.margeHT)}/>
                 </>) : (<>
-                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?INV_STATUS.online.color:C.danger}
+                  {/* ⚠️ UNE SEULE COULEUR, ET ELLE EST RARE (§5.90). La modale avait
+                      gardé l'ancienne identité — un vert et un ambre côte à côte,
+                      chacun avec son filet — alors que l'écran Ventes juste
+                      derrière est passé à l'encre. Ces deux chiffres n'appellent
+                      aucune action : ce sont des faits. Le rouge reste pour un
+                      bénéfice NÉGATIF, qui lui en appelle une. */}
+                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?C.text:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
                     sub={report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} color={C.warn} sub={`${String(report.taux).replace('.',',')} % du CA · réglable`}/>
+                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} sub={`${String(report.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
               </div>
-              {report.nb>report.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>⚠️ {report.nb-report.nbCout} vente(s) sans prix d'achat — le calcul de marge est incomplet.</div>}
               {/* ⚠️ Les ventes masquées à l'écran COMPTENT dans le CA déclaré.
                   On l'écrit, sinon le chiffre paraîtrait inexplicablement plus
                   haut que la liste de l'onglet Ventes. */}
@@ -18855,6 +18906,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <b>{report.nMasq} vente{report.nMasq>1?'s':''} masquée{report.nMasq>1?'s':''} dans l'app</b> ({fmtE(report.caMasq)}) {report.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
                 <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
               </div>}
+              {/* ── LE RELEVÉ DU PORTE-MONNAIE ────────────────────────────
+                  Une VÉRIFICATION à côté du CA, jamais à sa place : le CA
+                  ci-dessus date au jour de la VENTE, le relevé date au jour du
+                  mouvement. Les deux ne peuvent pas coïncider (Vinted finalise
+                  ~2 semaines après) et c'est normal — l'écart, c'est le décalage.
+                  ⚠️ On n'affiche que des faits : Vinted ne nous dit avec
+                  certitude qu'une chose, c'est qu'un mouvement `payout` est un
+                  virement vers SA banque. On ne baptise donc pas « recette » ce
+                  qu'on n'a pas encore mesuré. */}
+              {releveTotaux ? (
+                <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:3,padding:'9px 12px',marginBottom:12}}>
+                  <div style={{fontSize:12.5,color:C.text,lineHeight:1.45}}>
+                    <b>Relevé de ton porte-monnaie Vinted</b> — {releveTotaux.n} mouvement{releveTotaux.n>1?'s':''} sur {releveTotaux.comptes} compte{releveTotaux.comptes>1?'s':''}
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:14,marginTop:6}}>
+                    <div><div className="vrm-label" style={{fontSize:9,color:C.muted}}>CRÉDITÉ</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(releveTotaux.entrees)}</div></div>
+                    {releveTotaux.sorties!==0 && <div><div className="vrm-label" style={{fontSize:9,color:C.muted}}>PRÉLEVÉ</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(releveTotaux.sorties)}</div></div>}
+                    <div><div className="vrm-label" style={{fontSize:9,color:C.muted}}>VIRÉ VERS TA BANQUE</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(Math.abs(releveTotaux.virements))}</div></div>
+                  </div>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:5,lineHeight:1.4}}>
+                    Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour de la vente. L'écart entre les deux, c'est le délai de finalisation. Un virement vers ta banque déplace ton propre argent — ce n'est pas une recette.
+                  </div>
+                </div>
+              ) : (
+                <div style={{fontSize:11.5,color:C.muted,marginBottom:12,lineHeight:1.4}}>
+                  Relevé du porte-monnaie : rien de capté pour ce mois. L'extension le récupère à ta prochaine visite sur Vinted, compte par compte.
+                </div>
+              )}
               {/* Registre d'achats */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(report.achatsTotal)} ({report.buyLines.length})</div>
               {report.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat ce mois-ci{buys.items===null?' (registre en cours de chargement)':''}.</div>}

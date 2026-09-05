@@ -7621,3 +7621,115 @@ défauts ci-dessus, aucun n'était visible au build ni au compte d'erreurs (§5.
 ⚠️ **Ce qui reste, dit franchement** : sur un grand écran, « Ma journée » laisse
 un vide en bas quand la journée est calme — la page est courte, c'est tout. Je
 ne l'ai pas rempli de décoration.
+
+---
+
+## 5.91 — LE RELEVÉ DU PORTE-MONNAIE : l'argent daté était en base, personne ne le lisait
+
+§5.88 avait nommé ça « le vrai chantier suivant » et laissé la question ouverte :
+Julien déclare l'argent **reçu**, l'app ne sait dater que la **vente** (§5.57 —
+7 jours d'écart en médiane, jusqu'à 25 ; la date de finalisation n'existe nulle
+part dans la moisson des commandes). Mesuré avant de coder (méthode §46) — et
+la réponse était déjà là.
+
+### Ce que la base dit (5 septembre)
+`/api/v2/users/{id}/payouts` — que l'extension appelle **DÉJÀ à chaque
+moisson** depuis la 4.26 — ne renvoie pas qu'un solde :
+```
+starting_date : "2026-08-01"                    ← le mois du relevé
+history       : [{year:2026, month:7, …}]       ← les mois consultables
+invoice_lines : [{ id, date:"2026-08-07T18:02:15Z", type:"credit",
+                   title:"Transfert vers le compte bancaire",
+                   amount:{amount:"-54.0"}, pending, entity_type:"payout" }]
+```
+➡️ **Le relevé daté est capté depuis des semaines, et rien ne le lisait** — même
+famille que §5.26 (les points de dépôt) et §5.10 (le texte des annonces).
+
+### ⚠️ POURQUOI IL DISPARAISSAIT : une seule ligne pour deux réponses
+Il n'y a qu'une ligne `harvest_{uid}_billing`, donc **la dernière réponse
+gagne** (§5.14 point 8). La capture passive du porte-monnaie renvoie
+`{main, escrow}` et écrasait donc le relevé de `payouts`. Mesuré : sur les
+9 comptes vivants, **7 portent `{main,escrow}`, 0 porte des `invoice_lines`** —
+seul un compte SUPPRIMÉ, plus jamais recapté, avait gardé la forme complète.
+Le garde-fou de §5.27 rejetait le vide et le hors-sujet ; il ne voyait pas la
+**collision de deux formes également valables**.
+
+➡️ Le relevé a désormais **sa propre ligne, une par compte et par mois** :
+`harvest_{uid}_releve_{YYYY-MM}`, écrite depuis les **deux** voies (passive
+`storeHarvest` + active `storeHarvestRow`, §5.27 : un garde-fou vit dans la
+fonction qui écrit) et **AVANT** le tri du solde — une réponse peut porter les
+mouvements sans porter de montant.
+
+### ⚠️ CE QU'ON NE CALCULE PAS, ET POURQUOI
+Le seul mouvement jamais observé est un **VIREMENT SORTANT vers sa banque** —
+et il porte `type: "credit"`. Donc **« credit » ne veut pas dire « recette »**,
+et la forme d'une ligne de VENTE n'a jamais été vue. Bâtir un chiffre de
+déclaration là-dessus serait deviner : un montant faux ne se voit pas (§22,
+§5.23, §5.38). On capte d'abord, on mesurera sur du vrai ensuite.
+Le résumé écrit à la capture ne porte donc que des **faits arithmétiques** :
+`virements` (les `entity_type:"payout"`, la seule chose que Vinted nomme avec
+certitude), `entrees` (montants positifs hors payout), `sorties` (négatifs hors
+payout). ⚠️ **Ne pas baptiser l'un d'eux « CA encaissé » avant d'avoir vu une
+ligne de vente en base.**
+
+### Les mois passés : un pari BORNÉ, qui sait s'arrêter
+`history` liste les mois, mais **le paramètre n'a jamais été observé**. On tente
+`?year=&month=` — et si Vinted rend le mois COURANT malgré la demande, on le
+voit à `starting_date`, on garde un échantillon (§5.24) et **on marque le compte
+muet définitivement** (`vrmReleveMuet`). Boucler sur un endpoint qui ignore nos
+paramètres, c'est exactement ce que §5.52 a dû retirer après 73 échecs.
+Garde-fous habituels : compte connecté (`garde`), plafond de 20 actions/h,
+**2 par visite**, pas de nouvel essai avant 24 h.
+⚠️ **Le mois COURANT ne coûte AUCUNE requête** : il arrive dans la réponse que
+la moisson fait déjà.
+
+### ⚠️ Deux bugs que ni le build ni `node --check` ne voyaient
+1. **`withOwner` est `async`.** L'appeler sans `await` écrivait une **Promise**
+   à la place du relevé : la ligne partait avec un `data` VIDE. Et il n'avait
+   rien à faire là — `supabaseUpsert` pose déjà le propriétaire ET choisit la
+   cible du conflit (§12). C'est le banc qui l'a attrapé.
+2. **`vinted_accounts` ne porte pas d'ID DE PROFIL.** Ma première version lisait
+   `acc.profile_id` — un champ qui n'existe pas, donc `capterReleves` sortait
+   toujours en silence. Le dressing et le porte-monnaie utilisent l'**ID de
+   profil** (§7), qui vit dans `harvest_{uid}_profile` : on le lit **en
+   scalaire** (§34), zéro requête ajoutée.
+
+### Côté app : une VÉRIFICATION, jamais un remplacement
+Le rapport comptable affiche le relevé **à côté** du CA, avec ce qu'il est :
+« ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au
+jour de la vente — l'écart, c'est le délai de finalisation ». Lecture en
+**scalaires** (les trois totaux sont précalculés à la capture, motif du widget
+§5.14) ; le détail des mouvements ne repart jamais dans l'app. Un compte
+supprimé ne compte pas (§5.20). Rien de capté ⟹ une ligne grise d'une phrase,
+pas un bandeau.
+
+### Au passage : la modale du rapport avait gardé l'ancienne identité
+Vu **en regardant la capture** (§5.76), pas en relisant le code : « Bénéfice
+net » en vert et « Cotisations » en ambre, chacun avec son filet coloré, alors
+que l'écran Ventes juste derrière est passé à l'encre (§5.90). Même défaut que
+le tableau de bord en §5.84. Les deux passent à l'encre — ces chiffres
+n'appellent aucune action ; le rouge reste pour un bénéfice **négatif**.
+Et le bandeau ambre « N vente(s) sans prix d'achat » répétait **mot pour mot**
+la légende du chiffre juste au-dessus (§5.67) : supprimé.
+
+### Vérifié
+`npm run build` OK · `node --check` OK · **20 audits au vert**, dont
+**`scripts/audit-releve.cjs` (nouveau, 27 contrôles)** qui exécute le VRAI code
+du service worker dans un `vm` contre la **vraie réponse relevée en base** —
+**prouvé dans les deux sens** (§21, méthode §5.80 : `git archive HEAD` dans un
+arbre à part, script copié DEDANS et lancé DEPUIS cet arbre) : **14 contrôles en
+échec sur le code d'avant** · banc du rapport RENDU sur les vraies données, avec
+une fixture **produite par la vraie fonction `storeReleve`** : août affiche
+« 2 mouvements sur 2 comptes · crédité 0,00 € · viré vers ta banque 108,00 € »,
+juin (rien de capté) affiche la ligne grise — **0 erreur d'app dans les deux
+sens** · `verif_visuel.cjs` : 10 écrans × 2 tailles, 0 écran vide, 0 débordement,
+0 artefact, 0 erreur. Extension **5.52.0** — à recharger dans Chrome.
+
+### ⚠️ CE QUI RESTE OUVERT
+- **La forme d'une ligne de VENTE** : à lire dans `harvest_*_releve_*` dès que
+  Julien aura navigué avec la 5.52. C'est ce qui débloquera un vrai « argent
+  reçu » par mois — et rien ne doit être affiché comme tel avant.
+- **Le paramètre des mois passés** : s'il est ignoré, `panel_diag_capture.rates.releve_mois`
+  le dira, et il faudra chercher l'URL réelle dans les requêtes captées.
+- **0 prix d'achat sur 278 paires** (§22) : inchangé, c'est de la frappe et
+  Julien s'en charge (outils : §5.47 en série, §5.64 en un tap).
