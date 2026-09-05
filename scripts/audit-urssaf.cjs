@@ -223,5 +223,38 @@ enDur.length
   ? ok("une vente non finalisée n'entre jamais dans le CA déclaré")
   : nok("une vente non finalisée n'entre jamais dans le CA déclaré");
 
+// ⚠️ LE MOT « ENCAISSÉ » NE DOIT APPARAÎTRE DANS AUCUN LIBELLÉ VISIBLE.
+// L'app date TOUT au jour de la vente : elle ne connaît pas la date à laquelle
+// Vinted a versé l'argent. Or l'URSSAF demande légalement les recettes
+// ENCAISSÉES — écrire ce mot sur un chiffre qui n'est pas ça, c'est induire une
+// déclaration fausse. La règle avait déjà été posée une fois : elle a survécu
+// dans le PDF du rapport, dans le tableau de bord et dans les réglages. Ce
+// contrôle est là pour qu'elle ne se reperde pas une troisième fois.
+{
+  // On ne regarde QUE ce qui s'affiche. On retire donc D'ABORD tous les
+  // commentaires du fichier — y compris les blocs JSX `{/* … */}`, qui servent
+  // justement à expliquer la règle et diraient forcément le mot. Chaque bloc est
+  // remplacé par des espaces pour que les numéros de ligne restent justes.
+  const blanc = (m) => m.replace(/[^\n]/g, ' ');
+  const sansCom = SRC
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, blanc)
+    .replace(/\/\*[\s\S]*?\*\//g, blanc)
+    .replace(/^\s*\/\/.*$/gm, '')
+    // …et ceux en fin de ligne. L'espace avant `//` épargne les URLs (`https://`).
+    .replace(/\s\/\/[^\n]*$/gm, '');
+  // ⚠️ Le mot doit être ACCENTUÉ : « encaisse » sans accent est un identifiant
+  // interne (`type==='encaisse'`, `encaissees`). Le pister donnerait des faux
+  // positifs, et un audit qui crie au loup n'est plus lu (§5.49).
+  const fautes = [];
+  sansCom.split('\n').forEach((l, i) => {
+    if (/encaissé/i.test(l) && !/ça n'annule pas une vente encaissée/.test(l)) {
+      fautes.push((i + 1) + ' : ' + l.trim().slice(0, 90));
+    }
+  });
+  fautes.length === 0
+    ? ok('aucun libellé visible ne dit « encaissé »')
+    : nok('aucun libellé visible ne dit « encaissé »', fautes.slice(0, 4).join(' | '));
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nLe CA déclaré suit une seule règle, et rien n\'en est écarté en silence.');
 process.exit(ko ? 1 : 0);
