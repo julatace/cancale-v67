@@ -5369,10 +5369,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>Vinted en direct · ce mois</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',gap:10}}>
             {[
-              {k:'caMois', icon:'💸', label:'CA du mois', val:`${liveStats.caMois.toFixed(0)} €`, go:'cat_ventes', color:C.accent},
-              {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours, go:'cat_ventes', color:C.warn},
-              {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.blue||C.accent},
-              {k:'unread', icon:'💬', label:'Messages non lus', val:liveStats.unread, go:'cat_msg', color:liveStats.unread>0?C.danger:C.muted},
+              /* ⚠️ CES QUATRE CHIFFRES ÉTAIENT DE QUATRE COULEURS (bleu, ambre,
+                 bleu, rouge), et les six du dessous de six autres : dix teintes
+                 sur un seul écran, donc plus rien qui ressorte (§5.90). Aucun
+                 d'eux n'appelle une action — ce sont des repères. Seuls les
+                 messages non lus se colorent, parce que là il y a vraiment
+                 quelque chose à faire. */
+              {k:'caMois', icon:'💸', label:'CA du mois', val:`${liveStats.caMois.toFixed(0)} €`, go:'cat_ventes', color:C.text},
+              {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours, go:'cat_ventes', color:C.text},
+              {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.text},
+              {k:'unread', icon:'💬', label:'Messages non lus', val:liveStats.unread, go:'cat_msg', color:liveStats.unread>0?C.accent:C.text},
             ].map(s=>(
               <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
                 style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
@@ -5385,16 +5391,25 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
-          Σ prix d'achat des annonces en ligne · CA encaissé = finalisé tous comptes.
+          Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-        <StatCard icon="📦" label="Paires en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.accent} sub="numéros au garage"/>
-        <StatCard icon="💰" label="Valeur stock" value={fmt(liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue)} color={C.warn} sub="prix d'achat des annonces en ligne"/>
+        {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
+            alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
+            les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
+            légende disait. Un chiffre qu'on doit corriger avec sa légende est un
+            chiffre faux : le titre dit maintenant ce qu'il compte. */}
+        <StatCard icon="📦" label="Paires au garage" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
+        <StatCard icon="💰" label="Valeur stock" value={fmt(liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue)} color={C.text} sub="prix d'achat des annonces en ligne"/>
         {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
-        <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.danger} sub="finalisées, tous comptes"/>
-        <StatCard icon="💸" label="CA encaissé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="finalisé, tous comptes"/>
+        <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
+        {/* ⚠️ « CA ENCAISSÉ » EST LE MOT INTERDIT : l'app date tout au jour de la
+            VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
+            cette date). Le rapport comptable a été corrigé, ce titre-là était
+            resté — et c'est le chiffre qu'on regarde pour déclarer. */}
+        <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="ventes finalisées · daté au jour de la vente"/>
         {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
             afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
         <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'n/d':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?"saisis tes prix d'achat":'argent reçu uniquement'}/>
@@ -5426,17 +5441,21 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
 
       {/* Estimation cotisations du MOIS EN COURS */}
       <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
-        <div style={{fontSize:11,color:C.warn,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
+        {/* ⚠️ TROIS COULEURS DANS UN BLOC DE SIX LIGNES (titre ambre, montant
+            ambre, net bleu). Ces cotisations ne sont pas une alerte : c'est une
+            estimation qu'on lit une fois par mois. Encre partout — la couleur
+            reste pour ce qu'on doit rattraper. */}
+        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
           🧾 À payer pour {moisCourant.nom} ({String(tauxUrssaf()).replace('.',',')} % du CA finalisé)
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Somme à payer ce mois</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.warn}}>{fmt(urssafEstime)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{fmt(urssafEstime)}</div>
           </div>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net estimé après paiement</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.accent}}>{fmt(netApresUrssaf)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{fmt(netApresUrssaf)}</div>
           </div>
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
@@ -5527,7 +5546,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
           {bestDayCA&&(
             <Card style={{flex:1,minWidth:160,background:C.card,borderColor:C.border}}>
-              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🏆 Meilleur jour encaissé</div>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>🏆 Meilleur jour</div>
               <div style={{fontSize:20,fontWeight:600,color:C.warn}}>{fmt(bestDayCA[1].ca)}</div>
               <div style={{fontSize:11,color:C.muted,marginTop:4}}>{bestDayCA[0]} · {bestDayCA[1].count} vente{bestDayCA[1].count>1?'s':''}</div>
             </Card>
@@ -5548,7 +5567,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         const sel=caHistory.find(h=>h.key===selMonthEnc);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>💰 Évolution du CA encaissé (argent reçu, 12 derniers mois)</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>💰 Évolution du CA (ventes finalisées, 12 derniers mois)</div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche une barre pour voir le détail des ventes du mois.</div>
             <div style={{display:'flex',alignItems:'flex-end',gap:6,height:150,paddingTop:10}}>
               {caHistory.map((h,i)=>{
@@ -5667,11 +5686,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
               <div style={{fontSize:13,fontWeight:600,color:C.blue,marginBottom:6}}>📅 Récap semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
                 <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
-                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>encaissé</span></span>
+                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
-                <div style={{fontSize:11,color:up?C.accent:C.danger,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} encaissés</span></div>
+                <div style={{fontSize:11,color:up?C.accent:C.danger,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
               ); })()}
             </div>
             <button type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
@@ -5688,7 +5707,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
               <div style={{fontSize:13,fontWeight:600,color:C.purple,marginBottom:6}}>📆 Récap {monthlyRecapData.nom}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
                 <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
-                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>encaissé</span></span>
+                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
               </div>
             </div>
@@ -6075,7 +6094,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
         <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:500,width:'100%'}}>
           📅 {moisVentes.nom} — mois en cours
         </div>
-        <div><span style={{fontSize:11,color:C.muted}}>CA encaissé</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
+        <div><span style={{fontSize:11,color:C.muted}}>CA finalisé</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
         <div><span style={{fontSize:11,color:C.muted}}>Bénéfice</span><div style={{fontSize:20,fontWeight:600,color:moisVentes.profit>=0?C.accent:C.danger}}>{fmt(moisVentes.profit)}</div></div>
         <div><span style={{fontSize:11,color:C.muted}}>Ventes</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
       </div>
@@ -14828,7 +14847,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let y=800; const T=(t,x,s,f,c)=>page.drawText(String(t),{x,y,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
     T('Rapport comptable',40,22,bold,rgb(0,0.47,0.51)); y-=22; T(R.monthLabel+'  ·  '+(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur'),40,11,reg,rgb(0.4,0.4,0.4)); y-=28;
     const kv=(k,v,big)=>{ T(k,40,9,reg,rgb(0.45,0.45,0.45)); page.drawText(String(v),{x:40,y:y-14,size:big?15:12,font:big?bold:reg,color:rgb(0.1,0.1,0.1)}); y-=big?36:30; };
-    kv('Chiffre d\'affaires encaissé', R.ca.toFixed(2)+' EUR', true);
+    kv('Chiffre d\'affaires des ventes finalisees', R.ca.toFixed(2)+' EUR', true);
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
     if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
@@ -16261,7 +16280,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     vente sur un écran qui en porte des dizaines. Les quatre
                     segments suffisent à montrer l'avancement. */
                  <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}
-                      title={[1,2,3,4].map(i=>['À expédier','Expédiée','Livrée','Encaissée'][i-1]).join(' → ')}>
+                      title={[1,2,3,4].map(i=>['À expédier','Expédiée','Livrée','Finalisée'][i-1]).join(' → ')}>
                    {[1,2,3,4].map(idx=>(
                      <div key={idx} style={{flex:1,height:4,borderRadius:3,background:vs.step>=idx?vs.color:C.border}}/>
                    ))}
@@ -21230,7 +21249,7 @@ function RegimeSetting() {
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>Adapte le rapport comptable à ta situation.</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA encaissé, bénéfice net, estimation des cotisations.'],
+        {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA des ventes finalisées, bénéfice net, estimation des cotisations.'],
           ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
           <button key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:3,cursor:'pointer',
             border:`1px solid ${regime===id?C.accent:C.border}`,background:regime===id?`${C.accent}12`:'transparent'}}>
