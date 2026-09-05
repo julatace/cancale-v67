@@ -101,12 +101,23 @@ const AGENERER = 'Le paiement a été validé';
     await b.ctx.genererBordereauxEnAttente('111');
     dit(!b.demandes.includes('21000006'), 'vente remboursée → on ne cherche rien', b.demandes.join(',') || 'aucune');
   }
-  // 7. LE PLAFOND PAR VISITE TIENT (3).
+  // 7. LE PLAFOND PAR VISITE TIENT — quelle que soit sa valeur.
+  // ⚠️ On ne fige PAS le chiffre : il a bougé de 3 à 6 (§5.88) et il rebougera.
+  // Ce qu'on vérifie, c'est qu'un plafond EXISTE et qu'il est respecté à
+  // l'unité près : on donne deux ventes de plus que le plafond et on compte.
   {
-    const b = banc({ ventes: [V('21000011', EXPEDIE, 1), V('21000012', EXPEDIE, 2), V('21000013', EXPEDIE, 3), V('21000014', EXPEDIE, 4), V('21000015', EXPEDIE, 5)] });
+    const cap = Number(/const BORD_MAX_PAR_VISITE = (\d+)/.exec(src)[1]);
+    const ventes = [];
+    for (let k = 0; k < cap + 2; k++) ventes.push(V('2100001' + k, EXPEDIE, k + 1));
+    const b = banc({ ventes });
     await b.ctx.genererBordereauxEnAttente('111');
     const n = new Set(b.demandes).size;
-    dit(n === 3, '5 ventes en retard → 3 par visite, pas plus', `${n} demandée(s)`);
+    dit(n === cap, `${cap + 2} ventes en retard → ${cap} par visite, pas plus`, `${n} demandée(s)`);
+    // ⚠️ Le plafond par visite ne doit JAMAIS dépasser le plafond horaire :
+    // sinon une seule visite épuiserait le garde-fou anti-blocage (§48).
+    const heure = Number(/const ACTIONS_MAX_HEURE = (\d+)/.exec(src)[1] || 0);
+    dit(heure > 0 && cap <= heure,
+      `le plafond par visite (${cap}) reste sous le plafond horaire (${heure})`);
   }
   // 8. PRIORITÉ : ce qui attend TON envoi passe devant l'historique.
   {

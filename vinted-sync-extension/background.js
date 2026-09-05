@@ -351,50 +351,82 @@ async function logActivity(text) {
 // abandon, par type. Aucune donnée personnelle : des nombres.
 // Conséquence concrète : sans fiche article, pas de description → « Republier »
 // obligerait à tout retaper. C'est le vrai blocage de cette fonction.
-const _diag = { n: {}, dernier: 0 };
+// ⚠️⚠️ L'INSTRUMENTATION NE SURVIVAIT PAS AU SERVICE WORKER (2 septembre).
+// `_diag.n` et `_rates` étaient des variables de MODULE, écrites en base au plus
+// une fois par minute. Or Chrome tue un service worker MV3 après ~30 s
+// d'inactivité : le tampon mourait donc AVANT le flush, et les compteurs comme
+// les échantillons partaient avec lui.
+// PREUVE DIRECTE EN BASE, pas une hypothèse : `recupererLabel` pose TROIS
+// échantillons dans la même boucle (label_url, shipments/{id}, label_options),
+// à quelques centaines de millisecondes d'intervalle. Le premier écrivait et
+// consommait le quota d'une minute ; les deux suivants étaient jetés. En base,
+// `rates` ne contient QUE `label_label_url` — jamais `label` ni
+// `label_label_options`. C'est exactement pour ça qu'après trois sessions
+// d'instrumentation on ne connaissait toujours la forme d'AUCUNE de ces
+// réponses : on ne pouvait pas la capturer.
+// Même dégât sur les compteurs : `label_url_trouve = 6` pour `label_envoye = 2`
+// sans aucun compteur d'échec entre les deux — les deltas manquants n'ont jamais
+// été flushés.
+// ➡️ LE TAMPON VIT DÉSORMAIS DANS `chrome.storage.local` : local, gratuit, zéro
+// égress, et il SURVIT à la mort du worker. Le throttle ne protège plus que
+// l'écriture Supabase ; il ne peut plus rien perdre.
+const DIAG_BUF = 'vrmDiagBuf';
+let _diagChaine = Promise.resolve();   // sérialise les lecture-modification-écriture
+let _diagFlushAt = 0;
+
+// Toute modification du tampon passe par ici : deux appels concurrents feraient
+// sinon un lire-modifier-écrire croisé et perdraient des incréments.
+function majTampon(fn) {
+  _diagChaine = _diagChaine.then(async () => {
+    let buf = {};
+    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) {}
+    buf.n = buf.n || {}; buf.rates = buf.rates || {};
+    fn(buf);
+    try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
+    // Le flux Supabase reste throttlé — mais s'il ne part pas, rien n'est perdu.
+    if (Date.now() - _diagFlushAt < 60000) return;
+    _diagFlushAt = Date.now();
+    await viderTampon(buf);
+  }).catch(() => {});
+  return _diagChaine;
+}
+
+// Envoie le tampon en base et ne le vide QUE si l'écriture a abouti.
+async function viderTampon(buf) {
+  const aDesN = Object.keys(buf.n || {}).length, aDesR = Object.keys(buf.rates || {}).length;
+  if (!aDesN && !aDesR) return;
+  const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
+  const tout = (rows && rows[0] && rows[0].data) || {};
+  const n = { ...(tout.n || {}) };
+  for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
+  // ⚠️ ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
+  // `rates` — les échantillons de réponses ratées. Et comme les compteurs
+  // partent à chaque capture (des centaines de fois par jour) alors qu'un
+  // échantillon n'est posé que sur un échec, la preuve était détruite dans la
+  // minute (constaté le 24 août).
+  await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
+    ...tout, n, rates: { ...(tout.rates || {}), ...(buf.rates || {}) }, majAt: new Date().toISOString(),
+  } }], 'id');
+  buf.n = {}; buf.rates = {};
+  try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
+}
+
 // Un exemplaire par type, écrasé à chaque fois (pas d'accumulation).
-const _rates = {};
-let _ratesEcritAt = 0;
 async function echantillonRate(type, id, body) {
-  try {
-    const t = String(type || 'inconnu');
-    _rates[t] = {
+  const t = String(type || 'inconnu');
+  return majTampon((buf) => {
+    buf.rates[t] = {
       id: String(id == null ? '' : id).slice(0, 40),
       taille: body == null ? null : String(body).length,
       type: typeof body,
       tete: String(body == null ? '' : body).slice(0, 160),
       at: new Date().toISOString(),
     };
-    if (Date.now() - _ratesEcritAt < 60000) return;
-    _ratesEcritAt = Date.now();
-    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-    const cur = (rows && rows[0] && rows[0].data) || {};
-    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { ...cur, rates: { ...(cur.rates || {}), ..._rates } } }], 'id');
-  } catch (_) {}
+  });
 }
 
 async function noterDiag(cle) {
-  try {
-    _diag.n[cle] = (_diag.n[cle] || 0) + 1;
-    // On n'écrit qu'une fois par minute (le compteur vit en mémoire entre-temps).
-    if (Date.now() - _diag.dernier < 60000) return;
-    _diag.dernier = Date.now();
-    const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-    const tout = (rows && rows[0] && rows[0].data) || {};
-    const cur = tout.n || {};
-    const n = { ...cur };
-    for (const k in _diag.n) n[k] = (n[k] || 0) + _diag.n[k];
-    _diag.n = {};
-    // ⚠️ ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
-    // `rates` — les échantillons de réponses ratées gardés par
-    // `echantillonRate`. Et comme `noterDiag` part à chaque capture (des
-    // centaines de fois par jour) alors qu'un échantillon n'est posé que sur un
-    // échec, la preuve était détruite dans la minute. Constaté le 24 août :
-    // `rates: {}` en base alors que `abandon_json_item` était à 73 et
-    // `label_url_introuvable` à 1 — l'instrumentation détruisait ses propres
-    // preuves, donc on ne pouvait pas expliquer les échecs qu'elle comptait.
-    await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: { ...tout, n, majAt: new Date().toISOString() } }], 'id');
-  } catch (_) {}
+  return majTampon((buf) => { buf.n[cle] = (buf.n[cle] || 0) + 1; });
 }
 
 // Le dressing qui arrive est-il au moins aussi riche que celui déjà en base ?
@@ -497,6 +529,10 @@ async function storeHarvest(domain, type, id, body) {
   // (`minimum_price`) avait REMPLACÉ le vrai solde d'un compte — il n'y a qu'une
   // ligne `harvest_{uid}_billing`, donc la dernière réponse gagne. On n'écrit
   // que ce qui porte vraiment un montant de porte-monnaie.
+  // Le RELEVÉ part dans sa propre ligne, AVANT le tri ci-dessous : une réponse
+  // peut porter les mouvements sans porter de solde, et il n'y a qu'une ligne
+  // `billing` par compte — c'est elle qui écrasait le relevé (§5.91).
+  if (type === 'billing') { try { await storeReleve(uid, parsed, domain); } catch (_) {} }
   if (type === 'billing' && !estPorteMonnaie(parsed)) { noterDiag('ignore_billing_hors_sujet'); return; }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
@@ -739,6 +775,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: r2.ok, envoye: r2.ok, error: r2.ok ? '' : (r2.raison || 'échec') });
             return;
           }
+          // « Je vais le télécharger moi-même » : on note pour quelle vente,
+          // pour que le PDF capté par `chrome.downloads` soit relié à ELLE et
+          // pas laissé sans identité (cas mesuré : 2 colis à la fois).
+          if (msg.action === 'attendreBord') { sendResponse(await attendreBordereau(msg.uid, msg.tx)); return; }
           // Lire la fiche d'une de TES annonces (description, catégorie) pour
           // pouvoir la republier sans tout retaper. Lecture seule.
           if (msg.action === 'capterAnnonce') { const r = await capterAnnonce(msg.uid, msg.itemId); sendResponse(r); return; }
@@ -907,15 +947,50 @@ async function storeWriteReq(domain, method, url, body) {
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
 }
 
+// ⚠️ LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ QUAND IL Y EN A DEUX.
+// `storeLabel` n'attribue le PDF que s'il n'existe QU'UN seul colis possible
+// (règle juste : on ne devine jamais, §24). Mais mesuré le 2 septembre :
+// `tomj606` a EXACTEMENT DEUX ventes qui attendent l'envoi et dont aucun
+// bordereau n'a pu être récupéré — donc même en les téléchargeant à la main,
+// aucun des deux n'était relié à sa vente, et le second écrasait le premier
+// dans `label_latest`. C'est précisément le compte dont Julien se plaint.
+// ➡️ Quand c'est NOUS qui l'envoyons télécharger UNE vente précise (le bouton
+// « Télécharger sur Vinted » du panneau), on sait laquelle : on pose un rendez-
+// vous. Ce n'est pas une devinette — c'est l'identité de la vente qu'il vient
+// d'ouvrir, sur SON clic. Court (15 min) et à usage unique.
+const BORD_ATTENDU = 'vrmBordAttendu';
+const BORD_ATTENDU_MS = 15 * 60 * 1000;
+
+async function attendreBordereau(uid, tx) {
+  if (!uid || !tx) return { ok: false };
+  try { await chrome.storage.local.set({ [BORD_ATTENDU]: { uid: String(uid), tx: String(tx), at: Date.now() } }); } catch (_) {}
+  return { ok: true };
+}
+
+// Le rendez-vous vaut-il pour ce compte, et est-il encore frais ? Usage unique :
+// on l'efface en le consommant, pour qu'un PDF suivant ne reprenne pas la même
+// identité.
+async function bordereauAttendu(uid) {
+  try {
+    const s = await chrome.storage.local.get(BORD_ATTENDU);
+    const a = s && s[BORD_ATTENDU];
+    if (!a || String(a.uid) !== String(uid)) return null;
+    if (Date.now() - (a.at || 0) > BORD_ATTENDU_MS) return null;
+    await chrome.storage.local.remove(BORD_ATTENDU);
+    return String(a.tx);
+  } catch (_) { return null; }
+}
+
 // Range le dernier bordereau (PDF) telecharge, pour que l'app le tamponne.
 async function storeLabel(domain, url, b64) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
   // À quel colis appartient ce PDF ? Le téléchargement ne le dit pas. On ne
-  // DEVINE pas (§24) : on ne l'attribue que s'il n'y a QU'UN SEUL colis possible
+  // DEVINE pas (§24) : soit on l'a envoyé télécharger CETTE vente-là (rendez-
+  // vous ci-dessus, identité certaine), soit il n'y a QU'UN SEUL colis possible
   // pour ce compte — là ce n'est plus une supposition, c'est le seul candidat.
-  let tx = null;
-  try {
+  let tx = await bordereauAttendu(uid);
+  if (!tx) try {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const dejaCapte = new Set();
@@ -1241,6 +1316,191 @@ function alleger(type, payload) {
 const MONTANTS_PM = ['main', 'escrow', 'balance', 'pending_balance'];
 const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some(k => p[k] && p[k].amount != null));
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LE RELEVÉ DU PORTE-MONNAIE : l'argent réellement crédité, DATÉ
+// ══════════════════════════════════════════════════════════════════════════════
+// §5.88 avait nommé ça « le vrai chantier suivant » : pour sa déclaration,
+// Julien doit compter l'argent REÇU, alors que l'app ne sait dater que la VENTE
+// (7 jours d'écart en médiane, jusqu'à 25). La date de finalisation n'existe
+// nulle part dans la moisson des commandes.
+// MESURÉ EN BASE avant de coder (méthode §46) : la réponse de
+// `/api/v2/users/{id}/payouts` — que l'extension appelle DÉJÀ à chaque moisson
+// — porte le relevé complet, et personne ne le lisait (même famille que §5.26) :
+//   starting_date  : "2026-08-01"                     ← le mois du relevé
+//   history        : [{year:2026, month:7, …}]        ← les mois consultables
+//   invoice_lines  : [{ id, date:"2026-08-07T18:02:15Z", type:"credit",
+//                       title:"Transfert vers le compte bancaire",
+//                       amount:{amount:"-54.0"}, pending, entity_type:"payout" }]
+// ⚠️ POURQUOI ON CAPTE SANS RIEN CALCULER. Le seul exemplaire observé est un
+// VIREMENT SORTANT vers sa banque — et il porte `type:"credit"`. Donc « credit »
+// ne veut PAS dire « recette », et la forme d'une ligne de VENTE n'a jamais été
+// vue. Bâtir un chiffre de déclaration là-dessus serait deviner, exactement ce
+// que §22/§5.23 s'interdisent : un montant faux ne se voit pas. On capte
+// d'abord, on mesurera sur du vrai ensuite.
+// ⚠️ ET SURTOUT : il n'y a qu'UNE ligne `harvest_{uid}_billing`, donc la
+// dernière réponse gagne (§5.14). Le porte-monnaie de la page renvoie
+// `{main,escrow}` et écrase donc le relevé de `payouts` — c'est pour ça qu'AUCUN
+// compte vivant ne porte d'`invoice_lines` aujourd'hui alors que l'appel est
+// fait à chaque visite. Le relevé a donc sa PROPRE ligne, une par mois.
+const RELEVE_MAX_PAR_VISITE = 2;
+const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
+
+// Un mouvement, réduit à ce qui l'identifie et le date. On ne garde pas le
+// libellé complet ni les champs de présentation : ces lignes repartent à chaque
+// lecture (§34), et un relevé se lit sur la date, le sens et le montant.
+function ligneReleve(l) {
+  if (!l || typeof l !== 'object') return null;
+  const brut = l.amount && typeof l.amount === 'object' ? l.amount.amount : l.amount;
+  const n = parseFloat(String(brut == null ? '' : brut).replace(',', '.'));
+  if (!isFinite(n)) return null;                       // sans montant, ce n'est pas un mouvement
+  const d = l.date || l.created_at || l.updated_at || null;
+  return {
+    id: l.id != null ? String(l.id) : undefined,
+    date: d ? String(d) : undefined,
+    montant: n,
+    type: l.type ? String(l.type).slice(0, 40) : undefined,
+    quoi: l.entity_type ? String(l.entity_type).slice(0, 40) : undefined,
+    ref: l.entity_id != null ? String(l.entity_id) : undefined,
+    titre: l.title ? String(l.title).slice(0, 80) : undefined,
+    attente: l.pending === true ? true : undefined,
+  };
+}
+
+// Le mois que ce relevé décrit. `starting_date` fait foi (c'est Vinted qui le
+// dit) ; à défaut on prend le mois du mouvement le plus récent. Jamais la date
+// du jour : un relevé de juillet capté en septembre n'est pas un relevé de
+// septembre.
+function moisDuReleve(p) {
+  const sd = p && p.starting_date;
+  if (sd && /^\d{4}-\d{2}/.test(String(sd))) return String(sd).slice(0, 7);
+  const l = (p && Array.isArray(p.invoice_lines) ? p.invoice_lines : [])
+    .map(x => x && x.date).filter(Boolean).sort();
+  const der = l[l.length - 1];
+  return der && /^\d{4}-\d{2}/.test(String(der)) ? String(der).slice(0, 7) : null;
+}
+
+// Range le relevé dans SA ligne, une par compte et par mois. Appelé depuis les
+// deux voies d'écriture (§5.27 : un garde-fou vit dans la fonction qui écrit).
+// Aucune requête Vinted ajoutée : c'est la réponse qu'on a déjà sous la main.
+async function storeReleve(uid, payload, domain) {
+  try {
+    const lignes = payload && Array.isArray(payload.invoice_lines) ? payload.invoice_lines : null;
+    if (!lignes || !lignes.length) return false;
+    const mois = moisDuReleve(payload);
+    if (!mois) { noterDiag('releve_sans_mois'); echantillonRate('releve', String(uid), JSON.stringify(payload).slice(0, 400)); return false; }
+    const propres = lignes.map(ligneReleve).filter(Boolean);
+    if (!propres.length) { noterDiag('releve_sans_montant'); return false; }
+    // ⚠️ On n'écrase un relevé que par un relevé AU MOINS aussi complet — même
+    // règle que le dressing (§5.13) : `invoice_lines_has_more` dit que Vinted
+    // en a gardé sous le coude, et une réponse tronquée ne doit pas remplacer
+    // une réponse entière.
+    const rowId = `harvest_${uid}_releve_${mois}`;
+    try {
+      const av = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=n:data->>nLignes`);
+      const avant = Number(av && av[0] && av[0].n);
+      if (isFinite(avant) && avant > propres.length) { noterDiag('ignore_releve_partiel'); return false; }
+    } catch (_) {}
+    // ⚠️ `supabaseUpsert` pose DÉJÀ le propriétaire et choisit la cible du
+    // conflit (§12) : rappeler `withOwner` ici écrivait une Promise à la place
+    // du relevé — la ligne partait avec un `data` VIDE, et ni le build ni
+    // `node --check` ne le voyaient. C'est le banc qui l'a attrapé.
+    const ok = await supabaseUpsert('app_data', [{
+      id: rowId,
+      data: {
+        type: 'releve', uid: String(uid), mois, domain: domain || 'www.vinted.fr',
+        capturedAt: new Date().toISOString(),
+        nLignes: propres.length,
+        complet: payload.invoice_lines_has_more === false ? true : undefined,
+        // ⚠️ LE RÉSUMÉ EST CALCULÉ ICI, À LA CAPTURE — même motif que le widget
+        // (§5.14) : un mois chargé pèse des dizaines de Ko par compte, et l'app
+        // n'a besoin que de trois nombres. Elle les lira en SCALAIRES (§34) ;
+        // le détail ne repart que quand on ouvre vraiment le relevé.
+        // Ce sont trois FAITS arithmétiques, pas une interprétation : la seule
+        // chose que Vinted nous dit avec certitude, c'est qu'un mouvement
+        // `entity_type:"payout"` est un virement vers SA banque (donc un
+        // déplacement entre ses propres comptes, jamais une recette).
+        resume: {
+          virements: +propres.filter(l => l.quoi === 'payout').reduce((a, l) => a + l.montant, 0).toFixed(2),
+          entrees: +propres.filter(l => l.quoi !== 'payout' && l.montant > 0).reduce((a, l) => a + l.montant, 0).toFixed(2),
+          sorties: +propres.filter(l => l.quoi !== 'payout' && l.montant < 0).reduce((a, l) => a + l.montant, 0).toFixed(2),
+          n: propres.length,
+        },
+        lignes: propres,
+      },
+    }], 'id');
+    noterDiag(ok === false ? 'releve_ecriture_ratee' : 'releve_ecrit');
+    return ok !== false;
+  } catch (_) { return false; }
+}
+
+// Les mois PASSÉS. `history` les liste ; on va les chercher un par un, sur le
+// compte connecté, avec les mêmes garde-fous que partout (§48) : plafond
+// horaire, compte connecté, N par visite, pas de nouvel essai avant 24 h.
+// ⚠️ LE PARAMÈTRE N'A JAMAIS ÉTÉ OBSERVÉ. On tente `?year=&month=` ; si Vinted
+// l'ignore, il rend le mois COURANT — on le voit à `starting_date`, on garde un
+// échantillon et ON ARRÊTE (`vrmReleveMuet`). Boucler sur un endpoint qui
+// ignore nos paramètres, ce serait des requêtes pour rien dans l'empreinte du
+// compte, et c'est exactement ce que §5.52 a dû retirer après 73 échecs.
+async function capterReleves(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const muet = (await chrome.storage.local.get('vrmReleveMuet')).vrmReleveMuet || {};
+    if (muet[String(uid)]) return 0;                    // ce compte a déjà prouvé que le paramètre ne passe pas
+    // Ce qu'on a déjà (une seule lecture, deux scalaires — jamais le payload).
+    let cur = [];
+    try { cur = await sbGet(`app_data?id=like.harvest_${uid}_releve_*&select=m:data->>mois`); } catch (_) {}
+    const dejaMois = new Set((cur || []).map(r => r && r.m).filter(Boolean));
+    const bill = await sbGet(`app_data?id=eq.harvest_${uid}_billing&select=h:data->payload->history`);
+    const hist = (bill && bill[0] && bill[0].h) || [];
+    if (!Array.isArray(hist) || !hist.length) return 0;
+    // ⚠️ LE DRESSING ET LE PORTE-MONNAIE UTILISENT L'ID DE PROFIL, PAS
+    // L'IDENTIFIANT DE COMPTE (§7 : sans ça, 0 annonce — et ici, 0 relevé).
+    // `vinted_accounts` ne porte PAS ce champ : il vit dans la réponse
+    // `users/current` déjà moissonnée. On le lit en SCALAIRE (§34), zéro
+    // requête Vinted ajoutée.
+    let pid = null;
+    try {
+      const pr = await sbGet(`app_data?id=eq.harvest_${uid}_profile&select=pid:data->payload->user->>id`);
+      pid = (pr && pr[0] && pr[0].pid) || null;
+    } catch (_) {}
+    const memo = (await chrome.storage.local.get('vrmReleveFaits')).vrmReleveFaits || {};
+    let n = 0;
+    // Du plus récent au plus ancien : c'est le mois qu'il déclare qui compte.
+    const voulus = hist
+      .filter(h => h && h.year && h.month)
+      .map(h => ({ y: Number(h.year), m: Number(h.month), cle: `${h.year}-${String(h.month).padStart(2, '0')}` }))
+      .filter(h => !dejaMois.has(h.cle))
+      .sort((a, b) => b.cle.localeCompare(a.cle));
+    for (const v of voulus) {
+      if (n >= RELEVE_MAX_PAR_VISITE) break;
+      const k = `${uid}_${v.cle}`;
+      if (memo[k] && Date.now() - Number(memo[k]) < RELEVE_RETRY_MS) continue;
+      const refus = await garde(uid, acc);
+      if (refus) { logActivity(`⚠️ Relevé non lu : ${refus.error}`); break; }
+      memo[k] = Date.now();
+      n++;
+      if (!pid) { noterDiag('releve_sans_profil'); break; }
+      const rep = await vintedGet(acc, `/api/v2/users/${encodeURIComponent(pid)}/payouts?year=${v.y}&month=${v.m}`);
+      if (!rep.ok || !rep.json) { noterDiag(`releve_refuse_${rep.status}`); continue; }
+      const recu = moisDuReleve(rep.json);
+      // Le mois rendu n'est pas celui demandé ⟹ le paramètre est ignoré.
+      if (recu && recu !== v.cle) {
+        noterDiag('releve_parametre_ignore');
+        echantillonRate('releve_mois', v.cle, JSON.stringify({ demande: v.cle, recu, starting_date: rep.json.starting_date }).slice(0, 300));
+        muet[String(uid)] = Date.now();
+        await chrome.storage.local.set({ vrmReleveMuet: muet });
+        break;
+      }
+      await storeReleve(uid, rep.json, 'www.vinted.fr');
+    }
+    await chrome.storage.local.set({ vrmReleveFaits: memo });
+    return n;
+  } catch (_) { return 0; }
+}
+
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1393,6 +1653,9 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // Mesuré en base : 4 comptes sur 8 avaient un `payload: {}`, donc leur argent
   // en attente n'apparaissait nulle part. Un garde-fou doit vivre dans la
   // fonction qui écrit, pas chez ceux qui l'appellent.
+  // Idem côté moisson active — depuis le payload BRUT : l'allègement ne touche
+  // pas `billing` aujourd'hui, mais un relevé ne doit pas dépendre de ça.
+  if (type === 'billing') { try { await storeReleve(uid, brut, domain); } catch (_) {} }
   if (type === 'billing' && !estPorteMonnaie(payload)) return;
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
@@ -1763,6 +2026,10 @@ try {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
     else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
+    // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
+    // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
+    // une longue période calme attendrait la prochaine capture pour être écrit.
+    majTampon(() => {});
   });
 } catch (_) {}
 
@@ -1806,6 +2073,9 @@ async function rafraichirVentes(uid) {
   const sold = await fetchAllOrders(acc, 'sold');
   if (!sold || !sold.my_orders || !sold.my_orders.length) return false;
   await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
+  // ⚠️ On vient d'écrire des ventes FRAÎCHES : tout ce que le mémo de visite
+  // garde sur ce compte est périmé à la milliseconde près. On le vide.
+  viderMemoVisite(uid);
   noterDiag('ventes_rafraichies');
   return true;
 }
@@ -1814,37 +2084,43 @@ async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
-    const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
-    const der = Number(st[uid] || 0);
-    // ⚠️ LE GARDE COURT NE SAUTE PLUS LES VENTES. Avant, un `return` sec ici
-    // faisait qu'une vente conclue il y a deux minutes n'était pas captée tant
-    // qu'on n'avait pas laissé passer 5 min — et le récap ne pouvait rien dire.
-    if (Date.now() - der < VISITE_DELAI_MS) {
-      const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
-      if (Date.now() - Number(dv[uid] || 0) < VENTES_DELAI_MS) return;
+
+    // ═══ 1. CE QU'IL ATTEND, TOUT DE SUITE ═══════════════════════════════
+    // ⚠️ ORDRE INVERSÉ (Julien, 3 septembre : « quand je me connecte, que ça me
+    // demande plus vite de générer le bordereau »). Avant, la vente, le
+    // bordereau et le récap arrivaient APRÈS `runActive()` — une moisson
+    // COMPLÈTE : dressing jusqu'à 7 pages avec pauses, achats, boîte,
+    // porte-monnaie. Le récap pouvait donc mettre une minute à s'afficher
+    // alors que la vente ne demande QU'UNE requête (`my_orders?type=sold`).
+    // Ce bloc ne coûte rien de plus : ce sont les mêmes appels, simplement
+    // placés avant le lourd. Rien à voir avec un « rythme humain » (§32).
+    const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
+    if (Date.now() - Number(dv[uid] || 0) >= VENTES_DELAI_MS) {
       dv[uid] = Date.now();
       await chrome.storage.local.set({ vrmDerniereVente: dv });
       try { await rafraichirVentes(uid); } catch (_) {}
-      const g = await genererBordereauxEnAttente(uid);
-      await proposerBordereaux(uid, g);
-      return;
     }
+    // ⚠️ LA VISITE GÉNÈRE, TOUTE SEULE (Julien, 27 août puis 3 septembre :
+    // « que ça envoie direct dans l'app sans me demander »). Cohérent avec
+    // §5.29 : générer un bordereau n'engage AUCUN argent et ne décide de rien
+    // — la vente est faite, le colis doit partir. Tous les garde-fous restent :
+    // compte connecté uniquement, 20 actions/h, plafond par visite, pas de
+    // nouvel essai avant 6 h.
+    const genes = await genererBordereauxEnAttente(uid);
+    // Le récap arrive APRÈS la génération : il ANNONCE ce qui est parti dans
+    // l'app. Il ne demande plus rien (§5.88).
+    await proposerBordereaux(uid, genes);
+
+    // ═══ 2. LE RESTE, ENSUITE ════════════════════════════════════════════
+    // Le garde de 5 min ne protège plus que la moisson COMPLÈTE — c'est elle
+    // qui est lourde, et refaire dix fois la même en naviguant de page en page
+    // n'apporte rien (§5.19).
+    const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
+    if (Date.now() - Number(st[uid] || 0) < VISITE_DELAI_MS) return;
     st[uid] = Date.now();
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     const ok = await runActive();
     logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
-    // ⚠️ LA VISITE GÉNÈRE À NOUVEAU, TOUTE SEULE (Julien, 27 août) : « une fois
-    // que la vente a été faite, je veux que le bordereau soit automatiquement
-    // envoyé dans l'app ». C'est un retour en arrière assumé sur §5.32 — c'est
-    // sa décision, et elle est cohérente avec §5.29 : générer un bordereau
-    // n'engage AUCUN argent et ne décide de rien (la vente est faite, le colis
-    // doit partir). Tous les garde-fous restent : compte connecté uniquement,
-    // 20 actions/h, 3 par visite, pas de nouvel essai avant 6 h.
-    const genes = await genererBordereauxEnAttente(uid);
-    // Le récap arrive APRÈS la génération : il annonce ce qui est parti dans
-    // l'app, et ne pose la question que pour ce qui n'a PAS pu être généré
-    // (compte non connecté, plafond atteint, adresse inconnue).
-    await proposerBordereaux(uid, genes);
     // ⚠️ APRÈS la moisson : les offres viennent des conversations captées, donc
     //    travailler avant la capture reviendrait à décider sur des données
     //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
@@ -1853,6 +2129,10 @@ async function visiteVinted() {
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
     await capterRetraits(uid);
+    // ⚠️ APRÈS la moisson : le mois COURANT vient d'être capté gratuitement par
+    // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
+    // PASSÉS encore absents, deux par visite au plus.
+    await capterReleves(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
@@ -1862,20 +2142,21 @@ async function visiteVinted() {
 // Vinted les a rendues à la dernière moisson. Lecture seule, aucun appel Vinted.
 async function ventesSansBordereau(uid) {
   try {
-    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    const rows = await sbGetMemo(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const cand = ventes.filter(o => o && o.transaction_id != null && aGenererBordereau(o.status));
     if (!cand.length) return [];
-    // Un bordereau déjà reçu par email prouve qu'il existe : rien à proposer.
+    // Un bordereau déjà reçu par email — ou déjà capté — prouve qu'il existe :
+    // rien à proposer. ⚠️ LES DEUX LECTURES PARTENT EN MÊME TEMPS : elles ne
+    // dépendent pas l'une de l'autre, les enchaîner ajoutait un aller-retour
+    // réseau au temps que le récap fait attendre.
     const deja = new Set();
-    try {
-      const mails = await sbGet('app_data?id=like.email_bord_*&select=tx:data->>transaction');
-      for (const m of (mails || [])) if (m && m.tx) deja.add(String(m.tx));
-    } catch (_) {}
-    try {
-      const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
-      for (const r of (cur || [])) if (r && r.tx) deja.add(String(r.tx));
-    } catch (_) {}
+    const [mails, cur] = await Promise.all([
+      sbGetMemo('app_data?id=like.email_bord_*&select=tx:data->>transaction').catch(() => null),
+      sbGetMemo(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`).catch(() => null),
+    ]);
+    for (const m of (mails || [])) if (m && m.tx) deja.add(String(m.tx));
+    for (const r of (cur || [])) if (r && r.tx) deja.add(String(r.tx));
     return cand.filter(o => !deja.has(String(o.transaction_id)))
       // ⚠️ La photo se lit ICI, pas via un helper d'une autre portée :
       //    `photoDeCommande` vit dans `buildPanelData` — l'appeler d'ici lèverait
@@ -1909,12 +2190,20 @@ async function nouveautes(uid) {
   const memo = (await recapVu())[String(uid)] || null;
   out.premiere = !memo;
 
+  // ⚠️ LES QUATRE SOURCES PARTENT EN MÊME TEMPS. Elles ne dépendent pas les
+  // unes des autres : les enchaîner faisait attendre le récap le temps de
+  // QUATRE allers-retours au lieu d'un. Les ventes sont servies par le mémo de
+  // visite (la génération vient de les lire) — donc aucune requête de plus.
+  const [rVentes, rConvs, nOffres, aGen] = await Promise.all([
+    sbGetMemo(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`).catch(() => null),
+    sbGetMemo(`app_data?id=eq.harvest_${uid}_inbox&select=data`).catch(() => null),
+    offresEnAttente(uid).then(l => l.length).catch(() => 0),
+    ventesSansBordereau(uid).catch(() => []),
+  ]);
+
   // 1. LES VENTES — identité = n° de transaction, jamais un titre.
-  let ventes = [];
-  try {
-    const r = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
-    ventes = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.my_orders) || [];
-  } catch (_) {}
+  const ventes = (rVentes && rVentes[0] && rVentes[0].data && rVentes[0].data.payload
+    && rVentes[0].data.payload.my_orders) || [];
   const vus = new Set((memo && memo.ventes) || []);
   for (const o of ventes) {
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
@@ -1928,11 +2217,8 @@ async function nouveautes(uid) {
 
   // 2. LES MESSAGES — une conversation compte comme nouvelle si elle est non
   //    lue ET qu'elle a bougé depuis le dernier récap.
-  let convs = [];
-  try {
-    const r = await sbGet(`app_data?id=eq.harvest_${uid}_inbox&select=data`);
-    convs = (r && r[0] && r[0].data && r[0].data.payload && r[0].data.payload.conversations) || [];
-  } catch (_) {}
+  const convs = (rConvs && rConvs[0] && rConvs[0].data && rConvs[0].data.payload
+    && rConvs[0].data.payload.conversations) || [];
   const vuConv = (memo && memo.convs) || {};
   const convsMaj = {};
   for (const c of convs) {
@@ -1946,10 +2232,10 @@ async function nouveautes(uid) {
   }
 
   // 3. LES OFFRES en attente (argent, et 24 h pour répondre).
-  try { out.offres = (await offresEnAttente(uid)).length; } catch (_) { out.offres = 0; }
+  out.offres = nOffres;
 
   // 4. LES BORDEREAUX À GÉNÉRER — le seul point qui appelle une ACTION.
-  try { out.aGenerer = await ventesSansBordereau(uid); } catch (_) { out.aGenerer = []; }
+  out.aGenerer = aGen;
 
   out._marque = {
     at: Date.now(),
@@ -1958,6 +2244,24 @@ async function nouveautes(uid) {
       .reduce((a, k) => { a[k] = convsMaj[k]; return a; }, {}),
   };
   return out;
+}
+
+// Remet le récap à l'onglet Vinted actif, en laissant au script de la page le
+// temps d'être là. Rend `true` seulement si un onglet l'a VRAIMENT reçu — c'est
+// ce booléen qui autorise à noter « déjà montré » (§5.70).
+const RECAP_ESSAIS = 6, RECAP_PAUSE_MS = 350;
+async function envoyerRecap(charge) {
+  for (let i = 0; i < RECAP_ESSAIS; i++) {
+    let tabs = [];
+    try {
+      tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
+    } catch (_) { tabs = []; }
+    for (const t of tabs) {
+      try { await chrome.tabs.sendMessage(t.id, charge); return true; } catch (_) {}
+    }
+    await new Promise(r => setTimeout(r, RECAP_PAUSE_MS));
+  }
+  return false;
 }
 
 // Envoie le récap à l'onglet Vinted actif. Le panneau (déjà injecté) l'affiche
@@ -1977,22 +2281,27 @@ async function proposerBordereaux(uid, genes) {
     if (!n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length && !n.envoyes) {
       await marquerRecapVu(uid, n._marque); return;
     }
-    const tabs = await chrome.tabs.query({ active: true, url: ['https://www.vinted.fr/*', 'https://vinted.fr/*'] });
+
     // ⚠️ ON NE NOTE « DÉJÀ MONTRÉ » QUE SI LE RÉCAP EST RÉELLEMENT AFFICHÉ.
     // Avant, le mémo partait AVANT l'envoi : si le script de la page n'était pas
     // encore prêt (le cas courant, on arrive 3 s après le chargement), la
     // fenêtre ne s'affichait jamais ET les ventes étaient marquées « vues ».
     // C'est exactement « la génération a du mal à se faire ».
-    let pose = false;
     const charge = {
       __vrm: 'recap', uid: String(uid),
       ventes: n.ventes.slice(0, 12), eur: n.eur, messages: n.messages, offres: n.offres,
       aGenerer: n.aGenerer.slice(0, 8), envoyes: n.envoyes,
+      // pourquoi il en reste, quand il en reste (jamais une question, §5.88)
+      bloque: (dernierBlocage[String(uid)] && Date.now() - dernierBlocage[String(uid)].at < 30 * 60 * 1000)
+        ? dernierBlocage[String(uid)] : null,
     };
-    for (const t of tabs) {
-      try { await chrome.tabs.sendMessage(t.id, charge); pose = true; } catch (_) {}
-    }
-    if (!pose) return;
+    // ⚠️ ON ATTEND QUE L'ONGLET SOIT PRÊT À RECEVOIR, au lieu d'abandonner.
+    // On part maintenant 250 ms après le chargement (au lieu de 1,2 s) : le
+    // script de la page peut ne pas être encore injecté à cet instant précis.
+    // Sans ces quelques essais, le récap serait simplement perdu — le défaut
+    // exact de §5.70. Ce n'est PAS un rythme déguisé (§32) : aucune requête ne
+    // part vers Vinted ici, on parle à notre propre onglet.
+    if (!(await envoyerRecap(charge))) return;
     await marquerRecapVu(uid, n._marque);
   } catch (_) {}
 }
@@ -2013,8 +2322,14 @@ try {
     if (!/^https:\/\/(www\.)?vinted\.(fr|com|it|de)\//.test(u)) return;
     // Petit délai : on laisse la page finir de se charger, la capture passive
     // en profite aussi (elle observe ce que la page demande d'elle-même).
+    // ⚠️ 3 s → 1,2 s → 250 ms : c'est NOTRE minuterie, pas un rythme montré à
+    // Vinted (§32). Une fois les lectures dédoublonnées et mises en parallèle,
+    // cette attente était devenue le plus GROS morceau du délai — on attendait
+    // plus longtemps qu'on ne travaillait. La capture passive continue de
+    // tourner pendant ce temps, elle ne perd rien ; et le récap sait désormais
+    // patienter tout seul si l'onglet n'est pas encore prêt à le recevoir.
     clearTimeout(visiteTimer);
-    visiteTimer = setTimeout(() => { visiteVinted(); }, 3000);
+    visiteTimer = setTimeout(() => { visiteVinted(); }, 250);
   });
 } catch (_) {}
 
@@ -2828,8 +3143,19 @@ async function genererBordereau(uid, tx) {
 //    horaire. Le reste part à la visite suivante. Mesuré sur les vraies
 //    données : il y a 1 vente à générer aujourd'hui, la rafale est théorique.
 //  • on ne réessaie pas une vente refusée avant 6 h (mémo local, aucun égress).
-const BORD_MAX_PAR_VISITE = 3;
+// ⚠️ 3 → 6 (Julien, 3 septembre : « améliore encore la rapidité »). Ce n'est
+// PAS le garde-fou anti-blocage : le vrai plafond reste `ACTIONS_MAX_HEURE`
+// (20 actions/h par compte, §48), et il est vérifié AVANT chaque requête. Ce
+// nombre-ci ne fait que borner une seule visite pour ne pas tout envoyer d'un
+// coup ; à 3, une journée à 8 ventes demandait trois passages sur Vinted.
+// Les requêtes restent envoyées UNE PAR UNE, jamais en rafale (§5.36).
+const BORD_MAX_PAR_VISITE = 6;
 const BORD_RETRY_MS = 6 * 60 * 60 * 1000;
+// ⚠️ Le récap ne DEMANDE plus rien (§5.88) : il annonce. Donc quand la
+// génération s'arrête sur un garde-fou, il faut pouvoir DIRE pourquoi, sinon
+// « il reste 2 bordereaux » est un mur sans explication. Mémoire volatile : un
+// blocage périmé ne doit pas ressortir demain.
+let dernierBlocage = {};
 // Au-delà, on ne va plus chercher le PDF d'une vente : le colis est livré depuis
 // longtemps et le lien de Vinted n'existe plus. Mesuré : les 28 ventes sans PDF
 // qui ne sont pas encore livrées tiennent TOUTES dans cette fenêtre.
@@ -2892,6 +3218,31 @@ async function capterRetraits(uid) {
     return n;
   } catch (_) { return 0; }
 }
+
+// ⚠️ LE DÉTAIL D'EXPÉDITION PARLE UNE AUTRE LANGUE QUE LA COMMANDE.
+// Mesuré en base le 1er septembre : `shipment.status_title` emploie des
+// libellés que la commande n'utilise jamais — « Commande du bordereau d'envoi
+// validée » (le statut qui apparaît JUSTE APRÈS une génération manuelle),
+// « Commande annulée - article indisponible », « Le paiement a échoué ». Et
+// 284 lignes portent `shipment: {}` + `status_title: ""` : la chaîne de replis
+// retombe alors sur `t.status`, le NOMBRE 1 — un code, pas un libellé.
+// `awaitingShip` étant une liste POSITIVE de deux phrases, tout ce vocabulaire
+// répondait « non, plus rien à expédier » et la vente DISPARAISSAIT de la liste
+// (plainte de Julien : « la vente s'est automatiquement supprimée »).
+// ➡️ Trois états, et le troisième est le plus important : `null` = « ce statut
+// ne nous dit rien ». On ne conclut JAMAIS « le colis est parti » depuis un
+// statut qu'on ne sait pas lire. C'est la règle de §5.17 (la bonne question
+// n'est pas « ça ressemble à un colis parti ? ») et de §16 (une réponse
+// illisible n'est pas une réponse).
+const etatExpedition = (st) => {
+  const s = String(st == null ? '' : st).trim();
+  if (!s || /^\d+$/.test(s)) return null;                       // un code n'est pas un libellé
+  if (/annul|refus|rembours|retour|suspend|non r[ée]clam|[ée]chou/i.test(s)) return 'parti';
+  if (/bordereau/i.test(s) && /envoy|valid|pr[êe]t|disponible/i.test(s)) return 'attend';
+  if (/paiement.*valid/i.test(s)) return 'attend';
+  if (/exp[ée]di|achemin|livr|d[ée]pos|finalis|remis/i.test(s)) return 'parti';
+  return null;                                                  // libellé inconnu : on ne tranche pas
+};
 
 // Une vente attend une GÉNÉRATION quand Vinted dit que le paiement est validé
 // ET qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au vendeur »
@@ -3021,8 +3372,37 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
     // Les ventes telles que Vinted les a rendues à la dernière moisson.
-    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
-    const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const rows = await sbGetMemo(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
+    const ventesBrutes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    const capCmd = Date.parse((rows && rows[0] && rows[0].data && rows[0].data.capturedAt) || '') || 0;
+    // ⚠️ LE STATUT DE LA COMMANDE EST PÉRIMÉ JUSTE APRÈS UNE GÉNÉRATION MANUELLE.
+    // Julien génère le bordereau lui-même sur Vinted : le détail de transaction
+    // passe à « Commande du bordereau d'envoi validée », mais la ligne
+    // `orders_sold` dit encore « Le paiement a été validé » jusqu'à la prochaine
+    // moisson. Avec ce seul statut, la 1ʳᵉ passe REGÉNÈRE une étiquette qui
+    // existe déjà (une requête pour rien, refusée par Vinted → « message
+    // d'erreur ») et la 2ᵉ passe REFUSE d'aller chercher le PDF qui vient
+    // d'apparaître (`aGenererBordereau` la fait sortir). Résultat : le bordereau
+    // n'arrive jamais dans l'app.
+    // ➡️ On lit le détail de transaction de CE compte, en SCALAIRES (§34 : jamais
+    // `select=data`), et il fait foi quand il est plus frais ET lisible.
+    const detFrais = new Map();
+    try {
+      const dr = await sbGetMemo(`app_data?id=like.harvest_${uid}_txn_*&select=id,st:data->payload->transaction->shipment->>status_title,cap:data->>capturedAt`);
+      for (const r of (dr || [])) {
+        const tx = (/_txn_(\d+)$/.exec(String(r.id || '')) || [])[1];
+        if (!tx || !r.st) continue;
+        const c = Date.parse(r.cap || '') || 0;
+        if (!detFrais.has(tx) || c > detFrais.get(tx).cap) detFrais.set(tx, { st: String(r.st), cap: c });
+      }
+    } catch (_) { /* sans le détail on retombe sur la commande, comme avant */ }
+    const statutDe = (o) => {
+      const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+      const d = tx ? detFrais.get(tx) : null;
+      if (d && d.cap >= capCmd && etatExpedition(d.st)) return d.st;
+      return (o && o.status) || '';
+    };
+    const ventes = ventesBrutes.map(o => (o ? { ...o, status: statutDe(o) } : o));
     const candidates = ventes.filter(o => aGenererBordereau(o && o.status) && (o.transaction_id != null));
     // ⚠️ PAS DE SORTIE ANTICIPÉE ICI : même sans rien à générer, la 2ᵉ passe doit
     // tourner pour aller chercher les bordereaux DÉJÀ émis (c'est le cas le plus
@@ -3044,6 +3424,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       memo[tx] = { t: Date.now(), ok: !!r.ok };
       if (r.ok) {
         faits++;
+        delete dernierBlocage[String(uid)];
         const eu = (await recupererLabelInsiste(acc, uid, tx)).ok;
         logActivity(eu ? `📄 Bordereau généré et rangé dans l'app — ${String(o.title || '').slice(0, 40)}`
                        : `📄 Bordereau généré — ${String(o.title || '').slice(0, 40)} (le PDF arrivera par email)`);
@@ -3051,7 +3432,10 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
         logActivity(`⚠️ Bordereau non généré : ${r.error || 'refus Vinted'}`);
         // Compte connecté ailleurs / plafond atteint : inutile d'insister sur
         // les suivantes, elles échoueront pareil.
-        if (r.code === 'autre-compte' || r.code === 'trop-d-actions') break;
+        if (r.code === 'autre-compte' || r.code === 'trop-d-actions') {
+          dernierBlocage[String(uid)] = { code: r.code, error: r.error || '', at: Date.now() };
+          break;
+        }
       }
     }
     // ── 2ᵉ PASSE : LE BORDEREAU EXISTE DÉJÀ, ON VA LE CHERCHER ──────────────
@@ -3525,8 +3909,20 @@ async function buildPanelData() {
   // « Encore à expédier » = ce que dit la capture LA PLUS RÉCENTE dont on dispose.
   const encoreAExpedier = (tx, statutCommande, capCommande) => {
     const d = tx ? txnEtat[String(tx)] : null;
-    if (d && d.cap >= (capCommande || 0)) return awaitingShip(d.st);
+    if (d && d.cap >= (capCommande || 0)) {
+      const e = etatExpedition(d.st);
+      if (e) return e === 'attend';        // le détail tranche…
+    }                                      // …sinon il ne dit rien : la commande reste la référence
     return awaitingShip(statutCommande);
+  };
+  // Le LIBELLÉ et le FILTRE doivent lire la MÊME source (§11). Avant, la ligne
+  // était FILTRÉE sur la capture la plus fraîche mais ÉTIQUETÉE sur la commande :
+  // après une génération manuelle, elle affichait encore « pas encore générée »
+  // alors que le bordereau existait déjà (plainte de Julien).
+  const statutFrais = (tx, statutCommande, capCommande) => {
+    const d = tx ? txnEtat[String(tx)] : null;
+    if (d && d.cap >= (capCommande || 0) && etatExpedition(d.st)) return d.st;
+    return statutCommande;
   };
   const toShip = [];
   const seenTx = new Set();
@@ -3541,16 +3937,19 @@ async function buildPanelData() {
       if (!encoreAExpedier(tx0, o.status, capR)) { if (tx0) seenTx.add(tx0); continue; }
       const tx = tx0;
       if (tx) seenTx.add(tx);
+      // ⚠️ MÊME SOURCE QUE LE FILTRE : sinon la ligne survit grâce au détail frais
+      // mais se décrit avec la commande périmée.
+      const stFrais = statutFrais(tx0, o.status, capR);
       toShip.push({
         ...acctOfRow(r), photo: photoDeCommande(o),
-        transaction: tx, title: o.title || '', status: o.status || '',
+        transaction: tx, title: o.title || '', status: stFrais || o.status || '',
         price: (o.price && (o.price.amount != null ? o.price.amount : o.price)) ?? null,
         conv: o.conversation_id != null ? String(o.conversation_id) : null,
         url: tx ? `https://www.vinted.fr/member/transactions/${tx}` : (o.conversation_id ? `https://www.vinted.fr/inbox/${o.conversation_id}` : 'https://www.vinted.fr/member/transactions?type=sold'),
         hasBord: tx ? bordTxns.has(tx) : false,
         // Compte rendu, colis par colis : où en est-on vraiment ?
-        aGenerer: aGenererBordereau(o.status),                 // l'étiquette n'existe pas encore
-        emis: !aGenererBordereau(o.status),                    // Vinted l'a émise
+        aGenerer: aGenererBordereau(stFrais),                  // l'étiquette n'existe pas encore
+        emis: !aGenererBordereau(stFrais),                     // Vinted l'a émise
         envoye: tx ? !!labelParTx[tx] : false,                 // l'extension l'a mise dans l'app
         envoyeAt: tx ? (labelParTx[tx] || null) : null,
         numero: (tx && numParTx[tx]) || null,                  // le N° posé par l'app
@@ -4076,6 +4475,41 @@ async function sbGet(query) {
     if (!res.ok) return null;
     return await res.json();
   } catch (_) { return null; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE MÉMO DE VISITE — la même lecture lourde ne repart plus trois fois
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré (banc `reads.cjs`, vrai `visiteVinted()` en vm) : sur UNE arrivée sur
+// Vinted, `harvest_{uid}_orders_sold` — le payload ENTIER des ventes, plusieurs
+// centaines de Ko même après l'allègement (§23) — était demandé TROIS fois de
+// suite : par `genererBordereauxEnAttente`, par `nouveautes`, puis par
+// `ventesSansBordereau` que `nouveautes` appelle. Trois allers-retours réseau
+// AVANT que le récap puisse s'afficher, et trois fois l'égress (§34).
+//
+// On mémorise la PROMESSE, pas seulement le résultat : deux appelants lancés en
+// même temps partagent le même aller-retour au lieu d'en faire deux (le motif
+// `cachedRow` de l'app, §23).
+//
+// ⚠️ TTL très court, et VIDÉ par `rafraichirVentes` juste après l'écriture des
+// ventes fraîches : ce mémo ne doit JAMAIS servir des ventes plus vieilles que
+// la capture qu'on vient de faire — ce serait le piège `updated_at` de §15 sous
+// une autre forme.
+const VISITE_MEMO_MS = 20 * 1000;
+const _memoVisite = new Map();          // requête → { at, p }
+
+function sbGetMemo(query) {
+  const e = _memoVisite.get(query);
+  if (e && Date.now() - e.at < VISITE_MEMO_MS) return e.p;
+  const p = sbGet(query);
+  _memoVisite.set(query, { at: Date.now(), p });
+  return p;
+}
+
+function viderMemoVisite(uid) {
+  if (uid == null) { _memoVisite.clear(); return; }
+  const k = String(uid);
+  for (const q of [..._memoVisite.keys()]) if (q.includes(k)) _memoVisite.delete(q);
 }
 // Correspondance de catégorie Vinted → Leboncoin. La boutique = sneakers → la
 // catégorie Leboncoin est « Chaussures » (Mode). On garde une logique simple et

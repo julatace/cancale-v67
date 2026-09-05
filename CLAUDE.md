@@ -6931,3 +6931,805 @@ aucune seconde règle à maintenir.
 console sont le 400 volontaire de `select=owner` et les resets de fin de test) ·
 capture du tableau de bord relue : les deux rangées portent le même dessin que
 le reste de l'app, séparées par leur étiquette.
+
+### ✅ 5.84 (suite) — LES NOTIFICATIONS PARTENT (1er septembre, vérifié en direct)
+
+Julien a posé **`VAPID_PRIVATE_KEY`** dans les variables d'environnement Vercel.
+C'était le dernier maillon, et il était hors de portée du code (§5.77, §5.78).
+
+Mesuré sur la **production**, pas déduit :
+```
+GET  /api/push?etat=1        → {"pret":true,"devices":1}
+POST /api/push {test}        → {"ok":true,"sent":1,"total":1}
+```
+➡️ La chaîne complète fonctionne : clé serveur → abonnement scellé → service de
+push → téléphone. **La notification est réellement partie**, ce n'est pas un
+« ça devrait marcher maintenant ».
+
+⚠️ **`devices` est passé de 2 à 1** : le second appareil était abonné sous
+l'ancienne clé publique et a été **purgé** par `cleSansRapport` (§5.78) — c'est
+le comportement voulu, un abonnement mort ne doit pas être compté comme vivant.
+Il se réabonne **tout seul** (`memeCle`, §5.61) à la première ouverture de l'app
+sur cet appareil. **Rien à faire d'autre que l'ouvrir une fois.**
+
+⚠️ **Ne pas conclure de ce test que Julien recevra une notification pour chaque
+vente** : une notification de vente naît d'un **email de vente**, et **5 comptes
+sur 9 ne reçoivent aucun email** (§5.81 — leurs boîtes ne transfèrent pas vers
+l'adresse de réception de l'app). Le canal est réparé ; la couverture par compte
+reste le point ouvert, et il est affiché dans Réglages → Notifications.
+
+---
+
+## 5.85 — ⚠️ LE DÉTAIL D'EXPÉDITION NE PARLE PAS LA LANGUE DE LA COMMANDE
+
+Julien : « j'ai généré manuellement le bordereau et l'extension m'a mis encore
+que c'était **en paiement validé** et non en génération de bordereau. Et ensuite
+quand j'ai actualisé l'extension, **la vente s'est automatiquement supprimée** et
+ça n'a pas marqué que le bordereau a été généré. »
+
+Deux symptômes, **trois défauts**, tous mesurés sur la vraie base avant d'écrire
+une ligne (§46).
+
+### Ce que la base dit — deux vocabulaires, pas un
+| statut de COMMANDE (`orders_sold`) | n | statut d'EXPÉDITION (`txn.shipment.status_title`) | n |
+|---|---|---|---|
+| Commande finalisée… | 278 | **`1`** (un NOMBRE) | **284** |
+| Remboursement effectué | 42 | Commande livrée ! | 110 |
+| Commande expédiée… | 40 | Commande expédiée… | 28 |
+| Bordereau envoyé au vendeur | 14 | Bordereau envoyé au vendeur | 17 |
+| colis déposé en point relais | 11 | Commande annulée - article indisponible | 16 |
+| | | **Commande du bordereau d'envoi validée** | **3** |
+| | | Le paiement a échoué | 1 |
+
+⚠️ **Le détail emploie des libellés que la commande n'utilise JAMAIS** — dont
+**« Commande du bordereau d'envoi validée »**, qui est très exactement le statut
+qui apparaît **juste après une génération manuelle**.
+
+### A. La vente DISPARAÎT sur un statut qu'on ne sait pas lire
+`encoreAExpedier` passait le statut du détail à **`awaitingShip`**, une **liste
+POSITIVE de deux phrases** (« bordereau envoyé au vendeur » / « paiement
+validé »). Tout le reste du vocabulaire d'expédition répondait donc « non, plus
+rien à expédier » → **la vente sortait de la liste**. C'est le symptôme #2, mot
+pour mot.
+⚠️ §5.17 avait déjà tiré cette leçon **côté app** (« la liste positive laissait
+passer 4 cas ») ; l'extension ne l'a jamais reçue.
+
+### B. Un CODE NUMÉRIQUE traité comme un libellé
+Sur **284 lignes**, `shipment` vaut `{}` et `status_title` vaut `""` : la chaîne
+de replis `sh.status_title || sh.status || t.status_title || t.status` retombe
+alors sur **`t.status` = le nombre `1`**. On demandait donc à une règle de texte
+de lire un code. Aucune de ces 284 ne coïncide avec une vente en attente
+aujourd'hui — mais c'est un piège armé, pas une hypothèse.
+
+### C. Le LIBELLÉ et le FILTRE ne lisaient pas la même source (§11)
+`aGenerer` / `emis` lisaient `o.status` (la **commande**, périmée) pendant que le
+filtre lisait la **capture la plus fraîche**. La ligne survivait donc grâce au
+détail frais mais **se décrivait avec l'ancien statut** → « pas encore générée »
+alors que le bordereau existait. C'est le symptôme #1.
+
+### La règle : `etatExpedition(st)` — TROIS états, et le 3ᵉ est le plus important
+Au **niveau module** (une seule définition, §11), à côté de `aGenererBordereau` :
+`'attend'` · `'parti'` · **`null` = « ce statut ne nous dit rien »**.
+➡️ **On ne conclut JAMAIS « le colis est parti » depuis un statut illisible** —
+un code numérique, une chaîne vide, un libellé que Vinted inventera demain. Le
+détail ne tranche que lorsqu'il **dit** quelque chose ; sinon la commande reste
+la référence. C'est §16 (« une liste vide n'est jamais une réponse ») appliqué
+aux statuts.
+`statutFrais(tx, …)` nomme **une fois** le statut qui gouverne : le filtre ET
+l'étiquette le lisent.
+⚠️ `awaitingShip` est **inchangée** (elle reste la règle du vocabulaire des
+COMMANDES, et `audit-coherence` la compare à `isAwaitingShipStatus` de l'app par
+un regex sur sa ligne — ne pas la reformater).
+
+### La génération travaillait aussi sur le statut périmé
+Conséquence directe, jamais vue jusqu'ici : après une génération manuelle,
+**la 1ʳᵉ passe REGÉNÈRE** une étiquette qui existe déjà (requête pour rien,
+refusée par Vinted → « il y a des messages d'erreur », §5.71) **et la 2ᵉ passe
+REFUSE d'aller chercher le PDF** (`aGenererBordereau(o.status)` la fait sortir).
+**Donc le bordereau n'arrive jamais dans l'app** — c'est la plainte §5.72 qui
+revenait par une autre porte.
+➡️ `genererBordereauxEnAttente` lit le détail de CE compte en **SCALAIRES**
+(`select=id,st:…->shipment->>status_title,cap:data->>capturedAt` — jamais
+`select=data`, §34) et travaille sur le statut qui gouverne.
+
+### ✅ Prouvé sur la VRAIE base, dans les deux sens
+Banc `vm` exécutant le VRAI `buildPanelData`, avec **une seule fixture de banc**
+(jamais écrite en base) : un détail frais portant « Commande du bordereau d'envoi
+validée » sur une vente réelle (`tx=21883380310`, nike zoomX vaporfly).
+| | colis à envoyer | la cible |
+|---|---|---|
+| **code d'avant** | 14 → **13** | **ABSENTE (disparue de la liste)** |
+| **code corrigé** | **14** | **PRÉSENTE** · `aGenerer=false emis=true` → « étiquette prête » |
+
+⚠️ **Piège de banc** : la fixture doit porter un `uid` de compte VIVANT —
+`txnRows` est filtré par `keepAcc`, donc une ligne à `uid: ""` est écartée en
+silence et on mesure « rien n'a changé » (§21, encore).
+
+**`scripts/audit-bordereau-etat.cjs`** (nouveau, **9 contrôles**) exécute la
+vraie fonction sur les **11 statuts d'expédition relevés en base** + les valeurs
+illisibles, et vérifie le câblage des trois défauts.
+⚠️ Il ne **s'arrête pas** quand `etatExpedition` est absente : il rejoue
+l'ancienne sémantique pour montrer, statut réel par statut réel, ce qu'elle
+cassait — un audit qui sort au premier manque ne prouve qu'une chose.
+**Rejoué sur le code d'avant : 8 contrôles en échec**, dont
+`"Commande du bordereau d'envoi validée" → parti` et `"1" → parti`.
+
+### Vérifié
+`node --check` OK · **18 audits au vert** (`audit-coherence` : 0 désaccord sur
+les 12 statuts réels — `awaitingShip` et `etatExpedition` sont d'accord sur tout
+le vocabulaire des COMMANDES, aucune régression) · vrai `buildPanelData` contre
+la vraie base : **14 colis, mêmes chiffres qu'avant** hors scénario.
+Extension **5.48.0** — à recharger dans Chrome.
+
+---
+
+## 5.86 — ⚠️⚠️ L'INSTRUMENTATION NE SURVIVAIT PAS AU SERVICE WORKER (et 2 colis introuvables)
+
+Julien : « pour l'extension c'est pas encore parfait quand il y a une vente ».
+Méthode habituelle : lire la base avant de coder (§46).
+
+### Ce que la base dit (2 septembre)
+| | |
+|---|---|
+| ventes qui attendent l'envoi | **16** |
+| avec un bordereau capté par l'extension | 12 |
+| **sans AUCUN PDF** (ni capté, ni email) | **2 — les deux de `tomj606`** ⚠️ |
+| comptes **sans un seul** bordereau capté | **2 : `julienf765`, `tomj606`** (les 7 autres en ont) |
+
+⚠️ Ce n'est **pas** la fraîcheur ni le garde-fou « compte connecté » : ces deux
+comptes sont captés **le jour même** (235 et 205 lignes). C'est spécifique à eux.
+
+### 1. ⚠️⚠️ POURQUOI ON NE POUVAIT PAS L'EXPLIQUER : les sondes mouraient
+`_diag.n` et `_rates` étaient des variables de **MODULE**, écrites en base au plus
+une fois par minute. Or **Chrome tue un service worker MV3 après ~30 s
+d'inactivité** : le tampon mourait donc AVANT le flush.
+
+**Preuve directe en base, pas une hypothèse.** `recupererLabel` pose **trois**
+échantillons dans la même boucle (`label_url`, `shipments/{id}`, `label_options`),
+à quelques centaines de millisecondes. Le premier écrivait et **consommait le
+quota d'une minute** ; les deux suivants étaient jetés, puis mouraient avec le
+worker. En base, `rates` ne contient QUE **`label_label_url`** — jamais `label`,
+jamais `label_label_options`.
+➡️ **C'est exactement pour ça qu'après trois sessions d'instrumentation on ne
+connaissait toujours la forme d'AUCUNE de ces réponses.** La sonde posée en §5.24
+et réparée en §5.52 ne pouvait structurellement pas écrire ce qu'on lui demandait.
+
+Même dégât sur les compteurs : **`label_url_trouve = 6` pour `label_envoye = 2`,
+sans aucun compteur d'échec entre les deux** — les deltas manquants n'ont jamais
+été flushés. J'ai raisonné plusieurs sessions sur des compteurs sous-comptés.
+
+➡️ **Le tampon vit désormais dans `chrome.storage.local`** (`vrmDiagBuf`) : local,
+gratuit, zéro égress, et il **survit à la mort du worker**. Le throttle ne protège
+plus que l'écriture Supabase ; il ne peut plus rien perdre. `majTampon()`
+sérialise les lecture-modification-écriture (deux appels concurrents perdaient
+sinon des incréments), le tampon **n'est vidé que si l'écriture a abouti**, et une
+alarme le réveille pour qu'il ne dorme pas indéfiniment.
+
+⚠️ **Règle** : dans un service worker MV3, **aucun tampon de plus de ~30 s ne
+peut vivre en variable de module**. Ça vaut pour toute future sonde.
+
+### Le seul échantillon qui a survécu, et ce qu'il dit
+```
+label_label_url · shipId 51111914706 → {"label_url":null,"code":0}
+```
+Vinted répond donc **200 avec un `label_url` NUL** pour au moins certaines
+expéditions dont le bordereau a pourtant été « envoyé au vendeur ». On ne sait
+**pas encore** pourquoi (transporteur ? PDF pas encore déposé sur S3 ?) — et
+c'est justement ce que les deux échantillons manquants diront à la prochaine
+visite, maintenant qu'ils peuvent être écrits.
+
+### 2. ⚠️ DEUX COLIS À LA FOIS = LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ
+`storeLabel` n'attribue le PDF qu'à condition qu'il n'existe **qu'un seul** colis
+possible pour ce compte (règle juste, §24 : on ne devine jamais). Or `tomj606` a
+**exactement deux** ventes en attente sans bordereau : même en les téléchargeant à
+la main, **aucun des deux n'était relié à sa vente**, et le second écrasait le
+premier dans `label_latest`. C'est très exactement le compte dont Julien se plaint.
+
+Et à l'écran, l'échec était un **cul-de-sac** : le panneau affichait la raison
+technique (« Vinted n'a pas donné l'URL du PDF ») et il n'avait plus rien.
+
+➡️ **Le rendez-vous** (`attendreBordereau`) : quand c'est NOUS qui l'envoyons
+télécharger UNE vente précise, on sait laquelle. Ce n'est pas une devinette —
+c'est l'identité de la vente qu'il vient d'ouvrir, **sur son clic**. Court
+(15 min), **à usage unique**, borné au compte concerné. La règle « un seul
+candidat » reste en second, inchangée.
+➡️ Le bandeau d'échec porte maintenant **« ⬇ Ouvrir la vente sur Vinted »** : il
+pose le rendez-vous puis ouvre `/member/transactions/{tx}`. Il télécharge le
+bordereau, `chrome.downloads` le capte (§5.46) et le range **sur la bonne vente**.
+
+### Vérifié
+`node --check` OK sur les deux fichiers · **18 audits au vert** ·
+`audit-diagnostic.cjs` passe à **10 contrôles** et **5 échouent sur le code
+d'avant** — dont « les 3 échantillons de la chaîne bordereau arrivent en base »,
+qui manque exactement `label` et `label_label_options`, **la situation mesurée en
+base** · `audit-bordereau-pdf.cjs` passe à **14 contrôles**, **3 échouent sur le
+code d'avant** (§21), et l'audit **ne s'arrête plus** au premier manque : il
+rejoue l'ancien `storeLabel` pour montrer contrôle par contrôle ce qu'il ne
+savait pas faire — « un seul colis possible → toujours relié » passe dans les
+deux sens, donc aucune régression · banc panneau dédié sur le **cas réel**
+(les 2 ventes de `tomj606`) : le bouton de secours apparaît, le rendez-vous part
+avec **`tx=21928427030`**, la bonne page s'ouvre, **0 erreur d'app** · vrai
+`buildPanelData` contre la vraie base : 32 annonces, 80 ventes, **16 colis** —
+aucune régression.
+⚠️ `audit-bordereau-pdf.cjs` lisait le fichier par un **chemin absolu** : lancé
+depuis un arbre de test il relisait le dépôt courant, donc la preuve « ça échoue
+sur le code d'avant » aurait été truquée (§5.80). Passé en `__dirname`.
+
+Banc panneau complet : **14 onglets rendus, 0 PAGEERROR**.
+⚠️ **Le banc du panneau criait au loup depuis la 5.40** : sa liste d'onglets
+datait d'avant le dépliant « Plus », donc il annonçait « onglet absent » pour
+`ventes`, `recherche`, `coffre`, `litiges`, `favoris` — cinq onglets
+parfaitement vivants — et `republier`, retiré exprès en 5.70. **12 échecs → 6**,
+tous des artefacts assumés (l'onglet `reponse` n'existe que sur une page de
+conversation ; `republier` n'existe plus). Un banc qui crie au loup n'est plus
+lu (§5.14) : sa liste doit suivre `PANEL_TABS`, et ouvrir « Plus » avant de
+cliquer un onglet caché.
+
+Extension **5.49.0** — à recharger dans Chrome.
+
+---
+
+## 5.87 — LE RAPPORT URSSAF : il existait, et il ÉCARTAIT 2 174 € de ventes finalisées
+
+Julien : « je veux aussi que tu me fasses un rapport tous les mois de la somme de
+toutes les ventes finalisées pour mon URSSAF ; si c'est déjà fait, améliore la
+viabilité. » **C'était déjà fait** (§7, le rapport comptable) — donc la demande
+est bien « fiabilise-le ». Méthode habituelle : mesurer la vraie base avant
+d'écrire une ligne (§46).
+
+### ⚠️⚠️ 1. LE DÉFAUT : les ventes masquées à l'écran sortaient du CA DÉCLARÉ
+Les deux rapports (mensuel ET annuel) commençaient par `if (isHidden(o)) continue;`.
+Or `vinted_sales_hidden` contient **209 ventes masquées à la main** (§5.57) : un ✕
+sur une carte range un écran, **ça n'annule pas une vente encaissée**.
+
+| mesuré le 2 septembre | |
+|---|---|
+| CA que le rapport affichait | 5 814,09 € |
+| **CA écarté parce que masqué** | **2 174,80 € · 101 ventes finalisées** ⚠️ |
+| juin 2026 | **1 vente / 41 €** affiché contre **42 ventes / 1 512,70 €** réels |
+
+➡️ **Un chiffre destiné à une déclaration ne peut pas dépendre d'un geste
+d'affichage.** Les ventes masquées **comptent** dans le CA, et leur poids est
+affiché à part (`nMasq` / `caMasq`) — auditable, jamais silencieux. C'est la
+règle de §5.27 : *un total partiel qui se présente comme complet est pire qu'un
+total absent.*
+
+### 2. Le récap du tableau de bord lisait une archive VIDE
+Le bloc « À payer pour <mois> » et le tableau des 12 mois lisaient
+`vinted_sales` — **0 ligne en base** (l'ancien catalogue, vidé en juillet 2026,
+§4). Donc **0 € partout**, en permanence.
+➡️ L'écran Ventes **publie** `vinted_urssaf_mois` (§11 : un propriétaire, les
+autres consomment — exactement le motif de `vinted_nums_physiques`, §5.14), et le
+tableau de bord le consomme. **Mesuré au rendu : 22 mois publiés**, et le bloc
+d'échéance affiche « Période août 2026 · CA finalisé 3 163,20 € → à payer
+≈ 427,03 € » — le chiffre de la moisson, plus un zéro.
+⚠️ Clé **locale**, pas dans `SYNC_KEYS` : c'est une photo recalculable.
+
+### 3. Le taux de cotisations était écrit en dur à 14 endroits
+13,5 % figé dans le code — donc faux le jour où son taux change (ACRE, activité
+mixte, versement libératoire). `vinted_urssaf_taux` (réglable dans Réglages →
+Régime, **synchronisé**) + `tauxUrssaf()` au niveau module : modale, CSV, PDF et
+tableau de bord lisent la même valeur. Un taux illisible **retombe sur 13,5**,
+jamais sur zéro.
+
+### ⚠️ 4. LA MARGE ANNUELLE MÉLANGEAIT DEUX ENSEMBLES
+`marge = margeKnown - frais` : le sous-ensemble des ventes **au coût connu**
+moins les boosts de **TOUTES** les ventes. §5.84 avait corrigé le mensuel — pas
+l'annuel, qui part pourtant chez le comptable lui aussi. Aligné sur `fraisConnu`.
+
+### ⚠️ 5. « CA ENCAISSÉ » ÉTAIT LE MAUVAIS MOT (et ça compte ici)
+Les deux rapports et le tableau de bord annonçaient un **« CA encaissé »**. Or
+§5.57 a retiré la date d'encaissement de toute l'app : tout est daté au jour de
+la **VENTE**. Sur un écran de gestion c'est un détail ; sur un document destiné à
+l'URSSAF — qui demande légalement les recettes **encaissées** sur la période —
+c'est une affirmation fausse.
+➡️ Partout « **CA des ventes finalisées** », et le tableau de bord **le dit** :
+« ces ventes sont datées au jour de la vente, pas au jour où Vinted t'a versé
+l'argent — vérifie ton chiffre sur autoentrepreneur.urssaf.fr, je ne suis pas
+comptable ». On n'invente pas une date d'encaissement pour faire joli (§5.57 :
+elle n'existe que pour une partie des ventes, c'est pour ça qu'elle a été
+retirée).
+
+### ✅ `scripts/audit-urssaf.cjs` — 18 contrôles permanents
+Il **exécute** la règle (`caUrssafParMois`) dans un `vm` contre les **8 statuts
+réellement présents en base** : seules les finalisées comptent, une vente masquée
+reste dans le total (141 €, pas 41 €), son poids est compté à part, un
+remboursement n'est jamais du chiffre d'affaires, le taux vient du réglage
+(virgule acceptée) et un taux illisible retombe sur le défaut. Puis, en statique :
+les deux rapports n'écartent plus les masquées, comptent `nMasq`, appliquent le
+taux, ne disent plus « encaissé », la marge annuelle ne mélange plus deux
+ensembles, le récap est publié ET consommé, et plus aucun 13,5 % n'est en dur.
+⚠️ **Prouvé dans les deux sens** (§21) : rejoué sur le code d'avant (`git archive
+HEAD` dans un arbre à part, script copié DEDANS et lancé DEPUIS cet arbre — le
+piège de §5.80), il sort **13 contrôles en échec**.
+
+### ⚠️ Piège d'outillage : `vm.runInContext` n'expose PAS les `const`
+Une déclaration `const` est **lexicale** : contrairement à une `function`, elle ne
+devient jamais une propriété de l'objet de contexte. L'audit plantait sur
+`ctx.venteFinalisee is not a function` alors que le code était juste. Il faut
+**exporter explicitement** à la fin de la source évaluée
+(`Object.assign(this, { … })`) — le motif déjà utilisé dans
+`audit-bordereau-pdf.cjs`.
+
+### Vérifié au RENDU RÉEL (§20, vraies données)
+| | |
+|---|---|
+| rapport **mensuel**, juin 2026 | **CA des ventes finalisées 1 512,70 € · 42 ventes · cotisations 204,21 €**, avec « 41 ventes masquées dans l'app (1 471,70 €) sont comptées dans ce CA » |
+| rapport **annuel** 2026 | **7 626,89 € · 235 ventes**, dont 1 885,80 € masqués |
+| `vinted_urssaf_mois` publié | **22 mois** (2026-08 : 101 ventes / 3 163,20 €) |
+| tableau de bord | « Période août 2026 · CA finalisé 3 163,20 € → à payer ≈ 427,03 € » |
+
+⚠️ **Piège de banc, deux fois** : (1) la modale s'ouvre sur le **mois en cours** —
+le 2 du mois il est vide, on mesure « 0 € » et on conclut à tort que le rapport
+ne marche pas ; il faut choisir un mois qui a des ventes. (2) `body.innerText`
+place la modale **à la fin** du texte : lire les 700 premiers caractères ne
+montre que l'écran derrière, et on croit que rien ne s'est ouvert.
+
+`npm run build` OK · **19 audits au vert** · smoke **11 écrans, 0 écran vide,
+0 PAGEERROR, 0 suspect** · banc 390 px : **0 débordement**.
+
+### ⚠️ CE QUE CE RAPPORT NE RÈGLE PAS
+**0 prix d'achat sur 278 paires** (§22) : le CA déclaré est juste, le **bénéfice**
+reste calculé sur la seule vente au coût connu (et le dit — §5.84). Julien s'en
+charge lui-même (« je vais faire les coûts d'achat ») ; les outils de saisie
+existent (§5.47 en série, §5.64 en un tap).
+
+
+---
+
+## 5.86 — LE MOIS DU RAPPORT SE CHOISIT LIBREMENT, ET UN MOIS N'EST PAS FINI QUAND IL SE TERMINE
+
+Julien : « tu es sûr de juin ? et en plus je veux août — je veux pouvoir
+sélectionner tous les mois comme je veux ».
+
+### La mesure d'août, telle qu'il l'a demandée (3 septembre)
+**110 ventes finalisées du 1er au 31 août 2026 = 3 345,20 €**, tous comptes
+confondus : julatace3535 20/733,40 · llloollllaa 18/593,10 · julatace35260
+20/592,30 · julienf765 16/415,20 · tomj606 11/350,20 · tomj683 12/329,00 ·
+angeled92 9/284,00 · arthuror2 4/48,00.
+⚠️ Non compté sur la même fenêtre : **59 pas encore finalisées → 1 174,90 €** et
+14 annulées/remboursées → 186,20 €. Toutes ventes d'août confondues : 183 →
+4 706,30 €. Le total INCLUT 1 vente masquée à la main (2,00 €), et rien ne vient
+d'un compte masqué ni supprimé.
+⚠️ **Le chiffre a bougé dans la journée** : 3 285,20 € le matin → 3 345,20 € le
+soir (3 ventes finalisées entre-temps). C'est normal, pas un bug — et c'est
+exactement ce que l'encart ci-dessous annonce désormais.
+
+### 1. Un mois n'est PAS complet le jour où il se termine
+Une vente Vinted se finalise ~2 semaines après. Le rapport compte et **annonce**
+les ventes du mois **pas encore finalisées** (« ce mois va encore monter »).
+⚠️ Elles n'entrent **jamais** dans le CA déclaré ; le montant passe par
+`montantCommande` (le prix Vinted est un **objet** `{amount}` — §5.27), et une
+**annulée** n'est jamais comptée comme « en attente ».
+⚠️ **La réserve VOYAGE avec le document** : ligne dédiée dans le CSV **et** dans
+le PDF. Un rapport imprimé qui présente un mois comme terminé, c'est le risque
+(§5.84).
+
+### 2. Le mois s'ouvrait sur le MOIS EN COURS, dans un `<select>`
+Le 2 d'un mois, ce mois est vide : on ouvre « Rapport », on lit 0 €, on croit
+que ses ventes ont disparu. Et un menu déroulant n'atteint que les mois de sa
+propre liste.
+- **`derniersMoisDeclarables`** = les mois qui portent vraiment des ventes
+  **finalisées** → la modale s'ouvre sur le dernier (mesuré : août 2026).
+- ⚠️ **`moisChoisiMain`** : dès qu'il a choisi un mois, on ne le déplace plus
+  sous ses doigts.
+- **Grille de 12 mois + année navigable** (la même que le sélecteur de période
+  de l'écran Ventes, §5.57), mois à venir grisés, pastille `VENTES` sur ceux qui
+  en portent. `reportMonths`, devenu mort, est **supprimé** — un helper mort est
+  un piège pour la session suivante (§5.39).
+
+### ⚠️ LA LEÇON LA PLUS CHÈRE DE LA SESSION : J'AI PERDU CE TRAVAIL, PUIS JE L'AI REFAIT EN DOUBLE
+Ce travail avait été écrit, commité **en local**, jamais poussé. Le conteneur a
+été recyclé → tout était à refaire. Je l'ai refait **sur un clone périmé**
+(`origin` avait entre-temps 5 commits de plus, dont §5.85 sur le même écran) :
+mon correctif « ventes masquées » **doublonnait** une règle déjà posée, et en
+sens INVERSE (j'excluais en l'annonçant ; §5.85 les **compte dans le CA**, ce
+qui est la bonne réponse — masquer une carte range un écran, ça n'annule pas une
+vente encaissée). Commit jeté, version distante reprise, seule la partie
+réellement manquante portée dessus.
+➡️ **Deux règles, toutes deux déjà écrites et toutes deux ignorées :**
+1. **`git fetch` AVANT de comparer ou de coder** (§5.21 — une référence locale
+   jamais rafraîchie ment en silence) ;
+2. **pousser à CHAQUE modification** (§5.11) : ce n'est pas une préférence, c'est
+   ce qui empêche une session de perdre son travail et la suivante de le refaire
+   à l'envers.
+
+### Vérifié
+`npm run build` OK · `scripts/audit-urssaf.cjs` : **12 contrôles ajoutés**, et
+**les 12 échouent sur le code d'avant** (§21, méthode §5.80 : `git archive HEAD`
+dans un arbre à part, script copié DEDANS et lancé DEPUIS cet arbre) ·
+**19 audits au vert** · modale RENDUE sur les vraies données : s'ouvre sur
+**août 2026 — 3 345,20 € / 110 ventes** (= le chiffre mesuré à l'euro près),
+« 57 ventes pas encore finalisées — 1 148,90 € », et un clic sur **juin** donne
+**1 512,70 € / 42 ventes** · smoke **10 écrans à 390 px : 0 vide, 0 débordement,
+0 artefact, 0 erreur**.
+⚠️ **Piège de banc (§21, encore)** : mon mock ne servait que `id=like.`, pas
+`id=eq.` → l'écran Annonces affichait « Impossible de charger ces données » et
+j'ai failli conclure à une régression. **Servir toutes les FORMES de requête,
+pas seulement toutes les familles de lignes.**
+
+
+---
+
+## 5.88 — LE BORDEREAU PART SANS RIEN DEMANDER, ET LE RÉCAP N'ATTEND PLUS LA MOISSON
+
+Julien : « améliore encore la rapidité, et pareil quand je me connecte que ça me
+demande plus vite de générer le bordereau — et que ça envoie direct dans l'app
+sans me demander ».
+
+### ⚠️ 1. LA VRAIE CAUSE DE LA LENTEUR : L'ORDRE, PAS LE RÉSEAU
+`visiteVinted()` faisait **`runActive()` d'abord** — une moisson COMPLÈTE :
+dressing jusqu'à 7 pages avec pauses, achats, boîte, porte-monnaie. Le
+bordereau et le récap n'arrivaient qu'**après**. Or « ai-je vendu ? » ne demande
+**qu'une** requête (`my_orders?type=sold`).
+
+**Mesuré en exécutant le VRAI `visiteVinted()` dans un `vm`, sondes chronométrées :**
+| | séquence | récap affiché |
+|---|---|---|
+| **avant** | `moisson complète → bordereaux → récap` | **321 ms sur 337** (à la toute fin) |
+| **après** | `ventes → bordereaux → récap → moisson complète` | **40 ms sur 357** |
+
+En vrai, la moisson complète ne dure pas 300 ms mais plusieurs secondes : c'est
+tout ce temps que le récap attendait pour rien.
+⚠️ **Aucune requête ajoutée** : ce sont exactement les mêmes appels, remis dans
+l'ordre. Rien à voir avec un « rythme humain » (§32). Le garde de 5 min ne
+protège plus que la moisson complète — c'est elle qui est lourde.
+Le délai après chargement de page passe de **3 s à 1,2 s** (notre minuterie, pas
+un signal montré à Vinted ; la capture passive continue pendant ce temps).
+
+### 2. LE RÉCAP N'EST PLUS UNE QUESTION
+La fenêtre demandait **Oui / Non** pour ce qui restait à générer. Or la
+génération **a déjà eu lieu juste avant** de l'afficher : ce qui reste est bloqué
+par un garde-fou (mauvais compte connecté, plafond horaire), donc cliquer
+« Oui » **retombait sur le même mur**. La question ne servait à rien.
+➡️ **Un seul bouton, toujours : « Fermer ».** Et quand il en reste, on DIT
+pourquoi — `dernierBlocage[uid]` (mémoire volatile, 30 min) remonte le motif :
+« ton navigateur est sur un autre compte, bascule dessus » / « plafond d'actions
+atteint, ils partiront à ta prochaine visite ».
+⚠️ Le bouton « Générer » **par vente** reste dans l'onglet Bordereaux du panneau
+(§5.32) : c'est la porte du cas exceptionnel, pas la voie normale.
+
+### 3. Le plafond par visite : 3 → 6
+⚠️ **Ce n'est PAS le garde-fou anti-blocage.** Le vrai plafond reste
+`ACTIONS_MAX_HEURE = 20` par compte (§48), vérifié **avant chaque requête**.
+`BORD_MAX_PAR_VISITE` ne fait que borner une seule visite pour ne pas tout
+envoyer d'un coup ; à 3, une journée à 8 ventes demandait **trois passages** sur
+Vinted. Les requêtes partent toujours **une par une**, jamais en rafale (§5.36).
+⚠️ L'audit ne fige plus le chiffre (il a bougé, il rebougera) : il lit la
+constante dans la source, sert `cap + 2` ventes et vérifie qu'il en part
+**exactement `cap`** — plus un contrôle « le plafond par visite reste sous le
+plafond horaire ».
+
+### Vérifié
+`node --check` sur les deux fichiers · **19 audits au vert** ·
+`audit-recap.cjs` **+5 contrôles**, `audit-bordereau-rattrapage.cjs` réancré ·
+**Prouvé dans les deux sens** (§21, méthode §5.80 — `git archive HEAD` dans un
+arbre à part, scripts copiés DEDANS et lancés DEPUIS cet arbre) : 4 des 5
+nouveaux contrôles échouent sur le code d'avant, et le **banc `vm` d'ordre**
+sort `moisson → bordereaux → récap` avec le récap à **321 ms sur 337**.
+⚠️ **Honnêteté sur un contrôle** : « le récap passe avant la moisson » PASSE
+aussi sur le code d'avant en lecture statique — l'ancienne branche courte
+appelait bien `proposerBordereaux` avant `runActive()`. C'est un garde-fou
+anti-régression, **pas** une preuve du changement ; la preuve, c'est le banc `vm`.
+· Banc panneau dédié (faux `chrome`, 3 scénarios) : **1 seul bouton « Fermer »**
+dans les trois, les deux motifs de blocage affichés, **0 requête de génération
+envoyée depuis le récap**, 0 erreur d'app.
+
+Extension **5.50.0** — à recharger dans Chrome.
+
+### ⚠️ CE QUI N'EST PAS RÉGLÉ (et ne l'est pas par du code)
+La question du jour portait sur sa **déclaration URSSAF**. Réponse mesurée, à
+ne pas oublier : **je ne peux pas garantir un chiffre à 100 %**, pour deux
+raisons distinctes.
+1. **La fraîcheur de capture fausse le total en silence.** Mesuré en direct :
+   le total d'août est passé de **3 345,20 € à 3 739,60 €** pendant la
+   conversation, parce que `julatace3535` n'avait pas été capté depuis **7
+   jours** et que 17 ventes d'août sont apparues d'un coup.
+2. **Ce n'est pas la bonne base.** Il déclare l'argent **reçu** ; le chiffre de
+   l'app est « ventes finalisées dont la VENTE est en août ». La date de
+   finalisation n'existe **nulle part** dans la moisson (**0 sur 401
+   transactions** — le `shipment.status_title` ne porte que l'état du colis,
+   jamais « finalisé », §5.85).
+   Elle existe dans les emails **« La transaction est finalisée »** (`email_final_*`,
+   103 lignes, avec montant ET date) → **août 2026 = 2 131,80 €** — mais
+   **4 comptes sur 8 n'envoient aucun email** (julatace3535 1 102,80 €,
+   tomj606 350,20 €, angeled92 309,00 €, arthuror2 48,00 €).
+➡️ **La seule source complète ET juste est le porte-monnaie Vinted de chaque
+compte** (historique daté des crédits). ⚠️ **Ne jamais laisser croire qu'un
+chiffre de l'app suffit pour déclarer** : le rapport dit déjà « CA des ventes
+finalisées », pas « encaissé » (§5.87), et c'est exactement pour ça.
+➡️ Piste à ouvrir : l'extension lit déjà le SOLDE du porte-monnaie
+(`harvest_*_billing` = `{main, escrow}`) mais **pas son historique**. Capter
+l'historique daté réglerait le problème pour de bon — c'est le vrai chantier
+suivant sur ce sujet.
+
+---
+
+## 5.89 — LA LENTEUR ÉTAIT DANS LES LECTURES RÉPÉTÉES + ⚠️ VINTED NE NOMME JAMAIS LES LIKERS
+
+Julien : « pour l'extension fais un effort et fais plus vite. Je veux aussi un
+bouton pour envoyer des messages aux favoris : je sélectionne les personnes qui
+ont mis en fav, je pré-remplis un message et ça envoie tout seul. »
+
+### 1. ⚠️ LA MÊME LECTURE LOURDE PARTAIT JUSQU'À QUATRE FOIS PAR VISITE
+§5.88 avait remis la visite dans le bon ORDRE ; il restait que le chemin rapide
+**relisait la même chose**. Mesuré en exécutant le VRAI `visiteVinted()` en `vm`
+avec un compteur de requêtes (`reads.cjs`) :
+
+| lecture | avant | après |
+|---|---|---|
+| `harvest_{uid}_orders_sold` (`select=data`, le payload ENTIER des ventes) | **4×** sur le chemin rapide | **1×** |
+| requêtes Supabase sur une visite | 8 | **7** |
+| octets rendus (données de banc) | 16 Ko | 11 Ko |
+
+Les quatre venaient de `genererBordereauxEnAttente`, `nouveautes`, et
+`ventesSansBordereau` que `nouveautes` appelle. Chacune est un **aller-retour
+réseau AVANT que le récap puisse s'afficher** — et quatre fois l'égress (§34).
+⚠️ En base, cette ligne pèse jusqu'à **41 Ko** sur un compte chargé.
+
+➡️ **`sbGetMemo(query)` + `viderMemoVisite(uid)`** (à côté de `sbGet`) : on
+mémorise la **PROMESSE**, pas seulement le résultat — deux appelants lancés en
+même temps partagent un seul aller-retour (le motif `cachedRow` de §23). TTL
+**20 s**, et **vidé par `rafraichirVentes` juste après l'écriture des ventes
+fraîches** : ce mémo ne doit JAMAIS servir des ventes plus vieilles que la
+capture qu'on vient de faire — ce serait le piège `updated_at` de §15 sous une
+autre forme.
+⚠️ **`storeLabel` n'utilise PAS le mémo, volontairement** : il part d'un
+téléchargement qui peut arriver bien plus tard, il lui faut des ventes fraîches.
+Un contrôle permanent borne donc la règle au chemin rapide, pas au fichier.
+
+### 2. LES QUATRE SOURCES DU RÉCAP PARTENT EN MÊME TEMPS
+`nouveautes` enchaînait ventes → boîte → offres → bordereaux, alors qu'aucune ne
+dépend d'une autre : le récap attendait **quatre** allers-retours au lieu d'un.
+`Promise.all` sur les quatre ; `ventesSansBordereau` fait de même pour ses deux
+lectures indépendantes (`email_bord_*` et `label_*`).
+
+### 3. L'ATTENTE APRÈS LE CHARGEMENT DE PAGE : 1,2 s → 250 ms
+Une fois les lectures dédoublonnées, **notre propre minuterie était devenue le
+plus gros morceau du délai** — on attendait plus longtemps qu'on ne travaillait.
+⚠️ C'est NOTRE timer, pas un rythme montré à Vinted (§32) ; la capture passive
+continue de tourner pendant ce temps.
+
+**Contrepartie, et elle est traitée** : à 250 ms le script de la page peut ne pas
+être injecté, donc le récap se serait **perdu** — le défaut exact de §5.70.
+**`envoyerRecap(charge)`** réessaie (6 × 350 ms) jusqu'à ce qu'un onglet accepte,
+et ne rend `true` que si un onglet a **vraiment** reçu — c'est ce booléen qui
+autorise à noter « déjà montré ».
+⚠️ Ce n'est pas un rythme déguisé : **aucune requête ne part vers Vinted ici**,
+on parle à notre propre onglet.
+
+### Mesuré, bout en bout (banc `chrono.cjs`, vrai `visiteVinted()`, 120 ms/requête)
+| | récap affiché |
+|---|---|
+| **avant** | 1 210 ms (+ 1 200 ms d'attente) = **≈ 2,4 s** |
+| **après** | **742 ms** (+ 250 ms d'attente) = **≈ 1,0 s** |
+
+### ⚠️ 4. LES FAVORIS : VINTED NE DIT JAMAIS *QUI*
+Mesuré avant de répondre (§46), pas supposé :
+| source | ce qu'elle porte |
+|---|---|
+| une annonce du dressing | **`favourite_count`** — un NOMBRE |
+| les 76 fiches lues sur la page (`vinted_item_details`) | `photos`, `readAt`, `description` — **rien sur les likers** |
+| les URL réellement observées, 8 comptes | **aucun endpoint favoris** |
+| les 1 000 lignes de la base | seule famille « favourites » : `user_favourites_toggle` = **Julien qui met un article en favori**, pas la liste de ceux qui likent les siens |
+
+➡️ **« Je sélectionne les personnes qui ont mis en fav » n'a aucun destinataire
+techniquement atteignable.** Ce n'est pas un refus, c'est une absence de donnée :
+Vinted ne l'expose nulle part. Il n'y a donc personne à qui envoyer un message,
+automatiquement ou non.
+➡️ **Le seul canal qui touche ces gens est la remise aux favoris de Vinted** —
+un clic, elle part **à tous en une fois**, et une remise convertit mieux qu'un
+message (§5.02). L'onglet Favoris faisait déjà la sélection, le calcul du montant
+et le défilement ; il gagne deux choses :
+- **« Ouvrir ↗ » copie le montant EN MÊME TEMPS** — c'était le seul geste en trop
+  du parcours : sur l'écran de Vinted il n'y a plus qu'à coller ;
+- un encart qui **dit** que Vinted ne nomme pas les personnes, au lieu de laisser
+  chercher un bouton qui ne peut pas exister.
+- **`montantRemise(o)`** devient la définition unique du montant (§11) : il était
+  calculé en deux endroits (la ligne d'info et le bouton « Copier »).
+⚠️ Le refus de l'**envoi automatique en série** reste entier (§32/§43) — mais ici
+il est même sans objet : il n'y a pas de liste de destinataires.
+
+### Vérifié
+`node --check` sur les deux fichiers · **19 audits au vert** ·
+`audit-recap.cjs` **+7 contrôles**, et **les 7 échouent sur le code d'avant**
+(§21, méthode §5.80 : `git archive` dans un arbre à part, script copié DEDANS et
+lancé DEPUIS cet arbre) — dont « 4 lectures directes restantes » sur l'ancien
+code · banc `visite_banc.cjs` (ordre inchangé, récap à 41 ms sur 357) · banc
+`recap_banc.cjs` (un seul bouton « Fermer », 0 génération envoyée depuis le
+récap) · **banc `fav_banc.cjs`** (nouveau) : l'onglet rend, le montant est
+calculé (38 € sur une annonce à 45 €), **jamais sous le prix d'achat**, le
+défilement démarre, **« Ouvrir » copie `38` et ouvre la bonne annonce**,
+0 erreur d'app.
+⚠️ Piège de banc (§21, encore) : le panneau **jette toute réponse sans `ok:true`**
+(`DATA = (resp && resp.ok) ? resp : {…}`). Mon premier banc servait les données
+sans ce champ → 7 contrôles rouges sur un code qui marchait.
+
+Extension **5.51.0** — à recharger dans Chrome.
+
+---
+
+## 5.90 — ARDOISE, BLANC, UN SEUL BLEU : la couleur devient RARE
+
+Julien : « je veux un meilleur visuel de l'app, je n'aime pas les couleurs »,
+puis « je te laisse choisir ».
+
+⚠️ **Cinq passes de palette avaient déjà échoué** (§5.54, §5.58, §5.61, §5.65,
+§5.66). J'ai donc commencé par **RENDRE l'app et la REGARDER** à sa résolution de
+travail (§5.76) avant de toucher une teinte — et le défaut se nomme, il n'est pas
+une affaire de goût :
+
+| ce que la capture montrait | pourquoi ça rate |
+|---|---|
+| les **4 chiffres de Ventes** en rouge / ambre / encre / vert, chacun avec un filet d'accent | quatre couleurs côte à côte ⟹ **plus rien ne ressort** |
+| un **bouton vermillon PLEIN répété sur chaque ligne** de vente | l'aplat le plus fort de l'écran servait le geste le moins important (un PDF) |
+| les **pastilles de compte** teintées (orange, bleu, violet, jaune) | une 5ᵉ famille de couleurs, pour une information secondaire |
+| fond beige `#EFE8DC` sous des cartes crème `#FFFCF6` | **écart trop faible : les cartes ne se détachaient pas** → bouillie |
+| le rail affichait le carré « VRM » **et** le mot « VRM » | §5.68 avait retiré le doublon de l'en-tête, pas celui-ci |
+
+### La règle posée — elle vaut plus que la teinte choisie
+> ⚠️ **UNE SEULE couleur d'accent, et elle est RARE.** Tout le reste est neutre.
+> Un chiffre ne porte une couleur que s'il y a **vraiment quelque chose à
+> rattraper** ; sinon il est à l'encre.
+
+### La nouvelle famille
+| | avant (papier/vermillon) | maintenant |
+|---|---|---|
+| fond | `#EFE8DC` beige | **`#F6F7F9`** gris froid |
+| cartes | `#FFFCF6` crème | **`#FFFFFF`** blanc franc + ombre très douce |
+| accent | `#D2401E` vermillon | **`#1E5FCC`** bleu profond, **rare** |
+| encre | `#1A1512` brune | **`#10151B`** ardoise |
+| chrome (rail, barre du bas) | encre brune | **`#131820`** ardoise — il reste sombre, c'est la signature |
+
+**Le froid est un choix, pas un hasard** : les photos de paires sont chaudes
+(cuir, beige, orange). Un cadre neutre froid les fait ressortir ; le beige leur
+faisait concurrence. Et le vert comme le turquoise ont déjà été essayés et
+rejetés (§5.58, §5.60, §5.70).
+
+### Ce qui change dans le code (et pas seulement dans les jetons)
+- **`StatBox`** : le filet du haut est **NEUTRE par défaut**. Une couleur ne se
+  pose que si l'appelant en passe une. Ventes : « Bénéfice net » et « En
+  attente » repassent à l'encre (le rouge reste sur un bénéfice **négatif**).
+- **« Ta semaine »** (Ma journée) : ses trois chiffres passent à l'encre — même
+  défaut, autre écran, ce bloc n'utilise pas `StatBox`.
+- **La carte « Argent en attente »** de l'accueil quitte son fond teinté pleine
+  largeur pour la **même surface blanche** que les cartes d'action au-dessus :
+  c'était la tache la plus forte de l'écran… pour une estimation.
+- **`AcctTag`** : seule la **pastille** reste colorée (elle sert à distinguer les
+  comptes) ; le fond et le texte deviennent neutres.
+- Les deux boutons **répétés sur chaque ligne** (« bordereau » sur Ventes,
+  « Baisser » sur Annonces) passent de l'aplat au **contour**.
+- **Rail** : la marque n'est plus écrite deux fois, et l'onglet actif est un
+  **liseré d'accent** au lieu d'un pavé plein — posée en aplat sur la navigation
+  à longueur de journée, la couleur d'accent ne signalait plus rien.
+- **`INV_STATUS`** (couleurs en dur, le piège de §5.66) réaligné.
+- **`index.html`** : la trame « papier » (rayures verticales) est **retirée** —
+  sur de l'ardoise elle se lisait comme une salissure ; le **grain** passe
+  DERRIÈRE les cartes (`z-index:-1`) au lieu de recouvrir la page en `multiply`,
+  qui **grisait les cartes blanches**. Barre de défilement, `::selection` et
+  `theme-color` réalignés.
+
+### Vérifié
+`npm run build` OK · **19 audits au vert** (dont `audit-variables` : aucun
+identifiant fantôme) · **`verif_visuel.cjs`** (nouveau banc) sur **10 écrans ×
+2 tailles (390 px et 1512 px)** : **0 écran vide, 0 débordement horizontal,
+0 artefact d'affichage, 0 erreur d'app** · captures relues avant/après sur Ma
+journée, Ventes et Annonces — c'est la lecture des images qui a trouvé les cinq
+défauts ci-dessus, aucun n'était visible au build ni au compte d'erreurs (§5.56,
+§5.76).
+
+⚠️ **Ce qui reste, dit franchement** : sur un grand écran, « Ma journée » laisse
+un vide en bas quand la journée est calme — la page est courte, c'est tout. Je
+ne l'ai pas rempli de décoration.
+
+---
+
+## 5.91 — LE RELEVÉ DU PORTE-MONNAIE : l'argent daté était en base, personne ne le lisait
+
+§5.88 avait nommé ça « le vrai chantier suivant » et laissé la question ouverte :
+Julien déclare l'argent **reçu**, l'app ne sait dater que la **vente** (§5.57 —
+7 jours d'écart en médiane, jusqu'à 25 ; la date de finalisation n'existe nulle
+part dans la moisson des commandes). Mesuré avant de coder (méthode §46) — et
+la réponse était déjà là.
+
+### Ce que la base dit (5 septembre)
+`/api/v2/users/{id}/payouts` — que l'extension appelle **DÉJÀ à chaque
+moisson** depuis la 4.26 — ne renvoie pas qu'un solde :
+```
+starting_date : "2026-08-01"                    ← le mois du relevé
+history       : [{year:2026, month:7, …}]       ← les mois consultables
+invoice_lines : [{ id, date:"2026-08-07T18:02:15Z", type:"credit",
+                   title:"Transfert vers le compte bancaire",
+                   amount:{amount:"-54.0"}, pending, entity_type:"payout" }]
+```
+➡️ **Le relevé daté est capté depuis des semaines, et rien ne le lisait** — même
+famille que §5.26 (les points de dépôt) et §5.10 (le texte des annonces).
+
+### ⚠️ POURQUOI IL DISPARAISSAIT : une seule ligne pour deux réponses
+Il n'y a qu'une ligne `harvest_{uid}_billing`, donc **la dernière réponse
+gagne** (§5.14 point 8). La capture passive du porte-monnaie renvoie
+`{main, escrow}` et écrasait donc le relevé de `payouts`. Mesuré : sur les
+9 comptes vivants, **7 portent `{main,escrow}`, 0 porte des `invoice_lines`** —
+seul un compte SUPPRIMÉ, plus jamais recapté, avait gardé la forme complète.
+Le garde-fou de §5.27 rejetait le vide et le hors-sujet ; il ne voyait pas la
+**collision de deux formes également valables**.
+
+➡️ Le relevé a désormais **sa propre ligne, une par compte et par mois** :
+`harvest_{uid}_releve_{YYYY-MM}`, écrite depuis les **deux** voies (passive
+`storeHarvest` + active `storeHarvestRow`, §5.27 : un garde-fou vit dans la
+fonction qui écrit) et **AVANT** le tri du solde — une réponse peut porter les
+mouvements sans porter de montant.
+
+### ⚠️ CE QU'ON NE CALCULE PAS, ET POURQUOI
+Le seul mouvement jamais observé est un **VIREMENT SORTANT vers sa banque** —
+et il porte `type: "credit"`. Donc **« credit » ne veut pas dire « recette »**,
+et la forme d'une ligne de VENTE n'a jamais été vue. Bâtir un chiffre de
+déclaration là-dessus serait deviner : un montant faux ne se voit pas (§22,
+§5.23, §5.38). On capte d'abord, on mesurera sur du vrai ensuite.
+Le résumé écrit à la capture ne porte donc que des **faits arithmétiques** :
+`virements` (les `entity_type:"payout"`, la seule chose que Vinted nomme avec
+certitude), `entrees` (montants positifs hors payout), `sorties` (négatifs hors
+payout). ⚠️ **Ne pas baptiser l'un d'eux « CA encaissé » avant d'avoir vu une
+ligne de vente en base.**
+
+### Les mois passés : un pari BORNÉ, qui sait s'arrêter
+`history` liste les mois, mais **le paramètre n'a jamais été observé**. On tente
+`?year=&month=` — et si Vinted rend le mois COURANT malgré la demande, on le
+voit à `starting_date`, on garde un échantillon (§5.24) et **on marque le compte
+muet définitivement** (`vrmReleveMuet`). Boucler sur un endpoint qui ignore nos
+paramètres, c'est exactement ce que §5.52 a dû retirer après 73 échecs.
+Garde-fous habituels : compte connecté (`garde`), plafond de 20 actions/h,
+**2 par visite**, pas de nouvel essai avant 24 h.
+⚠️ **Le mois COURANT ne coûte AUCUNE requête** : il arrive dans la réponse que
+la moisson fait déjà.
+
+### ⚠️ Deux bugs que ni le build ni `node --check` ne voyaient
+1. **`withOwner` est `async`.** L'appeler sans `await` écrivait une **Promise**
+   à la place du relevé : la ligne partait avec un `data` VIDE. Et il n'avait
+   rien à faire là — `supabaseUpsert` pose déjà le propriétaire ET choisit la
+   cible du conflit (§12). C'est le banc qui l'a attrapé.
+2. **`vinted_accounts` ne porte pas d'ID DE PROFIL.** Ma première version lisait
+   `acc.profile_id` — un champ qui n'existe pas, donc `capterReleves` sortait
+   toujours en silence. Le dressing et le porte-monnaie utilisent l'**ID de
+   profil** (§7), qui vit dans `harvest_{uid}_profile` : on le lit **en
+   scalaire** (§34), zéro requête ajoutée.
+
+### Côté app : une VÉRIFICATION, jamais un remplacement
+Le rapport comptable affiche le relevé **à côté** du CA, avec ce qu'il est :
+« ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au
+jour de la vente — l'écart, c'est le délai de finalisation ». Lecture en
+**scalaires** (les trois totaux sont précalculés à la capture, motif du widget
+§5.14) ; le détail des mouvements ne repart jamais dans l'app. Un compte
+supprimé ne compte pas (§5.20). Rien de capté ⟹ une ligne grise d'une phrase,
+pas un bandeau.
+
+### Au passage : la modale du rapport avait gardé l'ancienne identité
+Vu **en regardant la capture** (§5.76), pas en relisant le code : « Bénéfice
+net » en vert et « Cotisations » en ambre, chacun avec son filet coloré, alors
+que l'écran Ventes juste derrière est passé à l'encre (§5.90). Même défaut que
+le tableau de bord en §5.84. Les deux passent à l'encre — ces chiffres
+n'appellent aucune action ; le rouge reste pour un bénéfice **négatif**.
+Et le bandeau ambre « N vente(s) sans prix d'achat » répétait **mot pour mot**
+la légende du chiffre juste au-dessus (§5.67) : supprimé.
+
+### Vérifié
+`npm run build` OK · `node --check` OK · **20 audits au vert**, dont
+**`scripts/audit-releve.cjs` (nouveau, 27 contrôles)** qui exécute le VRAI code
+du service worker dans un `vm` contre la **vraie réponse relevée en base** —
+**prouvé dans les deux sens** (§21, méthode §5.80 : `git archive HEAD` dans un
+arbre à part, script copié DEDANS et lancé DEPUIS cet arbre) : **14 contrôles en
+échec sur le code d'avant** · banc du rapport RENDU sur les vraies données, avec
+une fixture **produite par la vraie fonction `storeReleve`** : août affiche
+« 2 mouvements sur 2 comptes · crédité 0,00 € · viré vers ta banque 108,00 € »,
+juin (rien de capté) affiche la ligne grise — **0 erreur d'app dans les deux
+sens** · `verif_visuel.cjs` : 10 écrans × 2 tailles, 0 écran vide, 0 débordement,
+0 artefact, 0 erreur. Extension **5.52.0** — à recharger dans Chrome.
+
+### ⚠️ CE QUI RESTE OUVERT
+- **La forme d'une ligne de VENTE** : à lire dans `harvest_*_releve_*` dès que
+  Julien aura navigué avec la 5.52. C'est ce qui débloquera un vrai « argent
+  reçu » par mois — et rien ne doit être affiché comme tel avant.
+- **Le paramètre des mois passés** : s'il est ignoré, `panel_diag_capture.rates.releve_mois`
+  le dira, et il faudra chercher l'URL réelle dans les requêtes captées.
+- **0 prix d'achat sur 278 paires** (§22) : inchangé, c'est de la frappe et
+  Julien s'en charge (outils : §5.47 en série, §5.64 en un tap).

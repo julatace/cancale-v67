@@ -1474,10 +1474,25 @@
     // ⚠️ Classe DISTINCTE de `.vrm-gen-bord` (les lignes de vente) : deux
     // câblages sur la même classe, le second écrase le premier — et le bouton
     // paraît mort. C'est exactement ce qui s'est passé au premier essai.
+    // Le chemin de secours : on ouvre LA vente et on prévient l'extension de
+    // quelle vente il s'agit, pour que le PDF téléchargé soit relié à elle.
+    const bm = panel.querySelector('#vrm-bord-manuel');
+    if (bm) bm.onclick = async () => {
+      const { uid, tx } = bordManuel || {};
+      if (!uid || !tx) return;
+      bm.disabled = true; bm.textContent = '⏳ …';
+      try {
+        await new Promise(res => chrome.runtime.sendMessage(
+          { from: 'cancale-vpanel', action: 'attendreBord', uid, tx }, () => res(null)));
+      } catch (_) {}
+      window.open(`https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`, '_blank', 'noopener');
+      bm.textContent = '✓ page ouverte — télécharge le bordereau';
+    };
     panel.querySelectorAll('.vrm-bord-act').forEach(b => {
       b.onclick = async () => {
         const { uid, tx, act } = b.dataset;
         if (!uid || !tx) return;
+        alerte = null; bordManuel = null;
         const avant = b.textContent;
         b.disabled = true; b.textContent = act === 'gen' ? '⏳ Génération…' : '⏳ Récupération…';
         try {
@@ -1486,7 +1501,21 @@
             (x) => res(chrome.runtime.lastError ? { ok: false, error: chrome.runtime.lastError.message } : x)));
           if (r && r.ok && r.envoye) { b.textContent = '✓ envoyé à l\'app'; b.style.background = '#0f6b4f'; setTimeout(load, 1200); }
           else if (r && r.ok) { b.textContent = '✓ généré'; b.style.background = '#0f6b4f'; b.title = "Le PDF n'est pas encore récupérable — il arrivera par email"; setTimeout(load, 1200); }
-          else { b.disabled = false; b.textContent = avant; alerte = (r && (r.error || r.message)) || 'Vinted a refusé'; render(); }
+          // ⚠️ UN ÉCHEC N'EST PAS UN CUL-DE-SAC. Avant, on affichait la raison
+          // technique (« Vinted n'a pas donné l'URL du PDF ») et Julien n'avait
+          // plus rien : ni PDF capté, ni email. Mesuré le 2 septembre —
+          // `tomj606` a DEUX colis dans ce cas, aucun imprimable.
+          // Le chemin qui marche existe : il télécharge le bordereau sur
+          // Vinted, `chrome.downloads` le capte et le range (§5.46). On lui
+          // ouvre donc la vente, en disant à l'extension DE QUELLE vente il
+          // s'agit — sinon, avec deux colis en attente, le PDF arriverait sans
+          // identité et le second écraserait le premier.
+          else {
+            b.disabled = false; b.textContent = avant;
+            alerte = ((r && (r.error || r.message)) || 'Vinted a refusé') + " — télécharge-le sur Vinted, l'extension le rangera toute seule";
+            bordManuel = { uid, tx };
+            render();
+          }
         } catch (e) { b.disabled = false; b.textContent = avant; alerte = String(e).slice(0, 120); render(); }
       };
     });
@@ -1821,12 +1850,22 @@
   // Règle : on descend au prix plancher s'il est posé, sinon −10 % arrondi.
   // ⚠️ Jamais en dessous du prix d'achat : on le signale au lieu de proposer
   //    une vente à perte (le prix d'achat, quand il est connu, fait foi).
-  function remiseLigne(o) {
-    const prix = Number(o.price);
-    if (!isFinite(prix) || prix <= 0) return '';
+  // LE montant à proposer aux favoris — une seule définition, lue partout
+  // (la ligne d'info, le bouton « Copier », et le clic « Ouvrir »). Deux
+  // calculs pour un même chiffre, c'est deux chiffres qui finissent par ne
+  // plus dire la même chose (§11).
+  function montantRemise(o) {
+    const prix = Number(o && o.price);
+    if (!isFinite(prix) || prix <= 0) return null;
     const plancher = Number(o.minPrice);
     const cible = Math.max(1, Math.round(isFinite(plancher) && plancher > 0 ? plancher : prix * 0.9));
-    if (cible >= prix) return '';
+    return cible >= prix ? null : cible;
+  }
+
+  function remiseLigne(o) {
+    const prix = Number(o.price);
+    const cible = montantRemise(o);
+    if (cible == null) return '';
     const achat = Number(o.buyPrice);
     const perte = isFinite(achat) && cible <= achat;
     const pct = Math.round((1 - cible / prix) * 100);
@@ -1846,11 +1885,8 @@
       return `
         <div class="vrm-m" style="margin-bottom:8px">Annonce <b>${i + 1}</b> / ${total} — ouvre-la, propose une remise à tes <b>${o.favs} favori${o.favs > 1 ? 's' : ''}</b> (bouton Vinted « offre aux favoris »), puis <b>Suivante</b>.</div>
         ${card(o, `<div class="vrm-m" style="margin-top:3px">❤️ ${o.favs} favori${o.favs > 1 ? 's' : ''}${o.views != null ? ` · 👁 ${o.views}` : ''}</div>${remiseLigne(o)}${(() => {
-          const prix = Number(o.price), plancher = Number(o.minPrice);
-          if (!isFinite(prix) || prix <= 0) return '';
-          const cible = Math.max(1, Math.round(isFinite(plancher) && plancher > 0 ? plancher : prix * 0.9));
-          if (cible >= prix) return '';
-          return `<button class="vrm-copy-line" data-c="${cible}" style="margin-top:6px;border:1px solid #0f6b4f;background:#0f6b4f;color:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">📋 Copier ${cible} €</button>`;
+          const cible = montantRemise(o);
+          return cible == null ? '' : `<button class="vrm-copy-line" data-c="${cible}" style="margin-top:6px;border:1px solid #0f6b4f;background:#0f6b4f;color:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">📋 Copier ${cible} €</button>`;
         })()}`)}
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="vrm-fav-go" data-act="open" style="flex:1;border:none;background:#D2401E;color:#fff;border-radius:10px;padding:9px;font-weight:800;cursor:pointer">Ouvrir ↗</button>
@@ -1870,7 +1906,8 @@
         <div class="vrm-st"><b style="color:#e2456b">❤️ ${favTot}</b><span class="vrm-m">favoris en attente</span></div>
         <div class="vrm-st"><b>${list.length}</b><span class="vrm-m">annonce${list.length > 1 ? 's' : ''} likée${list.length > 1 ? 's' : ''}</span></div>
       </div>
-      <div class="vrm-m" style="margin-bottom:8px">Ces annonces ont été mises en <b>favori</b> par des acheteurs. Coche celles où tu veux <b>leur envoyer une petite remise</b> pour déclencher la vente. L'extension t'ouvre chaque annonce, tu cliques le bouton <b>« Proposer une remise »</b> de Vinted. Rien n'est envoyé automatiquement.</div>
+      <div class="vrm-m" style="margin-bottom:8px">Ces annonces ont été mises en <b>favori</b> par des acheteurs. Coche celles où tu veux <b>leur proposer une remise</b> pour déclencher la vente : l'extension t'ouvre chaque annonce et <b>copie le montant</b>, tu cliques le bouton <b>« Proposer une remise »</b> de Vinted et tu colles.</div>
+      <div class="vrm-m" style="margin-bottom:8px;padding:7px 9px;border-radius:8px;background:#fff6ec;color:#9a5b16;border:1px solid #ffd7a8">ℹ️ <b>Vinted ne dit jamais QUI a mis en favori</b> — il donne seulement le nombre. Personne n'est donc joignable un par un. Sa remise aux favoris, elle, part <b>à tous en une fois</b> : c'est le seul canal qui les touche, et une remise convertit mieux qu'un message.</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="vrm-fav-go" data-act="all" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout cocher</button>
         <button class="vrm-fav-go" data-act="none" style="flex:1;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:6px;font-weight:700;font-size:11.5px;cursor:pointer">Tout décocher</button>
@@ -1888,7 +1925,16 @@
         else if (act === 'none') { favSel.clear(); render(); }
         else if (act === 'start') { if (!favSel.size) return; favRun = { queue: list.filter(o => favSel.has(o.id)).sort((a, b) => (b.favs || 0) - (a.favs || 0)), idx: 0 }; render(); }
         else if (act === 'stop') { favRun = null; render(); }
-        else if (act === 'open') { const o = favRun && favRun.queue[favRun.idx]; if (o && o.url) window.open(o.url, '_blank', 'noopener'); }
+        else if (act === 'open') {
+          // Le montant part dans le presse-papier EN MÊME TEMPS que l'annonce
+          // s'ouvre : sur l'écran de Vinted il n'y a plus qu'à coller. C'était
+          // le seul geste en trop du parcours.
+          const o = favRun && favRun.queue[favRun.idx];
+          const cible = montantRemise(o);
+          if (cible != null) { try { navigator.clipboard.writeText(String(cible)); } catch (_) {} }
+          if (o && o.url) window.open(o.url, '_blank', 'noopener');
+          if (cible != null) { const p = b.textContent; b.textContent = `Ouvert · ${cible} € copié`; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1600); }
+        }
         else if (act === 'next') { if (favRun) { favRun.idx++; render(); } }
       };
     });
@@ -2377,9 +2423,15 @@
   let q = '', passeport = null;
   // Message d'alerte affiché en haut du panneau (refus du garde-fou anti-blocage).
   let alerte = null;
+  // Quand la récupération automatique échoue, on garde SOUS LA MAIN la vente
+  // concernée : le bandeau propose alors de la télécharger sur Vinted, ce qui
+  // est le seul chemin qui marche à coup sûr — et l'extension le range.
+  let bordManuel = null;
   const bandeauAlerte = () => alerte ? `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
       <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} Action non envoyée</div>
       <div class="vrm-m" style="font-size:11.5px;margin-top:3px">${esc(alerte)}</div>
+      ${bordManuel ? `<button id="vrm-bord-manuel" style="margin-top:7px;border:none;background:#0f172a;color:#fff;border-radius:9px;padding:7px 11px;font:inherit;font-weight:800;font-size:12px;cursor:pointer">⬇ Ouvrir la vente sur Vinted</button>
+      <div class="vrm-m" style="font-size:11px;margin-top:4px">Télécharge le bordereau depuis cette page : l'extension le capte et le relie <b>à cette vente</b>, sans rien te demander.</div>` : ''}
     </div>` : '';
   const cont = (s, t) => String(s || '').toLowerCase().includes(t);
   function renderRecherche() {
@@ -3414,16 +3466,22 @@
     // envoyé dans l'app »). On le DIT : un geste silencieux n'inspire pas
     // confiance, surtout celui-là.
     if (nEnv) lignes.push(['🖨️', nEnv === 1 ? '1 bordereau envoyé dans l\'app' : nEnv + ' bordereaux envoyés dans l\'app', '✓']);
-    // Ce qui n'a PAS pu être généré tout seul : là, on demande.
-    if (aGen.length) lignes.push(['📦', aGen.length === 1 ? '1 bordereau à générer' : aGen.length + ' bordereaux à générer', '']);
+    // ⚠️ CE QUI RESTE N'EST PLUS UNE QUESTION (Julien, 3 septembre : « que ça
+    // envoie direct dans l'app sans me demander »). La génération a déjà eu
+    // lieu juste avant ce récap ; ce qui reste est bloqué par un garde-fou, et
+    // cliquer « Oui » retomberait sur le même mur. On l'ANNONCE, avec la raison.
+    if (aGen.length) lignes.push(['📦', aGen.length === 1 ? '1 bordereau pas encore généré' : aGen.length + ' bordereaux pas encore générés', '']);
 
     propo = document.createElement('div');
     propo.id = 'vrm-propo';
     propo.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;'
       + 'background:rgba(21,17,16,.45);backdrop-filter:blur(2px);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
-    const question = aGen.length
-      ? (aGen.length === 1 ? 'Je génère le bordereau ?' : 'Je génère les ' + aGen.length + ' bordereaux ?')
-      : '';
+    // Plus de question : une phrase qui dit ce qui va se passer tout seul.
+    const bl = recap.bloque;
+    const question = !aGen.length ? ''
+      : bl && bl.code === 'autre-compte' ? 'Ton navigateur est sur un autre compte — bascule dessus et ils partiront tout seuls.'
+      : bl && bl.code === 'trop-d-actions' ? "Plafond d'actions atteint sur ce compte — ils partiront à ta prochaine visite."
+      : 'Ils partiront tout seuls à ta prochaine visite sur Vinted.';
     propo.innerHTML = `
       <div id="vrm-propo-box" role="dialog" aria-modal="true" style="background:#FBF7F0;color:#151110;border:1px solid #D9CFBE;
            border-radius:8px;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:24px 22px 18px;width:340px;max-width:calc(100vw - 32px);text-align:center">
@@ -3445,40 +3503,14 @@
     const bouton = (id, txt, plein) => `<button id="${id}" style="flex:1;border:${plein ? 'none' : '1px solid #C3B49C'};`
       + `background:${plein ? '#151110' : '#FBF7F0'};color:${plein ? '#EFE8DC' : '#151110'};border-radius:6px;padding:11px 0;`
       + `font-size:15px;font-weight:${plein ? 700 : 600};cursor:pointer;font-family:inherit">${txt}</button>`;
-    // Pas de bordereau à générer ⟹ c'est une information, pas une question.
-    btns.innerHTML = aGen.length ? bouton('vrm-propo-non', 'Non', false) + bouton('vrm-propo-oui', 'Oui', true)
-                                 : bouton('vrm-propo-ok', 'Fermer', true);
+    // ⚠️ UN SEUL BOUTON, TOUJOURS : ce récap est une information, jamais une
+    // question (§5.88). Le bouton « Générer » par vente reste disponible dans
+    // l'onglet Bordereaux du panneau, pour le cas exceptionnel (§5.32).
+    btns.innerHTML = bouton('vrm-propo-ok', 'Fermer', true);
     const ok = propo.querySelector('#vrm-propo-ok'); if (ok) ok.onclick = fermerPropo;
-    const non = propo.querySelector('#vrm-propo-non'); if (non) non.onclick = fermerPropo;
-    // Cliquer à côté = « Non » (aucune action envoyée à Vinted).
+    // Cliquer à côté ferme aussi (aucune action envoyée à Vinted).
     propo.onclick = (e) => { if (e.target === propo) fermerPropo(); };
 
-    const oui = propo.querySelector('#vrm-propo-oui');
-    if (oui) oui.onclick = async () => {
-      btns.innerHTML = '';
-      let faits = 0, rates = 0, arret = '';
-      for (const v of aGen) {
-        sous.textContent = `Génération ${faits + rates + 1} sur ${aGen.length}…`;
-        const r = await new Promise(res => {
-          try { chrome.runtime.sendMessage({ action: 'genererBord', uid, tx: v.tx }, x => res(x || {})); }
-          catch (_) { res({}); }
-        });
-        if (r && r.ok) faits++;
-        else {
-          rates++;
-          // Un refus du garde-fou vaut pour toutes les suivantes : on s'arrête.
-          if (r && r.code) { arret = r.error || r.raison || ''; break; }
-        }
-      }
-      sous.textContent = arret ? arret
-        : rates ? `${faits} généré${faits > 1 ? 's' : ''}, ${rates} non — le détail est dans le panneau VRM.`
-        : (faits === 1 ? 'Bordereau généré, il part dans ton application.' : faits + ' bordereaux générés, ils partent dans ton application.');
-      sous.style.color = rates ? '#b45309' : '#0f6b4f';
-      sous.style.fontWeight = '600';
-      btns.innerHTML = bouton('vrm-propo-ok', 'Fermer', true);
-      const o2 = propo.querySelector('#vrm-propo-ok'); if (o2) o2.onclick = fermerPropo;
-      try { load(); } catch (_) {}
-    };
   }
   try {
     chrome.runtime.onMessage.addListener((msg) => {

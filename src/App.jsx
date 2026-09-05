@@ -13,52 +13,60 @@ const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
 // conservées : tout le reste du fichier lit toujours C.xxx sans changement.
 const THEMES = {
-  // ── IDENTITÉ : PAPIER, ENCRE, VERMILLON ───────────────────────────────────
-  // Julien, quatre fois : « je veux que ce soit choquant, qu'on ne reconnaisse
-  // presque plus l'application ». Les passes précédentes déplaçaient les
-  // couleurs de quelques pour cent — invisible, et il avait raison de le dire.
-  // On change donc de FAMILLE, pas de nuance :
-  //  · on quitte le tableau de bord sombre vert/teal (celui de tous les
-  //    outils SaaS) pour un fond PAPIER chaud et une ENCRE brune ;
-  //  · l'accent devient un VERMILLON franc — la couleur de la sneaker, pas
-  //    celle d'un graphique ;
-  //  · plus d'ombres portées en clair : des FILETS nets à la place. Une carte
-  //    ne flotte pas, elle est imprimée sur la page ;
-  //  · les formes passent de l'arrondi générique au CARRÉ (rayon 3-4 px).
+  // ── IDENTITÉ : ARDOISE, BLANC, UN SEUL BLEU ───────────────────────────────
+  // Julien, 3 septembre : « je veux un meilleur visuel, je n'aime pas les
+  // couleurs ». En REGARDANT l'écran (§5.76) le défaut se nomme : ce n'était
+  // pas une teinte à corriger, c'était QUATRE FAMILLES DE COULEURS qui se
+  // battaient sur le même écran — les 4 chiffres de Ventes en rouge / ambre /
+  // noir / vert, un bouton vermillon plein répété sur chaque ligne pour le
+  // geste le moins important, des pastilles de compte multicolores, et un fond
+  // beige trop proche du crème des cartes (elles ne se détachaient pas).
+  //
+  // La règle posée ici, et elle vaut plus que la teinte choisie :
+  //   ⚠️ UNE SEULE couleur d'accent, et elle est RARE. Tout le reste est
+  //      neutre. Un chiffre ne porte une couleur que s'il y a vraiment
+  //      quelque chose à rattraper — sinon il est à l'encre.
+  //
+  // Le froid est un choix, pas un hasard : les photos de paires sont chaudes
+  // (cuir, beige, orange). Un cadre neutre FROID les fait ressortir ; le beige
+  // leur faisait concurrence. Et le vert comme le turquoise ont déjà été
+  // essayés et rejetés (§5.58, §5.60, §5.70).
   // Les clés existantes sont conservées : tout le fichier lit toujours C.xxx.
   light: {
-    bg:"#EFE8DC", surface:"#FFFCF6", card:"#FFFCF6", card2:"#F6EFE2", border:"#D9CDB8",
-    accent:"#D2401E", accentSoft:"#E85B33", onAccent:"#FFFFFF",
-    danger:"#A8231A", warn:"#96650B", gold:"#8A6A2F",
-    blue:"#1F5A78", purple:"#584a86", text:"#1A1512", muted:"#6B6055",
-    // Pas d'ombre douce : un filet net sous la carte, comme une impression.
-    shadow:"0 1px 0 rgba(26,21,18,.07)",
-    shadowMd:"0 2px 0 rgba(26,21,18,.10)",
-    shadowLg:"0 3px 0 rgba(26,21,18,.13)",
-    ring:"rgba(210,64,30,.13)",
-    glass:"rgba(255,252,246,.90)",
-    // LE CHROME EST À L'ENCRE, MÊME EN CLAIR. Barre latérale, en-tête et barre
-    // du bas sont un bloc d'encre contre la page papier : c'est la signature
-    // qui rend l'app reconnaissable en une seconde, et ça règle au passage
+    bg:"#F6F7F9", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F1F3F6", border:"#E3E7EC",
+    accent:"#1E5FCC", accentSoft:"#3D7BE0", onAccent:"#FFFFFF",
+    danger:"#C0392B", warn:"#A15C00", gold:"#7A6636",
+    blue:"#1E5FCC", purple:"#5B4B9E", text:"#10151B", muted:"#5C6672",
+    // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
+    // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
+    // du papier n'ont plus de sens ici.
+    shadow:"0 1px 2px rgba(16,21,27,.06)",
+    shadowMd:"0 2px 6px rgba(16,21,27,.08)",
+    shadowLg:"0 8px 24px rgba(16,21,27,.10)",
+    ring:"rgba(30,95,204,.14)",
+    glass:"rgba(255,255,255,.88)",
+    // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
+    // sombre contre la page claire — c'est la signature, et ça règle au passage
     // l'incohérence du thème sur les composants qui ne se redessinent pas
-    // (`C` est une variable de module mutable, cf. §4).
-    chrome:"#1A1512", onChrome:"#F5EEE3", chromeMuted:"#9C8D7E", chromeLine:"#332A23",
-    s1:"#D2401E", s2:"#1F5A78",
+    // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
+    // plus brune : deux températures sur le même écran, ça se voit.
+    chrome:"#131820", onChrome:"#E7ECF2", chromeMuted:"#8592A3", chromeLine:"#242C37",
+    s1:"#1E5FCC", s2:"#0F8A6A",
   },
   dark: {
-    // Le sombre reste CHAUD (encre, pas ardoise) : c'est la même identité, la
-    // nuit. Le vermillon s'éclaircit pour tenir le contraste sur le brun.
-    bg:"#151110", surface:"#1E1917", card:"#1E1917", card2:"#292320", border:"#3D342E",
-    accent:"#FF6B3D", accentSoft:"#FF8A63", onAccent:"#1B0C05",
-    danger:"#FF7F6B", warn:"#E0A945", gold:"#D8B071",
-    blue:"#69B4D6", purple:"#a795e0", text:"#F6EFE6", muted:"#A2948A",
-    shadow:"0 1px 0 rgba(0,0,0,.55)",
-    shadowMd:"0 2px 0 rgba(0,0,0,.6)",
-    shadowLg:"0 3px 0 rgba(0,0,0,.7)",
-    ring:"rgba(255,107,61,.16)",
-    glass:"rgba(30,25,23,.90)",
-    chrome:"#0F0C0B", onChrome:"#F6EFE6", chromeMuted:"#9C8D7E", chromeLine:"#2C2521",
-    s1:"#FF6B3D", s2:"#69B4D6",
+    // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
+    // éclairci pour tenir le contraste. Ce n'est pas un inversement mécanique.
+    bg:"#0E1116", surface:"#171B22", card:"#171B22", card2:"#1F242C", border:"#2C333D",
+    accent:"#5B9BFF", accentSoft:"#7FB4FF", onAccent:"#08111F",
+    danger:"#FF7A6E", warn:"#E0A945", gold:"#C9AE78",
+    blue:"#5B9BFF", purple:"#A99AF0", text:"#E8ECF1", muted:"#98A3B2",
+    shadow:"0 1px 2px rgba(0,0,0,.5)",
+    shadowMd:"0 2px 8px rgba(0,0,0,.55)",
+    shadowLg:"0 10px 28px rgba(0,0,0,.6)",
+    ring:"rgba(91,155,255,.18)",
+    glass:"rgba(23,27,34,.90)",
+    chrome:"#0A0D12", onChrome:"#E8ECF1", chromeMuted:"#8592A3", chromeLine:"#1D242D",
+    s1:"#5B9BFF", s2:"#37D39A",
   },
 };
 let C = THEMES.light;
@@ -574,7 +582,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
-  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq',
+  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
@@ -2319,6 +2327,55 @@ const montantCommande = (o) => {
   return isNaN(n) ? 0 : n;
 };
 const parDateDesc = (a, b) => tsCommande(b) - tsCommande(a);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE CHIFFRE D'AFFAIRES À DÉCLARER — UNE SEULE RÈGLE (§11)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux un rapport tous les mois de la somme de toutes les ventes
+// finalisées pour mon URSSAF ». Trois endroits calculaient ça chacun de leur
+// côté (tableau de bord, récap mensuel, rapport comptable) — donc trois chiffres
+// qui pouvaient se contredire sur un document qui part à l'administration.
+//
+// ⚠️⚠️ DEUX DÉFAUTS MESURÉS LE 2 SEPTEMBRE, TOUS DEUX SUR DE L'ARGENT DÉCLARÉ :
+//  1. le rapport ÉCARTAIT les ventes masquées dans l'app (`isHidden`) —
+//     **101 ventes finalisées, 2 174,80 €**. Sur juin 2026 il affichait
+//     **41 €** au lieu de **1 512,70 €**. Masquer une carte range un écran ;
+//     ça n'annule pas une vente encaissée. **On inclut tout, et on le DIT.**
+//  2. le récap du tableau de bord lisait l'archive `vinted_sales`, **vide
+//     depuis juillet 2026** (§4) → il affichait 0 € partout.
+//
+// La règle : une vente compte si Vinted la dit FINALISÉE, à sa DATE DE VENTE
+// (§5.57 : « on ne te parle pas de transfert d'argent, simplement des ventes
+// finalisées »). Annulées et remboursées ne comptent jamais — ce n'est pas du
+// chiffre d'affaires.
+const TAUX_URSSAF_DEFAUT = 13.5;
+// Le taux est un RÉGLAGE, pas une constante : il dépend de l'activité et de
+// l'option pour le versement libératoire, et lui seul connaît le sien. On garde
+// 13,5 % par défaut pour ne rien changer en silence à ce qu'il voyait avant.
+const tauxUrssaf = () => {
+  const v = parseFloat(String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)).replace(',', '.'));
+  return (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT;
+};
+const moisDeVente = (o) => {
+  const t = tsCommande(o); if (!t) return null;
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'completed';
+// Répartition par mois du CA déclarable. `masquee(o)` sert UNIQUEMENT à compter
+// à part ce que l'app cache à l'écran : le total, lui, ne l'écarte jamais.
+const caUrssafParMois = (ventes, masquee) => {
+  const map = {};
+  for (const o of (ventes || [])) {
+    if (!venteFinalisee(o)) continue;
+    const ym = moisDeVente(o); if (!ym) continue;
+    const eur = montantCommande(o);
+    const m = map[ym] || (map[ym] = { ym, n: 0, ca: 0, nMasq: 0, caMasq: 0 });
+    m.n += 1; m.ca += eur;
+    if (masquee && masquee(o)) { m.nMasq += 1; m.caMasq += eur; }
+  }
+  return map;
+};
 // Heure locale d'une vente (« 14:07 »), affichée à côté de la date.
 const heureCommande = (o) => {
   const t = tsCommande(o); if (!t) return '';
@@ -3389,11 +3446,16 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null}) {
   // dans une page imprimée.
   // La taille suit toujours la LONGUEUR de la valeur : un montant à 5 chiffres
   // ne doit jamais se couper (§5.26).
+  // ⚠️ LE FILET EST NEUTRE PAR DÉFAUT. Avant, chaque chiffre portait un filet
+  // d'accent : quatre côte à côte, donc quatre couleurs, donc plus rien qui
+  // ressort (mesuré en regardant l'écran Ventes, §5.90). Une couleur ne se pose
+  // ici QUE si l'appelant en passe une — c'est-à-dire quand il y a vraiment
+  // quelque chose à rattraper.
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
   const fs = !L ? 'clamp(22px,7.4vw,34px)' : L <= 5 ? 'clamp(22px,7.4vw,34px)' : L <= 7 ? 'clamp(19px,6.2vw,28px)' : L <= 9 ? 'clamp(16px,4.8vw,21px)' : L <= 11 ? 'clamp(14px,3.9vw,17px)' : 'clamp(12px,3.2vw,14px)';
   return (
-    <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.accent:color}`}}>
+    <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`}}>
       <div className="vrm-label" style={{color:C.muted,minHeight:'2.44em'}}>{label}</div>
       <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,marginTop:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
@@ -4273,9 +4335,11 @@ function SideBar({ tab, setTab }) {
       display:'flex',flexDirection:'column',gap:2,
       background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,
       padding:'14px 12px 14px',overflowY:'auto'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,padding:'2px 6px 16px'}}>
-        <VrmLogo size={34}/>
-        <VrmWord height={17} color={C.onChrome} accent={C.accent}/>
+      {/* ⚠️ LA MARQUE EST ÉCRITE UNE SEULE FOIS. Le carré porte déjà les trois
+          lettres : le poser à côté du mot revenait à écrire « VRM VRM » en haut
+          de chaque écran (§5.68 l'avait corrigé dans l'en-tête, pas ici). */}
+      <div style={{display:'flex',alignItems:'center',padding:'6px 8px 18px'}}>
+        <VrmWord height={19} color={C.onChrome} accent={C.accent}/>
       </div>
       {groupes.map(g => (
         <div key={g.titre} style={{marginBottom:6}}>
@@ -4286,9 +4350,16 @@ function SideBar({ tab, setTab }) {
               <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={on?'page':undefined}
                 style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
                   padding:'9px 10px',marginBottom:2,borderRadius:3,border:'none',cursor:'pointer',fontFamily:'inherit',
-                  background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.onChrome,
+                  position:'relative',
+                  // ⚠️ L'onglet actif est un LISERÉ, plus un pavé plein d'accent.
+                  // La couleur d'accent doit rester rare : posée en aplat sur la
+                  // navigation, elle était la tache la plus forte de l'écran à
+                  // longueur de journée, donc elle ne signalait plus rien.
+                  background:on?'rgba(255,255,255,.09)':'transparent',
+                  color:on?'#fff':C.onChrome,
                   fontSize:13.5,fontWeight:on?600:500,transition:'background .15s ease,color .15s ease'}}>
-                <Icon name={t.icon} size={19} style={{opacity:on?1:.68,flexShrink:0}}/>
+                {on && <span aria-hidden="true" style={{position:'absolute',left:0,top:6,bottom:6,width:3,borderRadius:2,background:C.accent}}/>}
+                <Icon name={t.icon} size={19} style={{opacity:on?1:.68,flexShrink:0,color:on?C.accent:undefined}}/>
                 <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
               </button>
             );
@@ -5063,17 +5134,36 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
     return {ca:caM, profit:profitM, count:countM, nom:labels[now.getMonth()]};
   },[encaissees]);
 
-  // Cotisations + impôt du MOIS EN COURS : 13,5 % du CA encaissé du mois.
-  // C'est la somme à payer à la fin du mois (versement libératoire).
-  const TAUX_URSSAF=0.135;
-  const urssafEstime=moisCourant.ca*TAUX_URSSAF;
-  const netApresUrssaf=moisCourant.ca-urssafEstime;
+  // ⚠️ LE RÉCAP URSSAF NE VIENT PLUS DE L'ARCHIVE (elle est vide depuis
+  // juillet 2026, §4 — il affichait donc 0 € partout). Il vient de la photo
+  // publiée par l'écran Ventes, qui est le propriétaire des ventes (§11) :
+  // ventes FINALISÉES, à leur date de vente, ventes masquées comprises.
+  const urssafMois = useMemo(() => {
+    const v = load('vinted_urssaf_mois', null);
+    return (v && Array.isArray(v.mois)) ? v.mois : null;
+  }, [liveStats]);
+  const TAUX_URSSAF = tauxUrssaf()/100;
+  const moisCourantCA = useMemo(() => {
+    if (!urssafMois) return moisCourant.ca;
+    const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const e = urssafMois.find(m=>m.ym===ym);
+    return e ? e.ca : 0;
+  }, [urssafMois, moisCourant.ca]);
+  const urssafEstime=moisCourantCA*TAUX_URSSAF;
+  const netApresUrssaf=moisCourantCA-urssafEstime;
   // Échéance de déclaration URSSAF (fréquence réglable) + CA encaissé de la
   // période concernée → somme estimée à déclarer/payer à cette date.
   const [urssafFreq,setUrssafFreq]=useState(()=>load('vinted_urssaf_freq','trimestriel'));
   const urssafDue=useMemo(()=>nextUrssafDeadline(urssafFreq),[urssafFreq]);
   const urssafPeriodCA=useMemo(()=>{
     if(!urssafDue) return 0;
+    if (urssafMois) {
+      // Un mois publié tombe dans la période si son 1er jour y est.
+      return urssafMois.reduce((s,m)=>{
+        const [y,mo]=m.ym.split('-'); const d=new Date(Number(y),Number(mo)-1,1);
+        return (d>=urssafDue.periodStart && d<=urssafDue.periodEnd) ? s+m.ca : s;
+      },0);
+    }
     return encaissees.filter(v=>{
       const p=(v.receiveDate||'').trim().split('/'); if(p.length!==3) return false;
       const d=new Date(+p[2],+p[1]-1,+p[0]); if(isNaN(d)) return false;
@@ -5150,18 +5240,28 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         map[key].ca+=+v.sellPrice; map[key].profit+=(+v.sellPrice-+v.buyPrice); map[key].count++;
       }
     });
-    return Object.keys(map).sort().reverse().map(k=>({
+    const depuisArchive = Object.keys(map).sort().reverse().map(k=>({
       label:`${moisNoms[map[k].mois-1]||map[k].mois} ${map[k].annee}`,
       ca:map[k].ca, profit:map[k].profit, count:map[k].count,
-      urssaf:map[k].ca*0.135, net:map[k].ca-map[k].ca*0.135
+      urssaf:map[k].ca*TAUX_URSSAF, net:map[k].ca-map[k].ca*TAUX_URSSAF
     }));
-  },[encaissees]);
+    if (!urssafMois) return depuisArchive;
+    // ⚠️ Le bénéfice n'est PAS calculable ici (les prix d'achat vivent sur
+    // l'écran Annonces) : on le laisse à null et la colonne affiche « — »
+    // plutôt qu'un zéro qui passerait pour un vrai chiffre.
+    return urssafMois.map(m=>{
+      const [y,mo]=m.ym.split('-');
+      return { label:`${moisNoms[Number(mo)-1]||mo} ${y}`, ca:m.ca, profit:null, count:m.n,
+               nMasq:m.nMasq, caMasq:m.caMasq,
+               urssaf:m.ca*TAUX_URSSAF, net:m.ca-m.ca*TAUX_URSSAF };
+    });
+  },[encaissees,urssafMois,TAUX_URSSAF]);
 
   // Téléchargement du récap comptable MENSUEL en CSV
   const exportCompta=()=>{
     try{
-      const rows=[['Mois','Ventes','CA encaisse','Benefice','Cotisations+impot 13,5%','Net estime']];
-      moisRecap.forEach(m=>rows.push([m.label,m.count,m.ca.toFixed(2),m.profit.toFixed(2),m.urssaf.toFixed(2),m.net.toFixed(2)]));
+      const rows=[['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'Net estime']];
+      moisRecap.forEach(m=>rows.push([m.label,m.count,m.ca.toFixed(2),m.profit==null?'':m.profit.toFixed(2),m.urssaf.toFixed(2),m.net.toFixed(2)]));
       const csv=rows.map(r=>r.join(';')).join('\n');
       const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
       const url=URL.createObjectURL(blob);
@@ -5298,7 +5398,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
       {/* Estimation cotisations du MOIS EN COURS */}
       <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
         <div style={{fontSize:11,color:C.warn,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
-          🧾 À payer pour {moisCourant.nom} (13,5 % du CA encaissé)
+          🧾 À payer pour {moisCourant.nom} ({String(tauxUrssaf()).replace('.',',')} % du CA finalisé)
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
           <div>
@@ -5311,7 +5411,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           </div>
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          Calculé sur le CA encaissé de {moisCourant.nom} ({fmt(moisCourant.ca)}). C'est la somme à verser à la fin du mois (versement libératoire). Vérifie ton taux sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
+          Calculé sur le CA des ventes <b>finalisées</b> de {moisCourant.nom} ({fmt(moisCourant.ca)}), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).
+        </div>
+        {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ sur la période.
+            L'app date chaque vente au jour où elle a été VENDUE — la date à
+            laquelle Vinted libère l'argent n'est pas connue pour toutes les
+            ventes, donc on ne peut pas l'utiliser sans exclure des lignes en
+            silence. L'écart est de quelques jours à quelques semaines : on le
+            DIT au lieu de laisser croire à un chiffre officiel. */}
+        <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
+          ⚠️ Ces ventes sont datées au jour de la <b>vente</b>, pas au jour où Vinted t'a versé l'argent (l'app ne connaît pas cette date pour toutes). Sur une fin de mois, un ou deux jours d'écart sont possibles — vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr, je ne suis pas comptable.
         </div>
         {/* Prochaine échéance de DÉCLARATION (rappel) */}
         <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
@@ -5332,8 +5441,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
                   <span style={{fontSize:15,fontWeight:700,color:col}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                   <span style={{fontSize:12,fontWeight:600,color:col}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
                 </div>
-                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA encaissé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(urssafPeriodCA*TAUX_URSSAF)}</b></div>
-                <div style={{fontSize:9,color:C.muted,marginTop:5}}>Estimation (13,5 %). La vraie déclaration se fait sur autoentrepreneur.urssaf.fr.</div>
+                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA finalisé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(urssafPeriodCA*TAUX_URSSAF)}</b></div>
+                <div style={{fontSize:9,color:C.muted,marginTop:5}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %). La vraie déclaration se fait sur autoentrepreneur.urssaf.fr.</div>
               </div>
             );
           })() : <div style={{fontSize:11,color:C.muted}}>Aucune échéance à venir.</div>}
@@ -5496,7 +5605,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                  {['Mois','Ventes','CA encaissé','Bénéfice','Cotis.+impôt 13,5 %','Net estimé'].map(h=>(
+                  {['Mois','Ventes','CA finalisé','Bénéfice',`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'Net estimé'].map(h=>(
                     <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
@@ -5507,7 +5616,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.accent,whiteSpace:'nowrap'}}>{m.label}</td>
                     <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500}}>{fmt(m.ca)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:C.accent}}>{fmt(m.profit)}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.accent}}>{m.profit==null?'—':fmt(m.profit)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.warn}}>{fmt(m.urssaf)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(m.net)}</td>
                   </tr>
@@ -5516,7 +5625,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             </table>
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
-            Cotisations + impôt estimés à 13,5 % du CA encaissé chaque mois (versement libératoire). Vérifie auprès de l'URSSAF.
+            Somme des ventes que Vinted a marquées <b>finalisées</b>, à leur date de vente — annulées et remboursements exclus, ventes masquées comprises. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Réglages). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </Card>
       )}
@@ -10231,10 +10340,10 @@ function VintedAccounts({ accounts, setAccounts }) {
 // l'ancienne identité au milieu de la nouvelle — les badges N° restaient VERTS
 // sur une app vermillon. Elles suivent maintenant la famille papier/encre.
 const INV_STATUS = {
-  online:       { label: 'En ligne',      color: '#1F7A5C', icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#1F5A78', icon: '⏳' },
-  sold:         { label: 'Vendu',         color: '#D2401E', icon: '💸' },
-  stock:        { label: 'Stock',         color: '#96650B', icon: '📦' },
+  online:       { label: 'En ligne',      color: '#0F8A6A', icon: '🟢' },
+  pending_sale: { label: 'Vente en cours', color: '#1E5FCC', icon: '⏳' },
+  sold:         { label: 'Vendu',         color: '#5C6672', icon: '💸' },
+  stock:        { label: 'Stock',         color: '#A15C00', icon: '📦' },
 };
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
@@ -10793,9 +10902,14 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
 const ACCT_COLORS = ['#2f80ed','#9b51e0','#eb5757','#27ae60','#f2994a','#00b8a9','#e056fd','#f39c12'];
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 function AcctTag({ acc, name }) {
+  // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
+  // comptes, huit étiquettes teintées ajoutaient une famille de couleurs
+  // complète sur des écrans qui en portaient déjà trois (§5.90) — alors que la
+  // couleur ne sert ici qu'à distinguer les comptes entre eux. Le point suffit
+  // pour ça ; le texte redevient neutre.
   const col = acctColor(acc?.vinted_user_id);
-  return <span style={{display:'inline-flex',alignItems:'center',gap:4,background:col+'22',color:col,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:3,whiteSpace:'nowrap'}}>
-    <span style={{width:6,height:6,borderRadius:3,background:col}}/>{name}
+  return <span style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:3,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
+    <span style={{width:6,height:6,borderRadius:3,background:col,flexShrink:0}}/>{name}
   </span>;
 }
 
@@ -12260,6 +12374,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!memeChose) save('vinted_nums_physiques', { nums: liste, at: Date.now() });
     } catch (_) {}
   }, [listings.items, sales.items, numeros, saleOv]);
+
+  // ⚠️⚠️ LE RÉCAP URSSAF DU TABLEAU DE BORD AFFICHAIT 0 € PARTOUT.
+  // Il lit `vinted_sales` — l'archive des anciennes ventes, VIDÉE en juillet
+  // 2026 (§4). Donc « cotisations du mois », « CA de la période à déclarer » et
+  // le tableau « récap comptable par mois » étaient tous à zéro, alors que la
+  // moisson Vinted porte 5 814 € de ventes finalisées (mesuré le 2 septembre).
+  // C'est cet écran-là que Julien appelle « mon rapport tous les mois ».
+  // L'écran Ventes est le PROPRIÉTAIRE des ventes (§11) : il publie le récap,
+  // le tableau de bord le consomme — même motif que `vinted_nums_physiques`.
+  useEffect(() => {
+    if (!sales.items) return;                       // rien de sûr à publier
+    try {
+      const parMois = caUrssafParMois(sales.items, isHidden);
+      const liste = Object.values(parMois)
+        .map(m => ({ ym: m.ym, n: m.n, ca: Math.round(m.ca*100)/100, nMasq: m.nMasq, caMasq: Math.round(m.caMasq*100)/100 }))
+        .sort((a,b)=> a.ym < b.ym ? 1 : -1);
+      const avant = load('vinted_urssaf_mois', null);
+      const memeChose = avant && JSON.stringify(avant.mois) === JSON.stringify(liste);
+      if (!memeChose) save('vinted_urssaf_mois', { mois: liste, at: Date.now() });
+    } catch (_) {}
+  }, [sales.items, hiddenSales, hiddenAccts]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -14463,26 +14598,89 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [moisOuvert, setMoisOuvert] = useState(false);
+  const [reportAnnee, setReportAnnee] = useState(() => new Date().getFullYear());
   const ymOf = (dstr) => { if(!dstr) return null; const d=new Date(dstr); if(isNaN(d)) return null; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
-  // Mois disponibles (ventes + achats) pour le sélecteur.
-  const reportMonths = useMemo(() => {
+  // ⚠️ Les mois qui portent vraiment des ventes FINALISÉES — c'est ce qu'on
+  // déclare. Sert à ouvrir le rapport sur un mois qui a du contenu (le 2 du
+  // mois, le mois en cours est vide : on croit que ses ventes ont disparu) et
+  // à marquer les mois de la grille.
+  const derniersMoisDeclarables = useMemo(() => {
     const s = new Set();
-    (sales.items||[]).forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
-    buysBase.forEach(o=>{ const m=ymOf(o.date); if(m) s.add(m); });
-    s.add(reportMonth);
+    (sales.items||[]).forEach(o=>{ if(venteFinalisee(o)){ const m=ymOf(o.date); if(m) s.add(m); } });
     return [...s].sort().reverse();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase]);
+  }, [sales.items]);
+  // ── LE RELEVÉ DU PORTE-MONNAIE : l'argent réellement crédité ────────────
+  // ⚠️ CE QUE CE RAPPORT NE PEUT PAS DIRE, ET POURQUOI ON L'AFFICHE QUAND MÊME.
+  // Julien déclare l'argent REÇU ; ce rapport date tout au jour de la VENTE
+  // (§5.57 — la date d'encaissement n'existe nulle part dans la moisson des
+  // commandes, elle a donc été retirée). Mesuré : 7 jours d'écart en médiane,
+  // jusqu'à 25. Le relevé du porte-monnaie Vinted, lui, est daté — l'extension
+  // le capte depuis la 5.52 (§5.91) et le range par mois.
+  // On le montre À CÔTÉ du CA, comme une VÉRIFICATION, jamais à sa place :
+  // c'est un fait mesuré, pas un chiffre de déclaration.
+  // ⚠️ Lecture en SCALAIRES (§34) : les trois totaux sont précalculés à la
+  // capture. Le détail des mouvements ne repart jamais dans l'app.
+  const [releveMois, setReleveMois] = useState({ mois:null, lignes:null });
+  useEffect(() => {
+    if (!showReport || !reportMonth) return;
+    if (releveMois.mois === reportMonth) return;
+    let mort = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_releve_${encodeURIComponent(reportMonth)}`
+          + `&select=id,vir:data->resume->>virements,ent:data->resume->>entrees,sor:data->resume->>sorties,n:data->resume->>n`,
+          { headers: sbAuth() });
+        const j = r.ok ? await r.json() : [];
+        if (!mort) setReleveMois({ mois: reportMonth, lignes: Array.isArray(j) ? j : [] });
+      } catch (_) { if (!mort) setReleveMois({ mois: reportMonth, lignes: [] }); }
+    })();
+    return () => { mort = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReport, reportMonth]);
+  const releveTotaux = useMemo(() => {
+    const l = releveMois.mois === reportMonth ? (releveMois.lignes || []) : null;
+    if (!l || !l.length) return null;
+    const n = (v) => { const x = parseFloat(String(v ?? '').replace(',','.')); return isFinite(x) ? x : 0; };
+    // ⚠️ Un compte SUPPRIMÉ ne compte pas (même règle que partout, §5.20) :
+    // ses lignes restent en base, elles n'ont rien à faire dans un total.
+    const vivants = new Set(accounts.map(a => String(a.vinted_user_id)));
+    const gardees = l.filter(r => { const m = /^harvest_(\d+)_releve_/.exec(String(r.id||'')); return m && vivants.has(m[1]); });
+    if (!gardees.length) return null;
+    return {
+      comptes: gardees.length,
+      entrees: gardees.reduce((a,r)=>a+n(r.ent),0),
+      sorties: gardees.reduce((a,r)=>a+n(r.sor),0),
+      virements: gardees.reduce((a,r)=>a+n(r.vir),0),
+      n: gardees.reduce((a,r)=>a+n(r.n),0),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [releveMois, reportMonth, accounts]);
   const report = useMemo(() => {
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
     const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
+    let nMasq=0, caMasq=0, nAttente=0, caAttente=0;
     const saleLines=[];
     for (const o of (sales.items||[])) {
-      if (isHidden(o)) continue;
-      if (classifyOrderStatus(o.status)!=='completed') continue;
+      // ⚠️ ON N'ÉCARTE PLUS LES VENTES MASQUÉES. Le ✕ d'une carte range un
+      // écran ; il n'annule pas une vente encaissée. Mesuré le 2 septembre :
+      // l'exclusion retirait 101 ventes finalisées / 2 174,80 €, et faisait
+      // afficher 41 € au lieu de 1 512,70 € sur juin 2026. On les compte, et
+      // on affiche à part combien elles pèsent pour que ce soit vérifiable.
       if (ymOf(o.date)!==reportMonth) continue;
+      if (!venteFinalisee(o)) {
+        // ⚠️ Un mois n'est PAS complet le jour où il se termine : une vente se
+        // finalise ~2 semaines après. Mesuré le 3 septembre, août portait 110
+        // ventes finalisées (3 345,20 €) et 59 ENCORE EN COURS (1 174,90 €).
+        // Annoncer le premier chiffre sans dire que le second existe, c'est
+        // présenter comme définitif un CA qui va encore monter.
+        if (classifyOrderStatus(o.status)!=='cancelled') { nAttente+=1; caAttente+=montantCommande(o); }
+        continue;
+      }
+      if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
@@ -14509,12 +14707,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const marge = margeKnown - fraisConnu; // ventes - achats - boosts, sur les ventes au coût connu
     const tvaMarge = (regime==='marge' && marge>0) ? marge * (tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
-    const urssaf = ca * 0.135;
-    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, saleLines, buyLines, achatsTotal };
+    const taux = tauxUrssaf();
+    const urssaf = ca * (taux/100);
+    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
-  const openReport = () => { setShowReport(true); if (buys.items===null && accounts.length) loadOrders('purchased', setBuys); };
+  // ⚠️ Il a choisi un mois : on ne le déplace plus sous ses doigts.
+  const moisChoisiMain = useRef(false);
+  const openReport = () => {
+    setShowReport(true);
+    if (!moisChoisiMain.current && derniersMoisDeclarables[0]) {
+      setReportMonth(derniersMoisDeclarables[0]);
+      setReportAnnee(Number(derniersMoisDeclarables[0].slice(0,4)));
+    }
+    if (buys.items===null && accounts.length) loadOrders('purchased', setBuys);
+  };
 
   // Export CSV du rapport (ventes + registre d'achats).
   const exportReportCsv = () => {
@@ -14532,7 +14740,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push(['CA encaissé',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
+    else { L.push(['CA des ventes finalisées',R.ca.toFixed(2)]); L.push(['Bénéfice net',R.benefNet.toFixed(2)]); if(R.nbCout<R.nb) L.push(['(bénéfice calculé sur les ventes au coût connu)',`${R.nbCout}/${R.nb}`]); L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
+    // ⚠️ Le document part chez un comptable : ce qui n'y est PAS encore doit
+    // partir avec lui, sinon un mois se présente comme terminé (§5.84).
+    if (R.nAttente>0) L.push([`Ventes de ce mois pas encore finalisees (hors CA)`,`${R.nAttente}`,R.caAttente.toFixed(2)]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.csv`; document.body.appendChild(a); a.click(); a.remove();
@@ -14551,7 +14763,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
     if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
+    if (R.nAttente>0) kv('Ventes de ce mois pas encore finalisees (hors CA)', R.nAttente+' — '+R.caAttente.toFixed(2)+' EUR');
     kv('Nombre de ventes', String(R.nb));
     kv('Achats du mois (registre)', R.buyLines.length+' — '+R.achatsTotal.toFixed(2)+' EUR');
     y-=6; page.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
@@ -14574,11 +14788,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tvaRate = Number(load('vinted_tva',20))||20;
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
+    let nMasq=0, caMasq=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
     for (const o of (sales.items||[])) {
-      if (isHidden(o)) continue;
-      if (classifyOrderStatus(o.status)!=='completed' || !o.date) continue;
+      // ⚠️ MÊME RÈGLE QUE LE RAPPORT MENSUEL : une vente masquée à l'écran
+      // reste du chiffre d'affaires. On la compte, et on dit combien elle pèse.
+      if (!venteFinalisee(o) || !o.date) continue;
       const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
+      if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
@@ -14599,11 +14816,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     buyLines.sort((a,b)=> new Date(b.date)-new Date(a.date));
     const benefNet = margeKnown - fraisConnu;   // ⚠️ ventes au coût connu uniquement (cf. rapport mensuel)
-    const marge = margeKnown - frais;
+    // ⚠️ `marge` retranchait `frais` (les boosts de TOUTES les ventes) d'un
+    // `margeKnown` qui ne porte que les ventes au coût connu — deux ensembles
+    // différents dans la même soustraction. §5.84 l'avait corrigé sur le
+    // rapport MENSUEL et pas ici : le rapport annuel sortait donc une marge
+    // trop basse, sur un document qui part chez le comptable.
+    const marge = margeKnown - fraisConnu;
     const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
-    const urssaf = ca*0.135;
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, urssaf, achatsTotal, achatsNb, buyLines, saleLines };
+    const taux = tauxUrssaf();
+    const urssaf = ca*(taux/100);
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
@@ -14624,7 +14847,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push([`Bilan annuel ${R.year}`]);
     L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
     L.push([]);
-    L.push(['Mois','CA encaissé','Coût achat','Boosts','Bénéfice net','Ventes']);
+    L.push(['Mois','CA des ventes finalisees','Cout achat','Boosts','Benefice net','Ventes']);
     R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.ca-m.cout-m.frais).toFixed(2), String(m.nb)]));
     L.push(['TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2), String(R.nb)]);
     L.push([]);
@@ -14638,7 +14861,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push(['Estimation cotisations (13,5%)',R.urssaf.toFixed(2)]); }
+    else { L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.csv`; document.body.appendChild(a); a.click(); a.remove();
@@ -14660,7 +14884,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const kv=(k,v)=>{ T(k,40,y,10,reg,rgb(0.4,0.4,0.4)); T(v,300,y,11,bold); y-=20; };
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations (13,5%)', R.urssaf.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
     const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.pdf`; document.body.appendChild(a); a.click(); a.remove();
@@ -15060,7 +15285,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-label" style={{color:C.muted,marginBottom:9}}>Ta semaine</div>
                   <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 90px'}}>
-                      <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1}}>{sem.n}</div>
+                      <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{sem.n}</div>
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vente{sem.n>1?'s':''} · 7 j</div>
                     </div>
                     <div style={{flex:'1 1 90px'}}>
@@ -15068,7 +15293,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vendu sur 7 j</div>
                     </div>
                     <div style={{flex:'1 1 90px'}}>
-                      <div style={{fontSize:22,fontWeight:700,color:toShip.length?C.warn:C.muted,lineHeight:1}}>{toShip.length}</div>
+                      {/* ⚠️ Les trois chiffres de la semaine sont à l'ENCRE.
+                          Trois couleurs côte à côte (bleu, noir, ambre), c'est
+                          le même défaut que la rangée de Ventes : plus rien ne
+                          ressort (§5.90). Ce sont des repères, pas des alertes —
+                          l'urgence est dite juste en dessous, sur la carte. */}
+                      <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{toShip.length}</div>
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>à expédier</div>
                     </div>
                   </div>
@@ -15173,13 +15403,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const val=escrow?escrow.total:inRouteSum;
               if(loading||val<=0) return null;
               return (
-              <div style={{marginTop:16,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:4,border:`1px solid ${C.accent}33`,background:`${C.accent}0c`}}>
-                <div style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
+              /* ⚠️ MÊME SURFACE QUE LES CARTES D'ACTION AU-DESSUS. Un fond
+                 teinté pleine largeur faisait de cette ligne la tache la plus
+                 forte de l'accueil — pour une ESTIMATION, alors que les vraies
+                 actions juste au-dessus sont sur fond blanc (§5.90). */
+              <div style={{marginTop:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:4,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+                <div style={{color:C.muted,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en attente{escrow?'':' (estimation)'}</div>
-                  <div style={{fontSize:20,fontWeight:700,color:C.accent}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
+                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
                 </div>
-                <button type="button" onClick={()=>onNav && onNav('cat_ventes')} style={{border:'none',background:'transparent',color:C.accent,fontSize:22,fontWeight:700,cursor:'pointer'}}>›</button>
+                <button type="button" onClick={()=>onNav && onNav('cat_ventes')} style={{border:'none',background:'transparent',color:C.muted,fontSize:22,fontWeight:700,cursor:'pointer'}}>›</button>
               </div>
               );
             })()}
@@ -15230,7 +15464,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
                 Julien vient regarder : il prend sa place dans la rangée. */}
-            {totals.nbAttente>0 && <StatBox label="En attente" value={fmtE0(totals.enAttente)} color={C.warn} sub={`${totals.nbAttente} en cours`}/>}
+            {totals.nbAttente>0 && <StatBox label="En attente" value={fmtE0(totals.enAttente)} sub={`${totals.nbAttente} en cours`}/>}
             {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
                 affiche déjà ce montant, avec le détail par compte et l'avertissement
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
@@ -15246,7 +15480,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
             {totals.nbCout===0
               ? <StatBox label="Bénéfice net" value="n/d" color={C.muted} sub="saisis tes prix d'achat"/>
-              : <StatBox label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?INV_STATUS.online.color:C.danger}
+              : <StatBox label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                   subColor={totals.nbCout<totals.nb?C.warn:undefined}
                   sub={totals.nbCout<totals.nb
                     ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
@@ -15877,7 +16111,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:3,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}>📍</button>
                 )}
                 {needsBordereau(o.status) && !hidden && (
-                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:'none',background:C.accent,color:'#fff',borderRadius:3,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
+                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:3,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
                   <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:3,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
@@ -17330,7 +17564,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
                           {atFloor && <div style={{fontSize:9,color:C.muted}}>= prix d'achat (plancher)</div>}
                         </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'6px 11px',borderRadius:3}}>🏷️ Baisser</a>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:3}}>🏷️ Baisser</a>
                       </div>
                     );
                   })}
@@ -17511,7 +17745,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 10px 10px',padding:'6px 8px',borderRadius:3,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
                       <span style={{fontSize:11,color:C.text,fontWeight:500,flex:1,minWidth:0,lineHeight:1.3}}>💸 Prix conseillé <b>{sugg} {cur(it.currency)}</b> <span style={{color:C.muted}}>(−15 %{sleeps?` · dort ${age}j`:''})</span></span>
-                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',background:C.warn,color:'#fff',fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:3}}>🏷️ Baisser</a>
+                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:3}}>🏷️ Baisser</a>
                     </div>
                   );
                 })()}
@@ -18130,7 +18364,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
               <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA encaissé" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`}/>
+                <StatBox label="CA des ventes finalisées" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`}/>
                 {annual.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={fmtE(annual.marge)} color={annual.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={fmtE(annual.tvaMarge)} color={C.warn}/>
@@ -18139,10 +18373,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Bénéfice net" value={fmtE(annual.benefNet)} color={annual.benefNet>=0?INV_STATUS.online.color:C.danger}
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
                     sub={annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub="13,5% du CA"/>
+                  <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub={`${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
               </div>
               {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
+              {annual.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>
+                <b>{annual.nMasq} vente{annual.nMasq>1?'s':''} masquée{annual.nMasq>1?'s':''} dans l'app</b> ({fmtE(annual.caMasq)}) {annual.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
+                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
+              </div>}
               {/* Tableau mensuel */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Détail par mois</div>
               <div style={{overflowX:'auto',marginBottom:12}}>
@@ -18593,28 +18831,109 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
-                <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
-                <select value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 10px',fontSize:13,fontWeight:500,background:C.card,color:C.text,cursor:'pointer'}}>
-                  {reportMonths.map(m=>{ const [y,mo]=m.split('-'); const lbl=new Date(Number(y),Number(mo)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); return <option key={m} value={m}>{lbl}</option>; })}
-                </select>
+              {/* ⚠️ N'IMPORTE QUEL MOIS, pas seulement ceux d'une liste : la même
+                  grille que le sélecteur de période de l'écran Ventes (§5.57).
+                  Un menu déroulant enterrait le mois qu'il cherchait. */}
+              <div style={{marginBottom:14}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:12,fontWeight:500,color:C.text}}>Mois</span>
+                  <button type="button" onClick={()=>setMoisOuvert(v=>!v)} style={{border:`1px solid ${C.border}`,borderRadius:3,padding:'6px 12px',fontSize:13,fontWeight:600,background:C.card,color:C.text,cursor:'pointer',textTransform:'capitalize',fontFamily:'inherit'}}>
+                    {report.monthLabel} ▾
+                  </button>
+                </div>
+                {moisOuvert && (
+                  <div style={{marginTop:8,border:`1px solid ${C.border}`,borderRadius:4,background:C.card,padding:10}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                      <button type="button" aria-label="Année précédente" onClick={()=>setReportAnnee(a=>a-1)} style={{border:'none',background:'transparent',color:C.text,fontSize:18,cursor:'pointer',lineHeight:1,padding:'0 8px'}}>‹</button>
+                      <div style={{fontSize:13,fontWeight:700,color:C.text}}>{reportAnnee}</div>
+                      <button type="button" aria-label="Année suivante" onClick={()=>setReportAnnee(a=>a+1)} disabled={reportAnnee>=new Date().getFullYear()} style={{border:'none',background:'transparent',color:reportAnnee>=new Date().getFullYear()?C.muted:C.text,fontSize:18,cursor:reportAnnee>=new Date().getFullYear()?'default':'pointer',lineHeight:1,padding:'0 8px',opacity:reportAnnee>=new Date().getFullYear()?0.4:1}}>›</button>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
+                      {MOIS_FR.map((nom,m)=>{
+                        const ym = `${reportAnnee}-${String(m+1).padStart(2,'0')}`;
+                        const now = new Date();
+                        const futur = reportAnnee>now.getFullYear() || (reportAnnee===now.getFullYear() && m>now.getMonth());
+                        const actif = ym===reportMonth;
+                        const aDesVentes = derniersMoisDeclarables.includes(ym);
+                        return (
+                          <button key={ym} type="button" disabled={futur}
+                            onClick={()=>{ moisChoisiMain.current=true; setReportMonth(ym); setMoisOuvert(false); }}
+                            style={{border:`1px solid ${actif?C.accent:C.border}`,borderRadius:3,padding:'7px 4px',fontSize:12.5,fontWeight:actif?700:500,fontFamily:'inherit',
+                              background:actif?`${C.accent}1a`:'transparent',color:futur?C.muted:(actif?C.accent:C.text),
+                              cursor:futur?'default':'pointer',opacity:futur?0.35:1,textTransform:'capitalize',lineHeight:1.25}}>
+                            {nom}
+                            <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.06em',color:actif?C.accent:C.muted,minHeight:11}}>{aDesVentes?'VENTES':''}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
               {/* Chiffres clés selon le régime */}
               <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA encaissé" value={fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`}/>
+                <StatBox label="CA des ventes finalisées" value={fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`}/>
                 {report.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={fmtE(report.marge)} color={report.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${report.tvaRate}%`} value={fmtE(report.tvaMarge)} color={C.warn}/>
                   <StatBox label="Marge HT" value={fmtE(report.margeHT)}/>
                 </>) : (<>
-                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?INV_STATUS.online.color:C.danger}
+                  {/* ⚠️ UNE SEULE COULEUR, ET ELLE EST RARE (§5.90). La modale avait
+                      gardé l'ancienne identité — un vert et un ambre côte à côte,
+                      chacun avec son filet — alors que l'écran Ventes juste
+                      derrière est passé à l'encre. Ces deux chiffres n'appellent
+                      aucune action : ce sont des faits. Le rouge reste pour un
+                      bénéfice NÉGATIF, qui lui en appelle une. */}
+                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?C.text:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
                     sub={report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} color={C.warn} sub="13,5% du CA"/>
+                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} sub={`${String(report.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
               </div>
-              {report.nb>report.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>⚠️ {report.nb-report.nbCout} vente(s) sans prix d'achat — le calcul de marge est incomplet.</div>}
+              {/* ⚠️ Les ventes masquées à l'écran COMPTENT dans le CA déclaré.
+                  On l'écrit, sinon le chiffre paraîtrait inexplicablement plus
+                  haut que la liste de l'onglet Ventes. */}
+              {report.nAttente>0 && (
+                <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.warn}`,borderRadius:3,padding:'9px 12px',marginBottom:12}}>
+                  <div style={{fontSize:12.5,color:C.text,lineHeight:1.45}}>
+                    <b>{report.nAttente} vente{report.nAttente>1?'s':''} de ce mois {report.nAttente>1?'ne sont':"n'est"} pas encore finalisée{report.nAttente>1?'s':''}</b> — <b style={{color:C.warn}}>{fmtE(report.caAttente)}</b> qui ne {report.nAttente>1?'sont':'est'} pas dans le CA ci-dessus.
+                    <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>Vinted finalise ~2 semaines après la vente : ce mois va encore monter.</div>
+                  </div>
+                </div>
+              )}
+              {report.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:3,padding:'8px 12px',marginBottom:12}}>
+                <b>{report.nMasq} vente{report.nMasq>1?'s':''} masquée{report.nMasq>1?'s':''} dans l'app</b> ({fmtE(report.caMasq)}) {report.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
+                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
+              </div>}
+              {/* ── LE RELEVÉ DU PORTE-MONNAIE ────────────────────────────
+                  Une VÉRIFICATION à côté du CA, jamais à sa place : le CA
+                  ci-dessus date au jour de la VENTE, le relevé date au jour du
+                  mouvement. Les deux ne peuvent pas coïncider (Vinted finalise
+                  ~2 semaines après) et c'est normal — l'écart, c'est le décalage.
+                  ⚠️ On n'affiche que des faits : Vinted ne nous dit avec
+                  certitude qu'une chose, c'est qu'un mouvement `payout` est un
+                  virement vers SA banque. On ne baptise donc pas « recette » ce
+                  qu'on n'a pas encore mesuré. */}
+              {releveTotaux ? (
+                <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:3,padding:'9px 12px',marginBottom:12}}>
+                  <div style={{fontSize:12.5,color:C.text,lineHeight:1.45}}>
+                    <b>Relevé de ton porte-monnaie Vinted</b> — {releveTotaux.n} mouvement{releveTotaux.n>1?'s':''} sur {releveTotaux.comptes} compte{releveTotaux.comptes>1?'s':''}
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:14,marginTop:6}}>
+                    <div><div className="vrm-label" style={{fontSize:9,color:C.muted}}>CRÉDITÉ</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(releveTotaux.entrees)}</div></div>
+                    {releveTotaux.sorties!==0 && <div><div className="vrm-label" style={{fontSize:9,color:C.muted}}>PRÉLEVÉ</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(releveTotaux.sorties)}</div></div>}
+                    <div><div className="vrm-label" style={{fontSize:9,color:C.muted}}>VIRÉ VERS TA BANQUE</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(Math.abs(releveTotaux.virements))}</div></div>
+                  </div>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:5,lineHeight:1.4}}>
+                    Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour de la vente. L'écart entre les deux, c'est le délai de finalisation. Un virement vers ta banque déplace ton propre argent — ce n'est pas une recette.
+                  </div>
+                </div>
+              ) : (
+                <div style={{fontSize:11.5,color:C.muted,marginBottom:12,lineHeight:1.4}}>
+                  Relevé du porte-monnaie : rien de capté pour ce mois. L'extension le récupère à ta prochaine visite sur Vinted, compte par compte.
+                </div>
+              )}
               {/* Registre d'achats */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(report.achatsTotal)} ({report.buyLines.length})</div>
               {report.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat ce mois-ci{buys.items===null?' (registre en cours de chargement)':''}.</div>}
@@ -20740,6 +21059,11 @@ function AiKeySetting() {
 function RegimeSetting() {
   const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
   const [tva, setTva] = useState(() => Number(load('vinted_tva', 20)) || 20);
+  // ⚠️ LE TAUX DE COTISATIONS EST UN RÉGLAGE, PAS UNE CONSTANTE. Il était écrit
+  // 13,5 % en dur à SIX endroits, et il tombe sur un document qu'il recopie
+  // pour l'URSSAF. Le bon taux dépend de son activité et de son option pour le
+  // versement libératoire — lui seul le connaît, et il change chaque année.
+  const [txUrs, setTxUrs] = useState(() => String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)));
   const pick = (r) => { setRegime(r); save('vinted_regime', r); };
   const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
   return (
@@ -20761,6 +21085,22 @@ function RegimeSetting() {
           </button>
         ))}
       </div>
+      {regime!=='marge' && (
+        <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de cotisations</span>
+            <input type="text" inputMode="decimal" value={txUrs}
+              onChange={e=>setTxUrs(e.target.value)}
+              onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; setTxUrs(String(ok)); save('vinted_urssaf_taux', ok); }}
+              style={{width:70,border:`1px solid ${C.border}`,borderRadius:3,padding:'5px 8px',fontSize:13,fontWeight:600,background:C.bg,color:C.text,outline:'none'}}/>
+            <span style={{fontSize:12,color:C.muted}}>% du CA</span>
+          </div>
+          <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
+            Sert au rapport mensuel et annuel. Il se compose des <b>cotisations sociales</b>, de la <b>contribution à la formation</b>, et du <b>versement libératoire de l'impôt</b> si tu l'as choisi — donc il dépend de ta situation et il change d'une année à l'autre.
+            <b> Vérifie le tien sur autoentrepreneur.urssaf.fr</b> : l'app ne le devine pas, elle applique celui que tu poses ici.
+          </div>
+        </div>
+      )}
       {regime==='marge' && (
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
           <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de TVA</span>
