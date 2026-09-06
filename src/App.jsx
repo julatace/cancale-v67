@@ -18032,10 +18032,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" desc="On te dit juste s'il y a du nouveau. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
         <NoAcc/>
+        {/* ── RÉSUMÉ, PAS LA LISTE ──────────────────────────────────────────
+            Julien : « enlève les messages, mets juste qu'il y en a de nouveaux ».
+            On ne déroule plus toutes les conversations : une seule carte dit
+            combien de messages non lus, et un bouton emmène répondre sur Vinted
+            (répondre depuis l'app n'est pas possible, cf. section 5). */}
+        {convs.loading && <Skeleton variant="row" count={2}/>}
+        {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
+        {convs.items && !convs.error && (()=>{
+          const nonLus = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
+          const total  = (convs.items||[]).filter(c=>!acctOffOf(c)).length;
+          const inboxUrl = 'https://www.vinted.fr/inbox';
+          return (
+            /* ⚠️ SURFACE NEUTRE, LE CHIFFRE PORTE LA COULEUR (§5.90). Le fond
+               teinté pleine largeur faisait de cette carte la tache la plus
+               forte de l'écran ; et l'emoji servait d'icône, alors que la barre
+               du bas dessine le même symbole au trait (§5.55). */
+            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+              <span aria-hidden="true" style={{flexShrink:0,width:38,height:38,borderRadius:4,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:nonLus?C.accent:C.muted}}><Icon name="chat" size={19}/></span>
+              <div style={{flex:'1 1 165px',minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.text,lineHeight:1.2}}>
+                  {nonLus>0 ? <><span style={{color:C.accent,fontSize:19,letterSpacing:-0.3}}>{nonLus}</span> {`nouveau${nonLus>1?'x':''} message${nonLus>1?'s':''}`}</> : 'Aucun nouveau message'}
+                </div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+                  {total>0 ? `${total} conversation${total>1?'s':''} en tout` : 'Tes échanges apparaîtront ici'}
+                </div>
+              </div>
+              <a href={inboxUrl} target="_blank" rel="noreferrer"
+                /* ⚠️ `flex:'1 1 130px'` sans plafond : sur un écran large ce
+                   bouton s'étirait sur 500 px (même défaut que « Imprimer »,
+                   §5.84). Il grandit toujours sur téléphone, il s'arrête à une
+                   taille de bouton sur ordinateur. */
+                style={{flex:'1 1 130px',maxWidth:260,textAlign:'center',textDecoration:'none',border:'none',borderRadius:4,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
+                {nonLus>0?'Répondre sur Vinted':'Ouvrir Vinted'}
+              </a>
+            </div>
+          );
+        })()}
         {/* Réponses rapides : modèles copiables en 1 clic (répondre se fait sur Vinted). */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-            <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>⚡ Réponses rapides</span>
+            <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>Réponses rapides</span>
             <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':'✎ Modifier'}</button>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -18054,35 +18091,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6}}>Clique un message pour le <b>copier</b>, puis colle-le dans la conversation Vinted.</div>
         </div>
-        {/* ── RÉSUMÉ, PAS LA LISTE ──────────────────────────────────────────
-            Julien : « enlève les messages, mets juste qu'il y en a de nouveaux ».
-            On ne déroule plus toutes les conversations : une seule carte dit
-            combien de messages non lus, et un bouton emmène répondre sur Vinted
-            (répondre depuis l'app n'est pas possible, cf. section 5). */}
-        {convs.loading && <Skeleton variant="row" count={2}/>}
-        {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
-        {convs.items && !convs.error && (()=>{
-          const nonLus = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
-          const total  = (convs.items||[]).filter(c=>!acctOffOf(c)).length;
-          const inboxUrl = 'https://www.vinted.fr/inbox';
-          return (
-            <div style={{border:`1px solid ${nonLus?C.accent:C.border}`,background:nonLus?`${C.accent}0e`:C.card,borderRadius:4,padding:'16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-              <span style={{fontSize:26,flexShrink:0}}>{nonLus?'✉️':'📭'}</span>
-              <div style={{flex:'1 1 165px',minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:nonLus?C.accent:C.text,lineHeight:1.2}}>
-                  {nonLus>0 ? `${nonLus} nouveau${nonLus>1?'x':''} message${nonLus>1?'s':''}` : 'Aucun nouveau message'}
-                </div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                  {total>0 ? `${total} conversation${total>1?'s':''} en tout` : 'Tes échanges apparaîtront ici'}
-                </div>
-              </div>
-              <a href={inboxUrl} target="_blank" rel="noreferrer"
-                style={{flex:'1 1 130px',textAlign:'center',textDecoration:'none',border:'none',borderRadius:4,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
-                {nonLus>0?'Répondre sur Vinted':'Ouvrir Vinted'}
-              </a>
-            </div>
-          );
-        })()}
       </>)}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
