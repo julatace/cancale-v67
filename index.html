@@ -120,6 +120,38 @@
     button:disabled{ cursor:not-allowed; }
     /* Anneau de focus au clavier : visible, aux couleurs de la marque, jamais
        le contour bleu du navigateur. */
+    /* ── LES BOUTONS ──────────────────────────────────────────────────────
+       ⚠️ MESURÉ AVANT DE TOUCHER À QUOI QUE CE SOIT (561 boutons rendus sur
+       5 écrans) : **22 hauteurs différentes**, **22 paddings**, **13 tailles de
+       texte** — dont 47 boutons à `13.3333px` (la valeur PAR DÉFAUT du
+       navigateur : ils n'héritaient même pas de la police de l'app). C'est
+       cette dispersion qui se lit « pas fini », pas la couleur.
+       Les boutons de ce fichier portent tous des styles EN LIGNE, qui gagnent
+       sur une classe : cette règle ne pose donc que les propriétés que le
+       style en ligne ne fixe pas — la police, une hauteur plancher, un
+       alignement. Une intention explicite (un mini-bouton d'icône, un gros
+       bouton d'action) reste intacte. */
+    /* ⚠️ ON NE TOUCHE PAS À `display`. Un `<button>` centre déjà son contenu
+       verticalement ET horizontalement par défaut ; le passer en `inline-flex`
+       a immédiatement cassé deux choses, vues en capture : les entrées du rail
+       de navigation se sont retrouvées CENTRÉES au lieu d'être alignées à
+       gauche, et le chiffre cliquable « Coût d'achat » a mis son étiquette, son
+       nombre et sa légende SUR UNE SEULE LIGNE. Une hauteur plancher suffit :
+       le navigateur centre le contenu tout seul. */
+    button, a.vrm-btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.005em;
+      min-height: 34px;
+      /* Un bouton qui répond au doigt sans « sauter » : c'est ce qu'on ressent
+         comme du soin. 110 ms — au-delà ça traîne, en deçà ça claque. */
+      transition: background-color .11s ease, border-color .11s ease, color .11s ease, box-shadow .11s ease, filter .11s ease;
+    }
+    /* Les boutons qui ne portent qu'une icône restent compacts. */
+    button[aria-label] { min-height: 30px; }
+
     /* ⚠️ UNE RANGÉE DE PASTILLES : elle DÉFILE sur téléphone, elle REVIENT À
        LA LIGNE sur ordinateur. Sur mobile, laisser retourner à la ligne faisait
        quatre rangées empilées (§5.68) ; sur un écran large, faire défiler
