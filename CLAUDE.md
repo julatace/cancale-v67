@@ -202,19 +202,35 @@ c'est elle, la signature. Mode sombre choisi, pas inversé automatiquement.
   aller mesurer la composition** à sa résolution de travail (1512 px, ordinateur).
   Les deux vrais défauts trouvés comme ça : une app mobile étirée sur 1440 px, et
   un accueil qui s'arrêtait au tiers de l'écran.
+- **La même phrase répétée sur chaque ligne est UNE phrase.** Quand l'en-tête d'un
+  groupe la dit déjà, la ligne ne la reprend que si le groupe est **mixte** — là
+  seulement elle distingue. (Achats : 13 × « code pas encore reçu » ; Colis :
+  14 × « l'extension le récupère ».) C'est le §11 à l'échelle de l'écran.
+- **Une rangée de pastilles défile au doigt, revient à la ligne à la souris** :
+  classe `.vrm-rangee` (`nowrap`, puis `wrap` au-delà de 1024 px). ⚠️ Un style
+  **en ligne** gagne sur une classe — retirer `flexWrap`/`overflowX` du `style`.
+- **Un bouton en `flex:'1 1 …'` sans `maxWidth` s'étire sur 500 px** sur un écran
+  large. Toujours plafonner.
 
 ---
 
-## 8. État au 5 septembre 2026
+## 8. État au 6 septembre 2026
 
 | | |
 |---|---|
-| annonces en ligne | ~30 · **0 sans numéro · 0 doublon de numéro** ✅ |
-| paires numérotées | 278 · **0 prix d'achat** ⚠️ (il les saisit lui-même ; outils : saisie en série, suggestion en un tap) |
+| annonces en ligne | 54 · **0 sans numéro · 0 doublon de numéro** ✅ |
+| paires numérotées | 320 · **0 prix d'achat** ⚠️ (il les saisit lui-même ; outils : saisie en série, suggestion en un tap) |
+| numéros de vente | 432 · le plus haut : 456 (un numéro n'est jamais réattribué — c'est normal) |
 | notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
 | comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
+| ventes masquées | 209 (masquées à la main ; « tout réafficher » existe sur l'écran Ventes) |
 
 **Ouvert :**
+- ⚠️ **L'extension installée chez lui est en retard** (mesuré : captures fraîches
+  du matin, mais **0 ligne de relevé**). L'app le dit maintenant — `EXT_ATTENDUE`
+  comparée à la version que le pont annonce, bandeau sur Ma journée et ligne dans
+  Réglages. `scripts/audit-coherence.cjs` vérifie que la constante suit le
+  manifeste. **C'est ce qui bloque le point suivant.**
 - **La forme d'une ligne de VENTE dans le relevé du porte-monnaie.** Le relevé daté
   est capté (`harvest_{uid}_releve_{YYYY-MM}`), mais le seul mouvement jamais
   observé est un **virement sortant** — et il porte `type:"credit"`. Donc
