@@ -8,6 +8,28 @@ import MIGRATION_SQL from "../supabase/migrations/001-multi-utilisateurs.sql?raw
 // Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
 // si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
 const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
+// ⚠️ LA VERSION D'EXTENSION QUE CETTE APP ATTEND — tenue à jour par
+// `scripts/audit-coherence.cjs`, qui la compare au manifeste. Mesuré le
+// 6 septembre : l'extension installée chez Julien était en retard de plusieurs
+// versions (0 ligne de relevé alors que ses captures dataient de la matinée),
+// et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
+// dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
+// « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
+const EXT_ATTENDUE = '5.52.0';
+// Compare deux numéros de version (« 5.9.0 » < « 5.52.0 » — une comparaison de
+// chaînes dirait l'inverse).
+const cmpVersion = (a, b) => {
+  const A = String(a || '').split('.').map(n => parseInt(n, 10) || 0);
+  const B = String(b || '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(A.length, B.length); i++) {
+    const d = (A[i] || 0) - (B[i] || 0); if (d) return d < 0 ? -1 : 1;
+  }
+  return 0;
+};
+// ⚠️ On ne conclut RIEN quand la version est inconnue (extension trop ancienne
+// pour l'annoncer, ou pont pas encore prêt) : dire « en retard » sans le savoir
+// enverrait recharger pour rien.
+const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -3393,6 +3415,32 @@ function NotifsMuettes({ onNav }) {
       action={onNav && <button type="button" onClick={()=>onNav('settings')}
         style={{border:'none',background:C.danger,color:'#fff',borderRadius:3,padding:'8px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
         Voir les réglages
+      </button>}
+      style={{marginBottom:14}}/>
+  );
+}
+
+// ⚠️ UNE EXTENSION EN RETARD NE FAIT AUCUN BRUIT. Elle continue de capter —
+// simplement moins que ce que l'app attend, et sans jamais afficher d'erreur.
+// Mesuré le 6 septembre : ses captures dataient de la matinée et il n'y avait
+// pourtant AUCUNE ligne de relevé (la lecture du porte-monnaie daté, arrivée en
+// 5.52). Le seul endroit qui le disait affichait un numéro de version nu, dans
+// les réglages — illisible pour quelqu'un qui n'est pas développeur.
+// ⚠️ Ne s'affiche QUE sur un navigateur où l'extension est là ET annonce sa
+// version : sur téléphone, ou tant que le pont n'a pas répondu, on ne dit rien.
+function ExtEnRetard({ onNav }) {
+  const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  if (!ext.on || !extEnRetard(ext.v)) return null;
+  return (
+    <Notice tone="warn" icon="alert"
+      title="Ton extension VRM est en retard"
+      value={`${ext.v} → ${EXT_ATTENDUE}`}
+      desc="Elle capte toujours, mais moins que ce que l'app attend — et elle ne le dit pas d'elle-même."
+      detail="Ouvre chrome://extensions, trouve VRM, clique sur ⟳ (la flèche ronde). Recharge ensuite une page Vinted : la capture repart avec la nouvelle version."
+      action={onNav && <button type="button" onClick={()=>onNav('settings')}
+        style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,borderRadius:3,padding:'8px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+        Voir l'état
       </button>}
       style={{marginBottom:14}}/>
   );
@@ -15346,6 +15394,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 l'app, c'est le pire des deux mondes. Le bandeau se retire tout
                 seul dès que la clé est posée. */}
             <NotifsMuettes onNav={onNav}/>
+            <ExtEnRetard onNav={onNav}/>
 
             {/* RÉSULTAT DU JOUR : ce que tu as vendu aujourd'hui. Placé tout en
                 haut parce que c'est la première chose qu'on veut savoir en
@@ -21227,10 +21276,14 @@ function ConnexionsSetting() {
     <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:4,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>État des connexions</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>Ce qui alimente l'app, et depuis quand.</div>
-      <Ligne t="Extension Chrome" coul={ext.on ? INV_STATUS.online.color : C.warn}
-        etat={ext.on ? (ext.v ? `version ${ext.v}` : 'détectée') : 'pas détectée ici'}
-        d={ext.on ? "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."
-                  : "Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions."}/>
+      {/* ⚠️ UN NUMÉRO DE VERSION NE VEUT RIEN DIRE TOUT SEUL. On dit s'il est
+          à jour, et sinon ce que ça coûte et quoi faire — une version en retard
+          ne « bugue » pas, elle ne capte simplement pas, en silence. */}
+      <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : INV_STATUS.online.color}
+        etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
+        d={!ext.on ? "Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions."
+           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête. Ouvre chrome://extensions et clique sur ⟳ (la flèche ronde) sur VRM. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
+           : "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."}/>
       <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
         etat={capt === 'vide' || !capt ? 'inconnue' : `dernière ${depuis(capt.ts)}`}
         d={capt && capt.ts && (Date.now() - capt.ts) > 2 * 864e5

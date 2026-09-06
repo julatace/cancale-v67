@@ -12,10 +12,14 @@
 // et affiche chaque désaccord.
 //
 // Lecture seule. Aucune écriture, aucun appel à Vinted.
-const fs=require('fs'), vm=require('vm');
-const APP=fs.readFileSync('/home/user/cancale-v67/src/App.jsx','utf8');
-const BG=fs.readFileSync('/home/user/cancale-v67/vinted-sync-extension/background.js','utf8');
-const PANEL=fs.readFileSync('/home/user/cancale-v67/vinted-sync-extension/vinted-panel.js','utf8');
+const fs=require('fs'), vm=require('vm'), path=require('path');
+// ⚠️ §5.80 : chemins RELATIFS au script. Avec des chemins absolus, ce fichier
+// copié dans un arbre de preuve relisait le dépôt courant — et la preuve
+// « ça échoue sur le code d'avant » était truquée.
+const RACINE=path.join(__dirname,'..');
+const APP=fs.readFileSync(path.join(RACINE,'src/App.jsx'),'utf8');
+const BG=fs.readFileSync(path.join(RACINE,'vinted-sync-extension/background.js'),'utf8');
+const PANEL=fs.readFileSync(path.join(RACINE,'vinted-sync-extension/vinted-panel.js'),'utf8');
 
 // corpus : tous les statuts distincts des commandes moissonnées
 // Corpus : tous les statuts distincts des commandes réellement moissonnées.
@@ -90,6 +94,18 @@ if(appNeedsBord&&bgShipConst){
   const d=S.filter(s=>appNeedsBord(s)!==bgShipConst(s));
   console.log(`ℹ️  « à expédier » : ${d.length} statuts où l'app dit « bordereau nécessaire » et l'extension non (ou l'inverse)`);
   d.slice(0,10).forEach(s=>console.log(`     « ${s} » → app.needsBordereau=${appNeedsBord(s)} / ext.aExpedier=${bgShipConst(s)}`));
+}
+// ── LA VERSION D'EXTENSION QUE L'APP ANNONCE ─────────────────────────────
+// L'app dit à Julien « ton extension est en retard » en comparant la version
+// captée par le pont à `EXT_ATTENDUE`. Si cette constante n'est pas celle du
+// manifeste, elle ment dans un sens ou dans l'autre : soit elle réclame un
+// rechargement pour rien, soit elle laisse tourner une version qui ne capte
+// plus ce que l'app attend — exactement ce qu'on veut rendre visible.
+{
+  const man=JSON.parse(fs.readFileSync(path.join(RACINE,'vinted-sync-extension/manifest.json'),'utf8'));
+  const m=/const EXT_ATTENDUE\s*=\s*'([^']+)'/.exec(APP);
+  const ok = m && m[1]===man.version;
+  console.log((ok?'✅':'❌')+` version d'extension attendue par l'app — app=${m?m[1]:'ABSENTE'} / manifeste=${man.version}`);
 }
 console.log('\nStatuts réels :'); S.forEach(s=>console.log('  -',s));
 })();
