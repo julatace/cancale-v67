@@ -3512,12 +3512,17 @@ function ExtEnRetard({ onNav }) {
     <Notice tone="warn" icon="alert"
       title="Ton extension VRM est en retard"
       value={`${ext.v} → ${EXT_ATTENDUE}`}
-      desc="Elle capte toujours, mais moins que ce que l'app attend — et elle ne le dit pas d'elle-même."
-      detail="Ouvre chrome://extensions, trouve VRM, clique sur ⟳ (la flèche ronde). Recharge ensuite une page Vinted : la capture repart avec la nouvelle version."
-      action={onNav && <button type="button" onClick={()=>onNav('settings')}
-        style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,borderRadius:8,padding:'8px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
-        Voir l'état
-      </button>}
+      desc="Elle capte toujours, mais moins que ce que l'app attend — et elle ne le dit pas d'elle-même. C'est elle qui va chercher les codes de retrait dans tes conversations Vinted."
+      /* ⚠️ « CLIQUE SUR ⟳ » NE SUFFIT PAS, ET C'EST CE QUI L'A BLOQUÉ DES
+         SEMAINES : la flèche ronde recharge le DOSSIER du disque — donc la
+         MÊME vieille version. Il faut d'abord remplacer le dossier. Et le zip
+         de la 5.52 n'existait nulle part : le dépôt n'en portait qu'un, du
+         30 août, en 4.13. On le livre maintenant depuis l'app. */
+      detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. Ouvre chrome://extensions et clique sur ⟳ (la flèche ronde) sur VRM. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
+      action={<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
+        style={{display:'inline-block',border:'none',background:C.warn,color:'#fff',borderRadius:8,padding:'9px 15px',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',textDecoration:'none'}}>
+        Télécharger la {EXT_ATTENDUE}
+      </a>}
       style={{marginBottom:14}}/>
   );
 }
@@ -21740,8 +21745,22 @@ function ConnexionsSetting() {
       <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : INV_STATUS.online.color}
         etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
         d={!ext.on ? "Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions."
-           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête. Ouvre chrome://extensions et clique sur ⟳ (la flèche ronde) sur VRM. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
+           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
            : "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."}/>
+      {/* ⚠️ LE ZIP DOIT ÊTRE À UN CLIC. Pendant des semaines l'app a dit
+          « mets à jour l'extension » sans que le zip existe nulle part : le
+          dépôt n'en portait qu'un, du 30 août, en 4.13, alors que le code était
+          en 5.52. `scripts/audit-extension-zip.cjs` vérifie désormais que le
+          zip livré porte bien la version du manifeste. */}
+      <div style={{margin:'6px 0 2px',display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}>
+        <a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
+          style={{textDecoration:'none',border:'none',borderRadius:8,background:extEnRetard(ext.v)?C.warn:C.card2,color:extEnRetard(ext.v)?'#fff':C.text,fontSize:12,fontWeight:700,padding:'8px 13px',fontFamily:'inherit'}}>
+          Télécharger l'extension {EXT_ATTENDUE}
+        </a>
+        <span style={{fontSize:11,color:C.muted,flex:'1 1 180px',minWidth:0,lineHeight:1.4}}>
+          Le zip se dézippe en un seul dossier « VRM-extension » : remplace l'ancien au même endroit, puis ⟳ dans chrome://extensions.
+        </span>
+      </div>
       <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
         etat={capt === 'vide' || !capt ? 'inconnue' : `dernière ${depuis(capt.ts)}`}
         d={capt && capt.ts && (Date.now() - capt.ts) > 2 * 864e5

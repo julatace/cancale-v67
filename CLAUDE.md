@@ -213,7 +213,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **24 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **25 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | bancs Playwright (scratchpad) | l'app **rendue sur les vraies données**, à 390 px et 1512 px |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -291,6 +291,22 @@ qu'un bouton ne fixe pas lui-même.
 
 ---
 
+### Le zip de l'extension — le défaut le plus coûteux du projet
+Pendant des semaines l'app a dit « ton extension est en retard, mets-la à
+jour », alors que **le zip de cette version n'existait nulle part** : le
+manifeste était en 5.52.0, le seul zip du dépôt datait du 30 août en 4.13.0, et
+l'app n'offrait **aucun lien de téléchargement**. Pire, la consigne disait
+« clique sur ⟳ dans chrome://extensions » — or ⟳ recharge le **dossier du
+disque**, donc la même vieille version. Il ne pouvait pas mettre à jour, quoi
+qu'il fasse — et tout ce que l'app lui promettait ensuite (les codes de retrait
+lus dans ses conversations) en dépendait.
+- Le zip vit dans `public/VRM-extension.zip`, se dézippe en **un seul dossier au
+  nom stable** (`VRM-extension`) pour qu'il remplace l'ancien au même endroit.
+- `scripts/audit-extension-zip.cjs` vérifie que le zip livré porte la version du
+  manifeste, qu'`EXT_ATTENDUE` suit, qu'il tient en un dossier, qu'il contient
+  tous les fichiers, que l'app le propose, et qu'aucun zip périmé ne traîne.
+- **Après toute modification de `vinted-sync-extension/`, régénérer le zip.**
+
 ## 8. État au 6 septembre 2026
 
 | | |
@@ -330,7 +346,7 @@ qu'un bouton ne fixe pas lui-même.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 24 audits
+scripts/audit-*.cjs             les 25 audits
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
