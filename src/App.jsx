@@ -4176,7 +4176,7 @@ function PeriodePicker({ value, onChange }) {
   const chip = (on, actifC) => ({ flexShrink:0, border:`1px solid ${actifC?C.accent:C.border}`, background:actifC?`${C.accent}14`:'transparent', color:actifC?C.accent:C.text, borderRadius:3, padding:'6px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
   return (
     <div style={{ marginBottom:12 }}>
-      <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2 }}>
+      <div className="vrm-rangee" style={{ display:'flex', gap:6, alignItems:'center', WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2 }}>
         <button type="button" onClick={()=>setOpen(o=>!o)} style={{ ...chip(null, actif), display:'inline-flex', alignItems:'center', gap:6 }}>
           <Icon name="calendar" size={14} style={{marginRight:5}}/>{libellePeriode(value)}
         </button>
@@ -16156,7 +16156,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
-        <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+        <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
           {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:3,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
@@ -16374,7 +16374,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+        <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque paire entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
@@ -17467,14 +17467,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             disparaissent partout) ou réafficher. Réglé le souci « 2 comptes
             bloqués dont les annonces restaient affichées ». */}
         {listings.items && listings.items.length>0 && (()=>{
+          // ⚠️ LA SOMME DES PUCES DOIT ÉGALER « N en ligne » JUSTE EN DESSOUS.
+          // Elles comptaient TOUTES les annonces captées, `annStats` compte
+          // `annBase` (qui écarte les paires déjà vendues dont Vinted a laissé
+          // l'annonce ouverte) : on lisait « 7+6+5+5+4+3+3+2+1 = 36 » au-dessus
+          // d'un « 35 en ligne » — deux chiffres pour la même notion, sur le
+          // même écran (§11). Un compte MASQUÉ, lui, n'est pas dans `annBase`
+          // du tout : sa puce garde le compte brut, qui dit ce qu'on
+          // récupérerait en le réaffichant (et elle est barrée, donc lisible
+          // comme telle).
+          const brut = {}, visibles = {};
+          for (const it of listings.items) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; brut[uid] = (brut[uid]||0)+1; }
+          for (const it of annBase) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; visibles[uid] = (visibles[uid]||0)+1; }
           const counts = {};
-          for (const it of listings.items) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; counts[uid] = (counts[uid]||0)+1; }
+          Object.keys(brut).forEach(uid => {
+            const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
+            counts[uid] = off ? brut[uid] : (visibles[uid] || 0);
+          });
           const uids = Object.keys(counts);
           if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // 1 seul compte visible : inutile
           const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
           const anyHidden = uids.some(u=>hiddenAccts.has(u));
           return (
-            <div style={{marginBottom:12,display:'flex',gap:7,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+            <div className="vrm-rangee" style={{marginBottom:12,display:'flex',gap:7,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
               <span style={{fontSize:11,fontWeight:600,color:C.muted,flexShrink:0}}>Comptes :</span>
               {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
                 const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
@@ -17588,7 +17603,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           )}
           {/* Bandeau de stats façon outil pro */}
-          <div style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
+          <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
             <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.n} en ligne</span>
             <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
             {annStats.hasFav && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:3,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}

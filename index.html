@@ -120,6 +120,17 @@
     button:disabled{ cursor:not-allowed; }
     /* Anneau de focus au clavier : visible, aux couleurs de la marque, jamais
        le contour bleu du navigateur. */
+    /* ⚠️ UNE RANGÉE DE PASTILLES : elle DÉFILE sur téléphone, elle REVIENT À
+       LA LIGNE sur ordinateur. Sur mobile, laisser retourner à la ligne faisait
+       quatre rangées empilées (§5.68) ; sur un écran large, faire défiler
+       horizontalement coupe la dernière pastille au bord droit (vu en capture :
+       le compte « liliand65… » tronqué) et oblige à un geste que personne ne
+       fait à la souris (§5.62). La règle est la MÊME pour les deux — c'est la
+       requête média qui tranche, pas un test de largeur en JavaScript.
+       ⚠️ Un style EN LIGNE gagne sur une classe : ces deux propriétés doivent
+       donc être retirées du `style={{…}}` des rangées concernées. */
+    .vrm-rangee{ flex-wrap:nowrap; overflow-x:auto; }
+    @media (min-width: 1024px){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
     :focus-visible{ outline:2px solid rgba(0,135,90,.55); outline-offset:2px; border-radius:10px; }
     @media (prefers-color-scheme: dark){ :focus-visible{ outline-color:rgba(46,224,143,.6); } }
 
