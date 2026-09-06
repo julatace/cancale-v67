@@ -5458,7 +5458,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {actions.map((a,i)=>(
                 <button key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer'}}>
-                  <span style={{fontSize:22,flexShrink:0}}>{a.icon}</span>
+                  {/* ⚠️ ICÔNE AU TRAIT, comme le rail et les titres d'écran (§5.55).
+                      Un emoji est dessiné par le système : à côté de nos propres
+                      icônes, ça ne va pas ensemble. L'emoji reste en repli. */}
+                  <span aria-hidden="true" style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}>
+                    {a.ic ? <Icon name={a.ic} size={17}/> : <span style={{fontSize:17}}>{a.icon}</span>}
+                  </span>
                   <span style={{flex:1,fontSize:15,fontWeight:600,color:C.text}}>{a.text}</span>
                   <span style={{fontSize:20,color:C.muted}}>›</span>
                 </button>
@@ -5486,9 +5491,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
               <span style={{fontSize:15,fontWeight:600,color:C.muted}}>· {liveStats.caJour.toFixed(0)} €</span>
             </div>
           ) : (
-            <div style={{fontSize:13,fontWeight:500,color:C.muted}}>Pas encore de vente aujourd'hui 👟</div>
+            /* ⚠️ La HIÉRARCHIE était inversée : le message était en gris fin et
+               son explication juste en dessous en gras. On lit d'abord ce qui se
+               passe, l'explication reste une légende. */
+            <div style={{fontSize:15,fontWeight:600,color:C.text}}>Pas encore de vente aujourd'hui</div>
           )}
-          <div style={{fontSize:11,color:C.muted,marginTop:3}}>Paires vendues dans la journée (pas l'argent viré, qui arrive plus tard).</div>
+          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Paires vendues dans la journée — pas l'argent viré, qui arrive plus tard.</div>
         </button>
       )}
 
@@ -5530,7 +5538,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
             légende disait. Un chiffre qu'on doit corriger avec sa légende est un
             chiffre faux : le titre dit maintenant ce qu'il compte. */}
         <StatCard icon="📦" label="Paires au garage" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
-        <StatCard icon="💰" label="Valeur stock" value={fmt(liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue)} color={C.text} sub="prix d'achat des annonces en ligne"/>
+        {/* ⚠️ « 0,00 € » N'EST PAS UN ZÉRO, C'EST UNE ABSENCE. Cette carte somme
+            les PRIX D'ACHAT des annonces en ligne — or aucun n'est saisi, donc
+            elle affichait un gros 0,00 € à côté d'un « 1581 € de valeur » sur
+            l'écran Annonces (qui, lui, somme les prix de VENTE). Deux chiffres
+            qui portent presque le même nom et se contredisent (§11). Tant qu'on
+            ne sait rien, on l'écrit. */}
+        {(()=>{ const v = (liveStats&&liveStats.stockValue!=null?liveStats.stockValue:stockValue) || 0;
+          const enLigne = liveStats && liveStats.online > 0;
+          return <StatCard icon="💰" label="Valeur d'achat du stock"
+            value={(v>0 || !enLigne) ? fmt(v) : '—'} color={C.text}
+            sub={(v>0 || !enLigne) ? "prix d'achat des annonces en ligne" : "saisis tes prix d'achat"}
+            subColor={(v>0 || !enLigne) ? null : C.warn}/>; })()}
         {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
         <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
@@ -5541,49 +5560,39 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="ventes finalisées · daté au jour de la vente"/>
         {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
             afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
-        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'n/d':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?"saisis tes prix d'achat":'argent reçu uniquement'}/>
-        <StatCard icon="🎯" label="Taux marge" value={liveStats&&liveStats.caEncaisse!=null?'n/d':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?'prix d\'achat manquants':'bénéf / CA'}/>
+        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?"saisis tes prix d'achat":'argent reçu uniquement'} subColor={liveStats&&liveStats.caEncaisse!=null?C.warn:null}/>
+        <StatCard icon="🎯" label="Taux marge" value={liveStats&&liveStats.caEncaisse!=null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?'prix d\'achat manquants':'bénéf / CA'} subColor={liveStats&&liveStats.caEncaisse!=null?C.warn:null}/>
       </div>
 
-      {/* Mois en cours */}
+      {/* ── LE MOIS EN COURS, EN UNE SEULE CARTE ────────────────────────────
+          ⚠️ Il y en avait DEUX à la suite, toutes deux titrées du même mois
+          (« Mois en cours — septembre », puis « À payer pour septembre »), et
+          la première répétait un « CA du mois » déjà affiché quatre lignes plus
+          haut — arrondi différemment (296 € contre 296,40 €). Le même nombre,
+          deux fois, deux valeurs : c'est ce qui fait douter de tous les autres
+          (§11). Une carte, un mois, et chaque chiffre une seule fois. */}
       <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
-        <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
-          📅 Mois en cours — {moisCourant.nom}
+        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
+          {moisCourant.nom}
         </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
-          {/* Chiffres du mois pris sur la MOISSON Vinted (comme « Vinted en
-              direct »), plus le vieux catalogue archivé qui était vide. */}
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>CA du mois</div>
-            <div style={{fontSize:22,fontWeight:600,color:C.text,letterSpacing:-0.5}}>{fmt(liveStats&&liveStats.caMois!=null?liveStats.caMois:moisCourant.ca)}</div>
-          </div>
-          <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice du mois</div>
-            <div style={{fontSize:22,fontWeight:600,color:C.muted,letterSpacing:-0.5}}>{liveStats&&liveStats.caMois!=null?'n/d':fmt(moisCourant.profit)}</div>
-          </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:22}}>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Ventes</div>
-            <div style={{fontSize:22,fontWeight:600,color:C.muted,letterSpacing:-0.5}}>{liveStats&&liveStats.ventesMois!=null?liveStats.ventesMois:moisCourant.count}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{liveStats&&liveStats.ventesMois!=null?liveStats.ventesMois:moisCourant.count}</div>
           </div>
-        </div>
-      </Card>
-
-      {/* Estimation cotisations du MOIS EN COURS */}
-      <Card style={{padding:18,background:C.card,border:`1px solid ${C.border}`}}>
-        {/* ⚠️ TROIS COULEURS DANS UN BLOC DE SIX LIGNES (titre ambre, montant
-            ambre, net bleu). Ces cotisations ne sont pas une alerte : c'est une
-            estimation qu'on lit une fois par mois. Encre partout — la couleur
-            reste pour ce qu'on doit rattraper. */}
-        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>
-          🧾 À payer pour {moisCourant.nom} ({String(tauxUrssaf()).replace('.',',')} % du CA finalisé)
-        </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:18}}>
           <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Somme à payer ce mois</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice</div>
+            {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
+                raison en clair — il n'est pas développeur. */}
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>{liveStats&&liveStats.caMois!=null?'—':fmt(moisCourant.profit)}</div>
+            {liveStats&&liveStats.caMois!=null&&<div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>saisis tes prix d'achat</div>}
+          </div>
+          <div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
             <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{fmt(urssafEstime)}</div>
           </div>
           <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net estimé après paiement</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
             <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{fmt(netApresUrssaf)}</div>
           </div>
         </div>
@@ -5602,7 +5611,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         {/* Prochaine échéance de DÉCLARATION (rappel) */}
         <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>📅 Prochaine déclaration URSSAF</span>
+            <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,flex:1}}>Prochaine déclaration URSSAF</span>
             <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
               {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
                 <button key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:urssafFreq===v?C.accent:'transparent',color:urssafFreq===v?'#fff':C.muted}}>{l}</button>
@@ -22307,28 +22316,33 @@ export default function App() {
         const hit=(vintedAccounts||[]).filter(a=>blocked.has(String(a.vinted_user_id)));
         if(hit.length){
           const noms=hit.map(a=>String(a.login||`#${a.vinted_user_id}`)).join(', ');
-          items.push({icon:'🚫', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts'});
+          items.push({icon:'🚫', ic:'alert', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts'});
         }
       }catch(_){}
-      if(colisCount>0)   items.push({icon:'📦', text:`${colisCount} colis à retirer — tu as le code ou l'adresse`, n:colisCount, tab:'cat_achats'});
-      if(toShipCount>0)  items.push({icon:'⏰', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
-      if(lbcRemoveCount>0) items.push({icon:'🟠', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
+      if(colisCount>0)   items.push({icon:'📦', ic:'box', text:`${colisCount} colis à retirer — tu as le code ou l'adresse`, n:colisCount, tab:'cat_achats'});
+      if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
+      if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(unreadTotal>0){
-        const accs=Object.entries(unreadByAcct).sort((x,y)=>y[1]-x[1]).map(([n,c])=>`${n} (${c})`);
-        const hint=accs.length?` · sur ${accs.join(', ')}`:'';
-        items.push({icon:'💬', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}${hint}`, n:unreadTotal, tab:'cat_msg'});
+        // ⚠️ SEPT COMPTES ÉNUMÉRÉS, ÇA FAISAIT DEUX LIGNES qui noyaient l'action
+        // (« lis tes messages »). On garde les trois qui en ont le plus, le
+        // reste devient un total — le détail est sur l'écran Messages.
+        const tri=Object.entries(unreadByAcct).sort((x,y)=>y[1]-x[1]);
+        const tete=tri.slice(0,3).map(([n,c])=>`${n} (${c})`);
+        const reste=tri.slice(3).reduce((t,[,c])=>t+c,0);
+        const hint=tete.length?` · sur ${tete.join(', ')}${reste>0?` et ${tri.length-3} autres comptes`:''}`:'';
+        items.push({icon:'💬', ic:'chat', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}${hint}`, n:unreadTotal, tab:'cat_msg'});
       }
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
-      if(numDbl.length>0) items.push({icon:'🚨', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces'});
-      if(noNumCount>0)   items.push({icon:'🔢', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
-      if(sleepCount>0)   items.push({icon:'😴', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
+      if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces'});
+      if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
+      if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
       // Rappel URSSAF si l'échéance de déclaration approche (≤ 14 j) ou est passée.
       try{
         const due=nextUrssafDeadline(load('vinted_urssaf_freq','trimestriel'));
         if(due && due.daysLeft<=14){
           const when=due.daysLeft<0?`en retard (${due.dueDate.toLocaleDateString('fr-FR')})`:due.daysLeft===0?"aujourd'hui":`avant le ${due.dueDate.toLocaleDateString('fr-FR')}`;
-          items.push({icon:'🧾', text:`Déclaration URSSAF ${when}`, n:1, tab:'dashboard'});
+          items.push({icon:'🧾', ic:'receipt', text:`Déclaration URSSAF ${when}`, n:1, tab:'dashboard'});
         }
       }catch(_){}
       setNotifItems(items);
