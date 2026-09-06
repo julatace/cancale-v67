@@ -12939,6 +12939,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, venduesRecentes, accountUids]);
 
+  // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
+  // VIDE. Mesuré : 0 case posée, donc la mention s'affichait sur les 184 ventes,
+  // identique — la même phrase répétée est UNE phrase (§11 à l'échelle de
+  // l'écran). Dès qu'une seule paire est rangée, la mention redevient un écart
+  // qui se remarque, et elle réapparaît partout.
+  const garageUtilise = useMemo(
+    () => Object.values(garageGrid || {}).some(a => Array.isArray(a) && a.some(v => v && String(v).trim() !== '')),
+    [garageGrid]);
+
   // ── NUMÉROS EN DOUBLE ─────────────────────────────────────────────────
   // Deux annonces EN LIGNE portant le même numéro = deux paires dans la même
   // boîte du garage. Au moment d'expédier, on prend la mauvaise chaussure et
@@ -16283,7 +16292,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:3,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                     {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:3,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
-                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span>; })()}
+                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
                       if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:3,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
