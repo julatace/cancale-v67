@@ -18245,8 +18245,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
           const sec = { flexShrink:0, borderRadius:3, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
+          // ⚠️ QUATORZE CARTES QUI PORTENT LA MÊME PHRASE, C'EST UNE PHRASE.
+          // Chaque colis sans PDF affichait un bandeau pleine largeur expliquant
+          // que l'extension s'en occupe — identique sur les quatorze (vu en
+          // capture). Quand l'attente est la MÊME pour tous, elle se dit une
+          // fois au-dessus de la liste ; dès que deux colis n'attendent pas la
+          // même chose, chaque carte reprend la sienne (elle distingue).
+          const attentes = new Set(ex
+            .filter(e => !((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])))
+            .map(e => aGenererBordereau(e.o && e.o.status) ? 'gen' : 'recup'));
+          const attenteCommune = attentes.size === 1 ? [...attentes][0] : null;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {attenteCommune && (
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.45,padding:'0 2px 2px'}}>
+                  {attenteCommune==='gen'
+                    ? <><b style={{color:C.text}}>L'extension génère les bordereaux manquants</b> à ta prochaine visite sur Vinted, puis les dépose ici.</>
+                    : <><b style={{color:C.text}}>Les bordereaux sont déjà générés chez Vinted</b> — l'extension les récupère à ta prochaine visite (l'email sert de filet). Tu peux aussi déposer un PDF que tu as téléchargé.</>}
+                </div>
+              )}
               {ex.map(e=>{
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
@@ -18354,11 +18371,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             Vinted (aucun argent engagé, aucun choix — c'est une
                             formalité obligatoire). L'app se contente de dire où on
                             en est, au lieu de te renvoyer faire le travail. */}
+                        {!attenteCommune && (
                         <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
                           {aGenererBordereau(o && o.status)
                             ? <><b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
                             : <><b>Bordereau déjà généré</b> chez Vinted — <b>l'extension le récupère</b> à ta prochaine visite sur Vinted (l'email sert de filet).</>}
-                        </div>
+                        </div>)}
                         <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
                       </>)}
@@ -18372,8 +18390,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         const v=(await askText({numeric:true,desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
                         if(v) setSaleOverride(o.transaction_id,{numero:v});
                       }} title="Poser le numéro de boîte de cette paire" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔢 Poser le N°</button>}
-                    </div>
-                    <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+                      {/* ⚠️ UNE SEULE RANGÉE D'ACTIONS. Les états (imprimé, colis
+                          fait, suivre) vivaient sur une deuxième rangée : sur un
+                          colis sans PDF, la première n'avait plus qu'un bouton et
+                          la carte occupait deux étages pour trois mots. Le retour
+                          à la ligne (`flexWrap`) fait le travail sur téléphone. */}
                       {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
                         title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
                         style={{...sec,border:`1px solid ${isBordPrinted(b)?C.accent:C.border}`,background:isBordPrinted(b)?`${C.accent}18`:'transparent',color:isBordPrinted(b)?C.accent:C.muted}}>
@@ -18391,7 +18412,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </button>
                       {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
                       {capte && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · ✓ confirmé par l\'email' : ''}</span>}
-                      {!pdf && <span style={{fontSize:11,color:C.muted}}>Bordereau pas encore reçu</span>}
+                      {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
+                          et à trois lignes d'écart, exactement ce que le bandeau
+                          d'attente dit déjà. Retiré : l'absence du bouton
+                          « Imprimer » le montre de toute façon. */}
                     </div>
                   </div>
                 );
