@@ -12089,6 +12089,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, []);
   // Le retrait connu pour CETTE commande — par transaction uniquement.
   const relaisDe = (o) => { const k = String((o && o.transaction_id) || ''); return (k && colisRelais[k]) || null; };
+  // ── LA PORTE VERS LE CODE DE RETRAIT ──────────────────────────────────────
+  // ⚠️ MESURÉ SUR LA VRAIE BASE (6 septembre) : le code et le QR de retrait
+  // d'un colis Vinted vivent dans la CONVERSATION, jamais dans l'email du
+  // transporteur — sur 139 emails de suivi, **0** porte le titre de l'article
+  // (un transporteur ne sait pas ce qu'il y a dans le carton), et la ligne
+  // `panel_colis_relais` que l'extension remplit était VIDE : 0 colis.
+  // Résultat vu en capture : treize lignes « en attente de leur code », et rien
+  // à toucher. La commande, elle, porte toujours son `conversation_id` (mesuré :
+  // 6 sur 6 des colis déposés en point relais) — c'est une IDENTITÉ donnée par
+  // Vinted, pas un rapprochement (§24). On ouvre donc toujours SA conversation,
+  // même quand l'extension n'est pas encore passée.
+  const lienConv = (o) => { const c = o && o.conversation_id; return c ? `https://www.vinted.fr/inbox/${c}` : ''; };
   const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev,[k]:new Date().toISOString()}; save('vinted_pickup_done',u); return u; }); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
@@ -16922,21 +16934,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     )}
                   </div>
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
-                    <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{pt.colis.length} colis · Au comptoir</span>
+                    {/* ⚠️ LE MÊME NOMBRE NE S'ÉCRIT PAS DEUX FOIS SUR UN ÉCRAN.
+                        « 12 colis à retirer » en tête, puis « 12 colis · Au
+                        comptoir » trois lignes dessous : le second ne distingue
+                        rien tant qu'il n'y a qu'un point relais. Dès qu'il y en a
+                        deux, il redevient l'information utile — combien dans
+                        CELUI-là — donc il revient tout seul. */}
+                    <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>
+                      {(ordre.length > 1 || pt.colis.length !== pickupUnion.total)
+                        ? `${pt.colis.length} colis · Au comptoir` : 'Au comptoir'}
+                    </span>
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
-                        : 'Le code de retrait arrive dans la conversation Vinted'}
+                        : 'Le code de retrait est dans la conversation Vinted — le lien est sur chaque colis'}
                     </span>
                   </div>
-                  <div style={{padding:'10px 12px 4px'}}>
+                  {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
+                      Une ligne de colis tient sur UNE ligne de texte et s'étirait
+                      sur 1 080 px : le bouton « ✓ retiré » se retrouvait à un
+                      mètre du titre qu'il concerne, et douze colis remplissaient
+                      deux écrans. Le `min()` évite qu'une piste de 430 px déborde
+                      un téléphone. */}
+                  <div style={{padding:'10px 12px 4px',display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:7,alignItems:'start'}}>
                   {pt.colis.map((o,i)=>{
                     // Ce que la CONVERSATION Vinted dit de ce colis : l'adresse du
                     // relais et le code de retrait. Pour Vinted Go c'est la seule
                     // source — aucun email ne les porte (voir `colisRelais`).
                     const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
                     return (
-                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
+                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
                       {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
@@ -16949,11 +16976,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
                             (§17). Si le message porte le lien direct du code, on
                             l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
-                        {rel&&(rel.qr||rel.url)&&(
-                          <a href={rel.qr||rel.url} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
-                            {rel.qr ? 'Voir le QR de retrait ↗' : 'Ouvrir la conversation (QR) ↗'}
-                          </a>
-                        )}
+                        {/* ⚠️ UNE LIGNE QUI DIT « en attente de leur code » SANS
+                            RIEN À TOUCHER NE SERT À RIEN. Le lien de la
+                            conversation existe toujours (`conversation_id` de la
+                            commande) : même sans l'extension, il est à un tap du
+                            code et du QR, à l'endroit exact où Vinted les met. */}
+                        {(()=>{
+                          const href = (rel && (rel.qr || rel.url)) || lienConv(o);
+                          if (!href) return null;
+                          const quoi = (rel && rel.qr) ? 'Voir le QR de retrait ↗'
+                            : cd ? 'Ouvrir la conversation ↗'
+                            : 'Voir le code de retrait dans Vinted ↗';
+                          return (
+                            <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
+                              {quoi}
+                            </a>
+                          );
+                        })()}
                       </div>
                       {cd&&(
                         <div style={{flexShrink:0,textAlign:'center',padding:'4px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card2||C.card}}>
@@ -17336,6 +17375,62 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
               )}
+            </div>
+          );
+        })()}
+        {/* ── LES COLIS QUI SONT REPARTIS CHEZ LE VENDEUR ────────────────────
+            ⚠️ MESURÉ SUR LA VRAIE BASE (6 septembre) : trois achats portent
+            « Commande non réclamée - Retournée à l'expéditeur.rice », pour
+            84,94 € et tous de moins de quinze jours — et AUCUN écran ne le
+            disait. `phaseReception` les range en « annulé » (son test attrape
+            « retour »), avec les remboursements : ils sortaient donc de
+            « À retirer », de « En route » ET de « Reçus » sans un mot.
+            Un colis caché est un colis perdu, et celui-là est le pire des
+            trois : la paire est repartie chez le vendeur, et l'argent n'est
+            pas forcément revenu.
+            ⚠️ On n'écrit PAS « tu as perdu 84,94 € » : Vinted rembourse
+            souvent tout seul, et un chiffre qu'on ne peut pas vérifier est
+            invendable (§2.7). On dit ce que Vinted dit, on donne le montant à
+            vérifier, et on ouvre la conversation — là où ça se règle. */}
+        {(()=>{
+          const rendus = (buysBase || [])
+            .filter(o => /non r[ée]clam/i.test(o.status || ''))
+            .sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+          if (!rendus.length) return null;
+          const tot = rendus.reduce((t,o) => t + montantCommande(o), 0);
+          return (
+            <div style={{position:'relative',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow,padding:'13px 15px 11px 17px',marginBottom:12,overflow:'hidden'}}>
+              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:C.warn}}/>
+              <span aria-hidden="true" style={{position:'absolute',inset:0,background:`linear-gradient(100deg, ${C.warn}0e, transparent 42%)`,pointerEvents:'none'}}/>
+              <div style={{display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap'}}>
+                <span aria-hidden="true" style={{flexShrink:0,color:C.warn,marginTop:1,display:'flex'}}><Icon name="alert" size={18}/></span>
+                <div style={{flex:'1 1 190px',minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text}}>
+                    {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'} — {tot.toFixed(2).replace('.',',')} € à vérifier
+                  </div>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
+                    Vinted dit « commande non réclamée ». La paire ne viendra pas : ouvre chaque conversation et vérifie que le remboursement est bien arrivé.
+                  </div>
+                </div>
+              </div>
+              <div style={{marginTop:9,display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(360px,100%), 1fr))',gap:7}}>
+                {rendus.slice(0,8).map(o=>{
+                  const j = Math.round((Date.now() - new Date(o.date||0).getTime())/86400000);
+                  const href = lienConv(o);
+                  return (
+                    <div key={'nr'+o.transaction_id} style={{display:'flex',gap:9,alignItems:'center',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',background:C.card2||C.card}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Achat'}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>
+                          {montantCommande(o).toFixed(2).replace('.',',')} €{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}
+                        </div>
+                      </div>
+                      {href && <a href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,fontSize:11.5,fontWeight:700,color:C.accent,textDecoration:'none'}}>Ouvrir la conversation ↗</a>}
+                    </div>
+                  );
+                })}
+              </div>
+              {rendus.length>8 && <div style={{fontSize:11,color:C.muted,marginTop:6}}>et {rendus.length-8} autre{rendus.length-8>1?'s':''} — ils sont tous dans l'onglet « Tous ».</div>}
             </div>
           );
         })()}
