@@ -161,6 +161,9 @@
        requête média qui tranche, pas un test de largeur en JavaScript.
        ⚠️ Un style EN LIGNE gagne sur une classe : ces deux propriétés doivent
        donc être retirées du `style={{…}}` des rangées concernées. */
+    /* L'île d'actions flotte en haut à droite : la ligne de titre lui laisse
+       la place, sinon les boutons d'écran passent dessous. */
+    @media (min-width: 1024px){ .vrm-tete-row{ padding-right: 208px; } }
     .vrm-rangee{ flex-wrap:nowrap; overflow-x:auto; }
     @media (min-width: 1024px){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
     :focus-visible{ outline:2px solid rgba(0,135,90,.55); outline-offset:2px; border-radius:10px; }

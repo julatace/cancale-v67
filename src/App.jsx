@@ -4354,7 +4354,12 @@ function ScreenHead({ icon, title, desc, right }) {
        l'écran dans la barre de navigation) et le filet redevient une simple
        séparation. Mesuré : 40 px rendus au contenu, en haut de chaque page. */
     <div style={{marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
-      <div style={{display:'flex',alignItems:'flex-end',gap:14,flexWrap:'wrap'}}>
+      {/* ⚠️ LA RANGÉE DU TITRE RÉSERVE LA PLACE DE L'ÎLE D'ACTIONS. Depuis
+          qu'elle flotte en haut à droite (fixe), les boutons qu'un écran pose
+          sur sa propre ligne de titre passaient DESSOUS : sur Factures,
+          « ⚙ Réglages » disparaissait derrière (vu en capture). Le filet de
+          séparation, lui, garde toute la largeur. */}
+      <div className="vrm-tete-row" style={{display:'flex',alignItems:'flex-end',gap:14,flexWrap:'wrap'}}>
         <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:10}}>
           {line
             ? <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name={icon} size={20}/></span>
@@ -6704,18 +6709,22 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
-        <ScreenHead icon="receipt" title={`Factures (${invoices.length})`} desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."/>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+      {/* ⚠️ LES BOUTONS PASSENT DANS LE `right` DE `ScreenHead`. Posés à côté
+          dans une rangée à part, ils sortaient de la zone protégée et
+          glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
+          invisible (vu en capture). Le slot `right` existe pour ça. */}
+      <div>
+        <ScreenHead icon="receipt" title={`Factures (${invoices.length})`} desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
+          right={<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
           <Btn small onClick={()=>fetchVintedInvoices(false)} color={C.purple} disabled={fetching}>
             {fetching?'⏳ Chargement...':'📥 Récupérer Vinted'}
           </Btn>
           <Btn small onClick={exportExcel} color={C.blue}>📤 Exporter Excel</Btn>
           <Btn small onClick={()=>setShowSettings(true)} color={C.border}>⚙ Réglages</Btn>
-        </div>
+        </div>}/>
       </div>
-      
+
       {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
         <input
