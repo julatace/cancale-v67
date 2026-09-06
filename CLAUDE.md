@@ -169,6 +169,24 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   Ils ont leur bloc sur Achats. On dit « à vérifier », **jamais « perdu »** :
   Vinted rembourse souvent tout seul.
 
+### La carte des points relais (Achats)
+**Mesuré le 6 septembre** : `vrm_ville` valait déjà « Cancale », `/api/relais`
+répond bien 5 points — mais `vrm_ville_points` était **absent** et l'écran ne
+cherchait rien. Cause : **un écran lit ses réglages au MONTAGE**
+(`useState(() => load(...))`) et le nuage atterrit ~500 ms plus tard. Sur le
+**premier écran ouvert**, il lit donc du vide ; on change d'onglet, on revient,
+et tout marche. Le mécanisme de rattrapage existait (`onCloudReady`, posé pour
+les numéros) : les réglages de la carte n'y étaient pas branchés. **Toute
+donnée synchronisée lue au montage doit passer par `onCloudReady`**, et n'y
+remplacer que ce qui est resté VIDE (sinon une saisie faite pendant le
+chargement est écrasée — pour les numéros ce serait le pire défaut de l'app).
+- Le filtre « Casiers & transporteurs », actif par défaut, cachait **4 des
+  5 points** de Cancale sans le dire. Il affiche maintenant combien il masque.
+- `vrm_points_relais` contient « Juste Ici » — un bout de texte pris dans un
+  email, géocodé à **Marseille**, listé comme point relais de Cancale. Un point
+  à plus de 30 km de la ville est signalé (« à 819 km ») ; **jamais supprimé
+  tout seul**, c'est sa liste.
+
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
 `panel_accounts_off`, `panel_colis_relais`, …) en lecture-fusion-écriture.
@@ -195,7 +213,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **23 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **24 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | bancs Playwright (scratchpad) | l'app **rendue sur les vraies données**, à 390 px et 1512 px |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -312,7 +330,7 @@ qu'un bouton ne fixe pas lui-même.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 23 audits
+scripts/audit-*.cjs             les 24 audits
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

@@ -11579,7 +11579,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (j && j.error === 'ville_introuvable') { setVilleLoading(false); toast('Ville introuvable — vérifie l\'orthographe.'); return; }
       const pts = (j && Array.isArray(j.points)) ? j.points : [];
       if (!pts.length && j && j.error) { setVilleLoading(false); toast('Service de carte momentanément indisponible, réessaie dans un instant.'); return; }
-      const cache = { city, pts };
+      // ⚠️ On garde le CENTRE de la ville : sans lui, impossible de dire qu'un
+      // point enregistré est à 800 km (cas mesuré : « Juste Ici », capté depuis
+      // le texte d'un email, géocodé à Marseille et listé « à Cancale »).
+      const cache = { city, pts, center: (j && j.center) || null };
       setVilleCache(cache); save('vrm_ville_points', cache);
       setVille(city); save('vrm_ville', city);
       setVilleInput(city);
@@ -13963,6 +13966,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && vintedPoints===null) fetchHarvestPickupPoints().then(setVintedPoints); /* eslint-disable-next-line */ }, [sub]);
+  // ── LES RÉGLAGES QUI N'ARRIVAIENT JAMAIS JUSQU'À L'ÉCRAN ──────────────────
+  // ⚠️ LE NUAGE ARRIVE APRÈS LE MONTAGE. Un écran lit ses réglages au montage
+  // (`useState(() => load(...))`) ; le nuage, lui, atterrit ~500 ms plus tard.
+  // Sur le PREMIER écran ouvert, l'écran lit donc du vide, et rien ne le
+  // réveille. Mesuré au banc sur une copie de la vraie base : `vrm_ville` vaut
+  // « Cancale » dans `localStorage` dès 500 ms, mais l'écran Achats ne cherche
+  // AUCUN point relais — zéro appel — jusqu'à ce qu'on change d'onglet et qu'on
+  // revienne (le composant remonte, et là tout marche). C'est exactement ce que
+  // Julien voyait : un écran qui se présente comme s'il n'avait jamais été réglé.
+  // Le mécanisme existait déjà pour les numéros (`onCloudReady`, §5.49) — les
+  // réglages de la carte n'y étaient simplement pas branchés.
+  // ⚠️ ON NE REMPLACE QUE CE QUI EST RESTÉ VIDE : ce qu'il vient de saisir sur
+  // CET appareil gagne toujours.
+  useEffect(() => onCloudReady(() => {
+    const vide = (o) => !o || (Array.isArray(o) ? o.length === 0 : Object.keys(o).length === 0);
+    setVille(v => v || load('vrm_ville', ''));
+    setVilleInput(v => v || load('vrm_ville', ''));
+    setSavedPoints(p => vide(p) ? load('vrm_points_relais', []) : p);
+    setBuyByNum(n => vide(n) ? load('vinted_buyprice_by_num', {}) : n);
+    setPickupDone(n => vide(n) ? load('vinted_pickup_done', {}) : n);
+    setShipDone(n => vide(n) ? load('vinted_ship_done', {}) : n);
+    setTxnLink(n => vide(n) ? load('vinted_txn_link', {}) : n);
+    setCollectedAt(n => vide(n) ? load('vrm_colis_collected_at', {}) : n);
+    setCollected(c => (c && c.size) ? c : loadCollected());
+  }), []);
   // Ta ville est connue mais la liste de ses points n'est pas encore chargée
   // (ou date d'une autre ville) → on la récupère AUTOMATIQUEMENT.
   useEffect(() => {
@@ -17202,7 +17230,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const withColis=entriesSorted.filter(([,g])=>g.colis.length>0);
           // Points enregistrés SANS colis : masqués quand tu as des colis à retirer
           // (ils encombraient la vue), listés seulement quand tu n'as rien à retirer.
-          const autres=anyColis?[]:entriesSorted.filter(([,g])=>g.colis.length===0 && g.saved);
+          // ⚠️ LA LISTE NE MONTRAIT QUE SES POINTS ENREGISTRÉS, sous le titre
+          // « Points relais à Cancale (4) » : les points de la VILLE, ceux
+          // qu'il vient justement de demander en tapant son nom, n'y étaient
+          // pas — ils n'existaient que comme épingles sur la carte. Le compte
+          // du titre ne comptait donc pas ce qu'il annonçait.
+          const autres=anyColis?[]:entriesSorted.filter(([,g])=>g.colis.length===0 && (g.saved || g.ville || g.vinted));
+          // ⚠️ CE QUE LE FILTRE CACHE DOIT SE VOIR. « Casiers & transporteurs »
+          // est actif par défaut : sur les 5 points que l'API renvoie pour
+          // Cancale, il en laissait passer UN. L'écran avait l'air vide sans
+          // jamais dire pourquoi — et un filtre muet, ça se lit « ça ne marche
+          // pas ».
+          const villeAJour = villeCache.city && norm(villeCache.city)===norm(ville);
+          const masquesFiltre = !carriersOnly ? 0 :
+            ((villeAJour ? (villeCache.pts||[]) : []).concat(vintedPoints||[])
+              .filter(pt=>pt && !pt.carrier && !pt.locker && !hiddenPts.has(norm2(pt.nom))).length);
+          // Le centre de la ville, pour repérer un point manifestement hors sujet.
+          const centreVille = (villeAJour && villeCache.center) ? villeCache.center
+            : (villeAJour && (villeCache.pts||[]).length
+                ? { lat:(villeCache.pts||[]).reduce((t,p)=>t+(+p.lat||0),0)/villeCache.pts.length,
+                    lon:(villeCache.pts||[]).reduce((t,p)=>t+(+p.lon||0),0)/villeCache.pts.length }
+                : null);
+          // Au-delà de 30 km, ce n'est plus « un point relais de ta ville ».
+          const kmDeLaVille = (g) => {
+            if (!centreVille || !g || !g.lat) return null;
+            const km = distMeters(centreVille.lat, centreVille.lon, g.lat, g.lon) / 1000;
+            return km > 30 ? Math.round(km) : null;
+          };
           const singlePoint=withColis.length===1;
           const selGroup=openPoint?groups[openPoint]:null;
           return (
@@ -17222,7 +17276,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       const r=await fetch(`/api/relais?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
                       const j=await r.json();
                       const pts=(j&&Array.isArray(j.points))?j.points:[];
-                      if(j&&j.city){ const cache={city:j.city,pts}; setVilleCache(cache); save('vrm_ville_points',cache); setVille(j.city); save('vrm_ville',j.city); setVilleInput(j.city); }
+                      if(j&&j.city){ const cache={city:j.city,pts,center:j.center||null}; setVilleCache(cache); save('vrm_ville_points',cache); setVille(j.city); save('vrm_ville',j.city); setVilleInput(j.city); }
                       else toast('Ville non trouvée depuis ta position.');
                     }catch(_){ toast('Recherche indisponible, réessaie.'); }
                     setVilleLoading(false);
@@ -17358,15 +17412,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderBottom:`1px solid ${C.border}`}}>
                     <span style={{flex:1,fontSize:11,fontWeight:600,color:C.muted}}>Points relais{ville?` à ${ville}`:''} ({autres.length})</span>
+                    {masquesFiltre>0 && <span style={{fontSize:11,color:C.warn,fontWeight:600,flexShrink:0}}>{masquesFiltre} masqué{masquesFiltre>1?'s':''} par le filtre</span>}
                     <button onClick={()=>{ const v=!carriersOnly; setCarriersOnly(v); save('vrm_relais_carriers_only',v); }} style={{border:`1px solid ${carriersOnly?C.accent:C.border}`,borderRadius:8,background:carriersOnly?`${C.accent}12`:'transparent',color:carriersOnly?C.accent:C.muted,fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>{carriersOnly?'Casiers & transporteurs':'Tous les commerces'}</button>
                   </div>
-                  <div style={{maxHeight:240,overflowY:'auto'}}>
+                  {/* Assez haut pour montrer six points d'un coup : à 240 px la
+                      sixième ligne était coupée en deux, ce qui se lit « cassé »
+                      plutôt que « ça défile ». */}
+                  <div style={{maxHeight:320,overflowY:'auto'}}>
                     {autres.map(([lieu,g])=>(
                       <div key={lieu} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 12px',borderTop:`1px solid ${C.border}55`}}>
                         {g.carrier?<CarrierBadge carrier={g.carrier} size={22}/>:<span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="pin" size={18}/></span>}
                         <span style={{flex:1,minWidth:0}}>
                           <span style={{display:'block',fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nom||lieu}</span>
                           <span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.rue,g.type].filter(Boolean).join(' · ')||' '}</span>
+                          {/* ⚠️ MESURÉ DANS SA BASE : « Juste Ici » — un bout de
+                              texte pris dans un email, géocodé à Marseille — était
+                              listé comme un point relais de Cancale, à 800 km. On
+                              ne le supprime pas tout seul (c'est sa liste), on dit
+                              ce qui cloche, et la croix est juste à côté. */}
+                          {(()=>{ const km = kmDeLaVille(g); return km == null ? null : (
+                            <span style={{display:'block',fontSize:11,color:C.warn,fontWeight:600}}>à {km} km de {ville} — sûrement une erreur de nom</span>
+                          ); })()}
                         </span>
                         {g.lat&&<a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.blue||C.accent,padding:'5px 7px',display:'flex'}}><Icon name="nav" size={15}/></a>}
                         <button onClick={()=>{ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); }} title="Retirer ce point de la carte" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',flexShrink:0,padding:'2px 6px'}}><Icon name="close" size={15}/></button>
@@ -18587,6 +18653,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // la même chose.
           const estPoste = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
           const nbPostes = ex.filter(estPoste).length;
+          // ── LES GROUPES DE LA LISTE ────────────────────────────────────────
+          // ⚠️ L'EN-TÊTE ANNONCE TROIS GROUPES (« 10 en retard · 3 aujourd'hui ·
+          // 1 demain »), LA LISTE N'EN MONTRAIT AUCUN : quatorze cartes à la
+          // suite, triées mais sans frontière. Sur téléphone il en voit cinq à
+          // la fois — la limite entre « en retard » et « aujourd'hui » tombait
+          // hors de l'écran, donc le compte du haut n'était pas vérifiable.
+          // Le tri est déjà bon (le plus urgent en haut, les postés à la fin) :
+          // on pose seulement l'intertitre à chaque charnière, comme pour
+          // « Déjà postés ».
+          const groupeDe = (x) => {
+            if (estPoste(x)) return 'fait';
+            const d = x.dl;
+            if (d == null) return 'sansdate';
+            if (d < 0) return 'retard';
+            if (d === 0) return 'jour';
+            if (d === 1) return 'demain';
+            return 'apres';
+          };
+          const TITRE_GROUPE = {
+            retard:   ['En retard', 'Vinted compte les jours — ceux-là partent en premier.'],
+            jour:     ["À poster aujourd'hui", ''],
+            demain:   ['À poster demain', ''],
+            apres:    ['Plus tard', ''],
+            sansdate: ['Sans date limite annoncée', ''],
+            fait:     ['Déjà postés', "Ils quittent la liste quand Vinted confirme l'envoi. « ↺ Pas encore » les remet dans les colis à envoyer."],
+          };
+          const nbParGroupe = {};
+          ex.forEach(x => { const g = groupeDe(x); nbParGroupe[g] = (nbParGroupe[g] || 0) + 1; });
+          // ⚠️ UN SEUL GROUPE : pas d'intertitre. Il redirait mot pour mot le
+          // compteur du haut (« 14 colis à envoyer » puis « En retard · 14 »),
+          // et le même nombre ne s'écrit pas deux fois sur un écran.
+          const plusieursGroupes = Object.keys(nbParGroupe).length > 1;
           const attentes = new Set(ex
             .filter(e => !estPoste(e))
             .filter(e => !((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])))
@@ -18627,20 +18725,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const capte = e.txn ? labelsCaptes[e.txn] : null;
                 const pdf = !!(b && b.hasPdf) || !!capte;
                 const acc = o ? o._acc : null;
-                // ⚠️ L'EN-TÊTE DISAIT « 6 colis à envoyer », LA LISTE EN MONTRAIT
-                // 14 (vu en capture à 1512 px). Les huit autres sont des colis
-                // qu'il a cochés « Colis fait » : ils restent affichés exprès —
-                // un colis caché est un colis perdu, et il doit pouvoir revenir
-                // en arrière — mais rien ne les annonçait. Le tri les met déjà
-                // tous à la fin ; on pose un intertitre à la charnière, et le
-                // compte du haut redevient vérifiable (6 + 8 = 14).
-                const ouvrePostes = estPoste(e) && !(ix > 0 && estPoste(ex[ix-1]));
+                // Une charnière de groupe : le premier colis d'un groupe porte
+                // son intertitre (voir `groupeDe` plus haut). C'est ce qui rend
+                // le compte du haut vérifiable — « 10 en retard · 3 aujourd'hui
+                // · 1 demain » se retrouve dans la liste, pas seulement dans une
+                // phrase. Le premier groupe en a un aussi : sans lui, dix cartes
+                // rouges commençaient sans qu'on sache où le retard s'arrête.
+                const grp = groupeDe(e);
+                const ouvreGrp = plusieursGroupes && (ix === 0 || groupeDe(ex[ix-1]) !== grp);
+                const [titreGrp, sousGrp] = TITRE_GROUPE[grp] || ['', ''];
                 return (
                   <React.Fragment key={e.key}>
-                  {ouvrePostes && (
-                    <div style={{gridColumn:'1 / -1',display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',borderTop:`1px solid ${C.border}`,padding:'10px 2px 0',marginTop:4}}>
-                      <span style={{fontSize:12.5,fontWeight:700,color:C.text}}>Déjà postés · {nbPostes}</span>
-                      <span style={{fontSize:11.5,color:C.muted}}>Ils quittent la liste quand Vinted confirme l'envoi. « ↺ Pas encore » les remet dans les colis à envoyer.</span>
+                  {ouvreGrp && (
+                    <div data-groupe={grp} style={{gridColumn:'1 / -1',display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',borderTop:ix===0?'none':`1px solid ${C.border}`,padding:ix===0?'2px 2px 0':'10px 2px 0',marginTop:ix===0?0:4}}>
+                      <span style={{fontSize:12.5,fontWeight:700,color:grp==='retard'?C.danger:C.text}}>{titreGrp} · {nbParGroupe[grp]}</span>
+                      {sousGrp && <span style={{fontSize:11.5,color:C.muted,flex:'1 1 200px',minWidth:0}}>{sousGrp}</span>}
                     </div>
                   )}
                   <div data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:10,opacity:posted?0.55:1}}>
