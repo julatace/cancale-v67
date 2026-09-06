@@ -3023,6 +3023,19 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
 // 7256d7e — mise en page en une colonne, une étiquette grise puis la valeur.
 // Le N° de la paire est ajouté (il est passé par `opts.numero` depuis les trois
 // boutons appelants) : c'est la seule chose qui manquait vraiment.
+// ── LE REÇU D'ACHAT ─────────────────────────────────────────────────────────
+// Julien : « refais bien les justificatifs ». Ce qu'il manquait, mesuré en le
+// générant : le document ne disait PAS QUI achète (`opts.shop` n'était passé
+// par AUCUN des 5 appelants → « Ma boutique » sur tous les reçus), il n'avait
+// ni la photo de la paire, ni sa marque/pointure, ni la date d'établissement,
+// et surtout sa note de bas de page (« Reçu d'achat à conserver avec ta
+// comptabilité ») le faisait passer pour un document officiel.
+// ⚠️ CE N'EST PAS LA FACTURE DE VINTED. C'est un récapitulatif établi par
+// l'app d'après les données de la commande. Un comptable doit pouvoir le lire
+// sans se tromper là-dessus : c'est écrit sur le document, pas seulement ici.
+// ⚠️ La mise en page reste EN UNE COLONNE : il avait explicitement redemandé
+// « l'ancien modèle » après un essai en deux colonnes (§5.36). On enrichit, on
+// ne réorganise pas.
 const generateAchatJustificatif = async (o, opts = {}) => {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
@@ -3030,30 +3043,84 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
   const { height } = page.getSize();
-  let y = height - 48;
+  const G = rgb(0.45,0.45,0.45), N = rgb(0.1,0.1,0.1);
+  let y = height - 44;
+
+  // QUI ACHÈTE. L'entité active des Factures (raison sociale, adresse, SIRET) —
+  // aucun appelant ne la passait, donc chaque reçu disait « Ma boutique ».
+  const ents = load('vinted_entreprises', []);
+  const actif = load('vinted_entreprise_active', '');
+  const ent = (Array.isArray(ents) && ents.length)
+    ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0])
+    : load('vinted_invoice_settings', null);
+  const acheteur = [ent && ent.companyName, ent && ent.companyType].filter(Boolean).join(' ');
+
+  page.drawText('Recu d\'achat', { x:32, y, size:20, font:bold, color:N }); y -= 16;
+  page.drawText(acheteur || opts.shop || 'Achat de marchandise', { x:32, y, size:10, font:reg, color:G }); y -= 12;
+  const adr = [ent && ent.companyAddress, (ent && ent.siret) ? 'SIRET ' + ent.siret : ''].filter(Boolean).join(' · ');
+  if (adr) { page.drawText(adr.slice(0,74), { x:32, y, size:8.5, font:reg, color:G }); y -= 12; }
+  y -= 12;
+  page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 22;
+
+  // LA PAIRE : photo + ce qui l'identifie. ⚠️ Le CDN Vinted ne renvoie aucun
+  // en-tête CORS : les octets passent par l'extension (§5.28). Sans elle, le
+  // reçu se génère simplement sans photo — rien ne casse.
+  const src = (o && o.photo && (o.photo.url || o.photo)) || '';
+  let img = null;
+  if (src) {
+    try {
+      const dataUrl = await vmrPhoto(String(src));
+      if (dataUrl) {
+        const b64 = String(dataUrl).split(',')[1] || '';
+        const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        img = /png/i.test(dataUrl.slice(0,30)) ? await pdf.embedPng(raw) : await pdf.embedJpg(raw);
+      }
+    } catch (_) { img = null; }
+  }
+  const txtX = img ? 116 : 32;
+  const titre = String(o.title || '—');
+  const coupe = (t, max) => { const w=t.split(' '); const r=[]; let c=''; for(const x of w){ if((c+' '+x).trim().length>max){ r.push(c.trim()); c=x; } else c+=' '+x; } if(c.trim()) r.push(c.trim()); return r; };
+  const lignesTitre = coupe(titre, img ? 34 : 46).slice(0, 2);
+  const carac = [extractBrand(titre), extractSize(titre) ? 'pointure ' + String(extractSize(titre)).replace('.',',') : ''].filter(Boolean).join(' · ');
+  // ⚠️ LA HAUTEUR DU BLOC SE CALCULE, elle n'est pas figée. Une hauteur fixe
+  // laissait un trou de 94 px quand il n'y a ni photo (pas d'extension) ni
+  // marque/pointure reconnue — sur un document d'une page, ça se voit tout de
+  // suite comme un défaut d'impression.
+  let by = y;
+  if (opts.numero) { page.drawText('N°' + opts.numero, { x:txtX, y:by-11, size:15, font:bold, color:N }); by -= 25; }
+  lignesTitre.forEach((l,i) => page.drawText(l, { x:txtX, y:by-11-i*14, size:11, font:reg, color:N }));
+  by -= 11 + lignesTitre.length*14;
+  if (carac) { page.drawText(carac, { x:txtX, y:by, size:9, font:reg, color:G }); by -= 13; }
+  // la photo fixe un plancher : le bloc ne peut pas être plus court qu'elle
+  if (img) page.drawImage(img, { x:32, y:y-76, width:72, height:72 });
+  y = Math.min(by - 8, img ? y - 84 : by - 8);
+  page.drawRectangle({ x:32, y, width:356, height:1, color:rgb(0.92,0.92,0.92) }); y -= 22;
+
   const line = (label, val, o2={}) => {
-    page.drawText(label, { x:32, y, size:9, font:reg, color:rgb(0.45,0.45,0.45) });
-    page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:rgb(0.1,0.1,0.1) });
-    y -= o2.gap || 40;
+    page.drawText(label, { x:32, y, size:9, font:reg, color:G });
+    page.drawText(String(val==null?'—':val), { x:32, y:y-15, size:o2.big?15:12, font:o2.big?bold:reg, color:N });
+    y -= o2.gap || 38;
   };
-  page.drawText('Re\u00e7u d\'achat', { x:32, y, size:20, font:bold, color:rgb(0,0.47,0.51) }); y -= 14;
-  page.drawText(opts.shop || 'Ma boutique', { x:32, y, size:10, font:reg, color:rgb(0.45,0.45,0.45) }); y -= 30;
-  page.drawRectangle({ x:32, y, width:356, height:2, color:rgb(0.9,0.9,0.9) }); y -= 24;
   line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
   line('N° de transaction Vinted', o.transaction_id || '—');
-  line('Vendeur', o.seller || o.user_login || o.opposite_user?.login || '—');
-  line('Article', o.title || '—');
-  if (opts.numero) line('N\u00b0 de la paire', `N\u00b0${opts.numero}`);
-  // Virgule decimale : c'est un document comptable francais (le reste est repris tel quel).
-  line('Montant payé (TTC)', o.price?.amount!=null ? `${Number(o.price.amount).toFixed(2).replace('.',',')} ${o.price.currency_code==='EUR'?'€':o.price.currency_code||''}` : '—', { big:true });
+  line('Vendeur', o.seller || o.user_login || (o.opposite_user && o.opposite_user.login) || '—');
+  // Virgule decimale : c'est un document comptable francais.
+  line('Montant payé (TTC)', o.price && o.price.amount!=null
+    ? `${Number(o.price.amount).toFixed(2).replace('.',',')} ${o.price.currency_code==='EUR'?'€':(o.price.currency_code||'')}` : '—', { big:true });
   line('Compte acheteur', opts.account || '—');
-  y -= 6;
-  const note = opts.regime==='marge'
-    ? 'Achat de seconde main \u00e0 un particulier : pas de TVA d\u00e9ductible. \u00c0 conserver pour le r\u00e9gime de la marge (TVA sur la marge \u00e0 la revente).'
-    : 'Re\u00e7u d\'achat \u00e0 conserver avec ta comptabilit\u00e9.';
-  // Retour à la ligne simple.
-  const wrap = (txt, max) => { const words=txt.split(' '); const rows=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>max){ rows.push(cur.trim()); cur=w; } else cur+=' '+w; } if(cur.trim()) rows.push(cur.trim()); return rows; };
-  wrap(note, 62).forEach((r,i)=> page.drawText(r, { x:32, y:y-i*13, size:8.5, font:reg, color:rgb(0.5,0.5,0.5) }));
+
+  y -= 4;
+  const notes = [
+    opts.regime==='marge'
+      ? 'Achat de seconde main a un particulier : pas de TVA deductible. A conserver pour le regime de la marge (TVA sur la marge a la revente).'
+      : 'Achat de seconde main a un particulier : pas de TVA deductible.',
+    // ⚠️ NE PAS RETIRER. Sans cette phrase, le document se lit comme la facture
+    // de Vinted — or Vinted n'en emet pas pour un achat entre particuliers.
+    'Recapitulatif etabli par VRM d\'apres les donnees de la commande Vinted. Ce n\'est pas une facture emise par Vinted.',
+    'Etabli le ' + new Date().toLocaleDateString('fr-FR') + '.',
+  ];
+  let ny = y;
+  notes.forEach(n => { coupe(n, 68).forEach(r => { page.drawText(r, { x:32, y:ny, size:8, font:reg, color:G }); ny -= 11; }); ny -= 4; });
 
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type:'application/pdf' });
@@ -11769,6 +11836,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
   const [periode, setPeriode] = useState(null); // filtre de période (ventes + achats)
   const [pickerFor, setPickerFor] = useState(null);
+  // Recherche dans le sélecteur d'achat : avec ~700 achats, si la suggestion
+  // n'est pas la bonne il n'y avait que le défilement.
+  const [pickerQ, setPickerQ] = useState('');
   const [purchasesPick, setPurchasesPick] = useState({ loading:false, items:[] });
 
   // Numéros : édition depuis l'onglet Annonces.
@@ -11796,9 +11866,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
   const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros]);
   const openPicker = async (item) => {
-    setPickerFor(item); setPurchasesPick({loading:true,items:[]});
-    const seen=new Set(); const out=[];
-    for(const acc of accounts){ const r=await fetchVintedOrders(acc,'purchased',1,'all'); if(r.ok) for(const o of r.items){ const id=String(o.transaction_id); if(!seen.has(id)){seen.add(id); out.push({...o,_acc:acc});} } }
+    // ⚠️ LA MODALE S'OUVRE TOUT DE SUITE. Avant, elle attendait le chargement de
+    // TOUS les achats de TOUS les comptes — 11 s mesurées, à chaque clic. On
+    // affiche l'écran, la liste arrive dedans, et le chargement n'a lieu qu'une
+    // fois pour toute la session (`chargerAchats`).
+    setPickerFor(item); setPickerQ('');
+    if (!fillBuyAchats.items) setPurchasesPick({loading:true,items:[]});
+    const out = await chargerAchats();
     // CLASSEMENT PAR PERTINENCE, pas seulement par date. Avec ~700 achats,
     // une liste chronologique rend la recherche décourageante — et c'est
     // exactement pour ça qu'aucun prix d'achat n'était renseigné (0 sur 177
@@ -11808,10 +11882,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Le barème vit au niveau module (`refAchat` / `scoreAchat`) : la modale
     // de saisie en série s'en sert aussi. Deux copies, ce serait deux listes de
     // suggestions différentes selon l'écran ouvert (§11).
+    // ⚠️ On NE MUTE PAS la liste partagée : elle sert aussi à la saisie en série.
+    // Un `sort` en place réordonnerait la source sous l'autre écran.
     const ref = refAchat(item);
-    out.forEach(o => { o._score = scoreAchat(ref, o); });
-    out.sort((a,b) => (b._score - a._score) || (new Date(b.date||0) - new Date(a.date||0)));
-    setPurchasesPick({loading:false,items:out});
+    const liste = out.map(o => ({ ...o, _score: scoreAchat(ref, o) }))
+      .sort((a,b) => (b._score - a._score) || (new Date(b.date||0) - new Date(a.date||0)));
+    setPurchasesPick({loading:false,items:liste});
   };
   // ⚠️ ON GARDE UN INSTANTANÉ DE L'ACHAT sur la paire (`buyFrom`), pas seulement
   // son n° de transaction. Sans lui, réafficher « l'achat relié » (photo, reçu)
@@ -14622,25 +14698,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Aucune saisie automatique : c'est lui qui tape, ou qui tape sur une
   // suggestion qu'il voit (règle tenue depuis §22).
   const [fillBuyOpen, setFillBuyOpen] = useState(false);
-  // ⚠️ LES ACHATS SONT CHARGÉS UNE SEULE FOIS pour toute la modale, pas une fois
-  // par paire : la lecture est la même que celle du sélecteur (moisson en
-  // cache), la refaire 225 fois serait le trou d'égress de §34.
+  // ── LA LISTE DES ACHATS : CHARGÉE UNE SEULE FOIS, PARTAGÉE ────────────────
+  // ⚠️ MESURÉ EN ME METTANT À SA PLACE : le sélecteur « Quel achat correspond à
+  // cette paire ? » rechargeait les ~700 achats des 9 comptes À CHAQUE CLIC —
+  // **11 secondes** avant de voir quoi que ce soit. Relier trente paires, c'est
+  // cinq minutes d'attente : voilà pourquoi le prix d'achat n'est jamais saisi,
+  // bien plus que le classement des candidats. Et il y avait DEUX chargeurs pour
+  // la même lecture (celui-ci et une boucle dans `openPicker`), donc deux listes
+  // qui pouvaient diverger (§11).
+  // ⚠️ On mémorise la PROMESSE, pas seulement le résultat : deux ouvertures
+  // rapprochées partagent un seul aller-retour (le motif `cachedRow`, §23).
   const [fillBuyAchats, setFillBuyAchats] = useState({ loading:false, items:null });
-  useEffect(() => {
-    if (!fillBuyOpen || fillBuyAchats.items || fillBuyAchats.loading) return;
-    let mort = false;
+  const achatsEnCours = useRef(null);
+  const chargerAchats = React.useCallback(() => {
+    if (fillBuyAchats.items) return Promise.resolve(fillBuyAchats.items);
+    if (achatsEnCours.current) return achatsEnCours.current;
     setFillBuyAchats({ loading:true, items:null });
-    (async () => {
+    const pr = (async () => {
+      // ⚠️ `harvestOnly` : on NE tente PAS le proxy Vinted. Sans lui, cliquer 🔗
+      // pouvait déclencher jusqu'à 9 appels Vinted d'un coup depuis l'IP du
+      // serveur — le motif « multi-comptes piloté par un robot » (§5). Ici on
+      // ne fait que relire ce que l'extension a déjà capté, donc 9 lectures
+      // Supabase indépendantes : elles partent EN PARALLÈLE (11 s → ~2 s
+      // mesurées). Un compte jamais moissonné n'apporte rien, et c'est écrit
+      // dans l'état vide.
       const vus = new Set(); const out = [];
-      for (const acc of accounts) {
-        const r = await fetchVintedOrders(acc, 'purchased', 1, 'all');
+      const res = await Promise.all(accounts.map(acc =>
+        fetchVintedOrders(acc, 'purchased', 1, 'all', { harvestOnly: true })
+          .then(r => ({ acc, r })).catch(() => ({ acc, r: { ok: false, items: [] } }))));
+      for (const { acc, r } of res) {
         if (r.ok) for (const o of r.items) { const id = String(o.transaction_id); if (!vus.has(id)) { vus.add(id); out.push({ ...o, _acc: acc }); } }
       }
-      if (!mort) setFillBuyAchats({ loading:false, items: out });
+      setFillBuyAchats({ loading:false, items: out });
+      achatsEnCours.current = null;
+      return out;
     })();
-    return () => { mort = true; };
+    achatsEnCours.current = pr;
+    return pr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillBuyOpen]);
+  }, [fillBuyAchats.items, accounts]);
+  useEffect(() => { if (fillBuyOpen) chargerAchats(); }, [fillBuyOpen, chargerAchats]);
   const fillBuyRows = useMemo(() => {
     // Ce que chaque paire pèse dans la compta : ses ventes, résolues par
     // IDENTITÉ (id d'annonce Vinted, sinon photo) — jamais par titre (§5.34).
@@ -14678,6 +14775,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // compté deux fois. On sert les lignes dans l'ordre de la liste (les ventes
   // au plus gros CA d'abord), et un achat retenu ne ressort plus.
   const fillBuySugg = useMemo(() => {
+    // ⚠️ 300 paires × ~700 achats = 210 000 comparaisons de titres. C'est LOURD
+    // (mesuré : ~2 s de calcul), et ça ne sert QU'À la modale de saisie en
+    // série. Depuis que la liste des achats est partagée avec le sélecteur 🔗,
+    // ce calcul se déclenchait aussi à chaque clic sur 🔗 — pour un résultat
+    // que personne ne regardait. On le borne à la modale qui l'utilise.
+    if (!fillBuyOpen) return {};
     const achats = fillBuyAchats.items;
     if (!achats || !achats.length) return {};
     const pris = new Set(linkedBuyIds);
@@ -14695,7 +14798,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (best && bestS >= SEUIL_SUGGERE) { out[r.key] = best; pris.add(String(best.transaction_id)); }
     }
     return out;
-  }, [fillBuyAchats.items, fillBuyRows, linkedBuyIds]);
+  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, linkedBuyIds]);
 
   // Relier un achat à une paire depuis la liste (pas depuis le sélecteur) :
   // même écriture que `choosePick`, instantané compris (§5.36) — sinon le reçu
@@ -18542,16 +18645,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {pickerFor && (
         <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'4px 4px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.text}}>Quel achat correspond à cette paire ?</div>
-              <button type="button" onClick={()=>setPickerFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+            {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
+                demandait « quel achat correspond à CETTE paire ? » sans jamais
+                dire laquelle : il fallait se souvenir de la carte sur laquelle
+                on venait de taper. Avec 35 annonces dont beaucoup d'Adidas
+                Spezial, c'est exactement là qu'on relie le mauvais achat. */}
+            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:11}}>
+              <div style={{width:46,height:46,borderRadius:3,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {pickerFor.photo && !imgMortes.has(pickerFor.photo)
+                  ? <img src={pickerFor.photo} alt="" onError={()=>noterImgMorte(pickerFor.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : <span style={{fontSize:20}}>👟</span>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  {numeros[pickerFor.id]?.numero && <span style={{fontSize:12,fontWeight:700,color:C.onAccent||'#fff',background:C.accent,borderRadius:3,padding:'2px 7px',flexShrink:0}}>N°{numeros[pickerFor.id].numero}</span>}
+                  <span style={{fontSize:13.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pickerFor.title}</span>
+                </div>
+                <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>
+                  {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')} €`].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
+            </div>
+            <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
+              <input autoFocus value={pickerQ} onChange={e=>setPickerQ(e.target.value)}
+                placeholder="Chercher dans tes achats (titre, marque, taille…)"
+                style={{width:'100%',boxSizing:'border-box',padding:'9px 11px',border:`1px solid ${C.border}`,borderRadius:3,background:C.card,color:C.text,fontSize:13,fontFamily:'inherit'}}/>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'8px 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
               {purchasesPick.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement de tes achats…</div>}
               {!purchasesPick.loading && (() => {
                 const curId = numeros[pickerFor.id]?.buyFromId;
-                const avail = purchasesPick.items.filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId));
-                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun achat disponible.</div>;
+                const q = normTitle(pickerQ);
+                const avail = purchasesPick.items
+                  .filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId))
+                  .filter(p => !q || normTitle(p.title||'').includes(q));
+                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.6}}>
+                  {q ? <>Aucun achat ne correspond à « {pickerQ} ».<br/><span style={{fontSize:12}}>Un achat déjà relié à une autre paire n'apparaît pas ici.</span></> : 'Aucun achat disponible.'}
+                </div>;
                 // Les meilleurs candidats (même marque ET même taille) sont
                 // signalés : avec ~700 achats, sans repère on ne sait pas par où
                 // commencer, et le prix d'achat finit par ne jamais être saisi.
@@ -18568,7 +18699,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {(p._score||0) >= SEUIL_SUGGERE && <span style={{marginRight:5,fontSize:10,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:3,padding:'1px 6px'}}>suggéré</span>}
                         {p.title}
                       </div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}</div>
+                      <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}
+                        {/* ⚠️ DIRE POURQUOI. Un badge « suggéré » sans raison se
+                            croit sur parole ; ici on relie de l'argent à une
+                            paire, et un prix d'achat faux ne se voit jamais
+                            (§22). On nomme ce que les deux titres ont en commun
+                            — c'est vérifiable d'un coup d'œil. */}
+                        {(()=>{ const r=refAchat(pickerFor), t=String(p.title||'');
+                          // ⚠️ Les champs de `refAchat` s'appellent marque / taille /
+                          // modele (pas brand / size / model) : se tromper de nom
+                          // ne lève AUCUNE erreur, ça n'affiche simplement rien.
+                          const com=[];
+                          const mq=(extractBrand(t)||'').toLowerCase(), md=extractModel(t), tl=String(extractSize(t)||'').toLowerCase();
+                          if(r.marque&&mq&&mq===r.marque) com.push(r.marque);
+                          if(r.modele&&md&&md===r.modele) com.push(r.modele);
+                          if(r.taille&&tl&&tl===r.taille) com.push('taille '+r.taille);
+                          return com.length ? <span style={{color:C.accent,fontWeight:600}}> · {com.join(' · ')}</span> : null; })()}
+                      </div>
                     </div>
                     <div style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{p.price?.amount} {cur(p.price?.currency_code)}</div>
                   </button>
