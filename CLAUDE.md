@@ -145,6 +145,30 @@ facture de Vinted** (Vinted n'en émet aucune entre particuliers). La photo pass
 par l'extension : le CDN Vinted ne renvoie aucun en-tête CORS.
 `scripts/audit-justificatif.cjs` protège ces deux points.
 
+### Le retrait d'un colis acheté
+**Mesuré le 6 septembre, avant de coder** (`scripts/audit-retrait.cjs` porte le
+détail) : sur **139 emails de suivi**, 20 portent un code de retrait, 28 un lien
+de QR, 128 un n° de suivi — et **0 le titre de l'article**. Un transporteur ne
+sait pas ce qu'il y a dans le carton. Sur les **638 emails « non reconnus »,
+0 parle de colis** : il n'y a rien à récupérer de plus côté email.
+Une commande d'achat Vinted porte `transaction_id`, `conversation_id`, date,
+titre, prix, statut — **aucun n° de suivi** (le détail de transaction non plus :
+191 objets `shipment`, seulement id/status/status_title/status_updated_at).
+⇒ **Il n'existe aucune identité commune entre l'email du transporteur et la
+commande Vinted.** Les relier par la date, le relais ou le titre serait le
+rapprochement par ressemblance interdit — et se tromper ici, c'est ne pas aller
+chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle.
+- Ce qui marche : **le code et le QR vivent dans la conversation Vinted**. Chaque
+  colis à retirer ouvre la sienne (`conversation_id`). L'extension y lit le code
+  et le dépose dans `panel_colis_relais` — **cette ligne était VIDE (0 colis)**,
+  parce que l'extension installée est en retard.
+- Un email « colis retiré » sort déjà le colis d'email de la liste
+  (`suivisRetires` par n° de suivi, une identité).
+- **« Commande non réclamée — retournée à l'expéditeur »** : 3 achats, 84,94 €,
+  qui ne sortaient sur aucun onglet (`phaseReception` les range en « annulé »).
+  Ils ont leur bloc sur Achats. On dit « à vérifier », **jamais « perdu »** :
+  Vinted rembourse souvent tout seul.
+
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
 `panel_accounts_off`, `panel_colis_relais`, …) en lecture-fusion-écriture.
@@ -171,7 +195,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **22 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **23 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | bancs Playwright (scratchpad) | l'app **rendue sur les vraies données**, à 390 px et 1512 px |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -288,7 +312,7 @@ qu'un bouton ne fixe pas lui-même.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 20 audits
+scripts/audit-*.cjs             les 23 audits
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
