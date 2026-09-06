@@ -12044,11 +12044,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // dans l'écran Achats, sinon les deux écrans finissent par ne plus dire le
     // même nombre.
     const horsDelai = emailList.filter(t => { const j = joursAvant(t && t.limite); return j != null && j < 0; });
-    return { emailList, extra, attente, attenteMail, oublies, horsDelai,
-             prets: emailList.length, sansCode: extra.length,
+    // ⚠️ « SANS CODE » VEUT DIRE « PAS RETIRABLE AUJOURD'HUI », pas « venu de
+    // Vinted ». Depuis que la conversation nous donne le code (Vinted Go, §5.72),
+    // un colis d'`extra` PEUT en avoir un : compter tout `extra` faisait dire à
+    // l'en-tête « 13 en attente de leur code » au-dessus d'une ligne qui affiche
+    // le sien. Le test est le même que celui de la ligne (§11).
+    const sansCode = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); }).length;
+    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode,
+             prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone]);
+  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
@@ -16449,10 +16455,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Ce n'est pas la même liste de travail — soit tu l'as déjà
                       récupéré sans cocher, soit il est reparti chez l'expéditeur
                       et il faut le réclamer. On le dit sur la même ligne. */}
-                  {(()=>{ const hd = pickupUnion.horsDelai.length;   // §11 : calculé UNE fois, dans pickupUnion
+                  {/* ⚠️ ET CE QUI N'EST PAS ENCORE RETIRABLE. « 13 colis à retirer »
+                      au-dessus de 13 lignes qui disent toutes « code pas encore
+                      reçu », c'est un total qui envoie au comptoir pour rien.
+                      Le nombre NE BOUGE PAS (un colis caché est un colis perdu) :
+                      c'est la phrase qui dit ce qu'on peut en faire — exactement
+                      ce que §5.83 a fait pour la tuile de Ma journée. */}
+                  {(()=>{ const hd = pickupUnion.horsDelai.length, sc = pickupUnion.sansCode;   // §11 : calculés UNE fois, dans pickupUnion
                     return (<div style={{fontSize:15,fontWeight:700,color:C.text}}>
                       {pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
+                      {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
                     </div>); })()}
                   {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
                       reçoit » (Julien). On compte les colis dont on SAIT nommer
@@ -16675,7 +16688,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if ((a[0]==='__inconnu') !== (b[0]==='__inconnu')) return a[0]==='__inconnu' ? 1 : -1;
                   return b[1].colis.length - a[1].colis.length;
                 });
-                return ordre.map(([k,pt]) => (
+                return ordre.map(([k,pt]) => {
+                  // ⚠️ CALCULÉ UNE FOIS POUR LE GROUPE (§11) : l'en-tête ci-dessous
+                  // dit déjà « le code arrive dans la conversation ». Le répéter
+                  // sur chaque ligne donnait TREIZE fois la même phrase sous
+                  // treize titres différents — vu en capture.
+                  const aCode = (o) => { const r = relaisDe(o); return !!(r && codeRetrait(r.code)); };
+                  const avecCode = pt.colis.some(aCode);
+                  const melange  = avecCode && pt.colis.some(o => !aCode(o));
+                  return (
                 <div key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:4,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
                     <CarrierBadge carrier="vinted" size={24}/>
@@ -16692,7 +16713,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
                     <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{pt.colis.length} colis · Au comptoir</span>
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
-                      {pt.colis.some(o=>{const r=relaisDe(o);return r&&codeRetrait(r.code);})
+                      {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
                         : 'Le code de retrait arrive dans la conversation Vinted'}
                     </span>
@@ -16710,7 +16731,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         {/* L'adresse est déjà en tête du bloc : ici on ne met que
                             ce qui est propre à CE colis. */}
-                        {!cd && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
+                        {/* ⚠️ Seulement quand le groupe est MIXTE : là, la ligne
+                            distingue vraiment ce colis de ses voisins. Si AUCUN
+                            n'a de code, l'en-tête du bloc l'a déjà dit. */}
+                        {!cd && melange && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
                         {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
                             (§17). Si le message porte le lien direct du code, on
                             l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
@@ -16732,7 +16756,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   })}
                   </div>
                 </div>
-                )); })()}
+                );}); })()}
               {/* Colis cochés « retiré » que Vinted n'a pas encore confirmés :
                   on les garde EN GRIS plutôt que de les faire disparaître d'un
                   coup — on voit que c'est fait, et on peut annuler. Ils sortent
@@ -18221,8 +18245,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
           const sec = { flexShrink:0, borderRadius:3, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
+          // ⚠️ QUATORZE CARTES QUI PORTENT LA MÊME PHRASE, C'EST UNE PHRASE.
+          // Chaque colis sans PDF affichait un bandeau pleine largeur expliquant
+          // que l'extension s'en occupe — identique sur les quatorze (vu en
+          // capture). Quand l'attente est la MÊME pour tous, elle se dit une
+          // fois au-dessus de la liste ; dès que deux colis n'attendent pas la
+          // même chose, chaque carte reprend la sienne (elle distingue).
+          const attentes = new Set(ex
+            .filter(e => !((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])))
+            .map(e => aGenererBordereau(e.o && e.o.status) ? 'gen' : 'recup'));
+          const attenteCommune = attentes.size === 1 ? [...attentes][0] : null;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {attenteCommune && (
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.45,padding:'0 2px 2px'}}>
+                  {attenteCommune==='gen'
+                    ? <><b style={{color:C.text}}>L'extension génère les bordereaux manquants</b> à ta prochaine visite sur Vinted, puis les dépose ici.</>
+                    : <><b style={{color:C.text}}>Les bordereaux sont déjà générés chez Vinted</b> — l'extension les récupère à ta prochaine visite (l'email sert de filet). Tu peux aussi déposer un PDF que tu as téléchargé.</>}
+                </div>
+              )}
               {ex.map(e=>{
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
@@ -18330,11 +18371,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             Vinted (aucun argent engagé, aucun choix — c'est une
                             formalité obligatoire). L'app se contente de dire où on
                             en est, au lieu de te renvoyer faire le travail. */}
+                        {!attenteCommune && (
                         <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:4,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
                           {aGenererBordereau(o && o.status)
                             ? <><b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
                             : <><b>Bordereau déjà généré</b> chez Vinted — <b>l'extension le récupère</b> à ta prochaine visite sur Vinted (l'email sert de filet).</>}
-                        </div>
+                        </div>)}
                         <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
                       </>)}
@@ -18348,8 +18390,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         const v=(await askText({numeric:true,desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
                         if(v) setSaleOverride(o.transaction_id,{numero:v});
                       }} title="Poser le numéro de boîte de cette paire" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔢 Poser le N°</button>}
-                    </div>
-                    <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+                      {/* ⚠️ UNE SEULE RANGÉE D'ACTIONS. Les états (imprimé, colis
+                          fait, suivre) vivaient sur une deuxième rangée : sur un
+                          colis sans PDF, la première n'avait plus qu'un bouton et
+                          la carte occupait deux étages pour trois mots. Le retour
+                          à la ligne (`flexWrap`) fait le travail sur téléphone. */}
                       {b && <button type="button" onClick={()=>toggleBordPrinted(b)}
                         title={isBordPrinted(b)?'Remettre en « à imprimer »':'Marquer comme imprimé'}
                         style={{...sec,border:`1px solid ${isBordPrinted(b)?C.accent:C.border}`,background:isBordPrinted(b)?`${C.accent}18`:'transparent',color:isBordPrinted(b)?C.accent:C.muted}}>
@@ -18367,7 +18412,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </button>
                       {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
                       {capte && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · ✓ confirmé par l\'email' : ''}</span>}
-                      {!pdf && <span style={{fontSize:11,color:C.muted}}>Bordereau pas encore reçu</span>}
+                      {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
+                          et à trois lignes d'écart, exactement ce que le bandeau
+                          d'attente dit déjà. Retiré : l'absence du bouton
+                          « Imprimer » le montre de toute façon. */}
                     </div>
                   </div>
                 );
