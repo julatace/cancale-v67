@@ -22436,8 +22436,24 @@ export default function App() {
       {/* Sur ordinateur l'en-tête commence APRÈS la barre latérale, et la marque
           n'y est plus : elle est en haut de la barre. Deux logos sur le même
           écran, c'est le genre de doublon qui fait « assemblé », pas « conçu ». */}
-      <header style={{position:'sticky',top:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'11px 16px',
-        marginLeft: ordi ? NAV_LARGEUR : undefined,
+      {/* ⚠️ SUR ORDINATEUR LE BANDEAU NE PREND PLUS DE PLACE DANS LA PAGE. Il
+          restait 56 px de vide au-dessus de CHAQUE titre d'écran, pour quatre
+          icônes collées à droite (§5.62 avait retiré la marque de ce bandeau,
+          §5.68 le mot « VRM » — il ne restait plus rien à gauche). En le passant
+          en `fixed`, le titre de l'écran remonte et partage la ligne avec les
+          actions, comme dans une vraie application. Sur téléphone il porte le
+          menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
+      <header style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
+        padding: ordi ? '7px 10px' : '11px 16px',
+        // ⚠️ SUR ORDINATEUR C'EST UNE ÎLE, PAS UNE BARRE. Un bandeau pleine
+        // largeur avec un flou d'arrière-plan rendait le TITRE DE L'ÉCRAN
+        // illisible dès qu'il passait dessous (vu en capture). Réduit à la
+        // largeur de ses quatre icônes et posé en haut à droite, il ne recouvre
+        // plus rien et le titre remonte de 56 px.
+        right: ordi ? 24 : undefined,
+        borderRadius: ordi ? 12 : undefined,
+        border: ordi ? `1px solid ${C.border}` : undefined,
+        boxShadow: ordi ? (C.shadowMd||'none') : undefined,
         /* ⚠️ SUR ORDINATEUR C'ÉTAIT UNE BANDE BLANCHE VIDE de 62 px : la moitié
            gauche est masquée (la barre latérale porte déjà la marque et la
            navigation), donc il ne restait qu'un bandeau plein largeur avec
@@ -22445,10 +22461,12 @@ export default function App() {
            FOND et perd sa bordure : les icônes flottent au-dessus de la page,
            il n'y a plus de barre à regarder. Sur téléphone, rien ne change —
            le bandeau y porte le menu, le logo et la synchro. */
-        background: ordi ? 'transparent' : (C.glass||C.surface),
+        background: C.glass||C.surface,
         backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
-        borderBottom: ordi ? '1px solid transparent' : `1px solid ${C.border}`}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto',visibility: ordi ? 'hidden' : undefined}}>
+        borderBottom: ordi ? undefined : `1px solid ${C.border}`}}>
+        {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
+            invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
+        <div style={{display: ordi ? 'none' : 'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto'}}>
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
           {!ordi && <MenuEcrans tab={tab} setTab={setTab}/>}
@@ -22692,6 +22710,8 @@ export default function App() {
         margin: ordi ? '0' : '0 auto',
         marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
         paddingRight: ordi ? 28 : undefined,
+        // Le bandeau flotte : il faut juste de quoi ne pas coller au bord.
+        paddingTop: ordi ? 14 : undefined,
         paddingBottom: ordi ? 40 : 'calc(84px + env(safe-area-inset-bottom))'}}>
         <EcranGardeFou resetKey={tab}>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
