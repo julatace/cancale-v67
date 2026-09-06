@@ -3553,7 +3553,7 @@ function Card({children,style={}}) {
 function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:3,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
 }
-function StatBox({label,value,color=C.text,sub=null,subColor=null}) {
+function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null}) {
   // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
   // c'est le gabarit « KPI » de n'importe quel tableau de bord. Ici : un FILET
   // d'accent en haut, l'étiquette en capitales dessous, puis le nombre en très
@@ -3569,12 +3569,17 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null}) {
   const txt = (typeof value === 'string' || typeof value === 'number') ? String(value) : null;
   const L = txt ? txt.length : 0;
   const fs = !L ? 'clamp(22px,7.4vw,34px)' : L <= 5 ? 'clamp(22px,7.4vw,34px)' : L <= 7 ? 'clamp(19px,6.2vw,28px)' : L <= 9 ? 'clamp(16px,4.8vw,21px)' : L <= 11 ? 'clamp(14px,3.9vw,17px)' : 'clamp(12px,3.2vw,14px)';
+  // ⚠️ Un chiffre CLIQUABLE reste un chiffre : bouton nu (pas de fond, pas de
+  // contour), aligné à gauche comme les autres. Le geste s'apprend au survol.
+  const Balise = onClick ? 'button' : 'div';
+  const extra = onClick ? { type:'button', onClick, title: title||undefined,
+    style:{border:'none',background:'transparent',padding:0,margin:0,font:'inherit',textAlign:'left',cursor:'pointer',width:'100%'} } : {};
   return (
-    <div style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`}}>
+    <Balise {...extra} style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`,...(extra.style||{})}}>
       <div className="vrm-label" style={{color:C.muted,minHeight:'2.44em'}}>{label}</div>
       <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,marginTop:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
-    </div>
+    </Balise>
   );
 }
 
@@ -15775,7 +15780,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
                 dix lignes plus bas, « 807 € · 25 en cours » — la même chose deux fois
                 sur le même écran (§11 : une seule règle, et un seul endroit). */}
-            <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}`}/>
+            {/* ⚠️ LE CHIFFRE FAUX EST LA PORTE POUR LE CORRIGER. La saisie en
+                série ne vivait plus que derrière « Analyse de tes ventes »,
+                repliée (§5.67) — or le prix d'achat est LA donnée manquante
+                (0 sur 320) et c'est ce chiffre-ci qui le dit. Un tap dessus
+                ouvre la liste. */}
+            <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.nb?' · compléter':''}`}
+              onClick={totals.nbCout<totals.nb ? ()=>setFillBuyOpen(true) : null}
+              title="Compléter les prix d'achat, paire par paire"/>
             {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
                 « bénéfice » vaut mécaniquement le CA (coût = 0) — c'est FAUX, et
