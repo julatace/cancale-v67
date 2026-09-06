@@ -12044,11 +12044,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // dans l'écran Achats, sinon les deux écrans finissent par ne plus dire le
     // même nombre.
     const horsDelai = emailList.filter(t => { const j = joursAvant(t && t.limite); return j != null && j < 0; });
-    return { emailList, extra, attente, attenteMail, oublies, horsDelai,
-             prets: emailList.length, sansCode: extra.length,
+    // ⚠️ « SANS CODE » VEUT DIRE « PAS RETIRABLE AUJOURD'HUI », pas « venu de
+    // Vinted ». Depuis que la conversation nous donne le code (Vinted Go, §5.72),
+    // un colis d'`extra` PEUT en avoir un : compter tout `extra` faisait dire à
+    // l'en-tête « 13 en attente de leur code » au-dessus d'une ligne qui affiche
+    // le sien. Le test est le même que celui de la ligne (§11).
+    const sansCode = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); }).length;
+    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode,
+             prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone]);
+  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
@@ -16449,10 +16455,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Ce n'est pas la même liste de travail — soit tu l'as déjà
                       récupéré sans cocher, soit il est reparti chez l'expéditeur
                       et il faut le réclamer. On le dit sur la même ligne. */}
-                  {(()=>{ const hd = pickupUnion.horsDelai.length;   // §11 : calculé UNE fois, dans pickupUnion
+                  {/* ⚠️ ET CE QUI N'EST PAS ENCORE RETIRABLE. « 13 colis à retirer »
+                      au-dessus de 13 lignes qui disent toutes « code pas encore
+                      reçu », c'est un total qui envoie au comptoir pour rien.
+                      Le nombre NE BOUGE PAS (un colis caché est un colis perdu) :
+                      c'est la phrase qui dit ce qu'on peut en faire — exactement
+                      ce que §5.83 a fait pour la tuile de Ma journée. */}
+                  {(()=>{ const hd = pickupUnion.horsDelai.length, sc = pickupUnion.sansCode;   // §11 : calculés UNE fois, dans pickupUnion
                     return (<div style={{fontSize:15,fontWeight:700,color:C.text}}>
                       {pickupUnion.total} colis à retirer
                       {hd>0 && <span style={{color:C.danger,fontWeight:700}}> · {hd} hors délai à vérifier</span>}
+                      {sc>0 && <span style={{color:C.muted,fontWeight:600}}> · {sc} en attente de leur code</span>}
                     </div>); })()}
                   {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
                       reçoit » (Julien). On compte les colis dont on SAIT nommer
@@ -16675,7 +16688,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if ((a[0]==='__inconnu') !== (b[0]==='__inconnu')) return a[0]==='__inconnu' ? 1 : -1;
                   return b[1].colis.length - a[1].colis.length;
                 });
-                return ordre.map(([k,pt]) => (
+                return ordre.map(([k,pt]) => {
+                  // ⚠️ CALCULÉ UNE FOIS POUR LE GROUPE (§11) : l'en-tête ci-dessous
+                  // dit déjà « le code arrive dans la conversation ». Le répéter
+                  // sur chaque ligne donnait TREIZE fois la même phrase sous
+                  // treize titres différents — vu en capture.
+                  const aCode = (o) => { const r = relaisDe(o); return !!(r && codeRetrait(r.code)); };
+                  const avecCode = pt.colis.some(aCode);
+                  const melange  = avecCode && pt.colis.some(o => !aCode(o));
+                  return (
                 <div key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:4,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
                     <CarrierBadge carrier="vinted" size={24}/>
@@ -16692,7 +16713,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
                     <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{pt.colis.length} colis · Au comptoir</span>
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
-                      {pt.colis.some(o=>{const r=relaisDe(o);return r&&codeRetrait(r.code);})
+                      {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
                         : 'Le code de retrait arrive dans la conversation Vinted'}
                     </span>
@@ -16710,7 +16731,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         {/* L'adresse est déjà en tête du bloc : ici on ne met que
                             ce qui est propre à CE colis. */}
-                        {!cd && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
+                        {/* ⚠️ Seulement quand le groupe est MIXTE : là, la ligne
+                            distingue vraiment ce colis de ses voisins. Si AUCUN
+                            n'a de code, l'en-tête du bloc l'a déjà dit. */}
+                        {!cd && melange && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
                         {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
                             (§17). Si le message porte le lien direct du code, on
                             l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
@@ -16732,7 +16756,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   })}
                   </div>
                 </div>
-                )); })()}
+                );}); })()}
               {/* Colis cochés « retiré » que Vinted n'a pas encore confirmés :
                   on les garde EN GRIS plutôt que de les faire disparaître d'un
                   coup — on voit que c'est fait, et on peut annuler. Ils sortent
