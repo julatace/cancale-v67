@@ -18485,7 +18485,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // capture). Quand l'attente est la MÊME pour tous, elle se dit une
           // fois au-dessus de la liste ; dès que deux colis n'attendent pas la
           // même chose, chaque carte reprend la sienne (elle distingue).
+          // ⚠️ Un colis DÉJÀ POSTÉ n'attend plus rien. Le compter ici faisait
+          // deux choses fausses : la phrase parlait de bordereaux à récupérer
+          // pour des cartons déjà partis, et deux attentes différentes la
+          // faisaient disparaître alors que tous les colis en cours attendaient
+          // la même chose.
+          const estPoste = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
+          const nbPostes = ex.filter(estPoste).length;
           const attentes = new Set(ex
+            .filter(e => !estPoste(e))
             .filter(e => !((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])))
             .map(e => aGenererBordereau(e.o && e.o.status) ? 'gen' : 'recup'));
           const attenteCommune = attentes.size === 1 ? [...attentes][0] : null;
@@ -18504,7 +18512,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:8,alignItems:'start'}}>
-              {ex.map(e=>{
+              {ex.map((e,ix)=>{
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
                 // l'a (le n° de transaction est une identité certaine), jamais
@@ -18524,8 +18532,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const capte = e.txn ? labelsCaptes[e.txn] : null;
                 const pdf = !!(b && b.hasPdf) || !!capte;
                 const acc = o ? o._acc : null;
+                // ⚠️ L'EN-TÊTE DISAIT « 6 colis à envoyer », LA LISTE EN MONTRAIT
+                // 14 (vu en capture à 1512 px). Les huit autres sont des colis
+                // qu'il a cochés « Colis fait » : ils restent affichés exprès —
+                // un colis caché est un colis perdu, et il doit pouvoir revenir
+                // en arrière — mais rien ne les annonçait. Le tri les met déjà
+                // tous à la fin ; on pose un intertitre à la charnière, et le
+                // compte du haut redevient vérifiable (6 + 8 = 14).
+                const ouvrePostes = estPoste(e) && !(ix > 0 && estPoste(ex[ix-1]));
                 return (
-                  <div key={e.key} data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:10,opacity:posted?0.55:1}}>
+                  <React.Fragment key={e.key}>
+                  {ouvrePostes && (
+                    <div style={{gridColumn:'1 / -1',display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',borderTop:`1px solid ${C.border}`,padding:'10px 2px 0',marginTop:4}}>
+                      <span style={{fontSize:12.5,fontWeight:700,color:C.text}}>Déjà postés · {nbPostes}</span>
+                      <span style={{fontSize:11.5,color:C.muted}}>Ils quittent la liste quand Vinted confirme l'envoi. « ↺ Pas encore » les remet dans les colis à envoyer.</span>
+                    </div>
+                  )}
+                  <div data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:10,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'center'}}>
                       <div style={{width:58,height:58,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}>👟</span>}
@@ -18662,6 +18685,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           « Imprimer » le montre de toute façon. */}
                     </div>
                   </div>
+                  </React.Fragment>
                 );
               })}
               </div>
