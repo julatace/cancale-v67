@@ -53,5 +53,19 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   ? ok('les PDF impriment la couverture à côté du bénéfice')
   : nok('les 2 PDF impriment `(sur N/M ventes au coût connu)`');
 
+// 8) LE CHIFFRE FAUX EST LA PORTE POUR LE CORRIGER. La saisie en série des prix
+// d'achat s'était retrouvée derrière « Analyse de tes ventes », repliée (§5.67) —
+// or le prix d'achat est LA donnée manquante (0 sur 320) et c'est ce chiffre-ci
+// qui l'annonce. Un tap dessus doit ouvrir la liste.
+// ⚠️ On ne peut pas borner avec `[^>]*` : le `sub=` contient déjà des `>`
+// (`nbCout>1`). On regarde la fenêtre de texte qui suit l'étiquette.
+{
+  const i = app.indexOf('label="Coût d\'achat"');
+  const fenetre = i < 0 ? '' : app.slice(i, i + 400);
+  /setFillBuyOpen\(true\)/.test(fenetre)
+    ? ok('le chiffre « Coût d\'achat » ouvre la saisie en série')
+    : nok('« Coût d\'achat » doit ouvrir `setFillBuyOpen(true)` quand il manque des prix');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);
