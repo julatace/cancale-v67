@@ -171,7 +171,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **21 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **22 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | bancs Playwright (scratchpad) | l'app **rendue sur les vraies données**, à 390 px et 1512 px |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -202,6 +202,19 @@ Règle unique, posée après six passes ratées :
 Famille actuelle : fond gris froid `#F6F7F9`, cartes blanches, encre ardoise
 `#10151B`, accent bleu `#1E5FCC`, navigation (rail / barre du bas) en ardoise —
 c'est elle, la signature. Mode sombre choisi, pas inversé automatiquement.
+Rayons **5 / 8 / 10 / 12** (plus de 2-3-4 px éparpillés), ombres à **deux
+couches** (contact serré + diffusion large et pâle).
+
+### Les boutons — une seule forme (`audit-boutons.cjs`)
+Mesuré : **22 hauteurs, 22 paddings, 13 tailles de texte** sur 561 boutons, dont
+47 à la police PAR DÉFAUT du navigateur. C'est la dispersion qui se lit « pas
+fini », pas la couleur. Une règle de base dans `index.html` pose police, taille,
+graisse, hauteur plancher et transition — et **rien d'autre** :
+⚠️ **ne jamais y mettre `display:inline-flex`.** Un `<button>` centre déjà son
+contenu ; le forcer a centré le rail de navigation et aplati le chiffre
+cliquable « Coût d'achat » sur une seule ligne (vu en capture).
+Les styles **en ligne** gagnent sur une classe : la règle ne pose donc que ce
+qu'un bouton ne fixe pas lui-même.
 
 - Une couleur en dur qui n'est pas dans `THEMES` ne suivra pas un changement de
   palette : `grep -oE '#[0-9a-fA-F]{6}' src/App.jsx` après chaque passe.
