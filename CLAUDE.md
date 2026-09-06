@@ -124,6 +124,8 @@ qu'aucune règle n'en désigne une.
   l'app : c'est le seul endroit où le rouge est justifié.
 
 ### Les chiffres
+- **Le chiffre faux est la porte pour le corriger.** « Coût d'achat · 1/184
+  renseigné » ouvre la saisie en série ; on n'ajoute pas un bloc pour ça.
 - **Un total partiel qui se présente comme complet est pire qu'un total absent.**
   On somme uniquement ce qu'on connaît, et on affiche la couverture à côté
   (« sur 1 vente sur 175 »). Vaut pour le bénéfice, l'argent en attente, l'URSSAF.
@@ -135,6 +137,13 @@ qu'aucune règle n'en désigne une.
   sans qu'il le redemande.
 - Le rapport comptable dit « CA des ventes finalisées », **jamais « encaissé »** :
   l'URSSAF demande légalement les recettes encaissées, et l'app ne les connaît pas.
+
+### Le reçu d'achat part chez un comptable
+Il dit **qui achète** (l'entité des Factures : raison sociale, adresse, SIRET —
+pendant des mois il disait « Ma boutique »), et il dit **qu'il n'est pas la
+facture de Vinted** (Vinted n'en émet aucune entre particuliers). La photo passe
+par l'extension : le CDN Vinted ne renvoie aucun en-tête CORS.
+`scripts/audit-justificatif.cjs` protège ces deux points.
 
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
@@ -162,7 +171,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **20 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **21 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | bancs Playwright (scratchpad) | l'app **rendue sur les vraies données**, à 390 px et 1512 px |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -219,7 +228,7 @@ c'est elle, la signature. Mode sombre choisi, pas inversé automatiquement.
 | | |
 |---|---|
 | annonces en ligne | 54 · **0 sans numéro · 0 doublon de numéro** ✅ |
-| paires numérotées | 320 · **0 prix d'achat** ⚠️ (il les saisit lui-même ; outils : saisie en série, suggestion en un tap) |
+| paires numérotées | 320 · **0 prix d'achat** ⚠️ (il les saisit lui-même — trois portes : le 🔗 d'une annonce, la case « Coût d'achat » des Ventes, ⋯ Outils des Annonces) |
 | numéros de vente | 432 · le plus haut : 456 (un numéro n'est jamais réattribué — c'est normal) |
 | notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
 | comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
