@@ -82,7 +82,12 @@ const THEMES = {
   dark: {
     // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
     // éclairci pour tenir le contraste. Ce n'est pas un inversement mécanique.
-    bg:"#0E1116", surface:"#171B22", card:"#171B22", card2:"#1F242C", border:"#2C333D",
+    // ⚠️ LES MARCHES ÉTAIENT TROP RAPPROCHÉES : rail #0A0D12 contre fond
+    // #0E1116, soit quatre unités d'écart — la barre latérale se confondait
+    // avec la page et la signature du produit disparaissait la nuit. Chaque
+    // niveau est écarté : rail le plus sombre, page au-dessus, cartes encore
+    // au-dessus. C'est la hiérarchie qui porte le sombre, pas la teinte.
+    bg:"#11151B", surface:"#1A1F27", card:"#1A1F27", card2:"#232932", border:"#303845",
     accent:"#5B9BFF", accentSoft:"#7FB4FF", onAccent:"#08111F",
     danger:"#FF7A6E", warn:"#E0A945", gold:"#C9AE78",
     blue:"#5B9BFF", purple:"#A99AF0", text:"#E8ECF1", muted:"#98A3B2",
@@ -91,7 +96,7 @@ const THEMES = {
     shadowLg:"0 2px 6px rgba(0,0,0,.4), 0 18px 44px rgba(0,0,0,.5)",
     ring:"rgba(91,155,255,.18)",
     glass:"rgba(23,27,34,.90)",
-    chrome:"#0A0D12", onChrome:"#E8ECF1", chromeMuted:"#8592A3", chromeLine:"#1D242D",
+    chrome:"#070A0E", onChrome:"#E8ECF1", chromeMuted:"#8592A3", chromeLine:"#1A212A",
     s1:"#5B9BFF", s2:"#37D39A",
   },
 };
