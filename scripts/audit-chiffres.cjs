@@ -67,5 +67,24 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('« Coût d\'achat » doit ouvrir `setFillBuyOpen(true)` quand il manque des prix');
 }
 
+// 9) L'EN-TÊTE DES COLIS ANNONCE TROIS GROUPES : LA LISTE DOIT LES MONTRER.
+// « 10 en retard · 3 aujourd'hui · 1 demain » au-dessus de quatorze cartes à la
+// suite, sans aucune frontière : sur téléphone il en voit cinq à la fois, donc
+// aucun des trois nombres n'était vérifiable. Le tri était déjà bon — il
+// manquait l'intertitre à chaque charnière.
+{
+  const i = app.indexOf('const groupeDe');
+  const F = i < 0 ? '' : app.slice(i, i + 1600);
+  F ? ok('la liste des colis se découpe en groupes') : nok('`groupeDe` doit découper la liste des colis');
+  (/retard/.test(F) && /jour/.test(F) && /demain/.test(F) && /fait/.test(F))
+    ? ok('les groupes suivent l\'en-tête : retard, aujourd\'hui, demain, déjà postés')
+    : nok('les groupes doivent couvrir retard / aujourd\'hui / demain / déjà postés');
+  // ⚠️ UN SEUL GROUPE = PAS D'INTERTITRE : il redirait mot pour mot le compteur
+  // du haut, et le même nombre ne s'écrit pas deux fois sur un écran.
+  /plusieursGroupes/.test(app)
+    ? ok('un seul groupe n\'écrit pas d\'intertitre (le nombre serait redit)')
+    : nok('sans `plusieursGroupes`, « 14 colis à envoyer » puis « En retard · 14 »');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);
