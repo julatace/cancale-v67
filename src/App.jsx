@@ -9400,7 +9400,13 @@ function RoomPlan({ locate, onLocateConsumed }) {
           <button onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto', border: `1px solid ${C.danger}66`, borderRadius: 8, background: `${C.danger}12`, color: C.danger, fontSize: 12, fontWeight: 800, padding: '7px 10px', cursor: 'pointer' }}><Icon name="trash" size={16}/></button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5 }}>💡 <b>📦 Pile de boîtes</b> : colonnes + hauteur → auto-empilée. <b>Touche la pile</b> puis <b>🪑 Poser sur un meuble</b> → touche la table/commode : la pile se pose DESSUS, centrée (fiable). <b>⬇️ Au sol</b> la redescend. Touche une boîte pour changer SON N° (même dans le désordre) ou la retirer (vide). En <b>✋ mode déplacement</b>, glisse la pile pour la positionner.</div>
+      {/* ⚠️ MODE D'EMPLOI PERMANENT → DÉPLIANT. Ce paragraphe de cinq lignes
+          restait affiché sous la pièce, tous les jours, et parlait de piles de
+          boîtes même quand la pièce est vide. On le lit UNE fois (§5.66). */}
+      <details>
+        <summary style={{ listStyle:'none', cursor:'pointer', fontSize:11.5, color:C.muted, fontWeight:600 }}>Comment ranger une pile de boîtes ?</summary>
+        <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop:6 }}><b>Pile de boîtes</b> : colonnes + hauteur → auto-empilée. <b>Touche la pile</b> puis <b>Poser sur un meuble</b> → touche la table ou la commode : la pile se pose dessus, centrée. <b>Au sol</b> la redescend. Touche une boîte pour changer son N° (même dans le désordre) ou la retirer. En <b>mode déplacement</b>, glisse la pile pour la positionner.</div>
+      </details>
 
       {/* Vue de FACE du meuble ouvert : ses tiroirs/rayons */}
       {opened && (
@@ -18492,6 +18498,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     : <><b style={{color:C.text}}>Les bordereaux sont déjà générés chez Vinted</b> — l'extension les récupère à ta prochaine visite (l'email sert de filet). Tu peux aussi déposer un PDF que tu as téléchargé.</>}
                 </div>
               )}
+              {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Ventes et Achats (§5.63).
+                  Une carte de colis tient dans 500 px et s'étalait sur 1120 :
+                  trois colis visibles au lieu de six, sur l'écran où il travaille
+                  quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
+                  le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:8,alignItems:'start'}}>
               {ex.map(e=>{
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
@@ -18652,6 +18664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 );
               })}
+              </div>
             </div>
           );
         })()}
