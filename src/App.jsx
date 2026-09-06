@@ -16922,21 +16922,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     )}
                   </div>
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
-                    <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>{pt.colis.length} colis · Au comptoir</span>
+                    {/* ⚠️ LE MÊME NOMBRE NE S'ÉCRIT PAS DEUX FOIS SUR UN ÉCRAN.
+                        « 12 colis à retirer » en tête, puis « 12 colis · Au
+                        comptoir » trois lignes dessous : le second ne distingue
+                        rien tant qu'il n'y a qu'un point relais. Dès qu'il y en a
+                        deux, il redevient l'information utile — combien dans
+                        CELUI-là — donc il revient tout seul. */}
+                    <span style={{fontSize:12,fontWeight:700,color:C.text,flexShrink:0}}>
+                      {(ordre.length > 1 || pt.colis.length !== pickupUnion.total)
+                        ? `${pt.colis.length} colis · Au comptoir` : 'Au comptoir'}
+                    </span>
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
                         : 'Le code de retrait arrive dans la conversation Vinted'}
                     </span>
                   </div>
-                  <div style={{padding:'10px 12px 4px'}}>
+                  {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
+                      Une ligne de colis tient sur UNE ligne de texte et s'étirait
+                      sur 1 080 px : le bouton « ✓ retiré » se retrouvait à un
+                      mètre du titre qu'il concerne, et douze colis remplissaient
+                      deux écrans. Le `min()` évite qu'une piste de 430 px déborde
+                      un téléphone. */}
+                  <div style={{padding:'10px 12px 4px',display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:7,alignItems:'start'}}>
                   {pt.colis.map((o,i)=>{
                     // Ce que la CONVERSATION Vinted dit de ce colis : l'adresse du
                     // relais et le code de retrait. Pour Vinted Go c'est la seule
                     // source — aucun email ne les porte (voir `colisRelais`).
                     const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
                     return (
-                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
+                    <div key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
                       {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
