@@ -233,6 +233,19 @@ qu'un bouton ne fixe pas lui-même.
   **en ligne** gagne sur une classe — retirer `flexWrap`/`overflowX` du `style`.
 - **Un bouton en `flex:'1 1 …'` sans `maxWidth` s'étire sur 500 px** sur un écran
   large. Toujours plafonner.
+- **Sur ordinateur, les actions du haut sont une ÎLE flottante** en haut à droite
+  (le bandeau pleine largeur était 56 px de vide au-dessus de chaque titre).
+  ⚠️ Tout ce qu'un écran pose sur sa ligne de titre doit passer par le slot
+  `right` de `ScreenHead` — sinon ça glisse SOUS l'île et disparaît. Le banc
+  `verif_visuel.cjs` mesure ce recouvrement.
+- **Le sombre tient par la hiérarchie, pas par la teinte** : rail le plus sombre,
+  page au-dessus, cartes encore au-dessus. Quatre unités d'écart, et la barre
+  latérale se confond avec la page.
+- **Le même nombre ne s'écrit jamais deux fois sur un écran** — surtout pas
+  arrondi différemment (« 296 € » et « 296,40 € » le même jour). Et **un `0,00 €`
+  qui veut dire « on ne sait pas » s'écrit `—` avec la raison à côté**.
+- **Pas de « n/d »** ni d'autre vocabulaire d'informaticien : il n'est pas
+  développeur.
 
 ---
 
