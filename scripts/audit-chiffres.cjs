@@ -148,5 +148,19 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('un 0,00 € qui veut dire « on ne sait pas » doit s\'écrire « — »');
 }
 
+// 13) LA RECHERCHE NE DOIT PAS BLOQUER LA FRAPPE.
+// Mesuré le 7 septembre : l'écran Ventes rend 287 cartes et 8 840 nœuds. Chaque
+// lettre tapée les refiltrait toutes — 293 ms sur ordinateur, 179 sur téléphone.
+// Taper « salomon » coûtait deux secondes de saccade. `useDeferredValue` garde
+// le champ instantané et laisse React refiltrer juste après : ~150 ms.
+{
+  /React\.useDeferredValue\(ordSearch\)/.test(app)
+    ? ok('la recherche des ventes ne bloque plus la frappe')
+    : nok('sans `useDeferredValue`, chaque lettre refiltre 287 cartes');
+  /ordSearchDiff\.trim\(\)/.test(app)
+    ? ok('et c\'est bien la valeur différée qui filtre')
+    : nok('`matchOrd` doit lire la valeur différée, pas celle du champ');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);
