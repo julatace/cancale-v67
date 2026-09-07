@@ -12319,6 +12319,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
+  useEffect(() => {
+    // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
+    // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
+    // seule, les emails de suivi n'étaient pas encore chargés — `pickupUnion`
+    // valait alors « 0 prêt · 5 en attente » au lieu de « 1 · 5 », et c'est ce
+    // faux qui partait au tableau de bord. Les DEUX sources doivent être là.
+    if (!Array.isArray(tracking) || !Array.isArray(buys.items)) return;
+    try {
+      const v = { total: pickupUnion.total, prets: pickupUnion.prets, sansCode: pickupUnion.sansCode, at: Date.now() };
+      const avant = load('vrm_colis_retirer', null);
+      const memeChose = avant && avant.total === v.total && avant.prets === v.prets && avant.sansCode === v.sansCode;
+      if (!memeChose) {
+        save('vrm_colis_retirer', v);
+        // ⚠️ ET ON PRÉVIENT. Le centre de notifications lit cette ligne UNE
+        // fois, quand les comptes arrivent — donc au tout premier écran ouvert
+        // il lisait du vide et retombait sur le compte des seuls emails
+        // (« 1 colis à retirer » pour 6). C'est le même piège que les réglages
+        // lus au montage (`onCloudReady`) : ce qui arrive après doit se faire
+        // entendre, sinon l'écran garde sa première réponse.
+        try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
+      }
+    } catch (_) {}
+  }, [pickupUnion, tracking, buys.items]);
+
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
@@ -18639,6 +18663,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                   {total>0 ? `${total} conversation${total>1?'s':''} en tout` : 'Tes échanges apparaîtront ici'}
                 </div>
+                {nonLus>0 && (()=>{
+                  const par = {};
+                  for (const c of (convs.items||[])) {
+                    if (acctOffOf(c) || !c.unread) continue;
+                    const n = c._acc ? accName(c._acc) : '?';
+                    par[n] = (par[n]||0) + 1;
+                  }
+                  const tri = Object.entries(par).sort((x,y)=>y[1]-x[1]);
+                  if (!tri.length) return null;
+                  const tete = tri.slice(0,3).map(([n,k])=>`${n} (${k})`);
+                  const reste = tri.length - 3;
+                  return (
+                    <div style={{fontSize:11.5,color:C.muted,marginTop:4}}>
+                      sur <b style={{color:C.text,fontWeight:600}}>{tete.join(', ')}</b>
+                      {reste>0 ? ` et ${reste} autre${reste>1?'s':''} compte${reste>1?'s':''}` : ''}
+                      {' '}— connecte-toi dessus pour répondre
+                    </div>
+                  );
+                })()}
               </div>
               <a href={inboxUrl} target="_blank" rel="noreferrer"
                 /* ⚠️ `flex:'1 1 130px'` sans plafond : sur un écran large ce
@@ -18655,7 +18698,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
             <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>Réponses rapides</span>
-            <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':'✎ Modifier'}</button>
+            <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="pencil" size={12}/>Modifier</span>}</button>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {quickReplies.map((t,i)=>(
@@ -18666,7 +18709,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
                     <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
                   </>
-                ) : <span style={{color:C.muted,fontSize:11,paddingRight:4}}>📋</span>}
+                ) : <span style={{color:C.muted,paddingRight:4,display:'inline-flex'}} aria-hidden="true"><Icon name="doc" size={13}/></span>}
               </div>
             ))}
             {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
@@ -22721,6 +22764,14 @@ export default function App() {
   },[accountsLoaded, vintedAccounts]);
 
   const vintedNotifChecked = React.useRef(false);
+  // Le propriétaire des colis à retirer (`pickupUnion`) publie ses comptes ;
+  // ce compteur nous fait relire quand il vient de le faire (voir plus haut).
+  const [colisTick, setColisTick] = useState(0);
+  useEffect(() => {
+    const on = () => setColisTick(t => t + 1);
+    window.addEventListener('vrm:colis', on);
+    return () => window.removeEventListener('vrm:colis', on);
+  }, []);
   useEffect(()=>{
     if(!vintedAccounts || vintedAccounts.length===0) return;
     // ⚠️ DEUX CHOSES DIFFÉRENTES VIVAIENT DANS LE MÊME « UNE SEULE FOIS » :
@@ -22832,7 +22883,26 @@ export default function App() {
           items.push({icon:'🚫', ic:'alert', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts'});
         }
       }catch(_){}
-      if(colisCount>0)   items.push({icon:'📦', ic:'box', text:`${colisCount} colis à retirer — tu as le code ou l'adresse`, n:colisCount, tab:'cat_achats'});
+      // ⚠️ ON CONSOMME LA RÈGLE PUBLIÉE, on ne la refait pas. `colisCount`
+      // ci-dessus ne voit QUE les colis venus d'un email transporteur : le
+      // tableau de bord annonçait « 1 colis à retirer » pendant que Ma journée
+      // en comptait 5 (les cinq colis « déposés en point relais » vus côté
+      // Vinted). Sans la ligne publiée (premier écran ouvert, nuage pas encore
+      // arrivé), on retombe sur ce qu'on sait — jamais sur zéro.
+      {
+        const pub = load('vrm_colis_retirer', null);
+        const total = (pub && Number.isFinite(pub.total)) ? pub.total : colisCount;
+        const prets = (pub && Number.isFinite(pub.prets)) ? pub.prets : colisCount;
+        const sans  = Math.max(0, total - prets);
+        if (total > 0) {
+          const text = prets > 0 && sans > 0
+            ? `${prets} colis à retirer — tu as le code · ${sans} attendent le leur`
+            : prets > 0
+              ? `${prets} colis à retirer — tu as le code ou l'adresse`
+              : `${sans} colis à retirer — l'extension va chercher leur code`;
+          items.push({icon:'📦', ic:'box', text, n:total, tab:'cat_achats'});
+        }
+      }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(unreadTotal>0){
@@ -22877,7 +22947,7 @@ export default function App() {
     })();
     return ()=>{cancelled=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[vintedAccounts]);
+  },[vintedAccounts, colisTick]);
 
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans

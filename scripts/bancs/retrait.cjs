@@ -107,6 +107,35 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
       ligne.replace(/\n/g,' · ').slice(0,120));
   }
 
+  // ── 6. LES TROIS ÉCRANS DISENT LE MÊME NOMBRE ─────────────────────────────
+  // Mesuré le 7 septembre : le tableau de bord annonçait « 1 colis à retirer »
+  // pendant que Ma journée en comptait 5. Cause : le centre de notifications
+  // RECALCULAIT la règle et sa version ne voyait que les colis venus d'un email
+  // transporteur — les colis « déposés en point relais » vus côté Vinted
+  // n'apparaissaient nulle part sur cet écran (§5.43 : un colis caché est un
+  // colis perdu). `pickupUnion` publie maintenant, le tableau de bord consomme.
+  const nombres = {};
+  for (const t of ['cat_achats','journee','dashboard']) {
+    await pg.goto('http://localhost:4383/?tab='+t,{waitUntil:'domcontentloaded'});
+    await pg.waitForTimeout(5000);
+    const txt = await pg.evaluate(()=>document.body.innerText||'');
+    const m = /(\d+)\s+colis à retirer/.exec(txt) || /Retirer\s+(\d+)\s+colis/.exec(txt);
+    if (m) nombres[t] = Number(m[1]);
+  }
+  // ⚠️ ET LES TROIS DOIVENT PARLER. Premier jet : « tous ceux qui annoncent un
+  // nombre disent le meme » — sur le code d'avant le tableau de bord n'affichait
+  // AUCUNE ligne, la comparaison portait sur deux ecrans et passait au VERT sur
+  // le defaut a attraper. Un ecran muet sur un colis, c'est justement le
+  // probleme (§5.43). C'est la BASE qui declenche, comme au point 5.
+  const vus = Object.values(nombres);
+  const detail = ['cat_achats','journee','dashboard'].map(k=>k+'='+(k in nombres?nombres[k]:'(muet)')).join(' · ');
+  if (aRetirer.length === 0) { console.log('--  (aucun colis a retirer dans ces fixtures)'); }
+  else {
+    dit(vus.length === 3, 'les TROIS ecrans annoncent le colis a retirer', detail);
+    dit(new Set(vus).size === 1,
+      'et ils annoncent le MEME nombre', detail);
+  }
+
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nLe retrait a toujours une porte, et rien ne repart en silence.');
   process.exit(ko?1:0);

@@ -179,6 +179,19 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   neuf), et `audit-retrait.cjs` qui vérifie désormais que le message de l'app
   et le code de l'extension disent la même chose. Ouvrir la conversation reste
   proposé — c'est le raccourci, plus l'obligation.
+- ⚠️ **Le tableau de bord ne voyait qu'un colis sur six.** Le centre de
+  notifications RECALCULAIT la règle de son côté, et sa version ne comptait que
+  les colis venus d'un **email transporteur** : les colis vus « déposés en point
+  relais » côté Vinted n'apparaissaient **nulle part** sur cet écran — 1 annoncé
+  contre 5 sur Ma journée, et sur certaines données **aucune ligne du tout**.
+  C'est §11 mot pour mot et §5.43 (un colis caché est un colis perdu).
+  `pickupUnion` **publie** ses comptes (`vrm_colis_retirer`), le tableau de bord
+  **consomme** — même motif que `vinted_nums_physiques` et `vinted_urssaf_mois`.
+  ⚠️ Et il ne publie que **complet** : rendu depuis Ma journée seule, les emails
+  de suivi n'étaient pas encore chargés et la valeur partielle (« 0 prêt · 5 en
+  attente ») partait au tableau de bord. Sans ligne publiée, on retombe sur ce
+  qu'on sait — jamais sur zéro. Le banc `retrait.cjs` exige que **les trois
+  écrans** annoncent le même nombre.
 - Un email « colis retiré » sort déjà le colis d'email de la liste
   (`suivisRetires` par n° de suivi, une identité).
 - **Les QR : il n'y en a que 3 dans toute la base**, tous des codes-barres
@@ -309,6 +322,18 @@ chargement est écrasée — pour les numéros ce serait le pire défaut de l'ap
   email, géocodé à **Marseille**, listé comme point relais de Cancale. Un point
   à plus de 30 km de la ville est signalé (« à 819 km ») ; **jamais supprimé
   tout seul**, c'est sa liste.
+
+### L'écran Messages : il a demandé qu'on RETIRE la liste
+« Enlève les messages, mets juste qu'il y en a de nouveaux. » L'écran ne
+déroule donc **aucune conversation** — une carte dit combien sont non lus, un
+bouton emmène répondre sur Vinted, et les réponses rapides se copient. **Ne pas
+remettre la liste** : c'est une décision prise, pas un oubli.
+- Ce qui manquait, en revanche : **sur quel compte**. Il en a neuf, et le bouton
+  ouvre l'inbox du compte connecté — pas forcément celui qui a les messages. La
+  carte nomme maintenant les trois premiers (« sur lllooIlllaa (8),
+  julatace3535 (7), julatace35260 (6) et 4 autres comptes »), calculés sur la
+  MÊME source que le nombre juste au-dessus (§11) : les deux ne peuvent pas se
+  contredire. C'est une information, pas la liste.
 
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
