@@ -441,16 +441,29 @@ lus dans ses conversations) en dépendait.
   tous les fichiers, que l'app le propose, et qu'aucun zip périmé ne traîne.
 - **Après toute modification de `vinted-sync-extension/`, régénérer le zip.**
 
-## 8. État au 6 septembre 2026
+## 8. État au 7 septembre 2026
 
 | | |
 |---|---|
-| annonces en ligne | 54 · **0 sans numéro · 0 doublon de numéro** ✅ |
-| paires numérotées | 320 · **0 prix d'achat** ⚠️ (il les saisit lui-même — trois portes : le 🔗 d'une annonce, la case « Coût d'achat » des Ventes, ⋯ Outils des Annonces) |
-| numéros de vente | 432 · le plus haut : 456 (un numéro n'est jamais réattribué — c'est normal) |
+| annonces **ouvertes** | **49** · 0 sans numéro · **0 doublon vivant** ✅ (383 fermées à côté — voir le piège `nItems` ci-dessous) |
+| paires numérotées | 320 · **0 prix d'achat** ⚠️ (il les saisit lui-même — la modale trie les vendues d'abord : 20 saisies = 33 % du CA reliable) |
+| pool de numéros | 456, sans trou, plus haut = 456 (append-only : c'est normal) |
+| ⚠️ numéros en double | **13**, tous HISTORIQUES : N°1 à N°16 redonnés par la numérotation auto les 2/4/6/15/16 août. **Cause : sur un appareil neuf le pool était lu VIDE au montage**, le nuage arrivant 500 ms plus tard → la numérotation repartait de 1. Corrigé (`onCloudReady` relit le pool) et protégé par `audit-identite.cjs`. **Aucun n'est vivant** : les paires en double sont fermées. |
+| argent Vinted | **281,94 € disponibles** à virer · **2 235,80 € retenus** (9 porte-monnaie) |
+| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · 5 colis à retirer, **0 code** (leurs conversations ne sont pas captées) |
 | notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
 | comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
 | ventes masquées | 209 (masquées à la main ; « tout réafficher » existe sur l'écran Ventes) |
+
+⚠️ **PIÈGE `nItems`, payé le 7 septembre.** `harvest_{uid}_listings.nItems` compte
+**tout** ce que la moisson a capté, **annonces fermées comprises** : 103 pour
+`julatace3535`, dont **94 `is_closed`**. J'en ai déduit « 380 annonces en ligne »
+puis « **12 numéros en double, toutes les paires en ligne — le risque n°1 est
+vivant** » — et j'allais l'annoncer. La vraie mesure (`!x.is_closed`) donne **49
+ouvertes et 0 conflit**. C'est §6 mot pour mot : *vérifier le nom ET la forme du
+champ avant de conclure*. Le banc `conflit.cjs` FORCE désormais le cas pour
+prouver que l'alerte rouge s'affiche quand elle doit — constater une absence ne
+prouve rien.
 
 **Ouvert :**
 - ⚠️ **L'extension installée chez lui est en retard** (mesuré : captures fraîches
@@ -481,7 +494,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 26 audits
-scripts/bancs/                  les 9 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 10 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
