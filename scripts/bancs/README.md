@@ -31,6 +31,7 @@ node /tmp/bancs/verif_visuel.cjs
 | `oublies.cjs` | les colis « jamais retirés » montrent leur code **et** leur QR |
 | `carte.cjs` | la ville déjà renseignée déclenche la recherche des points relais |
 | `postes.cjs` | cocher « Colis fait » ne fait disparaître personne, et les comptes collent |
+| `conflit.cjs` | **le risque n°1** : deux paires sous le même numéro. Il FORCE le cas (aucun n'existe aujourd'hui) et vérifie que l'app crie en rouge sur Colis |
 | `serie.cjs` | la saisie en série des prix d'achat : ouverture < 1,2 s, toutes les paires annoncées sont saisissables, une suggestion relie et écrit |
 
 ## Les trois pièges qui m'ont fait mesurer des fictions

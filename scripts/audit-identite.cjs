@@ -453,5 +453,30 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('`scoreAchat` doit déléguer à `scoreAchatPrep`');
 }
 
+// ⚠️ LE POOL EST APPEND-ONLY, ET LA NUMÉROTATION DOIT LE LIRE.
+// Mesuré le 7 septembre : ses paires portent **13 numéros en double**, et les
+// dates le disent — N°1 à N°16 ont été REDONNÉS par la numérotation automatique
+// les 2, 4, 6, 15 et 16 août, alors qu'ils étaient déjà dans
+// `vinted_used_numeros` depuis le 22 juillet. La cause est connue : sur un
+// appareil neuf, le pool est lu VIDE au montage et le nuage arrive 500 ms plus
+// tard — la numérotation repartait donc de 1. Aucun de ces doublons n'est
+// vivant aujourd'hui (les paires en double sont fermées, vérifié : 0 conflit
+// sur les 49 annonces ouvertes), mais la garde doit rester.
+{
+  const i = SRC.indexOf('const takenNums');
+  const F = i < 0 ? '' : SRC.slice(i, i + 900);
+  /usedNumeros\.forEach/.test(F)
+    ? ok('le prochain numéro évite tout le pool `vinted_used_numeros`')
+    : nok('sans le pool, la numérotation repart à 1 et redonne des numéros déjà écrits sur des cartons');
+  /Object\.values\(numeros\)\.forEach/.test(F) && /Object\.values\(saleOv\)\.forEach/.test(F)
+    ? ok('et aussi les numéros posés sur les annonces et les ventes')
+    : nok('le prochain numéro doit éviter annonces ET ventes');
+  // ⚠️ Et le pool doit être RELU quand le nuage atterrit — c'est la cause exacte
+  // des doublons d'août.
+  /setUsedNumeros\(load\('vinted_used_numeros'/.test(SRC)
+    ? ok('le pool est relu quand le nuage atterrit')
+    : nok('sans relecture, un appareil neuf renumérote à partir de 1');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
