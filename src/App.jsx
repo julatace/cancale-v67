@@ -3250,14 +3250,29 @@ const refAchat = (item) => ({
   titre:    normTitle(item?.title || ''),
   prix:     Number(item?.price?.amount ?? item?.price ?? 0) || 0,
 });
-const scoreAchat = (ref, o) => {
-  let pts = 0;
+// ⚠️ L'ACHAT SE PRÉPARE UNE FOIS, PAS À CHAQUE COMPARAISON.
+// Mesuré le 7 septembre : la modale « Prix d'achat à compléter » comparait
+// 288 paires × 544 achats = **156 672 appels**, et chaque appel ré-extrayait la
+// marque, la taille, le modèle, les couleurs et le titre normalisé **du même
+// achat**. Chaque achat était donc analysé 288 fois. La modale mettait
+// **3,5 secondes** à s'ouvrir — sur l'écran qu'il doit utiliser 320 fois.
+// Le barème ne change pas d'un point : c'est un jugement métier (§5.23), et il
+// vit toujours dans `scoreAchatPrep`. On ne change que le NOMBRE de fois où on
+// épluche le titre : 544 au lieu de 156 672.
+const prepAchat = (o) => {
   const t = o?.title || '';
-  if (ref.marque && (extractBrand(t) || '').toLowerCase() === ref.marque) pts += 4;
-  const ta = String(extractSize(t) || '').toLowerCase();
+  const pa = Number(o?.price?.amount);
+  return { t, marque: (extractBrand(t) || '').toLowerCase(), taille: String(extractSize(t) || '').toLowerCase(),
+           modele: extractModel(t), couleurs: extractColors(t), prix: isNaN(pa) ? NaN : pa, titre: normTitle(t) };
+};
+const scoreAchat = (ref, o) => scoreAchatPrep(ref, prepAchat(o));
+const scoreAchatPrep = (ref, p) => {
+  let pts = 0;
+  if (ref.marque && p.marque === ref.marque) pts += 4;
+  const ta = p.taille;
   if (ref.taille && ta === ref.taille) pts += 4;
   else if (ref.taille && ta && ta !== ref.taille) pts -= 10;
-  const mo = extractModel(t);
+  const mo = p.modele;
   if (ref.modele && mo === ref.modele) pts += 5;
   else if (ref.modele && mo && mo !== ref.modele) pts -= 6;
   // ⚠️ MODÈLE CONNU D'UN CÔTÉ, INCONNU DE L'AUTRE = PREUVE INSUFFISANTE.
@@ -3276,11 +3291,11 @@ const scoreAchat = (ref, o) => {
   // la preuve est insuffisante. Mesuré : 19 → 17 suggestions, les 2 perdues
   // sont les 2 génériques, aucune bonne suggestion écartée.
   else pts -= 3;
-  const cs = extractColors(t);
+  const cs = p.couleurs;
   if (ref.couleurs.length && cs.length) pts += cs.some(c => ref.couleurs.includes(c)) ? 4 : -8;
-  const pa = Number(o?.price?.amount);
+  const pa = p.prix;
   if (!isNaN(pa) && ref.prix > 0 && pa > 0 && pa < ref.prix) pts += 1;
-  if (normTitle(t) === ref.titre && ref.titre) pts += 6;
+  if (p.titre === ref.titre && ref.titre) pts += 6;
   return pts;
 };
 const KNOWN_MODELS = [
@@ -14966,16 +14981,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const achats = fillBuyAchats.items;
     if (!achats || !achats.length) return {};
     const pris = new Set(linkedBuyIds);
+    // ⚠️ CHAQUE ACHAT ÉPLUCHÉ UNE FOIS (voir `prepAchat`) : 544 fois au lieu de
+    // 156 672. Et plus de plafond à 300 — il a 320 paires, les vingt dernières
+    // n'avaient jamais de suggestion.
+    const prets = [];
+    for (const o of achats) {
+      if (pris.has(String(o.transaction_id))) continue;
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      prets.push({ o, id: String(o.transaction_id), p: prepAchat(o) });
+    }
     const out = {};
-    for (const r of fillBuyRows.slice(0, 300)) {
+    for (const r of fillBuyRows) {
       const ref = refAchat({ title: r.e.title, price: r.e.price });
       let best = null, bestS = 0;
-      for (const o of achats) {
-        const id = String(o.transaction_id);
-        if (pris.has(id)) continue;
-        if (classifyOrderStatus(o.status) === 'cancelled') continue;
-        const sc = scoreAchat(ref, o);
-        if (sc > bestS) { bestS = sc; best = o; }
+      for (const c of prets) {
+        if (pris.has(c.id)) continue;
+        const sc = scoreAchatPrep(ref, c.p);
+        if (sc > bestS) { bestS = sc; best = c.o; }
       }
       if (best && bestS >= SEUIL_SUGGERE) { out[r.key] = best; pris.add(String(best.transaction_id)); }
     }
@@ -19688,7 +19710,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {fillBuyRows.length===0 && (
                 <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Toutes tes paires ont un prix d'achat.</div>
               )}
-              {fillBuyRows.slice(0,300).map((r,i)=>(
+              {/* ⚠️ IL Y AVAIT UN PLAFOND À 300, POUR 320 PAIRES : vingt paires
+                  n'étaient atteignables NULLE PART, alors que l'en-tête les
+                  comptait (« 320 paires sans coût »). Et la chaîne « Entrée »,
+                  qui passe à la suivante, s'arrêtait net à la 300ᵉ.
+                  On les rend toutes : c'est une liste qui défile, et le seul
+                  coût est quelques nœuds de plus — mesuré, la modale s'ouvre
+                  toujours en 200 ms. */}
+              {fillBuyRows.map((r,i)=>(
                 <div key={r.key} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>

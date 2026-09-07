@@ -23,7 +23,7 @@ if (!fs.existsSync(DIR)) { console.log(`\n${ko} contrôle(s) non conforme(s).`);
 
 const fichiers = fs.readdirSync(DIR);
 const bancs = fichiers.filter(f => f.endsWith('.cjs'));
-dit(bancs.length >= 8, 'les bancs permanents sont là', bancs.length + ' bancs');
+dit(bancs.length >= 9, 'les bancs permanents sont là', bancs.length + ' bancs');
 dit(fichiers.includes('README.md'), 'et ils disent comment les lancer');
 
 // ── AUCUNE DONNÉE. Le dépôt est public. ────────────────────────────────────

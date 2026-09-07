@@ -288,8 +288,15 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // vivait dans `openPicker`, donc la modale de saisie en série ne pouvait pas
   // s'en servir et le banc devait en recopier les poids. Le contrôle suit la
   // définition unique, pas l'ancien emplacement.
+  // ⚠️ ET LE CONTRÔLE SUIT LA RÈGLE, PAS SON ORTHOGRAPHE. Le 7 septembre,
+  // l'extraction du côté ACHAT a déménagé dans `prepAchat` (chaque achat épluché
+  // une fois au lieu de 288 : la modale passait de 3,5 s à 0,3 s, à barème
+  // identique — 26 suggestions avant, 26 après). Ce contrôle cherchait la ligne
+  // `const cs = extractColors(t);` et criait au loup. Ce qui compte, c'est que
+  // les DEUX côtés portent un ENSEMBLE de couleurs et qu'on les croise.
   /couleurs:\s*extractColors\(item\?\.title\)/.test(SRC)
-    && /const cs = extractColors\(t\);[\s\S]{0,200}?ref\.couleurs\.includes\(c\)/.test(SRC)
+    && /couleurs:\s*extractColors\(t\)/.test(SRC)
+    && /const cs = p\.couleurs;[\s\S]{0,200}?ref\.couleurs\.includes\(c\)/.test(SRC)
     ? ok('le sélecteur d\'achat compare des ensembles de couleurs')
     : nok('le sélecteur d\'achat compare des ensembles de couleurs',
           'il compare encore une couleur unique : une paire bicolore désactive le test');
@@ -428,6 +435,22 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   const nb = (app.match(/const venteExpediee = /g) || []).length;
   nb === 1 ? ok("venteExpediee n'existe qu'une seule fois (une règle, un endroit)")
            : nok("venteExpediee n'existe qu'une seule fois", nb + ' définitions');
+}
+
+// ⚠️ UNE OPTIMISATION NE DOIT PAS CHANGER LE BARÈME. `prepAchat` épluche le
+// titre de l'achat une fois ; `scoreAchatPrep` porte le jugement. Le second ne
+// doit plus JAMAIS ré-extraire quoi que ce soit — sinon on paie deux fois, et
+// surtout on risque de faire diverger les deux chemins.
+{
+  const i = SRC.indexOf('const scoreAchatPrep');
+  const F = i < 0 ? '' : SRC.slice(i, i + 1600);
+  F ? ok('le barème vit dans `scoreAchatPrep`') : nok('le barème doit vivre en un seul endroit');
+  !/extract(Brand|Size|Model|Colors)\(|normTitle\(/.test(F)
+    ? ok('et il ne ré-épluche plus le titre de l\'achat')
+    : nok('`scoreAchatPrep` ne doit rien extraire : c\'est le travail de `prepAchat`');
+  /const scoreAchat = \(ref, o\) => scoreAchatPrep\(ref, prepAchat\(o\)\)/.test(SRC)
+    ? ok('et l\'ancien appel passe par le même barème (une règle, un endroit)')
+    : nok('`scoreAchat` doit déléguer à `scoreAchatPrep`');
 }
 
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
