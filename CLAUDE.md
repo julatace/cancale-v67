@@ -185,6 +185,22 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   Ils ont leur bloc sur Achats. On dit « à vérifier », **jamais « perdu »** :
   Vinted rembourse souvent tout seul.
 
+### L'écran Colis se range sur CE QU'IL PEUT FAIRE
+**Vu en capture le 7 septembre, sur ses vraies données** : l'en-tête annonçait
+« 10 bordereaux prêts à imprimer », et les **quatre premières cartes de l'écran**
+disaient toutes « l'extension le récupère à ta prochaine visite ». Le tri par
+date limite mettait devant les seuls colis qu'il ne **peut pas** traiter — dix
+étiquettes l'attendaient plus bas. La liste se groupe donc en **Prêts à imprimer
+/ En attente de leur bordereau / Déjà postés**, l'urgence restant le tri à
+l'intérieur de chaque groupe et le texte de chaque carte.
+⚠️ **PIÈGE DE BANC, corrigé le 7 septembre** : mes bancs rendaient la ligne
+BRUTE (`{id,data}`) pour une requête qui demande une **projection**
+(`select=id,filename:data->>filename,…`). L'app lisait donc `r.filename` sur un
+objet qui ne l'a pas → **tous les bordereaux tombaient** et l'écran affichait
+« 0 bordereau prêt à imprimer ». C'était un artefact du banc, pas un défaut de
+l'app. `colis.cjs` applique désormais la projection `select=` pour de vrai
+(§6.3) : un banc qui ne sert pas la bonne FORME de réponse mesure une fiction.
+
 ### La carte des points relais (Achats)
 **Mesuré le 6 septembre** : `vrm_ville` valait déjà « Cancale », `/api/relais`
 répond bien 5 points — mais `vrm_ville_points` était **absent** et l'écran ne
