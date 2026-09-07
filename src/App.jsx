@@ -12277,8 +12277,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // un colis d'`extra` PEUT en avoir un : compter tout `extra` faisait dire à
     // l'en-tête « 13 en attente de leur code » au-dessus d'une ligne qui affiche
     // le sien. Le test est le même que celui de la ligne (§11).
-    const sansCode = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); }).length;
-    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode,
+    const sansCodeList = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); });
+    const sansCode = sansCodeList.length;
+    // ⚠️ SUR QUEL COMPTE SE CONNECTER — il en a NEUF. L'extension va chercher
+    // les codes toute seule, mais UNIQUEMENT pour le compte connecté dans
+    // l'onglet : « passe sur Vinted avec le bon compte » sans dire lequel, c'est
+    // une consigne qu'on ne peut pas suivre (§7 : une alerte qui ne dit pas quoi
+    // faire ne sert à rien). Mesuré le 7 septembre : ses 5 colis sans code sont
+    // tous sur `julatace3535` — donc UN seul compte à ouvrir, et l'app peut le
+    // nommer. On rend les identifiants bruts : les noms se résolvent au rendu,
+    // là où `accName` existe (un `useMemo` s'exécute immédiatement, §4.6).
+    // `_acc` porte l'OBJET compte (c'est ce que `accName` attend), pas un id :
+    // on déduplique donc sur `vinted_user_id` et on garde l'objet.
+    const parCompte = new Map();
+    for (const o of sansCodeList) { const a = o && o._acc; if (a && !parCompte.has(String(a.vinted_user_id))) parCompte.set(String(a.vinted_user_id), a); }
+    const comptesSansCode = [...parCompte.values()];
+    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode, comptesSansCode,
              prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -15688,7 +15702,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sub = hd>0 ? `${hd} hors délai — va vite ${hd>1?'les':'le'} chercher`
             : pr>0 && sc>0 ? `${pr} avec ton code · ${sc} en attente de leur code`
             : pr>0 ? 'Tu as le code — plus qu\'à aller les chercher'
-            : 'Ouvre la conversation Vinted : l\'extension y lit le code et il revient ici';
+            : (()=>{ const cs = (pickupUnion.comptesSansCode||[]).map(a=>accName(a)).filter(Boolean);
+                     const qui = cs.length===1 ? `sur ${cs[0]}` : cs.length>1 ? `sur ${cs.slice(0,3).join(', ')}${cs.length>3?'…':''}` : 'avec le bon compte';
+                     return `Passe sur Vinted connecté ${qui} : l'extension va chercher les codes toute seule`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
@@ -17148,7 +17164,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
-                        : 'Ouvre la conversation UNE fois, avec l\'extension active et le bon compte connecté : elle y lit le code et il s\'affichera ici.'}
+                        : 'L\'extension va chercher le code toute seule : passe sur Vinted connecté avec le compte indiqué ci-dessous (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite.'}
                     </span>
                   </div>
                   {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
@@ -17178,9 +17194,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             7 septembre : ses cinq colis à retirer sont TOUS sur
                             `julatace3535`, dont la dernière capture datait de
                             4 jours — et leurs cinq conversations n'avaient
-                            JAMAIS été captées. L'extension lit une conversation
-                            quand on l'ouvre : encore faut-il savoir sur quel
-                            compte se connecter. */}
+                            JAMAIS été captées. `capterRetraits` (extension,
+                            depuis le 27 août) va pourtant les chercher TOUT
+                            SEUL — mais seulement pour le compte connecté dans
+                            l'onglet : encore faut-il savoir lequel. C'est tout
+                            ce qui manquait. */}
                         {o && o._acc && (
                           <div style={{fontSize:11,color:C.muted,marginTop:2}}>
                             compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b>
@@ -17199,7 +17217,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!href) return null;
                           const quoi = (rel && rel.qr) ? 'Voir le QR de retrait ↗'
                             : cd ? 'Ouvrir la conversation ↗'
-                            : 'Ouvrir la conversation → le code revient ici ↗';
+                            : 'Ouvrir la conversation → le code arrive tout de suite ↗';
                           return (
                             <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
                               {quoi}
@@ -18145,7 +18163,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* La seule ACTION de la rangée garde l'accent, mais en contour :
                 un aplat de couleur posé à côté de cinq pastilles neutres tirait
                 l'œil vers un raccourci, pas vers les chiffres. */}
-            {fillBuyRows.length>0 && <button onClick={()=>setFillBuyOpen(true)} title="Sans prix d'achat, la marge de chaque annonce reste vide et le bénéfice est faux. Une liste, un champ par ligne, Entrée passe à la suivante." style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px',cursor:'pointer'}}><Icon name="cash" size={13}/>{fillBuyRows.length} sans prix d'achat</button>}
+            {fillBuyRows.length>0 && <button onClick={()=>setFillBuyOpen(true)} title="Sans prix d'achat, la marge de chaque annonce reste vide et le bénéfice est faux. Une liste, un champ par ligne, Entrée passe à la suivante." style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px',cursor:'pointer'}}><Icon name="cash" size={13}/>{fillBuyRows.length} paires sans prix d'achat</button>}
             <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────

@@ -20,6 +20,10 @@ const AT=(s)=>/d[ée]pos[ée]/i.test(s||'')&&/point\s+relais|bureau\s+de\s+poste
 const cmds=[]; purch.forEach(r=>(((r.data||{}).payload||{}).my_orders||[]).forEach(o=>cmds.push(o)));
 const aRetirer=cmds.filter(o=>AT(o.status));
 const nonRecl=cmds.filter(o=>/non r[ée]clam/i.test(o.status||''));
+// Les codes DEJA en base (panel_colis_relais) : un colis qui en a un n'attend
+// plus rien, donc il n'appelle aucune consigne de connexion.
+let codes={}; try { const pr=main.find(r=>r.id==='panel_colis_relais'); const d=(pr&&pr.data)||{};
+  for(const k in d) if(d[k]&&d[k].code) codes[k]=1; } catch(_){}
 const totNR=nonRecl.reduce((t,o)=>t+parseFloat(String((o.price&&o.price.amount)||0)||0),0);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
@@ -70,6 +74,39 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   dit(!/perdu|perte/i.test(v.txt), "aucun ecran n'annonce une perte non prouvee");
   dit(/a verifier|à vérifier/i.test(v.txt), 'le montant est presente « a verifier »');
   dit(errs.length===0, "aucune erreur d'app", errs.slice(0,2).join(' | '));
+
+  // ── 5. MA JOURNÉE DIT SUR QUEL COMPTE SE CONNECTER ────────────────────────
+  // L'extension va chercher les codes toute seule (`capterRetraits`), mais
+  // seulement pour le compte connecte dans l'onglet. « Passe sur Vinted avec le
+  // bon compte » sans dire lequel est une consigne qu'on ne peut pas suivre :
+  // il en a NEUF. Rendu avec les vraies donnees (§26 : un bloc conditionnel ne
+  // compte que RENDU).
+  await pg.goto('http://localhost:4383/?tab=journee',{waitUntil:'domcontentloaded'});
+  await pg.waitForTimeout(4000);
+  await pg.screenshot({path:SC+'/z-retrait-journee.png',fullPage:true});
+  const j2=await pg.evaluate(()=>document.body.innerText||'');
+  // ⚠️ LE CONTROLE SE DECLENCHE SUR LA DONNEE, PAS SUR LA FORMULE. Premiere
+  // version : « si la phrase parle d'attendre un code, alors elle doit nommer un
+  // compte ». Sur le code d'AVANT, la phrase etait autre — la condition tombait
+  // a faux et le banc annoncait « rien a nommer », donc VERT sur le defaut
+  // qu'il devait attraper. C'est la base qui decide : s'il existe un colis sans
+  // code, la ligne DOIT nommer un compte, quelle que soit la formulation.
+  const logins=[...new Set(accounts.map(a=>String(a.login||'')).filter(Boolean))];
+  const ligne=(/Retirer \d+ colis[\s\S]{0,220}/.exec(j2)||[''])[0];
+  const sansCode=aRetirer.filter(o=>!codes[String(o.transaction_id||'')]);
+  console.log('base servie : '+sansCode.length+' colis sans code, sur '
+    +[...new Set(sansCode.map(o=>String(o.account||o.uid||'')))].length+' compte(s)');
+  if(sansCode.length===0){ console.log('--  (aucun colis sans code dans ces fixtures)'); }
+  else {
+    dit(/Retirer \d+ colis/.test(j2), 'Ma journee annonce les colis a retirer');
+    dit(!/Ouvre la conversation UNE fois/.test(j2),
+      "et ne reclame plus d'ouvrir chaque conversation",
+      "l'extension va les chercher toute seule depuis le 27 aout");
+    dit(logins.some(l=>ligne.includes(l)),
+      'elle NOMME le compte sur lequel se connecter',
+      ligne.replace(/\n/g,' · ').slice(0,120));
+  }
+
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nLe retrait a toujours une porte, et rien ne repart en silence.');
   process.exit(ko?1:0);
