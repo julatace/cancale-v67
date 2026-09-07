@@ -15558,7 +15558,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         const jobs=[];
-        if(toShip.length) jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub:late>0?`${late} en retard — à poster en priorité`:'Bordereau + paire au garage, coche par colis',tab:'cat_bord',prio:late>0?0:1});
+        // ⚠️ LA PREMIÈRE CHOSE QU'IL VOIT DOIT DIRE CE QU'IL PEUT FAIRE TOUT
+        // DE SUITE. Mesuré le 7 septembre : 15 colis à expédier, dont **10 dont
+        // le bordereau est déjà en base** — et la carte disait seulement
+        // « Bordereau + paire au garage, coche par colis ». Dix étiquettes
+        // prêtes, annoncées nulle part sur l'écran d'accueil.
+        if(toShip.length){
+          const pretsImpr = expeditions().filter(e => !(e.o && isShipDone(e.o))
+            && ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]))).length;
+          const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${pretsImpr} prêt${pretsImpr>1?'s':''} à imprimer`
+            : late>0 ? `${late} en retard — à poster en priorité`
+            : pretsImpr>0 ? `${pretsImpr} bordereau${pretsImpr>1?'x':''} prêt${pretsImpr>1?'s':''} à imprimer — le reste attend le sien`
+            : 'Bordereau + paire au garage, coche par colis';
+          jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub,tab:'cat_bord',prio:late>0?0:1});
+        }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
         // ⚠️ LE SOUS-TITRE DOIT DIRE CE QU'IL PEUT FAIRE, PAS SEULEMENT COMBIEN.
         // Mesuré le 1er septembre : « Retirer 15 colis — récupère-les avec ton
@@ -15571,7 +15584,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sub = hd>0 ? `${hd} hors délai — va vite ${hd>1?'les':'le'} chercher`
             : pr>0 && sc>0 ? `${pr} avec ton code · ${sc} en attente de leur code`
             : pr>0 ? 'Tu as le code — plus qu\'à aller les chercher'
-            : 'Vinted dit « déposé » — le code arrive par email ou dans la conversation';
+            : 'Ouvre la conversation Vinted : l\'extension y lit le code et il revient ici';
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
