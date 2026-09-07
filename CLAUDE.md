@@ -332,7 +332,14 @@ qu'un bouton ne fixe pas lui-même.
   arrondi différemment (« 296 € » et « 296,40 € » le même jour). Et **un `0,00 €`
   qui veut dire « on ne sait pas » s'écrit `—` avec la raison à côté**.
 - **Pas de « n/d »** ni d'autre vocabulaire d'informaticien : il n'est pas
-  développeur.
+  développeur. Un tiret dit « on ne sait pas », la raison en clair dit quoi
+  faire. `audit-chiffres.cjs` compte les `n/d` restants — il y en avait encore
+  **quatre** sur l'écran Statistiques le 7 septembre, des semaines après la
+  règle. ⚠️ Et remplacer un `n/d` par **`0,00 €` est pire** : « CA / jour
+  actif » se calcule sur `receiveDate`, la date d'encaissement **retirée exprès
+  de l'app** — donc 0 jour, donc 0 €. Il écrit `—` et dit pourquoi, sans rien
+  demander : il n'y a rien à saisir. *(À trancher : garder cette carte, ou la
+  remplacer par un CA moyen par jour de VENTE ?)*
 
 ---
 
