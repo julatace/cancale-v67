@@ -21820,11 +21820,15 @@ function SecuriteSetting() {
   const copier = async (txt, quoi) => {
     try { await navigator.clipboard.writeText(txt); setCopie(quoi); setTimeout(()=>setCopie(''), 2200); } catch (_) {}
   };
+  // Ce qu'on écrit quand la sonde n'a pas répondu : jamais un diagnostic.
+  const PAS_SU = "Le sondage n'a pas abouti (réseau, ou base injoignable). Rouvre cet écran pour réessayer.";
   const Ligne = ({ t, ok, etat, d, action }) => (
     <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
-      <span style={{flexShrink:0,fontSize:13,marginTop:1}}>{ok === null || ok === undefined ? '⏳' : ok ? '✅' : '⚠️'}</span>
+      <span style={{flexShrink:0,marginTop:2,display:'inline-flex',color: ok == null ? C.muted : ok ? INV_STATUS.online.color : C.warn}}>
+        <Icon name={ok == null ? 'clock' : ok ? 'check' : 'alert'} size={14}/>
+      </span>
       <div style={{minWidth:0,flex:'1 1 140px'}}>
-        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok ? INV_STATUS.online.color : C.warn}}>· {etat}</span></div>
+        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok == null ? C.muted : ok ? INV_STATUS.online.color : C.warn}}>· {etat}</span></div>
         <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
         {action}
       </div>
@@ -21832,34 +21836,36 @@ function SecuriteSetting() {
   );
   const s = st || {};
   const proteges = s.colonne === true && s.lisibleSansCompte === false;
+  // « Je ne sais pas » n'est ni « cloisonnées » ni « partagées ».
+  const sondeInconnue = s.colonne == null || s.lisibleSansCompte == null;
   return (
-    <div style={{border:`1px solid ${proteges ? C.border : C.warn + '66'}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+    <div style={{border:`1px solid ${proteges || sondeInconnue ? C.border : C.warn + '66'}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
-        <span style={{fontSize:11,fontWeight:600,color:proteges?INV_STATUS.online.color:C.warn,background:(proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
-          {st === null ? 'vérification…' : proteges ? 'cloisonnées' : 'partagées'}
+        <span style={{fontSize:11,fontWeight:600,color:sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn,background:(sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
+          {st === null ? 'vérification…' : sondeInconnue ? 'pas encore vérifié' : proteges ? 'cloisonnées' : 'partagées'}
         </span>
       </div>
       <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>
         Sondé en direct sur ta base, à chaque ouverture de cet écran.
       </div>
       <Ligne t="Propriétaire des lignes" ok={s.colonne}
-        etat={s.colonne === null ? '…' : s.colonne ? 'colonne présente' : 'colonne absente'}
-        d={s.colonne ? "Chaque ligne peut être attribuée à un vendeur."
+        etat={s.colonne == null ? 'pas encore vérifié' : s.colonne ? 'colonne présente' : 'colonne absente'}
+        d={s.colonne == null ? PAS_SU : s.colonne ? "Chaque ligne peut être attribuée à un vendeur."
           : "Sans elle, toutes les données vivent dans la même ligne : un deuxième compte ouvrirait TA boutique. C'est la migration SQL à passer dans Supabase → SQL Editor."}
-        action={!s.colonne && (
+        action={s.colonne === false && (
           <button type="button" onClick={()=>copier(MIGRATION_SQL, 'sql')}
             style={{marginTop:7,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : '📋 Copier la migration SQL'}
+            {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="doc" size={12}/>Copier la migration SQL</span>}
           </button>)}/>
-      <Ligne t="Lecture sans compte" ok={s.lisibleSansCompte === false}
-        etat={s.lisibleSansCompte === null ? '…' : s.lisibleSansCompte ? 'tout est lisible' : 'fermée'}
-        d={s.lisibleSansCompte
-          ? "⚠️ La clé publique, visible dans le code, suffit encore à tout lire. C'est le verrou qui compte vraiment (RLS) — la colonne seule ne protège rien."
+      <Ligne t="Lecture sans compte" ok={s.lisibleSansCompte == null ? null : s.lisibleSansCompte === false}
+        etat={s.lisibleSansCompte == null ? 'pas encore vérifié' : s.lisibleSansCompte ? 'tout est lisible' : 'fermée'}
+        d={s.lisibleSansCompte == null ? PAS_SU : s.lisibleSansCompte
+          ? "La clé publique, visible dans le code, suffit encore à tout lire. C'est le verrou qui compte vraiment (RLS) — la colonne seule ne protège rien."
           : "La clé publique ne ramène plus rien : seule une session identifiée lit tes données."}/>
-      <Ligne t="Création de compte" ok={s.mailAuto === true}
-        etat={s.mailAuto === null ? '…' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
-        d={s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
+      <Ligne t="Création de compte" ok={s.mailAuto == null ? null : s.mailAuto === true}
+        etat={s.mailAuto == null ? 'pas encore vérifié' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
+        d={s.mailAuto == null ? PAS_SU : s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
           : "Le serveur d'envoi de test de Supabase est limité à quelques emails par heure — une création peut rester bloquée. Authentication → Providers → Email → décocher « Confirm email »."}/>
       {/* ⚠️ LA MOITIÉ SERVEUR DU CLOISONNEMENT. Les emails, les rappels
           d'expédition et les notifications sont écrits par des routes qui
@@ -21869,8 +21875,8 @@ function SecuriteSetting() {
           silencieusement perdu). C'est le vrai blocage à lever AVANT la
           migration, et il ne se voit nulle part ailleurs. */}
       <Ligne t="Routes serveur (emails, rappels)" ok={srv === null ? null : !!(srv.serviceKey && srv.owner)}
-        etat={srv === null ? '…' : srv.serviceKey && srv.owner ? 'prêtes' : srv.serviceKey ? 'propriétaire manquant' : 'clé de service manquante'}
-        d={srv && srv.serviceKey && srv.owner
+        etat={srv == null ? 'pas encore vérifié' : srv.serviceKey && srv.owner ? 'prêtes' : srv.serviceKey ? 'propriétaire manquant' : 'clé de service manquante'}
+        d={srv == null ? PAS_SU : srv.serviceKey && srv.owner
           ? "Elles écriront sous ton compte une fois la base cloisonnée."
           : "À régler dans Vercel → Settings → Environment Variables AVANT la migration : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID (ton identifiant de compte). Sans ça, les emails et rappels cesseront d'être enregistrés dès que la séparation sera activée."}/>
       <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
