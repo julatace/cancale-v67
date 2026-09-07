@@ -38,7 +38,13 @@ const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
   r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
 srv.listen(4322);
-const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings'];
+// ⚠️ TOUS LES ÉCRANS, PAS DIX SUR TREIZE. `vintedaccounts` (« Comptes liés »)
+// n'etait rendu par AUCUN banc — et c'est la qu'un bouton « ↻ Actualiser »
+// posait sa propre ligne de titre au lieu de passer par le slot `right` de
+// `ScreenHead` : il atterrissait PILE SOUS l'ile d'actions, donc invisible.
+// Le controle existait, l'ecran n'y passait jamais. `catalog` et `sales`
+// (l'ancienne appli) etaient dans le meme angle mort.
+const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
@@ -95,7 +101,7 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
     dit(morts.length===0,"aucun écran n'est tombé sur le garde-fou",morts.join(', '));
     dit(deb.length===0,'aucun débordement horizontal',deb.join(', '));
     dit(susp.length===0,"aucun artefact d'affichage",susp.join(', '));
-    dit(sousIle.length===0,"rien ne passe sous l'île d'actions",sousIle.slice(0,3).join(' // '));
+    dit(sousIle.length===0,"rien ne passe sous l'île d'actions",sousIle.join(' // ')   /* ⚠️ PAS DE PLAFOND : `slice(0,3)` a masqué une 3e trouvaille derrière deux autres — un contrôle qui tronque ses résultats fait croire que le reste va bien. */);
     dit(errs.length===0,"aucune erreur d'app",errs.slice(0,2).join(' | '));
     await pg.close();
   }

@@ -494,6 +494,25 @@ qu'un bouton ne fixe pas lui-même.
   ⚠️ Tout ce qu'un écran pose sur sa ligne de titre doit passer par le slot
   `right` de `ScreenHead` — sinon ça glisse SOUS l'île et disparaît. Le banc
   `verif_visuel.cjs` mesure ce recouvrement.
+  ⚠️⚠️ **ET TROIS ÉCRANS Y ÉCHAPPAIENT PARCE QU'AUCUN BANC NE LES RENDAIT.**
+  Mesuré le 7 septembre : les deux bancs de rendu couvraient **10 onglets sur
+  15**. `vintedaccounts` (« Comptes liés », ses neuf comptes), `catalog` et
+  `stockvinted` se fabriquaient chacun leur propre `<h2>` + bouton — donc
+  « ↻ Actualiser », « Exporter Excel » et « Coller en masse » atterrissaient
+  **pile sous l'île, invisibles**. Mesure directe sur `vintedaccounts` : bouton
+  à `left 1311 · right 1410 · top 30`, île à `left 1301 · top 12 · bottom 59` —
+  entièrement dedans. Le contrôle existait depuis des semaines ; ces écrans n'y
+  passaient jamais. Les trois écrans sont repassés sous `ScreenHead`, et
+  `audit-bancs.cjs` exige désormais que les bancs rendent **tout écran
+  joignable** (dans le rail ou visé par un `setTab`).
+  ⚠️ *Deux écrans montés restent INJOIGNABLES* (`comptabilite`, `inventory`) :
+  aucun appelant, comme le tiroir `Nav`. Ils ne sont pas exigés au banc — tester
+  un chemin mort ne prouve rien.
+  ⚠️ *Nuance mesurée* : en séquence complète, le banc signale `catalog` et
+  `stockvinted` mais **pas** `vintedaccounts` (il le voit quand cet écran est
+  rendu seul). Cause non élucidée — un état laissé par un onglet précédent.
+  Donc : **un écran vert dans une séquence peut être faux ; c'est la mesure des
+  rectangles qui tranche.**
 - **Le sombre tient par la hiérarchie, pas par la teinte** : rail le plus sombre,
   page au-dessus, cartes encore au-dessus. Quatre unités d'écart, et la barre
   latérale se confond avec la page.

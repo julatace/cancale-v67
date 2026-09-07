@@ -6002,9 +6002,9 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
 
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
-        <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:600}}>Catalogue ({catalog.length})</h2>
-        <Btn small onClick={()=>{
+      <ScreenHead icon="box" title={`Catalogue (${catalog.length})`}
+        desc="Les paires de l'ancienne application. Elles comptent toujours dans les statistiques."
+        right={<Btn small onClick={()=>{
           if(fullList.length===0){toast('Aucune paire à exporter');return;}
           const headers=['N° Paire','Prix Achat (€)','Statut','Date ajout'];
           const rows=fullList.map(p=>[p.id||'',String(p.buyPrice||'').replace('.',','),p.status||'',p.addedAt||'']);
@@ -6016,8 +6016,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
           a.download=`catalogue-${new Date().toISOString().slice(0,10)}.csv`;
           document.body.appendChild(a);a.click();document.body.removeChild(a);
           URL.revokeObjectURL(url);
-        }} color={C.blue}>📤 Exporter Excel</Btn>
-      </div>
+        }} color={C.blue} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>}/>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <div style={{display:'flex',gap:6,alignItems:'center',flex:1,minWidth:200}}>
           <Input value={searchInput}
@@ -10100,12 +10099,11 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 
   return (
     <div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
-        <h2 style={{margin:0,fontSize:17,fontWeight:600}}>🟢 Stock Vinted ({stockVinted.length})</h2>
-        <button onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:8,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
+      <ScreenHead icon="tag" title={`Stock Vinted (${stockVinted.length})`}
+        desc="L'ancienne liste des numéros en ligne."
+        right={<button onClick={()=>setShowBulk(s=>!s)} style={{background:C.purple,color:'#fff',border:'none',borderRadius:8,padding:'7px 12px',fontWeight:500,fontSize:12,cursor:'pointer'}}>
           {showBulk?'Fermer':'Coller en masse'}
-        </button>
-      </div>
+        </button>}/>
 
       <p style={{fontSize:13,color:C.muted,margin:'0 0 14px',lineHeight:1.5}}>
         Liste de tes annonces actuellement en ligne sur Vinted. Ajoute tes numéros un par un ci-dessous.
@@ -10292,18 +10290,18 @@ function VintedAccounts({ accounts, setAccounts }) {
   })(); }, []);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
-    if (blockedAccts.has(uid)) return { icon: '🚫', label: 'Refusé par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403). Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
+    if (blockedAccts.has(uid)) return { etat: 'bad', ic: 'alert', label: 'Refusé par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403). Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
     // Sans refresh_token, le compte ne peut pas se renouveler tout seul → il
     // faudra le reconnecter à la main. (Le simple access_token expiré, lui, est
     // normal et se renouvelle automatiquement — on ne le signale pas.)
-    if (!acc.refresh_token) return { icon: '🔑', label: 'À reconnecter', color: C.warn, hint: 'Pas de jeton de renouvellement : ce compte ne restera pas connecté seul. Repasse sur vinted.fr avec l\'extension pour le recapter.' };
+    if (!acc.refresh_token) return { etat: 'warn', ic: 'key', label: 'À reconnecter', color: C.warn, hint: 'Pas de jeton de renouvellement : ce compte ne restera pas connecté seul. Repasse sur vinted.fr avec l\'extension pour le recapter.' };
     const cap = lastCap[uid];
-    if (!cap) return { icon: '⚪', label: 'Jamais capté', color: C.muted, hint: 'Ouvre ta boutique sur vinted.fr avec l\'extension pour capter ce compte.' };
+    if (!cap) return { etat: 'warn', ic: 'cloudOff', label: 'Jamais capté', color: C.muted, hint: 'Ouvre ta boutique sur vinted.fr avec l\'extension pour capter ce compte.' };
     const ageH = (Date.now() - cap) / 3600000;
     const ago = ageH < 1 ? 'il y a <1 h' : ageH < 48 ? `il y a ${Math.round(ageH)} h` : `il y a ${Math.round(ageH / 24)} j`;
-    if (ageH < 12) return { icon: '🟢', label: 'À jour', color: INV_STATUS.online.color, hint: `Dernière capture ${ago}.` };
-    if (ageH < 72) return { icon: '🟡', label: `Capté ${ago}`, color: C.warn, hint: 'Repasse sur vinted.fr pour rafraîchir.' };
-    return { icon: '🔴', label: `Pas capté (${ago})`, color: C.danger, hint: 'Repasse sur vinted.fr avec l\'extension pour re-capter ce compte.' };
+    if (ageH < 12) return { etat: 'ok', ic: 'check', label: 'À jour', color: INV_STATUS.online.color, hint: `Dernière capture ${ago}.` };
+    if (ageH < 72) return { etat: 'warn', ic: 'clock', label: `Capté ${ago}`, color: C.warn, hint: 'Repasse sur vinted.fr pour rafraîchir.' };
+    return { etat: 'bad', ic: 'cloudOff', label: `Pas capté (${ago})`, color: C.danger, hint: 'Repasse sur vinted.fr avec l\'extension pour re-capter ce compte.' };
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
@@ -10452,17 +10450,11 @@ function VintedAccounts({ accounts, setAccounts }) {
           </button>
         </div>
       )}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-        <h2 style={{fontSize:20,fontWeight:600,color:C.text,margin:0}}>🔗 Comptes Vinted liés</h2>
-        <button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
+      <ScreenHead icon="link" title="Comptes Vinted liés"
+        desc="Ceux que l'extension Chrome capte quand tu navigues sur Vinted. Annonces, ventes, achats et messages se consultent dans leurs onglets."
+        right={<button onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension" style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:500,color:C.text}}>
           {loading ? '…' : '↻ Actualiser'}
-        </button>
-      </div>
-
-      <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>
-        Les comptes ci-dessous sont ceux captés par l'extension Chrome quand tu navigues sur Vinted.
-        Les annonces, ventes, achats et messages se consultent dans les onglets dédiés du menu.
-      </div>
+        </button>}/>
 
       {accounts.length === 0 && (
         <div style={{padding:16,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
@@ -10474,15 +10466,15 @@ function VintedAccounts({ accounts, setAccounts }) {
       {/* Diagnostic global : combien de comptes à jour / à rafraîchir / bloqués. */}
       {accounts.length > 0 && (()=>{
         const st = accounts.map(acctHealth);
-        const ok = st.filter(s=>s.icon==='🟢').length;
-        const warn = st.filter(s=>s.icon==='🟡'||s.icon==='⚪'||s.icon==='🔑').length;
-        const bad = st.filter(s=>s.icon==='🔴'||s.icon==='🚫').length;
+        const ok   = st.filter(s=>s.etat==='ok').length;
+        const warn = st.filter(s=>s.etat==='warn').length;
+        const bad  = st.filter(s=>s.etat==='bad').length;
         return (
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
-            <span style={{color:C.text}}>🩺 État des comptes :</span>
-            <span style={{color:INV_STATUS.online.color}}>🟢 {ok} à jour</span>
-            {warn>0 && <span style={{color:C.warn}}>🟡 {warn} à rafraîchir</span>}
-            {bad>0 && <span style={{color:C.danger}}>🔴 {bad} en panne</span>}
+            <span style={{color:C.text}}>État des comptes :</span>
+            <span style={{display:'inline-flex',alignItems:'center',gap:4,color:INV_STATUS.online.color}}><Icon name="check" size={13}/>{ok} à jour</span>
+            {warn>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.warn}}><Icon name="clock" size={13}/>{warn} à rafraîchir</span>}
+            {bad>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.danger}}><Icon name="cloudOff" size={13}/>{bad} en panne</span>}
             <span style={{color:C.muted,fontWeight:600,flex:'1 1 100%',fontSize:11,marginTop:2}}>« À jour » = capté récemment par l'extension. Un compte « à rafraîchir » ou « en panne » : repasse sur vinted.fr, l'extension le recapte tout seul.</span>
           </div>
         );
@@ -10510,15 +10502,18 @@ function VintedAccounts({ accounts, setAccounts }) {
                     ) : (
                       <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
                         <div style={{fontWeight:600,color:C.text,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{accountName(acc)}</div>
-                        <span style={{fontSize:11,color:C.muted}}>✎</span>
+                        <span style={{color:C.muted,display:'inline-flex'}}><Icon name="pencil" size={12}/></span>
                       </div>
                     )}
                     <div style={{fontSize:11,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                       {acc.login && acc.login !== accountName(acc) ? `@${acc.login} · ` : ''}
-                      maj {acc.updated_at ? new Date(acc.updated_at).toLocaleString('fr-FR') : '—'}
+                      {/* ⚠️ « maj » est de l'abréviation d'informaticien (§7), et
+                          l'heure À LA SECONDE ne sert à rien : on lit cette ligne
+                          pour savoir si c'est frais, pas pour horodater. */}
+                      {acc.updated_at ? `lié le ${new Date(acc.updated_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
                     </div>
                     {(()=>{ const h=acctHealth(acc); return (
-                      <div title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:8,padding:'2px 9px'}}>{h.icon} {h.label}</div>
+                      <div title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:`${h.color}14`,border:`1px solid ${h.color}44`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
                     ); })()}
                     {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
                       <div style={{fontSize:12,marginTop:3,fontWeight:600,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
@@ -10531,7 +10526,7 @@ function VintedAccounts({ accounts, setAccounts }) {
                     <input
                       value={acctEmails[String(acc.vinted_user_id)] || ''}
                       onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
-                      placeholder="📧 Email du compte (auto dès que l'extension capte le profil)"
+                      placeholder="Email du compte"
                       title="L'adresse à laquelle Vinted écrit pour ce compte. Permet d'attribuer automatiquement les emails (ventes, bordereaux) au bon compte."
                       style={{marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
                       onFocus={e=>e.target.style.borderColor=C.accent}
@@ -10544,7 +10539,8 @@ function VintedAccounts({ accounts, setAccounts }) {
                   {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
                     <button onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
                       style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:off?C.muted:C.accent}}>
-                      {off ? '🚫 Masqué (annonces + compta)' : '✅ Actif'}
+                      {off ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eyeOff" size={12}/>Masqué (annonces + compta)</span>
+                           : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={12}/>Actif</span>}
                     </button>
                   ); })()}
                   <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
@@ -10552,7 +10548,7 @@ function VintedAccounts({ accounts, setAccounts }) {
                   </button>
                   <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Supprimer ce compte : jetons + annonces + ventes captées effacés, et l'extension ne le recaptera plus"
                     style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger,opacity:removing===acc.vinted_user_id?0.5:1}}>
-                    {removing===acc.vinted_user_id ? '…' : '🗑 Supprimer ce compte'}
+                    {removing===acc.vinted_user_id ? '…' : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>}
                   </button>
                 </div>
               </div>
