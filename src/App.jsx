@@ -15794,6 +15794,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en attente{escrow?'':' (estimation)'}</div>
                   <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
+                  {/* ⚠️ L'ARGENT DÉJÀ VIRABLE N'APPARAISSAIT QUE DANS UNE PHRASE
+                      d'explication de l'écran Statistiques. Mesuré le
+                      7 septembre sur ses neuf porte-monnaie : **281,94 €
+                      disponibles** à côté de 2 235,80 € retenus. Ce n'est pas
+                      une estimation — c'est le chiffre que Vinted affiche — et
+                      c'est de l'argent qu'il peut virer aujourd'hui.
+                      ⚠️ « en attente » et « disponible » ne se confondent
+                      JAMAIS (§5.14) : deux mots, deux montants, sur deux
+                      lignes. */}
+                  {escrow && escrow.dispo > 0 && (
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>
+                      et <b style={{color:C.text,fontWeight:700}}>{escrow.dispo.toFixed(2).replace('.',',')} €</b> déjà disponibles à virer
+                      {escrow.accounts>1?` · sur ${escrow.accounts} porte-monnaie`:''}
+                      {/* ⚠️ L'ARGENT BOUGE. Un solde lu il y a trois semaines
+                          n'est pas le montant d'aujourd'hui : on le dit, sinon
+                          c'est un chiffre invérifiable. */}
+                      {escrow.plusVieuxJours>7?` · le plus ancien lu il y a ${escrow.plusVieuxJours} j`:''}
+                    </div>
+                  )}
                 </div>
                 <button type="button" onClick={()=>onNav && onNav('cat_ventes')} style={{border:'none',background:'transparent',color:C.muted,fontSize:22,fontWeight:700,cursor:'pointer'}}>›</button>
               </div>
