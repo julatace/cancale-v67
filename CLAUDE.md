@@ -508,11 +508,31 @@ qu'un bouton ne fixe pas lui-même.
   ⚠️ *Deux écrans montés restent INJOIGNABLES* (`comptabilite`, `inventory`) :
   aucun appelant, comme le tiroir `Nav`. Ils ne sont pas exigés au banc — tester
   un chemin mort ne prouve rien.
-  ⚠️ *Nuance mesurée* : en séquence complète, le banc signale `catalog` et
-  `stockvinted` mais **pas** `vintedaccounts` (il le voit quand cet écran est
-  rendu seul). Cause non élucidée — un état laissé par un onglet précédent.
-  Donc : **un écran vert dans une séquence peut être faux ; c'est la mesure des
-  rectangles qui tranche.**
+  ⚠️⚠️ **CAUSE ÉLUCIDÉE — et elle corrige ce que j'avais écrit d'abord.** En
+  séquence complète, le banc ne signalait pas `vintedaccounts` ; j'en avais
+  conclu « le banc peut être aveugle, un écran vert peut être faux ». **C'est
+  faux.** Le banc mesurait juste : le bouton était bien à `left 1311` dans les
+  deux cas, mais à `top 30` seul (donc SOUS l'île) et à `top 154` en séquence
+  (donc dégagé). Ce qui le pousse : le bandeau **« 1 compte est exclu de
+  l'application »**, qui n'apparaît qu'une fois `vinted_accounts_hidden` écrit
+  dans le navigateur par un onglet précédent.
+  ⇒ La vraie leçon : **un écran qui se fabrique sa ligne de titre n'est sous
+  l'île que PARFOIS** — selon ce qui s'affiche au-dessus. C'est exactement
+  pour ça que le défaut a survécu si longtemps, et pourquoi passer par
+  `ScreenHead` compte plus, pas moins.
+  ⇒ Et une propriété des bancs à connaître : `localStorage` **survit d'un
+  onglet à l'autre** dans le même contexte, donc l'ORDRE des onglets change ce
+  qui est rendu. Un banc n'est pas moins fiable pour autant — il faut juste
+  savoir qu'il mesure un état, pas une vérité éternelle. *(Corollaire : l'état
+  le plus risqué est l'APPAREIL NEUF, celui où rien n'a encore été écrit — c'est
+  là que « ↻ Actualiser » disparaissait, et c'est le même terrain que les
+  numéros repartis de 1 au montage.)*
+  ⚠️ **Cherché, et il n'en reste pas** : deux lignes de titre sont encore
+  fabriquées à la main, mais aucune n'est ce défaut — **Leboncoin** est centré
+  (`maxWidth 600`), donc structurellement loin de l'île ; **« Ventes (n) »** de
+  l'ancienne appli est un titre de SECTION en milieu de page, pas un en-tête
+  d'écran. Onze écrans passent par `ScreenHead`. Ne pas refaire cette
+  recherche.
 - **Le sombre tient par la hiérarchie, pas par la teinte** : rail le plus sombre,
   page au-dessus, cartes encore au-dessus. Quatre unités d'écart, et la barre
   latérale se confond avec la page.
