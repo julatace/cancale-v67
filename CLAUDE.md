@@ -304,8 +304,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **25 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| bancs Playwright (scratchpad) | l'app **rendue sur les vraies données**, à 390 px et 1512 px |
+| `node scripts/audit-*.cjs` | **26 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -318,6 +318,19 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
    Un défaut dans un canvas (3D) ne se cherche pas dans le DOM.
 3. **Servir TOUTES les familles de lignes et TOUTES les formes de requête** au
    banc (`id=eq.`, `id=like.`, `select=`), sinon on mesure un artefact.
+   ⚠️ **La projection `select=` compte autant que la ligne.** Rendre `{id,data}`
+   pour une requête `select=id,filename:data->>filename,…` fait lire
+   `r.filename` sur un objet qui ne l'a pas : tous les bordereaux tombaient et
+   l'écran Colis affichait « 0 bordereau prêt à imprimer » alors que dix étaient
+   en base. C'est ce qui m'a fait chercher au mauvais endroit pendant plusieurs
+   passes. Les bancs appliquent la projection (`projette`).
+4. **Un écran tombé sur le garde-fou passe TOUS les contrôles.** « Cet écran n'a
+   pas pu s'afficher » est un vrai texte, sans débordement et sans `pageerror`
+   (React avale l'exception) : le banc répondait « rendu conforme » sur un écran
+   MORT. Le contrôle existe maintenant dans les deux bancs de rendu.
+5. **Playwright prend la DERNIÈRE route enregistrée en premier** : un fourre-tout
+   `**/api/**` posé après `**/api/relais**` avale la route précise et répond
+   `{pret:true}` — la carte restait vide sans lever la moindre erreur.
 
 ⚠️ Ne jamais lancer `npm run build` pendant qu'un banc sert `dist/`.
 ⚠️ `git fetch` avant toute comparaison avec la production : une référence locale
@@ -444,7 +457,8 @@ lus dans ses conversations) en dépendait.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 25 audits
+scripts/audit-*.cjs             les 26 audits
+scripts/bancs/                  les 8 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
