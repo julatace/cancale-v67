@@ -214,6 +214,20 @@ objet qui ne l'a pas → **tous les bordereaux tombaient** et l'écran affichait
 l'app. `colis.cjs` applique désormais la projection `select=` pour de vrai
 (§6.3) : un banc qui ne sert pas la bonne FORME de réponse mesure une fiction.
 
+### L'écran Ventes : 287 cartes, et la frappe qui saccade
+**Mesuré le 7 septembre au banc `perfv.cjs`, sur ses vraies données** : l'écran
+rend **287 cartes et 8 840 nœuds** d'un coup (page de 19 885 px sur ordinateur,
+**46 209 px sur iPhone**). Chaque lettre tapée dans la recherche les refiltrait
+toutes : **293 ms par frappe sur ordinateur, 179 sur téléphone** — taper
+« salomon » coûtait deux secondes de saccade.
+`React.useDeferredValue(ordSearch)` garde le champ instantané et laisse React
+refiltrer juste après → **~150 ms**, et le changement de filtre passe de 334 à
+~155 ms. Aucun changement de comportement.
+- Les **286 photos sont déjà toutes en `loading="lazy"`** — vérifié, ce n'était
+  pas là que ça coûtait.
+- `perfv.cjs` garde des planchers (frappe < 250 ms, filtre < 300 ms, zéro image
+  non paresseuse) aux deux tailles.
+
 ### La carte des points relais (Achats)
 **Mesuré le 6 septembre** : `vrm_ville` valait déjà « Cancale », `/api/relais`
 répond bien 5 points — mais `vrm_ville_points` était **absent** et l'écran ne

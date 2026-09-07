@@ -11901,6 +11901,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showQuality, setShowQuality] = useState(false); // panneau qualité d'annonce
   const [showLikers, setShowLikers] = useState(false); // panneau relance des likers
   const [ordSearch, setOrdSearch] = useState(''); // recherche ventes/achats (titre/N°/pseudo)
+  // ⚠️ MESURÉ LE 7 SEPTEMBRE, sur ses vraies données : l'écran Ventes rend
+  // **287 cartes et 8 840 nœuds** d'un coup. Chaque frappe dans la recherche
+  // les refiltrait toutes — **293 ms par lettre sur ordinateur, 179 ms sur
+  // téléphone**. Taper « salomon » coûtait donc deux secondes de saccade, et
+  // le champ ne suivait pas les doigts.
+  // `useDeferredValue` garde le champ INSTANTANÉ (il affiche ce qu'on tape tout
+  // de suite) et laisse React refiltrer la liste juste après, sans bloquer la
+  // frappe. Aucun changement de comportement : la même liste, au même moment,
+  // à un souffle près.
+  const ordSearchDiff = React.useDeferredValue(ordSearch);
   const [periode, setPeriode] = useState(null); // filtre de période (ventes + achats)
   const [pickerFor, setPickerFor] = useState(null);
   // Recherche dans le sélecteur d'achat : avec ~700 achats, si la suggestion
@@ -12921,7 +12931,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // NE PAS réintroduire la date d'encaissement ici sans qu'il le redemande.
   const matchOrd = (o) => {
     if (!dansPeriode(o, periode)) return false;
-    const q = ordSearch.trim().toLowerCase(); if (!q) return true;
+    const q = ordSearchDiff.trim().toLowerCase(); if (!q) return true;
     const e = effEntry(o); const num = String(e?.numero||'');
     const buyer = (o.user_login || o.buyer?.login || o.opposite_user?.login || '').toLowerCase();
     return (o.title||'').toLowerCase().includes(q) || num===q || num.includes(q) || buyer.includes(q);
