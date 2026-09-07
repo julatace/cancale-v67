@@ -161,15 +161,24 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
 - Ce qui marche : **le code et le QR vivent dans la conversation Vinted**. Chaque
   colis à retirer ouvre la sienne (`conversation_id`). L'extension y lit le code
   et le dépose dans `panel_colis_relais`.
-- ⚠️ **L'extension ne lit une conversation que lorsqu'elle est OUVERTE**, et
-  seulement pour le compte connecté dans l'onglet. Mesuré le 7 septembre, après
-  sa mise à jour : l'extension capte bien (moisson à la minute sur 7 comptes),
-  mais `panel_colis_relais` restait à 0 — parce que ses **5 colis à retirer sont
-  tous sur `julatace3535`** (dernière capture : 4 jours, 39 lignes, 4 conversations)
-  et que **leurs 5 conversations n'avaient jamais été captées**. Ce n'est donc
-  ni un bug de l'app ni de l'extension : il faut ouvrir chaque conversation une
-  fois. L'app le dit maintenant, et **nomme le compte sur chaque ligne** (il en
-  a neuf).
+- ⚠️ **L'extension VA CHERCHER les codes toute seule — et l'app disait le
+  contraire.** `capterRetraits(uid)` (posé le 27 août, dans `background.js`)
+  tourne à **chaque visite sur Vinted** : il prend les achats que Vinted dit
+  « déposés en point relais », ouvre leur conversation par l'API et en lit le
+  code. Bornes : **3 par visite**, pas de nouvel essai avant 6 h, et
+  **uniquement pour le compte connecté dans l'onglet** (`garde`). C'est une
+  LECTURE sur ses propres achats — la même forme que la récupération du
+  bordereau, elle ne décide de rien.
+  L'app, elle, lui répétait « ouvre la conversation UNE fois » : elle lui
+  réclamait le travail que l'extension fait déjà, et comme rien n'arrivait il
+  en concluait que l'app était cassée (« ça ne travaille pas tout seul »).
+  Le vrai geste, et le seul : **se connecter sur le bon compte et passer sur
+  Vinted**. Mesuré le 7 septembre — ses **5 colis à retirer sont tous sur
+  `julatace3535`**, dont la dernière capture datait de 4 jours : l'extension
+  n'y était jamais passée. D'où le compte **nommé sur chaque ligne** (il en a
+  neuf), et `audit-retrait.cjs` qui vérifie désormais que le message de l'app
+  et le code de l'extension disent la même chose. Ouvrir la conversation reste
+  proposé — c'est le raccourci, plus l'obligation.
 - Un email « colis retiré » sort déjà le colis d'email de la liste
   (`suivisRetires` par n° de suivi, une identité).
 - **Les QR : il n'y en a que 3 dans toute la base**, tous des codes-barres
@@ -351,7 +360,14 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
    pas pu s'afficher » est un vrai texte, sans débordement et sans `pageerror`
    (React avale l'exception) : le banc répondait « rendu conforme » sur un écran
    MORT. Le contrôle existe maintenant dans les deux bancs de rendu.
-5. **Playwright prend la DERNIÈRE route enregistrée en premier** : un fourre-tout
+5. **Un contrôle qui se déclenche sur la FORMULE est vert sur le code d'avant.**
+   Premier jet : « si la phrase parle d'attendre un code, elle doit nommer un
+   compte » — sur l'ancien texte la condition tombait à faux, le banc annonçait
+   « rien à vérifier » et passait au VERT sur le défaut qu'il devait attraper.
+   C'est la BASE qui déclenche : *s'il existe un colis sans code, la ligne doit
+   nommer un compte*, quelle que soit la formulation. (Même leçon que
+   `audit-identite` : suivre la règle, pas son orthographe.)
+6. **Playwright prend la DERNIÈRE route enregistrée en premier** : un fourre-tout
    `**/api/**` posé après `**/api/relais**` avale la route précise et répond
    `{pret:true}` — la carte restait vide sans lever la moindre erreur.
 
@@ -450,7 +466,7 @@ lus dans ses conversations) en dépendait.
 | pool de numéros | 456, sans trou, plus haut = 456 (append-only : c'est normal) |
 | ⚠️ numéros en double | **13**, tous HISTORIQUES : N°1 à N°16 redonnés par la numérotation auto les 2/4/6/15/16 août. **Cause : sur un appareil neuf le pool était lu VIDE au montage**, le nuage arrivant 500 ms plus tard → la numérotation repartait de 1. Corrigé (`onCloudReady` relit le pool) et protégé par `audit-identite.cjs`. **Aucun n'est vivant** : les paires en double sont fermées. |
 | argent Vinted | **281,94 € disponibles** à virer · **2 235,80 € retenus** (9 porte-monnaie) |
-| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · 5 colis à retirer, **0 code** (leurs conversations ne sont pas captées) |
+| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · 5 colis à retirer, **0 code** — tous sur `julatace3535`, où l'extension n'est jamais passée ; elle ira les chercher toute seule dès qu'il s'y connecte |
 | notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
 | comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
 | ventes masquées | 209 (masquées à la main ; « tout réafficher » existe sur l'écran Ventes) |

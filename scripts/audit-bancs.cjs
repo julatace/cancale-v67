@@ -30,7 +30,18 @@ dit(fichiers.includes('README.md'), 'et ils disent comment les lancer');
 const donnees = fichiers.filter(f => /\.json$/i.test(f)) ;
 dit(donnees.length === 0, 'aucune fixture n\'est commitée (dépôt PUBLIC)',
   donnees.length ? donnees.join(', ') : '');
-dit(!fichiers.includes('fx'), 'et pas de dossier `fx/` non plus');
+// ⚠️ `fx` DOIT pouvoir exister sur le disque : sans lui aucun banc ne tourne
+// (on le remplit avec `copie-fixtures.mjs`, souvent par un LIEN vers le
+// scratchpad). Ce qui est interdit, c'est qu'il puisse ENTRER dans le dépôt.
+// Le contrôle porte donc sur git, pas sur le disque — et c'est ce qui manquait :
+// la ligne `scripts/bancs/fx/` du .gitignore exige un DOSSIER (barre finale),
+// donc un lien symbolique du même nom ressortait en « untracked », prêt à être
+// commité, sur un dépôt PUBLIC.
+const git = (c) => { try { return require('child_process').execSync(c, { cwd: RACINE, stdio: ['ignore', 'pipe', 'ignore'] }).toString(); } catch (_) { return ''; } };
+const suivis = git('git ls-files scripts/bancs/fx').trim();
+dit(suivis === '', "rien sous `fx` n'est suivi par git (dépôt PUBLIC)", suivis.split('\n').slice(0, 3).join(', '));
+dit(!fichiers.includes('fx') || git('git check-ignore scripts/bancs/fx').trim() !== '',
+  "et si `fx` est là (dossier ou lien), git l'ignore");
 
 // ── LES TROIS LEÇONS, CÂBLÉES ──────────────────────────────────────────────
 const rendus = ['verif_visuel.cjs', 'verif_dark.cjs'].filter(f => fichiers.includes(f));

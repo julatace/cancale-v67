@@ -34,6 +34,7 @@
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+const BG = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
@@ -91,9 +92,30 @@ dit(/lienConv\(o\)/.test(B), 'chaque ligne ouvre sa conversation — là où ça
 dit(/compte <b[^>]*>\{accName\(o\._acc\)\}/.test(APP),
   'chaque colis à retirer dit sur quel compte se connecter',
   'il en a neuf, et l\'extension ne lit que le compte connecté dans l\'onglet');
-dit(/le code revient ici/.test(APP),
+// ⚠️ SUIVRE LA RÈGLE, PAS SON ORTHOGRAPHE (leçon payée sur `audit-identite`).
+// La règle : le lien dit ce qu'il RAPPORTE, pas seulement où il mène.
+dit(/Ouvrir la conversation → le code [^'"]+/.test(APP),
   'et ce que ça rapporte d\'ouvrir la conversation',
   'ouvrir un lien sans savoir pourquoi, c\'est du travail en plus');
+
+// ── 3 bis. L'APP NE DOIT PAS RÉCLAMER UN TRAVAIL QUE L'EXTENSION FAIT ──────
+// Mesuré dans `background.js` : `capterRetraits(uid)` tourne à CHAQUE visite
+// sur Vinted, va chercher la conversation de chaque achat « déposé en point
+// relais » et en lit le code — 3 par visite, pas de nouvel essai avant 6 h,
+// uniquement pour le compte connecté dans l'onglet (`garde`).
+// L'app disait pourtant encore « ouvre la conversation UNE fois » : elle lui
+// demandait le travail que l'extension fait toute seule, et quand rien
+// n'arrivait il en concluait que l'app était cassée (« ça ne travaille pas
+// tout seul »). Ces deux contrôles empêchent le message de re-diverger.
+dit(/capterRetraits\(uid\)/.test(BG) && /async function capterRetraits/.test(BG),
+  'l\'extension va chercher les codes toute seule, à chaque visite',
+  'sinon la phrase de l\'app ci-dessous serait un mensonge');
+dit(!/Ouvre la conversation UNE fois/.test(APP),
+  'et l\'app ne réclame plus d\'ouvrir chaque conversation',
+  'c\'est le geste d\'avant le 27 août');
+dit(/l'extension va chercher/i.test(APP) || /va chercher les codes toute seule/i.test(APP),
+  'elle dit ce qui se passe tout seul, et à quelle condition',
+  'le compte connecté dans l\'onglet — il en a neuf');
 
 // La porte vers la mise à jour de l'extension vit sur l'écran où il constate
 // que les codes manquent — pas seulement sur Ma journée.

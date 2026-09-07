@@ -12277,8 +12277,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // un colis d'`extra` PEUT en avoir un : compter tout `extra` faisait dire à
     // l'en-tête « 13 en attente de leur code » au-dessus d'une ligne qui affiche
     // le sien. Le test est le même que celui de la ligne (§11).
-    const sansCode = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); }).length;
-    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode,
+    const sansCodeList = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); });
+    const sansCode = sansCodeList.length;
+    // ⚠️ SUR QUEL COMPTE SE CONNECTER — il en a NEUF. L'extension va chercher
+    // les codes toute seule, mais UNIQUEMENT pour le compte connecté dans
+    // l'onglet : « passe sur Vinted avec le bon compte » sans dire lequel, c'est
+    // une consigne qu'on ne peut pas suivre (§7 : une alerte qui ne dit pas quoi
+    // faire ne sert à rien). Mesuré le 7 septembre : ses 5 colis sans code sont
+    // tous sur `julatace3535` — donc UN seul compte à ouvrir, et l'app peut le
+    // nommer. On rend les identifiants bruts : les noms se résolvent au rendu,
+    // là où `accName` existe (un `useMemo` s'exécute immédiatement, §4.6).
+    // `_acc` porte l'OBJET compte (c'est ce que `accName` attend), pas un id :
+    // on déduplique donc sur `vinted_user_id` et on garde l'objet.
+    const parCompte = new Map();
+    for (const o of sansCodeList) { const a = o && o._acc; if (a && !parCompte.has(String(a.vinted_user_id))) parCompte.set(String(a.vinted_user_id), a); }
+    const comptesSansCode = [...parCompte.values()];
+    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode, comptesSansCode,
              prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -15688,7 +15702,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sub = hd>0 ? `${hd} hors délai — va vite ${hd>1?'les':'le'} chercher`
             : pr>0 && sc>0 ? `${pr} avec ton code · ${sc} en attente de leur code`
             : pr>0 ? 'Tu as le code — plus qu\'à aller les chercher'
-            : 'Ouvre la conversation Vinted : l\'extension y lit le code et il revient ici';
+            : (()=>{ const cs = (pickupUnion.comptesSansCode||[]).map(a=>accName(a)).filter(Boolean);
+                     const qui = cs.length===1 ? `sur ${cs[0]}` : cs.length>1 ? `sur ${cs.slice(0,3).join(', ')}${cs.length>3?'…':''}` : 'avec le bon compte';
+                     return `Passe sur Vinted connecté ${qui} : l'extension va chercher les codes toute seule`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
@@ -17148,7 +17164,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
-                        : 'Ouvre la conversation UNE fois, avec l\'extension active et le bon compte connecté : elle y lit le code et il s\'affichera ici.'}
+                        : 'L\'extension va chercher le code toute seule : passe sur Vinted connecté avec le compte indiqué ci-dessous (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite.'}
                     </span>
                   </div>
                   {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
@@ -17178,9 +17194,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             7 septembre : ses cinq colis à retirer sont TOUS sur
                             `julatace3535`, dont la dernière capture datait de
                             4 jours — et leurs cinq conversations n'avaient
-                            JAMAIS été captées. L'extension lit une conversation
-                            quand on l'ouvre : encore faut-il savoir sur quel
-                            compte se connecter. */}
+                            JAMAIS été captées. `capterRetraits` (extension,
+                            depuis le 27 août) va pourtant les chercher TOUT
+                            SEUL — mais seulement pour le compte connecté dans
+                            l'onglet : encore faut-il savoir lequel. C'est tout
+                            ce qui manquait. */}
                         {o && o._acc && (
                           <div style={{fontSize:11,color:C.muted,marginTop:2}}>
                             compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b>
@@ -17199,7 +17217,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!href) return null;
                           const quoi = (rel && rel.qr) ? 'Voir le QR de retrait ↗'
                             : cd ? 'Ouvrir la conversation ↗'
-                            : 'Ouvrir la conversation → le code revient ici ↗';
+                            : 'Ouvrir la conversation → le code arrive tout de suite ↗';
                           return (
                             <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
                               {quoi}
@@ -18132,20 +18150,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
             <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>{annStats.n} en ligne</span>
             <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
-            {annStats.hasFav && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>❤️ {annStats.favs}</span>}
-            {annStats.hasView && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>👁 {annStats.views}</span>}
+            {annStats.hasFav && <span title="Favoris cumulés sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="heart" size={13}/> {annStats.favs}</span>}
+            {annStats.hasView && <span title="Vues cumulées sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="eye" size={13}/> {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {/* ⚠️ « qui dorment » était en ROUGE, à côté d'un « sans N° » ambre et
                 d'un bouton bleu plein : trois couleurs dans une rangée de stats.
                 Le rouge est réservé à ce qui est irréversible — deux paires sous
                 le même numéro (§5.56). Une paire qui dort depuis un mois se
                 rattrape ; c'est de l'ambre. */}
-            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer'}}>😴 {annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
+            {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
 
             {/* La seule ACTION de la rangée garde l'accent, mais en contour :
                 un aplat de couleur posé à côté de cinq pastilles neutres tirait
                 l'œil vers un raccourci, pas vers les chiffres. */}
-            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer'}}>🪄 Aide à la vente</button>
+            {fillBuyRows.length>0 && <button onClick={()=>setFillBuyOpen(true)} title="Sans prix d'achat, la marge de chaque annonce reste vide et le bénéfice est faux. Une liste, un champ par ligne, Entrée passe à la suivante." style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px',cursor:'pointer'}}><Icon name="cash" size={13}/>{fillBuyRows.length} paires sans prix d'achat</button>}
+            <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
               Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
@@ -18163,7 +18182,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               <button type="button" onClick={()=>setTipsOpen(v=>!v)}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-                <span style={{fontSize:15}}>💡</span>
+                <span style={{display:'inline-flex',color:C.muted}}><Icon name="spark" size={15}/></span>
                 <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Conseils & signalements</span>
                 <span style={{fontSize:11,fontWeight:700,color:'#fff',background:C.accent,borderRadius:8,padding:'1px 8px'}}>{n}</span>
                 <span style={{fontSize:13,color:C.muted,transform:tipsOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
@@ -18339,7 +18358,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
                           {atFloor && <div style={{fontSize:9,color:C.muted}}>= prix d'achat (plancher)</div>}
                         </div>
-                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:8}}>🏷️ Baisser</a>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:8,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Baisser</a>
                       </div>
                     );
                   })}
@@ -18437,9 +18456,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{width:'100%',aspectRatio:'3/4',maxHeight:250,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
                     {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:32}}>👟</span>}
                   </div>
-                  {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:700,padding:'4px 8px',borderRadius:8,textAlign:'center'}}>📦 VENDUE — bordereau reçu</div>}
+                  {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:700,padding:'4px 8px',borderRadius:8,textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><Icon name="box" size={12}/> VENDUE — bordereau reçu</div>}
                   {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:700,padding:'4px 10px',borderRadius:8,boxShadow:'0 2px 8px rgba(0,0,0,.28)',letterSpacing:-0.2}}>N°{num}</div>}
-                  {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:8}}>😴 {age}j</div>}
+                  {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:8,display:'flex',alignItems:'center',gap:4}}><Icon name="sleep" size={12}/>{age}j</div>}
                 </a>
                 <div style={{padding:'8px 10px 6px'}}>
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}>
@@ -18452,23 +18471,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       if(it.price==null || effBuy==='' || isNaN(b)) return null;
                       const m = Math.round(Number(it.price) - b - feesOf(e));
                       const pos = m>=0;
-                      return <span title="Marge potentielle si vendue à ce prix (prix en ligne − prix d'achat − boost)" style={{fontSize:12,fontWeight:700,color:pos?INV_STATUS.online.color:C.danger,background:(pos?INV_STATUS.online.color:C.danger)+'18',borderRadius:8,padding:'1px 6px'}}>{pos?`+${m}`:m} € {pos?'💰':'⚠️'}</span>;
+                      return <span data-marge="1" title="Marge potentielle si vendue à ce prix (prix en ligne − prix d'achat − boost)" style={{fontSize:12,fontWeight:700,color:pos?INV_STATUS.online.color:C.danger,background:(pos?INV_STATUS.online.color:C.danger)+'18',borderRadius:8,padding:'1px 6px'}}>{pos?`+${m}`:m} €</span>;
                     })()}
+                    <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire : son achat, son numéro, sa vente — toute sa vie" aria-label="Passeport de la paire" style={{marginLeft:'auto',border:'none',background:'transparent',padding:0,cursor:'pointer',color:C.muted,display:'inline-flex',alignItems:'center',minHeight:0}}><Icon name="doc" size={15}/></button>
                   </div>
                   <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.brand||it.title}</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
                   {(it.views!=null||it.favourites!=null) && (
                     <div style={{marginTop:4,display:'flex',alignItems:'center',gap:8,fontSize:11,color:C.muted,fontWeight:500}}>
-                      {it.views!=null && <span>👁 {it.views}</span>}
-                      {it.favourites!=null && <span>❤️ {it.favourites}</span>}
-                      {it.views>=30 && it.favourites===0 && <span title="Beaucoup de vues mais aucun favori : le prix est peut-être trop haut." style={{color:C.warn}}>💡 prix ?</span>}
+                      {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="eye" size={12}/> {it.views}</span>}
+                      {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="heart" size={12}/> {it.favourites}</span>}
+                      {it.views>=30 && it.favourites===0 && <span title="Beaucoup de vues mais aucun favori : le prix est peut-être trop haut." style={{display:'inline-flex',alignItems:'center',gap:3,color:C.warn}}><Icon name="spark" size={12}/> prix ?</span>}
                     </div>
                   )}
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
-                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.warn}}>{atGarage?'🏠 Au garage':'🏠 Ranger'}</button>}
+                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.warn,display:'inline-flex',alignItems:'center',gap:3,minHeight:0}}><Icon name="home" size={12}/>{atGarage?'Au garage':'Ranger'}</button>}
                     <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:8,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
-                    <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire (toute sa vie)" aria-label="Passeport de la paire" style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:15}}>📖</button>
                     {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
                 </div>
@@ -18536,8 +18555,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   if (!(sugg < Number(it.price))) return null;
                   return (
                     <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 10px 10px',padding:'6px 8px',borderRadius:8,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
-                      <span style={{fontSize:11,color:C.text,fontWeight:500,flex:1,minWidth:0,lineHeight:1.3}}>💸 Prix conseillé <b>{sugg} {cur(it.currency)}</b> <span style={{color:C.muted}}>(−15 %{sleeps?` · dort ${age}j`:''})</span></span>
-                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:8}}>🏷️ Baisser</a>
+                      <span style={{fontSize:11,color:C.text,fontWeight:500,flex:1,minWidth:0,lineHeight:1.3,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><Icon name="cash" size={12}/>Prix conseillé <b>{sugg} {cur(it.currency)}</b> <span style={{color:C.muted}}>(−15 %{sleeps?` · dort ${age}j`:''})</span></span>
+                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:8,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Baisser</a>
                     </div>
                   );
                 })()}
@@ -19762,7 +19781,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    ); })()}
                 </div>
               ))}
-              {fillBuyRows.length>300 && <div style={{fontSize:11,color:C.muted,textAlign:'center',padding:'8px'}}>… et {fillBuyRows.length-300} autres (elles apparaîtront au fur et à mesure).</div>}
             </div>
           </div>
         </div>

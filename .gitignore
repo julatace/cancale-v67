@@ -6,7 +6,7 @@ dist/
 
 # ⚠️ Les fixtures des bancs : ce sont les VRAIES ventes, les vrais acheteurs,
 # les vraies adresses — et ce dépôt est PUBLIC. Elles ne montent jamais.
-scripts/bancs/fx/
+scripts/bancs/fx
 scripts/bancs/*.json
 scripts/bancs/*.png
 scripts/bancs/*.pdf
