@@ -164,6 +164,14 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   parce que l'extension installée est en retard.
 - Un email « colis retiré » sort déjà le colis d'email de la liste
   (`suivisRetires` par n° de suivi, une identité).
+- **Les QR : il n'y en a que 3 dans toute la base**, tous des codes-barres
+  Pickup (`/api/barcode/AztecCode|DataMatrix`). Les 25 autres `qrUrl` sont des
+  bannières et des pixels de suivi — `URL_PAS_UN_QR` les écarte, ne pas
+  l'assouplir. Aucune ligne ne porte de `qrB64`.
+- Le bloc **« colis jamais retirés »** (plus de 14 j) n'affichait QUE le code :
+  ses 3 QR ne s'affichaient nulle part. Il montre les deux, et dit combien
+  peuvent encore être retirés — « réclame à Vinted » est le mauvais geste quand
+  on a encore le code.
 - **« Commande non réclamée — retournée à l'expéditeur »** : 3 achats, 84,94 €,
   qui ne sortaient sur aucun onglet (`phaseReception` les range en « annulé »).
   Ils ont leur bloc sur Achats. On dit « à vérifier », **jamais « perdu »** :

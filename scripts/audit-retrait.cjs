@@ -67,7 +67,33 @@ dit(/à vérifier|a v[ée]rifier/i.test(B), 'le montant est annoncé « à véri
 dit(!/perdu|perte/i.test(B), 'on n\'annonce jamais une perte qu\'on ne sait pas prouver');
 dit(/lienConv\(o\)/.test(B), 'chaque ligne ouvre sa conversation — là où ça se règle');
 
-// ── 3. CE QUI ÉTAIT DÉJÀ JUSTE ET DOIT LE RESTER ───────────────────────────
+// ── 3. AUCUN CODE, AUCUN QR NE RESTE CACHÉ ─────────────────────────────────
+// Julien : « il n'y a pas tous les codes de retrait ». Mesuré : sur les
+// 6 colis rangés dans « jamais retirés », **3 portent un code et 3 un QR** —
+// et ce bloc n'affichait QUE le code. Le QR, seul moyen d'ouvrir un casier
+// Pickup, ne s'affichait alors NULLE PART dans l'app.
+{
+  const i = APP.indexOf('colis jamais retirés');
+  const B = i < 0 ? '' : APP.slice(i, i + 4200);
+  dit(B.length > 200, 'le bloc des colis jamais retirés existe');
+  dit(/qrVivant\(t\)/.test(B), 'il affiche le QR quand il y en a un',
+    'sans ça, 3 QR valides ne s\'affichaient nulle part');
+  dit(/codeRetrait\(t\.code\)/.test(B), 'et le code de retrait');
+  // ⚠️ « Réclame à Vinted » est le mauvais geste quand on a encore le code.
+  dit(/leur code ou leur QR|son code ou son QR/.test(B),
+    'il distingue ceux qu\'on peut encore aller chercher',
+    'au lieu d\'envoyer tout le monde en réclamation');
+}
+// La porte vers la mise à jour de l'extension vit sur l'écran où il constate
+// que les codes manquent — pas seulement sur Ma journée.
+{
+  const i = APP.indexOf("curSub==='achats' && (<>");
+  const B = i < 0 ? '' : APP.slice(i, i + 1800);
+  dit(/<ExtEnRetard/.test(B), 'l\'écran Achats dit pourquoi les codes manquent',
+    'c\'est l\'extension qui les lit dans les conversations');
+}
+
+// ── 4. CE QUI ÉTAIT DÉJÀ JUSTE ET DOIT LE RESTER ───────────────────────────
 dit(/const suivisRetires/.test(APP) && /status === 'delivered'/.test(APP),
   'un email « colis retiré » sort le colis de la liste (n° de suivi = identité)');
 dit(/colisRetireAilleurs/.test(APP), 'et il le sort AUSSI de la ligne du second transporteur');
