@@ -110,5 +110,23 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('le code n\'arrive pas tout seul : il faut ouvrir la conversation');
 }
 
+// 11) L'ARGENT DÉJÀ VIRABLE EST UN CHIFFRE DE VINTED, PAS UNE ESTIMATION.
+// Mesuré le 7 septembre sur ses neuf porte-monnaie : 281,94 € disponibles à
+// côté de 2 235,80 € retenus. Le disponible n'apparaissait que dans une phrase
+// d'explication de l'écran Statistiques — jamais sur l'accueil.
+{
+  const i = app.indexOf('escrow && escrow.dispo > 0');
+  const F = i < 0 ? '' : app.slice(i, i + 900);
+  F ? ok('l\'accueil dit l\'argent déjà disponible à virer')
+    : nok('l\'argent virable doit apparaître à côté de l\'argent en attente');
+  // ⚠️ « en attente » et « disponible » ne se confondent JAMAIS (§5.14).
+  /déjà disponibles à virer/.test(F)
+    ? ok('et ne le confond pas avec l\'argent en attente')
+    : nok('les deux montants doivent porter des mots différents');
+  /plusVieuxJours>7/.test(F)
+    ? ok('un solde ancien annonce son âge')
+    : nok('un solde lu il y a trois semaines n\'est pas le montant d\'aujourd\'hui');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);

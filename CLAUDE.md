@@ -185,6 +185,19 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   Ils ont leur bloc sur Achats. On dit « à vérifier », **jamais « perdu »** :
   Vinted rembourse souvent tout seul.
 
+### L'argent : « en attente » et « disponible » ne se confondent jamais
+Mesuré le 7 septembre sur ses **neuf porte-monnaie** (`harvest_{uid}_billing`) :
+**281,94 € disponibles** à virer, à côté de **2 235,80 € retenus** par Vinted.
+Ce sont les chiffres de Vinted, pas une estimation — l'accueil ne montrait que
+l'attente, et le disponible ne vivait que dans une phrase d'explication de
+l'écran Statistiques. Les deux sont maintenant sur la ligne d'accueil, sur deux
+lignes et avec deux mots différents (`escrow`/`main` — jamais `balance` mélangé,
+§5.14), et un solde de plus de 7 jours annonce son âge.
+⚠️ **Le RELEVÉ daté reste introuvable** : ce que l'extension capte sous
+`billing` n'est que le **solde** (`{main, escrow}`), jamais une liste de
+mouvements — d'où `harvest_*_releve_*` = 0 ligne. Même cause que les
+conversations : Vinted ne charge le relevé que si on ouvre cette page-là.
+
 ### L'écran Colis se range sur CE QU'IL PEUT FAIRE
 **Vu en capture le 7 septembre, sur ses vraies données** : l'en-tête annonçait
 « 10 bordereaux prêts à imprimer », et les **quatre premières cartes de l'écran**
