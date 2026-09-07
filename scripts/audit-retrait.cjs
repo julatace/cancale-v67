@@ -84,6 +84,17 @@ dit(/lienConv\(o\)/.test(B), 'chaque ligne ouvre sa conversation — là où ça
     'il distingue ceux qu\'on peut encore aller chercher',
     'au lieu d\'envoyer tout le monde en réclamation');
 }
+// ⚠️ NEUF COMPTES. Mesuré le 7 septembre : ses 5 colis à retirer sont TOUS sur
+// `julatace3535`, dont les conversations n'avaient jamais été captées — parce
+// que l'extension lit une conversation quand on l'OUVRE, et qu'il faut être
+// connecté sur le bon compte. Sans le nom du compte, le lien ne sert à rien.
+dit(/compte <b[^>]*>\{accName\(o\._acc\)\}/.test(APP),
+  'chaque colis à retirer dit sur quel compte se connecter',
+  'il en a neuf, et l\'extension ne lit que le compte connecté dans l\'onglet');
+dit(/le code revient ici/.test(APP),
+  'et ce que ça rapporte d\'ouvrir la conversation',
+  'ouvrir un lien sans savoir pourquoi, c\'est du travail en plus');
+
 // La porte vers la mise à jour de l'extension vit sur l'écran où il constate
 // que les codes manquent — pas seulement sur Ma journée.
 {

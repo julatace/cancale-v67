@@ -16989,7 +16989,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
-                        : 'Le code de retrait est dans la conversation Vinted — le lien est sur chaque colis'}
+                        : 'Ouvre la conversation UNE fois, avec l\'extension active et le bon compte connecté : elle y lit le code et il s\'affichera ici.'}
                     </span>
                   </div>
                   {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
@@ -17015,6 +17015,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             distingue vraiment ce colis de ses voisins. Si AUCUN
                             n'a de code, l'en-tête du bloc l'a déjà dit. */}
                         {!cd && melange && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code de retrait pas encore reçu</div>}
+                        {/* ⚠️ LE COMPTE, PARCE QU'IL EN A NEUF. Mesuré le
+                            7 septembre : ses cinq colis à retirer sont TOUS sur
+                            `julatace3535`, dont la dernière capture datait de
+                            4 jours — et leurs cinq conversations n'avaient
+                            JAMAIS été captées. L'extension lit une conversation
+                            quand on l'ouvre : encore faut-il savoir sur quel
+                            compte se connecter. */}
+                        {o && o._acc && (
+                          <div style={{fontSize:11,color:C.muted,marginTop:2}}>
+                            compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b>
+                          </div>
+                        )}
                         {/* ⚠️ LE QR VIT DANS LA CONVERSATION, on n'en fabrique pas
                             (§17). Si le message porte le lien direct du code, on
                             l'ouvre ; sinon on ouvre le fil, où il est affiché. */}
@@ -17028,7 +17040,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!href) return null;
                           const quoi = (rel && rel.qr) ? 'Voir le QR de retrait ↗'
                             : cd ? 'Ouvrir la conversation ↗'
-                            : 'Voir le code de retrait dans Vinted ↗';
+                            : 'Ouvrir la conversation → le code revient ici ↗';
                           return (
                             <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
                               {quoi}

@@ -160,8 +160,16 @@ rapprochement par ressemblance interdit — et se tromper ici, c'est ne pas alle
 chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle.
 - Ce qui marche : **le code et le QR vivent dans la conversation Vinted**. Chaque
   colis à retirer ouvre la sienne (`conversation_id`). L'extension y lit le code
-  et le dépose dans `panel_colis_relais` — **cette ligne était VIDE (0 colis)**,
-  parce que l'extension installée est en retard.
+  et le dépose dans `panel_colis_relais`.
+- ⚠️ **L'extension ne lit une conversation que lorsqu'elle est OUVERTE**, et
+  seulement pour le compte connecté dans l'onglet. Mesuré le 7 septembre, après
+  sa mise à jour : l'extension capte bien (moisson à la minute sur 7 comptes),
+  mais `panel_colis_relais` restait à 0 — parce que ses **5 colis à retirer sont
+  tous sur `julatace3535`** (dernière capture : 4 jours, 39 lignes, 4 conversations)
+  et que **leurs 5 conversations n'avaient jamais été captées**. Ce n'est donc
+  ni un bug de l'app ni de l'extension : il faut ouvrir chaque conversation une
+  fois. L'app le dit maintenant, et **nomme le compte sur chaque ligne** (il en
+  a neuf).
 - Un email « colis retiré » sort déjà le colis d'email de la liste
   (`suivisRetires` par n° de suivi, une identité).
 - **Les QR : il n'y en a que 3 dans toute la base**, tous des codes-barres
