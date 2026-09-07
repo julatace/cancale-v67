@@ -93,5 +93,22 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('sans `plusieursGroupes`, « 14 colis à envoyer » puis « En retard · 14 »');
 }
 
+// 10) L'ÉCRAN D'ACCUEIL DIT CE QU'IL PEUT FAIRE MAINTENANT.
+// Mesuré le 7 septembre : 15 colis à expédier, dont 10 dont le bordereau est
+// DÉJÀ en base — et la carte disait seulement « Bordereau + paire au garage ».
+// Dix étiquettes prêtes, annoncées nulle part sur l'écran qu'il ouvre en premier.
+{
+  const i = app.indexOf('const pretsImpr');
+  const F = i < 0 ? '' : app.slice(i, i + 900);
+  F ? ok('« Expédier N colis » compte ce qui est imprimable') : nok('la carte doit compter les bordereaux prêts');
+  /prêt\$\{pretsImpr>1\?'s':''\} à imprimer|prêts? à imprimer/.test(F)
+    ? ok('et le dit dans son sous-titre')
+    : nok('le sous-titre doit annoncer les bordereaux prêts à imprimer');
+  // ⚠️ « le code arrive par email » laissait croire qu'il n'y a rien à faire.
+  !/le code arrive par email ou dans la conversation/.test(app)
+    ? ok('« Retirer N colis » ne dit plus que le code arrive tout seul')
+    : nok('le code n\'arrive pas tout seul : il faut ouvrir la conversation');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);
