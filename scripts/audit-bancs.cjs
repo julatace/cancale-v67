@@ -68,6 +68,38 @@ if (carte) {
     'sinon `**/api/**` avale /api/relais et la carte reste vide sans erreur');
 }
 
+// ── LES BANCS RENDENT-ILS TOUS LES ÉCRANS ? ────────────────────────────────
+// Mesuré le 7 septembre : les deux bancs de rendu couvraient **10 écrans sur
+// 13**. `vintedaccounts` — « Comptes liés », l'écran des neuf comptes — n'était
+// rendu nulle part, et c'est justement là qu'un bouton « ↻ Actualiser » posait
+// sa propre ligne de titre au lieu du slot `right` de `ScreenHead` : il
+// atterrissait sous l'île d'actions, donc INVISIBLE. Le contrôle existait
+// depuis des semaines ; l'écran n'y passait jamais.
+// ⚠️ « TOUS LES ÉCRANS » VEUT DIRE CEUX QU'IL PEUT OUVRIR. Exiger le rendu
+// d'un écran monté mais INJOIGNABLE ferait tester un chemin mort — et rendrait
+// l'audit faux le jour où il en reste un. Un écran est joignable s'il est dans
+// le rail (`BOTTOM_TABS`/`PLUS_TABS`) ou si un `setTab('…')` y mène.
+// Mesuré le 7 septembre : `comptabilite` et `inventory` sont montés mais
+// n'ont AUCUN appelant — deux culs-de-sac, comme le tiroir `Nav` retiré le
+// même jour. Ils ne sont donc pas exigés ici ; les dix autres, si.
+{
+  const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+  const montes  = new Set([...APP.matchAll(/tab===\'([a-z_]+)\'\s*&&/g)].map(m => m[1]));
+  const auRail  = new Set([...APP.matchAll(/id:'([a-z_]+)',\s*icon:/g)].map(m => m[1]));
+  const appeles = new Set([...APP.matchAll(/setTab\('([a-z_]+)'\)/g)].map(m => m[1]));
+  const joignables = [...montes].filter(t => auRail.has(t) || appeles.has(t));
+  const culsDeSac  = [...montes].filter(t => !auRail.has(t) && !appeles.has(t));
+  if (culsDeSac.length) console.log(`--  (${culsDeSac.length} écran(s) monté(s) mais injoignable(s) : ${culsDeSac.join(', ')})`);
+  for (const banc of ['verif_visuel.cjs', 'verif_dark.cjs']) {
+    const src = fs.readFileSync(path.join(DIR, banc), 'utf8');
+    const m = /const TABS=\[([^\]]*)\]/.exec(src);
+    const rendus = new Set(m ? [...m[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1]) : []);
+    const oublies = joignables.filter(t => !rendus.has(t));
+    dit(oublies.length === 0, `${banc} rend les ${joignables.length} écrans qu'il peut ouvrir`,
+      oublies.length ? 'jamais rendu(s) : ' + oublies.join(', ') : `${rendus.size} onglets servis`);
+  }
+}
+
 console.log(ko
   ? `\n${ko} contrôle(s) non conforme(s).`
   : '\nLes bancs survivent à la session, et sans emporter ses données.');
