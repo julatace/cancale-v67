@@ -137,15 +137,26 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   const restes = (app.match(/'n\/d'|"n\/d"/g) || []).length;
   restes === 0 ? ok('aucun « n/d » ne reste dans l\'app')
                : nok(`${restes} « n/d » à remplacer par « — » + la raison`);
-  // ⚠️ « CA / jour actif » ne dépend PAS des prix d'achat : il ne doit pas être
-  // éteint par le drapeau du bénéfice.
-  // ⚠️ ET IL NE S'ÉCRIT PAS « 0,00 € » QUAND ON NE SAIT PAS. `dayStats` compte
-  // les jours d'après `receiveDate` — la date d'encaissement, retirée exprès de
-  // l'app. Mesuré : 0 jour. Un zéro qui veut dire « on ne sait pas » est pire
-  // qu'un blanc.
-  /label="CA \/ jour actif" value=\{days\.length>0\?fmt\(avgDayCA\):'—'\}/.test(app)
-    ? ok('le CA par jour actif écrit « — » quand il ne peut pas être calculé')
-    : nok('un 0,00 € qui veut dire « on ne sait pas » doit s\'écrire « — »');
+  // ⚠️ LA CARTE « CA / JOUR » NE S'ÉCRIT JAMAIS « 0,00 € ». Un zéro qui veut
+  // dire « on ne sait pas » est pire qu'un blanc.
+  // ⚠️ SUIVRE LA RÈGLE, PAS SON ORTHOGRAPHE : ce contrôle cherchait la ligne
+  // exacte de l'ancienne version (« CA / jour actif », calculée sur `days`,
+  // c'est-à-dire sur `receiveDate` — la date d'encaissement retirée exprès de
+  // l'app, donc 0 jour et un tiret que RIEN ne pouvait remplir). La carte
+  // compte maintenant les jours de VENTE, connus pour toutes les ventes ; le
+  // contrôle porte donc sur la règle : la valeur est gardée par un dénominateur
+  // STRICTEMENT POSITIF, et retombe sur « — ».
+  {
+    const carte = /label="CA \/ jour[^"]*"[\s\S]{0,300}?value=\{([\s\S]*?)\}\s/.exec(app);
+    const v = carte ? carte[1] : '';
+    (v && /\w+>0\s*\?/.test(v) && /:\s*'—'/.test(v))
+      ? ok('le CA par jour écrit « — » tant qu\'il n\'a aucun jour à diviser')
+      : nok('un 0,00 € qui veut dire « on ne sait pas » doit s\'écrire « — »', v.slice(0,80));
+    // Et il ne se calcule PAS sur la date d'encaissement, qui n'existe plus.
+    /joursVente/.test(app)
+      ? ok('et il compte les jours de VENTE, la seule date connue pour toutes')
+      : nok('le CA par jour doit se compter sur la date de vente');
+  }
 }
 
 // 13) LA RECHERCHE NE DOIT PAS BLOQUER LA FRAPPE.
