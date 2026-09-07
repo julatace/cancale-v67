@@ -335,6 +335,32 @@ remettre la liste** : c'est une décision prise, pas un oubli.
   MÊME source que le nombre juste au-dessus (§11) : les deux ne peuvent pas se
   contredire. C'est une information, pas la liste.
 
+### Le panneau « Sécurité des données » (Réglages)
+C'est le SEUL endroit où des étapes techniques sont assumées : passer le dépôt
+en privé, appliquer la migration SQL, poser `SUPABASE_SERVICE_KEY` sur Vercel —
+**ces gestes n'appartiennent qu'à lui** (il possède les comptes). Le vocabulaire
+d'informaticien y est donc justifié ; ne pas « simplifier » ce bloc.
+- ⚠️ **Une sonde qui n'a pas répondu n'est PAS une alerte.** Le panneau sonde la
+  base à chaque ouverture. Deux de ses cinq lignes écrivaient
+  `ok={s.X === true}` : un sondage **raté** (`null`) devenait `false`, donc le
+  triangle d'alerte — et le texte dessous déroulait le diagnostic complet d'un
+  problème **qu'on n'avait pas mesuré**. Vu en capture le 7 septembre :
+  « Création de compte · … » en ambre. `Ligne` savait pourtant afficher
+  l'attente (`ok === null`) ; c'est l'appelant qui écrasait l'information.
+  Sur un panneau de SÉCURITÉ, une fausse alerte est ce qui fait cesser de lire
+  les vraies. État inconnu = **gris**, « pas encore vérifié », et une phrase qui
+  dit de rouvrir l'écran — jamais un diagnostic.
+  `audit-chiffres.cjs` le vérifie. ⚠️ Son premier jet exigeait la **formule**
+  `== null ? null` et criait au loup sur `ok={s.colonne}` (qui laisse passer le
+  `null`, c'est-à-dire exactement ce qu'on veut). Il porte maintenant sur la
+  règle : est fautive une expression qui **aplatit en booléen** sans jamais
+  pouvoir rendre `null`.
+  ⚠️ Et le même défaut avait deux autres restes, trouvés en relisant le bloc :
+  `action={!s.colonne && …}` affichait le bouton **« Copier la migration SQL »**
+  quand la sonde avait échoué (proposer le remède sans diagnostic), et le badge
+  du titre affirmait **« partagées »** dès que `proteges` était faux — or il
+  l'est aussi quand les deux sondes n'ont rien pu lire. Trois états, pas deux.
+
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
 `panel_accounts_off`, `panel_colis_relais`, …) en lecture-fusion-écriture.

@@ -219,5 +219,35 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('`achatsAffiches` doit venir après `achatStage` et `trackForBuy`');
 }
 
+// ── UNE SONDE QUI N'A PAS RÉPONDU N'EST PAS UNE ALERTE ─────────────────────
+// Panneau « Sécurité des données » (Réglages) : il sonde la base à chaque
+// ouverture. Deux de ses cinq lignes écrivaient `ok={s.X === true}` — donc un
+// sondage RATÉ (`null`) devenait `false`, c'est-à-dire le triangle d'alerte.
+// Vu en capture le 7 septembre : « Création de compte · … » en ambre, avec en
+// dessous le diagnostic complet d'un problème qu'on n'avait pas mesuré.
+// Sur un panneau de SÉCURITÉ, une fausse alerte est ce qui fait cesser de lire
+// les vraies. `Ligne` sait afficher l'attente (`ok === null`) — c'est
+// l'appelant qui écrasait l'information.
+{
+  const lignes = [...app.matchAll(/<Ligne\s+t="([^"]+)"\s+ok=\{([^}]*)\}/g)];
+  lignes.length >= 4
+    ? ok(`le panneau de sécurité a ses ${lignes.length} sondes`)
+    : nok('le panneau de sécurité a perdu ses lignes', String(lignes.length));
+  // La règle : « je ne sais pas » doit rester DISTINCT de « c'est faux ».
+  // ⚠️ TROISIÈME FOIS QUE JE ME FAIS PRENDRE : mon premier jet exigeait la
+  // formule `== null ? null`, et criait donc au loup sur `ok={s.colonne}` (qui
+  // laisse passer le `null` tel quel — c'est exactement ce qu'on veut) et sur
+  // `ok={ext === undefined ? null : …}`. Suivre la RÈGLE : est fautive une
+  // expression qui APLATIT en booléen sans jamais pouvoir rendre `null`.
+  const ecrase = lignes.filter(([, t, expr]) => {
+    const e = expr.trim();
+    if (/\bnull\b|\bundefined\b/.test(e)) return false;      // sait rendre « inconnu »
+    return /(===|!==)\s*(true|false)\s*$/.test(e) || /^!!/.test(e);
+  }).map(([, t]) => t);
+  ecrase.length === 0
+    ? ok('aucune ne transforme « pas su » en alerte')
+    : nok('une sonde ratée s\'affiche comme un défaut', ecrase.join(', '));
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);
