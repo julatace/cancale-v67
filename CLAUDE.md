@@ -179,6 +179,19 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   neuf), et `audit-retrait.cjs` qui vérifie désormais que le message de l'app
   et le code de l'extension disent la même chose. Ouvrir la conversation reste
   proposé — c'est le raccourci, plus l'obligation.
+- ⚠️ **Le tableau de bord ne voyait qu'un colis sur six.** Le centre de
+  notifications RECALCULAIT la règle de son côté, et sa version ne comptait que
+  les colis venus d'un **email transporteur** : les colis vus « déposés en point
+  relais » côté Vinted n'apparaissaient **nulle part** sur cet écran — 1 annoncé
+  contre 5 sur Ma journée, et sur certaines données **aucune ligne du tout**.
+  C'est §11 mot pour mot et §5.43 (un colis caché est un colis perdu).
+  `pickupUnion` **publie** ses comptes (`vrm_colis_retirer`), le tableau de bord
+  **consomme** — même motif que `vinted_nums_physiques` et `vinted_urssaf_mois`.
+  ⚠️ Et il ne publie que **complet** : rendu depuis Ma journée seule, les emails
+  de suivi n'étaient pas encore chargés et la valeur partielle (« 0 prêt · 5 en
+  attente ») partait au tableau de bord. Sans ligne publiée, on retombe sur ce
+  qu'on sait — jamais sur zéro. Le banc `retrait.cjs` exige que **les trois
+  écrans** annoncent le même nombre.
 - Un email « colis retiré » sort déjà le colis d'email de la liste
   (`suivisRetires` par n° de suivi, une identité).
 - **Les QR : il n'y en a que 3 dans toute la base**, tous des codes-barres
@@ -310,6 +323,18 @@ chargement est écrasée — pour les numéros ce serait le pire défaut de l'ap
   à plus de 30 km de la ville est signalé (« à 819 km ») ; **jamais supprimé
   tout seul**, c'est sa liste.
 
+### L'écran Messages : il a demandé qu'on RETIRE la liste
+« Enlève les messages, mets juste qu'il y en a de nouveaux. » L'écran ne
+déroule donc **aucune conversation** — une carte dit combien sont non lus, un
+bouton emmène répondre sur Vinted, et les réponses rapides se copient. **Ne pas
+remettre la liste** : c'est une décision prise, pas un oubli.
+- Ce qui manquait, en revanche : **sur quel compte**. Il en a neuf, et le bouton
+  ouvre l'inbox du compte connecté — pas forcément celui qui a les messages. La
+  carte nomme maintenant les trois premiers (« sur lllooIlllaa (8),
+  julatace3535 (7), julatace35260 (6) et 4 autres comptes »), calculés sur la
+  MÊME source que le nombre juste au-dessus (§11) : les deux ne peuvent pas se
+  contredire. C'est une information, pas la liste.
+
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
 `panel_accounts_off`, `panel_colis_relais`, …) en lecture-fusion-écriture.
@@ -336,7 +361,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **26 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **27 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -405,6 +430,15 @@ qu'un bouton ne fixe pas lui-même.
   palette : `grep -oE '#[0-9a-fA-F]{6}' src/App.jsx` après chaque passe.
 - Un emoji utilisé **comme icône** devient une icône au trait (`ICON_PATHS`, qui
   attend du **JSX**, pas une chaîne — sinon rien ne se dessine).
+  ⚠️ **Et un nom absent de `ICON_PATHS` ne dessine rien non plus** : `Icon` rend
+  `null`, sans erreur ni console. Mesuré le 7 septembre — l'onglet **« Grille »**
+  du Garage était sans icône entre « Ma pièce » et « Photos », depuis des
+  semaines, parce que `grid` n'avait jamais été défini. C'est la CAPTURE qui l'a
+  vu. `audit-icones.cjs` vérifie maintenant tous les noms, y compris ceux qui
+  passent par une variable (il regarde ce qui alimente le `<Icon name={…}/>`
+  juste au-dessus). ⚠️ Ses deux premiers jets étaient faux dans les deux sens :
+  trop timide il ratait `grid`, trop large il criait au loup sur les pays et les
+  transporteurs.
 - **Quand il dit trois fois « c'est pareil », arrêter de retoucher les teintes et
   aller mesurer la composition** à sa résolution de travail (1512 px, ordinateur).
   Les deux vrais défauts trouvés comme ça : une app mobile étirée sur 1440 px, et
@@ -509,7 +543,7 @@ prouve rien.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 26 audits
+scripts/audit-*.cjs             les 27 audits
 scripts/bancs/                  les 10 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

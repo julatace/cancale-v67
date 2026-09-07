@@ -3957,6 +3957,7 @@ const ICON_PATHS = {
   more:  <><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></>,
   sun:   <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   chart: <><path d="M5 20V10M12 20V4M19 20v-6"/></>,
+  grid:  <><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 9.7h17M3.5 15.3h17M9.7 3.5v17M15.3 3.5v17"/></>,
   tag:   <><path d="M3.5 11.2V4.5a1 1 0 0 1 1-1h6.7a1 1 0 0 1 .7.3l8.3 8.3a1 1 0 0 1 0 1.4l-6.7 6.7a1 1 0 0 1-1.4 0L3.8 11.9a1 1 0 0 1-.3-.7Z"/><circle cx="8" cy="8" r="1.4"/></>,
   cash:  <><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 12h.01M18 12h.01"/></>,
   bag:   <><path d="M4.6 8.4h14.8l-1.1 11.4a2 2 0 0 1-2 1.8H7.7a2 2 0 0 1-2-1.8L4.6 8.4Z"/><path d="M8.7 10V6.9a3.3 3.3 0 0 1 6.6 0V10"/></>,
@@ -6755,14 +6756,15 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
-        <ScreenHead icon="receipt" title={`Factures (${invoices.length})`} desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
-          right={<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+        <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
+          right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
-          <Btn small onClick={()=>fetchVintedInvoices(false)} color={C.purple} disabled={fetching}>
-            {fetching?'⏳ Chargement...':'📥 Récupérer Vinted'}
+          <Btn small outline color={C.muted} onClick={()=>fetchVintedInvoices(false)} disabled={fetching}
+            style={{display:'inline-flex',alignItems:'center',gap:5}}>
+            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Récupérer Vinted'}
           </Btn>
-          <Btn small onClick={exportExcel} color={C.blue}>📤 Exporter Excel</Btn>
-          <Btn small onClick={()=>setShowSettings(true)} color={C.border}>⚙ Réglages</Btn>
+          <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages</Btn>
         </div>}/>
       </div>
 
@@ -6823,13 +6825,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       {/* Sous-onglets zones */}
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
-          {id:'attente',icon:'⏳',label:'En attente',count:counters.attente},
-          {id:'comptabilisees',icon:'✅',label:'Comptabilisées',count:counters.comptabilisees},
+          {id:'attente',icon:'clock',label:'En attente',count:counters.attente},
+          {id:'comptabilisees',icon:'check',label:'Comptabilisées',count:counters.comptabilisees},
         ].map(z=>(
           <button key={z.id} type="button" onClick={()=>{setZone(z.id);setPage(null);}}
             style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
               color:zone===z.id?C.accent:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:500,fontFamily:'inherit',whiteSpace:'nowrap'}}>
-            {z.icon} {z.label} ({z.count})
+            <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
           </button>
         ))}
       </div>
@@ -6852,7 +6854,27 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
             </tr>
           </thead>
           <tbody>
-            {list.length===0&&<tr><td colSpan={7} style={{padding:30,textAlign:'center',color:C.muted}}>{search.trim()?`Aucune facture trouvée pour « ${search} »`:`Aucune facture ${zone==='attente'?'en attente':'comptabilisée'}`}</td></tr>}
+            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
+                développeur — « Aucune facture en attente » ne se rattrape
+                nulle part). D'où l'origine des lignes, et la porte : le même
+                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
+                constate le vide. */}
+            {list.length===0&&<tr><td colSpan={7} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:12.5,lineHeight:1.5}}>
+              {search.trim()
+                ? <>Aucune facture trouvée pour « {search} ».</>
+                : zone==='attente'
+                  ? <>Aucune facture en attente.<br/>
+                      <span style={{fontSize:11.5}}>Elles arrivent de tes emails Vinted, par ta feuille Google.</span>
+                      <br/>
+                      <span style={{display:'inline-block',marginTop:10}}>
+                        <Btn small outline color={C.accent} onClick={()=>fetchVintedInvoices(false)} disabled={fetching}
+                          style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sync" size={13}/>{fetching?'Chargement…':'Aller les chercher maintenant'}</Btn>
+                      </span>
+                    </>
+                  : <>Aucune facture comptabilisée.<br/>
+                      <span style={{fontSize:11.5}}>Une facture arrive ici quand tu la marques comptabilisée.</span>
+                    </>}
+            </td></tr>}
             {list.map(inv=>{
               const isAccounted=accountedSet.has(String(inv.productId).trim());
               return (
@@ -8533,7 +8555,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
                 soit la largeur. */}
             <div style={{ position: 'absolute', left: 8, bottom: 8, display: 'flex', gap: 6 }}>
               <button onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
-              <button onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus">🗺️</button>
+              <button onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus"><Icon name="grid" size={18}/></button>
               {sel && <button onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
             </div>
             <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
@@ -9226,7 +9248,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>🏠 Pièces :</span>
+        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="home" size={13}/>Pièces :</span>
         {plan.rooms.map(r => {
           const on = r.id === activeRoom.id;
           return (
@@ -12297,6 +12319,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
+  useEffect(() => {
+    // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
+    // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
+    // seule, les emails de suivi n'étaient pas encore chargés — `pickupUnion`
+    // valait alors « 0 prêt · 5 en attente » au lieu de « 1 · 5 », et c'est ce
+    // faux qui partait au tableau de bord. Les DEUX sources doivent être là.
+    if (!Array.isArray(tracking) || !Array.isArray(buys.items)) return;
+    try {
+      const v = { total: pickupUnion.total, prets: pickupUnion.prets, sansCode: pickupUnion.sansCode, at: Date.now() };
+      const avant = load('vrm_colis_retirer', null);
+      const memeChose = avant && avant.total === v.total && avant.prets === v.prets && avant.sansCode === v.sansCode;
+      if (!memeChose) {
+        save('vrm_colis_retirer', v);
+        // ⚠️ ET ON PRÉVIENT. Le centre de notifications lit cette ligne UNE
+        // fois, quand les comptes arrivent — donc au tout premier écran ouvert
+        // il lisait du vide et retombait sur le compte des seuls emails
+        // (« 1 colis à retirer » pour 6). C'est le même piège que les réglages
+        // lus au montage (`onCloudReady`) : ce qui arrive après doit se faire
+        // entendre, sinon l'écran garde sa première réponse.
+        try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
+      }
+    } catch (_) {}
+  }, [pickupUnion, tracking, buys.items]);
+
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).
   const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
@@ -18617,6 +18663,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                   {total>0 ? `${total} conversation${total>1?'s':''} en tout` : 'Tes échanges apparaîtront ici'}
                 </div>
+                {nonLus>0 && (()=>{
+                  const par = {};
+                  for (const c of (convs.items||[])) {
+                    if (acctOffOf(c) || !c.unread) continue;
+                    const n = c._acc ? accName(c._acc) : '?';
+                    par[n] = (par[n]||0) + 1;
+                  }
+                  const tri = Object.entries(par).sort((x,y)=>y[1]-x[1]);
+                  if (!tri.length) return null;
+                  const tete = tri.slice(0,3).map(([n,k])=>`${n} (${k})`);
+                  const reste = tri.length - 3;
+                  return (
+                    <div style={{fontSize:11.5,color:C.muted,marginTop:4}}>
+                      sur <b style={{color:C.text,fontWeight:600}}>{tete.join(', ')}</b>
+                      {reste>0 ? ` et ${reste} autre${reste>1?'s':''} compte${reste>1?'s':''}` : ''}
+                      {' '}— connecte-toi dessus pour répondre
+                    </div>
+                  );
+                })()}
               </div>
               <a href={inboxUrl} target="_blank" rel="noreferrer"
                 /* ⚠️ `flex:'1 1 130px'` sans plafond : sur un écran large ce
@@ -18633,7 +18698,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
             <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>Réponses rapides</span>
-            <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':'✎ Modifier'}</button>
+            <button onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="pencil" size={12}/>Modifier</span>}</button>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {quickReplies.map((t,i)=>(
@@ -18644,7 +18709,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
                     <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
                   </>
-                ) : <span style={{color:C.muted,fontSize:11,paddingRight:4}}>📋</span>}
+                ) : <span style={{color:C.muted,paddingRight:4,display:'inline-flex'}} aria-hidden="true"><Icon name="doc" size={13}/></span>}
               </div>
             ))}
             {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
@@ -22699,6 +22764,14 @@ export default function App() {
   },[accountsLoaded, vintedAccounts]);
 
   const vintedNotifChecked = React.useRef(false);
+  // Le propriétaire des colis à retirer (`pickupUnion`) publie ses comptes ;
+  // ce compteur nous fait relire quand il vient de le faire (voir plus haut).
+  const [colisTick, setColisTick] = useState(0);
+  useEffect(() => {
+    const on = () => setColisTick(t => t + 1);
+    window.addEventListener('vrm:colis', on);
+    return () => window.removeEventListener('vrm:colis', on);
+  }, []);
   useEffect(()=>{
     if(!vintedAccounts || vintedAccounts.length===0) return;
     // ⚠️ DEUX CHOSES DIFFÉRENTES VIVAIENT DANS LE MÊME « UNE SEULE FOIS » :
@@ -22810,7 +22883,26 @@ export default function App() {
           items.push({icon:'🚫', ic:'alert', text:`Compte bloqué par Vinted : ${noms} — le garder ou le déconnecter ?`, n:hit.length, tab:'vintedaccounts'});
         }
       }catch(_){}
-      if(colisCount>0)   items.push({icon:'📦', ic:'box', text:`${colisCount} colis à retirer — tu as le code ou l'adresse`, n:colisCount, tab:'cat_achats'});
+      // ⚠️ ON CONSOMME LA RÈGLE PUBLIÉE, on ne la refait pas. `colisCount`
+      // ci-dessus ne voit QUE les colis venus d'un email transporteur : le
+      // tableau de bord annonçait « 1 colis à retirer » pendant que Ma journée
+      // en comptait 5 (les cinq colis « déposés en point relais » vus côté
+      // Vinted). Sans la ligne publiée (premier écran ouvert, nuage pas encore
+      // arrivé), on retombe sur ce qu'on sait — jamais sur zéro.
+      {
+        const pub = load('vrm_colis_retirer', null);
+        const total = (pub && Number.isFinite(pub.total)) ? pub.total : colisCount;
+        const prets = (pub && Number.isFinite(pub.prets)) ? pub.prets : colisCount;
+        const sans  = Math.max(0, total - prets);
+        if (total > 0) {
+          const text = prets > 0 && sans > 0
+            ? `${prets} colis à retirer — tu as le code · ${sans} attendent le leur`
+            : prets > 0
+              ? `${prets} colis à retirer — tu as le code ou l'adresse`
+              : `${sans} colis à retirer — l'extension va chercher leur code`;
+          items.push({icon:'📦', ic:'box', text, n:total, tab:'cat_achats'});
+        }
+      }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(unreadTotal>0){
@@ -22855,7 +22947,7 @@ export default function App() {
     })();
     return ()=>{cancelled=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[vintedAccounts]);
+  },[vintedAccounts, colisTick]);
 
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
