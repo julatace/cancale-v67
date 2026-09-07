@@ -92,6 +92,17 @@ compte**, plafond par visite, requêtes **une par une** en attendant la réponse
     `npm run build` ne compile pas `api/`.
 11. **Une découpe par numéros de ligne se vérifie sur ce qui RESTE.** Deux écrans
     entiers ont disparu comme ça, sans qu'aucune erreur soit levée.
+    ⚠️ **Et un composant jamais rendu ne lève rien non plus.** `Nav` (un tiroir de
+    navigation avec `TABS` et `ARCHIVE_TABS`) était défini, complet, et
+    **référencé nulle part** — un `<Nav …>` n'existait pas dans le fichier. Il
+    portait une SECONDE navigation, aux libellés différents de la vraie
+    (« Stats » contre « Statistiques », un « Comptabilité » qui n'existe nulle
+    part ailleurs) et sept emojis-icônes qui ressortaient à chaque audit du §7.
+    Retiré le 7 septembre (66 lignes) après avoir vérifié que « Ancien
+    catalogue » et « Anciennes ventes » restent joignables depuis Réglages.
+    **Avant de « corriger » une navigation, vérifier qu'elle est rendue** :
+    `grep -c '<Nom'` — et compter les écrans montés (`tab===`) avant ET après
+    la coupe (13 des deux côtés).
 12. **`-0 < 0` est faux en JavaScript** (calcul de délais).
 
 ---
