@@ -3582,6 +3582,14 @@ function Card({children,style={}}) {
 function Badge({children,color}) {
   return <span style={{display:'inline-block',padding:'2px 10px',borderRadius:8,background:color+'22',color,fontSize:11,fontWeight:500}}>{children}</span>;
 }
+// ── « JE VEUX SAISIR MES PRIX D'ACHAT » ────────────────────────────────────
+// Le tableau de bord pose ce drapeau puis navigue vers Annonces ; la modale de
+// saisie en série (qui vit dans `Comptabilite`, son propriétaire) le consomme à
+// son montage et l'efface. ⚠️ Un `window.dispatchEvent` ne marcherait pas ici :
+// à l'instant du clic, l'écran Annonces n'est pas encore monté, personne
+// n'écoute. Un drapeau attend.
+const DEMANDE_SAISIE_PRIX = { on: false };
+
 function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null}) {
   // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
   // c'est le gabarit « KPI » de n'importe quel tableau de bord. Ici : un FILET
@@ -5470,8 +5478,32 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
   // donc cet écran hérite désormais de tout ce qui arrivera ensuite.
   // `icon` et `gradient` restent acceptés — les 10 appels ne changent pas — mais
   // ne sont plus dessinés.
-  const StatCard=({label,value,color=C.text,sub})=>
-    <StatBox label={label} value={value} color={color} sub={sub}/>;
+  const StatCard=({label,value,color=C.text,sub,subColor=null,onClick=null,title=null})=>
+    <StatBox label={label} value={value} color={color} sub={sub} subColor={subColor} onClick={onClick} title={title}/>;
+  // Une seule phrase pour une seule cause, et elle ouvre la saisie en série sur
+  // l'écran Annonces (le propriétaire de la modale, §11).
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onGo) onGo('cat_annonces'); };
+  // Les cartes qui ne peuvent rien afficher gardent leur tiret ; la RAISON et la
+  // PORTE vivent ici, une fois par groupe (§7 : la même phrase répétée sur
+  // chaque ligne est UNE phrase — il y en avait six sur cet écran).
+  const manquePrix = !!(liveStats && liveStats.caEncaisse != null);
+  // ⚠️ La ligne ne nomme QUE ce qui est vraiment bloqué. Dès qu'un prix d'achat
+  // est saisi, la valeur du stock s'affiche et n'attend plus rien : la citer
+  // quand même serait une alerte fausse, et une alerte fausse fait douter des
+  // vraies.
+  const stockInconnu = !!(liveStats && liveStats.online > 0
+    && !((liveStats.stockValue != null ? liveStats.stockValue : stockValue) > 0));
+  const quoiDepuisDebut = stockInconnu
+    ? 'La valeur du stock, le bénéfice et la marge'
+    : 'Le bénéfice et la marge';
+  const LignePrixAchat = ({ quoi }) => (
+    <button type="button" onClick={versSaisiePrix}
+      title="Ouvrir la saisie en série des prix d'achat"
+      style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:'-6px 0 0',cursor:'pointer',
+        fontFamily:'inherit',fontSize:12,fontWeight:600,color:C.warn,textAlign:'left',minHeight:0}}>
+      {quoi} attendent tes prix d'achat — les saisir →
+    </button>
+  );
 
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
@@ -5579,8 +5611,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           const enLigne = liveStats && liveStats.online > 0;
           return <StatCard icon="💰" label="Valeur d'achat du stock"
             value={(v>0 || !enLigne) ? fmt(v) : '—'} color={C.text}
-            sub={(v>0 || !enLigne) ? "prix d'achat des annonces en ligne" : "saisis tes prix d'achat"}
-            subColor={(v>0 || !enLigne) ? null : C.warn}/>; })()}
+            sub={(v>0 || !enLigne) ? "prix d'achat des annonces en ligne" : undefined}/>; })()}
         {/* « Vendues » = nb de ventes finalisées côté Vinted (moisson), pas le
             vieux catalogue archivé (vide → carte vide, plainte de Julien). */}
         <StatCard icon="✅" label="Vendues" value={liveStats&&liveStats.soldTotal!=null?liveStats.soldTotal:totalSold} color={C.text} sub="finalisées, tous comptes"/>
@@ -5591,9 +5622,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="ventes finalisées · daté au jour de la vente"/>
         {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
             afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
-        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?"saisis tes prix d'achat":'argent reçu uniquement'} subColor={liveStats&&liveStats.caEncaisse!=null?C.warn:null}/>
-        <StatCard icon="🎯" label="Taux marge" value={liveStats&&liveStats.caEncaisse!=null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?'prix d\'achat manquants':'bénéf / CA'} subColor={liveStats&&liveStats.caEncaisse!=null?C.warn:null}/>
+        <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
+        {/* ⚠️ « prix d'achat manquants » disait la MÊME chose que ses deux
+            voisines, avec d'autres mots : trois formulations pour une seule
+            cause font croire à trois problèmes. */}
+        <StatCard icon="🎯" label="Taux marge" value={liveStats&&liveStats.caEncaisse!=null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'bénéf / CA'}/>
       </div>
+      {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
 
       {/* ── LE MOIS EN COURS, EN UNE SEULE CARTE ────────────────────────────
           ⚠️ Il y en avait DEUX à la suite, toutes deux titrées du même mois
@@ -5669,7 +5704,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
       {/* Barre de progression du garage */}
       <Card style={{padding:18}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>🏠 Remplissage garage</span>
+          <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5}}><Icon name="home" size={12}/>Remplissage garage</span>
           <span style={{fontSize:13,fontWeight:600,color:C.accent}}>{fillRate}%</span>
         </div>
         <div style={{height:10,background:C.surface,borderRadius:8,overflow:'hidden',border:`1px solid ${C.border}`}}>
@@ -5699,28 +5734,35 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           const hv = liveStats && liveStats.soldTotal!=null;
           const venteMoy = hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale;
           return (
+        <>
         <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
           {/* ⚠️ PAS DE « n/d » : c'est du vocabulaire d'informaticien, et la
               règle est écrite noir sur blanc dans le dossier de passation. Un
               tiret dit « on ne sait pas » ; la raison juste dessous dit quoi
               faire. Les cartes voisines le faisaient déjà — ces trois-là
               étaient restées en arrière (vues en capture le 7 septembre). */}
-          <StatCard icon="⭐" label="× moyen" value={hv?'—':`×${avgX}`} color={C.muted} sub={hv?"saisis tes prix d'achat":undefined}/>
+          <StatCard icon="⭐" label="× moyen" value={hv?'—':`×${avgX}`} color={C.muted}/>
           <StatCard icon="💵" label="Vente moyenne" value={fmt(venteMoy)} color={C.text} sub={hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:undefined}/>
-          <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'—':fmt(avgProfit)} color={C.muted} sub={hv?"saisis tes prix d'achat":undefined}/>
-          {/* ⚠️ CELUI-LÀ NE PEUT PAS ÊTRE CALCULÉ, ET C'EST NORMAL.
-              `dayStats` compte les jours d'après `receiveDate`, la date
-              d'ENCAISSEMENT — or elle a été retirée exprès de l'app (elle
-              n'existait que pour une partie des ventes). Résultat mesuré :
-              0 jour, donc 0,00 €.
-              Un `0,00 €` qui veut dire « on ne sait pas » est pire qu'un blanc :
-              c'est un tiret, avec la raison à côté. Et on ne lui demande RIEN,
-              puisqu'il n'y a rien à saisir — cette date a été abandonnée.
-              À trancher par une prochaine session : cette carte a-t-elle encore
-              un sens, ou faut-il la remplacer par un CA moyen par jour de VENTE ? */}
-          <StatCard icon="📅" label="CA / jour actif" value={days.length>0?fmt(avgDayCA):'—'} color={C.muted}
-            sub={days.length>0?`${days.length} jour${days.length>1?'s':''} de vente`:"les dates d'encaissement ne sont pas connues"}/>
+          <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'—':fmt(avgProfit)} color={C.muted}/>
+          {/* ⚠️ TRANCHÉ. Cette carte s'appelait « CA / jour actif » et comptait
+              les jours d'après `receiveDate`, la date d'ENCAISSEMENT — retirée
+              exprès de l'app (elle n'existait que pour une partie des ventes).
+              Elle affichait donc un tiret que RIEN ne pouvait jamais remplir :
+              ni une saisie, ni une synchro. Une carte qui ne peut pas exister
+              n'apprend rien.
+              La date de VENTE, elle, est connue pour toutes les ventes. On
+              affiche donc le CA moyen par JOUR OÙ IL A VENDU — `joursVente` est
+              publié par le même calcul que `caEncaisse` (§11), sur exactement
+              les mêmes ventes finalisées : numérateur et dénominateur parlent
+              des mêmes lignes. Tant que la moisson n'a rien publié, tiret. */}
+          <StatCard icon="📅" label="CA / jour de vente"
+            value={hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—'} color={C.muted}
+            sub={hv && liveStats.joursVente>0
+              ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu`
+              : 'en attente de la synchro Vinted'}/>
         </div>
+        {hv && <LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen"/>}
+        </>
           );
         })()}
       </div>
@@ -14955,6 +14997,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Aucune saisie automatique : c'est lui qui tape, ou qui tape sur une
   // suggestion qu'il voit (règle tenue depuis §22).
   const [fillBuyOpen, setFillBuyOpen] = useState(false);
+  // Venu du tableau de bord : « Bénéfice net — saisis tes prix d'achat » est un
+  // bouton, il amène ICI et ouvre la saisie. Le drapeau est consommé une fois.
+  useEffect(() => {
+    if (DEMANDE_SAISIE_PRIX.on) { DEMANDE_SAISIE_PRIX.on = false; setFillBuyOpen(true); }
+  }, [curSub]);
   // ── LA LISTE DES ACHATS : CHARGÉE UNE SEULE FOIS, PARTAGÉE ────────────────
   // ⚠️ MESURÉ EN ME METTANT À SA PLACE : le sélecteur « Quel achat correspond à
   // cette paire ? » rechargeait les ~700 achats des 9 comptes À CHAQUE CLIC —
@@ -22648,6 +22695,15 @@ export default function App() {
       // ⚠️ C'est bien la VENTE (le moment où ça part), pas l'argent viré sur ton
       // compte — les deux sont décalés de plusieurs jours chez Vinted.
       let ventesJour=0, caJour=0;
+      // ⚠️ LES JOURS OÙ IL A VENDU. La carte « CA / jour actif » comptait les
+      // jours d'après `receiveDate`, la date d'ENCAISSEMENT — retirée exprès de
+      // l'app parce qu'elle n'existait que pour une partie des ventes. Résultat :
+      // 0 jour, donc un tiret permanent que rien ne pourra jamais remplir.
+      // La date de VENTE, elle, est connue pour tout. On compte donc les jours
+      // distincts des ventes FINALISÉES — la même population que `caEncaisse`,
+      // sinon la moyenne serait fausse (un numérateur et un dénominateur qui ne
+      // parlent pas des mêmes ventes, §5.45).
+      const joursVenteSet=new Set();
       // Comptes BLOQUÉS (détectés) ou MASQUÉS (à la main) : on les EXCLUT
       // totalement des stats — leurs annonces sont périmées et leurs ventes ne
       // comptent pas. Sinon le dashboard gonfle « annonces en ligne » / CA avec
@@ -22691,7 +22747,7 @@ export default function App() {
           const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
           const inMonth=okD&&d.getFullYear()*100+d.getMonth()===ym;
           if(st==='pending'){ enCours++; enAttente+=amt0; }
-          if(st==='completed'){ caEncaisse+=amt0; soldTotal++; }
+          if(st==='completed'){ caEncaisse+=amt0; soldTotal++; if(okD) joursVenteSet.add(d.toISOString().slice(0,10)); }
           // CA + ventes DU MOIS = ventes FAITES ce mois (par DATE de vente), hors
           // annulées — qu'elles soient déjà finalisées ou encore en cours. Une
           // vente ne devient « finalisée » que ~2 semaines après (validation
@@ -22746,7 +22802,7 @@ export default function App() {
       const uidsVivants=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
       try{ const esc=await fetchWalletEscrow(uidsVivants); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
       if(!stop && ok){
-        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal});
+        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
         // le widget = simplement ouvrir l'app (qui réécrit cette ligne).

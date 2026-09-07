@@ -467,11 +467,24 @@ qu'un bouton ne fixe pas lui-même.
   développeur. Un tiret dit « on ne sait pas », la raison en clair dit quoi
   faire. `audit-chiffres.cjs` compte les `n/d` restants — il y en avait encore
   **quatre** sur l'écran Statistiques le 7 septembre, des semaines après la
-  règle. ⚠️ Et remplacer un `n/d` par **`0,00 €` est pire** : « CA / jour
-  actif » se calcule sur `receiveDate`, la date d'encaissement **retirée exprès
-  de l'app** — donc 0 jour, donc 0 €. Il écrit `—` et dit pourquoi, sans rien
-  demander : il n'y a rien à saisir. *(À trancher : garder cette carte, ou la
-  remplacer par un CA moyen par jour de VENTE ?)*
+  règle. ⚠️ Et remplacer un `n/d` par **`0,00 €` est pire**.
+- **Une carte qui ne peut RIEN afficher, jamais, n'apprend rien — TRANCHÉ.**
+  « CA / jour actif » se calculait sur `receiveDate`, la date d'encaissement
+  **retirée exprès de l'app** : 0 jour, donc un tiret que ni une saisie ni une
+  synchro ne pourrait jamais remplir. La date de **VENTE**, elle, est connue
+  pour toutes les ventes : la carte est devenue **« CA / jour de vente »** —
+  mesuré sur ses données, **117,46 € sur 57 jours où il a vendu**. `joursVente`
+  est publié par le **même calcul** que `caEncaisse` (§11), sur exactement les
+  mêmes ventes finalisées : numérateur et dénominateur parlent des mêmes lignes.
+- **« saisis tes prix d'achat » s'écrivait SIX fois sur l'écran Statistiques**,
+  en ambre, dans trois groupes — six alertes pour une seule cause, ça se lit
+  comme six problèmes. Les cartes gardent leur `—` ; la raison et la **porte**
+  vivent une fois par groupe (« La valeur du stock, le bénéfice et la marge
+  attendent tes prix d'achat — les saisir → », qui ouvre la saisie en série).
+  Mesuré au rendu : **6 → 1**. Et « prix d'achat manquants » disait la même
+  chose avec d'autres mots : une cause, une phrase.
+  ⚠️ Le drapeau `DEMANDE_SAISIE_PRIX` vit au niveau **module** : au moment du
+  clic l'écran Annonces n'est pas monté, un `dispatchEvent` serait perdu.
 
 ---
 
