@@ -162,5 +162,26 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('`matchOrd` doit lire la valeur différée, pas celle du champ');
 }
 
+// 14) L'ÉCRAN VENTES NE DESSINE QU'UNE TRANCHE — mais rien n'est perdu.
+// Mesuré : 287 cartes d'un coup, 46 209 px sur iPhone (54 écrans). On en rend
+// 60, le bouton porte le TOTAL, et les totaux du haut ne bougent pas : ils
+// portent sur l'ensemble, pas sur la tranche.
+{
+  /const ventesAffichees = useMemo/.test(app)
+    ? ok('la liste des ventes est calculée une seule fois')
+    : nok('la chaîne de filtres ne doit pas vivre en plein milieu du JSX');
+  /ventesAffichees\.slice\(0, ventesMax\)/.test(app)
+    ? ok('et l\'écran n\'en dessine qu\'une tranche')
+    : nok('287 cartes d\'un coup font 46 209 px sur iPhone');
+  /Voir plus — \{ventesMax\} affichées sur \{ventesAffichees\.length\}/.test(app)
+    ? ok('le bouton « Voir plus » porte le total — rien n\'est caché')
+    : nok('le bouton doit dire combien de ventes existent en tout');
+  // ⚠️ Une recherche doit repartir du haut, sinon « 240 affichées » resterait
+  // écrit sur une liste qui n'en compte plus que trois.
+  /setVentesMax\(60\); \}, \[vFilter, ordSearchDiff, periode, showHidden\]/.test(app)
+    ? ok('changer de filtre ou chercher repart du haut')
+    : nok('la tranche doit se remettre à 60 quand la liste change');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);

@@ -225,8 +225,23 @@ refiltrer juste après → **~150 ms**, et le changement de filtre passe de 334 
 ~155 ms. Aucun changement de comportement.
 - Les **286 photos sont déjà toutes en `loading="lazy"`** — vérifié, ce n'était
   pas là que ça coûtait.
+- **La liste ne dessine plus que 60 cartes** (`ventesAffichees.slice(0, ventesMax)`),
+  le reste s'ouvre au bouton **« Voir plus — 60 affichées sur 287 »** : le total
+  est écrit dessus, rien n'est caché, et **les totaux du haut portent toujours
+  sur l'ensemble** (vérifié au banc : 6 695 € / 224 ventes, identiques avant et
+  après avoir déplié). Une recherche ou un changement de filtre remet la tranche
+  à 60. Mesuré : **8 840 → 2 194 nœuds**, iPhone **46 209 → 11 577 px**, frappe
+  ~150 → **~88 ms**.
+- La chaîne de filtres vivait **en plein milieu du JSX** : impossible de savoir
+  combien de ventes elle rendait sans la recopier. Elle est dans un `useMemo`
+  (§11 : une seule règle, un seul propriétaire).
 - `perfv.cjs` garde des planchers (frappe < 250 ms, filtre < 300 ms, zéro image
-  non paresseuse) aux deux tailles.
+  non paresseuse) aux deux tailles, et vérifie que « Voir plus » ouvre bien la
+  suite sans changer les totaux.
+  ⚠️ **Piège du banc** : ses mesures de frappe tapent « salomon » et cliquent un
+  filtre — la liste tombe à six cartes et le bouton disparaît légitimement. Il
+  faut **remettre l'écran à zéro** avant de vérifier la pagination, sinon le
+  banc mesure son absence comme un défaut.
 
 ### La carte des points relais (Achats)
 **Mesuré le 6 septembre** : `vrm_ville` valait déjà « Cancale », `/api/relais`

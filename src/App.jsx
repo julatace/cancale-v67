@@ -12937,6 +12937,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return (o.title||'').toLowerCase().includes(q) || num===q || num.includes(q) || buyer.includes(q);
   };
 
+  // ── LA LISTE DES VENTES AFFICHÉES — calculée UNE fois (§11) ───────────────
+  // ⚠️ MESURÉ AU BANC LE 7 SEPTEMBRE : l'écran rendait **287 cartes** d'un
+  // coup, soit une page de 19 885 px sur ordinateur et **46 209 px sur
+  // iPhone** — cinquante-quatre écrans de défilement pour retrouver une paire.
+  // La chaîne de filtres vivait en plein milieu du JSX : impossible de savoir
+  // combien de ventes elle rendait sans la recopier. Elle vit ici, et l'écran
+  // n'en dessine qu'une tranche.
+  const ventesAffichees = useMemo(() => (sales.items || [])
+    .filter(o => showHidden ? true : !isHidden(o))
+    .filter(o => { const st = classifyOrderStatus(o.status);
+      if (vFilter === 'encours') return st === 'pending';
+      if (vFilter === 'finalisees') return st === 'completed';
+      if (vFilter === 'annulees') return st === 'cancelled';
+      if (vFilter === 'sanscout') return isSaleNoBuy(o);
+      return true; })
+    .filter(o => matchOrd(o))
+    .sort(parDateDesc),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv]);
+  // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
+  // le compte total est écrit dessus.
+  const [ventesMax, setVentesMax] = useState(60);
+  // Une recherche ou un changement de filtre repart du haut : sinon on garderait
+  // « 240 affichées » sur une liste qui n'en compte plus que trois.
+  useEffect(() => { setVentesMax(60); }, [vFilter, ordSearchDiff, periode, showHidden]);
+
   // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
   // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
   // Annonces à retirer AUTOMATIQUEMENT car une VENTE est confirmée par email.
@@ -16529,7 +16555,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Les lignes portent deja `flexWrap` et une largeur plancher
             (§26), elles supportent la colonne plus etroite. */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px, 100%), 1fr))',gap:8,alignItems:'start'}}>
-          {(sales.items||[]).filter(o=> showHidden ? true : !isHidden(o)).filter(o=>{ const s=classifyOrderStatus(o.status); if(vFilter==='encours')return s==='pending'; if(vFilter==='finalisees')return s==='completed'; if(vFilter==='annulees')return s==='cancelled'; if(vFilter==='sanscout')return isSaleNoBuy(o); return true; }).filter(o=>matchOrd(o)).sort(parDateDesc).map(o=>{
+          {ventesAffichees.slice(0, ventesMax).map(o=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
             const e = effEntry(o); const num = e?.numero;
@@ -16641,6 +16667,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })}
         </div>
+        {/* ⚠️ RIEN N'EST CACHÉ : le compte total est écrit sur le bouton, et
+            un clic ouvre la suite. On dessine 60 cartes au lieu de 287 — sur
+            iPhone, la page passait de 46 209 px (cinquante-quatre écrans) à
+            une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
+            TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
+        {ventesAffichees.length > ventesMax && (
+          <button type="button" onClick={()=>setVentesMax(n=>n+120)}
+            style={{width:'100%',marginTop:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+            Voir plus — {ventesMax} affichées sur {ventesAffichees.length}
+          </button>
+        )}
       </>)}
 
 
