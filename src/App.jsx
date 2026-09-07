@@ -16577,6 +16577,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='achats' && (<>
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
         <NoAcc/>
+        {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
+            JOURNÉE. C'est sur CET écran que Julien compte les codes qui
+            manquent — « il n'y a pas tous les codes de retrait ». Mesuré le
+            6 septembre : `panel_colis_relais`, la ligne où l'extension dépose
+            les codes lus dans les conversations, contenait **0 colis**, et
+            aucun des colis Vinted à retirer n'avait de code. Lui dire pourquoi
+            sur un autre écran que celui où il le constate, ça ne sert à rien.
+            Le bandeau se cache tout seul dès que l'extension est à jour. */}
+        <ExtEnRetard onNav={onNav}/>
         {/* ⚠️ MÊME ORDRE QUE L'ÉCRAN VENTES. Ici la période arrivait en 19e position,
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
@@ -17147,6 +17156,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               Arrivés il y a plus de {PICKUP_MAX_DAYS} jours et jamais cochés. Un point relais rend le colis
               à l'expéditeur au bout de quelques jours : <b>si tu ne l'as pas eu, réclame à Vinted</b> —
               sinon coche ✓, il disparaîtra.
+              {/* ⚠️ « RÉCLAME À VINTED » EST LE MAUVAIS GESTE POUR UN COLIS DONT
+                  ON A ENCORE LE CODE. Mesuré : 3 de ces colis portent un QR et
+                  3 un code. On le dit, au lieu de tous les envoyer au litige. */}
+              {(()=>{ const n=(pickupUnion.oublies||[]).filter(t=>codeRetrait(t.code)||qrVivant(t)).length;
+                return n ? <> <b style={{color:C.text}}>{n} {n>1?'ont':'a'} encore {n>1?'leur code ou leur QR':'son code ou son QR'} ci-dessous</b> — commence par passer au relais, c'est peut-être encore là.</> : null; })()}
             </div>
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
               {pickupUnion.oublies.map((t,i)=>{
@@ -17164,6 +17178,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     </div>
                     {code && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{code}</span>}
+                    {/* ⚠️ CE BLOC CACHAIT DES QR QU'IL POSSÈDE. Mesuré sur la
+                        vraie base : sur les 6 colis rangés ici, **3 portent un
+                        QR** — dont deux vieux de 15 jours seulement, donc très
+                        probablement encore au relais. Le bloc n'affichait que
+                        le code : le QR, seul moyen de retrait d'un Pickup, ne
+                        s'affichait NULLE PART. « Il n'y a pas tous les codes de
+                        retrait » (Julien) — c'était vrai, et voilà où. */}
+                    {(()=>{ const qi=qrVivant(t); return qi ? (
+                      <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — présente-le au comptoir" aria-label="Afficher le QR de retrait en grand"
+                        style={{flexShrink:0,border:`1.5px solid ${C.accent}`,background:'#fff',borderRadius:8,padding:3,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                        <img src={qi} alt="QR de retrait" onError={()=>noterImgMorte(qi)} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                      </button>
+                    ) : null; })()}
                     {t.suivi && <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600}}>Vérifier</a>}
                     <button type="button" title="Je l'avais récupéré" onClick={()=>markCollected(t)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
                   </div>
