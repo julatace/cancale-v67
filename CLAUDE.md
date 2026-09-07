@@ -185,6 +185,29 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   Ils ont leur bloc sur Achats. On dit « à vérifier », **jamais « perdu »** :
   Vinted rembourse souvent tout seul.
 
+### Les prix d'achat : aucun pont automatique, mesuré
+**Mesuré le 7 septembre**, en cherchant s'il existait un rapprochement CERTAIN
+paire ↔ achat : sur **320 paires numérotées**, seules **4** partagent le nom de
+fichier photo d'un achat — il rephotographie ses paires avant de les mettre en
+ligne. `panel_buyprices` est vide, `vinted_buyprice_by_num` aussi. **Il n'y a
+rien à automatiser** : il les saisit, comme sa règle le dit.
+- Ce qui EST juste : la modale trie **les paires vendues d'abord, au CA
+  décroissant**. Mesuré : **150 des 320** portent au moins une vente reliée par
+  identité (42 % des ventes se relient), et **les 20 premières couvrent 33 % du
+  CA reliable**. Vingt saisies rattrapent donc un tiers des chiffres.
+- ⚠️ Elle plafonnait à **300 lignes pour 320 paires** : vingt paires n'étaient
+  atteignables nulle part alors que l'en-tête les comptait, et la chaîne
+  « Entrée » s'arrêtait net à la 300ᵉ. Plus de plafond.
+- ⚠️ **`prepAchat` : chaque achat épluché UNE fois.** Le barème comparait
+  288 paires × 544 achats = **156 672 appels**, chacun ré-extrayant marque,
+  taille, modèle, couleurs et titre normalisé **du même achat**. La modale
+  mettait **3,5 s** à s'ouvrir — sur l'écran qu'il doit utiliser 320 fois.
+  Après : **~300 ms**, et **exactement les mêmes 26 suggestions** (c'est la
+  preuve qu'un jugement métier n'a pas bougé). Le barème vit dans
+  `scoreAchatPrep`, qui ne doit **jamais** ré-extraire quoi que ce soit.
+  ⚠️ `audit-identite.cjs` cherchait la ligne `const cs = extractColors(t)` et a
+  crié au loup : **un audit doit suivre la RÈGLE, pas son orthographe**.
+
 ### L'argent : « en attente » et « disponible » ne se confondent jamais
 Mesuré le 7 septembre sur ses **neuf porte-monnaie** (`harvest_{uid}_billing`) :
 **281,94 € disponibles** à virer, à côté de **2 235,80 € retenus** par Vinted.
@@ -458,7 +481,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 26 audits
-scripts/bancs/                  les 8 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 9 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
