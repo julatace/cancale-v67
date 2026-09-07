@@ -5684,10 +5684,26 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           const venteMoy = hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale;
           return (
         <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-          <StatCard icon="⭐" label="× moyen" value={hv?'n/d':`×${avgX}`} color={C.muted} sub={hv?"prix d'achat manquants":undefined}/>
+          {/* ⚠️ PAS DE « n/d » : c'est du vocabulaire d'informaticien, et la
+              règle est écrite noir sur blanc dans le dossier de passation. Un
+              tiret dit « on ne sait pas » ; la raison juste dessous dit quoi
+              faire. Les cartes voisines le faisaient déjà — ces trois-là
+              étaient restées en arrière (vues en capture le 7 septembre). */}
+          <StatCard icon="⭐" label="× moyen" value={hv?'—':`×${avgX}`} color={C.muted} sub={hv?"saisis tes prix d'achat":undefined}/>
           <StatCard icon="💵" label="Vente moyenne" value={fmt(venteMoy)} color={C.text} sub={hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:undefined}/>
-          <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'n/d':fmt(avgProfit)} color={C.muted} sub={hv?"prix d'achat manquants":undefined}/>
-          <StatCard icon="📅" label="CA / jour actif" value={hv?'n/d':fmt(avgDayCA)} color={C.muted} sub={hv?'—':`${days.length} jours`}/>
+          <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'—':fmt(avgProfit)} color={C.muted} sub={hv?"saisis tes prix d'achat":undefined}/>
+          {/* ⚠️ CELUI-LÀ NE PEUT PAS ÊTRE CALCULÉ, ET C'EST NORMAL.
+              `dayStats` compte les jours d'après `receiveDate`, la date
+              d'ENCAISSEMENT — or elle a été retirée exprès de l'app (elle
+              n'existait que pour une partie des ventes). Résultat mesuré :
+              0 jour, donc 0,00 €.
+              Un `0,00 €` qui veut dire « on ne sait pas » est pire qu'un blanc :
+              c'est un tiret, avec la raison à côté. Et on ne lui demande RIEN,
+              puisqu'il n'y a rien à saisir — cette date a été abandonnée.
+              À trancher par une prochaine session : cette carte a-t-elle encore
+              un sens, ou faut-il la remplacer par un CA moyen par jour de VENTE ? */}
+          <StatCard icon="📅" label="CA / jour actif" value={days.length>0?fmt(avgDayCA):'—'} color={C.muted}
+            sub={days.length>0?`${days.length} jour${days.length>1?'s':''} de vente`:"les dates d'encaissement ne sont pas connues"}/>
         </div>
           );
         })()}
@@ -15923,7 +15939,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 faux bénéfice, on dit qu'il manque les prix d'achat. Prix connus
                 en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
             {totals.nbCout===0
-              ? <StatBox label="Bénéfice net" value="n/d" color={C.muted} sub="saisis tes prix d'achat"/>
+              ? <StatBox label="Bénéfice net" value="—" color={C.muted} sub="saisis tes prix d'achat"/>
               : <StatBox label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                   subColor={totals.nbCout<totals.nb?C.warn:undefined}
                   sub={totals.nbCout<totals.nb

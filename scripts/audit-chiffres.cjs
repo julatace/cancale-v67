@@ -128,5 +128,25 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('un solde lu il y a trois semaines n\'est pas le montant d\'aujourd\'hui');
 }
 
+// 12) PAS DE « n/d » — c'est du vocabulaire d'informaticien, et Julien n'est
+// pas développeur. La règle est écrite dans le dossier de passation depuis des
+// semaines ; quatre chiffres l'affichaient encore, vus en capture le
+// 7 septembre sur l'écran Statistiques. Un tiret dit « on ne sait pas », et la
+// raison juste dessous dit quoi faire.
+{
+  const restes = (app.match(/'n\/d'|"n\/d"/g) || []).length;
+  restes === 0 ? ok('aucun « n/d » ne reste dans l\'app')
+               : nok(`${restes} « n/d » à remplacer par « — » + la raison`);
+  // ⚠️ « CA / jour actif » ne dépend PAS des prix d'achat : il ne doit pas être
+  // éteint par le drapeau du bénéfice.
+  // ⚠️ ET IL NE S'ÉCRIT PAS « 0,00 € » QUAND ON NE SAIT PAS. `dayStats` compte
+  // les jours d'après `receiveDate` — la date d'encaissement, retirée exprès de
+  // l'app. Mesuré : 0 jour. Un zéro qui veut dire « on ne sait pas » est pire
+  // qu'un blanc.
+  /label="CA \/ jour actif" value=\{days\.length>0\?fmt\(avgDayCA\):'—'\}/.test(app)
+    ? ok('le CA par jour actif écrit « — » quand il ne peut pas être calculé')
+    : nok('un 0,00 € qui veut dire « on ne sait pas » doit s\'écrire « — »');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);
