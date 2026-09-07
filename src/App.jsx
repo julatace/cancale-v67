@@ -12451,10 +12451,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (dl == null && urg[e.txn] && urg[e.txn].daysLeft != null) dl = urg[e.txn].daysLeft;
       return { ...e, dl };
     });
-    // Le plus urgent en haut ; ce qui est déjà posté à la main descend.
+    // ⚠️ CE QU'IL PEUT IMPRIMER MAINTENANT PASSE DEVANT (7 septembre).
+    // Vu en capture sur ses vraies données : l'en-tête annonçait « 10 bordereaux
+    // prêts à imprimer », et les quatre premières cartes de l'écran disaient
+    // toutes « l'extension le récupère à ta prochaine visite ». Le tri par date
+    // limite mettait les colis SANS bordereau en haut — donc les seuls qu'il ne
+    // PEUT PAS traiter. Il ouvrait l'écran et lisait « va sur Vinted », alors
+    // que dix étiquettes l'attendaient plus bas.
+    // Un colis sans bordereau n'est pas postable aujourd'hui : l'urgence ne le
+    // rend pas plus actionnable. Elle reste le tri À L'INTÉRIEUR de chaque
+    // groupe, et elle reste écrite sur chaque carte.
+    const pret = (e) => !!((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]));
     tout.sort((a, b) => {
       const pa = a.o && isShipDone(a.o) ? 1 : 0, pb = b.o && isShipDone(b.o) ? 1 : 0;
-      if (pa !== pb) return pa - pb;
+      if (pa !== pb) return pa - pb;                       // les postés tout en bas
+      const ia = pret(a) ? 0 : 1, ib = pret(b) ? 0 : 1;
+      if (ia !== ib) return ia - ib;                       // imprimable d'abord
       return (a.dl == null ? 999 : a.dl) - (b.dl == null ? 999 : b.dl);
     });
     return tout;
@@ -18706,22 +18718,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Le tri est déjà bon (le plus urgent en haut, les postés à la fin) :
           // on pose seulement l'intertitre à chaque charnière, comme pour
           // « Déjà postés ».
-          const groupeDe = (x) => {
-            if (estPoste(x)) return 'fait';
-            const d = x.dl;
-            if (d == null) return 'sansdate';
-            if (d < 0) return 'retard';
-            if (d === 0) return 'jour';
-            if (d === 1) return 'demain';
-            return 'apres';
-          };
+          // ⚠️ LE GROUPE SUIT LE TRI, sinon les intertitres se répètent.
+          // On groupe sur CE QU'IL PEUT FAIRE — imprimer, ou attendre — parce
+          // que c'est la seule frontière qui change son geste. L'urgence, elle,
+          // reste écrite sur chaque carte et dans l'en-tête du haut.
+          const aSonPdf = (x) => !!((x.b && x.b.hasPdf) || (x.txn && labelsCaptes[x.txn]));
+          const groupeDe = (x) => estPoste(x) ? 'fait' : (aSonPdf(x) ? 'pret' : 'attente');
           const TITRE_GROUPE = {
-            retard:   ['En retard', 'Vinted compte les jours — ceux-là partent en premier.'],
-            jour:     ["À poster aujourd'hui", ''],
-            demain:   ['À poster demain', ''],
-            apres:    ['Plus tard', ''],
-            sansdate: ['Sans date limite annoncée', ''],
-            fait:     ['Déjà postés', "Ils quittent la liste quand Vinted confirme l'envoi. « ↺ Pas encore » les remet dans les colis à envoyer."],
+            pret:    ['Prêts à imprimer', 'Le bordereau est là : imprime, colle, dépose.'],
+            attente: ['En attente de leur bordereau', "Vinted l'a généré de son côté ; l'extension le dépose ici à ta prochaine visite sur Vinted (l'email sert de filet). Tu peux aussi déposer un PDF que tu as téléchargé."],
+            fait:    ['Déjà postés', "Ils quittent la liste quand Vinted confirme l'envoi. « ↺ Pas encore » les remet dans les colis à envoyer."],
           };
           const nbParGroupe = {};
           ex.forEach(x => { const g = groupeDe(x); nbParGroupe[g] = (nbParGroupe[g] || 0) + 1; });
@@ -18736,7 +18742,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const attenteCommune = attentes.size === 1 ? [...attentes][0] : null;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {attenteCommune && (
+              {/* ⚠️ La phrase d'attente vit désormais dans l'intertitre du groupe
+                  « En attente de leur bordereau » — au-dessus des colis qu'elle
+                  concerne, et d'eux seuls. En tête de liste, elle parlait au nom
+                  des quinze alors qu'elle n'en concernait que cinq. */}
+              {false && attenteCommune && (
                 <div style={{fontSize:12,color:C.muted,lineHeight:1.45,padding:'0 2px 2px'}}>
                   {attenteCommune==='gen'
                     ? <><b style={{color:C.text}}>L'extension génère les bordereaux manquants</b> à ta prochaine visite sur Vinted, puis les dépose ici.</>
@@ -18876,12 +18886,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             Vinted (aucun argent engagé, aucun choix — c'est une
                             formalité obligatoire). L'app se contente de dire où on
                             en est, au lieu de te renvoyer faire le travail. */}
-                        {!attenteCommune && (
-                        <div style={{flex:'1 1 160px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:12,color:C.text,lineHeight:1.4}}>
-                          {aGenererBordereau(o && o.status)
-                            ? <><b>L'extension le génère</b> à ta prochaine visite sur Vinted, puis le dépose ici.</>
-                            : <><b>Bordereau déjà généré</b> chez Vinted — <b>l'extension le récupère</b> à ta prochaine visite sur Vinted (l'email sert de filet).</>}
-                        </div>)}
+                        {/* ⚠️ CINQ FOIS LA MÊME PHRASE, C'EST UNE PHRASE.
+                            Ce paragraphe de trois lignes se répétait sur chaque
+                            carte sans bordereau — vu en capture, quatre fois de
+                            suite en haut de l'écran. L'intertitre du groupe
+                            « En attente de leur bordereau » le dit une fois, au
+                            bon endroit. La carte ne garde que ce qui la
+                            distingue : Vinted doit-il encore le générer ? */}
+                        {aGenererBordereau(o && o.status) && (
+                          <div style={{flex:'1 1 120px',minWidth:0,fontSize:11.5,color:C.muted,lineHeight:1.4,alignSelf:'center'}}>
+                            Vinted ne l'a pas encore généré.
+                          </div>
+                        )}
                         <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
                       </>)}

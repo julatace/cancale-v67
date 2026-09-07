@@ -76,9 +76,16 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   const i = app.indexOf('const groupeDe');
   const F = i < 0 ? '' : app.slice(i, i + 1600);
   F ? ok('la liste des colis se découpe en groupes') : nok('`groupeDe` doit découper la liste des colis');
-  (/retard/.test(F) && /jour/.test(F) && /demain/.test(F) && /fait/.test(F))
-    ? ok('les groupes suivent l\'en-tête : retard, aujourd\'hui, demain, déjà postés')
-    : nok('les groupes doivent couvrir retard / aujourd\'hui / demain / déjà postés');
+  // ⚠️ ON GROUPE SUR CE QU'IL PEUT FAIRE, pas sur l'urgence. Vu en capture le
+  // 7 septembre : l'en-tête annonçait « 10 bordereaux prêts à imprimer » et les
+  // quatre premières cartes disaient « l'extension le récupère » — le tri par
+  // date limite mettait devant les seuls colis qu'il ne PEUT PAS traiter.
+  (/'pret'/.test(F) && /'attente'/.test(F) && /'fait'/.test(F))
+    ? ok('les groupes suivent ce qu\'il peut faire : prêts, en attente, déjà postés')
+    : nok('les groupes doivent couvrir prêt / en attente / déjà posté');
+  /const pret = \(e\) =>/.test(app) && /if \(ia !== ib\) return ia - ib/.test(app)
+    ? ok('les colis imprimables passent devant dans le tri')
+    : nok('un colis sans bordereau n\'est pas postable : il ne doit pas ouvrir la liste');
   // ⚠️ UN SEUL GROUPE = PAS D'INTERTITRE : il redirait mot pour mot le compteur
   // du haut, et le même nombre ne s'écrit pas deux fois sur un écran.
   /plusieursGroupes/.test(app)
