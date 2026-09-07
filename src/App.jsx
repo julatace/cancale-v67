@@ -14143,6 +14143,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La preuve d'expédition est CERTAINE (jamais un rapprochement par titre) :
   // un bordereau existe pour ce n° de transaction, ou le statut Vinted lui-même
   // porte un mot d'acheminement.
+  // ── LA LISTE DES ACHATS AFFICHÉS — même histoire que les ventes ─────────
+  // ⚠️ PLACÉ ICI, ET PAS PLUS HAUT (§4.6) : un `useMemo` s'exécute
+  // IMMÉDIATEMENT, donc après TOUT ce qu'il lit — `trackForBuy` et
+  // `achatStage` vivent juste au-dessus. Posé plus haut, l'écran Achats
+  // tombait sur « Cannot access 'Xc' before initialization » (vu en capture,
+  // le garde-fou d'écran l'a rattrapé — mais l'écran était mort).
+  // ⚠️ MESURÉ AU BANC LE 7 SEPTEMBRE, onglet « Tous » : **72 880 px de page sur
+  // iPhone** — quatre-vingt-six écrans de défilement — pour 8 844 nœuds et
+  // 329 photos. La chaîne de filtres vivait, là aussi, en plein milieu du JSX.
+  const achatsAffiches = useMemo(() => buysBase
+    .filter(o => { const p = phaseReception(o);
+      if (aFilter === 'attente') return false;
+      if (aFilter === 'route') return p === 'route';
+      if (aFilter === 'recus') return p === 'recu';
+      return true; })
+    .filter(o => matchOrd(o))
+    .sort(parDateDesc)
+    .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; })
+    // ⚠️ EN ROUTE : LE PLUS ANCIEN EN PREMIER. Ce qu'on veut voir quand on
+    // attend des colis, ce n'est pas le dernier acheté — c'est celui qui
+    // traîne depuis trois semaines. Partout ailleurs le plus récent d'abord.
+    .sort((a, b) => { const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
+      const d = pr(a) - pr(b); if (d !== 0) return d;
+      return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros]);
+  const [achatsMax, setAchatsMax] = useState(60);
+  useEffect(() => { setAchatsMax(60); }, [aFilter, ordSearchDiff, periode]);
+
+
   const venteStage = (o) => {
     const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
     if (classifyOrderStatus(o.status) === 'cancelled') return venteExpediee(o)
@@ -17765,24 +17795,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Les lignes portent deja `flexWrap` et une largeur plancher
             (§26), elles supportent la colonne plus etroite. */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px, 100%), 1fr))',gap:8,alignItems:'start'}}>
-          {buysBase.filter(o=>{ const p=phaseReception(o);
-            // « À retirer » ne déroule PAS une liste : les colis qui t'attendent
-            // sont déjà en haut, groupés par endroit avec leur code. Répéter la
-            // même chose en dessous, c'était le doublon qui rendait l'écran
-            // illisible (336 lignes pour 4 colis).
-            if(aFilter==='attente')return false;
-            if(aFilter==='route')return p==='route';
-            if(aFilter==='recus')return p==='recu';
-            return true; }).filter(o=>matchOrd(o))
-            .sort(parDateDesc)
-            .map(o=>({ o, tk:trackForBuy(o), st:achatStage(o, trackForBuy(o)) }))
-            // ⚠️ EN ROUTE : LE PLUS ANCIEN EN PREMIER. Ce qu'on veut voir quand on
-            // attend des colis, ce n'est pas le dernier acheté — c'est celui qui
-            // traîne depuis trois semaines. Partout ailleurs le plus récent
-            // d'abord (§5.35) : le tri ne change QUE sur cette étape.
-            .sort((a,b)=>{ const pr=x=> x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4; const d=pr(a)-pr(b); if(d!==0) return d;
-              return aFilter==='route' ? ((tsCommande(a.o)||0)-(tsCommande(b.o)||0)) : (new Date(b.o.date||0)-new Date(a.o.date||0)); })
-            .map(({o,tk,st})=>{
+          {/* « À retirer » ne déroule PAS de liste ici : les colis qui t'attendent
+              sont déjà en haut, groupés par endroit avec leur code. Répéter la
+              même chose en dessous, c'était le doublon qui rendait l'écran
+              illisible (336 lignes pour 4 colis). Voir `achatsAffiches`. */}
+          {achatsAffiches.slice(0, achatsMax).map(({o,tk,st})=>{
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
             return (
@@ -17820,7 +17837,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
-                  <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4}}>{o.price?.amount} {cur(o.price?.currency_code)}</div>
+                  {/* ⚠️ LE PRIX S'ÉCRIVAIT À L'ANGLAISE : « 21.0 € », « 6.73 € »
+                      — le montant brut de Vinted, recopié tel quel. Vu en
+                      capture le 7 septembre. Deux décimales et une virgule,
+                      comme partout ailleurs dans l'app. */}
+                  <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
                   {buyNumByTxn[String(o.transaction_id)]!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'1px 7px'}}>N°{buyNumByTxn[String(o.transaction_id)]}</span>}
                 </div>
               </div>
@@ -17862,6 +17883,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );})}
         </div>
+        {/* ⚠️ MÊME RÈGLE QUE LES VENTES : on dessine une tranche, le bouton
+            porte le TOTAL, rien n'est caché. Mesuré : l'onglet « Tous »
+            faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
+        {achatsAffiches.length > achatsMax && (
+          <button type="button" onClick={()=>setAchatsMax(n=>n+120)}
+            style={{width:'100%',marginTop:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
+            Voir plus — {achatsMax} affichés sur {achatsAffiches.length}
+          </button>
+        )}
       </>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}

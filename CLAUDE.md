@@ -243,6 +243,23 @@ refiltrer juste après → **~150 ms**, et le changement de filtre passe de 334 
   faut **remettre l'écran à zéro** avant de vérifier la pagination, sinon le
   banc mesure son absence comme un défaut.
 
+### L'écran Achats : même tranche, et un piège TDZ payé cash
+Onglet « Tous », mesuré au banc : **72 880 px de page sur iPhone** — quatre-vingt-six
+écrans — pour **544 commandes rendues d'un coup**. Même traitement que les
+ventes : `achatsAffiches` dans un `useMemo`, 60 cartes dessinées, bouton
+**« Voir plus — 60 affichés sur 534 »**. Mesuré : **8 844 → 1 261 nœuds**,
+**72 880 → 9 415 px**, recherche 227 → **69 ms**.
+- Le prix s'écrivait **à l'anglaise** (« 21.0 € », « 6.73 € ») : le montant brut
+  de Vinted recopié tel quel. Deux décimales et une virgule.
+- ⚠️ **§4.6 payé cash** : posé trop haut, ce `useMemo` s'exécute avant
+  `trackForBuy`/`achatStage` → **« Cannot access 'Xc' before initialization »**,
+  écran Achats mort. Il vit après `achatStage`.
+- ⚠️⚠️ **ET LE BANC N'A RIEN VU** : le garde-fou d'écran affiche un vrai texte,
+  sans débordement et sans `pageerror` (React attrape l'exception) — donc
+  « aucun écran vide », « aucune erreur d'app », **rendu conforme**. C'est la
+  CAPTURE qui l'a vu. `verif_visuel.cjs` teste désormais la présence de
+  « n'a pas pu s'afficher / Cannot access / is not defined ».
+
 ### La carte des points relais (Achats)
 **Mesuré le 6 septembre** : `vrm_ville` valait déjà « Cancale », `/api/relais`
 répond bien 5 points — mais `vrm_ville_points` était **absent** et l'écran ne

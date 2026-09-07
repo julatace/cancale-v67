@@ -183,5 +183,30 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('la tranche doit se remettre à 60 quand la liste change');
 }
 
+// 15) L'ÉCRAN ACHATS : même tranche, même règle, et un prix en français.
+// Mesuré au banc, onglet « Tous » : **72 880 px de page sur iPhone** —
+// quatre-vingt-six écrans — pour 544 commandes rendues d'un coup. Et le prix
+// s'écrivait à l'anglaise (« 21.0 € », « 6.73 € »), le montant brut de Vinted
+// recopié tel quel.
+{
+  /const achatsAffiches = useMemo/.test(app)
+    ? ok('la liste des achats est calculée une seule fois')
+    : nok('la chaîne de filtres ne doit pas vivre en plein milieu du JSX');
+  /achatsAffiches\.slice\(0, achatsMax\)/.test(app)
+    ? ok('et l\'écran n\'en dessine qu\'une tranche')
+    : nok('544 commandes d\'un coup font 72 880 px sur iPhone');
+  /Voir plus — \{achatsMax\} affichés sur \{achatsAffiches\.length\}/.test(app)
+    ? ok('le bouton « Voir plus » porte le total')
+    : nok('le bouton doit dire combien d\'achats existent en tout');
+  !/\{o\.price\?\.amount\} \{cur\(/.test(app)
+    ? ok('le prix d\'un achat s\'écrit en français')
+    : nok('« 21.0 € » : deux décimales et une virgule, comme partout ailleurs');
+  // ⚠️ §4.6 — un `useMemo` s'exécute IMMÉDIATEMENT : posé avant `achatStage`,
+  // il a tué l'écran Achats (« Cannot access 'Xc' before initialization »).
+  app.indexOf('const achatsAffiches') > app.indexOf('const achatStage')
+    ? ok('et il est déclaré APRÈS tout ce qu\'il lit (piège TDZ)')
+    : nok('`achatsAffiches` doit venir après `achatStage` et `trackForBuy`');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);
