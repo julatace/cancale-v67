@@ -3957,6 +3957,7 @@ const ICON_PATHS = {
   more:  <><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></>,
   sun:   <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   chart: <><path d="M5 20V10M12 20V4M19 20v-6"/></>,
+  grid:  <><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 9.7h17M3.5 15.3h17M9.7 3.5v17M15.3 3.5v17"/></>,
   tag:   <><path d="M3.5 11.2V4.5a1 1 0 0 1 1-1h6.7a1 1 0 0 1 .7.3l8.3 8.3a1 1 0 0 1 0 1.4l-6.7 6.7a1 1 0 0 1-1.4 0L3.8 11.9a1 1 0 0 1-.3-.7Z"/><circle cx="8" cy="8" r="1.4"/></>,
   cash:  <><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 12h.01M18 12h.01"/></>,
   bag:   <><path d="M4.6 8.4h14.8l-1.1 11.4a2 2 0 0 1-2 1.8H7.7a2 2 0 0 1-2-1.8L4.6 8.4Z"/><path d="M8.7 10V6.9a3.3 3.3 0 0 1 6.6 0V10"/></>,
@@ -6755,14 +6756,15 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
-        <ScreenHead icon="receipt" title={`Factures (${invoices.length})`} desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
-          right={<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+        <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
+          right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
-          <Btn small onClick={()=>fetchVintedInvoices(false)} color={C.purple} disabled={fetching}>
-            {fetching?'⏳ Chargement...':'📥 Récupérer Vinted'}
+          <Btn small outline color={C.muted} onClick={()=>fetchVintedInvoices(false)} disabled={fetching}
+            style={{display:'inline-flex',alignItems:'center',gap:5}}>
+            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Récupérer Vinted'}
           </Btn>
-          <Btn small onClick={exportExcel} color={C.blue}>📤 Exporter Excel</Btn>
-          <Btn small onClick={()=>setShowSettings(true)} color={C.border}>⚙ Réglages</Btn>
+          <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages</Btn>
         </div>}/>
       </div>
 
@@ -6823,13 +6825,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
       {/* Sous-onglets zones */}
       <div style={{display:'flex',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
         {[
-          {id:'attente',icon:'⏳',label:'En attente',count:counters.attente},
-          {id:'comptabilisees',icon:'✅',label:'Comptabilisées',count:counters.comptabilisees},
+          {id:'attente',icon:'clock',label:'En attente',count:counters.attente},
+          {id:'comptabilisees',icon:'check',label:'Comptabilisées',count:counters.comptabilisees},
         ].map(z=>(
           <button key={z.id} type="button" onClick={()=>{setZone(z.id);setPage(null);}}
             style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
               color:zone===z.id?C.accent:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:500,fontFamily:'inherit',whiteSpace:'nowrap'}}>
-            {z.icon} {z.label} ({z.count})
+            <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
           </button>
         ))}
       </div>
@@ -6852,7 +6854,27 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
             </tr>
           </thead>
           <tbody>
-            {list.length===0&&<tr><td colSpan={7} style={{padding:30,textAlign:'center',color:C.muted}}>{search.trim()?`Aucune facture trouvée pour « ${search} »`:`Aucune facture ${zone==='attente'?'en attente':'comptabilisée'}`}</td></tr>}
+            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
+                développeur — « Aucune facture en attente » ne se rattrape
+                nulle part). D'où l'origine des lignes, et la porte : le même
+                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
+                constate le vide. */}
+            {list.length===0&&<tr><td colSpan={7} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:12.5,lineHeight:1.5}}>
+              {search.trim()
+                ? <>Aucune facture trouvée pour « {search} ».</>
+                : zone==='attente'
+                  ? <>Aucune facture en attente.<br/>
+                      <span style={{fontSize:11.5}}>Elles arrivent de tes emails Vinted, par ta feuille Google.</span>
+                      <br/>
+                      <span style={{display:'inline-block',marginTop:10}}>
+                        <Btn small outline color={C.accent} onClick={()=>fetchVintedInvoices(false)} disabled={fetching}
+                          style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sync" size={13}/>{fetching?'Chargement…':'Aller les chercher maintenant'}</Btn>
+                      </span>
+                    </>
+                  : <>Aucune facture comptabilisée.<br/>
+                      <span style={{fontSize:11.5}}>Une facture arrive ici quand tu la marques comptabilisée.</span>
+                    </>}
+            </td></tr>}
             {list.map(inv=>{
               const isAccounted=accountedSet.has(String(inv.productId).trim());
               return (
@@ -8533,7 +8555,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
                 soit la largeur. */}
             <div style={{ position: 'absolute', left: 8, bottom: 8, display: 'flex', gap: 6 }}>
               <button onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
-              <button onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus">🗺️</button>
+              <button onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus"><Icon name="grid" size={18}/></button>
               {sel && <button onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
             </div>
             <div style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
@@ -9226,7 +9248,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
       {/* Sélecteur de pièces — passer d'une pièce à l'autre */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center' }}>🏠 Pièces :</span>
+        <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 800, alignSelf: 'center', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="home" size={13}/>Pièces :</span>
         {plan.rooms.map(r => {
           const on = r.id === activeRoom.id;
           return (
