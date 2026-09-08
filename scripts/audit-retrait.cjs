@@ -138,14 +138,30 @@ dit(/colisRetireAilleurs/.test(APP), 'et il le sort AUSSI de la ligne du second 
 // tournaient à la minute sur sept comptes. `capterRetraits` écrit son compteur
 // dès qu'il s'exécute, MÊME EN ÉCHEC (`retrait_conv_refuse_*`,
 // `retrait_conv_sans_message`). Zéro compteur = la fonction n'a jamais tourné :
-// l'extension installée est antérieure a 5.52.
+// l'extension installée est antérieure a 5.45 (la version qui l'a apporté).
 // ⇒ « Passe sur Vinted, l'extension ira chercher les codes » etait donc une
 // promesse que SON extension ne peut pas tenir — et on l'envoyait ouvrir Vinted
 // pour rien. C'est le défaut le plus coûteux du projet (l'app promet ce que
 // l'extension ne fait pas), refait. Le premier geste est la mise à jour.
-dit(/const EXT_LIT_LES_CODES\s*=/.test(APP),
-  "l'app sait à partir de quelle version l'extension lit les codes",
-  'sinon elle promet la fonction de la DERNIÈRE version, pas de celle installée');
+// ⚠️ LE CONTRÔLE PORTE SUR LA RÈGLE, PAS SUR L'ORTHOGRAPHE (même leçon que
+// `audit-identite`, qui cherchait un nom de variable). Ce qu'on exige : que
+// l'app connaisse un SEUIL DE VERSION pour cette capacité. Il vivait dans
+// `EXT_LIT_LES_CODES`, il vit maintenant dans la table `EXT_CAPACITES` avec les
+// deux autres — l'audit ne doit pas casser pour ça.
+// ⚠️ ET LE SEUIL EST LA VERSION OÙ LA CAPACITÉ EST ARRIVÉE, PAS LA DERNIÈRE
+// PUBLIÉE : `capterRetraits` est arrivé en 5.45 (27 août), pas en 5.52. Exiger
+// 5.52 ferait dire à une 5.48 « je ne sais pas encore lire les codes » — faux
+// dans l'autre sens, et il chercherait une mise à jour qui ne change rien.
+{
+  const m = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
+  const seuil = m && /codes\s*:\s*'([0-9.]+)'/.exec(m[1]);
+  dit(!!seuil,
+    "l'app sait à partir de quelle version l'extension lit les codes",
+    'sinon elle promet la fonction de la DERNIÈRE version, pas de celle installée');
+  if (seuil) dit(seuil[1] === '5.45.0',
+    "et ce seuil est la version où `capterRetraits` est ARRIVÉ",
+    `déclaré ${seuil[1]} — mesuré 5.45.0 (27 août)`);
+}
 dit(/extSaitLireCodes/.test(APP),
   "et elle distingue « absente » / « en retard » / « à jour »");
 // La promesse et le repli doivent coexister : jamais la promesse toute seule.
