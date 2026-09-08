@@ -17354,6 +17354,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const aCode = (o) => { const r = relaisDe(o); return !!(r && codeRetrait(r.code)); };
                   const avecCode = pt.colis.some(aCode);
                   const melange  = avecCode && pt.colis.some(o => !aCode(o));
+                  // ⚠️ LE COMPTE AUSSI EST UNE PHRASE DE GROUPE QUAND IL EST LE
+                  //    MÊME. Vu en capture le 8 septembre : « compte
+                  //    julatace3535 » écrit CINQ fois, sous cinq titres
+                  //    différents, alors que les cinq colis sont sur ce
+                  //    compte-là. C'est §7 mot pour mot — la ligne ne reprend la
+                  //    phrase du groupe que si le groupe est MIXTE, là seulement
+                  //    elle distingue. Il en a neuf, donc on le NOMME toujours :
+                  //    une fois en tête si c'est le même, sur chaque ligne sinon.
+                  const comptesGr = [...new Set(pt.colis.map(o => (o && o._acc) ? accName(o._acc) : '').filter(Boolean))];
+                  const memeCompte = comptesGr.length === 1 ? comptesGr[0] : null;
                   return (
                 <div key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
@@ -17385,7 +17395,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         : (()=>{ const e = extSaitLireCodes();
                             if (e === 'retard') return "Ton extension est en retard : cette version-là ne sait pas encore aller lire les codes. Mets-la à jour (Réglages), puis passe sur Vinted avec le compte indiqué. En attendant, ouvre la conversation : le code y est.";
                             if (e === 'absente') return "Sur téléphone il n'y a pas d'extension : ouvre la conversation Vinted du colis, le code et le QR y sont.";
-                            return "L'extension va chercher le code toute seule : passe sur Vinted connecté avec le compte indiqué ci-dessous (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite."; })()}
+                            return `L'extension va chercher le code toute seule : passe sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'} (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite.`; })()}
+                      {memeCompte && !avecCode && extSaitLireCodes() !== 'ok' && <> Ils sont tous sur <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b>.</>}
                     </span>
                   </div>
                   {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
@@ -17420,7 +17431,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             SEUL — mais seulement pour le compte connecté dans
                             l'onglet : encore faut-il savoir lequel. C'est tout
                             ce qui manquait. */}
-                        {o && o._acc && (
+                        {o && o._acc && !memeCompte && (
                           <div style={{fontSize:11,color:C.muted,marginTop:2}}>
                             compte <b style={{color:C.text,fontWeight:600}}>{accName(o._acc)}</b>
                           </div>
@@ -17436,8 +17447,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {(()=>{
                           const href = (rel && (rel.qr || rel.url)) || lienConv(o);
                           if (!href) return null;
+                          // ⚠️ MÊME RÈGLE POUR LE LIBELLÉ. « → le code arrive
+                          //    tout de suite » explique la même chose que
+                          //    l'en-tête du groupe : répété sur les cinq lignes,
+                          //    c'est cinq fois une phrase. Il ne reste que
+                          //    lorsqu'il DISTINGUE — groupe mixte, ce colis-ci
+                          //    n'a pas son code alors que ses voisins l'ont.
                           const quoi = (rel && rel.qr) ? 'Voir le QR de retrait ↗'
-                            : cd ? 'Ouvrir la conversation ↗'
+                            : (cd || !melange) ? 'Ouvrir la conversation ↗'
                             : 'Ouvrir la conversation → le code arrive tout de suite ↗';
                           return (
                             <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
