@@ -30,6 +30,17 @@ const cmpVersion = (a, b) => {
 // pour l'annoncer, ou pont pas encore prêt) : dire « en retard » sans le savoir
 // enverrait recharger pour rien.
 const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
+// ⚠️ « L'extension va chercher les codes toute seule » n'est vrai QUE si celle
+// qui est installée sait le faire. `capterRetraits` est arrivé en 5.52 : en
+// dessous, la promesse est fausse et on envoie Julien ouvrir Vinted pour rien.
+// Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
+const EXT_LIT_LES_CODES = '5.52.0';
+const extSaitLireCodes = () => {
+  if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
+  const v = vmrExtVersion();
+  if (!v) return 'inconnue';                                 // détectée mais muette sur sa version
+  return cmpVersion(v, EXT_LIT_LES_CODES) < 0 ? 'retard' : 'ok';
+};
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -15727,6 +15738,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : pr>0 ? 'Tu as le code — plus qu\'à aller les chercher'
             : (()=>{ const cs = (pickupUnion.comptesSansCode||[]).map(a=>accName(a)).filter(Boolean);
                      const qui = cs.length===1 ? `sur ${cs[0]}` : cs.length>1 ? `sur ${cs.slice(0,3).join(', ')}${cs.length>3?'…':''}` : 'avec le bon compte';
+                     const e = extSaitLireCodes();
+                     if (e === 'retard') return `Mets d'abord ton extension à jour — celle installée ne sait pas encore lire les codes`;
+                     if (e === 'absente') return `Ouvre la conversation Vinted du colis : le code y est`;
                      return `Passe sur Vinted connecté ${qui} : l'extension va chercher les codes toute seule`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
@@ -17187,7 +17201,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{fontSize:11.5,color:C.muted,flex:'1 1 140px',minWidth:0}}>
                       {avecCode
                         ? 'Donne le code de retrait, ou scanne le QR depuis la conversation Vinted'
-                        : 'L\'extension va chercher le code toute seule : passe sur Vinted connecté avec le compte indiqué ci-dessous (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite.'}
+                        : (()=>{ const e = extSaitLireCodes();
+                            if (e === 'retard') return "Ton extension est en retard : cette version-là ne sait pas encore aller lire les codes. Mets-la à jour (Réglages), puis passe sur Vinted avec le compte indiqué. En attendant, ouvre la conversation : le code y est.";
+                            if (e === 'absente') return "Sur téléphone il n'y a pas d'extension : ouvre la conversation Vinted du colis, le code et le QR y sont.";
+                            return "L'extension va chercher le code toute seule : passe sur Vinted connecté avec le compte indiqué ci-dessous (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite."; })()}
                     </span>
                   </div>
                   {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Colis et Ventes.
@@ -22891,7 +22908,9 @@ export default function App() {
             ? `${prets} colis à retirer — tu as le code · ${sans} attendent le leur`
             : prets > 0
               ? `${prets} colis à retirer — tu as le code ou l'adresse`
-              : `${sans} colis à retirer — l'extension va chercher leur code`;
+              : extSaitLireCodes() === 'retard'
+                ? `${sans} colis à retirer — mets ton extension à jour pour qu'elle lise les codes`
+                : `${sans} colis à retirer — l'extension va chercher leur code`;
           items.push({icon:'📦', ic:'box', text, n:total, tab:'cat_achats'});
         }
       }

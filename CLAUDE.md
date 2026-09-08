@@ -172,8 +172,31 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
 - Ce qui marche : **le code et le QR vivent dans la conversation Vinted**. Chaque
   colis à retirer ouvre la sienne (`conversation_id`). L'extension y lit le code
   et le dépose dans `panel_colis_relais`.
-- ⚠️ **L'extension VA CHERCHER les codes toute seule — et l'app disait le
-  contraire.** `capterRetraits(uid)` (posé le 27 août, dans `background.js`)
+- ⚠️⚠️ **MESURÉ LE 8 SEPTEMBRE : SON EXTENSION NE SAIT PAS ENCORE LE FAIRE.**
+  Sur les **42 compteurs** que l'extension tient (`panel_diag_capture.n`),
+  **aucun `retrait_*` ni `releve_*`** — alors que `bordereau_genere`,
+  `label_envoye` et tous les `ecrit_*` tournaient à la minute sur **sept
+  comptes** (captures de 9 à 11 minutes). Or `capterRetraits` écrit son compteur
+  dès qu'il s'exécute, **même en échec** (`retrait_conv_refuse_*`,
+  `retrait_conv_sans_message`). **Zéro compteur = la fonction n'a jamais
+  tourné** : l'extension installée est antérieure à 5.52. `panel_colis_relais`
+  n'existe même pas en base.
+  ⇒ Et le 7 septembre je lui avais dit « passe sur Vinted connecté sur
+  `julatace3535`, l'extension ira chercher les codes toute seule », et **l'app
+  le lui disait aussi**. C'était une promesse que SON extension ne peut pas
+  tenir — le défaut le plus coûteux du projet (§ zip), refait à l'identique.
+  ⇒ Corrigé : `extSaitLireCodes()` distingue **absente** (téléphone → « ouvre la
+  conversation, le code y est ») · **en retard** (→ « mets-la à jour d'abord,
+  celle installée ne sait pas encore lire les codes ») · **à jour** (→ la
+  promesse). `audit-retrait.cjs` exige qu'aucune promesse « toute seule » ne
+  s'affiche sans cette garde.
+  ⚠️ **Autre chose que la mesure a démentie** : les colis à retirer ne sont pas
+  tous sur `julatace3535`. Il y en a **6**, dont **1 sur `julatace35260`** — un
+  compte capté il y a 10 minutes. Toutes les conditions y étaient réunies, et
+  rien n'a été écrit : c'est ce qui prouve que le problème n'est pas le compte,
+  mais la version.
+- ⚠️ **L'extension VA CHERCHER les codes toute seule** (à partir de la 5.52) —
+  **et l'app disait le contraire.** `capterRetraits(uid)` (posé le 27 août, dans `background.js`)
   tourne à **chaque visite sur Vinted** : il prend les achats que Vinted dit
   « déposés en point relais », ouvre leur conversation par l'API et en lit le
   code. Bornes : **3 par visite**, pas de nouvel essai avant 6 h, et
@@ -589,7 +612,7 @@ lus dans ses conversations) en dépendait.
 | pool de numéros | 456, sans trou, plus haut = 456 (append-only : c'est normal) |
 | ⚠️ numéros en double | **13**, tous HISTORIQUES : N°1 à N°16 redonnés par la numérotation auto les 2/4/6/15/16 août. **Cause : sur un appareil neuf le pool était lu VIDE au montage**, le nuage arrivant 500 ms plus tard → la numérotation repartait de 1. Corrigé (`onCloudReady` relit le pool) et protégé par `audit-identite.cjs`. **Aucun n'est vivant** : les paires en double sont fermées. |
 | argent Vinted | **281,94 € disponibles** à virer · **2 235,80 € retenus** (9 porte-monnaie) |
-| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · 5 colis à retirer, **0 code** — tous sur `julatace3535`, où l'extension n'est jamais passée ; elle ira les chercher toute seule dès qu'il s'y connecte |
+| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · **6** colis à retirer, **0 code** — 5 sur `julatace3535` (dernière capture : 4 j) et **1 sur `julatace35260`, capté il y a 10 min**. ⚠️ Ce n'est PAS le compte qui bloque : **son extension est antérieure à 5.52**, elle n'a pas `capterRetraits` (0 compteur `retrait_*` sur 42). La mise à jour est le premier geste. |
 | notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
 | comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
 | ventes masquées | 209 (masquées à la main ; « tout réafficher » existe sur l'écran Ventes) |
