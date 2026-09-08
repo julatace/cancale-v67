@@ -190,6 +190,15 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   celle installée ne sait pas encore lire les codes ») · **à jour** (→ la
   promesse). `audit-retrait.cjs` exige qu'aucune promesse « toute seule » ne
   s'affiche sans cette garde.
+  ⚠️ **Et le premier jet de cette garde avait le même trou.** Le pont n'annonce
+  sa version que **depuis la 5.26** (posé le 17 août) : une extension plus
+  ancienne est détectée mais **muette**. Or `extEnRetard` exigeait `!!v` — donc
+  **aucun bandeau** — et `extSaitLireCodes` répondait « inconnue », qui
+  retombait sur la PROMESSE. **L'extension la plus en retard était la seule à ne
+  rien déclencher.** Se taire veut dire « plus vieille que 5.26 » : c'est traité
+  comme un retard, et le bandeau s'affiche avec « ? → 5.52.0 ».
+  ⇒ C'est le miroir exact de la leçon du panneau de sécurité : **« pas su » ne
+  vaut pas « oui »**. À vérifier partout où l'app décide sur une capacité.
   ⚠️ **Autre chose que la mesure a démentie** : les colis à retirer ne sont pas
   tous sur `julatace3535`. Il y en a **6**, dont **1 sur `julatace35260`** — un
   compte capté il y a 10 minutes. Toutes les conditions y étaient réunies, et
