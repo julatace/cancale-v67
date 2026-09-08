@@ -160,6 +160,20 @@ dit(/ne sait pas encore lire les codes|ne sait pas encore aller lire les codes|m
   "et une extension en retard s'entend dire de se mettre à jour d'abord",
   "l'envoyer sur Vinted ne donnerait rien");
 
+// ── 8. UNE CAPACITÉ NON PROUVÉE N'EST PAS UNE CAPACITÉ ────────────────────
+// Le pont n'annonce sa version que DEPUIS la 5.26 (17 août). Une extension
+// plus ancienne est détectée mais MUETTE — et c'est la plus en retard de
+// toutes. Or `extEnRetard` exigeait `!!v` : elle ne déclenchait donc AUCUN
+// bandeau, et le premier jet de `extSaitLireCodes` répondait « inconnue »,
+// qui retombait sur la promesse. Miroir exact de la leçon du panneau de
+// sécurité : « pas su » ne vaut pas « oui ».
+dit(!/if \(!v\) return 'inconnue'/.test(APP),
+  "une extension muette sur sa version ne passe plus pour capable",
+  "se taire veut dire « plus vieille que 5.26 »");
+dit(/const muette = ext\.on && !ext\.v/.test(APP),
+  "et le bandeau de retard s'affiche aussi pour elle",
+  "c'etait la seule a ne rien declencher");
+
 console.log(ko
   ? `\n${ko} contrôle(s) non conforme(s).`
   : '\nUn colis à retirer offre toujours une porte, et aucun ne repart en silence.');

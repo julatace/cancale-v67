@@ -38,7 +38,9 @@ const EXT_LIT_LES_CODES = '5.52.0';
 const extSaitLireCodes = () => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
   const v = vmrExtVersion();
-  if (!v) return 'inconnue';                                 // détectée mais muette sur sa version
+  // Muette sur sa version = antérieure à 5.26 (le pont l'annonce depuis) —
+  // donc très loin des 5.52 : on ne promet rien.
+  if (!v) return 'retard';
   return cmpVersion(v, EXT_LIT_LES_CODES) < 0 ? 'retard' : 'ok';
 };
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
@@ -3533,11 +3535,16 @@ function NotifsMuettes({ onNav }) {
 function ExtEnRetard({ onNav }) {
   const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
   useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
-  if (!ext.on || !extEnRetard(ext.v)) return null;
+  // ⚠️ ET LE BANDEAU DOIT S'AFFICHER AUSSI QUAND ELLE NE DIT PAS SA VERSION :
+  // le pont l'annonce depuis la 5.26, donc se taire veut dire « plus vieille
+  // que ça ». `extEnRetard` exigeait `!!v` : l'extension la plus en retard
+  // était précisément la seule à ne rien déclencher.
+  const muette = ext.on && !ext.v;
+  if (!ext.on || (!muette && !extEnRetard(ext.v))) return null;
   return (
     <Notice tone="warn" icon="alert"
       title="Ton extension VRM est en retard"
-      value={`${ext.v} → ${EXT_ATTENDUE}`}
+      value={muette ? `? → ${EXT_ATTENDUE}` : `${ext.v} → ${EXT_ATTENDUE}`}
       desc="Elle capte toujours, mais moins que ce que l'app attend — et elle ne le dit pas d'elle-même. C'est elle qui va chercher les codes de retrait dans tes conversations Vinted."
       /* ⚠️ « CLIQUE SUR ⟳ » NE SUFFIT PAS, ET C'EST CE QUI L'A BLOQUÉ DES
          SEMAINES : la flèche ronde recharge le DOSSIER du disque — donc la
