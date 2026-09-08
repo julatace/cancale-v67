@@ -131,6 +131,35 @@ dit(/const suivisRetires/.test(APP) && /status === 'delivered'/.test(APP),
   'un email « colis retiré » sort le colis de la liste (n° de suivi = identité)');
 dit(/colisRetireAilleurs/.test(APP), 'et il le sort AUSSI de la ligne du second transporteur');
 
+// ── 7. NE JAMAIS PROMETTRE CE QUE SON EXTENSION NE SAIT PAS FAIRE ─────────
+// Mesuré le 8 septembre sur la vraie base : sur les 42 compteurs que
+// l'extension tient (`panel_diag_capture.n`), AUCUN `retrait_*` ni `releve_*`
+// — alors que `bordereau_genere`, `label_envoye` et tous les `ecrit_*`
+// tournaient à la minute sur sept comptes. `capterRetraits` écrit son compteur
+// dès qu'il s'exécute, MÊME EN ÉCHEC (`retrait_conv_refuse_*`,
+// `retrait_conv_sans_message`). Zéro compteur = la fonction n'a jamais tourné :
+// l'extension installée est antérieure a 5.52.
+// ⇒ « Passe sur Vinted, l'extension ira chercher les codes » etait donc une
+// promesse que SON extension ne peut pas tenir — et on l'envoyait ouvrir Vinted
+// pour rien. C'est le défaut le plus coûteux du projet (l'app promet ce que
+// l'extension ne fait pas), refait. Le premier geste est la mise à jour.
+dit(/const EXT_LIT_LES_CODES\s*=/.test(APP),
+  "l'app sait à partir de quelle version l'extension lit les codes",
+  'sinon elle promet la fonction de la DERNIÈRE version, pas de celle installée');
+dit(/extSaitLireCodes/.test(APP),
+  "et elle distingue « absente » / « en retard » / « à jour »");
+// La promesse et le repli doivent coexister : jamais la promesse toute seule.
+{
+  const promesses = (APP.match(/extension va chercher (?:le|les) codes? toute seule/g) || []).length;
+  const gardes    = (APP.match(/extSaitLireCodes\(\)/g) || []).length;
+  dit(gardes >= promesses,
+    'chaque promesse « toute seule » est gardée par une vérification de version',
+    `${promesses} promesse(s) · ${gardes} garde(s)`);
+}
+dit(/ne sait pas encore lire les codes|ne sait pas encore aller lire les codes|mets ton extension à jour/i.test(APP),
+  "et une extension en retard s'entend dire de se mettre à jour d'abord",
+  "l'envoyer sur Vinted ne donnerait rien");
+
 console.log(ko
   ? `\n${ko} contrôle(s) non conforme(s).`
   : '\nUn colis à retirer offre toujours une porte, et aucun ne repart en silence.');
