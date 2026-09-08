@@ -148,6 +148,23 @@ qu'aucune règle n'en désigne une.
   sans qu'il le redemande.
 - Le rapport comptable dit « CA des ventes finalisées », **jamais « encaissé »** :
   l'URSSAF demande légalement les recettes encaissées, et l'app ne les connaît pas.
+- ⚠️⚠️ **LA PHRASE QUI EXPLIQUE UN CHIFFRE DOIT VENIR DE LA MÊME SOURCE QUE LUI.**
+  Vu en capture le 8 septembre, sur la carte du mois du Tableau de bord :
+  « À payer (13,5 %) **19,32 €** », et juste dessous « Calculé sur le CA des
+  ventes finalisées de septembre (**0,00 €**) ». 19,32 € vient bien de
+  **143,10 €** — la ligne publiée par l'écran Ventes ; le `0,00 €` venait de
+  l'**ancienne archive**, vide depuis juillet 2026. Les CHIFFRES avaient été
+  rebranchés sur le bon propriétaire, **la phrase était restée en arrière** —
+  et le commentaire du code disait pourtant que l'archive n'était plus la
+  source. Sur l'écran où il décide ce qu'il verse à l'URSSAF.
+  ⚠️ Même carte, même passe : « Ventes **26** » à côté d'un montant calculé sur
+  **2** ventes finalisées. Un total partiel présenté comme complet est pire
+  qu'un total absent : c'est « Ventes finalisées 2 · sur 26 vendues ce
+  mois-ci » — la couverture À CÔTÉ, jamais à la place.
+  ⇒ Le banc `urssaf.cjs` ne lit **aucun libellé pour juger** : il prend les
+  nombres rendus et exige `CA × taux = à payer` et `CA − à payer = net`, plus
+  l'égalité avec la ligne publiée. Un contrôle posé sur la formulation serait
+  vert le jour où quelqu'un reformule (§6.5). 4 échecs sur le code d'avant.
 
 ### Le reçu d'achat part chez un comptable
 Il dit **qui achète** (l'entité des Factures : raison sociale, adresse, SIRET —
@@ -206,7 +223,7 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   compte capté il y a 10 minutes. Toutes les conditions y étaient réunies, et
   rien n'a été écrit : c'est ce qui prouve que le problème n'est pas le compte,
   mais la version.
-- ⚠️ **L'extension VA CHERCHER les codes toute seule** (à partir de la 5.52) —
+- ⚠️ **L'extension VA CHERCHER les codes toute seule** (à partir de la **5.45**) —
   **et l'app disait le contraire.** `capterRetraits(uid)` (posé le 27 août, dans `background.js`)
   tourne à **chaque visite sur Vinted** : il prend les achats que Vinted dit
   « déposés en point relais », ouvre leur conversation par l'API et en lit le
@@ -283,10 +300,16 @@ l'attente, et le disponible ne vivait que dans une phrase d'explication de
 l'écran Statistiques. Les deux sont maintenant sur la ligne d'accueil, sur deux
 lignes et avec deux mots différents (`escrow`/`main` — jamais `balance` mélangé,
 §5.14), et un solde de plus de 7 jours annonce son âge.
-⚠️ **Le RELEVÉ daté reste introuvable** : ce que l'extension capte sous
-`billing` n'est que le **solde** (`{main, escrow}`), jamais une liste de
-mouvements — d'où `harvest_*_releve_*` = 0 ligne. Même cause que les
-conversations : Vinted ne charge le relevé que si on ouvre cette page-là.
+⚠️ **Le RELEVÉ daté : ce paragraphe disait le contraire de §8, corrigé le
+8 septembre.** Il affirmait « introuvable — Vinted ne charge le relevé que si
+on ouvre cette page-là ». C'était vrai de la voie PASSIVE : sous `billing`,
+l'extension ne capte que le **solde** (`{main, escrow}`). Mais depuis la
+**5.52** `capterReleves` va le chercher activement
+(`/api/v2/users/{pid}/payouts?year=&month=`, borné, `garde`, un compte marqué
+muet s'il ignore le paramètre). `harvest_*_releve_*` = 0 ligne chez lui **parce
+que son extension est plus ancienne**, pas parce que la donnée n'existe pas.
+Deux sections du dossier se contredisaient sur le même fait — ne pas relire §8
+en croyant celle-ci.
 
 ### L'écran Colis se range sur CE QU'IL PEUT FAIRE
 **Vu en capture le 7 septembre, sur ses vraies données** : l'en-tête annonçait
@@ -708,7 +731,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 27 audits
-scripts/bancs/                  les 10 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 12 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

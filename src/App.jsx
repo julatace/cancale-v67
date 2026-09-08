@@ -5314,6 +5314,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
     const e = urssafMois.find(m=>m.ym===ym);
     return e ? e.ca : 0;
   }, [urssafMois, moisCourant.ca]);
+  // ⚠️ ET LE NOMBRE DE VENTES AUSSI, DE LA MÊME LIGNE. La carte affichait
+  //    `liveStats.ventesMois` — TOUTES les ventes du mois (26 en septembre) —
+  //    juste à côté d'un « à payer » calculé sur les **finalisées** (2). Un
+  //    total partiel présenté comme complet est pire qu'un total absent (§5) :
+  //    26 et 19,32 € ne parlent pas des mêmes lignes, et rien ne le disait.
+  //    `n` vit dans la MÊME ligne publiée que `ca` — ils ne peuvent pas diverger.
+  const moisCourantN = useMemo(() => {
+    if (!urssafMois) return null;
+    const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const e = urssafMois.find(m=>m.ym===ym);
+    return e ? (e.n || 0) : 0;
+  }, [urssafMois]);
   const urssafEstime=moisCourantCA*TAUX_URSSAF;
   const netApresUrssaf=moisCourantCA-urssafEstime;
   // Échéance de déclaration URSSAF (fréquence réglable) + CA encaissé de la
@@ -5611,8 +5623,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:22}}>
           <div>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Ventes</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{liveStats&&liveStats.ventesMois!=null?liveStats.ventesMois:moisCourant.count}</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Ventes finalisées</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{moisCourantN!=null?moisCourantN:(liveStats&&liveStats.ventesMois!=null?liveStats.ventesMois:moisCourant.count)}</div>
+            {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
+                n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
+                doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
+            {moisCourantN!=null && liveStats && liveStats.ventesMois!=null && liveStats.ventesMois>moisCourantN && (
+              <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>sur {liveStats.ventesMois} vendue{liveStats.ventesMois>1?'s':''} ce mois-ci</div>
+            )}
           </div>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice</div>
@@ -5631,7 +5649,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
           </div>
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
-          Calculé sur le CA des ventes <b>finalisées</b> de {moisCourant.nom} ({fmt(moisCourant.ca)}), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).
+          {/* ⚠️⚠️ CETTE PHRASE CITAIT `moisCourant.ca` — L'ANCIENNE ARCHIVE, VIDE
+              DEPUIS JUILLET 2026, donc « (0,00 €) ». Le commentaire juste
+              au-dessus dit pourtant que le récap ne vient plus de là. Les
+              CHIFFRES avaient été rebranchés sur la ligne publiée, la phrase
+              qui les explique était restée en arrière : l'écran affichait
+              « 19,32 € à payer » et, dessous, « calculé sur 0,00 € ». Sur
+              l'écran où il décide ce qu'il verse à l'URSSAF, c'est le pire
+              endroit possible pour un chiffre invérifiable (§2.7). */}
+          Calculé sur le CA des ventes <b>finalisées</b> de {moisCourant.nom} (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).
         </div>
         {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ sur la période.
             L'app date chaque vente au jour où elle a été VENDUE — la date à
