@@ -30,19 +30,35 @@ const cmpVersion = (a, b) => {
 // pour l'annoncer, ou pont pas encore prêt) : dire « en retard » sans le savoir
 // enverrait recharger pour rien.
 const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
-// ⚠️ « L'extension va chercher les codes toute seule » n'est vrai QUE si celle
-// qui est installée sait le faire. `capterRetraits` est arrivé en 5.52 : en
-// dessous, la promesse est fausse et on envoie Julien ouvrir Vinted pour rien.
+// ⚠️ « L'extension le fait toute seule » n'est vrai QUE si celle qui est
+// installée sait le faire. Une capacité arrivée en 5.45 n'existe pas dans une
+// 5.30 : la promesse est alors fausse, et on envoie Julien attendre pour rien.
+// C'est le défaut le plus coûteux du projet (§ zip), et il s'est reproduit
+// trois fois — d'où une seule table, relue à chaque ajout.
+//
+// ⚠️ CHAQUE CAPACITÉ PORTE LA VERSION OÙ ELLE EST ARRIVÉE, PAS LA DERNIÈRE
+// PUBLIÉE. Premier jet : « les codes exigent 5.52 » — or `capterRetraits` est
+// arrivé en 5.45 (27 août). Une 5.48 installée sait très bien les lire, et
+// l'app lui aurait dit « celle installée ne sait pas encore » : faux dans
+// l'autre sens, et il aurait cherché une mise à jour qui ne changeait rien.
+// Vérifié commit par commit sur `vinted-sync-extension/manifest.json` :
+//   codes   `capterRetraits`      5.45.0  (27 août)   le code de retrait, lu dans la conversation
+//   offres  `autoAccepterOffres`  5.38.0  (26 août)   accepter une offre au-dessus du plancher
+//   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
+// `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
+// l'extension : une capacité annoncée mais retirée serait le même mensonge.
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
-const EXT_LIT_LES_CODES = '5.52.0';
-const extSaitLireCodes = () => {
+const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
   const v = vmrExtVersion();
   // Muette sur sa version = antérieure à 5.26 (le pont l'annonce depuis) —
-  // donc très loin des 5.52 : on ne promet rien.
+  // donc antérieure à TOUTES ces capacités : on ne promet rien.
+  // « Pas su » ne vaut pas « oui » (leçon du panneau de sécurité).
   if (!v) return 'retard';
-  return cmpVersion(v, EXT_LIT_LES_CODES) < 0 ? 'retard' : 'ok';
+  return cmpVersion(v, EXT_CAPACITES[quoi] || EXT_ATTENDUE) < 0 ? 'retard' : 'ok';
 };
+const extSaitLireCodes = () => extSait('codes');
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -13556,16 +13572,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // est affiché en dessous. Avant, il partait de listings.items (TOUS les
     // comptes, même déconnectés) → « 42 en ligne » avec 30 cartes visibles.
     const arr = annBase;
-    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0;
+    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, planchers=0;
     for (const it of arr) {
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
       if (it.views!=null) { views+=it.views; hasView=true; }
       if (!(numeros[it.id]?.numero)) sansNum++;
+      // ⚠️ UN SEUL PROPRIÉTAIRE (§11) : le compte de prix planchers se calcule
+      //    ICI, sur la MÊME base que la grille — pas une seconde fois dans le
+      //    bandeau qui l'annonce. Sinon les deux finissent par se contredire.
+      const mp = numeros[it.id] && numeros[it.id].minPrice;
+      if (mp != null && String(mp).trim() !== '') planchers++;
       const age = listedAgeDays(it); if (age!=null) datesKnown++; if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
@@ -18205,6 +18226,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               les puces de comptes (donc à côté de l'information qu'elle
               qualifie, et repliée). Deux blocs pour la même notion (§11), dont
               un plein écran au-dessus de la grille. */}
+          {/* ⚠️ UNE FOIS, PAS SUR 43 CARTES (§7 : la même phrase répétée sur
+              chaque ligne est UNE phrase). Le prix plancher n'a d'effet que si
+              l'extension installée sait accepter une offre — `autoAccepterOffres`
+              est arrivé en 5.38. En dessous, il pose un minimum et attend une
+              acceptation qui ne viendra jamais : c'est le défaut des codes de
+              retrait, à l'identique.
+              ⚠️ ET SEULEMENT S'IL EN A POSÉ. Mesuré le 8 septembre : 0 plancher
+              sur 329 paires. Un bandeau permanent serait du bruit sur un écran
+              qu'il ouvre tous les jours ; il ne s'affiche que quand la promesse
+              est réellement en jeu, et il DIT COMBIEN (un chiffre qu'on peut
+              vérifier). */}
+          {annStats.planchers > 0 && extSait('offres') !== 'ok' && (
+            <div style={{marginBottom:10,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'10px 12px'}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.warn,marginBottom:2}}>
+                {annStats.planchers} prix plancher{annStats.planchers>1?'s':''} posé{annStats.planchers>1?'s':''}, mais rien ne les applique
+              </div>
+              <div style={{fontSize:11.5,color:C.text,lineHeight:1.45}}>{extSait('offres')==='absente'
+                ? <>C'est l'extension, dans ton Chrome, qui accepte une offre au-dessus de ton minimum. Ouvre l'app sur l'ordinateur où elle est installée — tes montants sont enregistrés, ils ne bougent pas.</>
+                : <>L'extension installée ne sait pas encore accepter une offre toute seule (il faut la <b>5.38</b> au minimum). Mets-la à jour depuis <b>Réglages</b>, puis active l'acceptation automatique dans son panneau. Tes montants sont enregistrés, ils ne bougent pas.</>}</div>
+            </div>
+          )}
           {numeroReprises.length > 0 && (
             <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:10,padding:'10px 12px'}}>
               <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} paire{numeroReprises.length>1?'s':''} déjà connue{numeroReprises.length>1?'s':''} ?</div>
@@ -18614,7 +18656,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         Prix plancher &amp; boost{rempli ? '' : ' ›'}
                       </summary>
                       <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${e.minPrice?C.accent:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg,marginTop:5}}
-                           title="Offre acceptée automatiquement à partir de ce montant (si tu as activé l'acceptation auto dans l'extension). Vide = aucune offre n'est acceptée toute seule.">
+                           title={extSait('offres')==='ok'
+                             ? "Offre acceptée automatiquement à partir de ce montant (si tu as activé l'acceptation auto dans l'extension). Vide = aucune offre n'est acceptée toute seule."
+                             : "Ton minimum est enregistré ici, mais l'extension installée ne sait pas encore accepter une offre toute seule : mets-la à jour d'abord. Vide = aucune offre n'est acceptée toute seule."}>
                         <span style={{fontSize:11,color:e.minPrice?C.accent:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Min. accepté</span>
                         <ChampSaisie value={e.minPrice ?? ''} onCommit={v=>updatePair(item,{minPrice:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                         <span style={{fontSize:11,color:C.muted}}>€</span>
@@ -19997,8 +20041,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
               ) : (
+                /* ⚠️ MÊME GARDE QUE LES CODES DE RETRAIT. `capterReleves` est
+                   arrivé en 5.52 : en dessous, « à ta prochaine visite » est une
+                   promesse que SON extension ne peut pas tenir, et il attendrait
+                   un relevé qui n'arrivera jamais. Mesuré le 8 septembre :
+                   0 compteur `releve_*` sur 42, donc elle n'a jamais tourné. */
                 <div style={{fontSize:11.5,color:C.muted,marginBottom:12,lineHeight:1.4}}>
-                  Relevé du porte-monnaie : rien de capté pour ce mois. L'extension le récupère à ta prochaine visite sur Vinted, compte par compte.
+                  Relevé du porte-monnaie : rien de capté pour ce mois. {(() => {
+                    const e = extSait('releve');
+                    if (e === 'retard') return <>Mets d'abord ton extension à jour — celle installée ne sait pas encore lire le relevé.</>;
+                    if (e === 'absente') return <>C'est l'extension, sur ton ordinateur, qui va le chercher : ouvre l'app dans le Chrome où elle est installée.</>;
+                    return <>L'extension le récupère à ta prochaine visite sur Vinted, compte par compte.</>;
+                  })()}
                 </div>
               )}
               {/* Registre d'achats */}

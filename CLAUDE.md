@@ -49,7 +49,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 | demande | pourquoi non |
 |---|---|
 | republication automatique en file, avec délais aléatoires | un délai « faussement humain » n'a qu'un usage : tromper la détection bot. C'est ce qui a fait bloquer `vanessa5723`. |
-| accepter une offre automatiquement | ça engage une **vente ferme**, et le champ « offre encore en attente » n'a **jamais été observé** (toutes les offres captées sont déjà acceptées/refusées). On trancherait sur un code inconnu, avec de l'argent réel. |
+| ~~accepter une offre automatiquement~~ ⚠️ **PÉRIMÉ — VOIR §5** | le refus tenait à une **mesure**, pas à un principe : le code « offre encore en attente » n'avait jamais été observé. Un relevé du **26 août sur 326 offres** l'a trouvé (**10 = En attente**, 4 cas ; 20 acceptée ×118, 30 refusée ×195, 40 annulée ×9). La raison est tombée, et le moteur est livré depuis la **5.38** — bordé : éteint par défaut, plancher obligatoire annonce par annonce, `garde`, 3 par visite, jamais deux fois la même offre. **Ne pas le retirer en relisant cette table.** |
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
 | supprimer une annonce automatiquement | irréversible et sans confirmation côté Vinted. |
@@ -179,7 +179,9 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   comptes** (captures de 9 à 11 minutes). Or `capterRetraits` écrit son compteur
   dès qu'il s'exécute, **même en échec** (`retrait_conv_refuse_*`,
   `retrait_conv_sans_message`). **Zéro compteur = la fonction n'a jamais
-  tourné** : l'extension installée est antérieure à 5.52. `panel_colis_relais`
+  tourné** : l'extension installée est antérieure à **5.45** — la version qui a
+  apporté `capterRetraits`, pas 5.52 (voir « ce que sait faire l'extension »
+  plus bas). `panel_colis_relais`
   n'existe même pas en base.
   ⇒ Et le 7 septembre je lui avais dit « passe sur Vinted connecté sur
   `julatace3535`, l'extension ira chercher les codes toute seule », et **l'app
@@ -404,6 +406,47 @@ d'informaticien y est donc justifié ; ne pas « simplifier » ce bloc.
   du titre affirmait **« partagées »** dès que `proteges` était faux — or il
   l'est aussi quand les deux sondes n'ont rien pu lire. Trois états, pas deux.
 
+### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
+Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
+ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
+cas : l'app tient **une table**, chaque capacité portant **la version où elle est
+arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `codes` | `capterRetraits` | **5.45.0** (27 août) | « l'extension va chercher les codes toute seule » |
+| `offres` | `autoAccepterOffres` | **5.38.0** (26 août) | « offre acceptée automatiquement au-dessus de ton plancher » |
+| `releve` | `capterReleves` | **5.52.0** (5 sept.) | « l'extension récupère le relevé à ta prochaine visite » |
+
+`extSait(quoi)` rend **trois états** — `absente` (téléphone, autre navigateur) ·
+`retard` · `ok` — et **jamais deux**. Une extension **muette** sur sa version est
+antérieure à la 5.26 (le pont l'annonce depuis) donc antérieure à tout : elle
+compte comme `retard`. **« Pas su » ne vaut pas « oui ».**
+
+⚠️ **Le seuil est la version d'ARRIVÉE, jamais la dernière publiée.** Premier
+jet : `EXT_LIT_LES_CODES = '5.52.0'` — or `capterRetraits` date de la 5.45. Une
+5.48 installée sait très bien lire les codes, et l'app lui aurait dit « celle
+installée ne sait pas encore » : **faux dans l'autre sens**, et il aurait cherché
+une mise à jour qui ne change rien. `audit-coherence.cjs` vérifie les deux sens :
+la fonction citée existe encore dans l'extension, et le seuil est **atteignable**
+(≤ manifeste — un seuil plus haut ne s'afficherait jamais).
+
+⚠️⚠️ **ET `audit-coherence.cjs` NE POUVAIT PAS ÉCHOUER.** Il imprimait des ❌ et
+sortait **toujours en 0** : le balayage `for f in scripts/audit-*.cjs` le comptait
+vert quoi qu'il arrive. Prouvé en cassant `EXT_ATTENDUE` à 9.99.9 — « ❌ version
+d'extension attendue » à l'écran, code de sortie 0. §8 annonçait pourtant « il
+vérifie que la constante suit le manifeste » : il le **racontait**. Un contrôle
+qui ne peut pas échouer est **pire qu'absent — il rassure**. Il compte
+maintenant (`ko`/`dit`) et sort en 1.
+
+⚠️ **Le bandeau se pose UNE fois, pas sur chaque carte.** Les 43 cartes
+d'Annonces portent chacune le champ « Min. accepté » ; la phrase qui dit que
+l'extension ne l'appliquera pas vit **au-dessus de la grille**, et seulement si
+**au moins un plancher est posé** (mesuré le 8 septembre : **0 sur 329**) — sinon
+c'est du bruit permanent. Elle dit **combien**, pour qu'il puisse le vérifier.
+Le compte vient de `annStats` (§11 : même base que la grille, un seul
+propriétaire), pas d'un second calcul.
+
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
 `panel_accounts_off`, `panel_colis_relais`, …) en lecture-fusion-écriture.
@@ -621,7 +664,7 @@ lus dans ses conversations) en dépendait.
 | pool de numéros | 456, sans trou, plus haut = 456 (append-only : c'est normal) |
 | ⚠️ numéros en double | **13**, tous HISTORIQUES : N°1 à N°16 redonnés par la numérotation auto les 2/4/6/15/16 août. **Cause : sur un appareil neuf le pool était lu VIDE au montage**, le nuage arrivant 500 ms plus tard → la numérotation repartait de 1. Corrigé (`onCloudReady` relit le pool) et protégé par `audit-identite.cjs`. **Aucun n'est vivant** : les paires en double sont fermées. |
 | argent Vinted | **281,94 € disponibles** à virer · **2 235,80 € retenus** (9 porte-monnaie) |
-| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · **6** colis à retirer, **0 code** — 5 sur `julatace3535` (dernière capture : 4 j) et **1 sur `julatace35260`, capté il y a 10 min**. ⚠️ Ce n'est PAS le compte qui bloque : **son extension est antérieure à 5.52**, elle n'a pas `capterRetraits` (0 compteur `retrait_*` sur 42). La mise à jour est le premier geste. |
+| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · **6** colis à retirer, **0 code** — 5 sur `julatace3535` (dernière capture : 4 j) et **1 sur `julatace35260`, capté il y a 10 min**. ⚠️ Ce n'est PAS le compte qui bloque : **son extension est antérieure à 5.45**, elle n'a pas `capterRetraits` (0 compteur `retrait_*` sur 42). La mise à jour est le premier geste. |
 | notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
 | comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
 | ventes masquées | 209 (masquées à la main ; « tout réafficher » existe sur l'écran Ventes) |

@@ -32,6 +32,7 @@ node /tmp/bancs/verif_visuel.cjs
 | `carte.cjs` | la ville déjà renseignée déclenche la recherche des points relais |
 | `postes.cjs` | cocher « Colis fait » ne fait disparaître personne, et les comptes collent |
 | `conflit.cjs` | **le risque n°1** : deux paires sous le même numéro. Il FORCE le cas (aucun n'existe aujourd'hui) et vérifie que l'app crie en rouge sur Colis |
+| `capacites.cjs` | **l'app ne promet que ce que l'extension INSTALLÉE sait faire**. Il simule le pont (`__vmr:'ready'`) dans ses cinq états — absent · muet · 5.37 · 5.38 · 5.52 — et FORCE des prix planchers (0 en vrai). Vérifie des deux côtés du seuil 5.38, et que le bandeau compte sur la même base que la grille |
 | `serie.cjs` | la saisie en série des prix d'achat : ouverture < 1,2 s, toutes les paires annoncées sont saisissables, une suggestion relie et écrit |
 
 ## Les trois pièges qui m'ont fait mesurer des fictions

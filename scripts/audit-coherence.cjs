@@ -21,6 +21,21 @@ const APP=fs.readFileSync(path.join(RACINE,'src/App.jsx'),'utf8');
 const BG=fs.readFileSync(path.join(RACINE,'vinted-sync-extension/background.js'),'utf8');
 const PANEL=fs.readFileSync(path.join(RACINE,'vinted-sync-extension/vinted-panel.js'),'utf8');
 
+// ⚠️⚠️ CE FICHIER IMPRIMAIT DES ❌ ET SORTAIT TOUJOURS EN 0 (trouvé le
+// 8 septembre). Le balayage des audits (`for f in scripts/audit-*.cjs`) le
+// comptait donc VERT quoi qu'il arrive : casser `EXT_ATTENDUE` à 9.99.9
+// affichait « ❌ version d'extension attendue » et le script rendait 0. Or
+// CLAUDE.md annonçait « audit-coherence vérifie que la constante suit le
+// manifeste » — elle ne vérifiait rien du tout, elle le RACONTAIT.
+// C'est la règle de preuve du projet à l'envers : un contrôle qui ne peut pas
+// échouer ne prouve rien, et il est PIRE qu'absent — il rassure.
+// `ko` compte, et `dit` remplace les `console.log((ok?…))` un par un.
+// « 5.9.0 » < « 5.52.0 » : une comparaison de chaînes dirait l'inverse.
+const cmpVer = (a, b) => { const A=String(a).split('.').map(Number), B=String(b).split('.').map(Number);
+  for (let i=0;i<Math.max(A.length,B.length);i++){ const d=(A[i]||0)-(B[i]||0); if(d) return d<0?-1:1; } return 0; };
+let ko = 0;
+const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
+
 // corpus : tous les statuts distincts des commandes moissonnées
 // Corpus : tous les statuts distincts des commandes réellement moissonnées.
 // On lit la base (clé publique, lecture seule) ; à défaut, un jeu de secours
@@ -76,7 +91,7 @@ if(manquants.length) console.log('⚠️ non extraits :', manquants.join(', '));
 const cmp=(nom,a,b)=>{
   if(!a||!b) return;
   const ecarts=S.filter(s=>String(a(s))!==String(b(s)));
-  console.log(`${ecarts.length?'❌':'✅'} ${nom} — ${ecarts.length} désaccord(s) sur ${S.length} statuts`);
+  dit(ecarts.length===0, nom, `${ecarts.length} désaccord(s) sur ${S.length} statuts`);
   ecarts.slice(0,8).forEach(s=>console.log(`     « ${s} » → app=${a(s)} / ext=${b(s)}`));
 };
 (async()=>{
@@ -88,7 +103,7 @@ cmp('à expédier (les DEUX copies internes de l\'extension)', bgShipConst, bgSh
 cmp('au point relais (app vs extension)', appRelay, bgRelayConst);
 cmp('bordereau À GÉNÉRER (app vs extension)', appGen, bgGen);
 const titres=['Nike  Air   MAX 1','  adidas Spezial ','ÉTÉ  Blanc'];
-console.log((titres.every(t=>appNorm&&bgNorm&&appNorm(t)===bgNorm(t))?'✅':'❌')+' normalisation de titre (app vs extension)');
+dit(titres.every(t=>appNorm&&bgNorm&&appNorm(t)===bgNorm(t)), 'normalisation de titre (app vs extension)');
 // besoin d'un bordereau : l'extension n'a pas la même notion — on regarde l'écart
 if(appNeedsBord&&bgShipConst){
   const d=S.filter(s=>appNeedsBord(s)!==bgShipConst(s));
@@ -105,7 +120,40 @@ if(appNeedsBord&&bgShipConst){
   const man=JSON.parse(fs.readFileSync(path.join(RACINE,'vinted-sync-extension/manifest.json'),'utf8'));
   const m=/const EXT_ATTENDUE\s*=\s*'([^']+)'/.exec(APP);
   const ok = m && m[1]===man.version;
-  console.log((ok?'✅':'❌')+` version d'extension attendue par l'app — app=${m?m[1]:'ABSENTE'} / manifeste=${man.version}`);
+  dit(ok, "version d'extension attendue par l'app", `app=${m?m[1]:'ABSENTE'} / manifeste=${man.version}`);
+
+  // ── LES TROIS CAPACITÉS, ET LA VERSION OÙ CHACUNE EST ARRIVÉE ────────────
+  // L'app ne promet « l'extension le fait toute seule » qu'au-dessus d'un
+  // seuil (`EXT_CAPACITES`). Deux façons de mentir, et l'audit couvre les deux :
+  //   • citer une capacité que l'extension n'a plus (fonction retirée) — on
+  //     promettrait dans le vide sur une extension pourtant à jour ;
+  //   • annoncer un seuil PLUS HAUT que le manifeste — aucune version livrée ne
+  //     l'atteindrait, donc la promesse ne s'afficherait JAMAIS, et on
+  //     enverrait Julien chercher une mise à jour qui n'existe pas. C'est le
+  //     défaut du zip, retourné.
+  const FONCTIONS = { codes:'capterRetraits', offres:'autoAccepterOffres', releve:'capterReleves' };
+  const t = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
+  dit(!!t, "l'app tient une table des capacités de l'extension",
+    "sans elle, chaque promesse « tout seul » est reprise à la main — et une seule était gardée");
+  if (t) {
+    const caps = [...t[1].matchAll(/(\w+)\s*:\s*'([0-9.]+)'/g)].map(x => ({ nom:x[1], v:x[2] }));
+    for (const c of caps) {
+      const fn = FONCTIONS[c.nom];
+      dit(!!fn && new RegExp('function\\s+' + fn + '\\b').test(BG),
+        `capacité « ${c.nom} » : \`${fn || '?'}\` existe toujours dans l'extension`,
+        fn ? '' : 'capacité inconnue de cet audit — ajoute-la à FONCTIONS avec sa fonction');
+      dit(cmpVer(c.v, man.version) <= 0,
+        `capacité « ${c.nom} » : son seuil ${c.v} est atteignable`,
+        `manifeste ${man.version} — un seuil plus haut ne s'affiche jamais`);
+    }
+    for (const k in FONCTIONS) dit(caps.some(c => c.nom === k),
+      `la capacité « ${k} » est déclarée dans la table`,
+      'une capacité livrée mais non déclarée retombe sur EXT_ATTENDUE');
+  }
 }
 console.log('\nStatuts réels :'); S.forEach(s=>console.log('  -',s));
+console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : "\nL'app et l'extension disent la même chose.");
+process.exit(ko ? 1 : 0);
 })();
+
+
