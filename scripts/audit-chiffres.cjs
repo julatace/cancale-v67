@@ -83,9 +83,23 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   (/'pret'/.test(F) && /'attente'/.test(F) && /'fait'/.test(F))
     ? ok('les groupes suivent ce qu\'il peut faire : prêts, en attente, déjà postés')
     : nok('les groupes doivent couvrir prêt / en attente / déjà posté');
-  /const pret = \(e\) =>/.test(app) && /if \(ia !== ib\) return ia - ib/.test(app)
-    ? ok('les colis imprimables passent devant dans le tri')
-    : nok('un colis sans bordereau n\'est pas postable : il ne doit pas ouvrir la liste');
+  // ⚠️ CE CONTRÔLE PORTAIT SUR L'ORTHOGRAPHE, ET IL A CRIÉ AU LOUP. Il exigeait
+  // la ligne `const pret = (e) =>` ; renommer ce helper en `estPret` le faisait
+  // échouer alors que la règle était intacte — et mieux respectée qu'avant.
+  // Même leçon que `audit-identite` (§5). La RÈGLE, elle, tient en deux points :
+  //   1. « prêt à imprimer » est PORTÉ PAR LA LIGNE, pas recalculé par chaque
+  //      lecteur — c'est ce qui a fait diverger Ma journée (8) et Colis (9) ;
+  //   2. le tri compare cette propriété AVANT la date limite, pour qu'un colis
+  //      qu'il ne peut pas poster n'ouvre pas la liste.
+  const porte = /\.pret\s*=\s*estPret\(|forEach\(e\s*=>\s*\{\s*e\.pret\s*=/.test(app)
+             || /return \{ \.\.\.e, dl, pret/.test(app);
+  const triAvantDl = /if \(ia !== ib\) return ia - ib/.test(app)
+                  && app.indexOf('if (ia !== ib) return ia - ib') < app.indexOf("a.dl == null ? 999");
+  porte && triAvantDl
+    ? ok('« prêt à imprimer » est porté par la ligne, et passe devant dans le tri')
+    : nok(!porte
+        ? '« prêt à imprimer » doit être porté par la ligne : deux lecteurs qui le recalculent finissent par se contredire (accueil 8 / Colis 9)'
+        : 'un colis sans bordereau n\'est pas postable : il ne doit pas ouvrir la liste');
   // ⚠️ UN SEUL GROUPE = PAS D'INTERTITRE : il redirait mot pour mot le compteur
   // du haut, et le même nombre ne s'écrit pas deux fois sur un écran.
   /plusieursGroupes/.test(app)

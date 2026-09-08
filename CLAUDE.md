@@ -327,6 +327,48 @@ objet qui ne l'a pas → **tous les bordereaux tombaient** et l'écran affichait
 l'app. `colis.cjs` applique désormais la projection `select=` pour de vrai
 (§6.3) : un banc qui ne sert pas la bonne FORME de réponse mesure une fiction.
 
+### Colis : « prêt à imprimer » n'avait pas de propriétaire
+Mesuré le 8 septembre, sur ses vraies données : **Ma journée annonçait « 8
+bordereaux prêts à imprimer », Colis « 9 »** — même formule, mêmes données.
+La règle « prêt » a deux moitiés : le PDF reçu par email (`b.hasPdf`) **et** le
+bordereau capté par l'extension (`labelsCaptes`). Or `labelsCaptes` n'est
+rempli **que par l'écran Colis** — mesuré : **18 requêtes `label_*` sur Colis,
+zéro sur l'accueil**. Le compte de Ma journée était donc un **minorant**,
+présenté comme un total. C'est §11 : deux lecteurs recalculent la même notion.
+- `pret` est maintenant **porté par la ligne** (`expeditions()` l'estampille) :
+  le tri et le bandeau le LISENT, ils ne peuvent plus diverger.
+- Colis **publie** `vrm_colis_prets`, Ma journée **consomme** — comme
+  `vrm_colis_retirer`. Charger les `label_*` sur l'accueil coûterait neuf
+  lectures de plus à chaque ouverture de l'app.
+- ⚠️ **Et sans ligne publiée, on ne présente pas un minorant comme un total** :
+  sur un appareil neuf l'accueil dit « **au moins** 8 bordereaux prêts ». Dès
+  qu'on est passé par Colis, les deux disent 9.
+- ⚠️ **« pas encore lu » n'est pas « aucun »** : `labelsCaptes` part à `{}`, et
+  rien ne distinguait « zéro capté » de « jamais demandé ». D'où `labelsPrets`.
+  Troisième forme du même piège après le panneau de sécurité et les capacités
+  de l'extension.
+- ⚠️ **Et `audit-chiffres.cjs` a crié au loup en renommant ce helper** : il
+  exigeait la ligne `const pret = (e) =>`. Devenu `estPret`, la règle était
+  intacte — mieux respectée qu'avant — et l'audit tombait au rouge. **Troisième
+  fois** qu'un contrôle porte sur l'orthographe au lieu de la règle (après
+  `audit-identite` et `audit-retrait`). Il vérifie maintenant les deux points
+  qui comptent : la ligne PORTE `pret`, et le tri le compare AVANT la date
+  limite.
+
+### « Les plus urgents sont en haut de la liste » — faux une fois sur deux
+La liste des colis se groupe sur **ce qu'il peut faire** (prêts à imprimer,
+puis en attente de bordereau) ; l'urgence n'est que le tri **à l'intérieur** de
+chaque groupe. Le bandeau d'urgence affirmait pourtant « les plus urgents sont
+en haut de la liste ». Vu en capture le 8 septembre : le seul « à poster
+demain » était dans le **second** groupe, dix cartes plus bas — et c'était
+justement celui qu'il ne peut pas imprimer. **La structure avait été corrigée
+en septembre, la phrase qui la décrit était restée en arrière** — exactement le
+défaut de la carte URSSAF, le même jour.
+`urgenceColis()` compte donc aussi **où** ils sont (`pressePret` /
+`presseAttente`, sur la même source), et `ouSontLesPresses()` écrit les trois
+cas réels. Le banc `colis.cjs` déclenche sur la **position** d'un colis pressé,
+pas sur la formulation : 4 échecs sur le code d'avant.
+
 ### L'écran Ventes : 287 cartes, et la frappe qui saccade
 **Mesuré le 7 septembre au banc `perfv.cjs`, sur ses vraies données** : l'écran
 rend **287 cartes et 8 840 nœuds** d'un coup (page de 19 885 px sur ordinateur,

@@ -25,7 +25,7 @@ node /tmp/bancs/verif_visuel.cjs
 |---|---|
 | `verif_visuel.cjs` | les 10 écrans, à 390 et 1512 px : écran vide, débordement, garde-fou, recouvrement par l'île d'actions |
 | `verif_dark.cjs` | les mêmes en sombre |
-| `colis.cjs` | l'écran Colis voit ses bordereaux, et un bouton Imprimer les sort |
+| `colis.cjs` | l'écran Colis voit ses bordereaux, et un bouton Imprimer les sort. **Compare aussi Ma journée et Colis sur le nombre de bordereaux prêts** — dans l'ordre le plus risqué (accueil ouvert EN PREMIER, rien de publié), et vérifie que le bandeau d'urgence dit **où** est un colis pressé quand il n'est pas dans le premier groupe |
 | `perfv.cjs` | Ventes : frappe < 250 ms, filtre < 300 ms, « Voir plus » sans changer les totaux |
 | `retrait.cjs` | chaque colis à retirer a une porte vers son code ; les colis non réclamés sont nommés |
 | `oublies.cjs` | les colis « jamais retirés » montrent leur code **et** leur QR |
