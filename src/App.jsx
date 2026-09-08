@@ -11438,6 +11438,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // qui permet de mettre « 🖨 Imprimer » sur LA bonne ligne (identité certaine),
   // au lieu du bandeau générique « un bordereau a été téléchargé quelque part ».
   const [labelsCaptes, setLabelsCaptes] = useState({});
+  // ⚠️ « PAS ENCORE LU » N'EST PAS « AUCUN ». `labelsCaptes` part à `{}` et
+  //    n'est rempli que par l'écran Colis : partout ailleurs, la moitié
+  //    « bordereau capté par l'extension » de la règle « prêt à imprimer »
+  //    répond faux — donc un COMPTE MINORÉ, présenté comme exact.
+  //    Mesuré le 8 septembre : Ma journée annonçait « 8 bordereaux prêts à
+  //    imprimer », Colis « 9 », sur la même formule et les mêmes données.
+  //    Ce drapeau dit si la lecture a eu lieu ; sans lui on ne peut pas
+  //    distinguer « zéro capté » de « jamais demandé ».
+  const [labelsPrets, setLabelsPrets] = useState(false);
   // Identifiants des annonces que Vinted lui-même a fermées en « vendue ».
   // Vinted ne supprime pas une annonce vendue (Julien) : il la range dans cette
   // catégorie. C'est donc une preuve PAR IDENTIFIANT qu'une paire est partie.
@@ -12630,11 +12639,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Un colis sans bordereau n'est pas postable aujourd'hui : l'urgence ne le
     // rend pas plus actionnable. Elle reste le tri À L'INTÉRIEUR de chaque
     // groupe, et elle reste écrite sur chaque carte.
-    const pret = (e) => !!((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]));
+    // ⚠️ `pret` EST PORTÉ PAR LA LIGNE, pas recalculé par chaque lecteur.
+    //    Le tri le connaissait, `urgenceColis` non — et c'est exactement ce qui
+    //    a fait mentir le bandeau d'urgence (voir §5, « les plus urgents sont
+    //    en haut »). Une notion, un propriétaire : la ligne le porte, le tri et
+    //    le bandeau le lisent. Ils ne peuvent plus se contredire.
+    const estPret = (e) => !!((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]));
+    tout.forEach(e => { e.pret = estPret(e); });
     tout.sort((a, b) => {
       const pa = a.o && isShipDone(a.o) ? 1 : 0, pb = b.o && isShipDone(b.o) ? 1 : 0;
       if (pa !== pb) return pa - pb;                       // les postés tout en bas
-      const ia = pret(a) ? 0 : 1, ib = pret(b) ? 0 : 1;
+      const ia = a.pret ? 0 : 1, ib = b.pret ? 0 : 1;
       if (ia !== ib) return ia - ib;                       // imprimable d'abord
       return (a.dl == null ? 999 : a.dl) - (b.dl == null ? 999 : b.dl);
     });
@@ -14121,7 +14136,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     }
     setLabelsCaptes(idx);
+    setLabelsPrets(true);
   })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  // ── COLIS PUBLIE « PRÊTS À IMPRIMER », LES AUTRES CONSOMMENT (§11) ────────
+  // Même motif que `vrm_colis_retirer` et `vinted_urssaf_mois` : l'écran qui a
+  // TOUTES les sources publie, les autres lisent. Ma journée ne demande jamais
+  // les lignes `label_*` (mesuré : 18 requêtes sur Colis, zéro sur l'accueil) —
+  // les charger là aussi coûterait neuf lectures de plus à chaque ouverture de
+  // l'app, sur l'écran qu'il ouvre le plus.
+  // ⚠️ ON NE PUBLIE QUE COMPLET. Une photo à moitié développée écrase une photo
+  //    entière (§4.2) : tant que les ventes, les emails de bordereau et les
+  //    bordereaux captés n'ont pas tous répondu, on ne dit rien.
+  useEffect(() => {
+    if (curSub!=='bordereaux' || !labelsPrets || sales.items===null || emailBords===null) return;
+    try {
+      const ex = expeditions();
+      const aPoster = ex.filter(e => !(e.o && isShipDone(e.o)));
+      const v = { prets: aPoster.filter(e => e.pret).length, total: aPoster.length, at: Date.now() };
+      const avant = load('vrm_colis_prets', null);
+      if (!avant || avant.prets !== v.prets || avant.total !== v.total) save('vrm_colis_prets', v);
+    } catch (_) {}
+  /* eslint-disable-next-line */ }, [sub, labelsPrets, sales.items, emailBords, labelsCaptes, numeros]);
   // Identité certaine des ventes (transaction → annonce). Une seule lecture, en
   // scalaires : elle sert au N°, au bordereau, au prix d'achat et à la photo.
   // `txnPret` = la lecture des identités « transaction → annonce » a répondu
@@ -15167,17 +15202,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Même source que la liste : les colis que Vinted attend, avec leur délai.
   const nAPoster = () => expeditions().filter(e => !(e.o && isShipDone(e.o))).length;
   const urgenceColis = () => {
-    let overdue = 0, today = 0, tomorrow = 0;
+    let overdue = 0, today = 0, tomorrow = 0, pressePret = 0, presseAttente = 0;
     for (const e of expeditions()) {
       if (e.o && isShipDone(e.o)) continue;
       if (e.dl == null) continue;
-      if (e.dl < 0) overdue++; else if (e.dl === 0) today++; else if (e.dl === 1) tomorrow++;
+      if (e.dl < 0) overdue++; else if (e.dl === 0) today++; else if (e.dl === 1) tomorrow++; else continue;
+      // ⚠️ OÙ SONT-ILS ? La liste se groupe sur CE QU'IL PEUT FAIRE (prêts à
+      //    imprimer d'abord, puis en attente de bordereau) et l'urgence n'est
+      //    que le tri À L'INTÉRIEUR de chaque groupe. Le bandeau affirmait
+      //    pourtant « les plus urgents sont en haut de la liste » : faux dès
+      //    que l'urgent attend encore son bordereau — vu en capture le
+      //    8 septembre, le seul « à poster demain » était dix cartes plus bas,
+      //    dans le second groupe. La structure avait été corrigée, la phrase
+      //    qui la décrit était restée en arrière (même défaut que la carte
+      //    URSSAF). On compte donc les deux, ici, sur la même source.
+      if (e.pret) pressePret++; else presseAttente++;
     }
     const parts = [];
     if (overdue) parts.push(`${overdue} en retard`);
     if (today) parts.push(`${today} aujourd'hui`);
     if (tomorrow) parts.push(`${tomorrow} demain`);
-    return { overdue, today, tomorrow, total: overdue + today + tomorrow, danger: overdue > 0 || today > 0, parts };
+    return { overdue, today, tomorrow, total: overdue + today + tomorrow, danger: overdue > 0 || today > 0, parts,
+             pressePret, presseAttente };
+  };
+  // La phrase du bandeau d'urgence — elle DÉCRIT la liste, elle ne la promet
+  // pas. Trois cas, parce qu'il y a trois situations réelles.
+  const ouSontLesPresses = (u) => {
+    if (!u.presseAttente) return 'les plus urgents sont en haut de la liste.';
+    // ⚠️ La phrase est déjà introduite par un tiret (« 1 demain — … ») : une
+    //    seconde incise entre tirets la rendait illisible. Une virgule suffit.
+    if (!u.pressePret) return u.presseAttente > 1
+      ? `ils attendent encore leur bordereau, plus bas dans « En attente de leur bordereau ».`
+      : `il attend encore son bordereau, plus bas dans « En attente de leur bordereau ».`;
+    return `${u.pressePret} en haut de la liste, ${u.presseAttente} plus bas dans « En attente de leur bordereau ».`;
   };
 
   const setBuyForKey = (key, val) => {
@@ -15806,11 +15863,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // « Bordereau + paire au garage, coche par colis ». Dix étiquettes
         // prêtes, annoncées nulle part sur l'écran d'accueil.
         if(toShip.length){
-          const pretsImpr = expeditions().filter(e => !(e.o && isShipDone(e.o))
+          // ⚠️ CE COMPTE ÉTAIT MINORÉ ICI, ET ANNONCÉ COMME EXACT. La règle
+          //    « prêt à imprimer » a deux moitiés : le PDF reçu par email, et
+          //    le bordereau capté par l'extension (`labelsCaptes`). Cet écran
+          //    ne lit jamais la seconde — mesuré le 8 septembre : « 8 prêts »
+          //    ici, « 9 » sur Colis, sur la même formule. On lit donc ce que
+          //    Colis a PUBLIÉ ; à défaut on garde ce qu'on sait, mais on ne le
+          //    présente plus comme un total (§5 : un total partiel présenté
+          //    comme complet est pire qu'un total absent).
+          const localPrets = expeditions().filter(e => !(e.o && isShipDone(e.o))
             && ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]))).length;
-          const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${pretsImpr} prêt${pretsImpr>1?'s':''} à imprimer`
+          const pub = labelsPrets ? null : load('vrm_colis_prets', null);
+          // La ligne publiée ne vaut que si elle parle du MÊME lot de colis.
+          const exact = labelsPrets || !!(pub && pub.total === toShip.length);
+          const pretsImpr = (!labelsPrets && pub && pub.total === toShip.length)
+            ? Math.max(pub.prets, localPrets) : localPrets;
+          const combien = `${exact?'':'au moins '}${pretsImpr} bordereau${pretsImpr>1?'x':''} prêt${pretsImpr>1?'s':''} à imprimer`;
+          const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${exact?'':'au moins '}${pretsImpr} prêt${pretsImpr>1?'s':''} à imprimer`
             : late>0 ? `${late} en retard — à poster en priorité`
-            : pretsImpr>0 ? `${pretsImpr} bordereau${pretsImpr>1?'x':''} prêt${pretsImpr>1?'s':''} à imprimer — le reste attend le sien`
+            : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
             : 'Bordereau + paire au garage, coche par colis';
           jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub,tab:'cat_bord',prio:late>0?0:1});
         }
@@ -18862,7 +18933,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       s'il désigne un SOUS-ENSEMBLE strict ; sinon l'urgence
                       tient sur cette ligne. */}
                   {(()=>{ const u=urgenceColis(); if(!u.total || u.total<aPoster.length) return null;
-                    return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — les plus urgents sont en haut de la liste.</div>; })()}
+                    return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — {ouSontLesPresses(u)}</div>; })()}
                 </div>
                 {avecPdf.length>0 && (
                   <button type="button" onClick={batchBordereaux} disabled={batchBusy}
@@ -18975,7 +19046,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span style={{fontSize:17,fontWeight:700,color:danger?C.danger:C.warn,letterSpacing:-0.3}}>{total}</span>
                 <span style={{fontSize:13,fontWeight:600,color:C.text}}>à poster en priorité{overdue?' — du retard':''}</span>
               </div>
-              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — les plus urgents sont en haut de la liste.</div>
+              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
             </div>
           );
         })()}

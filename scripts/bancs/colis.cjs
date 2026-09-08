@@ -48,10 +48,18 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
 (async()=>{
   console.log('base servie : '+aEnvoyer.length+' ventes a expedier · '+attendus+' ont deja leur PDF en base');
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
+  // Un SECOND navigateur pour la comparaison accueil ↔ Colis : il lui faut un
+  // `localStorage` VIERGE (l'appareil neuf), et celui du premier a déjà servi.
+  const b2=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-  await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
+  const brancher=async(p)=>{
+    // ⚠️ `vrm_acces_direct` DOIT être posé sur CHAQUE page, pas seulement la
+    //    première : sans lui l'app reste sur son écran d'accueil de connexion
+    //    et le banc mesure une page vide en croyant mesurer un écran.
+    await p.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
+    await p.route('**/rest/v1/**',route=>{const u=route.request().url();
     const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(route.request().method()!=='GET') return j([]);
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
@@ -63,7 +71,9 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
       return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
     return j([]);});
-  await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
+    await p.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
+  };
+  await brancher(pg);
   await pg.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(5000);
   await pg.screenshot({path:SC+'/z-colis.png',fullPage:true});
@@ -78,7 +88,86 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   dit(!/l'extension les récupère/i.test(v.txt) || (mPret&&+mPret[1]>0),
     'l\'app ne demande plus d\'aller les chercher quand elle les a déjà');
   dit(errs.length===0, "aucune erreur d'app", errs.slice(0,2).join(' | '));
-  await b.close(); srv.close();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MA JOURNÉE NE DOIT PAS ANNONCER MOINS DE BORDEREAUX PRÊTS QUE COLIS
+  // ══════════════════════════════════════════════════════════════════════════
+  // Mesuré le 8 septembre sur ses vraies données : l'accueil disait « 8
+  // bordereaux prêts à imprimer », Colis « 9 » — même formule, mêmes données.
+  // Cause : la règle « prêt » a deux moitiés (PDF reçu par email · bordereau
+  // capté par l'extension) et Ma journée ne demande JAMAIS les lignes
+  // `label_*` : 18 requêtes sur Colis, zéro sur l'accueil. Son compte est donc
+  // un MINORANT, et il était présenté comme un total.
+  //
+  // ⚠️ CE CONTRÔLE PORTE SUR LES NOMBRES, PAS SUR LA PHRASE. Il compare les
+  // deux écrans ; une reformulation ne peut pas le rendre vert (§6.5).
+  // ⚠️ ET IL TESTE L'APPAREIL NEUF, l'ordre le plus risqué : Ma journée
+  // ouverte EN PREMIER, avant que Colis ait rien publié. C'est là que le
+  // minorant sort — dans l'autre sens le défaut est invisible.
+  {
+    const lit = (t) => { const m=/((?:au moins )?)(\d+)\s+bordereaux?\s+pr[êe]ts?\s+[àa]\s+imprimer/i.exec(t);
+      return m ? { n:+m[2], approx:!!m[1].trim() } : null; };
+    const ctx = await b2.newContext({viewport:{width:1512,height:950}});
+    const p2 = await ctx.newPage();
+    await brancher(p2);
+    await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
+    await p2.waitForTimeout(5500);
+    const av = lit(await p2.evaluate(()=>document.body.innerText||''));
+    await p2.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
+    await p2.waitForTimeout(5500);
+    const colis = lit(await p2.evaluate(()=>document.body.innerText||''));
+    await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
+    await p2.waitForTimeout(5500);
+    const ap = lit(await p2.evaluate(()=>document.body.innerText||''));
+    console.log(`    accueil seul : ${av?(av.approx?'au moins ':'')+av.n:'—'} · Colis : ${colis?colis.n:'—'} · accueil ensuite : ${ap?(ap.approx?'au moins ':'')+ap.n:'—'}`);
+    dit(!!(av && colis && ap), 'les deux écrans annoncent un nombre de bordereaux prêts');
+    if (av && colis) {
+      // Le seul mensonge possible : annoncer un nombre EXACT plus petit.
+      dit(av.n >= colis.n || av.approx,
+        "sur un appareil neuf, l'accueil n'annonce pas un total exact qu'il n'a pas mesuré",
+        `accueil ${av.n}${av.approx?' (annoncé comme minorant)':' (annoncé exact)'} · Colis ${colis.n}`);
+    }
+    if (ap && colis) dit(ap.n === colis.n && !ap.approx,
+      "et une fois Colis ouvert, les deux écrans disent le même nombre",
+      `accueil ${ap.n}${ap.approx?' (minorant)':''} · Colis ${colis.n}`);
+    await ctx.close();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // « LES PLUS URGENTS SONT EN HAUT DE LA LISTE » — vrai seulement PARFOIS
+  // ══════════════════════════════════════════════════════════════════════════
+  // La liste se groupe sur CE QU'IL PEUT FAIRE (prêts à imprimer, puis en
+  // attente de bordereau) ; l'urgence n'est que le tri À L'INTÉRIEUR de chaque
+  // groupe. Le bandeau affirmait pourtant « les plus urgents sont en haut de
+  // la liste ». Vu en capture le 8 septembre : le seul « à poster demain »
+  // était dans le SECOND groupe, dix cartes plus bas — et c'était justement
+  // celui qu'il ne peut pas imprimer. La structure avait été corrigée, la
+  // phrase qui la décrit était restée en arrière.
+  //
+  // ⚠️ C'EST LA POSITION QUI DÉCLENCHE, PAS LA FORMULATION : s'il existe un
+  // colis pressé APRÈS l'intertitre « En attente de leur bordereau », alors le
+  // bandeau doit dire où il est. Une reformulation ne peut pas rendre ce
+  // contrôle vert (§6.5).
+  {
+    const lignes = v.txt.split('\n').map(x=>x.trim());
+    const iAttente = lignes.findIndex(l=>/^En attente de leur bordereau/i.test(l));
+    const presse = /à poster demain|à poster aujourd'hui|en retard/i;
+    const presseEnBas = iAttente>=0 && lignes.slice(iAttente).some(l=>presse.test(l));
+    const bandeau = lignes.find(l=>/(en retard|aujourd'hui|demain)\s+—/.test(l)) || '';
+    console.log(`    bandeau d'urgence : ${bandeau||'(aucun)'}${presseEnBas?'  [un pressé est dans le 2e groupe]':''}`);
+    if (presseEnBas && bandeau) {
+      dit(/En attente de leur bordereau/i.test(bandeau),
+        "quand un colis pressé attend encore son bordereau, le bandeau dit où il est",
+        `il annonce : « ${bandeau} »`);
+      dit(!/les plus urgents sont en haut de la liste/i.test(bandeau),
+        "et il ne promet pas de le trouver en haut de la liste",
+        'la liste se groupe sur ce qu\'il peut faire, pas sur l\'urgence');
+    } else if (bandeau) {
+      dit(true, 'aucun colis pressé hors du premier groupe — le bandeau peut renvoyer en haut');
+    }
+  }
+
+  await b.close(); await b2.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nL\'ecran Colis voit ses bordereaux.');
   process.exit(ko?1:0);
 })();
