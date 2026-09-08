@@ -5,9 +5,29 @@ import { createPortal } from "react-dom";
 // dans une base de production sans le relire.
 import MIGRATION_SQL from "../supabase/migrations/001-multi-utilisateurs.sql?raw";
 
-// Version visible (coin haut gauche sous « VRM ») pour vérifier d'un coup d'œil
-// si l'app a bien chargé la dernière version (fini le doute « c'est à jour ? »).
-const BUILD_ID = 'v83/00 · Rafraîchissement auto en revenant sur l\'app';
+// Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
+// dernière version (« c'est à jour ? », la question qu'il pose après chaque
+// déploiement — et le bouton « Forcer la mise à jour » est juste à côté).
+//
+// ⚠️⚠️ ELLE ÉTAIT TAPÉE À LA MAIN, ET FIGÉE. `BUILD_ID` valait `'v83/00 · …'`
+// depuis le **25 août**, soit **81 commits** — donc elle répondait TOUJOURS la
+// même chose, c'est-à-dire exactement le contraire de ce à quoi elle sert : un
+// numéro qui ne bouge jamais ne peut pas dire si l'app a été rechargée. Et le
+// mécanisme existait déjà : `vite.config.js` injecte `__BUILD__`, l'horodatage
+// réel de la compilation, avec en commentaire « sert de version visible pour
+// diagnostiquer les problèmes de cache » — **il n'était lu nulle part**. Même
+// famille que le tiroir `Nav` défini et jamais rendu (§4.11) : le code existe,
+// personne ne l'appelle, et rien ne lève d'erreur.
+//
+// ⚠️ Et la chaîne mélangeait deux choses : une version (`v83/00`) et une phrase
+// de comportement (« Rafraîchissement auto en revenant sur l'app »). On lisait
+// donc « Version · v83/00 · Rafraîchissement auto… ». Une notion par ligne.
+const BUILD_ISO = (typeof __BUILD__ !== 'undefined' && __BUILD__) ? String(__BUILD__) : '';
+const BUILD_ID = (() => {
+  const d = BUILD_ISO ? new Date(BUILD_ISO) : null;
+  if (!d || isNaN(d.getTime())) return 'inconnue';   // jamais une date inventée
+  return `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+})();
 // ⚠️ LA VERSION D'EXTENSION QUE CETTE APP ATTEND — tenue à jour par
 // `scripts/audit-coherence.cjs`, qui la compare au manifeste. Mesuré le
 // 6 septembre : l'extension installée chez Julien était en retard de plusieurs
@@ -22254,10 +22274,19 @@ function ConnexionsSetting() {
             : "Annonces, ventes, achats et messages viennent de là."}/>
       <Ligne t="Emails" coul={teinte(mail && mail.ts)}
         etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
-        d="Bordereaux, suivi des colis et codes de retrait arrivent par email — Vinted ne les donne pas autrement."/>
+        /* ⚠️ « Vinted ne les donne pas autrement » ÉTAIT FAUX pour les codes de
+           retrait, et c'est la mesure qui le dit : sur 139 emails de suivi, 20
+           seulement portent un code — et le code vit dans la CONVERSATION
+           Vinted, où l'extension va le lire depuis la 5.45. Cette phrase
+           l'envoyait fouiller sa boîte mail pour quelque chose qui n'y est pas.
+           Les bordereaux et le suivi, eux, viennent bien de l'email. */
+        d="Les bordereaux et le suivi des colis arrivent par email. Le code de retrait, lui, vit dans la conversation Vinted — c'est là que l'extension va le chercher."/>
       {/* La version de l'app : ici, et plus dans l'en-tête de chaque écran. */}
       <div style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',fontSize:11,color:C.muted}}>
-        <span style={{flex:'1 1 160px'}}>Version de l'application · <span style={{fontVariantNumeric:'tabular-nums'}}>{BUILD_ID}</span></span>
+        <span style={{flex:'1 1 220px'}}>{BUILD_ID==='inconnue'
+          ? <>Version de l'application · <b style={{color:C.text}}>inconnue</b> — recharge la page</>
+          : <>Cette page a été <b style={{color:C.text}}>compilée le <span style={{fontVariantNumeric:'tabular-nums'}}>{BUILD_ID}</span></b>.<br/>
+              Elle se rafraîchit toute seule quand tu reviens sur l'app ; si la date ne bouge pas après une mise à jour, force-la.</>}</span>
         {/* ⚠️ Ce bouton vivait AU MILIEU DE L'ÉCRAN GARAGE (« Version : … ·
             🔄 Forcer la mise à jour »), juste au-dessus de la pièce en 3D :
             de l'outillage de développeur posé dans un écran de travail. Il ne
@@ -22305,7 +22334,14 @@ function RegimeSetting() {
   // 13,5 % en dur à SIX endroits, et il tombe sur un document qu'il recopie
   // pour l'URSSAF. Le bon taux dépend de son activité et de son option pour le
   // versement libératoire — lui seul le connaît, et il change chaque année.
-  const [txUrs, setTxUrs] = useState(() => String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)));
+  // ⚠️ À LA FRANÇAISE, comme partout ailleurs dans l'app. Le champ affichait
+  //    « 13.5 » (le nombre recopié tel quel) alors que les deux rapports qui
+  //    l'utilisent écrivent « 13,5 % » : le même taux, deux orthographes, sur
+  //    l'écran qui sert justement à le régler. Même défaut que les prix
+  //    d'achat « 21.0 € » de l'écran Achats. La saisie, elle, accepte
+  //    toujours les deux (`replace(',','.')` à la validation).
+  const virgule = (n) => String(n).replace('.', ',');
+  const [txUrs, setTxUrs] = useState(() => virgule(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)));
   const pick = (r) => { setRegime(r); save('vinted_regime', r); };
   const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
   return (
@@ -22333,7 +22369,7 @@ function RegimeSetting() {
             <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de cotisations</span>
             <input type="text" inputMode="decimal" value={txUrs}
               onChange={e=>setTxUrs(e.target.value)}
-              onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; setTxUrs(String(ok)); save('vinted_urssaf_taux', ok); }}
+              onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; setTxUrs(virgule(ok)); save('vinted_urssaf_taux', ok); }}
               style={{width:70,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',fontSize:13,fontWeight:600,background:C.bg,color:C.text,outline:'none'}}/>
             <span style={{fontSize:12,color:C.muted}}>% du CA</span>
           </div>

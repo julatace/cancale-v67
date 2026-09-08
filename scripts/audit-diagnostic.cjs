@@ -148,6 +148,39 @@ const attendre = () => new Promise((r) => setTimeout(r, 30));
     ? nok('aucune variable morte laissée derrière', '`wardrobeIds` ne sert plus à rien')
     : ok('aucune variable morte laissée derrière');
 
+  // ── LA VERSION DE L'APP DOIT VENIR DU BUILD, PAS D'UNE CONSTANTE ─────────
+  // C'est de l'instrumentation, elle aussi : la seule chose qui réponde à
+  // « est-ce que j'ai bien la dernière version ? » — la question que Julien
+  // pose après chaque déploiement, et le bouton « Forcer la mise à jour » est
+  // juste à côté.
+  // ⚠️ Mesuré le 8 septembre : `BUILD_ID` était une chaîne TAPÉE À LA MAIN,
+  // `'v83/00 · …'`, inchangée depuis le 25 août — **81 commits**. Elle
+  // répondait donc toujours la même chose, c'est-à-dire le contraire de ce à
+  // quoi elle sert. Et `vite.config.js` injectait déjà `__BUILD__`, avec en
+  // commentaire « sert de version visible pour diagnostiquer les problèmes de
+  // cache » : **lu nulle part**. Le code existait, personne ne l'appelait, et
+  // rien ne levait d'erreur (famille du tiroir `Nav`, §4.11).
+  {
+    const APP = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+    const VITE = fs.readFileSync(path.join(RACINE, 'vite.config.js'), 'utf8');
+    /define:\s*\{[^}]*__BUILD__/.test(VITE)
+      ? ok('le build injecte son horodatage (`__BUILD__`)')
+      : nok('le build injecte son horodatage', 'sans lui, aucune version réelle à afficher');
+    // La RÈGLE, pas l'orthographe : ce que l'app affiche comme version doit
+    // DÉPENDRE de `__BUILD__`. Une constante littérale ne peut pas bouger.
+    const m = /const BUILD_ID\s*=\s*([\s\S]{0,400}?);\n/.exec(APP);
+    const litteral = m && /^\s*['"`]/.test(m[1]);
+    (m && !litteral && /__BUILD__/.test(APP))
+      ? ok("la version affichée vient du build, pas d'une chaîne écrite à la main")
+      : nok("la version affichée vient du build",
+          litteral ? 'BUILD_ID est une chaîne littérale : elle ne changera jamais, donc elle ne peut pas répondre « c\'est à jour ? »'
+                   : '`__BUILD__` n\'est lu nulle part');
+    // Et on n'invente pas une date quand l'horodatage manque.
+    /isNaN\(d\.getTime\(\)\)/.test(APP) || /BUILD_ID === 'inconnue'|BUILD_ID==='inconnue'/.test(APP)
+      ? ok("et une version illisible s'affiche « inconnue », pas une date inventée")
+      : nok("une version illisible doit s'afficher « inconnue »", 'jamais une date par défaut');
+  }
+
   console.log(ko ? `\n${ko} contrôle(s) en échec.` : "\nL'instrumentation garde ses preuves, et rien ne tape dans le vide.");
   process.exit(ko ? 1 : 0);
 })();
