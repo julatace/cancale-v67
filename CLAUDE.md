@@ -512,6 +512,29 @@ c'est du bruit permanent. Elle dit **combien**, pour qu'il puisse le vérifier.
 Le compte vient de `annStats` (§11 : même base que la grille, un seul
 propriétaire), pas d'un second calcul.
 
+### La version de l'app était tapée à la main, et figée
+`BUILD_ID` valait `'v83/00 · Rafraîchissement auto…'` **depuis le 25 août —
+81 commits**. C'est le seul chiffre qui réponde à « **est-ce que j'ai bien la
+dernière version ?** », la question qu'il pose après chaque déploiement, et le
+bouton « Forcer la mise à jour » est juste à côté. Un numéro qui ne bouge
+jamais répond donc **le contraire** de ce à quoi il sert.
+⚠️ **Et le mécanisme existait déjà** : `vite.config.js` injecte `__BUILD__`,
+l'horodatage réel de la compilation, avec en commentaire « sert de version
+visible pour diagnostiquer les problèmes de cache » — **lu nulle part**. Même
+famille que le tiroir `Nav` défini et jamais rendu (§4.11) : le code est là,
+personne ne l'appelle, rien ne lève d'erreur. **Avant d'ajouter un mécanisme,
+vérifier que celui qui existe est branché.**
+- L'ISO complet est injecté et formaté **côté app**, dans SON fuseau : la
+  chaîne tronquée était en UTC et aurait annoncé 12:32 pour un déploiement de
+  14:32 — deux heures d'écart sur le seul chiffre censé le rassurer.
+- Horodatage illisible ⇒ « **inconnue** », jamais une date inventée.
+- `audit-diagnostic.cjs` vérifie la règle : ce qui est affiché doit **dépendre**
+  de `__BUILD__`, une chaîne littérale échoue. 2 échecs sur le code d'avant.
+- ⚠️ `audit-variables.cjs` a crié au loup : `__BUILD__` n'est déclaré nulle part
+  dans le source (Vite le remplace au build). Corrigé en lui faisant **lire les
+  `define:` de `vite.config.js`** — pas en mettant ce nom en liste blanche : un
+  `__FOO__` non défini doit continuer d'échouer, et c'est vérifié.
+
 ### L'extension n'écrit jamais la ligne `main`
 Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`,
 `panel_accounts_off`, `panel_colis_relais`, …) en lecture-fusion-écriture.

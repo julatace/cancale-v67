@@ -29,6 +29,18 @@ const GLOBAUX = new Set([
   'CSS','SVGElement','canvas','OffscreenCanvas','ImageData','Path2D','WebGLRenderingContext','AbortSignal','ReadableStream',
 ]);
 
+// ⚠️ LES CONSTANTES INJECTÉES À LA COMPILATION SONT DÉCLARÉES, ELLES AUSSI.
+// `vite.config.js` remplace `__BUILD__` par une valeur littérale au build : le
+// code source ne la déclare donc nulle part, et cet audit criait au loup.
+// ⚠️ ON LIT `vite.config.js`, ON NE MET PAS `__BUILD__` DANS LA LISTE BLANCHE :
+// un `__FOO__` utilisé sans être défini là-bas DOIT continuer d'échouer —
+// sinon on remplacerait un vrai contrôle par une exception nominative.
+try {
+  const VITE = fs.readFileSync(path.join(__dirname, '..', 'vite.config.js'), 'utf8');
+  const bloc = /define:\s*\{([\s\S]*?)\}/.exec(VITE);
+  if (bloc) for (const m of bloc[1].matchAll(/([A-Za-z_$][\w$]*)\s*:/g)) GLOBAUX.add(m[1]);
+} catch (_) { /* pas de config vite : rien à ajouter */ }
+
 const fichiers = process.argv.slice(2).length ? process.argv.slice(2)
   : ['src/App.jsx', 'src/main.jsx'].map(f => path.join(__dirname, '..', f)).filter(fs.existsSync);
 
