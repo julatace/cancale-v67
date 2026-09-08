@@ -10103,10 +10103,20 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
     stockVinted.map(norm).filter(n=>n&&!garageNums.has(n)).sort((a,b)=>(+a||0)-(+b||0))
   ,[stockVinted,garageNums]);
 
+  // ⚠️ Le garage 3D est-il seulement utilise ? Sans ca, « en ligne mais absent
+  // du garage » vaut mecaniquement 100 % et n'apprend rien.
+  const garageVide = garageNums.size === 0;
+  // Jamais des centaines de pastilles d'un coup : une tranche, et le total ecrit
+  // sur le bouton (meme motif que Ventes et Achats).
+  const [ecartsMax, setEcartsMax] = useState(200);
+  const [listeMax, setListeMax] = useState(200);
   const garagePasEnLigne=useMemo(()=>
     Array.from(garageNums).filter(n=>!stockSet.has(n)).sort((a,b)=>(+a||0)-(+b||0))
   ,[garageNums,stockSet]);
 
+  // Une recherche remet la tranche a zero : sinon on croirait que les derniers
+  // resultats manquent (meme regle que Ventes et Achats).
+  useEffect(()=>{ setListeMax(200); },[search]);
   // Liste filtrée pour l'affichage
   const liste=useMemo(()=>{
     const arr=[...stockVinted].map(norm).sort((a,b)=>(+a||0)-(+b||0));
@@ -10124,7 +10134,8 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         </button>}/>
 
       <p style={{fontSize:13,color:C.muted,margin:'0 0 14px',lineHeight:1.5}}>
-        Liste de tes annonces actuellement en ligne sur Vinted. Ajoute tes numéros un par un ci-dessous.
+        L'<b>ancienne</b> liste de numéros en ligne, tenue à la main avant que l'app lise Vinted
+        directement (l'onglet <b>Annonces</b> a pris le relais). Ajoute tes numéros un par un ci-dessous.
         Quand une facture arrive, le numéro se retire tout seul ; si tu supprimes la facture, il revient. Les nouveaux numéros ajoutés au catalogue s'ajoutent aussi automatiquement.
       </p>
 
@@ -10161,19 +10172,33 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
       )}
 
       {/* Incohérences */}
-      {(enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
+      {/* ⚠️ Rien a comparer tant que le garage est vide : on le DIT, une fois. */}
+      {garageVide && stockVinted.length>0 && (
+        <div style={{marginBottom:16,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,fontSize:12.5,color:C.muted,lineHeight:1.5}}>
+          Aucun numéro n'est encore posé dans le <b style={{color:C.text}}>Garage</b> : la comparaison
+          avec cette liste ne dirait donc rien d'utile (elle signalerait les {stockVinted.length} numéros
+          d'un coup). Range tes paires dans le Garage, et les écarts apparaîtront ici.
+        </div>
+      )}
+      {!garageVide && (enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
         <div style={{marginBottom:16}}>
-          <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn}}>⚠️ Incohérences avec le garage</h3>
+          <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn,display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={15}/>Incohérences avec le garage</h3>
 
           {enLignePasGarage.length>0&&(
             <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:8}}>
               <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>En ligne mais absent du garage ({enLignePasGarage.length})</div>
               <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le garage.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                {enLignePasGarage.map(n=>(
+                {enLignePasGarage.slice(0,ecartsMax).map(n=>(
                   <span key={n} style={{background:C.warn,color:'#fff',borderRadius:5,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
                 ))}
               </div>
+              {enLignePasGarage.length>ecartsMax && (
+                <button type="button" onClick={()=>setEcartsMax(m=>m+200)}
+                  style={{marginTop:8,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  Voir plus — {ecartsMax} affichés sur {enLignePasGarage.length}
+                </button>
+              )}
             </div>
           )}
 
@@ -10208,8 +10233,11 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         </div>
       ):(
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-          {liste.map(n=>{
-            const absentGarage=!garageNums.has(n);
+          {liste.slice(0,listeMax).map(n=>{
+            // ⚠️ Le contour ambre ne veut dire quelque chose que si le garage
+            // sert : sinon il est sur les 1815 pastilles a la fois, donc sur
+            // aucune. Une alerte qui vise tout ne vise rien.
+            const absentGarage=!garageVide && !garageNums.has(n);
             return (
               <span key={n} style={{
                 display:'inline-flex',alignItems:'center',gap:6,
@@ -10222,6 +10250,14 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
               </span>
             );
           })}
+        </div>
+      )}
+      {liste.length>listeMax && (
+        <div style={{marginTop:10}}>
+          <button type="button" onClick={()=>setListeMax(m=>m+200)}
+            style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            Voir plus — {listeMax} affichés sur {liste.length}
+          </button>
         </div>
       )}
     </div>
@@ -22219,7 +22255,14 @@ export default function App() {
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
-    const TABS_OK=['dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted'];
+    // ⚠️ LISTE BLANCHE DE `?tab=` — ET ELLE OUBLIAIT DEUX ÉCRANS. Un onglet
+    // absent d'ici ne provoque AUCUNE erreur : `goto` l'ignore et l'app reste
+    // sur Ma journée. Mesuré le 8 septembre : `?tab=leboncoin` rendait
+    // « Bonjour Julien » — donc un lien vers Leboncoin n'y menait pas, et mon
+    // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
+    // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
+    // `journee` manquait aussi : invisible parce que c'est l'état de départ.
+    const TABS_OK=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
