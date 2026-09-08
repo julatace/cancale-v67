@@ -249,5 +249,42 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
     : nok('une sonde ratée s\'affiche comme un défaut', ecrase.join(', '));
 }
 
+// ── UNE ALERTE QUI VISE TOUT NE VISE RIEN (écran « Stock Vinted ») ────────
+// Vu en capture le 8 septembre, à 1512 px : « ⚠️ Incohérences avec le garage —
+// En ligne mais absent du garage (1815) », puis **1815 pastilles ambre**, puis
+// la liste elle-même qui redéroulait les **1815 numéros** avec un contour ambre
+// sur CHACUN. Cause : `garageNums` est vide (mesuré — 0 paire posée dans le
+// garage 3D), donc la soustraction rend TOUT. Ce n'est pas une incohérence,
+// c'est un garage qu'il n'utilise pas encore.
+// Mesuré après correction : **20 146 → 1 850 caractères**, 1815 → 200 pastilles,
+// et **1** pastille colorée au lieu de 1815.
+{
+  // ⚠️ La fenêtre se cale sur la FIN RÉELLE du composant (la fonction suivante),
+  // pas sur un nombre de caractères au jugé : mon premier jet coupait à 9 000 et
+  // ratait le rendu de la liste — deux contrôles rouges sur du code correct.
+  const i = app.indexOf('function StockVinted');
+  const j = i < 0 ? -1 : app.indexOf('\nfunction ', i + 10);
+  const S = i < 0 ? '' : app.slice(i, j < 0 ? app.length : j);
+  dit_bloc(S);
+}
+function dit_bloc(S) {
+  /const garageVide = garageNums\.size === 0/.test(S)
+    ? ok('« Stock Vinted » sait si le garage sert')
+    : nok('sans ça, « absent du garage » vaut 100 % et n\'apprend rien');
+  /!garageVide && \(enLignePasGarage\.length>0/.test(S)
+    ? ok('et il ne crie pas « incohérence » sur un garage vide')
+    : nok('une alerte qui vise TOUT ne vise rien');
+  /const absentGarage=!garageVide && !garageNums\.has\(n\)/.test(S)
+    ? ok('le contour ambre de chaque pastille suit la même règle')
+    : nok('1815 pastilles ambre = aucune');
+  // ⚠️ ET AUCUNE LISTE NE SE DÉROULE SANS PLAFOND (même motif que Ventes/Achats).
+  (/liste\.slice\(0,listeMax\)/.test(S) && /Voir plus — \{listeMax\} affichés sur \{liste\.length\}/.test(S))
+    ? ok('la liste se lit par tranche, le total écrit sur le bouton')
+    : nok('la liste déroulait 1815 numéros d\'un coup');
+  (/enLignePasGarage\.slice\(0,ecartsMax\)/.test(S) && /Voir plus — \{ecartsMax\} affichés sur \{enLignePasGarage\.length\}/.test(S))
+    ? ok('les écarts aussi')
+    : nok('les écarts déroulaient tout');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucun chiffre ne peut se présenter comme complet sans l’être.');
 process.exit(ko ? 1 : 0);

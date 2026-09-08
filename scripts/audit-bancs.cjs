@@ -90,6 +90,20 @@ if (carte) {
   const joignables = [...montes].filter(t => auRail.has(t) || appeles.has(t));
   const culsDeSac  = [...montes].filter(t => !auRail.has(t) && !appeles.has(t));
   if (culsDeSac.length) console.log(`--  (${culsDeSac.length} écran(s) monté(s) mais injoignable(s) : ${culsDeSac.join(', ')})`);
+  // ⚠️⚠️ ET IL FAUT QUE L'APP ACCEPTE `?tab=` — sinon le banc mesure l'ACCUEIL.
+  // Mesuré le 8 septembre : `TABS_OK` (la liste blanche de `goto`) oubliait
+  // `leboncoin` et `journee`. Un onglet absent ne lève AUCUNE erreur : `goto`
+  // l'ignore et l'app reste sur Ma journée. Le banc annonçait donc « leboncoin
+  // rendu » en mesurant « Bonjour Julien » — un faux vert dans la couverture
+  // que je venais d'élargir. Un lien vers Leboncoin n'y menait pas non plus.
+  {
+    const m = /const TABS_OK=\[([^\]]*)\]/.exec(APP);
+    const acceptes = new Set(m ? [...m[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1]) : []);
+    const refuses = joignables.filter(t => !acceptes.has(t));
+    dit(refuses.length === 0,
+      `l'app accepte \`?tab=\` pour les ${joignables.length} écrans joignables`,
+      refuses.length ? 'ignoré(s) en silence → retombe sur Ma journée : ' + refuses.join(', ') : `${acceptes.size} onglets acceptés`);
+  }
   for (const banc of ['verif_visuel.cjs', 'verif_dark.cjs']) {
     const src = fs.readFileSync(path.join(DIR, banc), 'utf8');
     const m = /const TABS=\[([^\]]*)\]/.exec(src);
