@@ -355,6 +355,34 @@ présenté comme un total. C'est §11 : deux lecteurs recalculent la même notio
   qui comptent : la ligne PORTE `pret`, et le tri le compare AVANT la date
   limite.
 
+### Achats : le compte se nomme UNE fois quand c'est le même
+Il a **neuf comptes** et l'extension ne travaille que pour celui qui est
+connecté dans l'onglet : savoir lequel est **indispensable**, et ça ne se perd
+jamais. Mais vu en capture le 8 septembre : « **compte julatace3535** » écrit
+**cinq fois**, sous cinq titres différents, alors que les cinq colis du groupe
+sont sur ce compte-là — et « Ouvrir la conversation **→ le code arrive tout de
+suite** » cinq fois aussi, alors que l'en-tête du groupe l'explique déjà.
+C'est §7 mot pour mot, sur un groupe **uniforme**.
+- Le compte est nommé **dans l'en-tête du groupe** quand il est le même
+  (« Ils sont tous sur `julatace3535`. »), **sur chaque ligne** quand le groupe
+  est mixte — là seulement la ligne distingue.
+- Le libellé long ne reste que s'il distingue (groupe mixte, ce colis-ci n'a pas
+  son code alors que ses voisins l'ont). Mesuré : **3 098 → 2 875 caractères**.
+- Le banc `retrait.cjs` exige **les deux à la fois** : le compte apparaît **au
+  moins une fois** (jamais perdu) **et** pas une fois par colis quand ils sont
+  tous sur le même. Un contrôle qui n'aurait que la première moitié serait vert
+  sur le défaut. Prouvé : « julatace3535 » ×5 avant, ×1 après.
+- ⚠️ **Deux erreurs dans mon propre banc, corrigées** : (1) une commande
+  moissonnée **ne porte aucun champ de compte** — c'est l'identifiant de ligne
+  (`harvest_{uid}_orders_purchased`) qui le dit ; `o.account || o.uid` valait
+  toujours `''`, et un `Set([''])` a une taille de 1, donc le banc annonçait
+  « sur 1 compte » **en ne mesurant rien**. (2) Sa fenêtre de texte débordait
+  sur le bandeau voisin et y lisait un login sans rapport.
+- ⚠️ **Et l'uniformité se juge PAR GROUPE, pas sur l'ensemble** : les 6 colis
+  sans code sont sur **2** comptes, mais la liste se groupe par point relais et
+  celui « à confirmer » en porte 5, tous sur le même. Poser la condition sur
+  l'ensemble ne l'aurait jamais déclenchée.
+
 ### « Les plus urgents sont en haut de la liste » — faux une fois sur deux
 La liste des colis se groupe sur **ce qu'il peut faire** (prêts à imprimer,
 puis en attente de bordereau) ; l'urgence n'est que le tri **à l'intérieur** de
@@ -743,19 +771,37 @@ lus dans ses conversations) en dépendait.
   tous les fichiers, que l'app le propose, et qu'aucun zip périmé ne traîne.
 - **Après toute modification de `vinted-sync-extension/`, régénérer le zip.**
 
-## 8. État au 7 septembre 2026
+## 8. État au 8 septembre 2026 (remesuré en fin de journée)
 
 | | |
 |---|---|
-| annonces **ouvertes** | **49** · 0 sans numéro · **0 doublon vivant** ✅ (383 fermées à côté — voir le piège `nItems` ci-dessous) |
-| paires numérotées | 320 · **0 prix d'achat** ⚠️ (il les saisit lui-même — la modale trie les vendues d'abord : 20 saisies = 33 % du CA reliable) |
-| pool de numéros | 456, sans trou, plus haut = 456 (append-only : c'est normal) |
+| annonces **ouvertes** | **54** · **0 doublon vivant** ✅ (385 fermées à côté — voir le piège `nItems` ci-dessous) |
+| paires numérotées | **329** · **0 prix d'achat** ⚠️ (il les saisit lui-même — la modale trie les vendues d'abord : 20 saisies = 33 % du CA reliable) |
+| pool de numéros | **465**, sans trou, plus haut = 465 (append-only : c'est normal) |
 | ⚠️ numéros en double | **13**, tous HISTORIQUES : N°1 à N°16 redonnés par la numérotation auto les 2/4/6/15/16 août. **Cause : sur un appareil neuf le pool était lu VIDE au montage**, le nuage arrivant 500 ms plus tard → la numérotation repartait de 1. Corrigé (`onCloudReady` relit le pool) et protégé par `audit-identite.cjs`. **Aucun n'est vivant** : les paires en double sont fermées. |
-| argent Vinted | **281,94 € disponibles** à virer · **2 235,80 € retenus** (9 porte-monnaie) |
+| argent Vinted | **139,04 € disponibles** à virer · **2 013,60 € retenus** — sur **7 porte-monnaie**, pas 9, et c'est ce que l'app affiche (voir le piège des trois formes ci-dessous). Le plus ancien solde date de **13 j** (`julatace3535`). |
 | colis | 15 ventes à expédier, **10 bordereaux déjà en base** · **6** colis à retirer, **0 code** — 5 sur `julatace3535` (dernière capture : 4 j) et **1 sur `julatace35260`, capté il y a 10 min**. ⚠️ Ce n'est PAS le compte qui bloque : **son extension est antérieure à 5.45**, elle n'a pas `capterRetraits` (0 compteur `retrait_*` sur 42). La mise à jour est le premier geste. |
 | notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
 | comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
 | ventes masquées | 209 (masquées à la main ; « tout réafficher » existe sur l'écran Ventes) |
+
+⚠️⚠️ **PIÈGE `billing` — ET C'EST MON SCRIPT QUI AVAIT TORT, PAS L'APP.** Le
+8 septembre j'ai mesuré « 29,94 € disponibles sur 5 porte-monnaie » et j'allais
+annoncer que l'app perdait de l'argent. En vérifiant la FORME (§6) : **trois
+charges différentes** dorment sous le même identifiant `harvest_{uid}_billing` —
+`{main, escrow}` (le solde, 5 comptes), `{balance, pending_balance, …}` (la
+réponse `payouts`, 2 comptes : `arthuror2` 93 € + 109,80 €, `llloollllaa`
+16,10 € + 428,50 €), et une réponse **qui n'a rien à voir** (`minimum_price`,
+sur `julienf765`). `liliand653` n'a aucune ligne.
+⇒ **L'app lit déjà les trois** (`fetchWalletEscrow`), ne mélange jamais
+« disponible » et « en attente », ignore la charge hors sujet, et annonce
+**le nombre de porte-monnaie réellement lus** — donc « sur 7 », pas « sur 9 ».
+Elle est juste. Mon script lisait `data->payload->user_balance`, un champ qui
+n'existe pas.
+⇒ La ligne de `julienf765` est un **reliquat** : `estPorteMonnaie` (extension)
+exige aujourd'hui un montant réel parmi `main|escrow|balance|pending_balance`,
+donc ça ne peut plus se reproduire. Elle sera écrasée à sa prochaine visite du
+porte-monnaie. **Ne pas « corriger » l'app pour ça.**
 
 ⚠️ **PIÈGE `nItems`, payé le 7 septembre.** `harvest_{uid}_listings.nItems` compte
 **tout** ce que la moisson a capté, **annonces fermées comprises** : 103 pour

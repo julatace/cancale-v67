@@ -17,7 +17,14 @@ const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path
 srv.listen(4383);
 // Ce que la VRAIE base contient, calculé ici pour comparer à l'écran.
 const AT=(s)=>/d[ée]pos[ée]/i.test(s||'')&&/point\s+relais|bureau\s+de\s+poste/i.test(s||'');
-const cmds=[]; purch.forEach(r=>(((r.data||{}).payload||{}).my_orders||[]).forEach(o=>cmds.push(o)));
+// ⚠️ LE COMPTE VIENT DE L'IDENTIFIANT DE LIGNE, PAS DE LA COMMANDE. Mesuré :
+// une commande Vinted moissonnée ne porte AUCUN champ de compte — c'est
+// `harvest_{uid}_orders_purchased` qui le dit. Mon premier jet lisait
+// `o.account || o.uid` : toujours vide, donc un Set de [''] de taille 1 — le
+// banc annonçait « sur 1 compte(s) » en ne mesurant rien du tout. §6 : vérifier
+// le NOM et la FORME du champ avant de conclure.
+const cmds=[]; purch.forEach(r=>{ const uid=(/^harvest_([^_]+)_/.exec(r.id)||[])[1]||'';
+  (((r.data||{}).payload||{}).my_orders||[]).forEach(o=>cmds.push(Object.assign({__uid:uid}, o))); });
 const aRetirer=cmds.filter(o=>AT(o.status));
 const nonRecl=cmds.filter(o=>/non r[ée]clam/i.test(o.status||''));
 // Les codes DEJA en base (panel_colis_relais) : un colis qui en a un n'attend
@@ -95,7 +102,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   const ligne=(/Retirer \d+ colis[\s\S]{0,220}/.exec(j2)||[''])[0];
   const sansCode=aRetirer.filter(o=>!codes[String(o.transaction_id||'')]);
   console.log('base servie : '+sansCode.length+' colis sans code, sur '
-    +[...new Set(sansCode.map(o=>String(o.account||o.uid||'')))].length+' compte(s)');
+    +[...new Set(sansCode.map(o=>o.__uid).filter(Boolean))].length+' compte(s)');
   if(sansCode.length===0){ console.log('--  (aucun colis sans code dans ces fixtures)'); }
   else {
     dit(/Retirer \d+ colis/.test(j2), 'Ma journee annonce les colis a retirer');
@@ -105,6 +112,49 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     dit(logins.some(l=>ligne.includes(l)),
       'elle NOMME le compte sur lequel se connecter',
       ligne.replace(/\n/g,' · ').slice(0,120));
+  }
+
+  // ── 5 bis. LE COMPTE EST NOMMÉ UNE FOIS, PAS SUR CHAQUE LIGNE ────────────
+  // Il a NEUF comptes et l'extension ne travaille que pour celui qui est
+  // connecté dans l'onglet : savoir lequel est indispensable, et ça ne se perd
+  // jamais. Mais vu en capture le 8 septembre, sur l'écran Achats :
+  // « compte julatace3535 » écrit CINQ fois, sous cinq titres différents,
+  // alors que les cinq colis sont sur ce compte-là. C'est §7 mot pour mot.
+  //
+  // ⚠️ LA BASE DÉCLENCHE, PAS LA FORMULATION. Deux exigences, et elles
+  // s'opposent — c'est ce qui rend le contrôle utile :
+  //   • le compte doit apparaître AU MOINS une fois (jamais perdu) ;
+  //   • et pas une fois par colis quand ils sont tous sur le même.
+  // Un contrôle qui n'aurait que la première serait vert sur le défaut.
+  {
+    const comptes = [...new Set(sansCode.map(o => o.__uid).filter(Boolean))];
+    // ⚠️ LA FENÊTRE S'ARRÊTE À LA FIN DU BLOC. Premier jet : 1 400 caractères à
+    // partir de « Point relais » — ça débordait sur le bandeau voisin « 2
+    // comptes Vinted ne reçoivent aucun email — tomj606, angeled92 », et le
+    // banc y trouvait un login qui n'a rien à voir avec ce groupe.
+    const dep = v.txt.indexOf('Point relais');
+    const suite = dep < 0 ? -1 : v.txt.indexOf('Coche \u2713 quand tu l', dep);
+    const bloc = dep < 0 ? '' : v.txt.slice(dep, suite > 0 ? suite : dep + 1400);
+    // ⚠️ ET C'EST LE GROUPE QUI COMPTE, PAS L'ENSEMBLE. Mesuré : les 6 colis
+    // sans code sont sur DEUX comptes, mais la liste se groupe par point
+    // relais — et le groupe « Point relais à confirmer » en porte 5, tous sur
+    // le même. Poser la condition sur l'ensemble ne l'aurait jamais déclenchée.
+    // On lit donc ce que le bloc RENDU contient.
+    const vus = {};
+    for (const a of accounts) { const l = String(a.login || ''); if (!l) continue;
+      const n = bloc.split(l).length - 1; if (n > 0) vus[l] = n; }
+    const noms = Object.keys(vus);
+    const nColis = (bloc.match(/Ouvrir la conversation/g) || []).length;
+    console.log(`    bloc « point relais » : ${nColis} colis · comptes nommés ${noms.length ? noms.map(l => `${l}\u00d7${vus[l]}`).join(', ') : '(aucun)'}`);
+    if (nColis > 1) {
+      dit(noms.length >= 1, "l'écran Achats nomme le compte sur lequel se connecter",
+        "il en a neuf, et l'extension ne travaille que pour celui de l'onglet");
+      // Groupe uniforme (un seul compte nommé) ⇒ la phrase est celle du GROUPE :
+      // une fois. Groupe mixte ⇒ chaque ligne distingue, la répétition est due.
+      if (noms.length === 1) dit(vus[noms[0]] === 1,
+        "et il ne le répète pas sur chaque colis du même compte",
+        `« ${noms[0]} » écrit ${vus[noms[0]]} fois pour ${nColis} colis, tous sur ce compte`);
+    }
   }
 
   // ── 6. LES TROIS ÉCRANS DISENT LE MÊME NOMBRE ─────────────────────────────
