@@ -6609,92 +6609,37 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const PER_PAGE=50;
   useEffect(()=>{ fetchProInvoices().then(setProInvs); },[]);
 
-  // URL de l'API Apps Script (Vinted Auto)
-  const VINTED_API_URL='https://script.google.com/macros/s/AKfycbzO-jwmFwOwJI49W0LjR8EOcIKAWsTzElWsWc6IVg0luX6MhbJNdOXzpe2BhYUCXmHb/exec';
-  
-  // Récupère les factures depuis Google Sheets via Apps Script
-  // silencieux = true : pas d'alertes (utilisé pour le rafraîchissement auto au démarrage)
-  const fetchVintedInvoices=async(silencieux=false)=>{
-    setFetching(true);
-    try {
-      const res=await fetch(VINTED_API_URL);
-      const data=await res.json();
-      if(!Array.isArray(data)){
-        if(!silencieux) toast('Format de données inattendu');
-        return;
-      }
-      // Convertir les lignes Sheets en factures de l'app
-      const existingKeys=new Set(invoices.map(i=>`${i.productId}|${i.sellPrice}|${i.buyerName}`));
-      // Point de départ pour la numérotation auto : max des numéros existants de l'année
-      const year=new Date().getFullYear();
-      let maxNum=invoices.reduce((mx,i)=>{
-        if(i.number&&i.number.startsWith(`${year}-`)){
-          const n=parseInt(i.number.split('-')[1],10);
-          return isNaN(n)?mx:Math.max(mx,n);
-        }
-        return mx;
-      },0);
-      const newInvoices=[];
-      data.forEach(row=>{
-        const productId=String(row['N° paire']||'').trim();
-        const designation=String(row['Désignation']||'').trim();
-        const prix=row['Prix'];
-        const pseudo=String(row['Pseudo']||'').trim();
-        const nomComplet=String(row['Nom complet']||'').trim();
-        const email=String(row['Email']||'').trim();
-        const adresse=String(row['Adresse']||'').trim();
-        const dateMail=row['Date mail'];
-        
-        if(!pseudo||!prix) return; // données incomplètes
-        
-        const key=`${productId}|${prix}|${nomComplet}`;
-        if(existingKeys.has(key)) return; // déjà importé
-        
-        // Attribue un numéro de facture dès l'arrivée (la facture reste en Boîte de réception à valider)
-        maxNum+=1;
-        const autoNumber=`${year}-${String(maxNum).padStart(6,'0')}`;
-        
-        newInvoices.push({
-          id:'inv_auto_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
-          number:autoNumber, // numéro déjà attribué
-          productId:productId,
-          itemName:designation,
-          sellPrice:String(prix),
-          saleDate:dateMail?new Date(dateMail).toISOString().slice(0,10):'',
-          buyerName:nomComplet,
-          buyerEmail:email,
-          buyerAddress:adresse,
-          vintedNumber:'',
-          source:'auto',
-          validated:false,
-          pseudo:pseudo,
-          createdAt:new Date().toISOString(),
-        });
-      });
-      
-      if(newInvoices.length===0){
-        if(!silencieux) toast('Aucune nouvelle facture à importer');
-      } else {
-        const u=[...newInvoices,...invoices];
-        setInvoices(u); save('vinted_invoices',u);
-        if(!silencieux) toast(`✓ ${newInvoices.length} nouvelle(s) facture(s) importée(s) depuis Vinted !`);
-      }
-    } catch(err) {
-      if(!silencieux) toast('Erreur récupération : '+err.message);
-    } finally {
-      setFetching(false);
-    }
-  };
+  // ⚠️⚠️ CHEMIN GOOGLE SHEETS RETIRÉ (9 septembre) — IL ÉTAIT MORT, MESURÉ.
+  // `fetchVintedInvoices` appelait un Apps Script
+  // (`script.google.com/macros/s/…/exec`) au montage de l'écran ET TOUTES LES
+  // 5 MINUTES, en silence (`silencieux=true`, donc aucun message). Interrogé
+  // le 9 septembre : **404**, réponse HTML — donc `res.json()` levait, le
+  // `catch` avalait, et l'écran retentait indéfiniment un endpoint qui
+  // n'existe plus.
+  // ⚠️ Et l'écran vide DISAIT à Julien « elles arrivent de tes emails Vinted,
+  // par ta feuille Google », avec un bouton « Aller les chercher maintenant » :
+  // il pouvait attendre des factures qui ne pouvaient PAS arriver, et cliquer
+  // sur un bouton qui ne pouvait QUE échouer (avec « Erreur récupération : … »,
+  // du vocabulaire d'informaticien par-dessus le marché).
+  // ⚠️ Le dossier annonçait pourtant cette architecture retirée le 30 août
+  // (« plus AUCUN appelant ») : c'était FAUX, ce caller-ci avait survécu.
+  // Même famille que le tiroir `Nav` — sauf qu'ici le code mort TOURNAIT.
+  // ⚠️ Et l'URL `/exec` d'un Apps Script est une URL-capacité : quiconque la
+  // connaît peut l'invoquer. Elle vivait en clair dans un dépôt PUBLIC.
+  //
+  // La VRAIE source est juste à côté et elle est vivante : `fetchProInvoices`
+  // lit `email_invoice_*` en base — les reçus Vinted arrivés par email
+  // (`api/email-inbound`). Plus « + Nouvelle facture » pour la saisie.
 
-  // 🔄 Rafraîchissement automatique au démarrage (silencieux) + toutes les 5 min
+  // 🔄 Rafraîchissement automatique toutes les 5 min — sur la source VIVANTE.
+  // ⚠️ Cette boucle interrogeait l'Apps Script mort (404) toutes les 5 minutes,
+  //    en silence. Elle relit maintenant les reçus Vinted arrivés par email
+  //    (`email_invoice_*`), c'est-à-dire ce qui remplit réellement l'écran.
   const _autoFetchedRef=React.useRef(false);
   useEffect(()=>{
     if(_autoFetchedRef.current) return;
     _autoFetchedRef.current=true;
-    // Premier chargement au démarrage de l'onglet Factures
-    fetchVintedInvoices(true);
-    // Puis toutes les 5 minutes tant que l'app est ouverte
-    const interval=setInterval(()=>fetchVintedInvoices(true), 5*60*1000);
+    const interval=setInterval(()=>{ fetchProInvoices().then(setProInvs); }, 5*60*1000);
     return ()=>clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -6814,9 +6759,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
           right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small onClick={()=>setShowForm(true)} color={C.accent}>+ Nouvelle facture</Btn>
-          <Btn small outline color={C.muted} onClick={()=>fetchVintedInvoices(false)} disabled={fetching}
+          {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
+              pouvait QUE échouer. Il relit maintenant les reçus arrivés par
+              email — la source qui remplit vraiment cet écran. */}
+          <Btn small outline color={C.muted} disabled={fetching}
+            onClick={async()=>{ setFetching(true); try{ setProInvs(await fetchProInvoices()); toast('Reçus Vinted relus'); } finally { setFetching(false); } }}
             style={{display:'inline-flex',alignItems:'center',gap:5}}>
-            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Récupérer Vinted'}
+            <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les reçus'}
           </Btn>
           <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages</Btn>
@@ -6919,11 +6868,16 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                 ? <>Aucune facture trouvée pour « {search} ».</>
                 : zone==='attente'
                   ? <>Aucune facture en attente.<br/>
-                      <span style={{fontSize:11.5}}>Elles arrivent de tes emails Vinted, par ta feuille Google.</span>
+                      {/* ⚠️ Cette phrase parlait d'une « feuille Google » : le
+                          pipeline Apps Script est mort (404, mesuré). Il aurait
+                          attendu des factures qui ne pouvaient pas arriver. Ce
+                          qui remplit vraiment cet écran, ce sont les reçus
+                          Vinted reçus par email, et sa propre saisie. */}
+                      <span style={{fontSize:11.5}}>Les reçus Vinted arrivent par email, à l'adresse de l'app. Tu peux aussi en créer une à la main.</span>
                       <br/>
                       <span style={{display:'inline-block',marginTop:10}}>
-                        <Btn small outline color={C.accent} onClick={()=>fetchVintedInvoices(false)} disabled={fetching}
-                          style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sync" size={13}/>{fetching?'Chargement…':'Aller les chercher maintenant'}</Btn>
+                        <Btn small color={C.accent} onClick={()=>setShowForm(true)}
+                          style={{display:'inline-flex',alignItems:'center',gap:5}}>+ Nouvelle facture</Btn>
                       </span>
                     </>
                   : <>Aucune facture comptabilisée.<br/>

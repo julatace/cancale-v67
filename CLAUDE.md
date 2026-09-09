@@ -499,6 +499,29 @@ d'informaticien y est donc justifié ; ne pas « simplifier » ce bloc.
   du titre affirmait **« partagées »** dès que `proteges` était faux — or il
   l'est aussi quand les deux sondes n'ont rien pu lire. Trois états, pas deux.
 
+### Factures : un pipeline MORT, appelé toutes les 5 minutes
+Mesuré le 9 septembre. L'écran Factures appelait `fetchVintedInvoices` — un
+**Google Apps Script** (`script.google.com/macros/s/…/exec`) — **au montage et
+toutes les 5 minutes**, en silence (`silencieux=true`, donc aucun message).
+Interrogé : **404**, réponse HTML. `res.json()` levait, le `catch` avalait, et
+l'écran retentait indéfiniment un endpoint qui n'existe plus.
+⚠️ Et l'écran vide **disait à Julien** « elles arrivent de tes emails Vinted,
+**par ta feuille Google** », avec un bouton « Aller les chercher maintenant » :
+il pouvait attendre des factures qui ne pouvaient **pas** arriver, et cliquer
+sur un bouton qui ne pouvait **que** échouer — en affichant « Erreur
+récupération : … », du vocabulaire d'informaticien par-dessus le marché.
+⚠️⚠️ **Le dossier annonçait cette architecture retirée le 30 août** (« plus
+AUCUN appelant ») : **c'était faux**, ce caller-ci avait survécu. Même famille
+que le tiroir `Nav` — sauf qu'ici le code mort **tournait**. *Une suppression
+« terminée » se vérifie sur ce qui RESTE, y compris des mois après.*
+⇒ La vraie source vit juste à côté : `fetchProInvoices` lit `email_invoice_*`
+en base (les reçus Vinted arrivés par email, `api/email-inbound`). C'est elle
+que la boucle des 5 minutes et le bouton relisent maintenant, et c'est elle que
+l'écran vide nomme. La porte proposée est « + Nouvelle facture », qui marche.
+⚠️ **Et l'URL `/exec` est une URL-CAPACITÉ dans un dépôt PUBLIC** : elle suffit
+à invoquer le script, sans mot de passe. `audit-secrets.cjs` la refuse
+désormais — elle était morte, mais un Apps Script se redéploie.
+
 ### Le mode sombre s'arrêtait aux composants
 Mesuré le 9 septembre, app **en sombre** : les cartes étaient bien à
 `rgb(26,31,39)` … et **`document.body` à `rgb(246,247,249)`**, le gris clair.

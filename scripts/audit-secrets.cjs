@@ -44,6 +44,14 @@ const REGLES = [
     'donnée personnelle (vendeur ou client) dans le code'],
   ['aucune clé Anthropic', /sk-ant-[A-Za-z0-9_-]{20,}/,
     'une clé de facturation ne vit jamais dans un dépôt'],
+  // ⚠️ Trouvé le 9 septembre, VIVANT dans l'écran Factures : l'URL `/exec` d'un
+  // Google Apps Script. C'est une URL-CAPACITÉ — pas un identifiant à protéger
+  // par un mot de passe, mais une adresse qui SUFFIT à invoquer le script.
+  // Publiée dans un dépôt ouvert, n'importe qui pouvait l'appeler.
+  // (Elle était morte — 404, mesuré — mais un Apps Script se redéploie, et
+  // l'URL, elle, reste dans l'historique du dépôt.)
+  ['aucune URL de Google Apps Script', /script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/,
+    "une URL `/exec` suffit à invoquer le script : c'est une capacité, pas un lien"],
 ];
 
 for (const [nom, motif, pourquoi] of REGLES) {
