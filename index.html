@@ -10,10 +10,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="VRM" />
-  <!-- Couleur de l'interface système (barre du navigateur / PWA) : alignée sur
-       le vert de marque, et adaptée au mode sombre. -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F6F7F9" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1116" />
+  <!-- Couleur de l'interface système (barre du navigateur / PWA sur iPhone).
+       ⚠️⚠️ ELLE SUIVAIT LA PRÉFÉRENCE DU SYSTÈME, PAS LE CHOIX DE L'APP.
+       Le mode sombre de VRM est un CHOIX, rangé dans `vinted_dark` (§7 :
+       « mode sombre choisi, pas inversé automatiquement »). Avec les deux
+       balises `prefers-color-scheme` d'avant, un téléphone en clair + une app
+       en sombre donnait une barre d'état BLANC CASSÉ au-dessus d'une app noire
+       — mesuré : `theme-color = #F6F7F9` alors que les cartes étaient à
+       `rgb(26,31,39)`. Une seule balise, sans `media`, pilotée par le choix. -->
+  <meta name="theme-color" content="#F6F7F9" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="/icon-192.png" />
@@ -37,6 +42,19 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
   <title>VRM</title>
+  <!-- ⚠️ AVANT LE PREMIER RENDU, sinon l'app s'affiche en clair puis bascule.
+       On lit le MÊME réglage que React (`vinted_dark`) et on estampille la
+       racine : le CSS ci-dessous et la barre d'état suivent aussitôt. Trois
+       lignes, aucune dépendance, et un `try` parce qu'un navigateur qui
+       refuse le stockage ne doit pas empêcher l'app de démarrer (§4.1). -->
+  <script>
+    try {
+      var d = JSON.parse(localStorage.getItem('vinted_dark') || 'false') === true;
+      document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', d ? '#11151B' : '#F6F7F9');
+    } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+  </script>
   <style>
     body{margin:0;padding:0;background:#F6F7F9;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
@@ -44,7 +62,19 @@
        mais c'est ce qui fait la différence entre « feuille de papier » et
        « écran d'application ». */
     body{background-image:none;}
-    @media (prefers-color-scheme: dark){ body{background:#0E1116;background-image:none;} }
+    /* ⚠️ LE CHOIX DE L'APP GAGNE SUR LA PRÉFÉRENCE DU SYSTÈME. `data-theme` est
+       posé par le script de démarrage ci-dessous (donc AVANT le premier
+       rendu), et sa spécificité passe devant la règle `body` du média.
+       ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#11151B) : le média
+       utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
+    html[data-theme="dark"]  body{ background:#11151B; background-image:none; }
+    html[data-theme="light"] body{ background:#F6F7F9; background-image:none; }
+    /* `color-scheme` habille les champs NATIFS (date, sélecteurs, ascenseurs).
+       Il n'était posé nulle part : la date d'« Import des emails » dans
+       Réglages s'affichait en boîte blanche au milieu de l'app sombre. */
+    html[data-theme="dark"]  { color-scheme: dark; }
+    html[data-theme="light"] { color-scheme: light; }
+    @media (prefers-color-scheme: dark){ body{background:#11151B;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
     @keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}
 

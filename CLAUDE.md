@@ -499,6 +499,33 @@ d'informaticien y est donc justifié ; ne pas « simplifier » ce bloc.
   du titre affirmait **« partagées »** dès que `proteges` était faux — or il
   l'est aussi quand les deux sondes n'ont rien pu lire. Trois états, pas deux.
 
+### Le mode sombre s'arrêtait aux composants
+Mesuré le 9 septembre, app **en sombre** : les cartes étaient bien à
+`rgb(26,31,39)` … et **`document.body` à `rgb(246,247,249)`**, le gris clair.
+Cause : `index.html` ne gérait le sombre que par **`prefers-color-scheme`**,
+c'est-à-dire la préférence du **système** — alors que le mode sombre de VRM est
+un **choix** rangé dans `vinted_dark` (§7 : « mode sombre choisi, pas inversé
+automatiquement »). `C` était bien remplacé pour React ; le **document**, lui,
+restait clair. Téléphone en clair + app en sombre, et il obtenait :
+- une **barre d'état blanc cassé** au-dessus d'une app noire (`theme-color`
+  valait `#F6F7F9`) — sur l'iPhone où il l'a ajoutée à l'écran d'accueil ;
+- un **éclair de gris clair au rebond de défilement** : iOS peint le fond du
+  BODY quand on tire au-delà de la page ;
+- des **champs natifs en clair** (`color-scheme` n'était posé nulle part) — la
+  date d'« Import des emails » sortait en boîte blanche dans l'app sombre.
+
+⇒ Le thème est **estampillé sur la racine** (`data-theme`), par un script de
+démarrage d'`index.html` **avant le premier rendu** (sinon l'app s'affiche en
+clair puis bascule) et tenu à jour par un effet au clic. Les deux lisent
+`vinted_dark` : une seule source (§11).
+⚠️ Le média utilisait `#0E1116` alors que `THEMES.dark.bg` vaut `#11151B` — une
+**troisième** valeur de fond sombre traînait dans le projet. Une seule reste.
+⚠️ Le banc `verif_dark.cjs` mesure la **luminance**, pas une chaîne : comparer à
+« #11151B » serait vert le jour où la palette change de teinte. Ce qui doit
+rester vrai : le fond du document est sombre, la barre d'état suit, les champs
+natifs suivent, et la **hiérarchie rail < page < carte** tient (0,0029 <
+0,0073 < 0,0135). **8 échecs** sur le code d'avant (4 contrôles × 2 tailles).
+
 ### Comptes liés : un CHOIX n'est pas une panne
 Vu en capture le 9 septembre : l'en-tête annonçait « ✓ 0 à jour · ⏱ 7 à
 rafraîchir · 🚫 **2 en panne** » — et l'un des deux était `liliand653`, le

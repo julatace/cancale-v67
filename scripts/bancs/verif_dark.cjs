@@ -33,6 +33,9 @@ function projette(row,select){
   return out;
 }
 
+// « #11151B » → « rgb(17,21,27) », pour mesurer la balise comme une couleur.
+const hexRgb=(h)=>{ const m=/^#?([0-9a-f]{6})$/i.exec(String(h||'').trim()); if(!m) return '';
+  const n=parseInt(m[1],16); return `rgb(${(n>>16)&255}, ${(n>>8)&255}, ${n&255})`; };
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
@@ -103,6 +106,53 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
     dit(susp.length===0,"aucun artefact d'affichage",susp.join(', '));
     dit(sousIle.length===0,"rien ne passe sous l'île d'actions",sousIle.join(' // ')   /* ⚠️ PAS DE PLAFOND : `slice(0,3)` a masqué une 3e trouvaille derrière deux autres — un contrôle qui tronque ses résultats fait croire que le reste va bien. */);
     dit(errs.length===0,"aucune erreur d'app",errs.slice(0,2).join(' | '));
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LE DOCUMENT LUI-MÊME DOIT ÊTRE SOMBRE, PAS SEULEMENT LES COMPOSANTS
+    // ══════════════════════════════════════════════════════════════════════
+    // Mesuré le 9 septembre, app en sombre : les cartes étaient bien à
+    // `rgb(26,31,39)` … et `document.body` à `rgb(246,247,249)`, le GRIS CLAIR.
+    // Cause : `index.html` ne gérait le sombre que par `prefers-color-scheme`,
+    // c'est-à-dire la préférence du SYSTÈME — alors que le mode sombre de VRM
+    // est un CHOIX rangé dans `vinted_dark` (§7). Téléphone en clair + app en
+    // sombre, et il obtenait une barre d'état blanc cassé au-dessus d'une app
+    // noire, un éclair de gris au rebond de défilement (iOS peint le fond du
+    // BODY quand on tire au-delà de la page), et des champs natifs en clair.
+    //
+    // ⚠️ ON MESURE LA LUMINANCE, PAS UNE CHAÎNE. Comparer à « #11151B » serait
+    // vert le jour où la palette change de teinte ; ce qui doit rester vrai,
+    // c'est que le fond du document est SOMBRE et qu'il suit la hiérarchie
+    // rail < page < carte (§7 : le sombre tient par la hiérarchie).
+    {
+      const lum = (c) => { const m=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c||''); if(!m) return null;
+        const f=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};
+        return 0.2126*f(+m[1])+0.7152*f(+m[2])+0.0722*f(+m[3]); };
+      const d = await pg.evaluate(() => {
+        const nav = document.querySelector('nav') || document.querySelector('aside');
+        const main = document.querySelector('main') || document.body;
+        let carte = null;
+        for (const el of main.querySelectorAll('div')) { const bg = getComputedStyle(el).backgroundColor;
+          if (bg && bg !== 'rgba(0, 0, 0, 0)' && el.getBoundingClientRect().width > 300) { carte = bg; break; } }
+        const m = document.querySelector('meta[name="theme-color"]');
+        return { rail: nav ? getComputedStyle(nav).backgroundColor : null,
+                 page: getComputedStyle(document.body).backgroundColor, carte,
+                 theme: m ? m.getAttribute('content') : null,
+                 scheme: getComputedStyle(document.documentElement).colorScheme };
+      });
+      const lPage = lum(d.page), lRail = lum(d.rail), lCarte = lum(d.carte), lTheme = lum(d.theme ? hexRgb(d.theme) : '');
+      console.log(`    document : body ${d.page} · theme-color ${d.theme} · color-scheme ${d.scheme}`);
+      dit(lPage != null && lPage < 0.15, 'le fond du DOCUMENT est sombre, pas seulement les cartes',
+        `body = ${d.page} (luminance ${lPage==null?'?':lPage.toFixed(3)}) — iOS le montre au rebond de défilement`);
+      dit(lTheme != null && lTheme < 0.15, "et la barre d'état du téléphone suit (`theme-color`)",
+        `theme-color = ${d.theme}`);
+      dit(d.scheme === 'dark', 'et les champs natifs aussi (`color-scheme`)',
+        `color-scheme = ${d.scheme} — la date de Réglages s'affichait en boîte blanche`);
+      // §7 : le sombre tient par la HIÉRARCHIE — rail le plus sombre, page
+      // au-dessus, cartes encore au-dessus. Trois marches, pas deux.
+      if (lRail != null && lPage != null && lCarte != null)
+        dit(lRail < lPage && lPage < lCarte, 'la hiérarchie sombre tient : rail < page < carte',
+          `${lRail.toFixed(4)} < ${lPage.toFixed(4)} < ${lCarte.toFixed(4)}`);
+    }
     await pg.close();
   }
   await b.close(); srv.close();
