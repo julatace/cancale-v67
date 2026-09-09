@@ -22499,6 +22499,27 @@ export default function App() {
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu
   C = dark ? THEMES.dark : THEMES.light;
   const toggleDark=()=>{ const d=!dark; setDark(d); save('vinted_dark',d); };
+  // ⚠️⚠️ LE THÈME NE VIVAIT QUE DANS REACT. `C` était bien remplacé, mais le
+  //    DOCUMENT lui-même restait clair : mesuré le 9 septembre, app en sombre,
+  //    `document.body` à `rgb(246,247,249)` et `theme-color` à `#F6F7F9` —
+  //    parce qu'`index.html` ne gérait le sombre que par `prefers-color-scheme`,
+  //    c'est-à-dire la préférence du SYSTÈME, alors que le mode sombre de VRM
+  //    est un CHOIX (§7). Téléphone en clair + app en sombre, et il obtenait :
+  //      • une barre d'état blanc cassé au-dessus d'une app noire,
+  //      • un éclair de gris clair au rebond de défilement (iOS montre le fond
+  //        du BODY quand on tire au-delà de la page),
+  //      • des champs natifs en clair (`color-scheme` n'était posé nulle part).
+  //    Le script de démarrage d'`index.html` pose l'état initial sans flash ;
+  //    cet effet le tient à jour au clic. Les deux lisent `vinted_dark` : une
+  //    seule source (§11).
+  useEffect(() => {
+    try {
+      const t = dark ? THEMES.dark : THEMES.light;
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      const m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', t.bg);
+    } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
+  }, [dark]);
   const [catalog,setCatalog]=useState(()=>{
     const s=load('vinted_catalog',null);
     if(!s||s.length===0){return INIT_CAT;}
