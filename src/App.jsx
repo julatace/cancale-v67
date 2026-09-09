@@ -10406,6 +10406,22 @@ function VintedAccounts({ accounts, setAccounts }) {
   })(); }, []);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
+    // ⚠️⚠️ UN CHOIX N'EST PAS UNE PANNE. Vu en capture le 9 septembre :
+    // l'en-tête annonçait « 2 en panne » en ROUGE, et l'un des deux était
+    // `liliand653` — le compte que Julien a lui-même EXCLU de l'application
+    // (le bandeau juste au-dessus le dit : « 1 compte est exclu »). Sa carte
+    // affichait donc « Masqué (annonces + compta) » ET « Pas capté (il y a
+    // 38 j) » en rouge, avec le conseil « repasse sur vinted.fr » — c'est-à-dire
+    // exactement ce qu'il ne faut PAS faire pour un compte qu'on a mis de côté.
+    // Même famille que le panneau de sécurité : une fausse alerte est ce qui
+    // fait cesser de lire les vraies. Un compte exclu n'a plus d'état de
+    // fraîcheur — il est simplement hors de l'app, en gris, sans consigne.
+    // ⚠️ Cette branche vient EN PREMIER, avant même « refusé par Vinted » :
+    // masquer un compte est très souvent la RÉPONSE à un blocage (le bouton le
+    // dit : « idéal pour un compte bloqué ou fermé »). Une fois le geste fait,
+    // l'app n'a plus à le réclamer. La raison reste écrite dans l'infobulle.
+    if (hiddenAccts.has(uid)) return { etat: 'exclu', ic: 'eyeOff', label: 'Exclu de l\'app', color: C.muted,
+      hint: `Tu as masqué ce compte : ses annonces, ses ventes et ses achats n'apparaissent nulle part.${blockedAccts.has(uid) ? ' (Vinted l\'avait aussi refusé.)' : ''} Sa date de capture ne veut donc plus rien dire ici — rien à rattraper.` };
     if (blockedAccts.has(uid)) return { etat: 'bad', ic: 'alert', label: 'Refusé par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403). Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
     // Sans refresh_token, le compte ne peut pas se renouveler tout seul → il
     // faudra le reconnecter à la main. (Le simple access_token expiré, lui, est
@@ -10582,16 +10598,22 @@ function VintedAccounts({ accounts, setAccounts }) {
       {/* Diagnostic global : combien de comptes à jour / à rafraîchir / bloqués. */}
       {accounts.length > 0 && (()=>{
         const st = accounts.map(acctHealth);
-        const ok   = st.filter(s=>s.etat==='ok').length;
-        const warn = st.filter(s=>s.etat==='warn').length;
-        const bad  = st.filter(s=>s.etat==='bad').length;
+        // ⚠️ ON NE COMPTE QUE LES COMPTES QUI SONT DANS L'APP. Les exclus ont
+        //    leur mention à part, en gris : ils ne sont ni « à jour » ni « en
+        //    panne », ils sont ailleurs. Les mêler aux autres, c'était annoncer
+        //    « 2 en panne » pour une panne réelle et un choix assumé.
+        const ok    = st.filter(s=>s.etat==='ok').length;
+        const warn  = st.filter(s=>s.etat==='warn').length;
+        const bad   = st.filter(s=>s.etat==='bad').length;
+        const exclu = st.filter(s=>s.etat==='exclu').length;
         return (
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
             <span style={{color:C.text}}>État des comptes :</span>
             <span style={{display:'inline-flex',alignItems:'center',gap:4,color:INV_STATUS.online.color}}><Icon name="check" size={13}/>{ok} à jour</span>
             {warn>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.warn}}><Icon name="clock" size={13}/>{warn} à rafraîchir</span>}
             {bad>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.danger}}><Icon name="cloudOff" size={13}/>{bad} en panne</span>}
-            <span style={{color:C.muted,fontWeight:600,flex:'1 1 100%',fontSize:11,marginTop:2}}>« À jour » = capté récemment par l'extension. Un compte « à rafraîchir » ou « en panne » : repasse sur vinted.fr, l'extension le recapte tout seul.</span>
+            {exclu>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted}}><Icon name="eyeOff" size={13}/>{exclu} exclu{exclu>1?'s':''} — ton choix</span>}
+            <span style={{color:C.muted,fontWeight:600,flex:'1 1 100%',fontSize:11,marginTop:2}}>« À jour » = capté récemment par l'extension. Un compte « à rafraîchir » ou « en panne » : repasse sur vinted.fr, l'extension le recapte tout seul.{exclu>0?` Le${exclu>1?'s':''} compte${exclu>1?'s':''} exclu${exclu>1?'s':''}, ${exclu>1?'eux':'lui'}, n${exclu>1?'\u2019attendent':'\u2019attend'} rien : ${exclu>1?'ils sont':'il est'} hors de l'app tant que tu ${exclu>1?'les':'le'} laisses masqué${exclu>1?'s':''}.`:''}</span>
           </div>
         );
       })()}

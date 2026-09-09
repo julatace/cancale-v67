@@ -499,6 +499,29 @@ d'informaticien y est donc justifié ; ne pas « simplifier » ce bloc.
   du titre affirmait **« partagées »** dès que `proteges` était faux — or il
   l'est aussi quand les deux sondes n'ont rien pu lire. Trois états, pas deux.
 
+### Comptes liés : un CHOIX n'est pas une panne
+Vu en capture le 9 septembre : l'en-tête annonçait « ✓ 0 à jour · ⏱ 7 à
+rafraîchir · 🚫 **2 en panne** » — et l'un des deux était `liliand653`, le
+compte que Julien a lui-même **exclu de l'application** (le bandeau juste
+au-dessus le disait : « 1 compte est exclu »). Sa carte portait donc
+« Masqué (annonces + compta) » **et** « Pas capté (il y a 38 j) » en rouge, avec
+la consigne « repasse sur vinted.fr » — c'est-à-dire exactement ce qu'il ne faut
+**pas** faire pour un compte mis de côté.
+`acctHealth` ignorait `hiddenAccts`. Il rend maintenant un **quatrième état**,
+`exclu` (gris), placé **avant** « refusé par Vinted » : masquer un compte est
+souvent la RÉPONSE à un blocage (le bouton le dit), et une fois le geste fait
+l'app n'a plus à le réclamer — la raison reste dans l'infobulle.
+- Le décompte ne porte que sur les comptes **qui sont dans l'app** ; les exclus
+  ont leur mention à part, en gris : « 1 exclu — ton choix », sans consigne.
+- Mais ils restent **nommés** : un compte écarté en silence serait pire que
+  l'alerte qu'on vient de retirer.
+- Le banc `comptes.cjs` **force le masquage** (aucune fixture n'en a) du compte
+  le moins frais — il tombe tout seul sur `liliand653` — et vérifie les deux
+  sens : il sort des pannes (2 → 1), il est compté à part, sa carte ne dit plus
+  « Pas capté », et il n'a pas disparu. **3 échecs** sur le code d'avant.
+- C'est la même famille que le panneau de sécurité : **une fausse alerte est ce
+  qui fait cesser de lire les vraies.**
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -842,7 +865,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 27 audits
-scripts/bancs/                  les 12 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 13 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
