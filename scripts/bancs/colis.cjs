@@ -105,7 +105,14 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   // ouverte EN PREMIER, avant que Colis ait rien publié. C'est là que le
   // minorant sort — dans l'autre sens le défaut est invisible.
   {
-    const lit = (t) => { const m=/((?:au moins )?)(\d+)\s+bordereaux?\s+pr[êe]ts?\s+[àa]\s+imprimer/i.exec(t);
+    // ⚠️ DEUX FORMULATIONS, PAS UNE — et mon premier jet n'en couvrait qu'une.
+    //    La carte de Ma journée écrit « N bordereaux prêts à imprimer » quand
+    //    rien n'est en retard, mais « 1 en retard · N prêts à imprimer » dès
+    //    qu'un colis l'est. Les données ont vieilli d'un jour, un colis est
+    //    passé en retard, et le banc a crié au loup sur une app intacte.
+    //    C'est §6.5 à mes dépens : on lit le NOMBRE devant « prêt(s) à
+    //    imprimer », quelle que soit la phrase autour.
+    const lit = (t) => { const m=/((?:au moins )?)(\d+)\s+(?:bordereaux?\s+)?pr[êe]ts?\s+[àa]\s+imprimer/i.exec(t);
       return m ? { n:+m[2], approx:!!m[1].trim() } : null; };
     const ctx = await b2.newContext({viewport:{width:1512,height:950}});
     const p2 = await ctx.newPage();
