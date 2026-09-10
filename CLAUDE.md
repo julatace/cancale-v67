@@ -499,6 +499,43 @@ d'informaticien y est donc justifié ; ne pas « simplifier » ce bloc.
   du titre affirmait **« partagées »** dès que `proteges` était faux — or il
   l'est aussi quand les deux sondes n'ont rien pu lire. Trois états, pas deux.
 
+### ⚠️⚠️ QUAND LA BASE NE RÉPOND PAS, L'APP DISAIT « TOUT VA BIEN »
+**Le 10 septembre la base Supabase était réellement injoignable** — 522
+Cloudflare, trois essais, réponse HTML. Rendue dans cet état, l'app affichait :
+- **Ma journée** : « Rien d'urgent — ta boutique tourne. 👌 » puis
+  « 🎉 **Tout est à jour ! Rien à expédier, rien à retirer** » — avec **14 colis
+  à expédier** et **6 à retirer** ;
+- **Colis** et **Achats** : « **Aucun compte Vinted lié** — installe l'extension
+  Chrome » — à quelqu'un qui en a **neuf** et dont l'extension tourne ;
+- **Tableau de bord** : « **Bienvenue 👋** · connecte ton compte pour commencer ».
+
+C'est **le mensonge le plus coûteux que l'app puisse produire** : il l'ouvre le
+matin, lit « tout va bien », et ne poste pas ses colis.
+
+**Cause** : `fetchVintedAccounts` rendait `[]` **à la fois** pour « aucun
+compte » et pour « la base n'a pas répondu ». §4.1 dit de rendre `[]` plutôt que
+de lever — **oui, mais l'app doit SAVOIR que c'est un échec** pour ne pas
+l'afficher comme un fait. C'est §4.1 **retourné**, et c'est la cinquième forme
+du même piège (panneau de sécurité, capacités de l'extension, `labelsCaptes`,
+comptes exclus) : **« pas su » ne vaut pas « oui », et « rien lu » ne vaut pas
+« rien ».**
+⇒ La lecture rend **`null` sur échec** (y compris quand la réponse n'est pas un
+tableau : un 522 renvoie du HTML), `baseKO` porte l'information, et un seul bloc
+`BaseInjoignable` dit ce qui se passe, **ce que ce n'est pas** (« rien n'est
+perdu — c'est la lecture qui échoue, pas tes données ») et le geste.
+⇒ Un « ↻ Actualiser » pendant la panne n'**efface** plus la liste des comptes.
+⚠️ **Mon premier correctif a raté DEUX écrans, et c'est le banc qui l'a vu :**
+- **Ma journée** est montée à part (`tab==='journee'`), pas dans la table `map`
+  des écrans — elle ne recevait donc pas `baseKO`. J'avais réparé Colis, Achats
+  et le tableau de bord… en laissant mentir **l'écran qu'il ouvre le matin**.
+- Le tableau de bord porte **DEUX** « tout est à jour » : celui de l'onboarding
+  et celui de la liste « À faire » vide.
+⇒ *Corriger « partout » se vérifie au RENDU, écran par écran, jamais en relisant
+le code.*
+⚠️ Le banc `panne.cjs` sert la **vraie forme** de la panne (522 + HTML, pas un
+JSON d'erreur) et vérifie **les deux sens** : aucun mensonge pendant la panne,
+et **aucune fausse alerte** en marche normale. **8 échecs** sur le code d'avant.
+
 ### Factures : un pipeline MORT, appelé toutes les 5 minutes
 Mesuré le 9 septembre. L'écran Factures appelait `fetchVintedInvoices` — un
 **Google Apps Script** (`script.google.com/macros/s/…/exec`) — **au montage et
@@ -915,7 +952,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 27 audits
-scripts/bancs/                  les 13 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 14 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

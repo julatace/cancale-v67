@@ -996,14 +996,26 @@ const save = (k,v) => {
 // et pousse dans la table Supabase "vinted_accounts". L'app lit cette table
 // pour savoir quels comptes sont lies et appelle l'API Vinted via le proxy
 // serverless "/api/vinted-proxy" (necessaire pour contourner le CORS).
+// ⚠️⚠️ `null` = LA BASE N'A PAS RÉPONDU · `[]` = ELLE A RÉPONDU « AUCUN ».
+// Les deux rendaient `[]`, donc l'app ne pouvait pas les distinguer — et elle
+// affichait le VIDE comme une réponse. Mesuré le 10 septembre, base Supabase
+// réellement injoignable (522 Cloudflare, trois essais) : l'app annonçait
+// « Aucun compte Vinted lié — installe l'extension Chrome » à quelqu'un qui en
+// a NEUF et dont l'extension tourne, et Ma journée affichait « 🎉 Tout est à
+// jour ! Rien à expédier, rien à retirer » avec 14 colis à expédier et 2 013 €
+// en attente. C'est le pire mensonge possible : il ouvre l'app le matin, lit
+// « tout va bien », et ne poste pas ses colis.
+// C'est §4.1 RETOURNÉ : rendre `[]` au lieu de lever, oui — mais l'app doit
+// SAVOIR que c'est un échec pour ne pas le présenter comme un fait.
 const fetchVintedAccounts = async () => {
   try {
     const [res, blk] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, { headers: sbAuth() }),
       fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() }),
     ]);
-    if (!res.ok) return [];
+    if (!res.ok) return null;                 // la base a répondu autre chose qu'une liste
     let list = await res.json();
+    if (!Array.isArray(list)) return null;     // 522 Cloudflare : c'est du HTML, pas du JSON
     // ⚠️ COMPTES SUPPRIMÉS DÉFINITIVEMENT (liste vrm_blocked_accounts) : ils ne
     // doivent JAMAIS réapparaître, même si l'extension les re-capte tant qu'ils
     // sont connectés dans Chrome (cas shop_cancale, qui « revenait tout le
@@ -1017,7 +1029,7 @@ const fetchVintedAccounts = async () => {
       reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
     }
     return list;
-  } catch (_) { return []; }
+  } catch (_) { return null; }                 // réseau coupé, DNS, CORS : on ne sait pas
 };
 
 // Retire un compte de l'app : supprime sa ligne dans Supabase "vinted_accounts".
@@ -5138,6 +5150,30 @@ function AuthScreen() {
 // Carte d'accueil affichée tant qu'aucun compte Vinted n'est connecté : guide
 // le nouvel utilisateur en 3 étapes (installer l'extension, se connecter sur
 // Vinted, revenir). Disparaît d'elle-même dès qu'un compte est capté.
+// ⚠️ « JE N'AI PAS PU LIRE » N'EST PAS « IL N'Y A RIEN ». Un seul bloc, réutilisé
+// partout où l'app affichait le vide comme un fait. Il dit ce qui s'est passé,
+// ce que ça n'est PAS (ses données sont intactes), et le seul geste utile.
+// Pas de vocabulaire d'informaticien : ni « 522 », ni « fetch », ni « API ».
+function BaseInjoignable() {
+  return (
+    <div style={{padding:'20px 16px 8px'}}>
+      <div style={{borderRadius:12,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,padding:'20px 18px'}}>
+        <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:6}}>Je n'arrive pas à joindre tes données</div>
+        <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
+          Le serveur qui garde tes annonces, tes ventes et tes numéros ne répond pas en ce moment.
+          <b> Rien n'est perdu</b> — ni tes paires, ni tes numéros, ni ta compta : c'est la lecture qui échoue, pas tes données.
+          <br/><br/>
+          Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, c'est une panne du serveur : ça revient tout seul.
+        </div>
+        <button type="button" onClick={()=>window.location.reload()}
+          style={{marginTop:14,border:'none',background:C.warn,color:'#fff',borderRadius:10,padding:'10px 17px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          Recharger
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Onboarding({ setTab }) {
   // L'étape 1 se VÉRIFIE : l'extension se signale à l'app (bridge.js). Cocher
   // « fait » soi-même n'apprend rien ; savoir qu'elle répond, si.
@@ -5183,7 +5219,7 @@ function Onboarding({ setTab }) {
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -5532,6 +5568,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions}) {
                 </button>
               ))}
             </div>
+          </div>
+        ) : baseKO ? (
+          /* ⚠️ SECONDE PHRASE DU MÊME GENRE, et mon premier correctif l'avait
+             ratée : le tableau de bord porte DEUX « tout est à jour » — celui
+             de l'onboarding et celui-ci, la liste « À faire » vide. C'est le
+             banc qui l'a vue, pas la relecture du code. Une liste d'actions
+             vide parce qu'on n'a rien pu lire n'est pas « rien qui presse ». */
+          <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,borderRadius:10,padding:'12px 14px'}}>
+            <span aria-hidden="true" style={{fontSize:20}}>⚠️</span>
+            <span style={{fontSize:13,fontWeight:500,color:C.text}}>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien.</span>
           </div>
         ) : (
           <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
@@ -10451,7 +10497,9 @@ function VintedAccounts({ accounts, setAccounts }) {
   const refreshAccounts = async () => {
     setLoading(true);
     const list = await fetchVintedAccounts();
-    setAccounts(list);
+    // ⚠️ Un échec ne doit pas EFFACER la liste affichée : sinon un « ↻ Actualiser »
+    //    pendant une panne fait disparaître ses neuf comptes sous ses yeux.
+    if (Array.isArray(list)) setAccounts(list);
     setLoading(false);
   };
   useEffect(() => { refreshAccounts(); /* eslint-disable-next-line */ }, []);
@@ -11356,7 +11404,7 @@ const _CACHE_TTL = 180000; // 3 min
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
 const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -15824,11 +15872,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Aucun compte lié : un vrai écran vide qui dit quoi faire, affiché SOUS le
   // titre de la section (avant, une phrase isolée flottait au-dessus du titre).
+  // ⚠️ « Aucun compte Vinted lié — installe l'extension Chrome » à quelqu'un qui
+  //    en a NEUF et dont l'extension tourne : c'est ce que ces écrans
+  //    affichaient quand la base ne répondait pas. Une liste vide parce qu'on
+  //    n'a pas pu lire n'est PAS une liste vide.
   const noAcc = accounts.length===0 && accountsReady;
-  const NoAcc = () => !noAcc ? null : (
-    <EmptyState icon="🔌" title="Aucun compte Vinted lié"
-      desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
-      action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
+  const NoAcc = () => !noAcc ? null : (baseKO
+    ? <BaseInjoignable/>
+    : <EmptyState icon="🔌" title="Aucun compte Vinted lié"
+        desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
+        action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
   );
   return (
     <div style={{padding:'16px 14px 40px'}}>
@@ -15922,7 +15975,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:24,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.5}}>{hello} Julien</div>
               {!loading && (
                 <div style={{fontSize:13,color:C.muted,marginTop:3}}>
-                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</> : <>Rien d'urgent — ta boutique tourne. 👌</>}
+                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</>
+                    : baseKO ? <>Je n'ai pas pu lire tes données — ce n'est pas « rien à faire ».</>
+                    : <>Rien d'urgent — ta boutique tourne. 👌</>}
                 </div>
               )}
             </div>
@@ -16004,12 +16059,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
             {loading && <Skeleton variant="card" count={4}/>}
 
-            {!loading && jobs.length===0 && (
-              <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:10,background:C.card}}>
-                <div style={{fontSize:44,lineHeight:1}}>🎉</div>
-                <div style={{fontSize:17,fontWeight:700,color:C.text,marginTop:10}}>Tout est à jour !</div>
-                <div style={{fontSize:13,color:C.muted,marginTop:5,lineHeight:1.5}}>Rien à expédier, rien à retirer, aucun message en attente.<br/>Profite — ou va sourcer de nouvelles paires. 👟</div>
-              </div>
+            {/* ⚠️⚠️ LE MENSONGE LE PLUS COÛTEUX POSSIBLE. Base injoignable, cet
+                encadré annonçait « 🎉 Tout est à jour ! Rien à expédier, rien à
+                retirer » — avec 14 colis à expédier et 6 à retirer. Il ouvre
+                l'app le matin, lit ça, et ne poste pas ses colis.
+                « Rien à faire » ne se dit QUE si on a pu regarder. */}
+            {!loading && jobs.length===0 && (baseKO
+              ? <BaseInjoignable/>
+              : <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:10,background:C.card}}>
+                  <div style={{fontSize:44,lineHeight:1}}>🎉</div>
+                  <div style={{fontSize:17,fontWeight:700,color:C.text,marginTop:10}}>Tout est à jour !</div>
+                  <div style={{fontSize:13,color:C.muted,marginTop:5,lineHeight:1.5}}>Rien à expédier, rien à retirer, aucun message en attente.<br/>Profite — ou va sourcer de nouvelles paires. 👟</div>
+                </div>
             )}
 
             {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
@@ -22669,12 +22730,18 @@ export default function App() {
   // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
+  // ⚠️ TROIS ÉTATS, comme partout ailleurs (panneau de sécurité, `extSait`,
+  //    `acctHealth`) : on charge · la base a répondu · la base n'a pas répondu.
+  //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
+  //    rien » — et c'est le seul cas où l'app peut le tromper gravement.
+  const [baseKO,setBaseKO]=useState(false);
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   useEffect(()=>{
     let stop=false;
     (async()=>{
       const list=await fetchVintedAccounts();
       if(stop) return;
+      setBaseKO(list===null);                  // `null` = pas de réponse, pas « zéro compte »
       if(list && list.length){ setVintedAccounts(list); try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){} }
       setAccountsLoaded(true);
     })();
@@ -23636,9 +23703,21 @@ export default function App() {
             toast('⚠ Fichier de sauvegarde invalide.');
           }catch(err){toast('Erreur : '+err.message);} }; inp.click(); }}
           dark={dark} toggleDark={toggleDark}/>}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab} actions={notifItems}/>}
+        {/* ⚠️ MA JOURNÉE EST MONTÉE ICI, PAS DANS LA TABLE `map` CI-DESSUS —
+            et elle ne recevait donc PAS `baseKO`. Mon premier correctif a réparé
+            Colis, Achats et le tableau de bord… et laissé l'écran d'ACCUEIL
+            annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
+            précisément l'écran qu'il ouvre le matin. Corriger « partout » se
+            vérifie au rendu, écran par écran, pas en lisant le code. */}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} baseKO={baseKO} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
+            quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
+            ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
+            pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
+        {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&(baseKO
+          ? <BaseInjoignable/>
+          : <Onboarding setTab={setTab}/>)}
+        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
@@ -23652,7 +23731,7 @@ export default function App() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
         </EcranGardeFou>
