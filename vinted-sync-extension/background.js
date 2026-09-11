@@ -396,7 +396,12 @@ async function viderTampon(buf) {
   const aDesN = Object.keys(buf.n || {}).length, aDesR = Object.keys(buf.rates || {}).length;
   if (!aDesN && !aDesR) return;
   const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-  const tout = (rows && rows[0] && rows[0].data) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  //    (et le tampon local n'est PAS vidé : les compteurs repartiront au prochain tour.)
+  if (rows === null) return;
+  const tout = (rows[0] && rows[0].data) || {};
   const n = { ...(tout.n || {}) };
   for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
   // ⚠️ ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
@@ -914,7 +919,11 @@ async function noterStatutsOffres(parsed) {
     }
     if (!Object.keys(vus).length) return;
     const rows = await sbGet('app_data?id=eq.panel_offer_statuts&select=data');
-    const cur = (rows && rows[0] && rows[0].data) || {};
+      // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+    //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+    //    reste. On n'écrit pas.
+    if (rows === null) return;
+    const cur = (rows[0] && rows[0].data) || {};
     const next = { ...(cur.statuts || {}), ...vus };
     // Rien de nouveau → on n'écrit pas (inutile de repousser la même ligne).
     if (JSON.stringify(next) === JSON.stringify(cur.statuts || {})) return;
@@ -1603,7 +1612,12 @@ async function noterRetrait(r) {
   if (!r || !r.tx) return false;
   try {
     const rows = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
-    const cur = (rows && rows[0] && rows[0].data) || {};
+      // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+    //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+    //    reste. On n'écrit pas.
+    //    Ici on perdrait les CODES DE RETRAIT déjà lus dans les conversations.
+    if (rows === null) return false;
+    const cur = (rows[0] && rows[0].data) || {};
     const avant = cur[r.tx];
     // Rien de neuf → aucune écriture (égress, §34).
     if (avant && avant.code === r.code && avant.lieu === r.lieu && avant.qr === r.qr) return false;
@@ -2367,7 +2381,11 @@ try {
 // les données du dressing. Elle se remplit au fil de ta navigation.
 async function saveListingDate(id, ts, text) {
   const rows = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  if (rows === null) return;
+  const cur = (rows[0] && rows[0].data) || {};
   const key = String(id);
   // On ne réécrit pas une date déjà connue (la 1re lecture est la plus proche
   // de la vérité ; « il y a 3 mois » lu plus tard donnerait la même chose).
@@ -2382,7 +2400,11 @@ async function saveListingDate(id, ts, text) {
 // générique) et (2) d'archive de tes textes/photos.
 async function saveItemDetail(id, detail) {
   const rows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  if (rows === null) return;
+  const cur = (rows[0] && rows[0].data) || {};
   const key = String(id);
   const prev = cur[key] || {};
   const desc = String(detail.description || '').trim();
@@ -2409,7 +2431,11 @@ async function markBordDone(key, done) {
   const k = String(key || '').trim();
   if (!k) return false;
   const rows = await sbGet('app_data?id=eq.panel_bords_done&select=data');
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  if (rows === null) return false;
+  const cur = (rows[0] && rows[0].data) || {};
   if (done === false) delete cur[k];
   else cur[k] = Date.now();
   return await supabaseUpsert('app_data', [{ id: 'panel_bords_done', data: cur }], 'id');
@@ -2447,7 +2473,13 @@ async function setMinPrice(id, amount) {
   const k = String(id || '').trim();
   if (!k) return false;
   const rows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  //    Ici on perdrait TOUS ses prix planchers — ceux qu'il a posés à la main,
+  //    et sans plancher le moteur d'offres ne fait plus rien (§3).
+  if (rows === null) return false;
+  const cur = (rows[0] && rows[0].data) || {};
   const n = Number(amount);
   if (!isFinite(n) || n <= 0) delete cur[k]; else cur[k] = n;
   return await supabaseUpsert('app_data', [{ id: 'panel_min_prices', data: cur }], 'id');
@@ -2970,7 +3002,12 @@ async function setBuyPrice(itemId, prix, tx, titre) {
   const k = String(itemId || '').trim();
   if (!k) return false;
   const rows = await sbGet('app_data?id=eq.panel_buyprices&select=data');
-  const cur = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  //    Ici on perdrait des PRIX D'ACHAT saisis à la main (§2.5).
+  if (rows === null) return false;
+  const cur = (rows[0] && rows[0].data && rows[0].data.items) || {};
   const items = { ...cur };
   const n = Number(String(prix).replace(',', '.'));
   if (!isFinite(n) || n < 0) delete items[k];
@@ -3512,7 +3549,12 @@ async function setAccountOff(uid, off) {
   const k = String(uid || '').trim();
   if (!k) return false;
   const rows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  //    Ici on perdrait quels comptes il a éteints — un compte exclu se rallume.
+  if (rows === null) return false;
+  const cur = (rows[0] && rows[0].data) || {};
   // `false` est ENREGISTRÉ (et non effacé) : c'est ce qui permet de rallumer
   // un compte masqué par l'app, que le panneau n'a pas le droit de modifier.
   cur[k] = !!off ? true : false;
@@ -3528,7 +3570,11 @@ async function markPickupDone(key, done) {
   const k = String(key || '').trim();
   if (!k) return false;
   const rows = await sbGet('app_data?id=eq.panel_colis_collected&select=data');
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  // ⚠️ LECTURE RATÉE ≠ LIGNE VIDE. `sbGet` rend `null` quand la base n'a pas
+  //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
+  //    reste. On n'écrit pas.
+  if (rows === null) return false;
+  const cur = (rows[0] && rows[0].data) || {};
   if (done === false) delete cur[k];
   else cur[k] = Date.now();
   return await supabaseUpsert('app_data', [{ id: 'panel_colis_collected', data: cur }], 'id');
@@ -4925,22 +4971,27 @@ async function downloadPhotos(urls, numero) {
 async function readPostedData() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
   const d = (rows && rows[0] && rows[0].data) || {};
-  return { ids: (d.ids || []).map(String), limit: d.limit != null ? d.limit : null, plan: d.plan || null };
+  // ⚠️ Trois ÉCRIVAINS passent par ici (marquer, démarquer, poser la limite) et
+  //    réécrivent la ligne entière. Une lecture ratée leur ferait repartir d'une
+  //    liste vide : toutes les annonces déjà publiées sur Leboncoin seraient
+  //    « à publier » de nouveau. `echec` le dit ; eux s'abstiennent.
+  return { echec: rows === null, ids: (d.ids || []).map(String), limit: d.limit != null ? d.limit : null, plan: d.plan || null };
 }
 async function readPostedIds() { return new Set((await readPostedData()).ids); }
 async function writePosted(d) {
   await supabaseUpsert('app_data', [{ id: 'vinted_lbc_posted', data: { ids: d.ids, limit: d.limit != null ? d.limit : null, plan: d.plan || null, updatedAt: new Date().toISOString() } }], 'id');
 }
 async function markLbcPosted(id) {
-  const d = await readPostedData(); const s = new Set(d.ids); s.add(String(id));
+  const d = await readPostedData(); if (d.echec) return false; const s = new Set(d.ids); s.add(String(id));
   await writePosted({ ids: [...s], limit: d.limit, plan: d.plan });
 }
 async function unmarkLbcPosted(id) {
-  const d = await readPostedData(); const s = new Set(d.ids); s.delete(String(id));
+  const d = await readPostedData(); if (d.echec) return false; const s = new Set(d.ids); s.delete(String(id));
   await writePosted({ ids: [...s], limit: d.limit, plan: d.plan });
 }
 async function setLbcLimit(limit, plan) {
   const d = await readPostedData();
+  if (d.echec) return false;
   const n = parseInt(String(limit), 10);
   await writePosted({ ids: d.ids, limit: (isNaN(n) || n <= 0) ? null : n, plan: (plan && String(plan).trim()) || null });
 }
