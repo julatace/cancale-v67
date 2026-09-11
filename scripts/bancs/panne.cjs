@@ -80,11 +80,13 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
 
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
-  const rendre=async(panne,t)=>{
+  const rendre=async(panne,t,depuisJours)=>{
     const ctx=await b.newContext({viewport:{width:1512,height:950}});
     const pg=await ctx.newPage();
     const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
     await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
+    // Une panne qui DURE : l'app doit cesser de dire d'attendre.
+    if(depuisJours) await pg.addInitScript(j=>{try{localStorage.setItem('vrm_base_ko_depuis',new Date(Date.now()-j*86400000).toISOString());}catch(_){}}, depuisJours);
     if(panne){
       await pg.route('**/rest/v1/**',r=>r.fulfill({status:522,contentType:'text/html',headers:{'access-control-allow-origin':'*'},body:HTML522}));
       await pg.route('**/api/**',r=>r.fulfill({status:522,contentType:'text/html',body:HTML522}));
@@ -142,6 +144,22 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     dit(nBloc===1 && nLigne<=1, `${t} : elle le dit une fois, pas trois`,
       `bloc ×${nBloc}, ligne ×${nLigne}`);
     dit(errs.length===0, `${t} : aucune erreur d'app pendant la panne`, errs.slice(0,2).join(' | '));
+  }
+
+  // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » — FAUX AU TROISIÈME JOUR. La base est tombée
+  //      le 9 septembre et n'est pas revenue ; l'app a répété pendant trois
+  //      jours d'attendre, c'est-à-dire de ne RIEN faire, alors que le seul
+  //      geste utile était d'ouvrir son tableau de bord d'hébergement. Une
+  //      alerte qui dit d'attendre quand il faut agir est pire qu'une alerte
+  //      muette. Le contrôle porte sur la DURÉE servie, pas sur la tournure.
+  console.log('\n── ET QUAND ÇA DURE (3 jours)');
+  {
+    const {txt}=await rendre(true,'journee',3);
+    dit(/3 jours/.test(txt), 'panne longue : elle dit depuis COMBIEN de temps', 'sinon « en ce moment » au 3ᵉ jour');
+    dit(!/revient tout seul/i.test(txt), 'panne longue : elle ne promet plus que ça revient tout seul',
+      /revient tout seul/i.test(txt)?"elle lui dit d'attendre":'');
+    dit(/supabase\.com/i.test(txt), 'panne longue : et elle dit OÙ aller', 'une alerte sans geste ne sert à rien');
+    dit(/Rien n'est perdu/i.test(txt), 'panne longue : elle rassure toujours sur ses données');
   }
 
   console.log('\n── EN MARCHE NORMALE (l\'autre sens : pas de fausse alerte)');
