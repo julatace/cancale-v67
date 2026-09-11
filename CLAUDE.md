@@ -536,6 +536,48 @@ le code.*
 JSON d'erreur) et vérifie **les deux sens** : aucun mensonge pendant la panne,
 et **aucune fausse alerte** en marche normale. **8 échecs** sur le code d'avant.
 
+### ⚠️⚠️ ET CE BANC NE RENDAIT QUE LES 4 ÉCRANS QUE JE VENAIS DE CORRIGER
+Le 11 septembre, élargi aux **15 écrans joignables** : **huit** se taisaient
+pendant la panne, et cinq affirmaient pour de bon. *Un banc qui ne rend que les
+écrans du correctif prouve le correctif, jamais la RÈGLE* — c'est mot pour mot
+la leçon de l'île d'actions (trois écrans y échappaient parce qu'aucun banc ne
+les rendait). **19 échecs** sur le code d'avant, 0 après.
+- ⚠️⚠️ **LE PANNEAU DE SÉCURITÉ AFFIRMAIT « Lecture sans compte · fermée —
+  seule une session identifiée lit tes données », en VERT.** Alors que RLS est
+  désactivé et que la clé publique lit tout. Le défaut n'était pas dans
+  l'affichage (corrigé le 7 septembre, `ok={…}` laisse passer `null`) mais
+  **dans la sonde** : `out.lisibleSansCompte = r.ok ? … : false`, donc tout
+  échec valait « fermée ». Deux autres du même bloc : `out.colonne = res.ok`
+  (→ « colonne absente » **et** le bouton « Copier la migration SQL » : le
+  diagnostic ET son remède, sur une mesure qui n'a pas eu lieu) et
+  `setSrv({})` (→ « clé de service manquante »). **Seul un 400 PostgREST dit
+  « colonne absente » ; seul un 401/403 dit « fermée » ; seul `ok:true` mesure
+  les routes.** Sixième forme de « pas su ne vaut pas oui » — et la première
+  où le mensonge est un **feu vert**, sur l'écran qui sert à décider si ses
+  données sont protégées. `audit-chiffres.cjs` pose la règle là où la mesure
+  est FAITE : une sonde doit pouvoir rendre `null` — rouge sur le code d'avant,
+  et il y **nomme les trois sondes**.
+- **« Comptes Vinted liés » disait « Aucun compte détecté · installe
+  l'extension »** à quelqu'un qui en a neuf — pire que faux : une consigne à ne
+  surtout pas suivre, réinstaller l'extension ne répare pas une lecture.
+- **Leboncoin fêtait « Tout est publié 🎉 »** une file jamais lue. Cet écran
+  lit lui-même (`sbGet` rend `null` sur échec) : il porte donc son propre
+  `echecLecture`, il n'a pas besoin de `baseKO`.
+- ⇒ **La garde ne se pose plus écran par écran : elle est sur la COQUE**,
+  au-dessus de `EcranGardeFou` — un seul `{baseKO && <BaseInjoignable/>}`, qui
+  couvre aussi les écrans pas encore écrits. Les écrans gardent une
+  **`LignePanne`** là où leur propre liste vide mentirait ; le bloc, lui, ne
+  s'affiche qu'une fois.
+- ⚠️ §7 sur le même écran : une fois le bloc posé, Ma journée disait la panne
+  **trois fois** (bloc + sous le bonjour + liste vide). Le banc compte les
+  occurrences : bloc ×1, ligne ≤1.
+- ⚠️ **Deux fois de plus, mes contrôles ont crié au loup** (cinquième et
+  sixième) : `/Tout est publié/i` attrapait la phrase HONNÊTE que je venais
+  d'écrire (« …pas parce que tout est publié ») — c'est la FÊTE qui est
+  interdite, 🎉 compris ; et le balayage des sondes s'est déclenché sur **mon
+  propre commentaire**, qui cite l'ancienne ligne. **Un audit lit le CODE** :
+  les commentaires sont retirés d'abord.
+
 ### Factures : un pipeline MORT, appelé toutes les 5 minutes
 Mesuré le 9 septembre. L'écran Factures appelait `fetchVintedInvoices` — un
 **Google Apps Script** (`script.google.com/macros/s/…/exec`) — **au montage et
