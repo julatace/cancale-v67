@@ -5154,16 +5154,63 @@ function AuthScreen() {
 // partout où l'app affichait le vide comme un fait. Il dit ce qui s'est passé,
 // ce que ça n'est PAS (ses données sont intactes), et le seul geste utile.
 // Pas de vocabulaire d'informaticien : ni « 522 », ni « fetch », ni « API ».
+// Depuis quand la base ne répond-elle plus ? Posé au premier échec, effacé dès
+// qu'elle répond. Vit sur l'appareil : c'est la seule chose qu'on puisse encore
+// écrire quand la base est justement injoignable.
+const PANNE_DEPUIS = 'vrm_base_ko_depuis';
+export const noterPanneBase = (ko) => {
+  try {
+    if (!ko) { localStorage.removeItem(PANNE_DEPUIS); return; }
+    if (!localStorage.getItem(PANNE_DEPUIS)) localStorage.setItem(PANNE_DEPUIS, new Date().toISOString());
+  } catch (_) {}
+};
+const dureePanne = () => {
+  try {
+    const t = Date.parse(localStorage.getItem(PANNE_DEPUIS) || '');
+    if (!t || isNaN(t)) return null;
+    const h = (Date.now() - t) / 3600000;
+    return h < 0 ? null : h;
+  } catch (_) { return null; }
+};
+
 function BaseInjoignable() {
+  // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » ÉTAIT FAUX LE TROISIÈME JOUR.
+  // La phrase promettait une panne passagère. Le 9 septembre la base est
+  // tombée et n'est PAS revenue : au bout de trois jours, l'app lui répétait
+  // d'attendre — donc de ne rien faire — alors que le seul geste utile était
+  // d'ouvrir son tableau de bord Supabase. Une alerte qui ne dit pas quoi
+  // faire ne sert à rien (§2.7) ; une alerte qui dit d'ATTENDRE quand il faut
+  // agir est pire. On compte donc les heures, et au-delà d'une heure on dit le
+  // vrai geste.
+  // ⚠️ NE PAS ÉCRIRE ICI « ils seront rangés dès le retour ». C'est vrai
+  //    seulement si le Worker Cloudflare a été remis à jour (il doit relancer
+  //    quand la route répond 503) — et l'app n'a AUCUN moyen de le vérifier.
+  //    Promettre ce qui dépend d'une pièce qu'on ne peut pas observer est le
+  //    défaut le plus coûteux du projet (le zip, les codes de retrait) ; le
+  //    refaire ici lui ferait attendre des emails qui ne reviendront pas.
+  const h = dureePanne();
+  const longue = h != null && h >= 1;
+  const depuis = h == null ? '' : h < 24
+    ? `depuis ${Math.max(1, Math.round(h))} h`
+    : `depuis ${Math.round(h / 24)} jour${Math.round(h / 24) > 1 ? 's' : ''}`;
   return (
     <div style={{padding:'20px 16px 8px'}}>
       <div style={{borderRadius:12,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,padding:'20px 18px'}}>
-        <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:6}}>Je n'arrive pas à joindre tes données</div>
+        <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:6}}>
+          Je n'arrive pas à joindre tes données{longue ? ` — ${depuis}` : ''}
+        </div>
         <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
-          Le serveur qui garde tes annonces, tes ventes et tes numéros ne répond pas en ce moment.
+          Le serveur qui garde tes annonces, tes ventes et tes numéros ne répond pas.
           <b> Rien n'est perdu</b> — ni tes paires, ni tes numéros, ni ta compta : c'est la lecture qui échoue, pas tes données.
           <br/><br/>
-          Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, c'est une panne du serveur : ça revient tout seul.
+          {longue ? <>
+            Ça ne revient pas tout seul : <b>c'est ton hébergeur de données qui a un problème</b>.
+            Ouvre <b>supabase.com</b>, connecte-toi, choisis le projet : la page d'accueil du projet dit
+            ce qui bloque (souvent un bouton vert <i>Restore</i> à cliquer, ou l'espace disque plein).
+            Tant que ce n'est pas réglé, les emails Vinted qui arrivent ne peuvent pas être rangés.
+          </> : <>
+            Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, l'app te dira quoi faire.
+          </>}
         </div>
         <button type="button" onClick={()=>window.location.reload()}
           style={{marginTop:14,border:'none',background:C.warn,color:'#fff',borderRadius:10,padding:'10px 17px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
@@ -22804,6 +22851,7 @@ export default function App() {
       const list=await fetchVintedAccounts();
       if(stop) return;
       setBaseKO(list===null);                  // `null` = pas de réponse, pas « zéro compte »
+      noterPanneBase(list===null);             // depuis quand ? (pour dire le bon geste au 3ᵉ jour)
       if(list && list.length){ setVintedAccounts(list); try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){} }
       setAccountsLoaded(true);
     })();

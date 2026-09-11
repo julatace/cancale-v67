@@ -626,6 +626,29 @@ apprise. **6 échecs** sur le code d'avant (`scripts/bancs/serveur.cjs`), 0 apr�
   (« le serveur de données ne répond pas · rien n'est perdu · réessaie »)
   plutôt que « enregistrement serveur échoué ».
 
+### « Ça revient tout seul » était faux au troisième jour
+Le bloc de panne promettait une coupure passagère : « *si ça dure plus d'une
+heure, c'est une panne du serveur : ça revient tout seul* ». La base est tombée
+le 9 septembre et **n'est pas revenue** — le 11 l'app lui répétait encore
+d'attendre, c'est-à-dire de **ne rien faire**, alors que le seul geste utile
+était d'ouvrir son tableau de bord Supabase. *Une alerte qui ne dit pas quoi
+faire ne sert à rien ; une alerte qui dit d'ATTENDRE quand il faut agir est
+pire.*
+- La durée est notée sur l'APPAREIL (`vrm_base_ko_depuis`) : c'est la seule
+  chose qu'on puisse encore écrire quand la base est justement injoignable.
+  Posée au premier échec, **effacée dès qu'elle répond**.
+- Au-delà d'une heure, le bloc dit **depuis combien de temps** et **où aller**
+  (supabase.com → le projet → souvent un bouton *Restore*, ou le disque plein).
+- ⚠️⚠️ **ET J'ALLAIS Y REMETTRE UNE PROMESSE INVÉRIFIABLE** : « les emails qui
+  arrivent sont mis en attente, ils seront rangés dès le retour ». Ce n'est vrai
+  que si le **Worker Cloudflare** a été remis à jour (il doit relancer quand la
+  route répond 503) — et **l'app n'a aucun moyen de le vérifier**. C'est le
+  défaut le plus coûteux du projet (le zip, les codes de retrait) qui repointait
+  dans la phrase même où je corrigeais son cousin. Retiré, et la raison est en
+  commentaire dans le code.
+- Le banc `panne.cjs` sert une panne **datée de 3 jours** et exige les trois
+  points. **3 échecs** sur le code d'avant.
+
 ### Factures : un pipeline MORT, appelé toutes les 5 minutes
 Mesuré le 9 septembre. L'écran Factures appelait `fetchVintedInvoices` — un
 **Google Apps Script** (`script.google.com/macros/s/…/exec`) — **au montage et
