@@ -23,11 +23,18 @@ const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` 
 const parisDate = (off = 0) => new Date(Date.now() + off * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
 const frToIso = (s) => { const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
 
+// ⚠️⚠️ `[]` SUR UNE LECTURE RATÉE = « RIEN À FAIRE » SUR SON ÉCRAN D'ACCUEIL.
+// Ces lectures rendaient une liste vide aussi bien quand la base disait « rien »
+// que quand elle ne répondait pas — et le widget affichait alors `0 à expédier ·
+// 0 à retirer · 0 €` avec 14 colis à poster. C'est le mensonge que l'app a
+// appris à ne plus faire (§ baseKO), jamais reporté ici. `null` = « pas su ».
 async function rows(like) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${like}&select=data`, { headers: HEADERS });
-    return r.ok ? (await r.json()).map(x => x.data).filter(Boolean) : [];
-  } catch (_) { return []; }
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j.map(x => x.data).filter(Boolean) : null;
+  } catch (_) { return null; }
 }
 // ⚠️ ÉGRESS SUPABASE — NE JAMAIS faire `select=data` sur `email_bord_*` : chaque
 // ligne embarque le PDF du bordereau en base64 (brut + tamponné = deux fois),
@@ -40,8 +47,10 @@ const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction
 async function bordRows() {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=${BORD_SELECT}`, { headers: HEADERS });
-    return r.ok ? await r.json() : [];
-  } catch (_) { return []; }
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
 }
 // Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
 // source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.
@@ -74,14 +83,16 @@ async function comptesAExpedierOuRetirer(kind) {
 async function harvestOrders(kind) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_${kind}&select=data`, { headers: HEADERS });
-    if (!r.ok) return [];
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
     const out = {};
-    for (const row of await r.json()) {
+    for (const row of j) {
       const items = (row.data && row.data.payload && row.data.payload.my_orders) || [];
       for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
     }
     return Object.values(out);
-  } catch (_) { return []; }
+  } catch (_) { return null; }
 }
 // À expédier : la vente attend que TU postes le colis.
 const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
@@ -90,9 +101,11 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 async function main() {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data`, { headers: HEADERS });
-    if (!r.ok) return {};
-    const j = await r.json(); return (j[0] && j[0].data) || {};
-  } catch (_) { return {}; }
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    return (j[0] && j[0].data) || {};
+  } catch (_) { return null; }
 }
 // Photo des chiffres publiée par l'app elle-même (ligne widget_stats) → source
 // PRIORITAIRE pour l'encaissé/ventes du mois, pour coller EXACTEMENT à l'app.
@@ -130,6 +143,21 @@ export default async function handler(req, res) {
     ]);
     const sold = txSold ? [] : await harvestOrders('sold');
     const purchased = txBuy ? [] : await harvestOrders('purchased');
+
+    // ⚠️ AVANT TOUT LE RESTE : a-t-on seulement pu LIRE ? Un chiffre absent est
+    //    honnête, un zéro inventé ne l'est pas — et c'est lui qu'il regarde le
+    //    matin sur son écran d'accueil. On ne renvoie AUCUN nombre : un widget
+    //    qui ne trouve pas `ship` affiche un tiret, jamais « 0 ».
+    //    ⚠️ Et la clé du widget vit dans `main` : sans elle, `expected` valait
+    //    '' et la route répondait SANS clé. Se taire referme aussi ça.
+    if (m === null || bords === null || finals === null || sales === null
+        || sold === null || purchased === null) {
+      res.status(503).json({
+        erreur: 'base-injoignable',
+        message: "Je n'ai pas pu lire tes données — ce n'est pas « rien à faire ». Rien n'est perdu, c'est la lecture qui échoue.",
+      });
+      return;
+    }
 
     const expected = m && m.vrm_widget_token ? String(m.vrm_widget_token) : '';
     if (expected) {
@@ -206,6 +234,7 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString(),
     });
   } catch (e) {
-    res.status(200).json({ error: String(e) });
+    // Une exception n'est pas « aucun colis » : on ne renvoie aucun chiffre.
+    res.status(500).json({ erreur: 'panne', message: "Je n'ai pas pu calculer tes chiffres — ce n'est pas « rien à faire »." });
   }
 }

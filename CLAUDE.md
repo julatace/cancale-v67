@@ -578,6 +578,54 @@ les rendait). **19 échecs** sur le code d'avant, 0 après.
   propre commentaire**, qui cite l'ancienne ligne. **Un audit lit le CODE** :
   les commentaires sont retirés d'abord.
 
+### ⚠️⚠️ LES ROUTES `api/` N'AVAIENT JAMAIS APPRIS LA LEÇON — ET ELLES, ELLES DÉTRUISENT
+Le 11 septembre, troisième jour de base injoignable, Julien : « **je reçois
+plus les messages** ». L'app venait d'apprendre cinq fois que « rien lu » ne
+vaut pas « rien ». Les **routes serveur**, que `npm run build` ne compile même
+pas (§4.10) et qu'**aucun banc n'avait jamais exécutées**, ne l'avaient jamais
+apprise. **6 échecs** sur le code d'avant (`scripts/bancs/serveur.cjs`), 0 après.
+
+- ⚠️⚠️ **`api/email-inbound` acquittait des emails qu'il n'avait pas rangés.**
+  `supabaseUpsert` rendait bien `res.ok` — et **aucun de ses douze appels ne le
+  lisait**. La route répondait **200**, c'est-à-dire « je l'ai, tu peux
+  l'oublier » : le service de réception **supprime** alors le message. Trois
+  jours de panne = trois jours de **ventes, bordereaux, suivis et messages
+  perdus pour de bon**. C'est §5 « on ne jette aucun email » retourné.
+  Le commentaire du `catch` final disait même, en toutes lettres : « *on répond
+  200 pour éviter que le service de mail ne rejoue* » — or **rejouer est
+  exactement ce qu'on veut**. Une écriture ratée se retient dans le contexte de
+  la requête (`marquerEcritureRatee`, jamais une variable de module : deux
+  emails se traitent en parallèle) et `repondre()` transforme tout succès en
+  **503**.
+  ⚠️ **Et la moitié qui compte est chez Cloudflare** : le Worker de
+  `docs/email-pipeline.md` faisait `await fetch(...)` **sans regarder la
+  réponse**. Le serveur peut bien dire « je n'ai pas pu », personne ne l'écoute.
+  Il fait maintenant `if (!rep.ok) throw` — Cloudflare réessaie. *Un correctif
+  serveur qui dépend d'un client qu'on ne corrige pas ne corrige rien.*
+  ⚠️ **Un email RECONNU dont l'analyse échoue n'était conservé nulle part** :
+  le jour où Vinted change une tournure, les ventes partent une par une en
+  silence. `garderInconnu` est appelé avant de répondre.
+- ⚠️⚠️ **`api/push` EFFAÇAIT ses autres téléphones.** `loadSubs()` rendait `[]`
+  aussi bien pour « aucun appareil » que pour « je n'ai pas pu lire » ; or
+  `subscribe` fait **lire-ajouter-réécrire**. Une lecture ratée repartait donc
+  d'une liste vide et **réécrivait `push_subs` avec le seul appareil courant**.
+  Ce n'est pas un affichage faux, c'est une **perte**. Le banc sert exprès un
+  troisième état — **lecture KO, écriture OK** (un simple timeout, la base
+  debout par ailleurs) — parce qu'en panne totale l'écriture échoue aussi et le
+  défaut **ne se voit pas**. `loadSubs` rend `null`, et on n'écrit pas.
+  La route répondait par-dessus `{ok:true}` → l'app affichait « ✅ Activé ».
+- ⚠️ **`api/widget` annonçait `0 à expédier · 0 à retirer · 0 €`** sur l'écran
+  d'accueil de son iPhone. Un chiffre **absent** est honnête, un zéro inventé
+  ne l'est pas : la route répond 503 **sans aucun nombre** (un widget qui ne
+  trouve pas `ship` affiche un tiret, jamais « 0 »).
+  ⚠️ Effet de bord trouvé au passage : la **clé** du widget vit dans la ligne
+  `main`. `main()` rendant `{}` sur échec, `expected` valait `''` et **la route
+  répondait sans clé**. Se taire referme aussi ça.
+- L'app, elle, était déjà juste : elle fait `if (!r.ok) throw`. **C'est le
+  serveur qui lui mentait.** Elle affiche maintenant la phrase de la route
+  (« le serveur de données ne répond pas · rien n'est perdu · réessaie »)
+  plutôt que « enregistrement serveur échoué ».
+
 ### Factures : un pipeline MORT, appelé toutes les 5 minutes
 Mesuré le 9 septembre. L'écran Factures appelait `fetchVintedInvoices` — un
 **Google Apps Script** (`script.google.com/macros/s/…/exec`) — **au montage et
@@ -994,7 +1042,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 27 audits
-scripts/bancs/                  les 14 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 15 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

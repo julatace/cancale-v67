@@ -102,6 +102,30 @@ function normalizeInbound(body) {
 // partiraient chez le mauvais vendeur, sans le moindre message d'erreur.
 // `AsyncLocalStorage` donne un contexte isolé par requête : deux emails traités
 // en parallèle ne peuvent pas se mélanger.
+// ⚠️⚠️ UN 200 DIT AU SERVICE DE RÉCEPTION « JE L'AI, TU PEUX L'OUBLIER ».
+// Cette route répondait 200 sans jamais regarder si l'écriture avait abouti :
+// `supabaseUpsert` rendait `res.ok`, et AUCUN des douze appels ne le lisait.
+// Du 9 au 11 septembre, base Supabase injoignable (522), chaque vente, chaque
+// bordereau, chaque suivi et chaque message a donc été acquitté puis SUPPRIMÉ
+// chez l'expéditeur. C'est « on ne jette aucun email » (§5) retourné, et c'est
+// la seule route où le mensonge détruit quelque chose.
+// La marque vit dans le contexte de LA REQUÊTE (jamais une variable de module :
+// deux emails se traitent en parallèle dans la même instance, voir plus haut).
+const marquerEcritureRatee = () => { const st = contexteVendeur.getStore(); if (st) st.ecritureRatee = true; };
+const ecritureRatee = () => !!(contexteVendeur.getStore() || {}).ecritureRatee;
+// Répondre « reçu » n'est vrai que si l'email est RANGÉ. Sinon : 503, et le
+// service de réception réessaiera — il le garde pendant des heures.
+function repondre(res, code, corps) {
+  if (code < 400 && ecritureRatee()) {
+    res.status(503).json({
+      ok: false, erreur: 'base-injoignable',
+      message: "Je n'ai pas pu ranger cet email : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le.",
+    });
+    return;
+  }
+  res.status(code).json(corps);
+}
+
 async function supabaseUpsert(rows) {
   const owner = proprietaireCourant();
   rows = owner
@@ -116,8 +140,9 @@ async function supabaseUpsert(rows) {
       'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal',
     },
     body: JSON.stringify(rows),
-  });
-  return res.ok;
+  }).catch(() => null);
+  if (!res || !res.ok) { marquerEcritureRatee(); return false; }
+  return true;
 }
 
 // Détection best-effort du compte : on cherche un login/email de compte connu
@@ -424,7 +449,7 @@ async function garderInconnu(corpsBrut, mail, raison, famille) {
       receivedAt: new Date().toISOString(),
       brut,
     } }]);
-  } catch (_) {}
+  } catch (_) { marquerEcritureRatee(); }
 }
 
 async function logEmail(entry) {
@@ -849,7 +874,7 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
         pieces: (mail.attachments || []).map(a => ({ filename: a.filename, contentType: a.contentType })),
       },
     };
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -857,7 +882,8 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
       },
       body: JSON.stringify(withOwnerAll([ligne])),
     });
-  } catch (_) {}
+    if (!r || !r.ok) marquerEcritureRatee();
+  } catch (_) { marquerEcritureRatee(); }
 }
 
 // Le handler exporté n'est qu'une enveloppe : il ouvre un contexte isolé pour
@@ -957,7 +983,7 @@ export async function traiterEmail(req, res) {
     // Même un corps illisible est conservé : c'est la seule façon de savoir
     // ensuite ce qui n'est pas passé.
     await garderInconnu(req.body, null, 'corps illisible');
-    res.status(200).json({ ok: false, error: 'corps illisible' }); return;
+    repondre(res, 200, { ok: false, error: 'corps illisible' }); return;
   }
 
   // ── À QUEL VENDEUR CET EMAIL APPARTIENT-IL ? ──────────────────────────────
@@ -987,7 +1013,7 @@ export async function traiterEmail(req, res) {
     // raison ; l'app le signale et permet de le rattacher. Un email égaré se
     // répare, un email livré au mauvais vendeur non.
     await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué');
-    res.status(200).json({ ok: true, quarantaine: true, raison: proprio.raison, adresses });
+    repondre(res, 200, { ok: true, quarantaine: true, raison: proprio.raison, adresses });
     return;
   }
 
@@ -1053,14 +1079,20 @@ export async function traiterEmail(req, res) {
         tag: `track-${track.suivi || rowId}`, url: '/?tab=cat_achats',
       }, track.status === 'available' ? 'colis' : 'suivi'); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
-      res.status(200).json({ ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
+      repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;
     }
 
     // 1) BORDEREAU (a une pièce jointe PDF) — prioritaire.
     if (/Bordereau\s+d['’]envoi/i.test(subject)) {
       const data = parseBordereauEmail(mail);
-      if (!data) { res.status(200).json({ ok: false, type: 'bordereau', error: 'parse échec' }); return; }
+      // ⚠️ §5 « ON NE JETTE AUCUN EMAIL ». Un email RECONNU dont l'analyse
+      //    échoue tombait ici sans être conservé nulle part : le jour où Vinted
+      //    change une tournure, les bordereaux partent à la poubelle une par une,
+      //    en silence. On le garde entier — l'écran des emails non reconnus le
+      //    montre, et il sert à recaler l'analyse.
+      if (!data) { await garderInconnu(corpsBrut, mail, 'reconnu bordereau, analyse impossible', 'bordereau');
+        repondre(res, 200, { ok: false, type: 'bordereau', error: 'parse échec', garde: true }); return; }
       const pdf = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
       // N° absent du titre de l'annonce ? On le retrouve dans les annonces
       // numérotées de l'app (correspondance de titre, jamais si ambigu).
@@ -1089,7 +1121,7 @@ export async function traiterEmail(req, res) {
       // Notif push : bordereau prêt = colis à expédier.
       try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }, 'expedier'); } catch (_) {}
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
-      res.status(200).json({ ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
+      repondre(res, 200, { ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
     }
 
@@ -1121,7 +1153,7 @@ export async function traiterEmail(req, res) {
         _cat: 'argent',
       }); } catch (_) {}
       await logEmail({ type: 'finalisation', subject, from: mail.from, montant, article, account: acc.login || '' });
-      res.status(200).json({ ok: true, type: 'finalisation', montant, article });
+      repondre(res, 200, { ok: true, type: 'finalisation', montant, article });
       return;
     }
 
@@ -1173,14 +1205,20 @@ export async function traiterEmail(req, res) {
         _cat: 'achat',
       }); } catch (_) {}
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
-      res.status(200).json({ ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
+      repondre(res, 200, { ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
       return;
     }
 
     // 3) VENTE ("Ton article s'est vendu") → facture.
     if (/vendu/i.test(subject) || /a\s+achet/i.test(corpsTexte)) {
       const data = parseSaleEmail(mail);
-      if (!data) { res.status(200).json({ ok: false, type: 'vente', error: 'parse échec' }); return; }
+      // ⚠️ §5 « ON NE JETTE AUCUN EMAIL ». Un email RECONNU dont l'analyse
+      //    échoue tombait ici sans être conservé nulle part : le jour où Vinted
+      //    change une tournure, les ventes partent à la poubelle une par une,
+      //    en silence. On le garde entier — l'écran des emails non reconnus le
+      //    montre, et il sert à recaler l'analyse.
+      if (!data) { await garderInconnu(corpsBrut, mail, 'reconnu vente, analyse impossible', 'vente');
+        repondre(res, 200, { ok: false, type: 'vente', error: 'parse échec', garde: true }); return; }
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
@@ -1203,7 +1241,7 @@ export async function traiterEmail(req, res) {
         }
       } catch (_) {}
       await logEmail({ type: 'vente', subject, from: mail.from, prix: data.prix, numero: data.numero, facture: facture ? facture.number : null });
-      res.status(200).json({ ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
+      repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
       return;
     }
 
@@ -1277,7 +1315,7 @@ export async function traiterEmail(req, res) {
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]); } catch (_) {}
       await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net });
-      res.status(200).json({ ok: true, type: 'offre', montant, de: qui, article, net });
+      repondre(res, 200, { ok: true, type: 'offre', montant, de: qui, article, net });
       return;
     }
 
@@ -1293,7 +1331,7 @@ export async function traiterEmail(req, res) {
         _cat: 'message',
       }); } catch (_) {}
       await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, account: acc.login || '' });
-      res.status(200).json({ ok: true, type: 'message', de: qui, extrait });
+      repondre(res, 200, { ok: true, type: 'message', de: qui, extrait });
       return;
     }
 
@@ -1311,7 +1349,7 @@ export async function traiterEmail(req, res) {
         _cat: 'favori',
       }); } catch (_) {}
       await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
-      res.status(200).json({ ok: true, type: 'favori', de: qui, article });
+      repondre(res, 200, { ok: true, type: 'favori', de: qui, article });
       return;
     }
 
@@ -1324,9 +1362,13 @@ export async function traiterEmail(req, res) {
     const famille = illisible ? '' : familleConnue(subject, mail.from);
     await garderInconnu(corpsBrut, mail, illisible ? 'illisible (aucun champ lu)' : (famille ? 'connu, sans action' : 'aucune règle ne le reconnaît'), famille);
     await logEmail({ type: famille ? 'connu-sans-action' : 'ignoré', subject, from: mail.from, forme, illisible, famille });
-    res.status(200).json({ ok: true, type: famille ? 'connu-sans-action' : 'ignoré', famille, subject, forme });
+    repondre(res, 200, { ok: true, type: famille ? 'connu-sans-action' : 'ignoré', famille, subject, forme });
   } catch (e) {
-    // On répond 200 pour éviter que le service de mail ne rejoue / bounce.
-    res.status(200).json({ ok: false, error: String(e) });
+    // ⚠️⚠️ « On répond 200 pour éviter que le service de mail ne rejoue » —
+    //    c'était écrit ici, en toutes lettres, comme une précaution. C'en était
+    //    l'inverse : rejouer est EXACTEMENT ce qu'on veut quand on n'a pas pu
+    //    ranger l'email. Un 200 le fait supprimer chez l'expéditeur ; un 500 le
+    //    fait réessayer, et s'il finit par rebondir, au moins quelqu'un le voit.
+    res.status(500).json({ ok: false, erreur: 'panne', message: String(e) });
   }
 }

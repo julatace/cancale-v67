@@ -21894,9 +21894,16 @@ function PushSetting() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC_KEY) });
       const r = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: sub.toJSON() }) });
-      if (!r.ok) throw new Error('enregistrement serveur échoué');
+      // ⚠️ « enregistrement serveur échoué » est du vocabulaire d'informaticien,
+      //    et surtout ça ne dit pas quoi faire. La route explique maintenant en
+      //    clair pourquoi (la base ne répond pas) et que rien n'est perdu : on
+      //    affiche SA phrase quand elle est là.
+      if (!r.ok) {
+        const j = await r.json().catch(() => null);
+        throw new Error((j && j.message) || "Le serveur n'a pas pu enregistrer cet appareil. Réessaie dans quelques minutes.");
+      }
       setState('on'); setMsg('✅ Activé sur cet appareil.');
-    } catch (e) { setState('off'); setMsg('Impossible d\'activer : ' + (e?.message || e)); }
+    } catch (e) { setState('off'); setMsg((e && e.message) || String(e)); }
   };
 
   const disable = async () => {

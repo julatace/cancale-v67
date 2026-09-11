@@ -137,6 +137,9 @@ export default async function handler(req, res) {
     });
     res.status(200).json({ ok: true, overdue, dueToday, dueTomorrow, total });
   } catch (e) {
-    res.status(200).json({ ok: false, error: String(e) });
+    // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
+    // le tableau de bord la compte réussie, et les rappels d'expédition
+    // cessent en silence. 500 = visible.
+    res.status(500).json({ ok: false, erreur: 'panne', message: String(e) });
   }
 }
