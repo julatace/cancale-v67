@@ -70,7 +70,7 @@ export default {
       content: btoa(String.fromCharCode(...new Uint8Array(a.content))),
     }));
 
-    await fetch('https://usevrm.com/api/email-inbound?key=' + env.EMAIL_INBOUND_SECRET, {
+    const rep = await fetch('https://usevrm.com/api/email-inbound?key=' + env.EMAIL_INBOUND_SECRET, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -82,9 +82,23 @@ export default {
         attachments,
       }),
     });
+    // ⚠️⚠️ SANS CES DEUX LIGNES, TOUT LE RESTE NE SERT À RIEN.
+    // Une fois le `email()` terminé sans erreur, Cloudflare considère le
+    // message DÉLIVRÉ et le supprime. Ignorer la réponse — ce que faisait ce
+    // Worker — revient à jeter l'email dès que VRM n'a pas pu le ranger : du
+    // 9 au 11 septembre 2026, base Supabase injoignable, chaque vente, chaque
+    // bordereau et chaque suivi a été acquitté puis perdu. La route répond
+    // maintenant 503 quand elle n'a rien pu écrire ; `throw` fait RÉESSAYER
+    // l'expéditeur, qui garde le message pendant des heures.
+    if (!rep.ok) throw new Error('VRM a répondu ' + rep.status + " — email non rangé, on réessaiera");
   },
 };
 ```
+
+> **Si tu as déjà collé ce Worker dans Cloudflare avant septembre 2026**,
+> remplace-le par cette version : c'est la moitié qui manque. Le serveur peut
+> bien dire « je n'ai pas pu », personne ne l'écoute tant que le Worker ne
+> regarde pas la réponse.
 
 Dans le Worker, définir la variable `EMAIL_INBOUND_SECRET` (même valeur qu'à l'étape 2).
 

@@ -101,20 +101,30 @@ export async function loadSubs() {
     // ⚠️ Les abonnements sont PAR VENDEUR : sans ce filtre, une vente de Julien
     // ferait sonner le téléphone de Marie.
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`, cloisonnee), { headers: HEADERS });
-    if (!res.ok) return [];
+    // ⚠️⚠️ `[]` VOULAIT DIRE DEUX CHOSES, ET LA SECONDE EFFAÇAIT SES TÉLÉPHONES.
+    // « aucun appareil abonné » et « je n'ai pas pu lire la liste » rendaient la
+    // MÊME valeur. Or `subscribe` fait lire-ajouter-réécrire : une lecture
+    // ratée repartait donc d'une liste vide et RÉÉCRIVAIT `push_subs` avec le
+    // seul appareil courant — les autres téléphones, supprimés, sans un mot.
+    // `null` = « pas su ». L'appelant ne doit alors ni écrire ni conclure.
+    if (!res.ok) return null;
     const rows = await res.json();
+    if (!Array.isArray(rows)) return null;              // 522 : c'est du HTML, pas du JSON
     return (rows[0] && rows[0].data && Array.isArray(rows[0].data.subs)) ? rows[0].data.subs : [];
-  } catch (_) { return []; }
+  } catch (_) { return null; }
 }
 
+// Rend VRAI seulement si la base a confirmé l'écriture. Avaler l'échec faisait
+// répondre « ✅ Activé sur cet appareil » à l'app alors que rien n'était rangé.
 export async function saveSubs(subs) {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
       method: 'POST',
       headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(withOwnerAll([{ id: 'push_subs', data: { subs, updatedAt: new Date().toISOString() } }])),
     });
-  } catch (_) {}
+    return !!(r && r.ok);
+  } catch (_) { return false; }
 }
 
 // ⚠️ UN ABONNEMENT SCELLÉ SUR UNE ANCIENNE CLÉ EST MORT POUR TOUJOURS.
@@ -156,9 +166,12 @@ export async function sendPushToAll(payload) {
   // abonnés », jamais « ce qu'on a réussi à faire ».
   if (!PUSH_PRET) {
     const abonnes = await loadSubs();
-    return { sent: 0, total: abonnes.length, erreur: 'VAPID_PRIVATE_KEY absente' };
+    // Même règle un cran plus loin : `total: 0` sur une liste qu'on n'a PAS pu
+    // lire serait « aucun appareil abonné ». On rend `null` — « pas su ».
+    return { sent: 0, total: abonnes === null ? null : abonnes.length, erreur: 'VAPID_PRIVATE_KEY absente' };
   }
   const subs = await loadSubs();
+  if (subs === null) return { sent: 0, total: null, erreur: 'base-injoignable' };
   if (!subs.length) return { sent: 0, total: 0 };
   const body = JSON.stringify(payload);
   const alive = [];
