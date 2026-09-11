@@ -261,6 +261,38 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   ecrase.length === 0
     ? ok('aucune ne transforme « pas su » en alerte')
     : nok('une sonde ratée s\'affiche comme un défaut', ecrase.join(', '));
+
+  // ⚠️⚠️ ET LE DÉFAUT ÉTAIT EN AMONT — la SONDE elle-même, pas son affichage.
+  // Mesuré le 11 septembre en rendant les 15 écrans base injoignable (522) :
+  //   « Propriétaire des lignes · colonne absente » + « Copier la migration
+  //     SQL »            ← `out.colonne = res.ok`, donc NON à tout échec
+  //   « Lecture sans compte · fermée — seule une session identifiée lit tes
+  //     données »         ← `: false`, un FEU VERT jamais mesuré, alors que RLS
+  //                         est désactivé et que la clé publique lit tout
+  //   « Routes serveur · clé de service manquante » ← `setSrv({})`
+  // `Ligne` savait déjà afficher l'inconnu, et les appelants étaient corrigés :
+  // c'est la valeur QU'ON LUI DONNAIT qui naissait fausse. La règle vaut donc
+  // aussi là où la mesure est FAITE : une sonde doit pouvoir rendre `null`.
+  const i = app.indexOf('function SecuriteSetting');
+  const j = i < 0 ? -1 : app.indexOf('\nfunction ', i + 10);
+  // ⚠️ SIXIÈME FOIS. Ce contrôle s'est déclenché sur MON PROPRE COMMENTAIRE :
+  //    il y cite l'ancienne ligne (« `out.colonne = res.ok` faisait répondre
+  //    non à tout échec »), et le balayage l'a lue comme du code. Un audit lit
+  //    le CODE — les commentaires sont retirés d'abord. (Et la fenêtre se
+  //    termine sur la fonction suivante, `-1` compris : `slice(i, -1)` aurait
+  //    ratissé tout le fichier.)
+  const S = i < 0 ? '' : app.slice(i, j < 0 ? app.length : j).replace(/^\s*\/\/.*$/gm, '');
+  const aveugles = [...S.matchAll(/out\.(\w+)\s*=\s*([\s\S]*?);/g)].filter(([tout, , expr]) => {
+    if (/\bnull\b/.test(expr)) return false;                  // sait rendre « je ne sais pas »
+    // Une affectation à l'intérieur d'un `if (r.ok)` est déjà une mesure : on
+    // n'y entre que quand la base a VRAIMENT répondu.
+    return !/if\s*\(\s*r\.ok\s*\)\s*\{[^{}]*$/.test(S.slice(0, S.indexOf(tout)));
+  }).map(m => m[1]);
+  const srvAveugle = [...S.matchAll(/setSrv\(([^;]*?)\)/g)].filter(m => !/\bnull\b/.test(m[1])).length;
+  (aveugles.length === 0 && srvAveugle === 0)
+    ? ok('et chaque sonde peut rendre « je ne sais pas »')
+    : nok('une sonde ratée naît en diagnostic (ou en feu vert)',
+        [...aveugles, srvAveugle ? 'setSrv' : ''].filter(Boolean).join(', '));
 }
 
 // ── UNE ALERTE QUI VISE TOUT NE VISE RIEN (écran « Stock Vinted ») ────────

@@ -5174,6 +5174,19 @@ function BaseInjoignable() {
   );
 }
 
+// Une LIGNE de panne, à poser LÀ OÙ un « rien à faire » mentirait. Le bloc
+// complet ci-dessus est rendu UNE fois par la coque, au-dessus de l'écran :
+// le répéter à chaque endroit répéterait aussi son bouton et ses quatre
+// phrases. Ici on dit seulement de quoi CETTE liste-là est vide.
+function LignePanne({ children }) {
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,borderRadius:10,padding:'12px 14px'}}>
+      <span aria-hidden="true" style={{fontSize:20}}>⚠️</span>
+      <span style={{fontSize:13,fontWeight:500,color:C.text}}>{children}</span>
+    </div>
+  );
+}
+
 function Onboarding({ setTab }) {
   // L'étape 1 se VÉRIFIE : l'extension se signale à l'app (bridge.js). Cocher
   // « fait » soi-même n'apprend rien ; savoir qu'elle répond, si.
@@ -5575,10 +5588,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
              de l'onboarding et celui-ci, la liste « À faire » vide. C'est le
              banc qui l'a vue, pas la relecture du code. Une liste d'actions
              vide parce qu'on n'a rien pu lire n'est pas « rien qui presse ». */
-          <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.warn}55`,background:`${C.warn}12`,borderRadius:10,padding:'12px 14px'}}>
-            <span aria-hidden="true" style={{fontSize:20}}>⚠️</span>
-            <span style={{fontSize:13,fontWeight:500,color:C.text}}>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien.</span>
-          </div>
+          <LignePanne>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien.</LignePanne>
         ) : (
           <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
             <span style={{fontSize:20}}>✅</span>
@@ -10335,7 +10345,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
    Messages), tous rendus par <Comptabilite/>. On a donc retiré d'ici tout ce
    qui était en doublon (numérotation, sélecteur d'achat, vues, conversations,
    bordereaux) — un seul endroit par chose. */
-function VintedAccounts({ accounts, setAccounts }) {
+function VintedAccounts({ accounts, setAccounts, baseKO }) {
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState({}); // { [vinted_user_id]: {ok, label, loading} }
   const [labels, setLabels] = useState(() => load('vinted_account_labels', {}));
@@ -10590,12 +10600,20 @@ function VintedAccounts({ accounts, setAccounts }) {
           {loading ? '…' : '↻ Actualiser'}
         </button>}/>
 
-      {accounts.length === 0 && (
+      {/* ⚠️ « Aucun compte détecté · installe l'extension » à quelqu'un qui en a
+          NEUF : c'est ce que cet écran affichait quand la base ne répondait pas.
+          Et ce n'était pas seulement faux, c'était une consigne à ne SURTOUT
+          pas suivre — réinstaller l'extension ne répare pas une panne de
+          lecture. Une liste vide parce qu'on n'a pas pu lire n'est pas une
+          liste vide. */}
+      {accounts.length === 0 && (baseKO
+        ? <LignePanne>Je n'ai pas pu lire la liste de tes comptes — elle est vide parce que la lecture a échoué, pas parce qu'aucun compte n'est lié. Rien n'est perdu.</LignePanne>
+        : (
         <div style={{padding:16,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
           Aucun compte détecté pour l'instant. Installe l'extension « Shop Cancale35 – Vinted Sync »,
           connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
         </div>
-      )}
+      ))}
 
       {/* Diagnostic global : combien de comptes à jour / à rafraîchir / bloqués. */}
       {accounts.length > 0 && (()=>{
@@ -15878,7 +15896,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    n'a pas pu lire n'est PAS une liste vide.
   const noAcc = accounts.length===0 && accountsReady;
   const NoAcc = () => !noAcc ? null : (baseKO
-    ? <BaseInjoignable/>
+    ? <LignePanne>Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».</LignePanne>
     : <EmptyState icon="🔌" title="Aucun compte Vinted lié"
         desc="Installe l'extension Chrome puis ouvre vinted.fr une fois : tes annonces, ventes, achats et messages arrivent ici tout seuls."
         action={onNav && <button type="button" onClick={()=>onNav('vintedaccounts')} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 18px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes</button>}/>
@@ -15975,8 +15993,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:24,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.5}}>{hello} Julien</div>
               {!loading && (
                 <div style={{fontSize:13,color:C.muted,marginTop:3}}>
+                  {/* ⚠️ Trois fois la même phrase sur un écran, c'est UNE phrase
+                      (§7). Le bloc de la coque annonce la panne, la ligne
+                      dit de quoi la liste est vide : sous le bonjour, plus
+                      rien — surtout pas « rien d'urgent ». */}
                   {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</>
-                    : baseKO ? <>Je n'ai pas pu lire tes données — ce n'est pas « rien à faire ».</>
+                    : baseKO ? null
                     : <>Rien d'urgent — ta boutique tourne. 👌</>}
                 </div>
               )}
@@ -16065,7 +16087,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 l'app le matin, lit ça, et ne poste pas ses colis.
                 « Rien à faire » ne se dit QUE si on a pu regarder. */}
             {!loading && jobs.length===0 && (baseKO
-              ? <BaseInjoignable/>
+              ? <LignePanne>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien à expédier ni à retirer.</LignePanne>
               : <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:10,background:C.card}}>
                   <div style={{fontSize:44,lineHeight:1}}>🎉</div>
                   <div style={{fontSize:17,fontWeight:700,color:C.text,marginTop:10}}>Tout est à jour !</div>
@@ -16230,7 +16252,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
 
-            {accounts.length===0 && (
+            {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
+                rien pu lire » : pendant la panne cette consigne envoyait lier
+                un dixième compte à quelqu'un qui en a neuf. */}
+            {accounts.length===0 && !baseKO && (
               <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
             )}
           </div>
@@ -20993,6 +21018,10 @@ function LeboncoinScreen() {
   const reload = async () => {
     setLoading(true);
     const mainRows = await sbGet('app_data?id=eq.main&select=data');
+    // ⚠️ `sbGet` rend `null` quand la base n'a PAS RÉPONDU, et `[]` quand elle
+    //    a répondu « rien ». Confondre les deux faisait fêter « Tout est
+    //    publié 🎉 » une file qu'on n'avait jamais pu lire.
+    const echecLecture = mainRows === null;
     const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
     const numeros = main.vinted_annonce_numeros || {};
     const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
@@ -21003,7 +21032,8 @@ function LeboncoinScreen() {
     // périmées). Et une paire déclarée retirée du stock n'a plus rien à publier.
     const offAcc = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
     const lost = main.vinted_pairs_lost || {};
-    const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+    const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
+    const listRows = listRowsBrut || [];
     const online = []; const onlineIds = new Set(); const seen = new Set();
     for (const r of listRows) {
       const uid = String(r.id).split('_')[1];
@@ -21066,7 +21096,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ queue, removals, unlinked, liveAds, autoMatched, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    setData({ echecLecture: echecLecture || listRowsBrut === null, queue, removals, unlinked, liveAds, autoMatched, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -21170,7 +21200,12 @@ function LeboncoinScreen() {
         {/* À publier */}
         <Card>
           <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 6 }}>🟠 {data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
-          {data.queue.length === 0 ? <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div> : (<>
+          {/* ⚠️ « Tout est publié 🎉 » se disait aussi quand la file était vide
+              parce que la base n'avait pas répondu — une fête sur une lecture
+              ratée. Le 🎉 ne sort que si on a pu REGARDER. */}
+          {data.queue.length === 0 ? (data.echecLecture
+            ? <LignePanne>Je n'ai pas pu lire tes annonces Vinted — cette file est vide parce que la lecture a échoué, pas parce qu'il ne reste rien à publier.</LignePanne>
+            : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div>) : (<>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Paires numérotées en ligne sur Vinted, pas encore sur Leboncoin. Ouvre Leboncoin avec l'extension pour les publier.</div>
             {data.queue.slice(0, 60).map((q, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{q.numero}</b> · {q.title || '—'}</div>)}
             {data.queue.length > 60 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {data.queue.length - 60} autres…</div>}
@@ -22008,11 +22043,23 @@ function SecuriteSetting() {
   const [ext, setExt] = useState(undefined);   // undefined = pas encore demandé
   const [copie, setCopie] = useState('');
   const [srv, setSrv] = useState(null);   // état des routes serveur (clé de service, propriétaire)
-  useEffect(() => { fetch('/api/sante').then(r=>r.json()).then(j=>setSrv(j&&j.ok?j:{})).catch(()=>setSrv({})); }, []);
+  // ⚠️ UN SONDAGE RATÉ RESTE `null` — il ne devient pas un diagnostic. `{}`
+  //    rendait `srv !== null`, donc « clé de service manquante » alors qu'on
+  //    n'avait rien mesuré (route injoignable, 404, réponse HTML d'un 522).
+  //    Seul `ok:true` est une mesure.
+  useEffect(() => { fetch('/api/sante').then(r=>r.json()).then(j=>setSrv(j && j.ok === true ? j : null)).catch(()=>setSrv(null)); }, []);
   useEffect(() => { (async () => {
     const out = { colonne: null, lisibleSansCompte: null, mailAuto: null };
-    // 1. La colonne `owner` existe-t-elle ? (400 « column does not exist » = non)
-    try { out.colonne = (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: sbAuth() })).ok; }
+    // 1. La colonne `owner` existe-t-elle ? SEUL un 400 « column does not
+    //    exist » répond NON. ⚠️ `out.colonne = res.ok` faisait répondre non à
+    //    TOUT échec : le 10 septembre, base injoignable (522), ce panneau
+    //    affichait « Propriétaire des lignes · colonne absente » et le bouton
+    //    « Copier la migration SQL » — un diagnostic et son remède sur une
+    //    mesure qui n'avait pas eu lieu. « Pas su » ne vaut pas « non ».
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: sbAuth() });
+      out.colonne = r.ok ? true : (r.status === 400 ? false : null);
+    }
     catch (_) { out.colonne = null; }
     // 2. ⚠️ LE PIÈGE : la colonne peut exister sans que RLS soit actif. On teste
     //    donc ce qui compte vraiment — une lecture avec la clé PUBLIQUE seule
@@ -22021,7 +22068,15 @@ function SecuriteSetting() {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=id&limit=1`, {
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
       });
-      out.lisibleSansCompte = r.ok ? (await r.json()).length > 0 : false;
+      // ⚠️⚠️ LE PIRE DES TROIS, ET C'ÉTAIT UN FEU VERT. `: false` faisait dire
+      //      « Lecture sans compte · fermée — seule une session identifiée lit
+      //      tes données » dès que la base ne répondait pas. Sur un panneau de
+      //      SÉCURITÉ, affirmer que le verrou est posé sans l'avoir mesuré est
+      //      le mensonge le plus cher possible : aujourd'hui RLS est DÉSACTIVÉ
+      //      et la clé publique lit tout. Un 401/403 est en revanche une vraie
+      //      mesure — la clé publique est refusée, donc elle ne ramène rien.
+      out.lisibleSansCompte = r.ok ? (await r.json()).length > 0
+        : ((r.status === 401 || r.status === 403) ? false : null);
     } catch (_) { out.lisibleSansCompte = null; }
     // 3. Création de compte : faut-il un email de confirmation ? (le serveur de
     //    test Supabase n'en envoie que quelques-uns par heure)
@@ -23640,6 +23695,18 @@ export default function App() {
         paddingTop: ordi ? 14 : undefined,
         paddingBottom: ordi ? 40 : 'calc(84px + env(safe-area-inset-bottom))'}}>
         <EcranGardeFou resetKey={tab}>
+        {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».
+            Mon premier correctif posait la garde ÉCRAN PAR ÉCRAN : j'en avais
+            couvert quatre, et le banc élargi aux 15 écrans joignables en a
+            trouvé HUIT qui se taisaient — dont « Comptes Vinted liés », qui
+            disait « Aucun compte détecté · installe l'extension » à quelqu'un
+            qui en a neuf, et Leboncoin qui fêtait « Tout est publié 🎉 » sans
+            avoir rien lu. Une garde qui se pose écran par écran s'oublie sur le
+            prochain écran écrit ; posée ICI, sur la coque, elle couvre aussi
+            ceux qui n'existent pas encore. Les écrans gardent en plus leur
+            LIGNE de panne (`LignePanne`) là où leur propre liste vide
+            mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
+        {baseKO && <BaseInjoignable/>}
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}
@@ -23714,9 +23781,7 @@ export default function App() {
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
-        {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&(baseKO
-          ? <BaseInjoignable/>
-          : <Onboarding setTab={setTab}/>)}
+        {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&!baseKO&&<Onboarding setTab={setTab}/>}
         {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
@@ -23732,7 +23797,7 @@ export default function App() {
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
-        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts}/>}
+        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         {tab==='leboncoin'&&<LeboncoinScreen/>}
         </EcranGardeFou>
       </main>

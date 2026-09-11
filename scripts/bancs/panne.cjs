@@ -59,6 +59,22 @@ const MENSONGES=[
   [/Aucun compte Vinted lié/i,    '« Aucun compte Vinted lié »'],
   [/Bienvenue 👋/,                '« Bienvenue 👋 » (l\'accueil des nouveaux)'],
   [/Rien d'urgent/i,              '« Rien d\'urgent — ta boutique tourne »'],
+  // ── Trouvés en élargissant ce banc aux 15 écrans joignables ───────────────
+  // Il n'était posé que sur quatre. Huit écrans se taisaient, et ces cinq-là
+  // affirmaient pour de bon — dont deux sur le panneau de SÉCURITÉ.
+  [/Aucun compte détecté/i,       '« Aucun compte détecté · installe l\'extension » (il en a neuf)'],
+  // ⚠️ CINQUIÈME FOIS qu'un de mes contrôles crie au loup. Posé en
+  //    `/Tout est publié/i`, il attrapait la phrase HONNÊTE que je venais
+  //    d'écrire (« …pas parce que tout est publié »). C'est la FÊTE qui est
+  //    interdite, pas les trois mots : le 🎉 en fait partie.
+  [/Tout est publié 🎉/,          '« Tout est publié 🎉 » (une file jamais lue)'],
+  [/colonne absente/i,            '« Propriétaire des lignes · colonne absente » — un diagnostic jamais mesuré'],
+  [/Copier la migration SQL/i,    'le bouton « Copier la migration SQL » — le remède sans le diagnostic'],
+  // ⚠️ CELUI-LÀ EST UN FEU VERT : affirmer que le verrou est posé alors que RLS
+  //    est désactivé et que la clé publique lit tout. Le pire des cinq.
+  [/seule une session identifiée lit tes données/i, '« Lecture sans compte · fermée » — un FEU VERT sur une sonde ratée'],
+  [/clé de service manquante/i,   '« Routes serveur · clé de service manquante » — jamais mesuré'],
+  [/Sécurité des données\s+(partagées|cloisonnées)/i, 'le badge du panneau de sécurité tranche sans avoir mesuré'],
 ];
 const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes données/i;
 
@@ -95,7 +111,14 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     return {txt, errs};
   };
 
-  const ECRANS=['journee','dashboard','cat_bord','cat_achats'];
+  // ⚠️⚠️ LES 15 ÉCRANS JOIGNABLES, PAS QUATRE. Premier jet de ce banc :
+  //      `journee`, `dashboard`, `cat_bord`, `cat_achats` — les quatre où
+  //      j'avais posé la garde. Un banc qui ne rend que les écrans qu'on vient
+  //      de corriger ne prouve que le correctif, jamais la RÈGLE. Élargi à la
+  //      liste complète (celle d'`audit-bancs.cjs`), il a trouvé HUIT écrans
+  //      muets et cinq affirmations de plus. Même leçon que l'île d'actions :
+  //      trois écrans y échappaient parce qu'aucun banc ne les rendait.
+  const ECRANS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 
   console.log('── BASE INJOIGNABLE (522, réponse HTML — la vraie forme)');
   for(const t of ECRANS){
@@ -110,6 +133,14 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     if(AVEU.test(txt)) dit(/Rien n'est perdu/i.test(txt) && /Recharger|recharge la page/i.test(txt),
       `${t} : elle rassure sur ses données et propose le geste`,
       "« rien n'est perdu » + un bouton");
+    // ⚠️ §7 — LA MÊME PHRASE RÉPÉTÉE EST UNE PHRASE. Une fois le bloc posé sur
+    //    la coque, Ma journée disait la panne TROIS FOIS : le bloc, la ligne
+    //    sous « Bonjour Julien », puis la ligne de la liste vide. Le bloc se
+    //    dit UNE fois, et au plus une ligne dit de quoi telle liste est vide.
+    const nBloc=(txt.match(/Je n'arrive pas à joindre tes données/g)||[]).length;
+    const nLigne=(txt.match(/Je n'ai pas pu lire/g)||[]).length;
+    dit(nBloc===1 && nLigne<=1, `${t} : elle le dit une fois, pas trois`,
+      `bloc ×${nBloc}, ligne ×${nLigne}`);
     dit(errs.length===0, `${t} : aucune erreur d'app pendant la panne`, errs.slice(0,2).join(' | '));
   }
 
