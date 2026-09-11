@@ -626,6 +626,38 @@ apprise. **6 échecs** sur le code d'avant (`scripts/bancs/serveur.cjs`), 0 apr�
   (« le serveur de données ne répond pas · rien n'est perdu · réessaie »)
   plutôt que « enregistrement serveur échoué ».
 
+### ⚠️⚠️ ET L'EXTENSION ACHETAIT LE MÊME DÉFAUT ONZE FOIS
+Mesuré le 11 septembre, après le serveur : l'extension range ses données dans
+des lignes **dédiées** (§« l'extension n'écrit jamais la ligne `main` ») et les
+met à jour en **lire-fusionner-réécrire**. Dix de ces onze endroits écrivaient
+`const cur = (rows && rows[0] && rows[0].data) || {}` — or `sbGet` rend `null`
+quand la base **n'a pas répondu**. La fusion repartait alors d'un objet vide et
+l'écriture **remplaçait la ligne par la seule clé courante**.
+Un simple timeout de lecture, la base debout par ailleurs, suffisait à effacer :
+| ligne | ce qu'il perdait |
+|---|---|
+| `panel_min_prices` | **tous ses prix planchers**, posés à la main |
+| `panel_buyprices` | **tous ses prix d'achat** saisis depuis le panneau (§2.5) |
+| `panel_accounts_off` | quels comptes il a éteints — un compte exclu se rallume |
+| `panel_colis_relais` | **les codes de retrait** déjà lus dans les conversations |
+| `panel_bords_done` · `panel_colis_collected` | bordereaux faits, colis récupérés |
+| `vinted_lbc_posted` | ce qui est déjà sur Leboncoin → tout à republier |
+| `vinted_listing_dates` · `vinted_item_details` · `panel_diag_capture` · `panel_offer_statuts` | dates, descriptions, diagnostic |
+- **Vérifié avant d'écrire quoi que ce soit sur l'argent** : perdre les
+  planchers ne fait PAS accepter d'offre à tort — `autoAccepterOffres` refuse
+  d'agir sans plancher (`if (!(isFinite(min) && min > 0)) continue`). C'est une
+  perte de RÉGLAGES, pas un risque d'argent. Ne pas dramatiser au-delà.
+- ⚠️ **Le cas qui détruit n'est pas la panne totale** : quand tout est tombé,
+  l'écriture échoue aussi et rien n'est perdu. C'est **lecture KO, écriture OK**
+  qu'il faut servir — sinon le contrôle est vert sur le défaut. Même leçon que
+  `push_subs`, et c'est ce que fait `scripts/audit-fusion.cjs` (le VRAI
+  `background.js` dans un `vm`). **9 échecs** sur le code d'avant, 0 après.
+- ⚠️ Le fichier portait déjà, sur `panel_diag_capture`, un gros avertissement :
+  « *ON RÉÉCRIT LA LIGNE ENTIÈRE : sans `...tout`, cette écriture EFFAÇAIT
+  `rates`* ». La **fusion** avait été corrigée, la **lecture ratée** jamais.
+  Une moitié de leçon apprise est une leçon non apprise.
+- Extension passée en **5.53.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### « Ça revient tout seul » était faux au troisième jour
 Le bloc de panne promettait une coupure passagère : « *si ça dure plus d'une
 heure, c'est une panne du serveur : ça revient tout seul* ». La base est tombée
@@ -812,7 +844,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **27 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **28 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -1064,7 +1096,7 @@ prouve rien.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 27 audits
+scripts/audit-*.cjs             les 28 audits
 scripts/bancs/                  les 15 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.52.0';
+const EXT_ATTENDUE = '5.53.0';
 // Compare deux numéros de version (« 5.9.0 » < « 5.52.0 » — une comparaison de
 // chaînes dirait l'inverse).
 const cmpVersion = (a, b) => {
