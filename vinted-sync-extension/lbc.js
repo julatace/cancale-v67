@@ -305,10 +305,22 @@
   // ne pas écrire « ton annonce est prête », écrire combien).
   function photosLigne(ad) {
     const n = (ad.photos || []).length;
-    if (n >= 2) return '';
+    const sansDesc = ad.aDescription === false;
+    if (n >= 2 && !sansDesc) return '';
+    // ⚠️ UNE SEULE LIGNE POUR LES DEUX MANQUES, parce que le geste est le MÊME :
+    //    ouvrir l'annonce sur Vinted capte la description ET les photos. Deux
+    //    lignes diraient deux problèmes pour une seule cause (§7).
+    //    Mesuré le 12 septembre : 53 des 59 annonces n'ont pas de description
+    //    captée, 54 n'ont qu'une photo — ce sont les mêmes.
     const lien = ad.vintedUrl ? ` <a href="${esc(ad.vintedUrl)}" target="_blank" rel="noreferrer">ouvrir l&#39;annonce Vinted</a>` : '';
-    if (n === 0) return `<div class="pnote" style="color:#c0392b">Aucune photo — Leboncoin refuse une annonce sans photo.${lien}</div>`;
-    return `<div class="pnote">1 seule photo. Les autres sont sur Vinted : ouvre l&#39;annonce une fois et l&#39;extension les lit toute seule.${lien}</div>`;
+    const manques = [];
+    if (n === 0) manques.push('aucune photo');
+    else if (n === 1) manques.push('1 seule photo');
+    if (sansDesc) manques.push('pas de description');
+    if (n === 0) {
+      return `<div class="pnote" style="color:#c0392b">${manques.join(' · ')} — Leboncoin refuse une annonce sans photo.${lien}</div>`;
+    }
+    return `<div class="pnote">${manques.join(' · ')}. Tout est sur la page Vinted : ouvre-la une fois, l&#39;extension lit le reste toute seule.${lien}</div>`;
   }
   function cardHtml(ad) {
     const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo">`).join('');

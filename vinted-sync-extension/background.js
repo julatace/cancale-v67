@@ -4657,6 +4657,25 @@ function lbcCategory(det, raw) {
 //    leboncoin.fr, où l'app n'est pas chargée (§11). `audit-places.cjs` exige que
 //    les deux rendent EXACTEMENT le même titre sur les mêmes entrées : sans ça
 //    l'app lui montre un titre et l'extension en publie un autre.
+// ⚠️⚠️ CE QUI EST CAPTÉ SUR LA PAGE N'EST PAS TOUJOURS SA DESCRIPTION.
+// Mesuré le 12 septembre sur ses 92 descriptions captées : **4** sont le texte
+// PUBLICITAIRE de Vinted — « Une communauté, des milliers de marques et de
+// styles de seconde main. Prêt à te lancer ? Découvre comment ça marche ! » —
+// et **une de ces quatre est en ligne aujourd'hui**, donc elle partirait telle
+// quelle sur Leboncoin, comme description de SON annonce. Une autre commence par
+// le libellé « Description » collé au texte.
+// C'est le même principe qu'`URL_PAS_UN_QR` : on ÉCARTE ce qui n'est pas la
+// chose, sans jamais rien supprimer en base (la capture reste, c'est la
+// PUBLICATION qui refuse).
+const PAS_UNE_DESCRIPTION = /communaut[ée].{0,80}seconde main|pr[êe]t [àa] te lancer|d[ée]couvre comment [çc]a marche|t[ée]l[ée]charge l.application/i;
+function lbcDescription(brut) {
+  let t = String(brut || '').trim();
+  if (!t) return '';
+  if (PAS_UNE_DESCRIPTION.test(t)) return '';       // texte de Vinted, pas le sien
+  t = t.replace(/^\s*Description\s*(?=\S)/, '');    // libellé collé au texte
+  return t.trim();
+}
+
 const LBC_TITRE_MAX = 50;
 function lbcTitre(brand, base, size) {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
@@ -4701,7 +4720,7 @@ function buildLbcAd(raw, det, num, account) {
   const cond = String(firstDefined(det.status, raw.status)).trim();
   const color = [firstDefined(det.color1, raw.color1), firstDefined(det.color2, raw.color2)].filter(Boolean).join(' ').trim();
   const price = String(firstDefined(det.price && det.price.amount, raw.price && raw.price.amount, raw.price, det.price)).replace(',', '.');
-  const desc0 = String(firstDefined(det.description, '')).trim();
+  const desc0 = lbcDescription(firstDefined(det.description, ''));
   // Photos HD
   let photos = [];
   const ph = det.photos || raw.photos || [];
@@ -4728,7 +4747,7 @@ function buildLbcAd(raw, det, num, account) {
   parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
   parts.push('Réf. ' + ref);
   const description = parts.join('\n');
-  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), photos, vintedUrl: firstDefined(raw.url, det.url) };
+  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
 }
 // Extrait NOTRE numéro depuis n'importe quel texte d'annonce Leboncoin (titre +
 // description). Marche pour un compte PRO (numérotation auto ignorée) comme pour
