@@ -1012,6 +1012,29 @@ mesurés :
      donnée qu'il observe* — et le banc vérifie désormais que les **deux**
      messages partent.
 
+10. ⚠️⚠️ **« TEXTE COPIÉ » SANS RIEN COPIER — UNE PROMESSE REJETÉE NE PASSE PAS
+    PAR `catch`.** `copy()` s'écrivait `try { navigator.clipboard.writeText(t) }
+    catch (_) { …repli… }` : le repli ne partait **que** si l'appel levait sur
+    place. Or `writeText` échoue en rendant une **promesse rejetée** (document
+    pas au premier plan, permission refusée, contexte non sécurisé) — donc rien
+    n'était copié, **et le panneau annonçait quand même « copié »**. Prouvé au
+    banc sur le code d'avant : le rejet ressort en `NotAllowed` (erreur de page
+    non gérée) et le presse-papier reste vide. C'est la même famille que « 1
+    champ pré-rempli » sur une page où rien n'a été rempli — et ça porte sur le
+    texte qui contient la **référence VRM-{n°}**, le seul filet quand le
+    formulaire n'a pas de champ pour elle.
+11. **Le remplissage automatique s'arrêtait au bout de 90 s, en silence.** Le
+    dépôt Leboncoin se fait en ÉTAPES (mesuré : la première page ne porte qu'un
+    champ) ; choisir la catégorie et arriver au prix prend plus longtemps. Passé
+    le délai, l'extension attendait des champs qu'elle ne surveillait plus. Le
+    bandeau le DIT maintenant et renvoie sur « Re-remplir » — lequel **relance**
+    la surveillance (sans ça il ne servait qu'une fois).
+12. **Et « 🚀 Tout préparer » — le bouton que l'app lui dit d'utiliser — n'avait
+    jamais été exécuté.** Il fait quatre choses, toutes vérifiées désormais :
+    télécharger les photos dans `VRM-{n°}`, copier le texte complet **avec la
+    référence**, **mémoriser la paire** (sans ça le nouvel onglet ne sait pas
+    laquelle remplir) et ouvrir la page de dépôt.
+
 ⚠️⚠️ **ET `lbc.js` N'AVAIT JAMAIS TOURNÉ** — 480 lignes, le panneau qui SERT à
 publier. `node --check` ne lit que la syntaxe. `scripts/bancs/leboncoin.cjs` le
 charge dans une fausse page avec un faux `chrome.runtime` : **18 contrôles, 10

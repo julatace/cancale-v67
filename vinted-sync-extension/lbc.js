@@ -451,7 +451,30 @@
     requestAnimationFrame(() => { el.style.opacity = '1'; });
     setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, 1600);
   }
-  function copy(t) { try { navigator.clipboard.writeText(t); } catch (_) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (_) {} ta.remove(); } }
+  // ⚠️⚠️ UNE PROMESSE REJETÉE NE PASSE PAS PAR `catch`. Écrit ainsi —
+  // `try { navigator.clipboard.writeText(t) } catch (_) { …repli… }` — le repli
+  // ne se déclenchait QUE si l'appel levait sur place. Or `writeText` échoue en
+  // rendant une promesse rejetée (document pas au premier plan, permission
+  // refusée, contexte non sécurisé) : le repli ne partait pas, **rien n'était
+  // copié**, et le panneau annonçait quand même « texte copié ». C'est la même
+  // famille que « 1 champ pré-rempli » sur une page où rien n'a été rempli.
+  // ⇒ On attend la réponse, et on retombe sur l'ancienne méthode si ça a raté.
+  function copyLegacy(t) {
+    const ta = document.createElement('textarea');
+    ta.value = t; ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+  function copy(t) {
+    try {
+      const p = navigator.clipboard && navigator.clipboard.writeText(t);
+      if (p && typeof p.then === 'function') { p.catch(() => { copyLegacy(t); }); return; }
+    } catch (_) {}
+    copyLegacy(t);
+  }
 
   // Pré-remplissage BEST-EFFORT du formulaire « Déposer une annonce ».
   // Leboncoin change souvent son formulaire : si un champ n'est pas trouvé, on
@@ -617,7 +640,7 @@
   // ⚠️ On remplit, on ne publie PAS : c'est toi qui relis et qui valides. Les
   // photos ne peuvent pas etre injectees (un navigateur interdit de remplir un
   // champ fichier par programme) : elles sont deja dans ton dossier VRM-{N°}.
-  let pending = null, pendingTries = 0, pendingDone = 0, pendingTimer = null;
+  let pending = null, pendingTries = 0, pendingDone = 0, pendingTimer = null, pendingArrete = false;
   async function autoPrefill() {
     if (!/deposer|depot|d[ée]p[oô]t/i.test(location.href)) return;
     const r = await send({ action: 'getPending' });
@@ -631,7 +654,13 @@
       if (n > pendingDone) { pendingDone = n; banner(); }
       // On s'arrete au bout de 90 s : au-dela, soit c'est rempli, soit la page
       // n'est pas celle qu'on croit — inutile de tourner en fond.
-      if (pendingTries > 90) clearInterval(pendingTimer);
+      // ⚠️ MAIS IL FAUT LE DIRE. Le dépôt Leboncoin se fait en ÉTAPES (mesuré :
+      //    la première page ne porte qu'un champ, « Que proposez-vous ? ») ;
+      //    choisir la catégorie, remplir l'état, arriver au prix prend plus de
+      //    90 secondes. Passé ce délai, le remplissage s'arrêtait EN SILENCE :
+      //    il attendait que les champs suivants se remplissent seuls, et rien ne
+      //    venait. Le bandeau dit maintenant que c'est à lui de cliquer.
+      if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; banner(); }
     }, 1000);
   }
   function fillNow(ad) {
@@ -661,13 +690,29 @@
       '<div style="font-weight:700;font-size:13px;margin-bottom:3px">N°' + (pending.numero || '?') + ' — ' + esc(String(pending.title || '').slice(0, 46)) + '</div>' +
       '<div style="color:#8b9b92">' + pendingDone + ' champ' + (pendingDone > 1 ? 's' : '') + ' rempli' + (pendingDone > 1 ? 's' : '') +
       '. Catégorie <b style="color:#eef4f0">' + esc(pending.category || '—') + '</b>. Photos dans le dossier <b style="color:#eef4f0">VRM-' + (pending.numero || '') + '</b>.</div>' +
+      (pendingArrete
+        ? '<div style="color:#e8b35d;margin-top:6px">Je ne remplis plus tout seul (c\'est fini après 1 min 30). Le dépôt se fait en plusieurs étapes : à chaque nouvelle étape, clique <b style="color:#eef4f0">Re-remplir</b>.</div>'
+        : '') +
       '<div style="display:flex;gap:6px;margin-top:9px">' +
       '<button id="vrm-refill" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">Re-remplir</button>' +
       '<button id="vrm-cdesc" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">Copier la description</button>' +
       '<button id="vrm-close" title="Fermer" style="border:1px solid #3a4a43;background:transparent;color:#8b9b92;border-radius:9px;padding:7px 9px;font-size:11.5px;cursor:pointer">✕</button>' +
       '</div>' +
       '<div style="color:#6f7f77;font-size:10px;margin-top:7px">VRM ne publie jamais à ta place : relis et clique toi-même sur Publier.</div>';
-    el.querySelector('#vrm-refill').onclick = () => { pendingDone = fillNowForce(pending); banner(); };
+    el.querySelector('#vrm-refill').onclick = () => {
+      pendingDone = fillNowForce(pending);
+      // Et on RELANCE la surveillance : sans ça, « Re-remplir » ne servait
+      // qu'une fois, et l'étape suivante repartait dans le silence.
+      pendingArrete = false; pendingTries = 0;
+      clearInterval(pendingTimer);
+      pendingTimer = setInterval(() => {
+        pendingTries++;
+        const n2 = fillNow(pending);
+        if (n2 > pendingDone) { pendingDone = n2; banner(); }
+        if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; banner(); }
+      }, 1000);
+      banner();
+    };
     el.querySelector('#vrm-cdesc').onclick = () => { copy(pending.description || ''); toast('Description copiée'); };
     el.querySelector('#vrm-close').onclick = () => { clearInterval(pendingTimer); el.remove(); send({ action: 'setPending', ad: null }); };
   }
