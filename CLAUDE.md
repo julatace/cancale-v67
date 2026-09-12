@@ -820,6 +820,23 @@ champs qu'il **reconnaît**. Aucune publication automatique.
   ⚠️ Son premier jet **mourait** sur le code d'avant (`buildEbayData` n'existe
   pas → `TypeError`), donc les contrôles suivants n'étaient jamais rendus : *un
   audit ne meurt pas, il rapporte*.
+- ⚠️⚠️ **ET `ebay.js` N'AVAIT JAMAIS TOURNÉ.** `node --check` ne lit que la
+  syntaxe : un sélecteur qui ne trouve rien, un panneau qui ne s'ouvre pas, un
+  `null` déréférencé — rien de tout ça ne se voit sans **exécuter le script dans
+  une page**. C'est §4.10 (« une fonction serverless n'est vérifiée que si un
+  banc l'EXÉCUTE ») appliqué à un script de contenu. Le banc `ebay.cjs` sert une
+  fausse page de mise en vente et le charge pour de vrai : **14 contrôles**.
+- ⚠️ **Ce que j'ai mesuré sur la vraie page d'eBay** (`curl` — le navigateur du
+  banc n'y accède pas) : le formulaire de mise en vente est **derrière la
+  connexion**, donc toujours invisible d'ici. Ce qui EST visible, c'est
+  l'en-tête : la barre de recherche est un `<input name="_nkw" id="gh-ac">`
+  **vide, sur toutes les pages**. Avec les motifs actuels elle n'est **pas**
+  atteignable (aucun ne correspond à « Rechercher sur eBay ») — ce n'était donc
+  pas un défaut vivant. Mais élargir un motif un jour suffirait : la garde
+  `DANS_ENTETE` écarte en-tête, pied de page et recherche, et le banc **passe
+  au rouge** si on la retire (prouvé : le titre de l'annonce atterrit dans la
+  barre de recherche, et le bandeau annonce « 1 champ rempli » sur une page où
+  il n'a rien rempli d'utile). *Une précaution, pas une découverte.*
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
@@ -1166,7 +1183,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 29 audits
-scripts/bancs/                  les 15 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 16 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
