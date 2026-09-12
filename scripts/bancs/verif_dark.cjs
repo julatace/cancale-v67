@@ -64,6 +64,21 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
     pg.on('pageerror',e=>errs.push('PAGEERROR '+e.message));
     pg.on('console',m=>{if(m.type()==='error'&&!/owner|ERR_|Failed to load|status of 4/.test(m.text()))errs.push('CONSOLE '+m.text().slice(0,140));});
     await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');localStorage.setItem('vinted_dark','true');}catch(_){}});
+    // ⚠️⚠️ UN BANC NE DOIT PAS DÉPENDRE DU CDN DE VINTED. Aucun de ces bancs
+    // n'interceptait les images : les photos des fixtures partaient pour de vrai
+    // sur le réseau. Tant que l'écran rendu n'en avait pas, ça ne se voyait pas ;
+    // le jour où l'écran Leboncoin a eu ses vignettes (12 septembre), la capture
+    // `fullPage` a fait charger les 59 — et le banc est mort sur
+    // « page.screenshot: Timeout 30000ms exceeded ». Ce n'était pas un défaut de
+    // l'app : le banc était à un hoquet de réseau de tomber, depuis toujours.
+    // On coupe donc les images EXTERNES (celles de l'app, servies en local,
+    // passent). C'est pour le DÉTERMINISME — ces bancs ne mesurent pas la
+    // validité d'une URL de photo, qui vient des fixtures.
+    await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r3) => {
+      const t3 = r3.request().resourceType();
+      if (t3 === 'image' || t3 === 'media' || t3 === 'font') return r3.abort();
+      return r3.continue();
+    });
     await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
       const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
       if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});

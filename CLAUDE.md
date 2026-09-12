@@ -896,6 +896,78 @@ manquait, c'est le **choix** : la file prenait TOUTE annonce numérotée en lign
   côté — le panneau tourne sur leboncoin.fr, où l'app n'est pas chargée).
   **6 échecs** sur le code d'avant.
 
+### Leboncoin : la liste vit dans le PANNEAU, et « vendue » se prouve
+Demande de Julien, 12 septembre : « propose-moi les paires en ligne **en liste**,
+prends le titre en l'optimisant pour Leboncoin, la description avec les photos,
+**comme un pro** ; si une paire est vendue sur Vinted elle doit être enlevée de
+Leboncoin, et elle garde le même numéro. » Puis : « **je veux avoir la liste sur
+l'extension, pas dans l'app** » — c'est sur leboncoin.fr qu'il travaille.
+
+**Mesuré avant de coder**, le vrai `buildLbcData()` exécuté sur la vraie base :
+59 annonces en ligne, 59 numérotées, **59 dans la file**. Quatre défauts, tous
+mesurés :
+
+1. **Le titre était tronqué à la hache.** `[marque, titre].join(' ').slice(0,50)` :
+   **7 titres au plafond dont 6 coupés EN PLEIN MOT** (« …tropez fringe noir
+   taill »), la marque **doublée** (« Nike nike shox tl »), « taille 38,5 » au
+   lieu de « T38,5 », « Chaussures style Nike sacai » (16 caractères de
+   remplissage). `lbcTitre()` : **0 coupé en plein mot, 0 au plafond, 58 des 59
+   améliorés**. ⚠️ Mon premier jet retirait le mot « chaussures » : il en faisait
+   « **Ville** derby » et « **Bateau**/ mocassins ». Mesuré, ce mot PORTE DU SENS
+   trois fois sur quatre chez lui — on ne retire que le remplissage pur
+   (« chaussures **style** X ») et le doublon devant la marque.
+2. **54 des 59 annonces partiraient avec UNE SEULE photo**, et rien ne le disait.
+   Cause mesurée : **l'API Vinted ne renvoie AUCUNE photo** (0 sur 57 lignes
+   `harvest_*_item_*`, captures jusqu'au 9 septembre) — elles ne viennent que de
+   la PAGE de l'annonce, et les 93 déjà ouvertes en ont **5 en moyenne**. On ne
+   peut donc pas les chercher tout seul : la liste se groupe sur **ce qu'il peut
+   faire** (loi de l'écran Colis) — *aucune photo* (Leboncoin refuse) en haut,
+   puis *prêtes*, puis *une seule photo* — chaque carte écrit **le chiffre** et
+   donne **le lien vers l'annonce Vinted**. Le chiffre, jamais la promesse.
+3. ⚠️⚠️ **« VENDUE » ÉTAIT DÉDUITE D'UNE ABSENCE.** Le panneau écrivait « N
+   **vendues** sur Vinted — à retirer », en rouge, dès qu'une annonce n'était
+   plus en ligne. Or elle sort aussi de la liste quand il l'a **mise en pause**.
+   Mesuré : sur ses **400 annonces fermées, 151 seulement** portent une vente
+   **prouvée** par identité (`transaction → item_id` : les 400 lignes
+   `harvest_*_txn_*` la portent toutes). Dire « supprime-la » pour les 249 autres
+   lui fait **perdre une vente sur une paire qu'il a encore**. Trois états
+   désormais : **vendue (prouvée, rouge)** · **plus en ligne, à vérifier
+   (ambre, aucun ordre)** · **en pause (gris, rien à faire)**. §5 mot pour mot :
+   mieux vaut un blanc qu'un faux. **Le numéro, lui, ne bouge jamais** (pool
+   append-only) — c'est écrit à l'écran.
+4. **Une catégorie devinée fausse** : « 3 manuels première ST2S » partait en
+   « Chaussures ». Leçon eBay appliquée ici.
+
+⚠️⚠️ **ET `lbc.js` N'AVAIT JAMAIS TOURNÉ** — 480 lignes, le panneau qui SERT à
+publier. `node --check` ne lit que la syntaxe. `scripts/bancs/leboncoin.cjs` le
+charge dans une fausse page avec un faux `chrome.runtime` : **18 contrôles, 10
+échecs sur le code d'avant**. Le plus parlant : « la consigne *supprime-la* est
+rendue **3 fois pour 1 vente prouvée** ».
+- ⚠️ **Neuvième ET dixième fois qu'un de mes contrôles crie au loup**, et le
+  second est le plus instructif. Jet 1 : « le mot *vendue* est interdit dans le
+  groupe du doute » → il attrapait « je n'ai pas la preuve qu'elles sont
+  **vendues** ». Jet 2 : « le mot *supprime* est interdit » → il attrapait « je
+  ne te dis pas de les **supprimer** », c'est-à-dire la NÉGATION de ce qu'il
+  traque. ⇒ Ce qui est interdit n'est pas un mot mais une **instruction**, et une
+  instruction **se compte** : « supprime-la » ne doit être rendu qu'autant de
+  fois qu'il y a de ventes prouvées. *La donnée déclenche, jamais la
+  formulation.*
+- ⚠️ `EXT_CAPACITES.lbctitre = '5.55.4'` : c'est l'EXTENSION qui publie, avec SA
+  version de la règle. Sans cette garde, l'app dirait « le titre exactement tel
+  qu'il partira » à une extension qui enverra l'ancien — le défaut le plus
+  coûteux du projet, pour la **cinquième** fois.
+- ⚠️ **Et les bancs de rendu dépendaient du CDN de Vinted sans le dire** : aucun
+  n'interceptait les images. Tant que l'écran rendu n'en avait pas, ça ne se
+  voyait pas ; le jour où la liste a eu ses vignettes, `verif_dark` est mort sur
+  « page.screenshot: Timeout 30000ms exceeded ». Ce n'était pas un défaut de
+  l'app — le banc était à un hoquet de réseau de tomber, depuis toujours. Les
+  images externes sont coupées : c'est du déterminisme, pas un moyen de cacher
+  une image cassée.
+- `audit-places.cjs` ne compare plus l'existence des règles mais **leurs
+  sorties** : l'app et l'extension doivent rendre **le même titre** sur les mêmes
+  entrées (8 cas réels). Sans ça l'app en montre un et l'extension en publie un
+  autre. **7 échecs** sur le code d'avant.
+
 ### eBay : deuxième place, même modèle — et le défaut d'eBay est **NON**
 Julien a confirmé le 12 septembre : « **j'ai les deux** » (compte particulier ET
 professionnel). L'assistant eBay est donc livré sur le modèle de Leboncoin :
@@ -956,6 +1028,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `releve` | `capterReleves` | **5.52.0** (5 sept.) | « l'extension récupère le relevé à ta prochaine visite » |
 | `places` | `mpChoisi` | **5.54.0** (11 sept.) | « seules les annonces cochées partent sur Leboncoin » |
 | `ebay` | `buildEbayData` | **5.55.0** (12 sept.) | « l'extension prépare tes annonces sur eBay » |
+| `lbctitre` | `lbcTitre` | **5.55.4** (12 sept.) | « le titre exactement tel qu'il partira sur Leboncoin » |
 
 `extSait(quoi)` rend **trois états** — `absente` (téléphone, autre navigateur) ·
 `retard` · `ok` — et **jamais deux**. Une extension **muette** sur sa version est
@@ -1036,7 +1109,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **31 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **17 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -1291,7 +1364,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 31 audits
-scripts/bancs/                  les 16 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 17 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

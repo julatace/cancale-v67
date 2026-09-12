@@ -4633,8 +4633,66 @@ function lbcCategory(det, raw) {
   if (/(sac|sacoche|bandouli|cabas)/.test(t)) return 'Sacs à main';
   if (/(veste|manteau|pull|t-?shirt|chemise|jean|pantalon|robe|short|sweat|hoodie)/.test(t)) return 'Vêtements';
   if (/(casquette|bonnet|ceinture|montre|lunettes|écharpe|gants)/.test(t)) return 'Accessoires & Bagagerie';
+  // ⚠️ VU DANS SA FILE : « 3 manuels première ST2S » partait en « Chaussures ».
+  //    Une catégorie FAUSSE fait plus de mal que pas de catégorie (leçon eBay) :
+  //    l'annonce ne sort dans aucune recherche utile.
+  if (/(manuel|livre|bouquin|roman|bd|scolaire|cahier)/.test(t)) return 'Livres';
   return 'Chaussures';
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// LE TITRE LEBONCOIN — 50 caractères, et ils se gagnent
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré le 12 septembre sur ses 59 vraies annonces en ligne. L'ancien titre
+// faisait `[marque, titre].join(' ')` puis `slice(0, 50)` :
+//   · 7 titres tapaient le plafond, et 6 finissaient EN PLEIN MOT
+//     (« chaussures philippe model tropez fringe noir taill ») ;
+//   · la marque était DOUBLÉE quand elle était déjà dans son titre
+//     (« Nike nike shox tl noir et vert ») ;
+//   · « taille 38,5 » mangeait 6 caractères de plus que « T38,5 » ;
+//   · « Chaussures style Nike sacai » : 16 caractères de remplissage.
+// Après : 0 coupé au plafond, 0 coupé en plein mot, 58 des 59 améliorés.
+//
+// ⚠️ LA MÊME FONCTION EXISTE DANS L'APP (`lbcTitre` dans App.jsx), parce que les
+//    deux calculent la file chacun de leur côté — le panneau tourne sur
+//    leboncoin.fr, où l'app n'est pas chargée (§11). `audit-places.cjs` exige que
+//    les deux rendent EXACTEMENT le même titre sur les mêmes entrées : sans ça
+//    l'app lui montre un titre et l'extension en publie un autre.
+const LBC_TITRE_MAX = 50;
+function lbcTitre(brand, base, size) {
+  let t = String(base || '').replace(/\s+/g, ' ').trim();
+  // 1. Le remplissage PUR, et seulement lui.
+  //    ⚠️ PAS le mot « chaussures » tout court : mesuré, il PORTE DU SENS trois
+  //    fois sur quatre chez lui (« chaussures bateau », « chaussures de ville
+  //    derby »). Mon premier jet en faisait « Bateau » et « Ville derby ». On ne
+  //    le retire que devant la marque elle-même.
+  t = t.replace(/^(?:chaussures?|baskets?|sneakers?)\s+(?:style|type|genre)\s+/i, '');
+  const bq = String(brand || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (bq) t = t.replace(new RegExp('^(?:chaussures?|baskets?|sneakers?)\\s+(?=' + bq + '\\b)', 'i'), '');
+  t = t.replace(/\s+/g, ' ').trim();
+  // 2. La taille sort du texte et revient en suffixe : c'est ce sur quoi un
+  //    acheteur filtre, donc elle ne doit JAMAIS être ce qu'on rogne.
+  let vue = null;
+  t = t.replace(/\btailles?\s*:?\s*(\d{1,2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
+       .replace(/\bT\s*(\d{2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
+       .replace(/\s+/g, ' ').trim();
+  const taille = String(size || vue || '').replace(/^t/i, '').trim();
+  // 3. La marque une seule fois.
+  const b = String(brand || '').trim();
+  if (b && !new RegExp('\\b' + bq + '\\b', 'i').test(t)) t = b + ' ' + t;
+  t = t.replace(/\s+/g, ' ').trim();
+  // 4. Une majuscule : un titre tout en minuscules se lit « bricolé ».
+  t = t.charAt(0).toUpperCase() + t.slice(1);
+  const suff = taille ? ' T' + taille : '';
+  // 5. ⚠️ ON NE COUPE JAMAIS EN PLEIN MOT.
+  const place = LBC_TITRE_MAX - suff.length;
+  if (t.length > place) {
+    const coupe = t.slice(0, place);
+    const esp = coupe.lastIndexOf(' ');
+    t = (esp > 12 ? coupe.slice(0, esp) : coupe).replace(/[\s,;:/-]+$/, '');
+  }
+  return (t + suff).trim();
+}
+
 function firstDefined(...v) { for (const x of v) if (x !== undefined && x !== null && x !== '') return x; return ''; }
 function buildLbcAd(raw, det, num, account) {
   const brand = firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand);
@@ -4649,10 +4707,7 @@ function buildLbcAd(raw, det, num, account) {
   const ph = det.photos || raw.photos || [];
   if (Array.isArray(ph)) photos = ph.map((p) => firstDefined(p.full_size_url, p.url, typeof p === 'string' ? p : '')).filter(Boolean);
   if (!photos.length && raw.photo && raw.photo.url) photos = [raw.photo.url];
-  // Titre Leboncoin (≤ 50 caractères, avec des termes qui « ressortent »)
-  let title = [brand, base].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-  if (size && !/taille|t\s?\d/i.test(title)) title += ' T' + size;
-  if (title.length > 50) title = title.slice(0, 50).trim();
+  const title = lbcTitre(brand, base, size);
   // Description structurée
   const specs = [];
   if (brand) specs.push('Marque : ' + brand);
@@ -4842,6 +4897,42 @@ async function buildLbcData() {
     if ((!cur.photos || !cur.photos.length) && pd.photos && pd.photos.length) cur.photos = pd.photos.map(u => ({ url: u }));
     details[id] = cur;
   }
+  // ── « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE ─────────────
+  // ⚠️⚠️ Le moteur disait « vendue sur Vinted » dès qu'une annonce n'était PLUS
+  // en ligne — et l'écran l'écrivait en rouge. Or une annonce peut sortir de la
+  // liste parce qu'il l'a MISE EN PAUSE ou retirée. Mesuré le 12 septembre sur
+  // ses vraies données : sur ses **400 annonces fermées, seules 151** portent une
+  // vente prouvée. Dire « vendue » pour les 249 autres, c'est lui faire retirer
+  // de Leboncoin une paire qu'il a encore — donc perdre la vente.
+  // L'identité, elle, existe et elle est complète : les 400 lignes
+  // `harvest_*_txn_*` portent TOUTES leur `item_id` (§5 : l'identité d'une paire,
+  // jamais la ressemblance). C'est donc ça qui prouve la vente.
+  // ⚠️ Et l'absence de preuve n'est PAS une preuve d'absence : une paire fermée
+  //    sans transaction captée se dit « à vérifier », jamais « pas vendue ».
+  const vendus = new Set();
+  {
+    const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data')) || [];
+    for (const r of txnRows) {
+      const p = (r.data && r.data.payload) || {};
+      const t = p.transaction || p;
+      const it = t && (t.item_id || (t.item && t.item.id));
+      if (it) vendus.add(String(it));
+    }
+  }
+  // L'état Vinted réel de chaque annonce connue : vendue (prouvé) · en pause ·
+  // fermée sans preuve · jamais vue. Trois états, pas deux (même leçon que le
+  // panneau de sécurité).
+  const etatVinted = {};
+  for (const r of listRows) {
+    const p = (r.data && r.data.payload) || {};
+    for (const it of (p.items || [])) {
+      const oid = String(it.id);
+      etatVinted[oid] = it.is_hidden ? 'pause' : (it.is_draft ? 'brouillon'
+        : (it.is_closed ? (vendus.has(oid) ? 'vendue' : 'fermee') : 'enligne'));
+    }
+  }
+  const etatDe = (oid) => etatVinted[String(oid)] || (vendus.has(String(oid)) ? 'vendue' : 'inconnue');
+
   // ── RAPPROCHEMENT AUTOMATIQUE VINTED ↔ LEBONCOIN ──────────────────────────
   // Tes annonces Leboncoin portent une RÉFÉRENCE pro (`CustomRef`, ex. « 2057 »)
   // qui correspond au numéro écrit dans ton titre Vinted (« … n2057 »). On s'en
@@ -4898,7 +4989,7 @@ async function buildLbcData() {
     if (onlineIds.has(pid)) continue;                  // encore en ligne sur Vinted → RAS
     const e = numeros[pid] || {};
     removalSeen.add(pid);
-    removals.push({ id: pid, numero: String(e.numero || '?'), ref: 'VRM-' + (e.numero || '?'), title: e.title || '' });
+    removals.push({ id: pid, numero: String(e.numero || '?'), ref: 'VRM-' + (e.numero || '?'), title: e.title || '', etat: etatDe(pid) });
   }
   // Détection AUTOMATIQUE (sans marquage manuel) : une annonce Leboncoin encore
   // active dont la paire n'est PLUS en ligne sur Vinted = vendue là-bas → à
@@ -4929,10 +5020,18 @@ async function buildLbcData() {
       if (!keys.some((k) => keysKnown.has(k))) { unlinked.push(lbcRow(ad, keys)); continue; }
       const key = 'lbc:' + ad.id;
       if (removalSeen.has(key)) continue; removalSeen.add(key);
+      // L'état vient de l'annonce VINTED que ces clés désignent — pas de
+      // l'annonce Leboncoin, qui ne sait rien de la vente.
+      let etat = 'inconnue';
+      for (const id in numeros) {
+        const en = numeros[id] || {};
+        const k2 = String(en.numero || '').trim();
+        if (k2 && keys.includes(k2)) { etat = etatDe(id); break; }
+      }
       removals.push({
         id: key, lbcId: String(ad.id), numero: keys[0] || '?',
         ref: ad.customRef || keys[0] || '?', title: ad.subject || '',
-        url: ad.url || '', auto: true,
+        url: ad.url || '', auto: true, etat,
       });
     }
   }
