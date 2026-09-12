@@ -658,6 +658,30 @@ Un simple timeout de lecture, la base debout par ailleurs, suffisait à effacer 
   Une moitié de leçon apprise est une leçon non apprise.
 - Extension passée en **5.53.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### ⚠️⚠️ ET UNE LECTURE RATÉE POUVAIT EFFACER UN COMPTE VINTED
+Douzième forme du même piège, et la plus coûteuse côté extension.
+`captureDomain` efface la ligne `vinted_accounts` d'un compte quand il est dans
+la **liste noire** ET qu'il n'a pas été **réautorisé**. Les deux listes se
+lisaient en `res.ok ? … : []`, puis le résultat était **mis en cache** (5 min /
+60 s) **comme une vraie mesure**. Un 522 devenait donc « liste vide », gardée.
+- **Contre-ordre lu vide → la ligne du compte est EFFACÉE.** Un compte qu'il
+  vient de réautoriser compte comme encore supprimé : ses jetons partent, il
+  doit repasser sur Vinted. C'est mot pour mot « l'extension ne veut pas
+  renvoyer mes nouveaux comptes », déclenché par 60 s de lecture ratée.
+- **Liste noire lue vide → un compte supprimé se fait re-capter** (le cas
+  `shop_cancale`, « il revenait tout le temps »).
+⇒ `null` = « pas su » : on **ne met pas en cache un échec**, on garde la
+dernière valeur connue, et `captureDomain` **n'efface que s'il SAIT** (les deux
+listes lues). Au pire un compte supprimé est re-capté une fois — ça se répare
+d'un clic ; un compte vivant qui perd ses jetons, non.
+- ⚠️⚠️ **ET MON PREMIER CONTRÔLE NE REPRODUISAIT PAS LE DÉFAUT.** Il faisait
+  échouer les **deux** listes à la fois — le compte n'était alors pas dans la
+  liste noire non plus, donc aucun DELETE, donc **vert sur le code fautif**.
+  Ce qui supprime est le cas **asymétrique** : liste noire lue, contre-ordre
+  pas lu. `audit-comptes-noirs.cjs` le sert exprès. **2 échecs** sur le code
+  d'avant, 0 après. *Même famille que « lecture KO, écriture OK » pour
+  `push_subs` : la panne totale n'est presque jamais le cas dangereux.*
+
 ### « Ça revient tout seul » était faux au troisième jour
 Le bloc de panne promettait une coupure passagère : « *si ça dure plus d'une
 heure, c'est une panne du serveur : ça revient tout seul* ». La base est tombée
@@ -937,7 +961,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **29 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **30 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -1189,7 +1213,7 @@ prouve rien.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 29 audits
+scripts/audit-*.cjs             les 30 audits
 scripts/bancs/                  les 16 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
