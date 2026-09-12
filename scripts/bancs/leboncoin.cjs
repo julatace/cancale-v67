@@ -309,6 +309,80 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p4.close();
   }
 
+  // ── « 🚀 TOUT PRÉPARER » : LE BOUTON PRINCIPAL, JAMAIS EXÉCUTÉ ─────────────
+  // C'est le geste que l'app lui dit de faire (« bouton 🚀 Tout préparer »), et
+  // il n'avait jamais tourné. Il doit faire QUATRE choses, et chacune compte :
+  // télécharger les photos, copier le texte complet, MÉMORISER la paire choisie
+  // (sinon le nouvel onglet ne sait pas laquelle remplir) et ouvrir la page de
+  // dépôt.
+  {
+    const p5 = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const e5 = []; p5.on('pageerror', (e) => e5.push(e.message));
+    const vus = { photos: null, pending: null, ouvert: null, copie: null };
+    await p5.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+      const t = r.request().resourceType();
+      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
+    });
+    await p5.exposeFunction('__banc_msg', (m) => {
+      if (m.action === 'downloadPhotos') vus.photos = m;
+      if (m.action === 'setPending') vus.pending = m;
+    });
+    await p5.exposeFunction('__banc_open', (u) => { vus.ouvert = u; });
+    await p5.exposeFunction('__banc_copy', (t) => { vus.copie = t; });
+    await p5.addInitScript((d) => {
+      window.open = (u) => { try { window.__banc_open(String(u)); } catch (_) {} return null; };
+      // ⚠️ ON SERT LE CAS QUI ÉCHOUE : `navigator.clipboard.writeText` rend une
+      //    promesse REJETÉE (document pas au premier plan, permission refusée).
+      //    C'est exactement le cas où l'ancien code ne copiait rien tout en
+      //    annonçant « copié » — un `try/catch` n'attrape pas un rejet.
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+        writeText: () => Promise.reject(new Error('NotAllowed')),
+      } });
+      document.execCommand = function () { try { const ta = document.querySelector('textarea'); window.__banc_copy(ta ? ta.value : ''); } catch (_) {} return true; };
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        try { window.__banc_msg(m); } catch (_) {}
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3, postedCount: 2, lbcCount: 2 } });
+        if (m && m.action === 'downloadPhotos') return rep({ ok: true, count: (m.urls || []).length });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { queue: QUEUE });
+    await p5.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
+    await p5.addScriptTag({ content: SRC });
+    await p5.waitForTimeout(1000);
+    const f5 = await p5.$('[data-a="open"]'); if (f5) { await f5.click(); await p5.waitForTimeout(500); }
+    // On prépare la paire qui a TROIS photos (celle des « prêtes »).
+    const idPrepare = await p5.evaluate(() => {
+      const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
+      for (const r of rs) {
+        for (const c of r.querySelectorAll('.card')) {
+          if (c.getAttribute('data-id') === '1001') { const b2 = c.querySelector('[data-a="prepare"]'); if (b2) { b2.click(); return '1001'; } }
+        }
+      }
+      return null;
+    });
+    dit(idPrepare === '1001', 'le bouton « Tout préparer » existe sur la carte voulue');
+    await p5.waitForTimeout(900);
+    dit(!e5.length, 'aucune erreur pendant « Tout préparer »', e5[0] || '');
+    dit(!!vus.photos && (vus.photos.urls || []).length === 3, 'il demande le téléchargement des 3 photos',
+      vus.photos ? (vus.photos.urls || []).length + ' url(s)' : 'aucune demande de photos');
+    dit(!!vus.photos && vus.photos.numero === '401', 'et elles vont dans le dossier de la paire (VRM-401)',
+      vus.photos ? 'numero=' + vus.photos.numero : '');
+    // ⚠️ CELUI-CI EST LE PLUS IMPORTANT : sans la paire mémorisée, le nouvel
+    //    onglet ne sait pas laquelle remplir — c'est le défaut qui obligeait à
+    //    tout recoller à la main.
+    dit(!!vus.pending && vus.pending.ad && vus.pending.ad.numero === '401',
+      'il MÉMORISE la paire choisie pour le nouvel onglet',
+      vus.pending ? '' : 'sans ça, la page de dépôt s\'ouvre sans savoir quoi remplir');
+    dit(/leboncoin\.fr\/deposer-une-annonce/.test(String(vus.ouvert || '')), 'et il ouvre la page de dépôt',
+      'ouvert : ' + String(vus.ouvert || 'rien'));
+    // Le texte copié doit porter la RÉFÉRENCE : c'est le seul filet quand le
+    // formulaire n'a pas de champ pour elle (mesuré : il n'en a pas).
+    dit(/VRM-401/.test(String(vus.copie || '')), 'le presse-papier refusé retombe sur l\'ancienne méthode, et le texte porte VRM-401',
+      'c\'est elle qui relie l\'annonce à la paire — sans elle, plus de retrait automatique');
+    dit(/TITRE|DESCRIPTION|PRIX/.test(String(vus.copie || '')), 'et il est complet (titre, description, prix)');
+    await p5.close();
+  }
+
   await b.close(); srv.close();
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : '\nLe panneau Leboncoin dit ce qu\'il sait, et seulement ce qu\'il sait.');
   process.exit(ko ? 1 : 0);
