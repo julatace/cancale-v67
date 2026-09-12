@@ -226,12 +226,27 @@ async function activeAccountId(domain) {
 // Tant qu'un compte reste connecté dans Chrome, l'extension le re-capte à
 // chaque cycle → il « revenait tout le temps » (cas shop_cancale). On lit donc
 // cette liste et on NE capte JAMAIS un compte bloqué (et on nettoie sa ligne).
+// ⚠️⚠️ UNE LECTURE RATÉE N'EST PAS UNE LISTE VIDE — ET ICI ÇA SUPPRIME.
+// Ces deux listes décident, dans `captureDomain`, si on EFFACE la ligne
+// `vinted_accounts` d'un compte. Elles écrivaient `res.ok ? … : []` puis
+// estampillaient le cache : un 522 devenait donc une mesure « rien », gardée
+// 5 minutes (60 s pour l'autre). Deux conséquences réelles, et opposées :
+//   · liste noire lue vide → un compte SUPPRIMÉ définitivement se fait
+//     re-capter (« shop_cancale revenait tout le temps ») ;
+//   · contre-ordre lu vide → un compte qu'il vient de RÉAUTORISER est traité
+//     comme encore supprimé : **sa ligne est effacée**, ses jetons partent, et
+//     il doit repasser sur Vinted. C'est « l'extension ne veut pas renvoyer mes
+//     nouveaux comptes », déclenché par 60 secondes de lecture ratée.
+// ⇒ `null` = « pas su ». On ne met pas en cache un échec, on garde la dernière
+//   valeur connue, et l'appelant n'efface RIEN tant qu'il ne sait pas.
 let _blockedAccts = null, _blockedAt = 0, _blockedNames = {};
 async function blockedAccounts() {
   if (_blockedAccts && Date.now() - _blockedAt < 300000) return _blockedAccts;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: await sbHeaders() });
-    const rows = res.ok ? await res.json() : [];
+    if (!res.ok) return _blockedAccts;                  // pas su : on garde ce qu'on avait (souvent `null`)
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return _blockedAccts;     // 522 : du HTML, pas du JSON
     const d = (rows[0] && rows[0].data) || {};
     const uids = (d.uids || []).map(String);
     _blockedAccts = new Set(uids);
@@ -241,7 +256,7 @@ async function blockedAccounts() {
     _blockedNames = {};
     uids.forEach((u, i) => { const n = (d.logins || [])[i]; if (n) _blockedNames[u] = String(n); });
     _blockedAt = Date.now();
-  } catch (_) { if (!_blockedAccts) _blockedAccts = new Set(); }
+  } catch (_) { return _blockedAccts; }                 // réseau coupé : pas su non plus
   return _blockedAccts;
 }
 
@@ -257,11 +272,13 @@ async function unblockedAccounts() {
   if (_unblockAccts && Date.now() - _unblockAt < 60000) return _unblockAccts;
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: await sbHeaders() });
-    const rows = res.ok ? await res.json() : [];
+    if (!res.ok) return _unblockAccts;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return _unblockAccts;
     const map = (rows[0] && rows[0].data) || {};
     _unblockAccts = new Set(Object.keys(map).filter(k => map[k] === false).map(String));
     _unblockAt = Date.now();
-  } catch (_) { if (!_unblockAccts) _unblockAccts = new Set(); }
+  } catch (_) { return _unblockAccts; }
   return _unblockAccts;
 }
 // Vide les deux caches : sans ça, réautoriser un compte ne prenait effet
@@ -297,7 +314,13 @@ async function captureDomain(domain) {
   // ⚠️ SAUF s'il a été RÉAUTORISÉ explicitement (tri-état ci-dessus) : sinon la
   // suppression est un aller sans retour, et rebrancher un compte devient
   // impossible depuis Chrome — silencieusement.
-  if ((await blockedAccounts()).has(uid) && !(await unblockedAccounts()).has(uid)) {
+  // ⚠️ ON N'EFFACE QUE SI ON SAIT. `null` veut dire « je n'ai pas pu lire » :
+  //    agir dessus reviendrait à supprimer les jetons d'un compte vivant sur
+  //    une simple coupure. Dans le doute, on ne touche à rien — le compte sera
+  //    re-capté une fois de trop au pire, ce qui se répare d'un clic.
+  const _noirs = await blockedAccounts();
+  const _rallumes = await unblockedAccounts();
+  if (_noirs && _rallumes && _noirs.has(uid) && !_rallumes.has(uid)) {
     try { await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, { method: 'DELETE', headers: await sbHeaders() }); } catch (_) {}
     await noterRefus(uid, domain, 'supprime');
     logActivity(`⛔ Compte ${uid} ignoré (supprimé définitivement) — réautorise-le dans « Mes comptes »`);
@@ -3690,7 +3713,9 @@ async function buildPanelData() {
     ...(Array.isArray(d.vinted_accounts_hidden) ? d.vinted_accounts_hidden : []),
     ...(Array.isArray(d.vinted_accounts_blocked) ? d.vinted_accounts_blocked : []),
   ].map(String));
-  let blockedAcc = new Set(); try { blockedAcc = await blockedAccounts(); } catch (_) {}
+  // Pour l'AFFICHAGE, « pas su » retombe sur une liste vide : ça ne supprime
+  // rien, ça montre juste le compte comme non bloqué le temps d'une lecture.
+  let blockedAcc = new Set(); try { blockedAcc = (await blockedAccounts()) || new Set(); } catch (_) {}
   const offRows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
   const offMap = (offRows && offRows[0] && offRows[0].data) || {};
   const offPanel = new Set(Object.keys(offMap).filter(k => offMap[k] === true));
