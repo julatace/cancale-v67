@@ -114,6 +114,37 @@ if (carte) {
   }
 }
 
+// ⚠️⚠️ UN BANC QUI SERT UN CHEMIN ABSOLU NE PEUT PAS ÉCHOUER.
+// La méthode de preuve du dossier (§6.1) extrait le code d'AVANT dans /tmp/avN,
+// y copie le banc et le lance DEPUIS cet arbre — précisément pour que
+// `__dirname/..` ne relise pas le dépôt courant. Les quatorze bancs de rendu
+// écrivaient pourtant `const DIST='/home/user/cancale-v67/dist'` : lancés depuis
+// /tmp/avN ils servaient le build COURANT, donc le CORRECTIF, et sortaient VERT
+// sur le code qu'ils devaient condamner. Mesuré le 12 septembre : `panne.cjs`
+// annonçait 118 contrôles verts sur un arbre dont l'App.jsx ne contenait même
+// pas le mot « Restart ». C'est exactement le défaut d'`audit-coherence.cjs`
+// (il imprimait des ❌ et sortait en 0) : un contrôle qui ne peut pas échouer
+// est pire qu'absent — il rassure.
+// La règle porte sur la RÈGLE, pas sur l'orthographe : est fautif tout chemin
+// servi au navigateur qui commence par « / » sans passer par __dirname.
+{
+  const bancs = fs.readdirSync(DIR).filter(f => f.endsWith('.cjs'));
+  const fautifs = [];
+  for (const f of bancs) {
+    const src = fs.readFileSync(path.join(DIR, f), 'utf8')
+      .split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+    const m = /const\s+DIST\s*=\s*([^,;]+)/.exec(src);
+    if (!m) continue;                          // ce banc ne sert pas de dist
+    const expr = m[1];
+    if (/^['"`]\//.test(expr.trim())) fautifs.push(f + ' → ' + expr.trim());
+  }
+  dit(fautifs.length === 0,
+    'aucun banc ne sert un dist en chemin ABSOLU',
+    fautifs.length
+      ? 'lancé depuis /tmp/avN il servirait le build courant, donc le correctif → vert sur le code d\'avant : ' + fautifs.join(' · ')
+      : `${bancs.length} bancs, dist déduit de leur emplacement`);
+}
+
 console.log(ko
   ? `\n${ko} contrôle(s) non conforme(s).`
   : '\nLes bancs survivent à la session, et sans emporter ses données.');

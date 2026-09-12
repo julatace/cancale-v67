@@ -23,7 +23,14 @@
 // temps.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const fs=require('fs'), http=require('http'), path=require('path');
-const DIST='/home/user/cancale-v67/dist', SC=__dirname;
+// ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
+// extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
+// cet arbre. Avec '/home/user/cancale-v67/dist' écrit en dur, le banc servait
+// le build COURANT : il mesurait le correctif en croyant mesurer le code
+// d'avant, et sortait VERT sur le défaut. Un banc qui ne peut pas échouer est
+// pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
+// toujours en 0). Le dist se déduit de l'emplacement DU BANC.
+const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
 const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')];
@@ -112,8 +119,13 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     // Ce que l'app a laissé sur l'appareil : c'est là que vit la date de début
     // de panne, et donc là qu'on vérifie qu'elle est bien EFFACÉE au retour.
     const marque=await pg.evaluate(()=>{try{return localStorage.getItem('vrm_base_ko_depuis');}catch(_){return 'illisible';}});
+    // Les LIENS, pas seulement le texte : un geste qui se clique ne se voit pas
+    // dans innerText. C'est la cible qui compte (§6.5 : on juge la donnée, pas
+    // la formulation) — un lien « Ouvrir mon projet » qui pointe ailleurs serait
+    // vert sur un contrôle posé sur le libellé.
+    const liens=await pg.evaluate(()=>Array.from(document.querySelectorAll('a[href]')).map(a=>a.getAttribute('href')));
     await ctx.close();
-    return {txt, errs, marque};
+    return {txt, errs, marque, liens};
   };
 
   // ⚠️⚠️ LES 15 ÉCRANS JOIGNABLES, PAS QUATRE. Premier jet de ce banc :
@@ -157,11 +169,28 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
   //      muette. Le contrôle porte sur la DURÉE servie, pas sur la tournure.
   console.log('\n── ET QUAND ÇA DURE (3 jours)');
   {
-    const {txt}=await rendre(true,'journee',3);
+    const {txt,liens}=await rendre(true,'journee',3);
     dit(/3 jours/.test(txt), 'panne longue : elle dit depuis COMBIEN de temps', 'sinon « en ce moment » au 3ᵉ jour');
     dit(!/revient tout seul/i.test(txt), 'panne longue : elle ne promet plus que ça revient tout seul',
       /revient tout seul/i.test(txt)?"elle lui dit d'attendre":'');
     dit(/supabase\.com/i.test(txt), 'panne longue : et elle dit OÙ aller', 'une alerte sans geste ne sert à rien');
+    // ⚠️⚠️ MESURÉ LE 12 SEPTEMBRE, 4ᵉ JOUR : son projet n'est PAS en pause (le
+    //      bord répond, seule la base expire — 522 / 544 DatabaseTimeout), donc
+    //      il n'y a AUCUN bouton Restore sur sa page. L'app l'y envoyait quand
+    //      même. Le geste réel est « Restart project ». On exige les DEUX cas.
+    dit(/Restart/i.test(txt), 'panne longue : elle nomme aussi Restart project',
+        'un projet bloqué mais PAS en pause n\'a pas de bouton Restore — l\'y envoyer, c\'est l\'envoyer nulle part');
+    dit(/Restore/i.test(txt), 'panne longue : et elle garde le cas du projet en pause',
+        'les deux cas existent, et ce n\'est pas le même bouton');
+    // Repayer l'abonnement ne redémarre rien : il l'a fait, rien n'est revenu.
+    dit(/abonnement/i.test(txt), 'panne longue : elle dit que repayer ne suffit pas',
+        'sinon il paie et attend un retour que le paiement ne déclenche pas');
+    // Le lien doit viser SON projet, pas la page d'accueil de supabase.com.
+    const vise=liens.filter(h=>/supabase\.com\/dashboard\/project\/[a-z0-9]+/.test(h||''));
+    dit(vise.length>=1, 'panne longue : un lien direct vers SON projet ('+(vise[0]||'aucun')+')',
+        'se connecter puis chercher le bon projet, c\'est quatre pas de plus quand il est déjà bloqué');
+    dit(vise.some(h=>/settings\/general/.test(h)), 'panne longue : et un lien direct vers le bouton Restart',
+        'le bouton est tout en bas d\'un écran de réglages — il ne le trouvera pas sans lien');
     dit(/Rien n'est perdu/i.test(txt), 'panne longue : elle rassure toujours sur ses données');
   }
 
