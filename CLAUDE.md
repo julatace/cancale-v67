@@ -680,6 +680,13 @@ pire.*
   commentaire dans le code.
 - Le banc `panne.cjs` sert une panne **datée de 3 jours** et exige les trois
   points. **3 échecs** sur le code d'avant.
+- ⚠️ **ET LE RETOUR COMPTE AUTANT QUE LA PANNE.** La marque vit sur l'appareil :
+  si elle n'est pas **effacée** quand la base répond de nouveau, la prochaine
+  coupure de deux minutes afficherait « depuis 5 jours » et enverrait ouvrir
+  supabase.com pour un problème qui n'existe plus. Une alerte **périmée** fait
+  cesser de lire les vraies, exactement comme une fausse alerte. Le banc rend
+  donc l'app **base debout AVEC une marque de 5 jours** et exige que la marque
+  soit partie — rouge dès qu'on retire le nettoyage (prouvé).
 
 ### Factures : un pipeline MORT, appelé toutes les 5 minutes
 Mesuré le 9 septembre. L'écran Factures appelait `fetchVintedInvoices` — un

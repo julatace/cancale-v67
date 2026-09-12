@@ -109,8 +109,11 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     await pg.waitForTimeout(5000);
     if(panne) await pg.screenshot({path:SC+'/z-panne-'+t+'.png',fullPage:true});
     const txt=await pg.evaluate(()=>document.body.innerText||'');
+    // Ce que l'app a laissé sur l'appareil : c'est là que vit la date de début
+    // de panne, et donc là qu'on vérifie qu'elle est bien EFFACÉE au retour.
+    const marque=await pg.evaluate(()=>{try{return localStorage.getItem('vrm_base_ko_depuis');}catch(_){return 'illisible';}});
     await ctx.close();
-    return {txt, errs};
+    return {txt, errs, marque};
   };
 
   // ⚠️⚠️ LES 15 ÉCRANS JOIGNABLES, PAS QUATRE. Premier jet de ce banc :
@@ -160,6 +163,22 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
       /revient tout seul/i.test(txt)?"elle lui dit d'attendre":'');
     dit(/supabase\.com/i.test(txt), 'panne longue : et elle dit OÙ aller', 'une alerte sans geste ne sert à rien');
     dit(/Rien n'est perdu/i.test(txt), 'panne longue : elle rassure toujours sur ses données');
+  }
+
+  // ⚠️⚠️ LE RETOUR. Le 12 septembre Julien reprend son abonnement Supabase :
+  //      la base va revenir, et l'appareil porte encore la date du premier
+  //      échec. Si elle n'est pas EFFACÉE, la prochaine coupure de deux minutes
+  //      afficherait « depuis 5 jours » — et surtout « ouvre supabase.com » pour un
+  //      problème qui n'existe plus. Une alerte périmée fait cesser de lire les
+  //      vraies, exactement comme une fausse alerte.
+  console.log('\n── LE RETOUR (la base répond de nouveau, la marque doit partir)');
+  {
+    const {txt,marque,errs}=await rendre(false,'journee',5);
+    dit(!AVEU.test(txt), 'retour : plus aucun bandeau de panne', AVEU.test(txt)?'elle crie encore alors que tout répond':'');
+    dit(!/depuis \d+ jour/.test(txt), 'retour : et plus aucun « depuis N jours »');
+    dit(marque===null, "retour : la date de début de panne est effacée de l'appareil",
+      marque===null?'':'il reste « '+marque+" » → la prochaine coupure d'une minute dirait « depuis 5 jours »");
+    dit(errs.length===0, 'retour : aucune erreur', errs.slice(0,2).join(' | '));
   }
 
   console.log('\n── EN MARCHE NORMALE (l\'autre sens : pas de fausse alerte)');
