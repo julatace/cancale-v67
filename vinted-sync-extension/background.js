@@ -4638,6 +4638,17 @@ function adRefKeys(ad) {
   return keys;
 }
 
+// ── LE CHOIX DE JULIEN, ANNONCE PAR ANNONCE ─────────────────────────────────
+// L'app est PROPRIÉTAIRE de `vinted_annonce_numeros[id].mp` (§11) ; ici on ne
+// fait que LIRE. `undefined` = jamais touché → défaut ; `false` = retiré exprès.
+// ⚠️ Le défaut de Leboncoin est OUI : c'est le comportement d'avant la
+//    sélection, personne ne perd sa file du jour au lendemain.
+const MP_DEFAUT = { lbc: true };
+function mpChoisi(e, place) {
+  const v = e && e.mp ? e.mp[place] : undefined;
+  return (v === undefined || v === null) ? !!MP_DEFAUT[place] : !!v;
+}
+
 async function buildLbcData() {
   const mainRows = await sbGet('app_data?id=eq.main&select=data');
   const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
@@ -4708,6 +4719,7 @@ async function buildLbcData() {
   for (const o of online) {
     const e = numeros[o.id]; const num = e && e.numero;
     if (!num || String(num).trim() === '') continue;          // seulement les annonces numérotées
+    if (!mpChoisi(e, 'lbc')) continue;                          // retirée de la file par Julien (écran Annonces)
     if (posted.has(o.id) || posted.has(String(num))) continue;  // déjà publiée (marquée à la main)
     // Déjà en ligne sur Leboncoin d'après la capture ? -> pas dans la file.
     let hit = null;

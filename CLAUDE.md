@@ -754,6 +754,46 @@ l'app n'a plus à le réclamer — la raison reste dans l'infobulle.
 - C'est la même famille que le panneau de sécurité : **une fausse alerte est ce
   qui fait cesser de lire les vraies.**
 
+### « Les annonces que l'on sélectionne » — le cross-posting part d'un CHOIX
+Demande de Julien, 11 septembre : « lorsqu'une annonce est publiée sur n'importe
+quel compte associé à VRM, je veux que ça publie les annonces que l'on
+**sélectionne** sur Leboncoin, eBay, etc. »
+Mesuré avant de coder : le « peu importe le compte » **était déjà vrai**
+(`buildLbcData` balaie `harvest_*_listings`, tous comptes confondus). Ce qui
+manquait, c'est le **choix** : la file prenait TOUTE annonce numérotée en ligne.
+- Le choix vit dans `vinted_annonce_numeros[id].mp` — **la même ligne** que le
+  numéro, le prix d'achat et le prix plancher. L'app en est propriétaire,
+  l'extension le LIT (§11, exactement comme `minPrice`).
+- ⚠️ **`undefined` (jamais touché) ≠ `false` (retiré exprès)**, et le défaut de
+  Leboncoin vaut **oui** : passer d'un coup à « rien n'est sélectionné » aurait
+  vidé sa file du jour au lendemain. *Une nouveauté ne doit pas éteindre ce qui
+  marchait.*
+- ⚠️ `updatePair` **effaçait l'entrée** quand numéro et prix d'achat étaient
+  vides : cocher une annonce sans numéro perdait le choix à la ligne suivante.
+  `mp` compte maintenant comme une valeur.
+- ⚠️ §7 : « Aussi sur » écrit sur 44 cartes est UNE phrase. Elle vit **au-dessus
+  de la grille** (avec le compte, calculé dans `annStats` — même base que la
+  grille, §11) ; sur la carte il ne reste que la **puce**, dont l'état change
+  d'une carte à l'autre — c'est elle qui distingue, pas le libellé.
+- ⚠️ **Une annonce retirée ne disparaît pas en silence** : l'écran Leboncoin dit
+  combien et où ça se règle, et « Tout est publié 🎉 » ne s'affiche plus quand
+  la file est vide **parce que tout a été décoché** (deux causes, deux phrases).
+- ⚠️⚠️ **C'EST L'EXTENSION QUI FILTRE** : une version antérieure à la **5.54**
+  enregistre bien le choix mais prépare TOUTES les annonces. D'où
+  `EXT_CAPACITES.places = '5.54.0'` — sans quoi l'app promettrait « la puce
+  décide » à une extension qui ne sait pas le faire, pour la **quatrième** fois.
+  `audit-coherence.cjs` l'a d'ailleurs attrapé tout seul : j'avais déclaré la
+  capacité sans l'inscrire dans `FONCTIONS`, il est sorti rouge.
+- `scripts/audit-places.cjs` exécute le VRAI `buildLbcData()` dans un `vm` sur
+  trois annonces de **deux comptes** : choisie → dans la file · retirée → pas
+  dans la file · jamais touchée → dans la file. Il vérifie aussi que **l'app et
+  l'extension appliquent la même règle** (elles calculent la file chacune de leur
+  côté — le panneau tourne sur leboncoin.fr, où l'app n'est pas chargée).
+  **6 échecs** sur le code d'avant.
+- **eBay et les autres restent à faire** : la sélection est déjà multi-place
+  (`MP_PLACES`), mais tant qu'aucun assistant eBay n'existe, **aucune puce eBay
+  n'est affichée** — un bouton qui ne mène à rien serait la même promesse vide.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -765,6 +805,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `codes` | `capterRetraits` | **5.45.0** (27 août) | « l'extension va chercher les codes toute seule » |
 | `offres` | `autoAccepterOffres` | **5.38.0** (26 août) | « offre acceptée automatiquement au-dessus de ton plancher » |
 | `releve` | `capterReleves` | **5.52.0** (5 sept.) | « l'extension récupère le relevé à ta prochaine visite » |
+| `places` | `mpChoisi` | **5.54.0** (11 sept.) | « seules les annonces cochées partent sur Leboncoin » |
 
 `extSait(quoi)` rend **trois états** — `absente` (téléphone, autre navigateur) ·
 `retard` · `ok` — et **jamais deux**. Une extension **muette** sur sa version est
@@ -844,7 +885,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **28 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **29 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -1096,7 +1137,7 @@ prouve rien.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 28 audits
+scripts/audit-*.cjs             les 29 audits
 scripts/bancs/                  les 15 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
