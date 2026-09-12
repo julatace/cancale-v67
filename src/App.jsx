@@ -35,7 +35,34 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.53.0';
+const EXT_ATTENDUE = '5.54.0';
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
+// ══════════════════════════════════════════════════════════════════════════════
+// Demande de Julien (11 septembre) : « lorsqu'une annonce est publiée sur
+// n'importe quel compte associé à VRM, je veux que ça publie les annonces que
+// l'on SÉLECTIONNE sur Leboncoin, eBay, etc. »
+// La file Leboncoin prenait jusqu'ici TOUTE annonce numérotée en ligne, sur
+// tous les comptes — le « peu importe le compte » était déjà vrai, le CHOIX
+// manquait. Il vit maintenant dans `vinted_annonce_numeros[id].mp`, c'est-à-dire
+// la MÊME ligne que le numéro, le prix d'achat et le prix plancher : l'app en
+// est PROPRIÉTAIRE, l'extension le LIT (§11, comme `minPrice`).
+//
+// ⚠️ UNE ANNONCE SANS CHOIX SUIT LE DÉFAUT, ET LE DÉFAUT DE LEBONCOIN EST OUI.
+//    Passer d'un coup à « rien n'est sélectionné » aurait vidé sa file du jour
+//    au lendemain, sans qu'il ait rien demandé : une nouveauté ne doit pas
+//    éteindre ce qui marchait.
+const MP_PLACES = [
+  { cle: 'lbc', nom: 'Leboncoin', defaut: true, pret: true },
+];
+const MP_DEFAUT = MP_PLACES.reduce((a, p) => (a[p.cle] = p.defaut, a), {});
+// `undefined` (jamais touché) ≠ `false` (retiré exprès) : le premier suit le
+// défaut, le second est un choix. Le même piège que partout ailleurs.
+const mpChoisi = (e, place) => {
+  const v = e && e.mp ? e.mp[place] : undefined;
+  return (v === undefined || v === null) ? !!MP_DEFAUT[place] : !!v;
+};
 // Compare deux numéros de version (« 5.9.0 » < « 5.52.0 » — une comparaison de
 // chaînes dirait l'inverse).
 const cmpVersion = (a, b) => {
@@ -67,7 +94,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -12148,7 +12175,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const next = { ...c, ...patch, title:item.title, photo:item.photo||null, photoK: photoKey(item.photo) || c.photoK || null, price:item.price??null, size:item.size ?? c.size ?? null, accountId:item._acc?.vinted_user_id };
       const emptyNum = !String(next.numero||'').trim();
       const emptyBuy = next.buyPrice==null || String(next.buyPrice).trim()==='';
-      if (emptyNum && emptyBuy) delete u[item.id]; else u[item.id] = next;
+      // ⚠️ `mp` compte comme une valeur : sans ça, cocher « aussi sur Leboncoin »
+      //    sur une annonce sans numéro ni prix d'achat effaçait l'entrée entière
+      //    — donc le choix — à la ligne suivante, sans un mot.
+      const emptyMp = !next.mp || Object.keys(next.mp).length === 0;
+      if (emptyNum && emptyBuy && emptyMp) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
     // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
@@ -12159,6 +12190,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (buy != null && String(buy).trim() !== '') setBuyByNum(prev => { const u = { ...prev, [num]: String(buy) }; save('vinted_buyprice_by_num', u); return u; });
       else if ('buyPrice' in patch) setBuyByNum(prev => { if (prev[num] == null) return prev; const u = { ...prev }; delete u[num]; save('vinted_buyprice_by_num', u); return u; });
     }
+  };
+  // Cocher/décocher d'un coup — sur la base AFFICHÉE (`annBase`), jamais sur
+  // tout ce qui traîne en base : le bouton fait ce que l'écran montre.
+  // ⚠️ Une seule écriture pour les 54, pas 54 : `setNumeros` une fois.
+  const setMpToutes = (place, on) => {
+    setNumeros(prev => {
+      const u = { ...prev }; let n = 0;
+      for (const it of annBase) {
+        const c = u[it.id]; if (!c || !String(c.numero || '').trim()) continue;  // sans N°, rien à envoyer
+        if (mpChoisi(c, place) === on) continue;
+        u[it.id] = { ...c, mp: { ...(c.mp || {}), [place]: on } }; n++;
+      }
+      if (!n) return prev;
+      save('vinted_annonce_numeros', u);
+      toast(on ? `${n} annonce${n>1?'s':''} ajoutée${n>1?'s':''} à la file Leboncoin` : `${n} annonce${n>1?'s':''} retirée${n>1?'s':''} de Leboncoin`);
+      return u;
+    });
   };
   const recordUsed = (num) => { const n=parseInt(String(num),10); if(isNaN(n)||n<=0) return; setUsedNumeros(prev=>{ if(prev.includes(n))return prev; const u=[...prev,n]; save('vinted_used_numeros',u); return u; }); };
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
@@ -13722,7 +13770,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // est affiché en dessous. Avant, il partait de listings.items (TOUS les
     // comptes, même déconnectés) → « 42 en ligne » avec 30 cartes visibles.
     const arr = annBase;
-    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, planchers=0;
+    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, planchers=0, surLbc=0;
     for (const it of arr) {
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
@@ -13734,9 +13782,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    bandeau qui l'annonce. Sinon les deux finissent par se contredire.
       const mp = numeros[it.id] && numeros[it.id].minPrice;
       if (mp != null && String(mp).trim() !== '') planchers++;
+      // Combien partent aussi sur Leboncoin — compté ICI, sur la même base que
+      // la grille, jamais recalculé par le bandeau qui l'annonce (§11).
+      if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'lbc')) surLbc++;
       const age = listedAgeDays(it); if (age!=null) datesKnown++; if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
@@ -18803,6 +18854,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ~284 px sur ordinateur, et **2 colonnes inchangées sur téléphone**
             (25 % de 362 px = 90 px, ramené au plancher de 160). Une seule règle,
             aucun test de largeur en JavaScript (§5.62). */}
+        {/* ── OÙ VONT TES ANNONCES, EN PLUS DE VINTED ─────────────────────
+            La phrase se dit UNE fois ici ; sur chaque carte il n'y a que la
+            puce (§7). Elle DIT COMBIEN, sur la même base que la grille
+            (`annStats`, §11) — un chiffre qu'il peut vérifier en comptant
+            les puces bleues. Deux boutons pour ne pas avoir à cliquer 54
+            fois : c'est la seule raison pour laquelle ils existent. */}
+        {annStats.n > 0 && (
+          <div style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 260px',minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.text}}>
+                  {annStats.surLbc} annonce{annStats.surLbc>1?'s':''} sur {annStats.n} part{annStats.surLbc>1?'ent':''} aussi sur Leboncoin
+                </div>
+                {/* ⚠️ `EXT_CAPACITES.places` — C'EST L'EXTENSION QUI FILTRE LA
+                    FILE. Une version antérieure à la 5.54 enregistre bien le
+                    choix (il vit en base) mais prépare TOUTES les annonces
+                    quand même. Promettre « la puce décide » à cette
+                    extension-là, c'est le défaut le plus coûteux du projet
+                    refait une quatrième fois. Trois états, jamais deux. */}
+                <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{
+                  extSait('places')==='ok'
+                    ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune sur leboncoin.fr — photos téléchargées, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>.</>
+                  : extSait('places')==='absente'
+                    ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce sur leboncoin.fr — ouvre l'app sur l'ordinateur où elle est installée.</>
+                    : <>Ton choix est enregistré, <b>mais l'extension installée prépare encore toutes tes annonces</b> : elle ne sait filtrer que depuis la <b>5.54</b>. Mets-la à jour depuis <b>Réglages</b> — tes coches ne bougent pas.</>
+                }</div>
+              </div>
+              <div style={{display:'flex',gap:6,flexShrink:0}}>
+                <button type="button" onClick={()=>setMpToutes('lbc', true)}
+                  style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout cocher</button>
+                <button type="button" onClick={()=>setMpToutes('lbc', false)}
+                  style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout décocher</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(clamp(160px, 25%, 240px), 1fr))',gap:14}}>
           {annShown.map(it=>{
             const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };
@@ -18874,6 +18961,37 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     « quand l'annonce est en ligne, pouvoir relier un achat avec la
                     photo de l'achat ainsi que sa facture d'achat ». */}
                 <div style={{padding:'0 10px'}}><AchatRelie entry={e} numero={num}/></div>
+                {/* ── AUSSI SUR ─────────────────────────────────────────────
+                    Le choix de Julien, annonce par annonce. Une seule ligne,
+                    des puces qui se lisent d'un coup d'œil : c'est ce qu'il
+                    regarde en passant sur sa grille, pas un formulaire.
+                    ⚠️ Sans numéro, l'annonce ne peut pas partir ailleurs (la
+                    référence « VRM-{n} » est ce qui permet de la reconnaître
+                    ensuite sur l'autre site) : on le DIT, au lieu de laisser
+                    cocher pour rien. */}
+                {/* ⚠️ §7 — « Aussi sur » écrit sur 44 cartes est UNE phrase.
+                    Elle vit au-dessus de la grille ; ici il ne reste que la
+                    PUCE, dont l'état change d'une carte à l'autre — c'est elle
+                    qui distingue, pas le libellé. */}
+                <div style={{padding:'6px 10px 0',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  {MP_PLACES.map(pl => {
+                    const on = mpChoisi(e, pl.cle);
+                    return (
+                      <button key={pl.cle} type="button"
+                        onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
+                        title={!num
+                          ? `Mets un N° à cette paire d'abord : c'est la référence qui permet de la retrouver ensuite sur ${pl.nom}.`
+                          : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
+                               : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
+                        style={{border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}14`:'transparent',
+                          color:on?C.accent:C.muted,borderRadius:8,padding:'2px 9px',fontSize:11,fontWeight:600,
+                          cursor:'pointer',fontFamily:'inherit',minHeight:0}}>
+                        {on ? '✓ ' : ''}{pl.nom}
+                      </button>
+                    );
+                  })}
+                  {!num && <span style={{fontSize:10.5,color:C.warn}}>il lui faut un N°</span>}
+                </div>
                 {/* ⚠️ LE PRIX MINIMUM ACCEPTÉ — demande de Julien : « pour chaque
                     annonce que je poste je mets un prix minimum que l'app accepte
                     dès que je reçois une offre ».
@@ -21114,10 +21232,16 @@ function LeboncoinScreen() {
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
     const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(String(e.numero).trim()); const m = numFrom(title || e.title); if (m) ks.push(m); return ks; };
 
-    const queue = []; let autoMatched = 0;
+    // ⚠️ CET ÉCRAN ET LE PANNEAU DE L'EXTENSION CALCULENT LA MÊME FILE, CHACUN
+    //    DE SON CÔTÉ (le panneau tourne sur leboncoin.fr, où l'app n'est pas
+    //    chargée). Ils doivent donc appliquer EXACTEMENT les mêmes règles, sinon
+    //    l'app annonce « 12 à publier » et le panneau en montre 8 —
+    //    `audit-places.cjs` vérifie que les deux filtres existent des deux côtés.
+    const queue = []; let autoMatched = 0; let retirees = 0;
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       if (!num || String(num).trim() === '') continue;
+      if (!mpChoisi(e, 'lbc')) { retirees++; continue; }             // retirée de la file par Julien
       if (lost[String(num).trim()]) continue;                        // paire retirée du stock
       if (posted.has(o.id) || posted.has(String(num))) continue;
       if (vKeys(o.id, o.title).some(k => refToAd.has(k))) { autoMatched++; continue; } // déjà sur LBC
@@ -21143,7 +21267,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ echecLecture: echecLecture || listRowsBrut === null, queue, removals, unlinked, liveAds, autoMatched, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    setData({ echecLecture: echecLecture || listRowsBrut === null, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -21247,12 +21371,25 @@ function LeboncoinScreen() {
         {/* À publier */}
         <Card>
           <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 6 }}>🟠 {data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
+          {/* ⚠️ UNE ANNONCE QUE TU AS RETIRÉE NE DISPARAÎT PAS EN SILENCE.
+              Sans cette ligne, désélectionner faisait fondre la file sans que
+              rien ne dise pourquoi — et « 0 à publier » se serait lu « tout est
+              fait ». On dit combien, et où c'est réglé. */}
+          {data.retirees > 0 && (
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
+              {data.retirees} annonce{data.retirees > 1 ? 's' : ''} en ligne {data.retirees > 1 ? 'ne sont' : "n'est"} pas dans cette file : tu {data.retirees > 1 ? 'les' : "l'"}as retirée{data.retirees > 1 ? 's' : ''} de Leboncoin. Ça se règle annonce par annonce sur l'écran <b>Annonces</b> (la puce « Aussi sur »).
+            </div>
+          )}
           {/* ⚠️ « Tout est publié 🎉 » se disait aussi quand la file était vide
               parce que la base n'avait pas répondu — une fête sur une lecture
               ratée. Le 🎉 ne sort que si on a pu REGARDER. */}
           {data.queue.length === 0 ? (data.echecLecture
             ? <LignePanne>Je n'ai pas pu lire tes annonces Vinted — cette file est vide parce que la lecture a échoué, pas parce qu'il ne reste rien à publier.</LignePanne>
-            : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div>) : (<>
+            : data.retirees > 0 && data.autoMatched === 0
+              // ⚠️ « Tout est publié 🎉 » serait faux : rien n'est publié, tout
+              //    a été retiré de la file. Deux causes, deux phrases.
+              ? <div style={{ fontSize: 12, color: C.muted }}>Rien dans la file — tu as retiré de Leboncoin toutes tes annonces en ligne.</div>
+              : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div>) : (<>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Paires numérotées en ligne sur Vinted, pas encore sur Leboncoin. Ouvre Leboncoin avec l'extension pour les publier.</div>
             {data.queue.slice(0, 60).map((q, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{q.numero}</b> · {q.title || '—'}</div>)}
             {data.queue.length > 60 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {data.queue.length - 60} autres…</div>}
