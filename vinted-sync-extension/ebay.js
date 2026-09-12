@@ -125,10 +125,18 @@
       return true;
     } catch (_) { return false; }
   }
+  // ⚠️ MESURÉ SUR LA VRAIE PAGE (12 septembre, `curl https://www.ebay.fr/sl/sell`) :
+  //    la barre de recherche du haut est un `<input name="_nkw" id="gh-ac">`
+  //    présent sur TOUTES les pages d'eBay, dans l'en-tête `#gh`. Un champ vide
+  //    et bien visible : exactement ce que mon remplissage aurait pu viser. On
+  //    écarte donc tout ce qui vit dans l'en-tête, la recherche ou un pied de
+  //    page — le formulaire de mise en vente, lui, n'y est jamais.
+  const DANS_ENTETE = (el) => !!el.closest('#gh, header, footer, [role="search"], [role="banner"], [role="navigation"], nav');
   function champ(patterns) {
     const els = Array.from(document.querySelectorAll('input, textarea'));
     for (const p of patterns) for (const el of els) {
       if (el.type === 'hidden' || el.disabled) continue;
+      if (DANS_ENTETE(el)) continue;
       const lab = (el.labels && el.labels[0] && el.labels[0].innerText) || '';
       const hay = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '') + ' ' + lab).toLowerCase();
       if (p.test(hay)) return el;
