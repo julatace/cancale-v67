@@ -954,6 +954,34 @@ mesurés :
    Vinted), et la carte le dit en **une ligne** — « 1 seule photo · pas de
    description » — pas deux alertes pour une cause (§7).
 
+7. ⚠️⚠️ **LE PANNEAU DISAIT « (dont la réf VRM-401) » À CHAQUE FOIS — Y COMPRIS
+   QUAND LA RÉFÉRENCE N'ÉTAIT PAS MISE.** Mesuré sur la structure que SON
+   navigateur a rapportée de la vraie page de dépôt (`lbc_recon`, 2 août) :
+   cette page ne porte **qu'UN seul champ** — `name="subject"`, « Que
+   proposez-vous aujourd'hui ? ». Le dépôt Leboncoin est un formulaire **en
+   étapes** : ni description, ni prix, ni référence n'existent à cette étape. La
+   référence n'était donc **jamais** remplie, et le message affirmait le
+   contraire à chaque clic. Ce n'est pas un détail : `VRM-{n°}` est ce qui relie
+   l'annonce Leboncoin à la paire **sans rapprochement par titre** (§5) — sans
+   elle, « vendue sur Vinted → à retirer » ne reconnaît plus l'annonce, et il
+   vend la même paire deux fois. ⇒ Le message **nomme ce qui a été rempli**, dit
+   quand la référence n'a pas pu l'être, et rappelle qu'elle est **dans la
+   description** (`buildLbcAd` l'y met en haut et en bas). *Le chiffre, jamais
+   la promesse.* **2 échecs** sur le code d'avant.
+   (Au passage : son compte Leboncoin est **professionnel** — `type: business` —
+   donc le champ Référence existe bien, à une étape ultérieure.)
+8. ⚠️ **ET LE PRIX DE SA PAIRE ATTERRISSAIT DANS UN FILTRE DE RECHERCHE.** Le
+   panneau tourne sur **toutes** les pages de Leboncoin ; une page de résultats
+   porte « Prix min » / « Prix max », qui collent parfaitement à
+   `/prix|price|montant/`. Prouvé au banc sur le code d'avant :
+   **`price_min = 24.00`**. `PAS_UN_CHAMP_DE_DEPOT` les écarte **par ce qu'ils
+   sont**, pas par l'URL — borner sur l'adresse aurait cassé le pré-remplissage
+   aux étapes suivantes du dépôt, dont je ne connais pas les URL (*une nouveauté
+   ne doit pas éteindre ce qui marchait*). La garde d'en-tête d'`ebay.js`
+   manquait aussi ici ; elle est posée, mais **c'est une précaution, pas une
+   découverte** : avec les motifs actuels la barre de recherche n'était pas
+   atteignable.
+
 ⚠️⚠️ **ET `lbc.js` N'AVAIT JAMAIS TOURNÉ** — 480 lignes, le panneau qui SERT à
 publier. `node --check` ne lit que la syntaxe. `scripts/bancs/leboncoin.cjs` le
 charge dans une fausse page avec un faux `chrome.runtime` : **18 contrôles, 10

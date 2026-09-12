@@ -303,6 +303,14 @@
   // pas le savoir : la carte n'en disait rien.
   // On écrit le CHIFFRE et on donne la porte (même règle que le bandeau eBay :
   // ne pas écrire « ton annonce est prête », écrire combien).
+  // Le montant brut de Vinted est à l'anglaise (« 24.0 »). Deux décimales et une
+  // virgule — c'est déjà la règle sur l'écran Achats (§7).
+  // ⚠️ Seulement pour l'AFFICHAGE : la valeur injectée dans le formulaire reste
+  //    celle de Vinted, qu'un champ numérique sait lire.
+  function euro(v) {
+    const n = Number(String(v == null ? '' : v).replace(',', '.'));
+    return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : String(v || '') + ' €';
+  }
   function photosLigne(ad) {
     const n = (ad.photos || []).length;
     const sansDesc = ad.aDescription === false;
@@ -328,7 +336,7 @@
     return `<div class="card" data-id="${esc(ad.id)}">
       <div class="row"><span class="num">N°${esc(ad.numero)}</span><span class="cat">${esc(ad.category)}</span>${onPage ? '<span class="cat" style="background:#e6f6ec;color:#0a7f3f">déjà sur cette page ?</span>' : ''}<span class="acc">${esc(ad.account)}</span></div>
       <div class="tt">${esc(ad.title)}</div>
-      <div class="pr">${esc(ad.price)} €</div>
+      <div class="pr">${esc(euro(ad.price))}</div>
       ${ph ? `<div class="ph">${ph}</div>` : ''}
       ${photosLigne(ad)}
       <div class="desc">${esc(ad.description)}</div>
@@ -365,26 +373,67 @@
       return true;
     } catch (_) { return false; }
   }
+  // ⚠️ LA GARDE D'EN-TÊTE EXISTAIT DANS `ebay.js`, PAS ICI — sur le script le
+  //    plus utilisé des deux. Le panneau tourne sur TOUTES les pages de
+  //    Leboncoin : cliquer « Pré-remplir » depuis une page de résultats visait
+  //    la barre de recherche et annonçait « 1 champ pré-rempli » sur une page où
+  //    rien d'utile n'a été rempli. On écarte en-tête, pied de page, navigation
+  //    et recherche — et un champ caché ou désactivé.
+  const DANS_ENTETE = (el) => !!el.closest('header, footer, [role="search"], [role="banner"], [role="navigation"], nav, form[action*="recherche"]');
+  // ⚠️ ET UN CHAMP DE FILTRE N'EST PAS UN CHAMP DE DÉPÔT. Le panneau tourne sur
+  //    TOUTES les pages de Leboncoin : une page de résultats porte « Prix min »
+  //    et « Prix max », qui correspondent parfaitement à `/prix|price|montant/`.
+  //    Y écrire son prix ne remplit rien d'utile — et le panneau annoncerait
+  //    « 1 champ rempli ». On les écarte par ce qu'ils SONT, pas par l'URL :
+  //    borner sur l'adresse casserait le pré-remplissage aux étapes suivantes du
+  //    dépôt, dont je ne connais pas les URL (une nouveauté ne doit pas éteindre
+  //    ce qui marchait).
+  const PAS_UN_CHAMP_DE_DEPOT = /recherch|\bmin\b|\bmax\b|filtr|\btri\b|code.?postal|localisation|mot.?cl/i;
   function findField(patterns) {
     const els = Array.from(document.querySelectorAll('input, textarea'));
     for (const p of patterns) {
       for (const el of els) {
-        const hay = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '')).toLowerCase();
+        if (el.type === 'hidden' || el.disabled) continue;
+        if (DANS_ENTETE(el)) continue;
+        const lab = (el.labels && el.labels[0] && el.labels[0].innerText) || '';
+        const hay = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '') + ' ' + lab).toLowerCase();
+        if (PAS_UN_CHAMP_DE_DEPOT.test(hay)) continue;
         if (p.test(hay)) return el;
       }
     }
     return null;
   }
+  // ⚠️⚠️ LE PANNEAU ANNONÇAIT « (dont la réf VRM-401) » MÊME QUAND LA RÉFÉRENCE
+  // N'AVAIT PAS ÉTÉ MISE. Mesuré le 12 septembre sur la structure que SON
+  // navigateur a rapportée de la vraie page de dépôt (`lbc_recon`, 2 août) :
+  // cette page ne contient qu'UN SEUL champ — `name="subject"`, « Que
+  // proposez-vous aujourd'hui ? ». C'est un formulaire en ÉTAPES : ni la
+  // description, ni le prix, ni la référence n'y existent. La référence n'était
+  // donc JAMAIS remplie, et le message disait le contraire à chaque fois.
+  // Ce n'est pas un détail d'affichage : la référence `VRM-{n°}` est ce qui
+  // relie l'annonce Leboncoin à la paire SANS rapprochement par titre (§5). Sans
+  // elle, « vendue sur Vinted → à retirer de Leboncoin » ne peut pas la
+  // reconnaître — et il vend la même paire deux fois.
+  // ⇒ On dit CE QUI a été rempli, on nomme ce qui manque, et on rappelle que la
+  //   référence est dans la description copiée (`buildLbcAd` l'y met en haut et
+  //   en bas). Le chiffre, jamais la promesse — leçon du bandeau eBay.
   function prefill(ad) {
-    let n = 0;
-    if (setField(findField([/titre|title|subject/]), ad.title)) n++;
-    if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
-    if (setField(findField([/prix|price|montant/]), ad.price)) n++;
+    const ref = ad.ref || ('VRM-' + ad.numero);
+    const faits = [];
+    if (setField(findField([/titre|title|subject|proposez/]), ad.title)) faits.push('le titre');
+    if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) faits.push('la description');
+    if (setField(findField([/prix|price|montant/]), ad.price)) faits.push('le prix');
     // Champ RÉFÉRENCE des comptes PRO : on y met VRM-{N°} → pas besoin de le mettre
     // dans le titre, et tu peux rechercher la paire par ce numéro dans ton profil.
-    if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
-    if (n) toast(n + ' champ' + (n > 1 ? 's' : '') + ' pré-rempli' + (n > 1 ? 's' : '') + ' (dont la réf ' + (ad.ref || ('VRM-' + ad.numero)) + ') — vérifie la catégorie « ' + ad.category + ' » et les photos, puis publie.');
-    else { copy(ad.title + '\n\n' + ad.description); toast('Formulaire non détecté sur cette page — titre + description copiés.'); }
+    const refMise = setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ref);
+    if (refMise) faits.push('la référence ' + ref);
+    if (!faits.length) {
+      copy(ad.title + '\n\n' + ad.description);
+      toast('Aucun champ reconnu sur cette page — titre + description copiés (la réf ' + ref + ' est dedans). Le dépôt Leboncoin se fait en plusieurs étapes : reviens cliquer ici à l\'étape du titre.');
+      return;
+    }
+    const manque = refMise ? '' : ' La référence ' + ref + ' n\'a PAS pu être mise dans un champ : elle est dans la description (en haut et en bas) — garde-la, c\'est elle qui relie l\'annonce à ta paire.';
+    toast(faits.length + ' champ' + (faits.length > 1 ? 's' : '') + ' rempli' + (faits.length > 1 ? 's' : '') + ' : ' + faits.join(', ') + '.' + manque + ' Vérifie la catégorie « ' + ad.category + ' » et les photos, puis publie.');
   }
   // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
   // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
