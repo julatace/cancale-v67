@@ -938,6 +938,22 @@ mesurés :
 4. **Une catégorie devinée fausse** : « 3 manuels première ST2S » partait en
    « Chaussures ». Leçon eBay appliquée ici.
 
+5. ⚠️⚠️ **LE TEXTE PUBLICITAIRE DE VINTED PARTAIT COMME SA DESCRIPTION.** Mesuré
+   sur ses **92 descriptions captées** : **4** sont « *Une communauté, des
+   milliers de marques et de styles de seconde main. Prêt à te lancer ?
+   Découvre comment ça marche !* » — la page de Vinted, pas son texte — et
+   **une des quatre est en ligne**, donc elle partirait telle quelle sur
+   Leboncoin comme description de SON annonce. Une autre commençait par le
+   libellé « Description » collé au texte. `PAS_UNE_DESCRIPTION` les écarte **à
+   la publication** ; rien n'est supprimé en base (même principe
+   qu'`URL_PAS_UN_QR`). ⚠️ Et le banc vérifie **les deux sens** : une VRAIE
+   description doit être gardée entière — un filtre trop large viderait ses
+   annonces.
+6. **Seules 6 des 59 annonces en ligne ont une description**, et 54 n'ont qu'une
+   photo : **ce sont les mêmes**. Le geste est donc UN seul (ouvrir la page
+   Vinted), et la carte le dit en **une ligne** — « 1 seule photo · pas de
+   description » — pas deux alertes pour une cause (§7).
+
 ⚠️⚠️ **ET `lbc.js` N'AVAIT JAMAIS TOURNÉ** — 480 lignes, le panneau qui SERT à
 publier. `node --check` ne lit que la syntaxe. `scripts/bancs/leboncoin.cjs` le
 charge dans une fausse page avec un faux `chrome.runtime` : **18 contrôles, 10

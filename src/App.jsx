@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.55.4';
+const EXT_ATTENDUE = '5.55.5';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -69,6 +69,19 @@ const MP_PLACES = [
 // le même titre sur les mêmes entrées — pas seulement que la fonction existe.
 // Mesuré sur ses 59 annonces : 0 titre coupé en plein mot (6 avant), 0 au
 // plafond (7 avant), 58 améliorés.
+// ⚠️⚠️ COPIE EXACTE de `PAS_UNE_DESCRIPTION` / `lbcDescription` de background.js.
+// Mesuré : 4 des 92 descriptions captées sont le texte PUBLICITAIRE de Vinted
+// (« Une communauté, des milliers de marques… »), dont une EN LIGNE — elle
+// partirait telle quelle sur Leboncoin comme description de son annonce.
+// On écarte à la publication, on ne supprime rien en base.
+const PAS_UNE_DESCRIPTION = /communaut[ée].{0,80}seconde main|pr[êe]t [àa] te lancer|d[ée]couvre comment [çc]a marche|t[ée]l[ée]charge l.application/i;
+const lbcDescription = (brut) => {
+  let t = String(brut || '').trim();
+  if (!t) return '';
+  if (PAS_UNE_DESCRIPTION.test(t)) return '';
+  return t.replace(/^\s*Description\s*(?=\S)/, '').trim();
+};
+
 const LBC_TITRE_MAX = 50;
 const lbcTitre = (brand, base, size) => {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
@@ -21362,6 +21375,7 @@ function LeboncoinScreen() {
         title: lbcTitre(d.brand || o.brand, d.title || o.title, d.size || o.size),
         prix: o.price != null ? Number(o.price) : null,
         photos, vignette: o.photo || (Array.isArray(d.photos) ? d.photos[0] : ''),
+        desc: !!lbcDescription(d.description),
         url: 'https://www.vinted.fr/items/' + o.id,
       });
     }
@@ -21585,7 +21599,7 @@ function LeboncoinScreen() {
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
                     <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                      N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'} · {q.photos} photo{q.photos > 1 ? 's' : ''}
+                      N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'} · {q.photos} photo{q.photos > 1 ? 's' : ''}{q.desc ? '' : ' · pas de description'}
                       {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
                     </span>
                   </span>

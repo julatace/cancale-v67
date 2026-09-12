@@ -219,6 +219,39 @@ function ctxAvec(numeros) {
     }
   }
 
+  // ── LE TEXTE DE VINTED N'EST PAS SA DESCRIPTION ─────────────────────────────
+  // Mesuré le 12 septembre : sur ses 92 descriptions captées, 4 sont le texte
+  // PUBLICITAIRE de Vinted (« Une communauté, des milliers de marques et de
+  // styles de seconde main. Prêt à te lancer ? … »), et UNE de ces quatre est en
+  // ligne — elle partirait telle quelle sur Leboncoin comme description de SON
+  // annonce. Même principe qu'`URL_PAS_UN_QR` : on écarte ce qui n'est pas la
+  // chose. Le contrôle porte sur le RÉSULTAT de `buildLbcAd`, pas sur la regex.
+  {
+    const ctxD = ctxAvec({});
+    const PUB = 'Une communauté, des milliers de marques et de styles de seconde main. Prêt à te lancer ? Découvre comment ça marche !';
+    if (typeof ctxD.buildLbcAd !== 'function') {
+      dit(false, 'l\'extension sait fabriquer une annonce Leboncoin', '`buildLbcAd` introuvable');
+    } else {
+      const raw = { id: '9001', title: 'nike air max 1 taille 42', brand_title: 'Nike', size_title: '42', price: { amount: '45.0' }, photo: { url: 'https://ex/1.jpg' } };
+      const a1 = ctxD.buildLbcAd(raw, { description: PUB }, '601', 'julatace3535');
+      dit(!/communauté|Prêt à te lancer|comment ça marche/i.test(a1.description),
+        'le texte publicitaire de Vinted ne part JAMAIS comme description',
+        /communaut/i.test(a1.description) ? 'il partirait tel quel sur son annonce Leboncoin' : '');
+      dit(a1.aDescription === false, 'et l\'annonce sait qu\'elle n\'a PAS de description',
+        'sinon la carte ne peut pas le dire — « pas su » ne vaut pas « oui »');
+      // Le libellé « Description » collé au texte (1 cas mesuré).
+      const a2 = ctxD.buildLbcAd(raw, { description: 'Description👟nike air max 1\n\ntrès bon état' }, '602', 'x');
+      dit(!/^.{0,20}\bDescription👟/.test(a2.description.replace(/^📦[^\n]*\n+/, '')),
+        'le libellé « Description » collé au texte est retiré', a2.description.slice(0, 40).replace(/\n/g, ' '));
+      // ⚠️ ET UNE VRAIE DESCRIPTION NE DOIT PAS ÊTRE JETÉE : un filtre trop large
+      //    viderait ses annonces. C'est l'autre sens, et il compte autant.
+      const vraie = '👟nike dunk low sb low pro st patrick\n\ntaille 42,5\n\ntrès bon état voir photos';
+      const a3 = ctxD.buildLbcAd(raw, { description: vraie }, '603', 'x');
+      dit(/dunk low sb/.test(a3.description) && a3.aDescription === true,
+        'mais une VRAIE description est gardée entière', 'un filtre trop large viderait ses annonces');
+    }
+  }
+
   // ── « VENDUE » SE PROUVE PAR UNE TRANSACTION, PAS PAR UNE ABSENCE ───────────
   // Mesuré le 12 septembre : sur ses 400 annonces fermées, 151 seulement portent
   // une vente prouvée (`transaction → item_id`). Annoncer « vendue » pour les
