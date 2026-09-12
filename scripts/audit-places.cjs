@@ -150,6 +150,102 @@ function ctxAvec(numeros) {
   dit(/ebay: '5\.55\.0'/.test(APP), 'et la capacité `ebay` est déclarée avec sa version d\'arrivée');
   dit(/mpChoisi\(e, 'ebay'\)/.test(src), 'l\'extension lit le même choix pour eBay');
 
+  // ── LE TITRE LEBONCOIN : LES DEUX CÔTÉS DOIVENT RENDRE LE MÊME ──────────────
+  // ⚠️⚠️ L'app et l'extension calculent la file CHACUN DE SON CÔTÉ (le panneau
+  // tourne sur leboncoin.fr, où l'app n'est pas chargée). Jusqu'ici ce banc
+  // vérifiait seulement que les FILTRES existaient des deux côtés — pas que le
+  // résultat était le même. Or l'app montre maintenant le titre tel qu'il
+  // partira : si les deux règles divergent d'un caractère, elle lui montre un
+  // titre et l'extension en publie un autre. On compare donc les SORTIES, sur
+  // les cas réels mesurés chez lui le 12 septembre.
+  {
+    const cas = [
+      // [marque, titre Vinted, taille] — tirés de ses vraies annonces
+      ['Nike', 'nike shox tl noir et vert taille 36', '36'],
+      ['Nike', 'Chaussures style Nike air Jordan 1 bleu taille 40', '40'],
+      ['Philippe model', 'chaussures philippe model tropez fringe noir taille 36', '36'],
+      ['Timberland', 'chaussures bateau/ mocassins timberland marron taille 40,5', '40,5'],
+      ['Paraboot', 'chaussures de ville derby paraboot en cuir taille 43,5', '43,5'],
+      ['Nike', 'nike zoomX vaporfly next 4 bright crimson mint foam taille 44', '44'],
+      ['', 'basket sans marque', ''],
+      ['Autry', 'Autry medalist blanc taille 36', '36'],
+    ];
+    // Le VRAI `lbcTitre` de l'extension, déjà chargé dans le contexte vm.
+    const ctxT = ctxAvec({});
+    // Celui de l'app : on l'extrait du source et on l'exécute tel quel.
+    const m = /const lbcTitre = \(brand, base, size\) => \{[\s\S]*?\n\};/.exec(APP);
+    // ⚠️ UN AUDIT NE MEURT PAS ET NE SAUTE PAS SES CONTRÔLES. Premier jet : si
+    //    l'app n'avait pas la fonction, tout le bloc était sauté — donc on ne
+    //    savait même pas si l'EXTENSION l'avait. On juge les deux séparément,
+    //    puis leur égalité seulement quand les deux existent.
+    dit(typeof ctxT.lbcTitre === 'function', 'l\'extension a `lbcTitre`',
+      'sinon le titre publié reste l\'ancien, coupé en plein mot');
+    if (!m) {
+      dit(false, 'l\'app a sa propre règle de titre Leboncoin', '`lbcTitre` introuvable dans App.jsx — la liste ne peut pas montrer ce qui partira');
+      if (typeof ctxT.lbcTitre === 'function') {
+        dit(cas.every(([b, t, z]) => ctxT.lbcTitre(b, t, z).length <= 50), 'côté extension : aucun titre ne dépasse 50 caractères');
+      }
+    } else {
+      const lbcApp = new Function('"use strict"; const LBC_TITRE_MAX = 50; ' + m[0] + ' return lbcTitre;')();
+      let memes = 0; const divergents = [];
+      for (const [b, t, z] of cas) {
+        const a = lbcApp(b, t, z);
+        const e = ctxT.lbcTitre ? ctxT.lbcTitre(b, t, z) : null;
+        if (e !== null && a === e) memes++; else divergents.push(`« ${t.slice(0, 28)}… » app:« ${a} » ext:« ${e} »`);
+      }
+      dit(divergents.length === 0, `l'app et l'extension rendent le MÊME titre (${memes}/${cas.length})`,
+        divergents.length ? divergents[0] : '');
+      // Et les règles qui font la qualité, jugées sur le RÉSULTAT (pas sur
+      // l'orthographe de la fonction) : c'est la leçon des six audits d'avant.
+      for (const [b, t, z] of cas) {
+        const r2 = lbcApp(b, t, z);
+        if (r2.length > 50) { dit(false, 'aucun titre ne dépasse 50 caractères', `${r2.length} : « ${r2} »`); break; }
+      }
+      dit(cas.every(([b, t, z]) => lbcApp(b, t, z).length <= 50), 'aucun titre ne dépasse les 50 caractères de Leboncoin');
+      // ⚠️ Coupé en plein mot : c'est LE défaut mesuré (6 titres sur 59).
+      const coupe = cas.map(([b, t, z]) => lbcApp(b, t, z)).filter(r2 => {
+        if (r2.length < 45) return false;                    // pas au plafond
+        return /[a-zà-ÿ]$/i.test(r2) && !/\bT\d/.test(r2.slice(-6));
+      });
+      dit(coupe.length === 0, 'aucun titre ne se termine au milieu d\'un mot', coupe[0] || '');
+      // La marque n'est jamais doublée (« Nike nike shox » était son titre réel).
+      const double = cas.map(([b, t, z]) => [b, lbcApp(b, t, z)])
+        .filter(([b, r2]) => b && (r2.toLowerCase().split(b.toLowerCase()).length - 1) > 1);
+      dit(double.length === 0, 'la marque n\'apparaît jamais deux fois', double.length ? double[0][1] : '');
+      // La taille survit TOUJOURS : c'est sur elle qu'un acheteur filtre.
+      const sansTaille = cas.filter(([b, t, z]) => z && !new RegExp('T' + z.replace('.', '[.,]') + '$').test(lbcApp(b, t, z)));
+      dit(sansTaille.length === 0, 'la taille est toujours à la fin, même sur un titre long',
+        sansTaille.length ? '« ' + lbcApp(...sansTaille[0]) + ' »' : '');
+    }
+  }
+
+  // ── « VENDUE » SE PROUVE PAR UNE TRANSACTION, PAS PAR UNE ABSENCE ───────────
+  // Mesuré le 12 septembre : sur ses 400 annonces fermées, 151 seulement portent
+  // une vente prouvée (`transaction → item_id`). Annoncer « vendue » pour les
+  // 249 autres lui ferait retirer de Leboncoin une paire qu'il a encore.
+  {
+    dit(/harvest_\*_txn_\*/.test(src) && /item_id/.test(src),
+      'l\'extension prouve la vente par l\'identité de la transaction',
+      'sans ça « plus en ligne » vaut « vendue » — faux 249 fois sur 400');
+    dit(/harvest_\*_txn_\*/.test(APP) && /vendus\.add/.test(APP),
+      'l\'app fait la même preuve, sur la même identité');
+    // L'état doit distinguer la PAUSE : une annonce masquée n'est pas vendue.
+    dit(/'pause'/.test(src) && /'pause'/.test(APP), 'les deux distinguent « en pause » de « vendue »',
+      'une annonce masquée sur Vinted n\'est pas vendue — la retirer de Leboncoin perdrait la vente');
+    // Et l'écran ne doit pas CRIER « vendue » sur ce qu'il n'a pas prouvé.
+    // ⚠️ HUITIÈME FOIS : mon premier jet cherchait « à vérifier » dans TOUT
+    //    App.jsx — or la phrase existe déjà sur l'écran Achats (les commandes non
+    //    réclamées). Le contrôle était donc VERT sur le code fautif, exactement
+    //    ce qu'un contrôle ne doit jamais être. On le borne à l'écran Leboncoin.
+    const iL = APP.indexOf('function LeboncoinScreen');
+    const ecran = iL < 0 ? '' : APP.slice(iL, APP.indexOf('\n}', APP.indexOf('➕ Ouvrir « Déposer une annonce »')));
+    dit(ecran.length > 2000, 'l\'écran Leboncoin a été retrouvé pour être jugé', ecran.length + ' caractères');
+    dit(/à vérifier/.test(ecran), 'l\'écran Leboncoin dit « à vérifier » quand la vente n\'est pas prouvée',
+      'sinon il fait supprimer une annonce Leboncoin sur une supposition');
+    dit(/etat === 'vendue'/.test(ecran), 'et le rouge y est réservé à la vente PROUVÉE');
+    dit(/en pause sur Vinted/.test(ecran), 'une annonce en pause est dite en pause, sans consigne');
+  }
+
   console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nLa file part de SA sélection, sur tous ses comptes.');
   process.exit(ko ? 1 : 0);
 })();

@@ -154,7 +154,11 @@
     .cbarfill{height:100%;border-radius:999px;transition:width .3s}
     .cmsg{font-size:11px;font-weight:700;margin-top:5px}
     .deposit{display:block;text-align:center;background:#ff6e14;color:#fff;text-decoration:none;font-size:13px;font-weight:900;padding:10px;margin:0 10px 6px;border-radius:10px}
-  `;
+  
+  .grp{font-size:11px;font-weight:800;color:#10151b;margin:10px 2px 4px;letter-spacing:.2px}
+  .pnote{font-size:10.5px;color:#6b7684;line-height:1.45;margin-top:5px}
+  .pnote a{color:#1e5fcc;font-weight:700}
+`;
 
   let open = false;
   function render() {
@@ -169,19 +173,57 @@
           + `${u.url ? ` · <a href="${esc(u.url)}" target="_blank" rel="noreferrer">voir</a>` : ''}</div></div>`).join('')
         + `<div class="remm" style="padding:4px 2px">VRM ne connaît pas ces numéros — à toi de voir. Ajoute la référence de la paire sur l&#39;annonce pour qu&#39;elles se relient toutes seules.</div></div>`
       : '';
-    const remHtml = removals.length
-      ? `<div class="remsec"><div class="remhd">🔴 ${removals.length} vendue${removals.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</div>${removals.map(remHtmlOne).join('')}</div>`
-      : '';
+    // ⚠️⚠️ « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE.
+    // Ce bandeau écrivait « N vendues sur Vinted — à retirer », en rouge, dès
+    // qu'une annonce n'était plus en ligne. Or elle peut sortir de la liste
+    // parce qu'il l'a MISE EN PAUSE. Mesuré le 12 septembre sur ses vraies
+    // données : sur ses 400 annonces fermées, **151 seulement** portent une
+    // vente prouvée par identité (`transaction → item_id`, §5). Pour les 249
+    // autres, « supprime-la de Leboncoin » lui ferait perdre une vente sur une
+    // paire qu'il a encore. Trois états, et le rouge est réservé à la preuve.
+    const parEtat = { vendue: [], doute: [], pause: [] };
+    for (const r of removals) parEtat[r.etat === 'vendue' ? 'vendue' : (r.etat === 'pause' ? 'pause' : 'doute')].push(r);
+    const remHtml =
+      (parEtat.vendue.length
+        ? `<div class="remsec"><div class="remhd">🔴 ${parEtat.vendue.length} vendue${parEtat.vendue.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</div>`
+          + `<div class="remm" style="padding:2px 2px 6px">La vente est certaine. Retire-les pour ne pas vendre la même paire deux fois — le numéro de la paire, lui, ne change pas.</div>`
+          + parEtat.vendue.map((r) => remHtmlOne(r, 'vendue')).join('') + '</div>'
+        : '')
+      + (parEtat.doute.length
+        ? `<div class="remsec" style="border-color:#e8a33d"><div class="remhd" style="color:#9a5b16">⚠️ ${parEtat.doute.length} plus en ligne sur Vinted — à vérifier</div>`
+          + `<div class="remm" style="padding:2px 2px 6px">Je n&#39;ai <b>pas la preuve</b> qu&#39;elles sont vendues : tu as peut-être juste retiré l&#39;annonce. Ouvre et décide — je ne te dis pas de les supprimer.</div>`
+          + parEtat.doute.map((r) => remHtmlOne(r, 'doute')).join('') + '</div>'
+        : '')
+      + (parEtat.pause.length
+        ? `<div class="remsec" style="border-color:#d7dce2"><div class="remhd" style="color:#6b7684">⏸ ${parEtat.pause.length} en pause sur Vinted</div>`
+          + `<div class="remm" style="padding:2px 2px 6px">Masquées sur Vinted, pas vendues. Elles peuvent rester sur Leboncoin : <b>rien à faire</b>.</div>`
+          + parEtat.pause.map((r) => remHtmlOne(r, 'pause')).join('') + '</div>'
+        : '');
     root.innerHTML = `<style>${css}</style>` + (open
       ? `<div class="panel">
            <div class="hd"><span class="t">🟠 ${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
            <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
-           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${unlHtml}${items.length ? items.map(cardHtml).join('') : emptyHtml()}${donePostedHtml()}</div>
+           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
            <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
+  }
+  // La liste se groupe sur CE QU'IL PEUT FAIRE, pas sur le numéro — c'est la loi
+  // de l'écran Colis : trier par numéro mettait devant des annonces qui
+  // partiraient bâclées. Le titre de groupe ne s'affiche que s'il y a plusieurs
+  // groupes, sinon il répète le compte de l'en-tête (§7).
+  function listeGroupee(items) {
+    const nb = (a) => (a.photos || []).length;
+    const pretes = items.filter((a) => nb(a) >= 2);
+    const une = items.filter((a) => nb(a) === 1);
+    const nues = items.filter((a) => nb(a) === 0);
+    const groupes = [pretes, une, nues].filter((g) => g.length).length;
+    const titre = (t, n, coul) => (groupes > 1 ? `<div class="grp"${coul ? ` style="color:${coul}"` : ''}>${t} — ${n}</div>` : '');
+    return titre('Aucune photo', nues.length, '#c0392b') + nues.map(cardHtml).join('')
+      + titre('Prêtes, avec toutes leurs photos', pretes.length) + pretes.map(cardHtml).join('')
+      + titre('Une seule photo', une.length) + une.map(cardHtml).join('');
   }
   function donePostedHtml() {
     if (!postedList.length) return '';
@@ -236,11 +278,37 @@
       ${bar}
     </div>`;
   }
-  function remHtmlOne(r) {
+  function remHtmlOne(r, cas) {
+    // Le geste dépend de la PREUVE : on ne demande de supprimer que ce qui est
+    // prouvé vendu. Sur un doute on propose d'ouvrir, pas de supprimer ; sur une
+    // pause on ne demande rien du tout.
+    const sous = cas === 'vendue'
+      ? `<div style="font-size:10.5px;color:#a33">cherche « ${esc(r.ref)} » dans tes annonces Leboncoin et supprime-la</div>`
+      : cas === 'doute'
+        ? `<div style="font-size:10.5px;color:#9a5b16">vendue ? retirée ? ouvre-la pour décider${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noreferrer">voir sur Leboncoin</a>` : ''}</div>`
+        : `<div style="font-size:10.5px;color:#6b7684">en pause sur Vinted — elle peut rester ici</div>`;
+    const bouton = cas === 'pause' ? ''
+      : `<button class="btn" data-a="removed" style="border-color:${cas === 'vendue' ? '#c0392b;color:#c0392b' : '#9a5b16;color:#9a5b16'}">✓ Retirée</button>`;
     return `<div class="rem" data-rid="${esc(r.id)}">
-      <div style="flex:1;min-width:0"><b>N°${esc(r.numero)}</b> ${esc((r.title || '').slice(0, 34))}<div style="font-size:10.5px;color:#a33">cherche « ${esc(r.ref)} » dans tes annonces Leboncoin et supprime-la</div></div>
-      <button class="btn" data-a="removed" style="border-color:#c0392b;color:#c0392b">✓ Retirée</button>
+      <div style="flex:1;min-width:0"><b>N°${esc(r.numero)}</b> ${esc((r.title || '').slice(0, 34))}${sous}</div>
+      ${bouton}
     </div>`;
+  }
+  // ⚠️⚠️ 54 DE SES 59 ANNONCES PARTIRAIENT AVEC UNE SEULE PHOTO.
+  // Mesuré le 12 septembre : les photos HD ne viennent QUE de la page de
+  // l'annonce Vinted (l'API n'en renvoie AUCUNE — 0 sur 57 lignes
+  // `harvest_*_item_*`, captures jusqu'au 9 septembre). Les annonces qu'il a
+  // déjà ouvertes ont 5 photos en moyenne ; les autres, une seule — celle de la
+  // vignette. Une annonce Leboncoin à une photo se vend mal, et il ne pouvait
+  // pas le savoir : la carte n'en disait rien.
+  // On écrit le CHIFFRE et on donne la porte (même règle que le bandeau eBay :
+  // ne pas écrire « ton annonce est prête », écrire combien).
+  function photosLigne(ad) {
+    const n = (ad.photos || []).length;
+    if (n >= 2) return '';
+    const lien = ad.vintedUrl ? ` <a href="${esc(ad.vintedUrl)}" target="_blank" rel="noreferrer">ouvrir l&#39;annonce Vinted</a>` : '';
+    if (n === 0) return `<div class="pnote" style="color:#c0392b">Aucune photo — Leboncoin refuse une annonce sans photo.${lien}</div>`;
+    return `<div class="pnote">1 seule photo. Les autres sont sur Vinted : ouvre l&#39;annonce une fois et l&#39;extension les lit toute seule.${lien}</div>`;
   }
   function cardHtml(ad) {
     const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo">`).join('');
@@ -250,6 +318,7 @@
       <div class="tt">${esc(ad.title)}</div>
       <div class="pr">${esc(ad.price)} €</div>
       ${ph ? `<div class="ph">${ph}</div>` : ''}
+      ${photosLigne(ad)}
       <div class="desc">${esc(ad.description)}</div>
       <div class="btns">
         <button class="btn p" data-a="prepare" style="flex:1 1 100%" title="Télécharge les photos, copie tout le texte de l'annonce et ouvre la page de dépôt Leboncoin.">🚀 Tout préparer (photos + texte + page)</button>

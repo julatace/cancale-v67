@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.55.3';
+const EXT_ATTENDUE = '5.55.4';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -61,6 +61,40 @@ const MP_PLACES = [
   { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places' },
   { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay' },
 ];
+// ── LE TITRE LEBONCOIN : 50 caractères, et ils se gagnent ───────────────────
+// ⚠️⚠️ COPIE EXACTE DE `lbcTitre` DE `background.js`. Les deux calculent la file
+// chacun de leur côté (le panneau tourne sur leboncoin.fr, où l'app n'est pas
+// chargée) : si les deux titres diffèrent, l'app lui en montre un et l'extension
+// en publie un autre. `audit-places.cjs` exige que les deux rendent EXACTEMENT
+// le même titre sur les mêmes entrées — pas seulement que la fonction existe.
+// Mesuré sur ses 59 annonces : 0 titre coupé en plein mot (6 avant), 0 au
+// plafond (7 avant), 58 améliorés.
+const LBC_TITRE_MAX = 50;
+const lbcTitre = (brand, base, size) => {
+  let t = String(base || '').replace(/\s+/g, ' ').trim();
+  t = t.replace(/^(?:chaussures?|baskets?|sneakers?)\s+(?:style|type|genre)\s+/i, '');
+  const bq = String(brand || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (bq) t = t.replace(new RegExp('^(?:chaussures?|baskets?|sneakers?)\\s+(?=' + bq + '\\b)', 'i'), '');
+  t = t.replace(/\s+/g, ' ').trim();
+  let vue = null;
+  t = t.replace(/\btailles?\s*:?\s*(\d{1,2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
+       .replace(/\bT\s*(\d{2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
+       .replace(/\s+/g, ' ').trim();
+  const taille = String(size || vue || '').replace(/^t/i, '').trim();
+  const b = String(brand || '').trim();
+  if (b && !new RegExp('\\b' + bq + '\\b', 'i').test(t)) t = b + ' ' + t;
+  t = t.replace(/\s+/g, ' ').trim();
+  t = t.charAt(0).toUpperCase() + t.slice(1);
+  const suff = taille ? ' T' + taille : '';
+  const place = LBC_TITRE_MAX - suff.length;
+  if (t.length > place) {
+    const coupe = t.slice(0, place);
+    const esp = coupe.lastIndexOf(' ');
+    t = (esp > 12 ? coupe.slice(0, esp) : coupe).replace(/[\s,;:/-]+$/, '');
+  }
+  return (t + suff).trim();
+};
+
 const MP_DEFAUT = MP_PLACES.reduce((a, p) => (a[p.cle] = p.defaut, a), {});
 // `undefined` (jamais touché) ≠ `false` (retiré exprès) : le premier suit le
 // défaut, le second est un choix. Le même piège que partout ailleurs.
@@ -99,7 +133,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -21246,12 +21280,38 @@ function LeboncoinScreen() {
     const lost = main.vinted_pairs_lost || {};
     const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
     const listRows = listRowsBrut || [];
-    const online = []; const onlineIds = new Set(); const seen = new Set();
+    // Les photos HD et la description ne viennent QUE de la page de l'annonce :
+    // mesuré le 12 septembre, l'API Vinted ne renvoie aucune photo (0 sur 57
+    // lignes `harvest_*_item_*`, captures jusqu'au 9 septembre). Sans cette
+    // lecture, l'écran ne peut pas dire avec combien de photos une annonce
+    // partirait — et 54 des 59 partiraient avec UNE SEULE.
+    const detRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+    const pageDet = (detRows && detRows[0] && detRows[0].data) || {};
+    // ⚠️ « VENDUE » SE PROUVE (§5). Les 400 lignes `harvest_*_txn_*` portent
+    //    toutes leur `item_id` : c'est l'identité qui relie une vente à son
+    //    annonce. Mesuré : sur 400 annonces fermées, 151 seulement ont une vente
+    //    prouvée — « plus en ligne » ne veut donc pas dire « vendue ».
+    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=data');
+    const vendus = new Set();
+    for (const r of (txnRows || [])) {
+      const pl = (r.data && r.data.payload) || {};
+      const t = pl.transaction || pl;
+      const it = t && (t.item_id || (t.item && t.item.id));
+      if (it) vendus.add(String(it));
+    }
+    const online = []; const onlineIds = new Set(); const seen = new Set(); const etatVinted = {};
     for (const r of listRows) {
       const uid = String(r.id).split('_')[1];
       if (offAcc.has(uid)) continue;
       const p = (r.data && r.data.payload) || {};
-      for (const it of (p.items || [])) { const oid = String(it.id); if (it.is_closed || it.is_hidden || it.is_draft) continue; onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid); online.push({ id: oid, title: it.title }); }
+      for (const it of (p.items || [])) {
+        const oid = String(it.id);
+        etatVinted[oid] = it.is_hidden ? 'pause' : (it.is_draft ? 'brouillon'
+          : (it.is_closed ? (vendus.has(oid) ? 'vendue' : 'fermee') : 'enligne'));
+        if (it.is_closed || it.is_hidden || it.is_draft) continue;
+        onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid);
+        online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '' });
+      }
     }
     // Comptes Leboncoin réellement vus dans le navigateur (captés par l'extension).
     const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
@@ -21292,12 +21352,24 @@ function LeboncoinScreen() {
       if (lost[String(num).trim()]) continue;                        // paire retirée du stock
       if (posted.has(o.id) || posted.has(String(num))) continue;
       if (vKeys(o.id, o.title).some(k => refToAd.has(k))) { autoMatched++; continue; } // déjà sur LBC
-      queue.push({ numero: String(num), title: o.title || (e && e.title) || '' });
+      // Ce que l'extension publiera VRAIMENT : le titre Leboncoin (même règle des
+      // deux côtés), le prix, et le nombre de photos réellement disponibles.
+      // Avant, cette liste montrait le titre VINTED brut — donc pas ce qui part.
+      const d = pageDet[o.id] || {};
+      const photos = Array.isArray(d.photos) ? d.photos.length : (o.photo ? 1 : 0);
+      queue.push({
+        id: o.id, numero: String(num), vinted: o.title || (e && e.title) || '',
+        title: lbcTitre(d.brand || o.brand, d.title || o.title, d.size || o.size),
+        prix: o.price != null ? Number(o.price) : null,
+        photos, vignette: o.photo || (Array.isArray(d.photos) ? d.photos[0] : ''),
+        url: 'https://www.vinted.fr/items/' + o.id,
+      });
     }
     queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
 
     const removals = [];
-    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid)) continue; const e = numeros[pid] || {}; removals.push({ numero: String(e.numero || '?'), title: e.title || '' }); }
+    const etatDe = (oid) => etatVinted[String(oid)] || (vendus.has(String(oid)) ? 'vendue' : 'inconnue');
+    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid)) continue; const e = numeros[pid] || {}; removals.push({ numero: String(e.numero || '?'), title: e.title || '', etat: etatDe(pid) }); }
     // Détection auto : annonce LBC active dont la paire n'est plus en ligne sur
     // Vinted = vendue → à retirer. Uniquement si la paire est connue de VRM.
     const keysOnline = new Set(); online.forEach(o => vKeys(o.id, o.title).forEach(k => keysOnline.add(k)));
@@ -21308,7 +21380,11 @@ function LeboncoinScreen() {
       const ks = adKeys(ad);
       if (!ks.length || !ks.some(k => keysKnown.has(k))) { unlinked.push(ad); continue; }
       if (ks.some(k => keysOnline.has(k))) continue;
-      removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '' });
+      // L'état vient de l'annonce VINTED que ces clés désignent : l'annonce
+      // Leboncoin, elle, ne sait rien de la vente.
+      let etat = 'inconnue';
+      for (const id in numeros) { const en = numeros[id] || {}; const k2 = String(en.numero || '').trim(); if (k2 && ks.includes(k2)) { etat = etatDe(id); break; } }
+      removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '', etat });
     }
     removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
@@ -21375,13 +21451,49 @@ function LeboncoinScreen() {
           </>) : <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Définis ta limite d'offre dans le panneau VRM sur Leboncoin pour suivre ton quota.</div>}
         </Card>
         {/* À retirer (vendues sur Vinted) */}
-        {data.removals.length > 0 && (
-          <Card style={{ border: `1px solid ${C.danger}`, background: `${C.danger}0e` }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: C.danger, marginBottom: 6 }}>🔴 {data.removals.length} à retirer de Leboncoin</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Vendues sur Vinted → retire-les de Leboncoin pour ne pas les vendre deux fois (cherche « VRM-N° »).</div>
-            {data.removals.slice(0, 30).map((r, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{r.numero}</b> · {r.title || '—'}</div>)}
-          </Card>
-        )}
+        {/* ⚠️⚠️ « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE.
+            Ce bloc disait « Vendues sur Vinted → retire-les », en rouge, dès
+            qu'une annonce n'était plus en ligne. Or elle peut sortir de la liste
+            parce qu'il l'a mise en pause. Mesuré le 12 septembre : sur ses
+            400 annonces fermées, **151 seulement** portent une vente prouvée par
+            identité (`transaction → item_id`). Pour les 249 autres, « retire-la
+            de Leboncoin » lui ferait perdre une vente sur une paire qu'il a
+            encore. Trois états, et seul le prouvé est rouge — §5 « mieux vaut un
+            blanc qu'un faux », et on dit « à vérifier », jamais « vendu ». */}
+        {data.removals.length > 0 && (() => {
+          const vendues = data.removals.filter(r => r.etat === 'vendue');
+          const pause = data.removals.filter(r => r.etat === 'pause');
+          const doute = data.removals.filter(r => r.etat !== 'vendue' && r.etat !== 'pause');
+          const Ligne = (r, i, coul) => (
+            <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}>
+              <b>N°{r.numero}</b> · {r.title || '—'}
+              {r.url ? <> · <a href={r.url} target="_blank" rel="noreferrer" style={{ color: coul, fontWeight: 700 }}>voir sur Leboncoin</a></> : null}
+            </div>
+          );
+          return (<>
+            {vendues.length > 0 && (
+              <Card style={{ border: `1px solid ${C.danger}`, background: `${C.danger}0e` }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: C.danger, marginBottom: 6 }}>🔴 {vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-les de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.</div>
+                {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger))}
+              </Card>
+            )}
+            {doute.length > 0 && (
+              <Card style={{ border: `1px solid ${C.warn}66`, background: `${C.warn}0e` }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: C.warn, marginBottom: 6 }}>⚠️ {doute.length} plus en ligne sur Vinted — à vérifier</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Ces annonces ne sont plus sur Vinted, mais <b>je n'ai pas la preuve qu'elles sont vendues</b> : tu as peut-être simplement retiré l'annonce. Ouvre-les et décide — je ne te dis pas de les supprimer.</div>
+                {doute.slice(0, 30).map((r, i) => Ligne(r, i, C.warn))}
+              </Card>
+            )}
+            {pause.length > 0 && (
+              <Card>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>⏸ {pause.length} en pause sur Vinted</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Tu les as masquées sur Vinted, elles ne sont pas vendues. Elles restent sur Leboncoin : <b>rien à faire</b>.</div>
+                {pause.slice(0, 20).map((r, i) => Ligne(r, i, C.muted))}
+              </Card>
+            )}
+          </>);
+        })()}
         {/* Annonces Leboncoin non reliées à une paire VRM : informatif. On ne les
             présente JAMAIS comme « à retirer » (VRM ne connaît pas la paire). */}
         {data.unlinked && data.unlinked.length > 0 && (
@@ -21437,9 +21549,72 @@ function LeboncoinScreen() {
               //    a été retiré de la file. Deux causes, deux phrases.
               ? <div style={{ fontSize: 12, color: C.muted }}>Rien dans la file — tu as retiré de Leboncoin toutes tes annonces en ligne.</div>
               : <div style={{ fontSize: 12, color: C.muted }}>Tout est publié 🎉 (toutes tes paires numérotées en ligne sont sur Leboncoin).</div>) : (<>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Paires numérotées en ligne sur Vinted, pas encore sur Leboncoin. Ouvre Leboncoin avec l'extension pour les publier.</div>
-            {data.queue.slice(0, 60).map((q, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}><b>N°{q.numero}</b> · {q.title || '—'}</div>)}
-            {data.queue.length > 60 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {data.queue.length - 60} autres…</div>}
+            {/* ⚠️⚠️ « EXACTEMENT TEL QU'IL PARTIRA » EST UNE PROMESSE SUR L'EXTENSION.
+                C'est ELLE qui publie, avec SA version de la règle : une extension
+                antérieure à 5.55.4 enverra l'ancien titre, coupé en plein mot.
+                Sans cette garde, l'app promettrait ce que l'extension installée ne
+                sait pas faire — le défaut le plus coûteux du projet, déjà refait
+                quatre fois (le zip, les codes de retrait, les places, eBay). */}
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>
+              {extSait('lbctitre') === 'ok'
+                ? <>Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, la taille à la fin). La description et les photos sont préparées par l'extension — tu valides.</>
+                : extSait('lbctitre') === 'absente'
+                  ? <>Voici le titre <b>que l'extension proposera</b> sur Leboncoin (50 caractères max, la taille à la fin). La publication se fait depuis ton ordinateur, avec l'extension.</>
+                  : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Réglages pour que ce soit ce titre-là qui parte.</>}
+            </div>
+            {/* ⚠️ LA LISTE SE GROUPE SUR CE QU'IL PEUT FAIRE, pas sur le numéro.
+                C'est la loi de l'écran Colis : mesuré ici, 54 des 59 annonces
+                partiraient avec UNE SEULE photo, parce que les photos HD ne sont
+                lues que sur la page de l'annonce (l'API Vinted n'en renvoie
+                aucune — 0 sur 57 lignes, vérifié). Mettre ces 54 en haut, c'est
+                mettre devant ce qui fera une annonce bâclée. */}
+            {(() => {
+              const pretes = data.queue.filter(q => q.photos >= 2);
+              const maigres = data.queue.filter(q => q.photos === 1);
+              // ⚠️ VU EN CAPTURE : « N°30 · 49,00 € · 0 photo », rangée sous
+              //    « Une seule photo ». Une annonce sans AUCUNE photo ne peut
+              //    pas être publiée sur Leboncoin — ce n'est pas une nuance,
+              //    c'est un blocage, et il doit être en haut.
+              const nues = data.queue.filter(q => q.photos === 0);
+              // Un seul groupe ⇒ pas de titre de groupe : il répéterait le
+              //    compte de l'en-tête (§7, le même nombre deux fois).
+              const groupes = [pretes, maigres, nues].filter(g => g.length).length;
+              const Ligne = (q) => (
+                <div key={q.id} style={{ display: 'flex', gap: 9, alignItems: 'center', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
+                  {q.vignette ? <img src={q.vignette} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 7, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 34, height: 34, borderRadius: 7, flexShrink: 0, background: C.bg }} />}
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
+                    <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
+                      N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'} · {q.photos} photo{q.photos > 1 ? 's' : ''}
+                      {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
+                    </span>
+                  </span>
+                </div>
+              );
+              return (<>
+                {nues.length > 0 && (<>
+                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.warn, marginTop: 4 }}>Aucune photo — {nues.length}</div>}
+                  <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
+                    Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted : l'extension lit ses photos au passage.
+                  </div>
+                  {nues.slice(0, 40).map(Ligne)}
+                  {nues.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {nues.length - 40} autres…</div>}
+                </>)}
+                {pretes.length > 0 && (<>
+                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.text, marginTop: 12 }}>Prêtes — {pretes.length} avec toutes leurs photos</div>}
+                  {pretes.slice(0, 40).map(Ligne)}
+                  {pretes.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {pretes.length - 40} autres…</div>}
+                </>)}
+                {maigres.length > 0 && (<>
+                  {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.text, marginTop: 12 }}>Une seule photo — {maigres.length}</div>}
+                  <div style={{ fontSize: 11, color: C.muted, margin: '3px 0 4px', lineHeight: 1.5 }}>
+                    Une annonce Leboncoin avec une seule photo se vend mal. Les autres existent, mais <b>Vinted ne les donne que sur la page de l'annonce</b> : ouvre-la une fois et l'extension lit les autres toute seule. Mesuré chez toi : les annonces déjà ouvertes ont <b>5 photos</b> en moyenne.
+                  </div>
+                  {maigres.slice(0, 40).map(Ligne)}
+                  {maigres.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>+ {maigres.length - 40} autres…</div>}
+                </>)}
+              </>);
+            })()}
           </>)}
         </Card>
         <a href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: '#ff6e14', color: '#fff', textDecoration: 'none', fontWeight: 900, fontSize: 14, padding: '12px', borderRadius: 12 }}>➕ Ouvrir « Déposer une annonce » sur Leboncoin</a>
