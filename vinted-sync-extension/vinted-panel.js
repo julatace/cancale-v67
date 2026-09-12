@@ -499,7 +499,11 @@
     const todoBlock = todo.length ? `
       <div class="vrm-m" style="font-weight:700;margin:12px 0 5px">À faire aujourd'hui</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${todo.map(x => `<button class="vrm-todo" data-t="${x.t}">${svgi(x.ic, 13)} ${x.n} ${x.lbl}</button>`).join('')}</div>`
-      : `<div class="vrm-card" style="margin-top:12px"><div class="vrm-m">✅ Rien d'urgent : tout est à jour. Beau boulot.</div></div>`;
+      : ((DATA && DATA.baseKO)
+        // Une liste « À faire » vide alors qu'aucune lecture n'a abouti ne veut
+        // rien dire : c'est le mensonge du 10 septembre, mot pour mot.
+        ? `<div class="vrm-card" style="margin-top:12px"><div class="vrm-m">Je ne sais pas ce que tu as à faire aujourd'hui — tes données n'ont pas pu être lues (voir en haut).</div></div>`
+        : `<div class="vrm-card" style="margin-top:12px"><div class="vrm-m">✅ Rien d'urgent : tout est à jour. Beau boulot.</div></div>`);
     // Optimisation : opportunités déjà calculées (mêmes onglets), pour vendre plus.
     const optim = [
       s.relance ? { f: 'relance', ic: 'zap', n: s.relance, lbl: 'à relancer' } : null,
@@ -1388,7 +1392,7 @@
         <div class="vrm-sub">Tes infos, sur Vinted.${fresh}</div>
         <div class="vrm-tabs">${barreOnglets()}</div>
       </div>
-      <div id="vrm-body">${bandeauAlerte()}${depotBandeau()}${modeleBandeau()}${
+      <div id="vrm-body">${bandeauPanne()}${bandeauAlerte()}${depotBandeau()}${modeleBandeau()}${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
@@ -2427,6 +2431,18 @@
   // concernée : le bandeau propose alors de la télécharger sur Vinted, ce qui
   // est le seul chemin qui marche à coup sûr — et l'extension le range.
   let bordManuel = null;
+  // ⚠️⚠️ LE PANNEAU DISAIT « ✅ Rien d'urgent : tout est à jour » PENDANT LA PANNE.
+  // Treizième forme du piège, sur la surface qu'il regarde tous les jours. Le
+  // bandeau se pose UNE fois au-dessus du corps — comme le bloc de panne sur la
+  // coque de l'app (§7 : la même phrase répétée est UNE phrase). Il dit ce qui se
+  // passe, CE QUE CE N'EST PAS (rien n'est perdu), et le geste.
+  // ⚠️ Ne rien promettre ici sur le retour : le panneau ne peut pas savoir quand
+  //    la base répondra, et une alerte qui dit d'ATTENDRE quand il faut agir est
+  //    pire que pas d'alerte.
+  const bandeauPanne = () => (DATA && DATA.baseKO) ? `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
+      <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} Je n'ai pas pu lire tes données</div>
+      <div class="vrm-m" style="font-size:11.5px;margin-top:3px"><b>Les chiffres ci-dessous sont incomplets</b> — ne te fie pas à eux pour décider ce que tu as à faire aujourd'hui. <b>Rien n'est perdu</b> : c'est la lecture qui échoue, pas tes données. Ouvre VRM sur <b>vrm.center</b>, il t'y dira quoi faire.</div>
+    </div>` : '';
   const bandeauAlerte = () => alerte ? `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
       <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} Action non envoyée</div>
       <div class="vrm-m" style="font-size:11.5px;margin-top:3px">${esc(alerte)}</div>
@@ -3346,8 +3362,13 @@
       dataBusy = true; render();
       chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'panelData' }, (resp) => {
         dataBusy = false; lastLoad = Date.now();
-        if (chrome.runtime.lastError) { DATA = { stats: {}, byId: {}, relance: [], sleeping: [], noNum: [] }; render(); return; }
-        DATA = (resp && resp.ok) ? resp : { stats: {}, byId: {}, relance: [], sleeping: [], noNum: [] };
+        // ⚠️⚠️ « RIEN LU » NE VAUT PAS « RIEN ». Ces deux replis rendaient des
+        // structures VIDES — indiscernables de « tout est à jour, rien à faire ».
+        // Ils portent donc `baseKO`, comme la réponse du fond quand une de ses
+        // lectures a échoué : c'est la seule chose qui distingue les deux cas.
+        const VIDE = () => ({ baseKO: true, stats: {}, byId: {}, relance: [], sleeping: [], noNum: [] });
+        if (chrome.runtime.lastError) { DATA = VIDE(); render(); return; }
+        DATA = (resp && resp.ok) ? resp : VIDE();
         render();
         // Pastille = ce qui T'ATTEND concrètement : colis à expédier + messages
         // non lus (les vraies actions), sinon les paires à relancer.
