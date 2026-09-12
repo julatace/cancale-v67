@@ -6,7 +6,14 @@
 // été enregistrée. Ce banc sert la VRAIE réponse de /api/relais.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const fs=require('fs'), http=require('http'), path=require('path');
-const DIST='/home/user/cancale-v67/dist', SC=__dirname;
+// ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
+// extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
+// cet arbre. Avec '/home/user/cancale-v67/dist' écrit en dur, le banc servait
+// le build COURANT : il mesurait le correctif en croyant mesurer le code
+// d'avant, et sortait VERT sur le défaut. Un banc qui ne peut pas échouer est
+// pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
+// toujours en 0). Le dist se déduit de l'emplacement DU BANC.
+const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
 const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox')];

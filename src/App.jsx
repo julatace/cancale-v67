@@ -5196,6 +5196,15 @@ export const noterPanneBase = (ko) => {
     if (!localStorage.getItem(PANNE_DEPUIS)) localStorage.setItem(PANNE_DEPUIS, new Date().toISOString());
   } catch (_) {}
 };
+// Le lien DIRECT vers son projet. Le « ref » n'est pas écrit une seconde fois :
+// il est extrait de l'URL que l'app appelle à chaque lecture (§11, une seule
+// source). Si l'URL change de forme un jour, on rend null et le texte retombe
+// sur « ouvre supabase.com » — jamais un lien inventé qui mène nulle part.
+const refProjet = () => {
+  const m = /^https:\/\/([a-z0-9]+)\.supabase\.co/.exec(SUPABASE_URL || '');
+  return m ? m[1] : null;
+};
+
 const dureePanne = () => {
   try {
     const t = Date.parse(localStorage.getItem(PANNE_DEPUIS) || '');
@@ -5214,6 +5223,20 @@ function BaseInjoignable() {
   // faire ne sert à rien (§2.7) ; une alerte qui dit d'ATTENDRE quand il faut
   // agir est pire. On compte donc les heures, et au-delà d'une heure on dit le
   // vrai geste.
+  // ⚠️⚠️ ET « OUVRE supabase.com, IL Y AURA UN BOUTON Restore » ÉTAIT FAUX AUSSI.
+  //    Mesuré le 12 septembre sur son vrai projet, quatrième jour de panne :
+  //    le bord répond (401 instantané sur /rest/v1/), mais TOUT ce qui touche
+  //    la base expire — /rest/v1/app_data → 522 au bout de 20 s, et le stockage
+  //    le dit en clair : 544 « DatabaseTimeout, the connection to the database
+  //    timed out ». Un projet dans cet état n'est PAS en pause : il n'y a donc
+  //    AUCUN bouton Restore sur sa page, et l'app l'envoyait chercher un bouton
+  //    qui n'existe pas. Le geste est « Settings → General → Restart project ».
+  //    Les deux cas sont nommés, et on dit comment les distinguer.
+  //    ⚠️ Et il avait entre-temps REPAYÉ l'abonnement sans que rien ne revienne :
+  //    c'est dit, sinon il attend un retour que le paiement ne déclenche pas.
+  //    (Vérifié au passage que ce n'était pas une panne de la plateforme : le
+  //    seul incident ouvert chez Supabase parle de « 401 errors due to JWT
+  //    rejections », impact mineur — pas d'un délai de base. C'est son projet.)
   // ⚠️ NE PAS ÉCRIRE ICI « ils seront rangés dès le retour ». C'est vrai
   //    seulement si le Worker Cloudflare a été remis à jour (il doit relancer
   //    quand la route répond 503) — et l'app n'a AUCUN moyen de le vérifier.
@@ -5222,6 +5245,7 @@ function BaseInjoignable() {
   //    refaire ici lui ferait attendre des emails qui ne reviendront pas.
   const h = dureePanne();
   const longue = h != null && h >= 1;
+  const ref = refProjet();
   const depuis = h == null ? '' : h < 24
     ? `depuis ${Math.max(1, Math.round(h))} h`
     : `depuis ${Math.round(h / 24)} jour${Math.round(h / 24) > 1 ? 's' : ''}`;
@@ -5237,8 +5261,24 @@ function BaseInjoignable() {
           <br/><br/>
           {longue ? <>
             Ça ne revient pas tout seul : <b>c'est ton hébergeur de données qui a un problème</b>.
-            Ouvre <b>supabase.com</b>, connecte-toi, choisis le projet : la page d'accueil du projet dit
-            ce qui bloque (souvent un bouton vert <i>Restore</i> à cliquer, ou l'espace disque plein).
+            <br/><br/>
+            <b>Deux boutons existent là-bas, et ce n'est pas le même selon le cas :</b>
+            <br/>• si la page du projet affiche un gros bouton <i>Restore</i>, le projet est
+            simplement en pause : clique-le, c'est tout.
+            <br/>• s'il n'y a <b>pas</b> ce bouton, le projet est allumé mais bloqué. Il faut le
+            redémarrer : <i>Settings</i> → <i>General</i>, tout en bas, <b>Restart project</b>.
+            <br/><br/>
+            <b>Reprendre ou repayer l'abonnement ne redémarre rien tout seul</b> — il faut l'un de
+            ces deux boutons.
+            {ref && <>
+              <br/><br/>
+              <a href={`https://supabase.com/dashboard/project/${ref}`} target="_blank" rel="noreferrer"
+                 style={{color:C.accent,fontWeight:600}}>Ouvrir mon projet sur supabase.com</a>
+              {' · '}
+              <a href={`https://supabase.com/dashboard/project/${ref}/settings/general`} target="_blank" rel="noreferrer"
+                 style={{color:C.accent,fontWeight:600}}>aller directement au bouton Restart</a>
+            </>}
+            <br/><br/>
             Tant que ce n'est pas réglé, les emails Vinted qui arrivent ne peuvent pas être rangés.
           </> : <>
             Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, l'app te dira quoi faire.

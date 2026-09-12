@@ -712,6 +712,48 @@ pire.*
   donc l'app **base debout AVEC une marque de 5 jours** et exige que la marque
   soit partie — rouge dès qu'on retire le nettoyage (prouvé).
 
+### ⚠️⚠️ LES QUATORZE BANCS DE RENDU NE POUVAIENT PAS ÉCHOUER
+Mesuré le 12 septembre, en voulant prouver un correctif de texte : le banc
+`panne.cjs`, copié dans `/tmp/av12` selon la méthode §6.1 et lancé **depuis cet
+arbre**, a annoncé **118 contrôles verts** — sur un `App.jsx` qui ne contenait
+même pas le mot « Restart ». Cause : `const DIST='/home/user/cancale-v67/dist'`,
+un **chemin absolu**, dans les **quatorze** bancs de rendu. La méthode de preuve
+existe précisément pour que `__dirname/..` ne relise pas le dépôt courant ; un
+chemin absolu la contourne **sans rien dire**, et le banc mesure le CORRECTIF en
+croyant mesurer le code d'avant.
+⇒ C'est le défaut d'`audit-coherence.cjs` à l'échelle de tous les bancs de
+rendu : **un contrôle qui ne peut pas échouer est pire qu'absent — il rassure.**
+Et il invalide rétroactivement tout « N échecs sur le code d'avant » obtenu par
+un banc de rendu lancé depuis `/tmp/avN` : la preuve était truquée, pas le
+correctif.
+⇒ `DIST` se déduit maintenant de l'emplacement DU BANC
+(`path.join(__dirname,'..','..','dist')`), et `audit-bancs.cjs` refuse tout
+chemin servi au navigateur qui commence par `/` sans passer par `__dirname` —
+rouge sur les 13 bancs d'avant (prouvé).
+
+### « Ouvre supabase.com, il y aura un bouton Restore » était faux aussi
+Mesuré le 12 septembre sur son vrai projet, **quatrième jour** de panne : le bord
+répond (401 **instantané** sur `/rest/v1/`), mais tout ce qui touche la base
+expire — `/rest/v1/app_data` → **522 au bout de 20 s**, et le stockage le dit en
+clair : **544 `DatabaseTimeout`, « the connection to the database timed out »**.
+Un projet dans cet état n'est **pas en pause** : il n'y a donc **aucun bouton
+Restore** sur sa page, et l'app l'envoyait chercher un bouton qui n'existe pas.
+Le geste réel est **`Settings` → `General` → `Restart project`**.
+- Les **deux** cas sont nommés, avec comment les distinguer, et deux **liens
+  directs** vers SON projet — le `ref` est extrait de `SUPABASE_URL` (§11, une
+  seule source), pas écrit une seconde fois.
+- **« Reprendre l'abonnement ne redémarre rien tout seul »** : il avait repayé le
+  plan à 25 € et rien n'était revenu. Sans cette phrase il attend un retour que
+  le paiement ne déclenche pas.
+- Vérifié que ce n'était **pas** une panne de plateforme : le seul incident
+  ouvert chez Supabase parle de « 401 errors due to JWT rejections », impact
+  mineur — pas d'un délai de base. C'est son projet.
+- Le banc lit aussi les **`href`**, pas seulement `innerText` : un geste qui se
+  clique ne se voit pas dans le texte, et un lien « Ouvrir mon projet » qui
+  pointe ailleurs serait vert sur un contrôle posé sur le libellé.
+  **4 échecs** sur le code d'avant — cette fois mesurés sur le **vrai** build
+  d'avant (voir ci-dessus).
+
 ### Factures : un pipeline MORT, appelé toutes les 5 minutes
 Mesuré le 9 septembre. L'écran Factures appelait `fetchVintedInvoices` — un
 **Google Apps Script** (`script.google.com/macros/s/…/exec`) — **au montage et
