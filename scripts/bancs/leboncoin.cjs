@@ -23,8 +23,19 @@ const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_m
 const fs = require('fs'), http = require('http'), path = require('path');
 const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'lbc.js'), 'utf8');
 
-const PAGE = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
-<body><header id="gh"><input name="text" placeholder="Rechercher sur leboncoin"></header><main><h1>Annonces</h1></main></body></html>`;
+// ⚠️ LA VRAIE STRUCTURE, pas une invention : la page de dépôt de Leboncoin ne
+// porte qu'UN champ (`name="subject"`, « Que proposez-vous aujourd'hui ? ») —
+// c'est ce que SON navigateur a rapporté dans `lbc_recon` le 2 août, et c'est un
+// formulaire en ÉTAPES. L'en-tête, lui, porte une barre de recherche sur TOUTES
+// les pages : c'est le piège que la garde `DANS_ENTETE` écarte.
+const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
+<body>
+  <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
+  <main>${depot
+    ? '<label for="s1">Que proposez-vous aujourd’hui ?</label><input id="s1" name="subject" type="text">'
+    : '<h1>Annonces</h1><aside><label for="pmin">Prix min</label><input id="pmin" name="price_min" type="text">'
+      + '<label for="pmax">Prix max</label><input id="pmax" name="price_max" type="text"></aside>'}</main>
+</body></html>`;
 
 // La file servie au panneau : les trois cas de photo, et les trois preuves.
 const QUEUE = [
@@ -42,7 +53,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -136,6 +147,108 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     'un groupe « à vérifier » sans raison se lit comme une alerte de plus');
   const zonePause = bloc('en pause sur Vinted', null);
   dit(!/supprime-la/i.test(zonePause), 'et aucune consigne de suppression sur une annonce en pause');
+
+  // ── LE PRÉ-REMPLISSAGE SUR LA VRAIE PAGE DE DÉPÔT ─────────────────────────
+  // ⚠️⚠️ Le panneau annonçait « pré-rempli (dont la réf VRM-401) » À CHAQUE FOIS,
+  // même quand aucun champ de référence n'existait. Or la vraie page de dépôt
+  // n'en a pas : la référence n'était donc JAMAIS mise, et c'est elle qui relie
+  // l'annonce Leboncoin à la paire sans rapprochement par titre (§5). Sans elle,
+  // « vendue sur Vinted → à retirer » ne reconnaît pas l'annonce — il vend la
+  // même paire deux fois.
+  {
+    const p2 = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const e2 = []; p2.on('pageerror', (e) => e2.push(e.message));
+    const toasts = [];
+    p2.on('console', () => {});
+    await p2.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+      const t = r.request().resourceType();
+      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
+    });
+    await p2.addInitScript((d) => {
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => { const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3 } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { queue: QUEUE });
+    await p2.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p2.addScriptTag({ content: SRC });
+    await p2.waitForTimeout(900);
+    const f2 = await p2.$('[data-a="open"]'); if (f2) { await f2.click(); await p2.waitForTimeout(500); }
+    // Cliquer « Pré-remplir » sur la première annonce.
+    // ⚠️ MON PREMIER JET ATTENDAIT « Salomon », la première annonce de la FILE.
+    //    Or la liste est maintenant groupée : la première carte est celle SANS
+    //    photo. Le code avait raison, c'est l'attente du banc qui était périmée
+    //    — et c'est au passage une preuve de plus que le groupement s'applique.
+    //    On lit donc quelle carte on clique, au lieu de le supposer.
+    const clic = await p2.evaluate(() => {
+      const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
+      for (const r of rs) {
+        const b2 = r.querySelector('[data-a="prefill"]');
+        if (b2) { const c = b2.closest('.card'); b2.click(); return c ? c.getAttribute('data-id') : 'sans-id'; }
+      }
+      return null;
+    });
+    dit(!!clic, 'le bouton « Pré-remplir » existe et se clique', clic ? 'carte ' + clic : '');
+    const attendu = (QUEUE.find((q) => q.id === clic) || {}).title || '';
+    await p2.waitForTimeout(500);
+    const etat = await p2.evaluate(() => ({
+      sujet: (document.querySelector('input[name="subject"]') || {}).value || '',
+      recherche: (document.querySelector('header input[name="text"]') || {}).value || '',
+      toast: [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean)
+        .map(r => r.textContent || '').join(' '),
+    }));
+    dit(!e2.length, 'aucune erreur de page pendant le pré-remplissage', e2[0] || '');
+    dit(!!attendu && etat.sujet === attendu, 'le champ de la page de dépôt reçoit le titre Leboncoin DE CETTE CARTE',
+      'attendu « ' + attendu +' », reçu « ' + etat.sujet.slice(0, 40) + ' »');
+    // ⚠️ LE PIÈGE : la barre de recherche de l'en-tête, présente sur TOUTES les
+    //    pages. La garde `DANS_ENTETE` doit l'écarter.
+    dit(etat.recherche === '', 'la barre de recherche de l\'en-tête n\'est JAMAIS remplie',
+      etat.recherche ? 'elle a reçu « ' + etat.recherche.slice(0, 30) + ' » : le panneau annoncerait « rempli » sur une page où il n\'a rien fait d\'utile' : '');
+    // Le message doit dire CE QUI a été rempli, et ne pas prétendre la référence.
+    const dit_ref = /dont la réf/i.test(etat.toast);
+    dit(!dit_ref, 'le message ne prétend PAS que la référence a été mise',
+      dit_ref ? 'la page de dépôt n\'a aucun champ de référence — l\'annonce partirait sans, et ne serait plus reconnaissable' : '');
+    dit(/n.a PAS pu être mise|est dans la description/i.test(etat.toast),
+      'il dit où se trouve la référence quand elle n\'a pas pu être mise',
+      'sans la réf, « vendue sur Vinted → à retirer » ne reconnaît plus l\'annonce');
+    await p2.close();
+  }
+
+  // ── UN CHAMP DE FILTRE N'EST PAS UN CHAMP DE DÉPÔT ────────────────────────
+  // Le panneau est sur TOUTES les pages de Leboncoin. Une page de résultats
+  // porte « Prix min » / « Prix max », qui collent au motif `/prix|price/`.
+  // Sans garde, cliquer « Pré-remplir » depuis une recherche écrit son prix dans
+  // un filtre et annonce « 1 champ rempli » — rien d'utile n'a été fait.
+  {
+    const p3 = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    await p3.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+      const t = r.request().resourceType();
+      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
+    });
+    await p3.addInitScript((d) => {
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => { const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3 } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { queue: QUEUE });
+    await p3.goto('http://localhost:4491/recherche', { waitUntil: 'domcontentloaded' });
+    await p3.addScriptTag({ content: SRC });
+    await p3.waitForTimeout(900);
+    const f3 = await p3.$('[data-a="open"]'); if (f3) { await f3.click(); await p3.waitForTimeout(500); }
+    await p3.evaluate(() => {
+      const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
+      for (const r of rs) { const b2 = r.querySelector('[data-a="prefill"]'); if (b2) { b2.click(); return; } }
+    });
+    await p3.waitForTimeout(400);
+    const filtres = await p3.evaluate(() => ({
+      min: (document.querySelector('input[name="price_min"]') || {}).value || '',
+      max: (document.querySelector('input[name="price_max"]') || {}).value || '',
+      toast: [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean).map(r => r.textContent || '').join(' '),
+    }));
+    dit(filtres.min === '' && filtres.max === '', 'un filtre « Prix min / max » n\'est jamais pris pour le champ prix',
+      'min=« ' + filtres.min + ' » max=« ' + filtres.max + ' » : le prix de sa paire écrit dans un filtre de recherche');
+    dit(/Aucun champ reconnu/i.test(filtres.toast), 'et sur une page sans formulaire, il le DIT et copie le texte',
+      'annoncer « rempli » sur une page où rien n\'a été fait est le défaut du bandeau eBay');
+    await p3.close();
+  }
 
   await b.close(); srv.close();
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : '\nLe panneau Leboncoin dit ce qu\'il sait, et seulement ce qu\'il sait.');
