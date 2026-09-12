@@ -250,6 +250,65 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p3.close();
   }
 
+  // ── « JAMAIS LU » N'EST PAS « ZÉRO », ET LA NOUVELLE SOURCE DOIT MARCHER ──
+  // Mesuré le 12 septembre : `lbc_listings` et `lbc_accounts` sont ABSENTES de sa
+  // base alors que `lbc_recon` existe depuis le 2 août. Or le compte Leboncoin se
+  // lit sur n'importe quelle page dès que `__NEXT_DATA__` est là : s'il n'a jamais
+  // été écrit, c'est que cet élément n'existe plus. La capture était donc morte,
+  // et le panneau annonçait « 📊 0 annonce sur Leboncoin » — un zéro inventé qui
+  // cachait que « vendue sur Vinted → à retirer » ne pouvait pas fonctionner.
+  {
+    const p4 = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const e4 = []; p4.on('pageerror', (e) => e4.push(e.message));
+    let capture = null;
+    await p4.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+      const t = r.request().resourceType();
+      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
+    });
+    let recu = null;
+    await p4.exposeFunction('__banc_capture', (o) => { capture = o; });
+    // ⚠️ ET ON VÉRIFIE QUE LA VRAIE CAPTURE PASSE TOUJOURS : mon diagnostic
+    //    réutilisait d'abord le nom `lbcCapture`, et il aurait avalé les annonces.
+    await p4.exposeFunction('__banc_listings', (o) => { recu = o; });
+    await p4.addInitScript((d) => {
+      // Une page SANS `__NEXT_DATA__` : le format actuel de Leboncoin, où les
+      // données arrivent en morceaux dans `self.__next_f`.
+      self.__next_f = [
+        [1, '{"buildId":"x"}'],
+        [1, 'a:["$","div",null,{"children":{"list_id":"2837465","subject":"Salomon XT-6 blanc T40","price":[99],"body":"Réf. VRM-401 — très bon état","url":"https://www.leboncoin.fr/ad/2837465","status":"active","owner":{"user_id":"77","name":"Cancale"}}}]'],
+      ];
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'lbcDiag') { try { window.__banc_capture(m); } catch (_) {} return rep({ ok: true }); }
+        if (m && m.action === 'lbcCapture') { try { window.__banc_listings(m); } catch (_) {} return rep({ ok: true }); }
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3, postedCount: 0, lbcCount: 0, lbcJamaisLu: true } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { queue: QUEUE });
+    await p4.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
+    await p4.addScriptTag({ content: SRC });
+    await p4.waitForTimeout(1100);
+    const f4 = await p4.$('[data-a="open"]'); if (f4) { await f4.click(); await p4.waitForTimeout(500); }
+    const t4 = await p4.evaluate(() => [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean).map(r => r.textContent || '').join(' '));
+    dit(!e4.length, 'aucune erreur sur une page au nouveau format', e4[0] || '');
+    // 1. La nouvelle source est lue.
+    dit(!!capture, 'la capture REMONTE ce qu\'elle a vu', capture ? '' : 'sans ça, « 0 annonce » et « rien pu lire » sont le même silence');
+    if (capture) {
+      dit(capture.source === 'next_f', 'elle lit le format actuel (données en morceaux)', 'source : ' + capture.source);
+      dit(capture.vues >= 1, 'et elle y retrouve bien une annonce', capture.vues + ' vue(s)');
+      dit(capture.a_next_data === false && capture.a_next_f === true,
+        'elle dit quel format porte la page', `__NEXT_DATA__:${capture.a_next_data} · __next_f:${capture.a_next_f}`);
+    }
+    // 2. Et tant que rien n'a été capté, aucun zéro inventé.
+    dit(!/0\s*annonces?\s*sur Leboncoin/i.test(t4), 'aucun « 0 annonce sur Leboncoin » quand rien n\'a été lu',
+      'un zéro inventé cache que « vendue → à retirer » ne peut pas fonctionner');
+    dit(/pas encore vu tes annonces/i.test(t4), 'il dit qu\'il n\'a pas encore vu ses annonces');
+    dit(/lesquelles retirer/i.test(t4), 'et ce que ça empêche', 'une alerte qui ne dit pas ce qu\'on perd ne sert à rien');
+    dit(!!recu && Array.isArray(recu.listings) && recu.listings.length >= 1,
+      'et la VRAIE capture des annonces part toujours vers le fond',
+      recu ? (recu.listings || []).length + ' annonce(s) transmise(s)' : 'aucun message `lbcCapture` : le diagnostic a pris sa place');
+    await p4.close();
+  }
+
   await b.close(); srv.close();
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : '\nLe panneau Leboncoin dit ce qu\'il sait, et seulement ce qu\'il sait.');
   process.exit(ko ? 1 : 0);
