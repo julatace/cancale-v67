@@ -3671,7 +3671,20 @@ async function convLastMessage(convId) {
 }
 
 async function buildPanelData() {
-  const rows = await sbGet('app_data?id=eq.main&select=data');
+  // ⚠️⚠️ « RIEN LU » NE VAUT PAS « RIEN » — ET LE PANNEAU NE POUVAIT PAS LE SAVOIR.
+  // Treizième forme du piège, sur la surface qu'il regarde TOUS LES JOURS : le
+  // panneau sur vinted.fr. Chacune des vingt lectures ci-dessous s'écrivait
+  // `(rows && rows[0] && rows[0].data) || {}` ou `|| []` — or `sbGet` rend `null`
+  // quand la base n'a pas répondu. Tous les compteurs tombaient donc à 0, et le
+  // panneau affichait « ✅ Rien d'urgent : tout est à jour. Beau boulot. » avec
+  // 14 colis à expédier et 6 à retirer. Pire : la route répondait `{ok:true}`
+  // par-dessus, donc le panneau n'avait AUCUN moyen de faire la différence.
+  // C'est le mensonge du 10 septembre (§ « quand la base ne répond pas ») refait
+  // à l'identique dans l'extension, et il tournait pendant les quatre jours de
+  // panne. On compte les lectures ratées et on le DIT.
+  let lecturesRatees = 0;
+  const lire = async (q) => { const r = await sbGet(q); if (r === null) lecturesRatees++; return r; };
+  const rows = await lire('app_data?id=eq.main&select=data');
   const d = (rows && rows[0] && rows[0].data) || {};
   const numeros = d.vinted_annonce_numeros || {};
   const grid = d.vinted_garage_grid || {};
@@ -3683,10 +3696,10 @@ async function buildPanelData() {
   }
   // Annonces réellement en ligne, depuis la moisson (par compte).
   // Dates de mise en ligne lues sur les pages d'annonce (voir saveListingDate).
-  const drows = await sbGet('app_data?id=eq.vinted_listing_dates&select=data');
+  const drows = await lire('app_data?id=eq.vinted_listing_dates&select=data');
   const listingDates = (drows && drows[0] && drows[0].data) || {};
   // Descriptions/photos lues sur les pages d'annonce (pour Leboncoin + archive).
-  const detRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  const detRows = await lire('app_data?id=eq.vinted_item_details&select=data');
   const pageDetails = (detRows && detRows[0] && detRows[0].data) || {};
   // Titre normalisé : sert au rapprochement par titre EXACT (jamais approximatif).
   const normT = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -3716,7 +3729,7 @@ async function buildPanelData() {
   // Pour l'AFFICHAGE, « pas su » retombe sur une liste vide : ça ne supprime
   // rien, ça montre juste le compte comme non bloqué le temps d'une lecture.
   let blockedAcc = new Set(); try { blockedAcc = (await blockedAccounts()) || new Set(); } catch (_) {}
-  const offRows = await sbGet('app_data?id=eq.panel_accounts_off&select=data');
+  const offRows = await lire('app_data?id=eq.panel_accounts_off&select=data');
   const offMap = (offRows && offRows[0] && offRows[0].data) || {};
   const offPanel = new Set(Object.keys(offMap).filter(k => offMap[k] === true));
   // ⚠️ « ↺ Réafficher » NE MARCHAIT PAS pour un compte masqué depuis l'APP.
@@ -3746,7 +3759,7 @@ async function buildPanelData() {
   };
   const keepAcc = (r) => { const u = r && r.data && r.data.uid; return compteExiste(u) && !acctOff(u); };
   // Nom lisible d'un compte : l'étiquette posée dans l'app, sinon le pseudo Vinted.
-  const accRows = await sbGet('vinted_accounts?select=vinted_user_id,login') || [];
+  const accRows = await lire('vinted_accounts?select=vinted_user_id,login') || [];
   const labels = (d.vinted_account_labels && typeof d.vinted_account_labels === 'object') ? d.vinted_account_labels : {};
   const nameByUid = {};
   for (const a of (accRows || [])) { const k = String(a.vinted_user_id || ''); if (k) nameByUid[k] = String(labels[k] || a.login || ('compte ' + k.slice(-4))); }
@@ -3765,8 +3778,8 @@ async function buildPanelData() {
   // sur une liste vide viderait tout le panneau pour une simple coupure.
   const comptesConnus = new Set((accRows || []).map(a => String(a.vinted_user_id || '')).filter(Boolean));
   const compteExiste = (uid) => !comptesConnus.size || comptesConnus.has(String(uid == null ? '' : uid));
-  const lstAll = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data') || []);
-  const soldAll = (await sbGet('app_data?id=like.harvest_*_orders_sold&select=data') || []);
+  const lstAll = (await lire('app_data?id=like.harvest_*_listings&select=id,data') || []);
+  const soldAll = (await lire('app_data?id=like.harvest_*_orders_sold&select=data') || []);
   // ⚠️ LA PLUS FRAÎCHE CAPTURE GAGNE. Une même vente peut exister dans plusieurs
   // lignes moissonnées (comptes, captures successives). Avant, on gardait la
   // PREMIÈRE rencontrée — donc parfois un statut périmé : une paire déjà expédiée
@@ -3961,12 +3974,12 @@ async function buildPanelData() {
   // ma paire »). C'est la source la PLUS sûre : elle vient de la commande
   // elle-même — aucun rapprochement, donc aucun risque d'afficher une autre paire.
   const photoDeCommande = (o) => (o && ((o.photo && (o.photo.url || (typeof o.photo === 'string' ? o.photo : null))) || o.photo_url)) || null;
-  const bordRows = await sbGet("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
+  const bordRows = await lire("app_data?id=like.email_bord_*&select=transaction:data->>transaction") || [];
   const bordTxns = new Set(bordRows.map(b => String(b.transaction || '')).filter(Boolean));
   // Bordereaux DÉJÀ ENVOYÉS DANS L'APP par l'extension (une ligne par vente).
   // C'est ce qui permet d'afficher un vrai compte rendu par colis au lieu de
   // « on a peut-être capté quelque chose quelque part ».
-  const labelRows = await sbGet("app_data?id=like.harvest_*_label_*&select=tx:data->>tx,capturedAt:data->>capturedAt") || [];
+  const labelRows = await lire("app_data?id=like.harvest_*_label_*&select=tx:data->>tx,capturedAt:data->>capturedAt") || [];
   const labelParTx = {};
   for (const r of labelRows) { if (r && r.tx) labelParTx[String(r.tx)] = r.capturedAt || null; }
   // Numéro de la paire POSÉ SUR LA VENTE par l'app (`vinted_sale_overrides`,
@@ -3989,7 +4002,7 @@ async function buildPanelData() {
   // dans la boucle existante — aucune requête ni octet supplémentaire (§34).
   const itemParTxn = {};
   try {
-    const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data') || []).filter(keepAcc);
+    const txnRows = (await lire('app_data?id=like.harvest_*_txn_*&select=data') || []).filter(keepAcc);
     for (const r of txnRows) {
       const p = (r.data && r.data.payload) || {};
       const t = p.transaction || p;
@@ -4094,7 +4107,7 @@ async function buildPanelData() {
   // ── DERNIERS ACHATS (lecture seule) : mêmes commandes moissonnées `orders_purchased`.
   // On NE relabelle PAS le statut (l'app classe les achats par statut, on ne veut
   // rien inventer) : juste titre + prix + date, exclus les annulés/remboursés.
-  const buyRows = (await sbGet('app_data?id=like.harvest_*_orders_purchased&select=data') || []).filter(keepAcc);
+  const buyRows = (await lire('app_data?id=like.harvest_*_orders_purchased&select=data') || []).filter(keepAcc);
   const buysFlat = [];
   const seenBuyTx = new Set();
   for (const r of buyRows) {
@@ -4131,7 +4144,7 @@ async function buildPanelData() {
   // forme exacte de l'API complaints n'est pas garantie → on lit large, sans throw).
   const complaintReasons = {};
   try {
-    const compRows = await sbGet('app_data?id=like.harvest_*_complaints&select=data') || [];
+    const compRows = await lire('app_data?id=like.harvest_*_complaints&select=data') || [];
     const pick = (o, keys) => { for (const k of keys) { if (o && o[k] != null && o[k] !== '') return o[k]; } return null; };
     for (const r of compRows) {
       const pay = (r.data && r.data.payload) || {};
@@ -4231,9 +4244,9 @@ async function buildPanelData() {
   // (`vrm_colis_collected`) OU depuis le panneau (`panel_colis_collected`).
   const PICKUP_MAX_DAYS = 14;
   const collectedApp = new Set((Array.isArray(d.vrm_colis_collected) ? d.vrm_colis_collected : []).map(String));
-  const pcRows = await sbGet('app_data?id=eq.panel_colis_collected&select=data');
+  const pcRows = await lire('app_data?id=eq.panel_colis_collected&select=data');
   const collectedPanel = new Set(Object.keys((pcRows && pcRows[0] && pcRows[0].data) || {}));
-  const trackRows = await sbGet("app_data?id=like.email_track_*&select=suivi:data->>suivi,subject:data->>subject,status:data->>status,code:data->>code,code2:data->>code2,lieu:data->>lieu,artTitle:data->>artTitle,carrier:data->>carrier,qrUrl:data->>qrUrl,receivedAt:data->>receivedAt") || [];
+  const trackRows = await lire("app_data?id=like.email_track_*&select=suivi:data->>suivi,subject:data->>subject,status:data->>status,code:data->>code,code2:data->>code2,lieu:data->>lieu,artTitle:data->>artTitle,carrier:data->>carrier,qrUrl:data->>qrUrl,receivedAt:data->>receivedAt") || [];
   const pickups = [];
   const seenPk = new Set();
   for (const t of trackRows) {
@@ -4256,7 +4269,7 @@ async function buildPanelData() {
   // ── CONVERSATIONS (inbox) : pour l'onglet Messages (relance guidée) ──────────
   // Tu sélectionnes des conversations, l'extension t'ouvre chacune une par une,
   // TU réponds toi-même (aucun message envoyé automatiquement).
-  const inboxRows = (await sbGet('app_data?id=like.harvest_*_inbox&select=data') || []).filter(keepAcc);
+  const inboxRows = (await lire('app_data?id=like.harvest_*_inbox&select=data') || []).filter(keepAcc);
   const convs = [];
   const seenC = new Set();
   for (const r of inboxRows) {
@@ -4290,7 +4303,7 @@ async function buildPanelData() {
   // donc refournir tout le texte. On le sert ici quand la fiche a été captée.
   const fiches = {};
   try {
-    const fRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data') || [])
+    const fRows = (await lire('app_data?id=like.harvest_*_item_*&select=id,data') || [])
       .filter(r => /_item_\d+$/.test(String(r.id || '')));
     for (const r of fRows) {
       const p = (r.data && r.data.payload) || {};
@@ -4392,7 +4405,7 @@ async function buildPanelData() {
 
   const renumSuggest = [];
   try {
-    const pRows = await sbGet('app_data?id=eq.panel_repub_pending&select=data');
+    const pRows = await lire('app_data?id=eq.panel_repub_pending&select=data');
     const pend = (pRows && pRows[0] && pRows[0].data && pRows[0].data.items) || {};
     const numsEnLigne = new Set(online.map(o => String(o.numero || '')).filter(Boolean));
     for (const ancienId in pend) {
@@ -4418,7 +4431,7 @@ async function buildPanelData() {
   // Prix d'achat posés depuis le panneau (ligne dédiée) → visibles tout de suite,
   // sans attendre que l'app les reporte sur la paire.
   try {
-    const bRows = await sbGet('app_data?id=eq.panel_buyprices&select=data');
+    const bRows = await lire('app_data?id=eq.panel_buyprices&select=data');
     const bItems = (bRows && bRows[0] && bRows[0].data && bRows[0].data.items) || {};
     for (const o of online) {
       const b = bItems[String(o.id)];
@@ -4434,7 +4447,7 @@ async function buildPanelData() {
       const n = Number(String(v).replace(',', '.').replace(/[^\d.]/g, ''));
       return isFinite(n) ? n : null;
     };
-    const convRows = (await sbGet('app_data?id=like.harvest_*_conv_*&select=id,data') || []).filter(keepAcc).sort(parFraicheur);
+    const convRows = (await lire('app_data?id=like.harvest_*_conv_*&select=id,data') || []).filter(keepAcc).sort(parFraicheur);
     const vus = new Set();
     for (const r of convRows) {
       const p = (r.data && r.data.payload) || {};
@@ -4484,13 +4497,13 @@ async function buildPanelData() {
   } catch (_) { /* la forme d'une conversation peut varier : on n'affiche rien plutôt que du faux */ }
   // ── BORDEREAUX À IMPRIMER : reçus par email (avec PDF), pas encore imprimés/
   //    expédiés/masqués, avec le N° de la paire + le titre (comme dans l'app). ──
-  const bp = await sbGet("app_data?id=like.email_bord_*&select=id,numero:data->>numero,modele:data->>modele,article:data->>article,transaction:data->>transaction,suivi:data->>suivi,filename:data->>filename,dateLimite:data->>dateLimite") || [];
+  const bp = await lire("app_data?id=like.email_bord_*&select=id,numero:data->>numero,modele:data->>modele,article:data->>article,transaction:data->>transaction,suivi:data->>suivi,filename:data->>filename,dateLimite:data->>dateLimite") || [];
   const bPrinted = d.vinted_bords_printed || {};
   const bShipped = d.vinted_bords_shipped || {};
   const bHidden = d.vinted_bords_hidden || {};
   // Bordereaux « traités » depuis le panneau (ligne dédiée, pas encore drainée
   // par l'app) → on les cache tout de suite, sans attendre la synchro de l'app.
-  const pdoneRows = await sbGet('app_data?id=eq.panel_bords_done&select=data');
+  const pdoneRows = await lire('app_data?id=eq.panel_bords_done&select=data');
   const bDonePanel = (pdoneRows && pdoneRows[0] && pdoneRows[0].data) || {};
   const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
   // ⚠️ VINTED FAIT FOI : si la vente liée (par n° de transaction) n'attend plus le
@@ -4560,10 +4573,14 @@ async function buildPanelData() {
   // Chiffres PUBLIÉS PAR L'APP (ligne widget_stats) → on les affiche tels quels
   // dans « Ma journée » pour ne jamais recalculer un CA qui divergerait de l'app.
   // Mis à jour quand Julien ouvre l'app : on montre la fraîcheur, pas de bluff.
-  const wsRows = await sbGet('app_data?id=eq.widget_stats&select=data');
+  const wsRows = await lire('app_data?id=eq.widget_stats&select=data');
   const appStats = (wsRows && wsRows[0] && wsRows[0].data) || null;
   const goal = Number(d.vinted_goal) || 0; // objectif de CA mensuel fixé dans l'app
-  return { online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, connecte, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  // `baseKO` : au moins une des 22 lectures n'a pas répondu. Le panneau ne peut
+  // PAS le déduire de ses chiffres — des compteurs à 0 sont exactement ce qu'il
+  // voit quand tout va bien et qu'il n'y a rien à faire. C'est donc la seule
+  // information qui distingue « rien à faire » de « je n'ai rien pu lire ».
+  return { baseKO: lecturesRatees > 0, lecturesRatees, online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, connecte, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {

@@ -682,6 +682,38 @@ d'un clic ; un compte vivant qui perd ses jetons, non.
   d'avant, 0 après. *Même famille que « lecture KO, écriture OK » pour
   `push_subs` : la panne totale n'est presque jamais le cas dangereux.*
 
+### ⚠️⚠️ ET LE PANNEAU SUR VINTED FÊTAIT « TOUT EST À JOUR » PENDANT LA PANNE
+**Treizième forme du piège, sur la surface qu'il regarde TOUS LES JOURS.**
+Mesuré le 12 septembre, quatrième jour de base injoignable. `buildPanelData`
+fait **22 lectures**, toutes écrites `(rows && rows[0] && rows[0].data) || {}`
+ou `|| []` — or `sbGet` rend `null` quand la base n'a pas répondu. Tous les
+compteurs tombaient à 0, et le panneau affichait
+**« ✅ Rien d'urgent : tout est à jour. Beau boulot. »** avec 14 colis à
+expédier et 6 à retirer. C'est le mensonge du 10 septembre, mot pour mot, dans
+l'extension — et il a tourné pendant toute la panne.
+- **Pire : la route répondait `{ok:true, ...r}` par-dessus.** Le panneau n'avait
+  donc **aucun moyen** de faire la différence : des compteurs à zéro sont
+  exactement ce qu'il voit un jour calme. `baseKO` est la seule information qui
+  sépare « rien à faire » de « je n'ai rien pu lire ».
+- Le bandeau se pose **UNE fois** au-dessus du corps (comme le bloc de panne sur
+  la coque de l'app, §7), dit ce que ce n'est **pas** (« rien n'est perdu »), et
+  **ne promet rien sur le retour** — le panneau ne peut pas le savoir.
+- Les **deux replis de `load()`** portent aussi l'échec (`VIDE()`) : « pas su »
+  ne vaut pas « rien », y compris quand c'est l'extension qui a été rechargée.
+- ⚠️ **Le cas dangereux n'est pas la panne totale** : `audit-panneau.cjs` sert
+  aussi **une seule lecture qui expire** (`orders_sold`, `email_track_`,
+  `id=eq.main`), la base debout par ailleurs — même famille que « lecture KO,
+  écriture OK » pour `push_subs`. **8 échecs** sur le code d'avant, 0 après,
+  et il vérifie les **deux sens** (aucune fausse alerte en marche normale).
+- ⚠️ **SEPTIÈME fois qu'un de mes contrôles crie au loup** : il exigeait
+  `baseKO` dans l'expression du repli, et le repli vaut `VIDE()` — un helper qui
+  le porte très bien. La règle est « la valeur de repli PORTE l'échec », pas
+  « elle l'écrit sur place » : le contrôle suit l'expression jusqu'à sa
+  définition. *Un audit suit la RÈGLE, pas son orthographe.*
+- Extension passée en **5.55.3**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune
+  entrée d'`EXT_CAPACITES` : l'app ne promet rien de neuf, c'est un mensonge
+  qu'on retire.
+
 ### « Ça revient tout seul » était faux au troisième jour
 Le bloc de panne promettait une coupure passagère : « *si ça dure plus d'une
 heure, c'est une panne du serveur : ça revient tout seul* ». La base est tombée
@@ -1003,7 +1035,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **30 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **31 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -1255,7 +1287,7 @@ prouve rien.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 30 audits
+scripts/audit-*.cjs             les 31 audits
 scripts/bancs/                  les 16 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
