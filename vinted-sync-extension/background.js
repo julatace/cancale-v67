@@ -895,6 +895,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
           if (msg.action === 'getPhotos') { const r = await getPairPhotos(msg.numero); sendResponse({ ok: true, numero: r.numero, title: r.title, photos: r.photos }); return; }
           if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
+          // Ce que la page Leboncoin porte vraiment. Aucune donnée d'annonce :
+          // juste de quoi savoir si la capture a pu lire quelque chose. Sans ça,
+          // « 0 annonce » et « je n'ai rien pu lire » sont le même silence.
+          if (msg.action === 'lbcDiag') {
+            await storeLbcRecon({ capture: { source: msg.source, vues: msg.vues, compte: !!msg.compte, url: msg.url, a_next_data: !!msg.a_next_data, a_next_f: !!msg.a_next_f, at: new Date().toISOString() } });
+            sendResponse({ ok: true }); return;
+          }
           if (msg.action === 'lbcForm' && Array.isArray(msg.fields)) { await storeLbcRecon({ form: { url: msg.url, fields: msg.fields, at: new Date().toISOString() } }); sendResponse({ ok: true }); return; }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
@@ -5057,11 +5064,22 @@ async function buildLbcData() {
   removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   // Compteur d'annonces Leboncoin : ce que TU as marqué publié (fiable) et, si la
   // capture LBC a remonté quelque chose, le nombre réellement vu en ligne.
+  // ⚠️⚠️ « JAMAIS LU » N'EST PAS « ZÉRO ». Mesuré le 12 septembre : `lbc_listings`
+  // est ABSENTE de sa base — la capture, qui dépendait de `__NEXT_DATA__`, ne
+  // trouvait plus rien depuis que Leboncoin a changé de format. Le panneau
+  // annonçait pourtant « 📊 0 annonce sur Leboncoin », et la liste « à retirer »
+  // restait vide : le « vendue sur Vinted → retire-la » ne pouvait PAS marcher,
+  // sans que rien ne le dise. On porte donc l'information.
   let lbcCount = 0;
+  let lbcJamaisLu = true;
   try {
     const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
-    const items = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
-    lbcCount = Object.values(items).filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v && v.status || ''))).length;
+    if (lbcRows !== null) {                       // `null` = la base n'a pas répondu
+      const ligne = lbcRows && lbcRows[0];
+      lbcJamaisLu = !ligne;                       // aucune ligne = jamais capté
+      const items = (ligne && ligne.data && ligne.data.items) || {};
+      lbcCount = Object.values(items).filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v && v.status || ''))).length;
+    }
   } catch (_) {}
   const postedCount = [...posted].filter((x) => /^\d+$/.test(x)).length;
   // Quota détecté automatiquement depuis l'offre Leboncoin (si trouvé).
@@ -5069,7 +5087,7 @@ async function buildLbcData() {
   try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=data'); const q = rec && rec[0] && rec[0].data && rec[0].data.quota; if (q && q.value) detected = q.value; } catch (_) {}
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
-  const stats = { postedCount, lbcCount, limit: lbcLimit, plan: lbcPlan, detected, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
+  const stats = { postedCount, lbcCount, lbcJamaisLu, limit: lbcLimit, plan: lbcPlan, detected, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
     autoMatched: autoMatched.size, lbcSeen: lbcItems.length, unlinkedCount: unlinked.length };
   // Liste des paires marquées « publiées » (pour pouvoir annuler une erreur).
   const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));

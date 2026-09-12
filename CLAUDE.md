@@ -982,6 +982,36 @@ mesurés :
    découverte** : avec les motifs actuels la barre de recherche n'était pas
    atteignable.
 
+9. ⚠️⚠️ **LA CAPTURE DE SES ANNONCES LEBONCOIN ÉTAIT MORTE, EN SILENCE.** Mesuré
+   le 12 septembre : `lbc_listings` **et** `lbc_accounts` sont **absentes** de sa
+   base, alors que `lbc_recon` (écrite par un autre chemin) existe depuis le
+   2 août. Or le compte Leboncoin se lit sur **n'importe quelle** page dès que
+   `__NEXT_DATA__` est là : s'il n'a jamais été écrit, c'est que cet élément
+   n'existe plus — Leboncoin est passé au routeur « app » de Next, qui diffuse
+   ses données dans **`self.__next_f`** au lieu de `__NEXT_DATA__`.
+   ⇒ Conséquence, et c'est elle qui compte : **le « vendue sur Vinted → retire-la
+   de Leboncoin » qu'il venait de demander ne pouvait pas fonctionner** (le
+   rapprochement passe par la référence lue sur l'annonce Leboncoin), et le
+   panneau affichait « 📊 **0** annonce sur Leboncoin » — un zéro **inventé** qui
+   cachait exactement ça. C'est « rien lu ne vaut pas rien » sur cet écran.
+   - `donneesNext()` essaie les **deux** formats ; `objetsDuFlux()` ne parse que
+     du JSON **complet et bien fermé** — un fragment tronqué est ignoré, jamais
+     deviné.
+   - `lbcJamaisLu` distingue « aucune annonce » de « jamais capté » : un **tiret**
+     et la raison, avec **ce que ça empêche**, jamais un zéro (§7).
+   - ⚠️ **Je n'ai jamais pu voir la page** (leboncoin.fr me renvoie 403) : c'est
+     donc l'extension qui mesure et qui **remonte ce qu'elle a vu**
+     (`lbcDiag` → `lbc_recon.capture` : quel format porte la page, combien
+     d'annonces). Même méthode que pour le formulaire eBay — faire mesurer par ce
+     qui y a accès.
+   - ⚠️⚠️ **ET MON DIAGNOSTIC A FAILLI CASSER LA VRAIE CAPTURE** : je l'avais
+     nommé `lbcCapture`, un nom **déjà pris** par le message qui transporte les
+     annonces. Le fond prenait le premier des deux handlers et **avalait la
+     capture réelle**, en silence. C'est le banc qui l'a vu (champs `undefined`)
+     avant que ça ne parte. *Un diagnostic ne doit jamais partager le canal de la
+     donnée qu'il observe* — et le banc vérifie désormais que les **deux**
+     messages partent.
+
 ⚠️⚠️ **ET `lbc.js` N'AVAIT JAMAIS TOURNÉ** — 480 lignes, le panneau qui SERT à
 publier. `node --check` ne lit que la syntaxe. `scripts/bancs/leboncoin.cjs` le
 charge dans une fausse page avec un faux `chrome.runtime` : **18 contrôles, 10

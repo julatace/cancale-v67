@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.55.6';
+const EXT_ATTENDUE = '5.56.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -21335,6 +21335,10 @@ function LeboncoinScreen() {
     // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
     // pour que les deux écrans racontent la même chose.
     const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+    // ⚠️ « jamais capté » n'est pas « zéro annonce » : sans cette ligne, le
+    //    rapprochement par référence est impossible, donc « vendue sur Vinted →
+    //    à retirer » ne peut RIEN trouver. L'écran doit le dire, pas afficher 0.
+    const lbcJamaisLu = lbcRows !== null && !(lbcRows && lbcRows[0]);
     const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
     const lbcAds = Object.values(lbcItems).filter(Boolean);
     const numFrom = (s) => { const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(s || '')); return m ? m[1] : null; };
@@ -21404,7 +21408,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ echecLecture: echecLecture || listRowsBrut === null, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    setData({ echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -21455,9 +21459,15 @@ function LeboncoinScreen() {
         {/* Compteur / offre */}
         <Card>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 26, fontWeight: 900, color: C.text }}>{n}</span>
+            <span style={{ fontSize: 26, fontWeight: 900, color: C.text }}>{data.lbcJamaisLu && !data.postedCount ? '—' : n}</span>
             <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
           </div>
+          {data.lbcJamaisLu && !data.postedCount && (
+            <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
+              Je n'ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> sur leboncoin.fr une fois, avec l'extension : je les lirai au passage.
+              <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand une paire se vend sur Vinted.
+            </div>
+          )}
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan || (lim ? '' : 'Gratuit')}{data.plan || !lim ? '' : ''}</div>
           {lim ? (<>
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>

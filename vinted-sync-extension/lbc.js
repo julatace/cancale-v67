@@ -47,12 +47,73 @@
   //    sont dans la balise <script id="__NEXT_DATA__"> du DOM. On y cherche les
   //    objets « annonce » (un prix + un titre) et on remonte les champs utiles.
   //    Sert au dispatcher (LBC → choisir un compte Vinted) et à la synchro inverse.
-  function captureLbcListings() {
-    let listings = [];
+  // ⚠️⚠️ CETTE CAPTURE ÉTAIT MORTE EN SILENCE — ET PERSONNE NE POUVAIT LE SAVOIR.
+  // Mesuré le 12 septembre : `lbc_listings` ET `lbc_accounts` sont ABSENTES de sa
+  // base, alors que `lbc_recon` (écrite par un autre chemin) existe depuis le
+  // 2 août. Or le compte Leboncoin se lit sur N'IMPORTE QUELLE page dès que
+  // `__NEXT_DATA__` est là : s'il n'a jamais été écrit, c'est que cet élément
+  // n'existe plus (Leboncoin est passé au routeur « app » de Next, qui diffuse
+  // ses données dans `self.__next_f` au lieu de `__NEXT_DATA__`).
+  // Conséquence : le panneau annonçait « 📊 0 annonce sur Leboncoin », aucun
+  // rapprochement automatique, et surtout **aucun « à retirer »** — donc le
+  // « vendue sur Vinted → retire-la » qu'il vient de demander ne pouvait pas
+  // marcher, sans que rien ne le dise. C'est « rien lu ne vaut pas rien », sur
+  // cet écran-ci.
+  // ⇒ On essaie les DEUX sources, et on REMONTE ce qu'on a trouvé (`lbcCapture`)
+  //   pour que le panneau puisse dire « je n'ai pas encore vu tes annonces »
+  //   plutôt qu'un zéro inventé. Je n'ai jamais pu voir la page (403 depuis mes
+  //   outils) : c'est donc l'extension qui mesure, comme pour le formulaire eBay.
+  function donneesNext() {
+    // 1) L'ancien format : un <script id="__NEXT_DATA__"> avec tout le JSON.
     try {
       const el = document.getElementById('__NEXT_DATA__');
-      if (el && el.textContent) {
-        const data = JSON.parse(el.textContent);
+      if (el && el.textContent) return { data: JSON.parse(el.textContent), source: 'next_data' };
+    } catch (_) {}
+    // 2) Le routeur « app » : les données arrivent en morceaux dans
+    //    `self.__next_f`, sous forme de fragments de texte. On en extrait les
+    //    objets JSON qui ressemblent à des annonces, sans rien supposer du reste.
+    try {
+      const f = self.__next_f;
+      if (Array.isArray(f) && f.length) {
+        const txt = f.map((c) => (Array.isArray(c) ? c[1] : c)).filter((x) => typeof x === 'string').join('');
+        if (txt) return { data: objetsDuFlux(txt), source: 'next_f' };
+      }
+    } catch (_) {}
+    return { data: null, source: 'aucune_source' };
+  }
+  // Extrait les objets JSON complets d'un flux texte. On ne parse QUE ce qui est
+  // du JSON valide et bien fermé : un fragment tronqué est ignoré, jamais deviné.
+  function objetsDuFlux(txt) {
+    const out = [];
+    let i = 0;
+    while (i < txt.length && out.length < 400) {
+      const d = txt.indexOf('{', i);
+      if (d < 0) break;
+      let p = 0, fin = -1, chaine = false, ech = false;
+      for (let j = d; j < txt.length && j < d + 20000; j++) {
+        const c = txt[j];
+        if (ech) { ech = false; continue; }
+        if (c === '\\') { ech = true; continue; }
+        if (c === '"') { chaine = !chaine; continue; }
+        if (chaine) continue;
+        if (c === '{') p++;
+        else if (c === '}') { p--; if (!p) { fin = j; break; } }
+      }
+      if (fin < 0) { i = d + 1; continue; }
+      const brut = txt.slice(d, fin + 1);
+      if (/"(subject|list_id|ad_id)"/.test(brut)) {
+        try { out.push(JSON.parse(brut)); } catch (_) {}
+      }
+      i = fin + 1;
+    }
+    return out;
+  }
+  function captureLbcListings() {
+    let listings = [];
+    const src = donneesNext();
+    try {
+      if (src.data) {
+        const data = src.data;
         const found = [];
         const seen = new Set();
         const looksLikeAd = (o) => o && typeof o === 'object' && (o.subject || o.title) && (o.price != null || o.price_cents != null || (o.attributes && o.price));
@@ -93,9 +154,8 @@
     // reellement branches, et lequel a servi a publier quoi.
     let account = null;
     try {
-      const el = document.getElementById('__NEXT_DATA__');
-      if (el && el.textContent) {
-        const data = JSON.parse(el.textContent);
+      if (src.data) {
+        const data = src.data;
         const walk = (node, depth) => {
           if (account || !node || depth > 8 || typeof node !== 'object') return;
           if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1); return; }
@@ -109,6 +169,28 @@
         };
         walk(data, 0);
       }
+    } catch (_) {}
+    // ⚠️ ON REMONTE LA MESURE, PAS SEULEMENT LE RÉSULTAT. Sans ça, « 0 annonce
+    //    captée » et « je n'ai pas pu lire la page » sont le même silence — et
+    //    c'est le silence qui a caché pendant des semaines que cette capture ne
+    //    marchait plus. Aucune donnée d'annonce ici : juste ce qui existe.
+    try {
+      send({
+        // ⚠️ NOM DISTINCT, ET CE N'EST PAS UN DÉTAIL : `lbcCapture` existe déjà et
+        //    transporte les ANNONCES. Mon premier jet réutilisait ce nom — le
+        //    handler du fond prenait le premier des deux et **avalait la vraie
+        //    capture** en silence. C'est le banc qui l'a vu (champs `undefined`)
+        //    avant que ça ne parte. Un diagnostic ne doit jamais partager le
+        //    canal de la donnée qu'il observe.
+        action: 'lbcDiag',
+        source: src.source,
+        vues: listings.length,
+        compte: !!account,
+        url: location.href.slice(0, 160),
+        // Ce que la page porte VRAIMENT, pour viser juste au prochain passage.
+        a_next_data: !!document.getElementById('__NEXT_DATA__'),
+        a_next_f: !!(self.__next_f && self.__next_f.length),
+      });
     } catch (_) {}
     if (listings.length || account) {
       send({ action: 'lbcCapture', url: location.href, listings, account });
@@ -258,6 +340,18 @@
     </div>`;
   }
   function counterHtml() {
+    // ⚠️⚠️ UN ZÉRO INVENTÉ EST PIRE QU'UN CHIFFRE ABSENT. Tant que ses annonces
+    // Leboncoin n'ont jamais été captées, « 📊 0 annonce sur Leboncoin » est
+    // faux — et surtout il CACHE que « vendue sur Vinted → à retirer » ne peut
+    // pas fonctionner (ça se rapproche par la référence de l'annonce Leboncoin).
+    // Un tiret et la raison, jamais un zéro (§7).
+    if (stats.lbcJamaisLu && !(stats.postedCount > 0)) {
+      return `<div class="counter">
+        <div class="crow"><b>📊 —</b> annonces sur Leboncoin
+          <button class="btn" data-a="setplan" style="margin-left:auto">Choisir mon offre</button></div>
+        <div class="cmsg" style="color:#9a5b16">Je n&#39;ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> une fois : je les lirai au passage.<br>Tant que c&#39;est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand une paire se vend sur Vinted.</div>
+      </div>`;
+    }
     const n = Math.max(stats.postedCount || 0, stats.lbcCount || 0); // le plus fiable des deux
     // Limite effective : celle que TU as choisie, sinon celle détectée sur ton offre.
     const lim = stats.limit != null ? stats.limit : (stats.detected || null);
