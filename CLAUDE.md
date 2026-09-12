@@ -1217,67 +1217,70 @@ lus dans ses conversations) en dépendait.
   tous les fichiers, que l'app le propose, et qu'aucun zip périmé ne traîne.
 - **Après toute modification de `vinted-sync-extension/`, régénérer le zip.**
 
-## 8. État au 8 septembre 2026 (remesuré en fin de journée)
+## 8. État au 12 septembre 2026, 19h40 — base revenue, remesuré en entier
+
+**La base Supabase est restée injoignable du 9 au 12 septembre** (522 après 20 s,
+et `544 DatabaseTimeout` côté stockage : le projet n'était **pas en pause**, il
+était bloqué). Julien a cliqué **`Settings` → `General` → `Restart project`** le
+12 à ~19h35 ; la base répond en **0,66 s**, et **six comptes ont été captés dans
+les deux minutes qui ont suivi** — toute la chaîne remarche. **Rien n'a été
+perdu** : les 9 comptes Vinted sont là, les 338 numéros aussi.
 
 | | |
 |---|---|
-| annonces **ouvertes** | **54** · **0 doublon vivant** ✅ (385 fermées à côté — voir le piège `nItems` ci-dessous) |
-| paires numérotées | **329** · **0 prix d'achat** ⚠️ (il les saisit lui-même — la modale trie les vendues d'abord : 20 saisies = 33 % du CA reliable) |
-| pool de numéros | **465**, sans trou, plus haut = 465 (append-only : c'est normal) |
-| ⚠️ numéros en double | **13**, tous HISTORIQUES : N°1 à N°16 redonnés par la numérotation auto les 2/4/6/15/16 août. **Cause : sur un appareil neuf le pool était lu VIDE au montage**, le nuage arrivant 500 ms plus tard → la numérotation repartait de 1. Corrigé (`onCloudReady` relit le pool) et protégé par `audit-identite.cjs`. **Aucun n'est vivant** : les paires en double sont fermées. |
-| argent Vinted | **139,04 € disponibles** à virer · **2 013,60 € retenus** — sur **7 porte-monnaie**, pas 9, et c'est ce que l'app affiche (voir le piège des trois formes ci-dessous). Le plus ancien solde date de **13 j** (`julatace3535`). |
-| colis | 15 ventes à expédier, **10 bordereaux déjà en base** · **6** colis à retirer, **0 code** — 5 sur `julatace3535` (dernière capture : 4 j) et **1 sur `julatace35260`, capté il y a 10 min**. ⚠️ Ce n'est PAS le compte qui bloque : **son extension est antérieure à 5.45**, elle n'a pas `capterRetraits` (0 compteur `retrait_*` sur 42). La mise à jour est le premier geste. |
-| notifications push | ✅ fonctionnent (clé VAPID posée sur Vercel) |
-| comptes Vinted | 9, dont 5 dont la boîte **ne fait suivre aucun email** → aucune notification de vente possible pour eux (affiché dans Réglages) |
-| ventes masquées | 209 (masquées à la main ; « tout réafficher » existe sur l'écran Ventes) |
+| annonces **ouvertes** | **59** · **0 doublon vivant** ✅ (400 fermées à côté — `nItems` compte les deux, piège du 7 sept.) |
+| paires numérotées | **338** · plus haut numéro **481** · **0 prix d'achat**, **0 prix plancher** ⚠️ (il les saisit lui-même) |
+| cochées pour une autre place | **0 explicitement** — donc la file Leboncoin prend tout (le défaut vaut « oui », exprès : une nouveauté n'éteint pas ce qui marchait). eBay, défaut `false` : file vide, comme prévu. |
+| argent Vinted | **227,54 € disponibles** à virer · **2 002,80 € retenus** — sur **8 porte-monnaie lus** sur 10 lignes (2 hors sujet, ignorées : une ligne `purgedAt/supprime` et une réponse `balance/history`). Détail : `arthuror2` 93 € + 109,80 € · `julienf765` 106,10 € + 273 € · `julatace3535` 28,44 € + 409,80 € · `tomj683` 455 € retenus · `julatace35260` 315 € · `tomj606` 343,50 € · `angeled92` 96,70 €. |
+| ventes | **431 captées**. À **expédier : 6** (5 « Le paiement a été validé » + 1 « Bordereau envoyé au vendeur » — qui n'est PAS un colis parti, §`needsBordereau`). 13 en cours d'acheminement, 4 déposés, 3 non réclamées, 350 finalisées, 46 remboursées. |
+| bordereaux | **157 emails** dont **139 avec le PDF** · **63 captés** par l'extension |
+| achats | **544 captés**. **1** « colis déposé en bureau de Poste ou point relais », 3 « non réclamée — retournée à l'expéditeur », 6 livrés. **0 code de retrait** : `panel_colis_relais` **n'existe toujours pas**. |
+| comptes Vinted | **9**, dont `liliand653` **exclu** (son choix). Trois identifiants de moisson n'ont plus de compte en face (reliquats de juillet/août). |
 
-⚠️⚠️ **PIÈGE `billing` — ET C'EST MON SCRIPT QUI AVAIT TORT, PAS L'APP.** Le
-8 septembre j'ai mesuré « 29,94 € disponibles sur 5 porte-monnaie » et j'allais
-annoncer que l'app perdait de l'argent. En vérifiant la FORME (§6) : **trois
-charges différentes** dorment sous le même identifiant `harvest_{uid}_billing` —
-`{main, escrow}` (le solde, 5 comptes), `{balance, pending_balance, …}` (la
-réponse `payouts`, 2 comptes : `arthuror2` 93 € + 109,80 €, `llloollllaa`
-16,10 € + 428,50 €), et une réponse **qui n'a rien à voir** (`minimum_price`,
-sur `julienf765`). `liliand653` n'a aucune ligne.
-⇒ **L'app lit déjà les trois** (`fetchWalletEscrow`), ne mélange jamais
-« disponible » et « en attente », ignore la charge hors sujet, et annonce
-**le nombre de porte-monnaie réellement lus** — donc « sur 7 », pas « sur 9 ».
-Elle est juste. Mon script lisait `data->payload->user_balance`, un champ qui
-n'existe pas.
-⇒ La ligne de `julienf765` est un **reliquat** : `estPorteMonnaie` (extension)
-exige aujourd'hui un montant réel parmi `main|escrow|balance|pending_balance`,
-donc ça ne peut plus se reproduire. Elle sera écrasée à sa prochaine visite du
-porte-monnaie. **Ne pas « corriger » l'app pour ça.**
+⚠️ **LA FRAÎCHEUR N'EST PAS LA MÊME PARTOUT** (lue sur `data.capturedAt`, jamais
+`updated_at` qui ment, §4.3) : `tomj606`, `llloollllaa`, `tomj683`,
+`julienf765`, `julatace35260`, `angeled92` **captés à l'instant** ; mais
+**`julatace3535` date de 3,1 jours** et **`arthuror2` de 4,1 jours** — ce sont
+les deux qu'il n'a pas ouverts depuis la panne, et `julatace3535` est justement
+celui qui porte ses colis à retirer. **Le geste : passer sur Vinted connecté sur
+ces deux comptes-là.**
 
-⚠️ **PIÈGE `nItems`, payé le 7 septembre.** `harvest_{uid}_listings.nItems` compte
-**tout** ce que la moisson a capté, **annonces fermées comprises** : 103 pour
-`julatace3535`, dont **94 `is_closed`**. J'en ai déduit « 380 annonces en ligne »
-puis « **12 numéros en double, toutes les paires en ligne — le risque n°1 est
-vivant** » — et j'allais l'annoncer. La vraie mesure (`!x.is_closed`) donne **49
-ouvertes et 0 conflit**. C'est §6 mot pour mot : *vérifier le nom ET la forme du
-champ avant de conclure*. Le banc `conflit.cjs` FORCE désormais le cas pour
-prouver que l'alerte rouge s'affiche quand elle doit — constater une absence ne
-prouve rien.
+⚠️⚠️ **SON EXTENSION EST TOUJOURS ANTÉRIEURE À 5.45** — mesuré, pas deviné : sur
+les **47 compteurs** de `panel_diag_capture`, **0 `retrait_*`, 0 `releve_*`,
+0 `ebay_*`, 0 `lbc_*`**, alors que `bordereau_genere` (3) et `label_envoye` (15)
+tournent. Or `capterRetraits` écrit son compteur **même en échec** : zéro
+compteur = la fonction n'a jamais tourné. Ni `panel_colis_relais` ni
+`panel_ebay_form` n'existent en base. **Tant qu'il ne met pas à jour, aucun code
+de retrait ne sera lu, aucun relevé capté, et la sélection Leboncoin/eBay ne
+sera pas appliquée par le panneau.** Le zip à jour est dans l'app
+(`public/VRM-extension.zip`, **5.55.3**) ; `EXT_ATTENDUE` le suit et l'app
+affiche le bandeau.
+
+⚠️⚠️ **PIÈGE `billing` — ET C'EST ENCORE MON SCRIPT QUI AVAIT TORT.** Première
+mesure après le retour : « **0 € sur 0 porte-monnaie, 10 lignes hors sujet** »,
+et « **0 annonce ouverte sur 12 comptes** ». J'allais annoncer que la panne avait
+tout effacé. En vérifiant la FORME (§6) : tout vit sous **`data.payload`** (pas
+`data`), les items sont **`payload.items`** / **`payload.my_orders`**, et les
+montants Vinted sont des **objets `{amount, currency_code}`**, pas des nombres.
+Le dossier le disait déjà en deux endroits. ⇒ **Avant d'annoncer une perte,
+vérifier le nom ET la forme du champ** — c'est la troisième fois que ce même
+script-là me fait croire à une catastrophe.
 
 **Ouvert :**
-- ⚠️ **L'extension installée chez lui est en retard** (mesuré : captures fraîches
-  du matin, mais **0 ligne de relevé**). L'app le dit maintenant — `EXT_ATTENDUE`
-  comparée à la version que le pont annonce, bandeau sur Ma journée et ligne dans
-  Réglages. `scripts/audit-coherence.cjs` vérifie que la constante suit le
-  manifeste. **C'est ce qui bloque le point suivant.**
-- **La forme d'une ligne de VENTE dans le relevé du porte-monnaie.** Le relevé daté
-  est capté (`harvest_{uid}_releve_{YYYY-MM}`), mais le seul mouvement jamais
-  observé est un **virement sortant** — et il porte `type:"credit"`. Donc
-  « credit » ≠ « recette ». **Ne baptiser aucun total « CA encaissé » avant
-  d'avoir vu une vraie ligne de vente en base.** C'est ce qui débloquera un vrai
-  « argent reçu » par mois pour l'URSSAF.
-- Le paramètre `?year=&month=` des mois passés : jamais observé, tenté de façon
-  bornée, et le compte est marqué muet si Vinted l'ignore.
-- **Dépôt PUBLIC** et **RLS désactivé** : la clé « anon » du bundle donne un accès
-  complet en lecture/écriture, y compris aux jetons Vinted. Les deux gestes qui
-  referment ça (passer le dépôt en privé, appliquer
-  `supabase/migrations/001-multi-utilisateurs.sql`) n'appartiennent qu'à lui.
-  Détail dans `SECURITE.md`.
+- **La mise à jour de l'extension** : le premier geste, et il débloque les codes
+  de retrait, les relevés et le filtrage des places.
+- **Les emails du 9 au 12 septembre sont perdus** si le Worker Cloudflare n'a pas
+  été remis à jour (il doit rejouer quand la route répond 503). Les ventes,
+  annonces, achats et messages se re-captent tout seuls par l'extension ; ce qui
+  ne revient pas, ce sont les **PDF de bordereau** et les **emails de suivi**
+  reçus pendant ces trois jours. **L'app n'a aucun moyen de le vérifier** — ne
+  pas le promettre à l'écran.
+- **La forme d'une ligne de VENTE dans le relevé** : toujours 0 ligne
+  `harvest_*_releve_*` (extension trop ancienne). « credit » ≠ « recette » :
+  **ne baptiser aucun total « CA encaissé »** avant d'avoir vu une vraie ligne.
+- **Dépôt PUBLIC** et **RLS désactivé** : la clé « anon » du bundle donne un
+  accès complet en lecture/écriture, y compris aux jetons Vinted. Les deux
+  gestes n'appartiennent qu'à lui (`SECURITE.md`).
 
 ---
 
