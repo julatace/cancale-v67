@@ -790,9 +790,36 @@ manquait, c'est le **choix** : la file prenait TOUTE annonce numérotée en lign
   l'extension appliquent la même règle** (elles calculent la file chacune de leur
   côté — le panneau tourne sur leboncoin.fr, où l'app n'est pas chargée).
   **6 échecs** sur le code d'avant.
-- **eBay et les autres restent à faire** : la sélection est déjà multi-place
-  (`MP_PLACES`), mais tant qu'aucun assistant eBay n'existe, **aucune puce eBay
-  n'est affichée** — un bouton qui ne mène à rien serait la même promesse vide.
+
+### eBay : deuxième place, même modèle — et le défaut d'eBay est **NON**
+Julien a confirmé le 12 septembre : « **j'ai les deux** » (compte particulier ET
+professionnel). L'assistant eBay est donc livré sur le modèle de Leboncoin :
+`ebay.js` tourne sur **ebay.fr**, liste les paires cochées, télécharge les
+photos, copie le texte, ouvre le formulaire de mise en vente et remplit les
+champs qu'il **reconnaît**. Aucune publication automatique.
+- ⚠️ **Le défaut d'eBay est `false`, et ce n'est pas une symétrie ratée.**
+  Leboncoin vaut « oui » parce que sa file existait AVANT la sélection et qu'on
+  ne l'éteint pas dans son dos ; eBay n'a jamais rien préparé, donc cocher à sa
+  place mettrait 44 annonces dans une file qu'il n'a pas demandée.
+- Le titre monte à **80 caractères** (50 sur Leboncoin) et la référence
+  `VRM-{n°}` va dans le champ **SKU** du compte pro — c'est ce qui permettra de
+  reconnaître l'annonce plus tard **sans rapprochement par titre** (§5).
+- **Aucune catégorie n'est devinée** : eBay la propose à partir du titre, et une
+  catégorie fausse ferait plus de mal que pas de catégorie du tout.
+- ⚠️⚠️ **JE N'AI JAMAIS VU LE FORMULAIRE eBAY, ET LE CODE LE DIT.** Le bandeau
+  annonce **combien de champs ont été remplis** — s'il dit 0, rien n'a été
+  reconnu et il le voit tout de suite (le texte complet est dans son
+  presse-papier, les photos dans `VRM-{n°}`). Et l'extension me **rapporte la
+  structure du formulaire** (`panel_ebay_form` : noms de champs, aucun contenu)
+  pour que le prochain passage vise juste. *Mesurer d'abord* appliqué à ce que
+  je ne peux pas mesurer moi-même : on fait mesurer par ce qui y a accès.
+  **Ne pas écrire « ton annonce est prête » — écrire le chiffre.**
+- Les photos ne peuvent **pas** être injectées (un navigateur interdit de
+  remplir un champ fichier par programme) — dit à l'écran, pas contourné.
+- `EXT_CAPACITES.ebay = '5.55.0'`, et `audit-places.cjs` couvre les deux places.
+  ⚠️ Son premier jet **mourait** sur le code d'avant (`buildEbayData` n'existe
+  pas → `TypeError`), donc les contrôles suivants n'étaient jamais rendus : *un
+  audit ne meurt pas, il rapporte*.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
@@ -806,6 +833,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `offres` | `autoAccepterOffres` | **5.38.0** (26 août) | « offre acceptée automatiquement au-dessus de ton plancher » |
 | `releve` | `capterReleves` | **5.52.0** (5 sept.) | « l'extension récupère le relevé à ta prochaine visite » |
 | `places` | `mpChoisi` | **5.54.0** (11 sept.) | « seules les annonces cochées partent sur Leboncoin » |
+| `ebay` | `buildEbayData` | **5.55.0** (12 sept.) | « l'extension prépare tes annonces sur eBay » |
 
 `extSait(quoi)` rend **trois états** — `absente` (téléphone, autre navigateur) ·
 `retard` · `ok` — et **jamais deux**. Une extension **muette** sur sa version est

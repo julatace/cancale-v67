@@ -111,6 +111,45 @@ function ctxAvec(numeros) {
   dit(/retirees/.test(APP) && /pas dans cette file/.test(APP),
     'une annonce retirée est comptée et dite, jamais effacée en silence');
 
+  // ── eBAY : MÊME RÈGLE, MAIS LE DÉFAUT EST NON ────────────────────────────
+  // Leboncoin vaut « oui » parce que sa file existait AVANT la sélection.
+  // eBay n'a jamais rien préparé : cocher à sa place mettrait 44 annonces dans
+  // une file qu'il n'a pas demandée.
+  {
+    const n2 = {
+      '101': { numero: '101', title: 'A', mp: { ebay: true } },
+      '202': { numero: '202', title: 'B', mp: { ebay: false } },
+      '303': { numero: '303', title: 'C' },
+    };
+    // ⚠️ UN AUDIT NE MEURT PAS, IL RAPPORTE. Sur le code d'avant `buildEbayData`
+    //    n'existe pas : un `TypeError` non rattrapé coupe le script au milieu et
+    //    les contrôles suivants ne sont jamais rendus — on ne sait plus ce qui
+    //    manque vraiment.
+    const ctx2 = ctxAvec(n2);
+    if (typeof ctx2.buildEbayData !== 'function') {
+      dit(false, 'eBay : l\'extension sait construire sa file', '`buildEbayData` n\'existe pas dans background.js');
+      console.log(ko ? `\n${ko} contrôle(s) en échec.` : '');
+      process.exit(1);
+    }
+    const r = await ctx2.buildEbayData();
+    const nums = (r.queue || []).map(a => String(a.numero)).sort();
+    dit(nums.includes('101'), 'eBay : une annonce cochée est dans la file', 'file : ' + (nums.join(', ') || 'vide'));
+    dit(!nums.includes('202'), 'eBay : une annonce décochée n\'y est pas');
+    dit(!nums.includes('303'), 'eBay : une annonce jamais touchée n\'y est PAS (défaut = non)',
+      nums.includes('303') ? '44 annonces se retrouveraient dans une file qu\'il n\'a pas demandée' : '');
+    const a = (r.queue || [])[0] || {};
+    // La référence est ce qui permettra de reconnaître l'annonce plus tard :
+    // jamais un rapprochement par titre (§5).
+    dit(a.sku === 'VRM-101', 'eBay : chaque annonce porte sa référence VRM-{n°}', String(a.sku));
+    dit(String(a.title || '').length <= 80, 'eBay : le titre tient dans les 80 caractères du site', String((a.title || '').length));
+    dit(!a.category, 'eBay : aucune catégorie devinée', 'eBay la propose lui-même, une catégorie fausse ferait pire que rien');
+  }
+  // L'app doit afficher la puce eBay ET ne rien promettre que l'extension
+  // installée ne sait pas faire.
+  dit(/cle: 'ebay'/.test(APP) && /defaut: false/.test(APP), 'l\'app propose eBay, décoché par défaut');
+  dit(/ebay: '5\.55\.0'/.test(APP), 'et la capacité `ebay` est déclarée avec sa version d\'arrivée');
+  dit(/mpChoisi\(e, 'ebay'\)/.test(src), 'l\'extension lit le même choix pour eBay');
+
   console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nLa file part de SA sélection, sur tous ses comptes.');
   process.exit(ko ? 1 : 0);
 })();

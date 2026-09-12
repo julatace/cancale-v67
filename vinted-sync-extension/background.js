@@ -839,6 +839,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     // PONT LEBONCOIN : le script lbc.js (sur leboncoin.fr) demande la liste des
     // annonces Vinted prêtes à publier, ou marque une annonce comme publiée.
+    if (msg && msg.from === 'cancale-ebay') {
+      (async () => {
+        try {
+          if (msg.action === 'getQueue') { const r = await buildEbayData(); sendResponse({ ok: true, ...r }); return; }
+          if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
+          if (msg.action === 'markPosted' && msg.id) { sendResponse({ ok: await markEbayPosted(msg.id, true) }); return; }
+          if (msg.action === 'unmarkPosted' && msg.id) { sendResponse({ ok: await markEbayPosted(msg.id, false) }); return; }
+          if (msg.action === 'setPending') { await chrome.storage.local.set({ vrmPendingEbay: msg.ad ? { ad: msg.ad, at: Date.now() } : null }); sendResponse({ ok: true }); return; }
+          if (msg.action === 'getPending') {
+            const g = await chrome.storage.local.get('vrmPendingEbay');
+            const p = g && g.vrmPendingEbay;
+            sendResponse({ ok: true, ad: (p && p.at && (Date.now() - p.at) < 30 * 60 * 1000) ? p.ad : null }); return;
+          }
+          // ⚠️ JE N'AI JAMAIS VU LE FORMULAIRE eBAY. Plutôt que de deviner ses
+          //    champs, l'extension me les RAPPORTE depuis son navigateur : c'est
+          //    la méthode du projet (mesurer d'abord) appliquée à ce que je ne
+          //    peux pas mesurer moi-même. Aucun contenu, juste des noms de champs.
+          if (msg.action === 'ebayForm' && Array.isArray(msg.fields)) {
+            await supabaseUpsert('app_data', [{ id: 'panel_ebay_form', data: { url: msg.url, fields: msg.fields.slice(0, 150), at: new Date().toISOString() } }], 'id');
+            sendResponse({ ok: true }); return;
+          }
+          sendResponse({ ok: false, error: 'action inconnue' });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-lbc') {
       (async () => {
         try {
@@ -4647,6 +4673,89 @@ const MP_DEFAUT = { lbc: true };
 function mpChoisi(e, place) {
   const v = e && e.mp ? e.mp[place] : undefined;
   return (v === undefined || v === null) ? !!MP_DEFAUT[place] : !!v;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// eBAY — MÊME MODÈLE QUE LEBONCOIN : ON PRÉPARE, C'EST LUI QUI PUBLIE
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien a un compte particulier ET un compte professionnel. Le compte pro a un
+// champ SKU (« numéro de référence ») : on y met `VRM-{n°}`, exactement comme la
+// référence pro de Leboncoin — c'est ce qui permettra plus tard de reconnaître
+// tout seul ce qui est déjà en ligne là-bas, sans rapprochement par titre (§5).
+//
+// ⚠️ AUCUNE PUBLICATION AUTOMATIQUE. On télécharge les photos, on copie le texte,
+//    on ouvre le formulaire et on remplit les champs qu'on RECONNAÎT. Le bandeau
+//    dit combien ont été remplis — s'il dit 0, rien n'a été reconnu et il le voit.
+//    On ne promet pas une annonce prête : on prépare, il relit, il publie.
+const EBAY_POSTED = 'vinted_ebay_posted';
+async function readEbayPosted() {
+  const rows = await sbGet(`app_data?id=eq.${EBAY_POSTED}&select=data`);
+  const d = (rows && rows[0] && rows[0].data) || {};
+  // Même règle que partout : une lecture ratée ne doit pas faire réécrire la
+  // ligne depuis une liste vide (§ lire-fusionner-réécrire).
+  return { echec: rows === null, ids: (d.ids || []).map(String) };
+}
+async function markEbayPosted(id, on) {
+  const d = await readEbayPosted();
+  if (d.echec) return false;
+  const s = new Set(d.ids);
+  if (on === false) s.delete(String(id)); else s.add(String(id));
+  return await supabaseUpsert('app_data', [{ id: EBAY_POSTED, data: { ids: [...s], updatedAt: new Date().toISOString() } }], 'id');
+}
+// Le titre eBay va jusqu'à 80 caractères (50 sur Leboncoin) : on ne coupe pas
+// au même endroit, et on ne devine AUCUNE catégorie — eBay la propose lui-même
+// à partir du titre, une catégorie fausse ferait plus de mal que pas de
+// catégorie du tout.
+function buildEbayAd(raw, det, num, account) {
+  const a = buildLbcAd(raw, det, num, account);
+  let titre = [firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand),
+               String(firstDefined(det.title, raw.title)).trim()].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
+  if (size && !/taille|t\s?\d/i.test(titre)) titre += ' Taille ' + size;
+  if (titre.length > 80) titre = titre.slice(0, 80).trim();
+  return { ...a, title: titre, sku: a.ref, category: '' };
+}
+async function buildEbayData() {
+  const mainRows = await sbGet('app_data?id=eq.main&select=data');
+  const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
+  const numeros = main.vinted_annonce_numeros || {};
+  const labels = main.vinted_account_labels || {};
+  const uid2login = {};
+  (main.vinted_accounts || []).forEach((a) => { uid2login[String(a.vinted_user_id)] = labels[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id); });
+  const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+  const lost = main.vinted_pairs_lost || {};
+  const pos = await readEbayPosted();
+  const posted = new Set(pos.ids);
+  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
+  const details = {};
+  for (const r of itemRows) { const p = (r.data || {}).payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
+  const pageRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  const pageDet = (pageRows && pageRows[0] && pageRows[0].data) || {};
+  for (const id in pageDet) {
+    const pd = pageDet[id] || {}; const cur = details[id] || {};
+    if (!cur.description && pd.description) cur.description = pd.description;
+    if ((!cur.photos || !cur.photos.length) && pd.photos && pd.photos.length) cur.photos = pd.photos.map(u => ({ url: u }));
+    details[id] = cur;
+  }
+  const queue = []; const vus = new Set(); let retirees = 0;
+  for (const r of listRows) {
+    const d = r.data || {}; const p = d.payload || {}; const uid = String(d.uid);
+    if (off.has(uid)) continue;
+    for (const it of (p.items || [])) {
+      const oid = String(it.id);
+      if (it.is_closed || it.is_hidden || it.is_draft) continue;
+      if (vus.has(oid)) continue; vus.add(oid);
+      const e = numeros[oid]; const num = e && e.numero;
+      if (!num || String(num).trim() === '') continue;      // il lui faut un N° (la réf)
+      if (!mpChoisi(e, 'ebay')) { retirees++; continue; }   // pas cochée pour eBay
+      if (lost[String(num).trim()]) continue;
+      if (posted.has(oid) || posted.has(String(num))) continue;
+      queue.push(buildEbayAd(it, details[oid] || {}, num, uid2login[uid]));
+    }
+  }
+  queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  return { queue, retirees, postedCount: posted.size, echec: pos.echec };
 }
 
 async function buildLbcData() {

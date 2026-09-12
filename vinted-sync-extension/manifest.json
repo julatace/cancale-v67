@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "5.54.0",
-  "description": "Synchronise tes comptes et donnees Vinted (annonces detaillees, ventes, achats, messages) vers VRM, depuis TON navigateur. + Panneau VRM sur Vinted (numero de la paire, prix achat, case garage, paires a relancer - affichage seul). + Assistant Leboncoin : prepare tes annonces (titre, description, prix, categorie, photos) et remplit le formulaire de depot des qu'il s'affiche, pour que tu n'aies plus qu'a relire et publier. Aucune publication automatique : c'est toi qui cliques sur Publier.",
+  "version": "5.55.0",
+  "description": "Synchronise tes comptes et donnees Vinted (annonces detaillees, ventes, achats, messages) vers VRM, depuis TON navigateur. + Panneau VRM sur Vinted (numero de la paire, prix achat, case garage, paires a relancer - affichage seul). + Assistants Leboncoin et eBay : prepare tes annonces (titre, description, prix, categorie, photos) et remplit le formulaire de depot des qu'il s'affiche, pour que tu n'aies plus qu'a relire et publier. Aucune publication automatique : c'est toi qui cliques sur Publier.",
   "permissions": [
     "cookies",
     "storage",
@@ -23,7 +23,9 @@
     "https://cancale-v67-ten.vercel.app/*",
     "https://vrm.center/*",
     "https://cancale-v67.vercel.app/*",
-    "https://www.vrm.center/*"
+    "https://www.vrm.center/*",
+    "https://*.ebay.fr/*",
+    "https://*.ebay.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -85,6 +87,16 @@
       ],
       "js": [
         "lbc.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.ebay.fr/*"
+      ],
+      "js": [
+        "ebay.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
