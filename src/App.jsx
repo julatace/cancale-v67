@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.54.0';
+const EXT_ATTENDUE = '5.55.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -53,8 +53,13 @@ const EXT_ATTENDUE = '5.54.0';
 //    Passer d'un coup à « rien n'est sélectionné » aurait vidé sa file du jour
 //    au lendemain, sans qu'il ait rien demandé : une nouveauté ne doit pas
 //    éteindre ce qui marchait.
+// ⚠️ LE DÉFAUT D'eBAY EST **NON**, et ce n'est pas une symétrie ratée :
+//    Leboncoin vaut « oui » parce que sa file existait AVANT la sélection et
+//    qu'on ne l'éteint pas dans son dos. eBay n'a jamais rien préparé : cocher
+//    à sa place mettrait 44 annonces dans une file qu'il n'a pas demandée.
 const MP_PLACES = [
-  { cle: 'lbc', nom: 'Leboncoin', defaut: true, pret: true },
+  { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places' },
+  { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay' },
 ];
 const MP_DEFAUT = MP_PLACES.reduce((a, p) => (a[p.cle] = p.defaut, a), {});
 // `undefined` (jamais touché) ≠ `false` (retiré exprès) : le premier suit le
@@ -94,7 +99,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -12204,7 +12209,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       if (!n) return prev;
       save('vinted_annonce_numeros', u);
-      toast(on ? `${n} annonce${n>1?'s':''} ajoutée${n>1?'s':''} à la file Leboncoin` : `${n} annonce${n>1?'s':''} retirée${n>1?'s':''} de Leboncoin`);
+      const nom = (MP_PLACES.find(p => p.cle === place) || {}).nom || place;
+      toast(on ? `${n} annonce${n>1?'s':''} ajoutée${n>1?'s':''} à la file ${nom}` : `${n} annonce${n>1?'s':''} retirée${n>1?'s':''} de ${nom}`);
       return u;
     });
   };
@@ -13770,7 +13776,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // est affiché en dessous. Avant, il partait de listings.items (TOUS les
     // comptes, même déconnectés) → « 42 en ligne » avec 30 cartes visibles.
     const arr = annBase;
-    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, planchers=0, surLbc=0;
+    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, planchers=0, surLbc=0, surEbay=0;
     for (const it of arr) {
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
@@ -13785,9 +13791,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Combien partent aussi sur Leboncoin — compté ICI, sur la même base que
       // la grille, jamais recalculé par le bandeau qui l'annonce (§11).
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'lbc')) surLbc++;
+      if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'ebay')) surEbay++;
       const age = listedAgeDays(it); if (age!=null) datesKnown++; if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc, surEbay };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
@@ -18855,41 +18862,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (25 % de 362 px = 90 px, ramené au plancher de 160). Une seule règle,
             aucun test de largeur en JavaScript (§5.62). */}
         {/* ── OÙ VONT TES ANNONCES, EN PLUS DE VINTED ─────────────────────
-            La phrase se dit UNE fois ici ; sur chaque carte il n'y a que la
-            puce (§7). Elle DIT COMBIEN, sur la même base que la grille
-            (`annStats`, §11) — un chiffre qu'il peut vérifier en comptant
-            les puces bleues. Deux boutons pour ne pas avoir à cliquer 54
-            fois : c'est la seule raison pour laquelle ils existent. */}
-        {annStats.n > 0 && (
-          <div style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
+            Une LIGNE PAR PLACE DE MARCHÉ, avec son compte et ses deux boutons.
+            La phrase se dit ici une fois (§7) ; sur chaque carte il n'y a que
+            la puce, dont l'état change d'une carte à l'autre. Les comptes
+            viennent d'`annStats` — la même base que la grille (§11), donc il
+            peut les vérifier en comptant les puces bleues.
+            ⚠️ Chaque place annonce ce que l'extension INSTALLÉE sait faire,
+            jamais ce que la dernière version sait faire (`EXT_CAPACITES`). */}
+        {annStats.n > 0 && MP_PLACES.map(pl => {
+          const n = pl.cle === 'lbc' ? annStats.surLbc : annStats.surEbay;
+          const etat = extSait(pl.cap);
+          return (
+          <div key={pl.cle} style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
               <div style={{flex:'1 1 260px',minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,color:C.text}}>
-                  {annStats.surLbc} annonce{annStats.surLbc>1?'s':''} sur {annStats.n} part{annStats.surLbc>1?'ent':''} aussi sur Leboncoin
+                  {n} annonce{n>1?'s':''} sur {annStats.n} part{n>1?'ent':''} aussi sur {pl.nom}
                 </div>
-                {/* ⚠️ `EXT_CAPACITES.places` — C'EST L'EXTENSION QUI FILTRE LA
-                    FILE. Une version antérieure à la 5.54 enregistre bien le
-                    choix (il vit en base) mais prépare TOUTES les annonces
-                    quand même. Promettre « la puce décide » à cette
-                    extension-là, c'est le défaut le plus coûteux du projet
-                    refait une quatrième fois. Trois états, jamais deux. */}
                 <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{
-                  extSait('places')==='ok'
-                    ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune sur leboncoin.fr — photos téléchargées, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>.</>
-                  : extSait('places')==='absente'
-                    ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce sur leboncoin.fr — ouvre l'app sur l'ordinateur où elle est installée.</>
-                    : <>Ton choix est enregistré, <b>mais l'extension installée prépare encore toutes tes annonces</b> : elle ne sait filtrer que depuis la <b>5.54</b>. Mets-la à jour depuis <b>Réglages</b> — tes coches ne bougent pas.</>
+                  etat==='ok'
+                    ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune sur {pl.nom.toLowerCase()}.fr — photos téléchargées, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>.</>
+                  : etat==='absente'
+                    ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce sur {pl.nom} — ouvre l'app sur l'ordinateur où elle est installée.</>
+                    : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore préparer {pl.nom}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Réglages</b> — tes coches ne bougent pas.</>
                 }</div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
-                <button type="button" onClick={()=>setMpToutes('lbc', true)}
+                <button type="button" onClick={()=>setMpToutes(pl.cle, true)}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout cocher</button>
-                <button type="button" onClick={()=>setMpToutes('lbc', false)}
+                <button type="button" onClick={()=>setMpToutes(pl.cle, false)}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout décocher</button>
               </div>
             </div>
           </div>
-        )}
+          );
+        })}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(clamp(160px, 25%, 240px), 1fr))',gap:14}}>
           {annShown.map(it=>{
             const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };

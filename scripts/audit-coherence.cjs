@@ -131,7 +131,7 @@ if(appNeedsBord&&bgShipConst){
   //     l'atteindrait, donc la promesse ne s'afficherait JAMAIS, et on
   //     enverrait Julien chercher une mise à jour qui n'existe pas. C'est le
   //     défaut du zip, retourné.
-  const FONCTIONS = { codes:'capterRetraits', offres:'autoAccepterOffres', releve:'capterReleves', places:'mpChoisi' };
+  const FONCTIONS = { codes:'capterRetraits', offres:'autoAccepterOffres', releve:'capterReleves', places:'mpChoisi', ebay:'buildEbayData' };
   const t = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
   dit(!!t, "l'app tient une table des capacités de l'extension",
     "sans elle, chaque promesse « tout seul » est reprise à la main — et une seule était gardée");
