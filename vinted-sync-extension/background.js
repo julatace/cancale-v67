@@ -895,6 +895,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
           if (msg.action === 'getPhotos') { const r = await getPairPhotos(msg.numero); sendResponse({ ok: true, numero: r.numero, title: r.title, photos: r.photos }); return; }
           if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
+          // Les OCTETS des photos, pour les ATTACHER au formulaire au lieu de
+          // les télécharger sur son disque. Le fond les lit parce que le CDN de
+          // Vinted ne renvoie aucun en-tête CORS : la page seule ne peut pas.
+          if (msg.action === 'photoBytes' && Array.isArray(msg.urls)) { const ph = await photosEnOctets(msg.urls, msg.max); sendResponse({ ok: true, photos: ph }); return; }
           // Ce que la page Leboncoin porte vraiment. Aucune donnée d'annonce :
           // juste de quoi savoir si la capture a pu lire quelque chose. Sans ça,
           // « 0 annonce » et « je n'ai rien pu lire » sont le même silence.
@@ -902,7 +906,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             await storeLbcRecon({ capture: { source: msg.source, vues: msg.vues, compte: !!msg.compte, url: msg.url, a_next_data: !!msg.a_next_data, a_next_f: !!msg.a_next_f, at: new Date().toISOString() } });
             sendResponse({ ok: true }); return;
           }
-          if (msg.action === 'lbcForm' && Array.isArray(msg.fields)) { await storeLbcRecon({ form: { url: msg.url, fields: msg.fields, at: new Date().toISOString() } }); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcForm' && Array.isArray(msg.fields)) {
+            // ⚠️ UNE SEULE ÉTAPE NE SUFFIT PAS : le dépôt Leboncoin en compte
+            //    plusieurs, et je n'ai jamais vu que la première. On les garde
+            //    TOUTES (par signature), sinon la dernière écrase la seule que
+            //    j'avais — et je ne saurai jamais où vivent la catégorie, l'état
+            //    ou le champ photo. Noms de champs et libellés d'options
+            //    uniquement : aucun contenu saisi.
+            const prev = await sbGet('app_data?id=eq.lbc_recon&select=data');
+            if (prev !== null) {
+              const cur = (prev && prev[0] && prev[0].data) || {};
+              const etapes = Object.assign({}, cur.etapes || {});
+              etapes[String(msg.etape || msg.url || Object.keys(etapes).length)] =
+                { url: msg.url, fields: msg.fields, selects: msg.selects || [], fichiers: msg.fichiers || 0, at: new Date().toISOString() };
+              await storeLbcRecon({ form: { url: msg.url, fields: msg.fields, at: new Date().toISOString() }, etapes });
+            }
+            sendResponse({ ok: true }); return;
+          }
           if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
           if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
@@ -4754,7 +4774,8 @@ function buildLbcAd(raw, det, num, account) {
   parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
   parts.push('Réf. ' + ref);
   const description = parts.join('\n');
-  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
+  // marque/taille : le formulaire Leboncoin a des listes déroulantes pour ça.
+  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
 }
 // Extrait NOTRE numéro depuis n'importe quel texte d'annonce Leboncoin (titre +
 // description). Marche pour un compte PRO (numérotation auto ignorée) comme pour
@@ -5276,6 +5297,35 @@ async function getPairPhotos(numero) {
 }
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans
 // un sous-dossier VRM-{N°} pour les retrouver et les glisser dans Leboncoin.
+// ⚠️⚠️ LE MUR DES PHOTOS N'EXISTE PAS — CE QUE J'AVAIS ÉCRIT ÉTAIT FAUX.
+// Le dossier affirmait : « les photos ne peuvent pas être injectées (un
+// navigateur interdit de remplir un champ fichier par programme) ». **Mesuré le
+// 13 septembre dans Chromium** : ce qui est interdit, c'est d'écrire
+// `input.value = '/chemin/photo.jpg'`. En revanche `input.files =
+// dataTransfer.files` MARCHE — la page reçoit un vrai `File` (nom, taille,
+// type), l'événement `change` part, et le glisser-déposer synthétique marche
+// aussi. Julien : « ça me fait télécharger des photos dans mon ordi » — il
+// n'avait pas à les télécharger du tout.
+// ⇒ Le fond récupère les OCTETS (il a les permissions d'hôte ; le CDN de Vinted
+//   ne renvoie aucun en-tête CORS, donc la page seule ne peut pas les lire) et
+//   les passe au panneau, qui les attache. Rien ne touche son disque.
+async function photosEnOctets(urls, max) {
+  const out = [];
+  for (const u of (urls || []).slice(0, max || 12)) {
+    try {
+      const r = await fetch(String(u));
+      if (!r.ok) { out.push({ url: u, erreur: 'http ' + r.status }); continue; }
+      const buf = new Uint8Array(await r.arrayBuffer());
+      if (!buf.length) { out.push({ url: u, erreur: 'vide' }); continue; }
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      const type = r.headers.get('content-type') || 'image/jpeg';
+      out.push({ url: u, b64: btoa(bin), type: type.split(';')[0].trim(), taille: buf.length });
+    } catch (e) { out.push({ url: u, erreur: String((e && e.message) || e).slice(0, 60) }); }
+  }
+  return out;
+}
+
 async function downloadPhotos(urls, numero) {
   if (!chrome.downloads) return 0;
   const list = urls.filter(Boolean); let n = 0;

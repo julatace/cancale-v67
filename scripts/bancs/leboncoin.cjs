@@ -31,7 +31,14 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot
+  <main>${depot === 'etape2'
+    ? '<label for="s2">Titre de l’annonce</label><input id="s2" name="subject" type="text">'
+      + '<label for="d2">Description</label><textarea id="d2" name="body"></textarea>'
+      + '<label for="p2">Prix</label><input id="p2" name="price" type="text">'
+      + '<label for="c2">Catégorie</label><select id="c2" name="category"><option value=""></option><option value="1">Vêtements</option><option value="2">Chaussures</option><option value="3">Sacs à main</option></select>'
+      + '<label for="e2">État</label><select id="e2" name="condition"><option value=""></option><option value="1">Neuf</option><option value="2">Très bon état</option><option value="3">Satisfaisant</option></select>'
+      + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple accept="image/*">'
+    : depot
     ? '<label for="s1">Que proposez-vous aujourd’hui ?</label><input id="s1" name="subject" type="text">'
     : '<h1>Annonces</h1><aside><label for="pmin">Prix min</label><input id="pmin" name="price_min" type="text">'
       + '<label for="pmax">Prix max</label><input id="pmax" name="price_max" type="text"></aside>'}</main>
@@ -53,7 +60,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -363,10 +370,12 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(idPrepare === '1001', 'le bouton « Tout préparer » existe sur la carte voulue');
     await p5.waitForTimeout(900);
     dit(!e5.length, 'aucune erreur pendant « Tout préparer »', e5[0] || '');
-    dit(!!vus.photos && (vus.photos.urls || []).length === 3, 'il demande le téléchargement des 3 photos',
-      vus.photos ? (vus.photos.urls || []).length + ' url(s)' : 'aucune demande de photos');
-    dit(!!vus.photos && vus.photos.numero === '401', 'et elles vont dans le dossier de la paire (VRM-401)',
-      vus.photos ? 'numero=' + vus.photos.numero : '');
+    // ⚠️ CES DEUX CONTRÔLES EXIGEAIENT LE TÉLÉCHARGEMENT — le comportement que
+    //    Julien a signalé (« ça me fait télécharger des photos dans mon ordi »)
+    //    et que j'ai retiré. Un contrôle qui garde l'ancienne règle rend le
+    //    correctif rouge : c'est la règle NOUVELLE qu'il doit mesurer.
+    dit(!vus.photos, '« Tout préparer » ne télécharge RIEN sur son ordinateur',
+      vus.photos ? 'il a demandé ' + (vus.photos.urls || []).length + ' téléchargement(s)' : 'les photos partiront par le formulaire');
     // ⚠️ CELUI-CI EST LE PLUS IMPORTANT : sans la paire mémorisée, le nouvel
     //    onglet ne sait pas laquelle remplir — c'est le défaut qui obligeait à
     //    tout recoller à la main.
@@ -381,6 +390,64 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       'c\'est elle qui relie l\'annonce à la paire — sans elle, plus de retrait automatique');
     dit(/TITRE|DESCRIPTION|PRIX/.test(String(vus.copie || '')), 'et il est complet (titre, description, prix)');
     await p5.close();
+  }
+
+  // ── LES PHOTOS S'ATTACHENT, ET LA CATÉGORIE SE CHOISIT ────────────────────
+  // ⚠️⚠️ LE DOSSIER AFFIRMAIT QUE C'ÉTAIT IMPOSSIBLE, ET C'ÉTAIT FAUX (je
+  // l'avais écrit). Ce qui est interdit c'est `input.value = '/chemin/…'` ;
+  // `input.files = dataTransfer.files` marche. Mesuré dans Chromium, puis ici
+  // sur le VRAI `lbc.js`. Julien : « ça me fait télécharger des photos dans mon
+  // ordi ça ne met pas la catégorie ni le reste » — les deux sont traités.
+  {
+    const p6 = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const e6 = []; p6.on('pageerror', (e) => e6.push(e.message));
+    let telechargements = 0;
+    await p6.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+      const t = r.request().resourceType();
+      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
+    });
+    await p6.addInitScript((d) => {
+      const JPEG = 'ffd8ffe000104a46494600010100000100010000ffd9';
+      const b64 = (() => { const bin = JPEG.match(/../g).map(h => String.fromCharCode(parseInt(h, 16))).join(''); return btoa(bin); })();
+      window.__dl = 0;
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        if (m && m.action === 'photoBytes') return rep({ ok: true, photos: (m.urls || []).map((u) => ({ url: u, b64, type: 'image/jpeg', taille: 22 })) });
+        if (m && m.action === 'downloadPhotos') { window.__dl++; return rep({ ok: true, count: 0 }); }
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad: QUEUE[0] });
+    await p6.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    await p6.addScriptTag({ content: SRC });
+    await p6.waitForTimeout(2600);           // la surveillance tourne à la seconde
+    const etat = await p6.evaluate(() => ({
+      photos: (document.querySelector('input[name="images"]') || {}).files ? document.querySelector('input[name="images"]').files.length : -1,
+      noms: document.querySelector('input[name="images"]') ? [...document.querySelector('input[name="images"]').files].map(f => f.name + ':' + f.type) : [],
+      categorie: (document.querySelector('select[name="category"]') || {}).value || '',
+      catTexte: (() => { const s2 = document.querySelector('select[name="category"]'); return s2 && s2.selectedIndex >= 0 ? s2.options[s2.selectedIndex].textContent : ''; })(),
+      etatSel: (() => { const s2 = document.querySelector('select[name="condition"]'); return s2 && s2.selectedIndex >= 0 ? s2.options[s2.selectedIndex].textContent : ''; })(),
+      titre: (document.querySelector('input[name="subject"]') || {}).value || '',
+      prix: (document.querySelector('input[name="price"]') || {}).value || '',
+      desc: (document.querySelector('textarea[name="body"]') || {}).value || '',
+      dl: window.__dl,
+      bandeau: (document.getElementById('vrm-lbc-banner') || {}).innerText || '',
+    }));
+    dit(!e6.length, 'aucune erreur sur la page de dépôt', e6[0] || '');
+    dit(etat.photos === 3, 'les 3 photos sont ATTACHÉES au champ fichier',
+      etat.photos + ' fichier(s) — ' + (etat.noms[0] || 'aucun'));
+    dit(/^VRM-401-1\.jpg:image\/jpeg$/.test(etat.noms[0] || ''), 'et elles portent le nom de la paire et le bon type',
+      etat.noms[0] || 'aucun');
+    dit(etat.dl === 0, 'RIEN n\'est téléchargé sur son ordinateur',
+      etat.dl ? 'il y a eu ' + etat.dl + ' téléchargement(s) : c\'est ce dont il se plaint' : '');
+    dit(/Chaussures/.test(etat.catTexte || ''), 'la CATÉGORIE est choisie', 'choisi : « ' + etat.catTexte + ' »');
+    dit(/état/i.test(etat.etatSel || ''), 'et l\'état aussi', 'choisi : « ' + etat.etatSel + ' »');
+    dit(etat.titre === QUEUE[0].title && !!etat.prix && !!etat.desc, 'titre, prix et description sont remplis',
+      'titre « ' + etat.titre.slice(0, 24) + ' » · prix ' + etat.prix);
+    // Le bandeau écrit le CHIFFRE, jamais « c'est prêt ».
+    dit(/3 photos attachées/.test(etat.bandeau), 'le bandeau écrit combien de photos ont été attachées',
+      (etat.bandeau || '').replace(/\n/g, ' ').slice(0, 90));
+    await p6.close();
   }
 
   await b.close(); srv.close();

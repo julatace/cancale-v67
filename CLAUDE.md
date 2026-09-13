@@ -1092,6 +1092,45 @@ rendue **3 fois pour 1 vente prouvée** ».
   entrées (8 cas réels). Sans ça l'app en montre un et l'extension en publie un
   autre. **7 échecs** sur le code d'avant.
 
+### ⚠️⚠️ « TROUVE UN MOYEN DE LE FAIRE » — ET LE MUR QUE J'ANNONÇAIS N'EXISTAIT PAS
+Julien, 13 septembre : « ça me fait télécharger des photos dans mon ordi, ça ne
+met pas la catégorie ni le reste donc bon », puis « **trouve un moyen de le
+faire** ».
+
+J'avais refusé la publication automatique sur **deux** arguments. Le premier
+était **faux**, et je l'avais écrit deux fois dans ce dossier sans jamais
+l'essayer : « un navigateur interdit de remplir un champ fichier par
+programme ». **Mesuré dans Chromium** : ce qui est interdit, c'est
+`input.value = '/chemin/photo.jpg'`. **`input.files = dataTransfer.files`
+marche** — la page reçoit un vrai `File` (nom, taille, type), l'événement
+`change` part, et le glisser-déposer synthétique marche aussi.
+⇒ *Une impossibilité qu'on n'a pas mesurée est une opinion.* Avant d'écrire
+« c'est impossible », l'essayer — ça coûtait dix lignes et un banc.
+
+**Ce qui est livré (mesuré au banc sur le VRAI `lbc.js`)** :
+- **Les photos s'ATTACHENT au formulaire** — plus rien ne touche son disque. Le
+  fond lit les octets (le CDN Vinted n'a pas d'en-tête CORS, la page seule ne
+  peut pas), le panneau fabrique les `File` nommés `VRM-{n°}-{i}.jpg` et les
+  attache. **3 photos attachées, 0 téléchargement** au banc ; **6 échecs** sur le
+  code d'avant, dont « il a demandé 3 téléchargements » et « 0 fichier attaché ».
+- **La catégorie et l'état sont choisis.** Les listes déroulantes ne sont pas des
+  `input` : `findField` ne les voyait même pas — c'est *exactement* pourquoi « ça
+  ne met pas la catégorie ». `choisirListe` ne retient une option que si son
+  libellé **correspond vraiment** ; sinon elle laisse vide. *Une catégorie fausse
+  fait plus de mal que pas de catégorie* (leçon eBay), et on ne prend jamais « le
+  premier de la liste ».
+- **Le bandeau écrit le CHIFFRE** : « 3 photos attachées », ou la raison quand il
+  n'y en a aucune. Jamais « ton annonce est prête ».
+
+⚠️ **CE QUI MANQUE ENCORE POUR PUBLIER TOUT SEUL, ET C'EST MESURABLE** : le dépôt
+Leboncoin est un formulaire **en étapes**, et je n'en ai jamais vu qu'**une**
+(`lbc_recon`, 2 août : un seul champ, `name="subject"`). L'extension enregistre
+désormais **chaque étape distincte** (`lbc_recon.etapes` — noms de champs,
+libellés d'options, présence d'un champ fichier ; **aucun contenu saisi**). Un
+seul dépôt fait à la main suffit à me donner la carte complète. **Ne pas écrire
+le clic « Publier » avant d'avoir ces étapes** : ce serait promettre ce qu'on n'a
+pas mesuré, le défaut le plus coûteux du projet.
+
 ### eBay : deuxième place, même modèle — et le défaut d'eBay est **NON**
 Julien a confirmé le 12 septembre : « **j'ai les deux** » (compte particulier ET
 professionnel). L'assistant eBay est donc livré sur le modèle de Leboncoin :
@@ -1115,8 +1154,15 @@ champs qu'il **reconnaît**. Aucune publication automatique.
   pour que le prochain passage vise juste. *Mesurer d'abord* appliqué à ce que
   je ne peux pas mesurer moi-même : on fait mesurer par ce qui y a accès.
   **Ne pas écrire « ton annonce est prête » — écrire le chiffre.**
-- Les photos ne peuvent **pas** être injectées (un navigateur interdit de
-  remplir un champ fichier par programme) — dit à l'écran, pas contourné.
+- ⚠️⚠️ **CETTE LIGNE DISAIT L'INVERSE, ET ELLE ÉTAIT FAUSSE** : « les photos ne
+  peuvent pas être injectées, un navigateur interdit de remplir un champ fichier
+  par programme ». **Mesuré le 13 septembre dans Chromium** : ce qui est interdit
+  c'est `input.value = '/chemin/photo.jpg'` ; **`input.files =
+  dataTransfer.files` marche** — la page reçoit un vrai `File` (nom, taille,
+  type), `change` part, et le glisser-déposer synthétique marche aussi. Je l'ai
+  écrit deux fois dans ce dossier sans jamais l'avoir essayé. *Une impossibilité
+  qu'on n'a pas mesurée est une opinion.* Voir Leboncoin ci-dessus — à reporter
+  sur eBay au prochain passage.
 - `EXT_CAPACITES.ebay = '5.55.0'`, et `audit-places.cjs` couvre les deux places.
   ⚠️ Son premier jet **mourait** sur le code d'avant (`buildEbayData` n'existe
   pas → `TypeError`), donc les contrôles suivants n'étaient jamais rendus : *un
